@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/newsfeed"
 	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 
@@ -186,7 +187,7 @@ type Messenger struct {
 	unhandledMessagesTracker func(*v1protocol.StatusMessage, error)
 
 	// enables control over chat messages iteration
-	retrievedMessagesIteratorFactory func(map[messaging.ChatFilter][]*wakutypes.Message) MessagesIterator
+	retrievedMessagesIteratorFactory func(map[messagingtypes.ChatFilter][]*wakutypes.Message) MessagesIterator
 
 	peersyncing         *peersyncing.PeerSyncing
 	peersyncingOffers   map[string]uint64
@@ -200,7 +201,7 @@ type Messenger struct {
 }
 
 type EnvelopeEventsInterceptor struct {
-	EnvelopeEventsHandler messaging.EnvelopeEventsHandler
+	EnvelopeEventsHandler messagingtypes.EnvelopeEventsHandler
 	Messenger             *Messenger
 }
 
@@ -972,7 +973,7 @@ func (m *Messenger) cleanTopics() error {
 	if m.mailserversDatabase == nil {
 		return nil
 	}
-	var filters messaging.ChatFilters
+	var filters messagingtypes.ChatFilters
 	for _, f := range m.messaging.ChatFilters() {
 		if f.Listen && !f.Ephemeral {
 			filters = append(filters, f)
@@ -3175,7 +3176,7 @@ func (m *Messenger) shouldSkipDuplicate(messageType protobuf.ApplicationMetadata
 	return true
 }
 
-func (m *Messenger) handleImportedMessages(messagesToHandle map[messaging.ChatFilter][]*wakutypes.Message) error {
+func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.ChatFilter][]*wakutypes.Message) error {
 
 	messageState := m.buildMessageState()
 
@@ -3316,7 +3317,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[messaging.ChatFi
 	return nil
 }
 
-func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messaging.ChatFilter][]*wakutypes.Message, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
+func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.ChatFilter][]*wakutypes.Message, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
 
 	m.handleMessagesMutex.Lock()
 	defer m.handleMessagesMutex.Unlock()

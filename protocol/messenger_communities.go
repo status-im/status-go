@@ -25,7 +25,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 
 	"github.com/status-im/status-go/account"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
@@ -955,7 +955,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 	chats := CreateCommunityChats(community, m.getTimesource())
 
 	for _, chat := range chats {
-		publicChatsToInit = append(publicChatsToInit, &messaging.ChatToInitialize{ChatID: chat.ID, PubsubTopic: community.PubsubTopic()})
+		publicChatsToInit = append(publicChatsToInit, &messagingtypes.ChatToInitialize{ChatID: chat.ID, PubsubTopic: community.PubsubTopic()})
 
 	}
 
@@ -968,7 +968,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 	if community.IsControlNode() {
 		// Init the community filter so we can receive messages on the community
 
-		communityFilters, err := m.InitCommunityFilters(messaging.CommunitiesToInitialize{{
+		communityFilters, err := m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
 			Shard:   community.Shard(),
 			PrivKey: community.PrivateKey(),
 		}})
@@ -2394,11 +2394,11 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	var chats []*Chat
-	var publicFiltersToInit messaging.ChatsToInitialize
+	var publicFiltersToInit messagingtypes.ChatsToInitialize
 	for chatID, chat := range changes.ChatsAdded {
 		c := CreateCommunityChat(changes.Community.IDString(), chatID, chat, m.getTimesource())
 		chats = append(chats, c)
-		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: changes.Community.PubsubTopic()})
+		publicFiltersToInit = append(publicFiltersToInit, &messagingtypes.ChatToInitialize{ChatID: c.ID, PubsubTopic: changes.Community.PubsubTopic()})
 
 		response.AddChat(c)
 	}
@@ -2436,11 +2436,11 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	var chats []*Chat
-	var publicFiltersToInit messaging.ChatsToInitialize
+	var publicFiltersToInit messagingtypes.ChatsToInitialize
 	for chatID, change := range changes.ChatsModified {
 		c := CreateCommunityChat(community.IDString(), chatID, change.ChatModified, m.getTimesource())
 		chats = append(chats, c)
-		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: community.PubsubTopic()})
+		publicFiltersToInit = append(publicFiltersToInit, &messagingtypes.ChatToInitialize{ChatID: c.ID, PubsubTopic: community.PubsubTopic()})
 		response.AddChat(c)
 	}
 
@@ -2479,11 +2479,11 @@ func (m *Messenger) DeleteCommunityChat(communityID types.HexBytes, chatID strin
 	return response, nil
 }
 
-func (m *Messenger) InitCommunityFilters(c messaging.CommunitiesToInitialize) (messaging.ChatFilters, error) {
+func (m *Messenger) InitCommunityFilters(c messagingtypes.CommunitiesToInitialize) (messagingtypes.ChatFilters, error) {
 	return m.messaging.InitCommunities(c)
 }
 
-func (m *Messenger) DefaultFilters(o *communities.Community) messaging.ChatsToInitialize {
+func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.ChatsToInitialize {
 	cID := o.IDString()
 	uncompressedPubKey := common.PubkeyToHex(o.PublicKey())[2:]
 	updatesChannelID := o.StatusUpdatesChannelID()
@@ -2492,7 +2492,7 @@ func (m *Messenger) DefaultFilters(o *communities.Community) messaging.ChatsToIn
 
 	communityPubsubTopic := o.PubsubTopic()
 
-	chats := messaging.ChatsToInitialize{
+	chats := messagingtypes.ChatsToInitialize{
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
 		{ChatID: updatesChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},
@@ -2529,7 +2529,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	}
 
 	// Init the community filter so we can receive messages on the community
-	_, err = m.InitCommunityFilters(messaging.CommunitiesToInitialize{{
+	_, err = m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
 		Shard:   community.Shard(),
 		PrivKey: community.PrivateKey(),
 	}})
@@ -2706,7 +2706,7 @@ func (m *Messenger) GetCommunityStorenodes(communityID types.HexBytes) (*Messeng
 
 func (m *Messenger) UpdateCommunityFilters(community *communities.Community) error {
 	defaultFilters := m.DefaultFilters(community)
-	publicFiltersToInit := make(messaging.ChatsToInitialize, 0, len(defaultFilters)+len(community.Chats()))
+	publicFiltersToInit := make(messagingtypes.ChatsToInitialize, 0, len(defaultFilters)+len(community.Chats()))
 
 	publicFiltersToInit = append(publicFiltersToInit, defaultFilters...)
 	for _, filter := range defaultFilters {
@@ -2721,7 +2721,7 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 		if err != nil {
 			return err
 		}
-		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: communityChatID, PubsubTopic: community.PubsubTopic()})
+		publicFiltersToInit = append(publicFiltersToInit, &messagingtypes.ChatToInitialize{ChatID: communityChatID, PubsubTopic: community.PubsubTopic()})
 	}
 
 	_, err := m.messaging.InitPublicChats(publicFiltersToInit)
@@ -2730,7 +2730,7 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 	}
 
 	// Init the community filter so we can receive messages on the community
-	_, err = m.InitCommunityFilters(messaging.CommunitiesToInitialize{{
+	_, err = m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
 		Shard:   community.Shard(),
 		PrivKey: community.PrivateKey(),
 	}})
@@ -3401,7 +3401,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	// Update relevant chats names and add new ones
 	// Currently removal is not supported
 	chats := CreateCommunityChats(community, state.Timesource)
-	var publicFiltersToInit messaging.ChatsToInitialize
+	var publicFiltersToInit messagingtypes.ChatsToInitialize
 	for i, chat := range chats {
 
 		oldChat, ok := state.AllChats.Load(chat.ID)
@@ -3410,7 +3410,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 			state.AllChats.Store(chat.ID, chats[i])
 
 			state.Response.AddChat(chat)
-			publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{
+			publicFiltersToInit = append(publicFiltersToInit, &messagingtypes.ChatToInitialize{
 				ChatID:      chat.ID,
 				PubsubTopic: community.PubsubTopic(),
 			})

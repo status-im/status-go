@@ -13,6 +13,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/wakuv2"
 
 	"go.uber.org/zap"
@@ -199,7 +200,7 @@ func (m *StoreNodeRequestManager) subscribeToRequest(ctx context.Context, reques
 	if !requestFound {
 		// Create corresponding filter
 		var err error
-		var filter *messaging.ChatFilter
+		var filter *messagingtypes.ChatFilter
 		filterCreated := false
 
 		filter, filterCreated, err = m.getFilter(requestType, dataID, shard)
@@ -237,7 +238,7 @@ func (m *StoreNodeRequestManager) newStoreNodeRequest(ctx context.Context) *stor
 
 // getFilter checks if a filter for a given community is already created and creates one of not found.
 // Returns the found/created filter, a flag if the filter was created by the function and an error.
-func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, dataID string, shard *wakuv2.Shard) (*messaging.ChatFilter, bool, error) {
+func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, dataID string, shard *wakuv2.Shard) (*messagingtypes.ChatFilter, bool, error) {
 	// First check if such filter already exists.
 	filter := m.messenger.messaging.ChatFilterByChatID(dataID)
 	if filter != nil {
@@ -249,7 +250,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 	case storeNodeShardRequest, storeNodeCommunityRequest:
 		// If filter wasn't installed we create it and
 		// remember for uninstalling after response is received
-		filters, err := m.messenger.messaging.InitPublicChats(messaging.ChatsToInitialize{{
+		filters, err := m.messenger.messaging.InitPublicChats(messagingtypes.ChatsToInitialize{{
 			ChatID:      dataID,
 			PubsubTopic: shard.PubsubTopic(),
 		}})
@@ -291,8 +292,8 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 }
 
 // forgetFilter uninstalls the given filter
-func (m *StoreNodeRequestManager) forgetFilter(filter *messaging.ChatFilter) {
-	err := m.messenger.messaging.RemoveFilters(messaging.ChatFilters{filter})
+func (m *StoreNodeRequestManager) forgetFilter(filter *messagingtypes.ChatFilter) {
+	err := m.messenger.messaging.RemoveFilters(messagingtypes.ChatFilters{filter})
 	if err != nil {
 		m.logger.Warn("failed to remove filter", zap.Error(err))
 	}
@@ -319,7 +320,7 @@ type storeNodeRequest struct {
 	config           StoreNodeRequestConfig
 
 	// request corresponding metadata to be used in finalize
-	filterToForget *messaging.ChatFilter
+	filterToForget *messagingtypes.ChatFilter
 
 	// internal fields
 	manager       *StoreNodeRequestManager

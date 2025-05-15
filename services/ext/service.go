@@ -32,7 +32,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -124,7 +124,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		return err
 	}
 
-	envelopeEventsConfig := &messaging.EnvelopeEventsConfig{
+	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
 		MaxMessageDeliveryAttempts: s.config.ShhextConfig.MaxMessageDeliveryAttempts,
 		MailServerConfirmations:    s.config.ShhextConfig.MailServerConfirmations,
 		EnvelopeEventsHandler:      EnvelopeSignalHandler{},
@@ -354,7 +354,7 @@ func buildMessengerOptions(
 	rpcClient *rpc.Client,
 	multiAccounts *multiaccounts.Database,
 	account *multiaccounts.Account,
-	envelopeEventsConfig *messaging.EnvelopeEventsConfig,
+	envelopeEventsConfig *messagingtypes.EnvelopeEventsConfig,
 	accountsDB *accounts.Database,
 	walletService *wallet.Service,
 	communityTokensService *communitytokens.Service,

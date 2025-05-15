@@ -27,7 +27,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
@@ -3642,7 +3642,7 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	message.Payload = wrappedPayload
 
 	filter := s.alice.messaging.ChatFilterByChatID(chat.ID)
-	importedMessages := make(map[messaging.ChatFilter][]*wakutypes.Message, 0)
+	importedMessages := make(map[messagingtypes.ChatFilter][]*wakutypes.Message, 0)
 
 	importedMessages[*filter] = append(importedMessages[*filter], message)
 

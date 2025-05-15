@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/datasync"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 	"github.com/status-im/status-go/protocol/encryption"
@@ -1287,7 +1288,7 @@ func (s *MessageSender) notifyOnScheduledMessage(recipient *ecdsa.PublicKey, mes
 	}
 }
 
-func (s *MessageSender) JoinPublic(id string) (*messaging.ChatFilter, error) {
+func (s *MessageSender) JoinPublic(id string) (*messagingtypes.ChatFilter, error) {
 	return s.messaging.JoinPublicChat(id)
 }
 

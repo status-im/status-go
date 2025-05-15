@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -42,7 +42,7 @@ func (tmm *ArchiveManagerNop) IsReady() bool {
 	return false
 }
 
-func (tmm *ArchiveManagerNop) GetCommunityChatsFilters(communityID types.HexBytes) (messaging.ChatFilters, error) {
+func (tmm *ArchiveManagerNop) GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error) {
 	return nil, nil
 }
 

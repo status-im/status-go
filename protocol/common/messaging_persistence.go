@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/status-im/status-go/messaging"
+	"github.com/status-im/status-go/messaging/types"
 )
 
 const tableName = "wakuv2_keys"
@@ -15,7 +15,7 @@ type messagingPersistence struct {
 	db *sql.DB
 }
 
-var _ messaging.Persistence = (*messagingPersistence)(nil)
+var _ types.Persistence = (*messagingPersistence)(nil)
 
 func NewMessagingPersistence(db *sql.DB) *messagingPersistence {
 	return &messagingPersistence{db: db}

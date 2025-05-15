@@ -11,8 +11,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging/transport"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/messaging/adapters"
+	"github.com/status-im/status-go/messaging/layers/transport"
+	"github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 )
@@ -27,97 +29,97 @@ func NewAPI(transport *transport.Transport) *API {
 	}
 }
 
-func (a *API) InitChats(chats ChatsToInitialize, publicKeys []*ecdsa.PublicKey) error {
-	_, err := a.transport.InitFilters(chats.toFilters(), publicKeys)
+func (a *API) InitChats(chats types.ChatsToInitialize, publicKeys []*ecdsa.PublicKey) error {
+	_, err := a.transport.InitFilters(adapters.ChatsToInitializeToTransport(chats), publicKeys)
 	return err
 }
 
-func (a *API) InitPublicChats(chats ChatsToInitialize) (ChatFilters, error) {
-	filters, err := a.transport.InitPublicFilters(chats.toFilters())
-	return fromTransportFilters(filters), err
+func (a *API) InitPublicChats(chats types.ChatsToInitialize) (types.ChatFilters, error) {
+	filters, err := a.transport.InitPublicFilters(adapters.ChatsToInitializeToTransport(chats))
+	return adapters.FromTransportFilters(filters), err
 }
 
-func (a *API) InitCommunities(communities CommunitiesToInitialize) (ChatFilters, error) {
-	filters, err := a.transport.InitCommunityFilters(communities.toFilters())
-	return fromTransportFilters(filters), err
+func (a *API) InitCommunities(communities types.CommunitiesToInitialize) (types.ChatFilters, error) {
+	filters, err := a.transport.InitCommunityFilters(adapters.CommunitiesToInitializeToTransport(communities))
+	return adapters.FromTransportFilters(filters), err
 }
 
-func (a *API) ChatFilters() ChatFilters {
-	return fromTransportFilters(a.transport.Filters())
+func (a *API) ChatFilters() types.ChatFilters {
+	return adapters.FromTransportFilters(a.transport.Filters())
 }
 
-func (a *API) ChatFilterByChatID(chatID string) *ChatFilter {
-	return fromTransportFilter(a.transport.FilterByChatID(chatID))
+func (a *API) ChatFilterByChatID(chatID string) *types.ChatFilter {
+	return adapters.FromTransportFilter(a.transport.FilterByChatID(chatID))
 }
 
-func (a *API) ChatFilterByTopic(topic []byte) *ChatFilter {
-	return fromTransportFilter(a.transport.FilterByTopic(topic))
+func (a *API) ChatFilterByTopic(topic []byte) *types.ChatFilter {
+	return adapters.FromTransportFilter(a.transport.FilterByTopic(topic))
 }
 
-func (a *API) ChatFiltersByIdentities(identities []string) ChatFilters {
-	return fromTransportFilters(a.transport.FiltersByIdentities(identities))
+func (a *API) ChatFiltersByIdentities(identities []string) types.ChatFilters {
+	return adapters.FromTransportFilters(a.transport.FiltersByIdentities(identities))
 }
 
-func (a *API) RemoveFilters(filters ChatFilters) error {
-	return a.transport.RemoveFilters(filters.toTransportFilters())
+func (a *API) RemoveFilters(filters types.ChatFilters) error {
+	return a.transport.RemoveFilters(adapters.ToTransportFilters(filters))
 }
 
-func (a *API) RemoveFilterByChatID(chatID string) (*ChatFilter, error) {
+func (a *API) RemoveFilterByChatID(chatID string) (*types.ChatFilter, error) {
 	filter, err := a.transport.RemoveFilterByChatID(chatID)
 	if err != nil {
 		return nil, err
 	}
-	return fromTransportFilter(filter), nil
+	return adapters.FromTransportFilter(filter), nil
 }
 
 func (a *API) ResetChatFilters(ctx context.Context) error {
 	return a.transport.ResetFilters(ctx)
 }
 
-func (a *API) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*ChatFilter, error) {
+func (a *API) ProcessNegotiatedSecret(secret ethtypes.NegotiatedSecret) (*types.ChatFilter, error) {
 	filter, err := a.transport.ProcessNegotiatedSecret(secret)
 	if err != nil {
 		return nil, err
 	}
-	return fromTransportFilter(filter), nil
+	return adapters.FromTransportFilter(filter), nil
 }
 
-func (a *API) JoinPublicChat(chatID string) (*ChatFilter, error) {
+func (a *API) JoinPublicChat(chatID string) (*types.ChatFilter, error) {
 	filter, err := a.transport.JoinPublic(chatID)
 	if err != nil {
 		return nil, err
 	}
-	return fromTransportFilter(filter), nil
+	return adapters.FromTransportFilter(filter), nil
 }
 
-func (a *API) JoinPrivateChat(publicKey *ecdsa.PublicKey) (*ChatFilter, error) {
+func (a *API) JoinPrivateChat(publicKey *ecdsa.PublicKey) (*types.ChatFilter, error) {
 	filter, err := a.transport.JoinPrivate(publicKey)
 	if err != nil {
 		return nil, err
 	}
-	return fromTransportFilter(filter), nil
+	return adapters.FromTransportFilter(filter), nil
 }
 
-func (a *API) JoinGroupChat(publicKeys []*ecdsa.PublicKey) (ChatFilters, error) {
+func (a *API) JoinGroupChat(publicKeys []*ecdsa.PublicKey) (types.ChatFilters, error) {
 	filters, err := a.transport.JoinGroup(publicKeys)
 	if err != nil {
 		return nil, err
 	}
-	return fromTransportFilters(filters), nil
+	return adapters.FromTransportFilters(filters), nil
 }
 
 func (a *API) GetStats() wakutypes.StatsSummary {
 	return a.transport.GetStats()
 }
 
-func (a *API) RetrieveRawAll() (map[ChatFilter][]*wakutypes.Message, error) {
+func (a *API) RetrieveRawAll() (map[types.ChatFilter][]*wakutypes.Message, error) {
 	filters, err := a.transport.RetrieveRawAll()
 	if err != nil {
 		return nil, err
 	}
-	chatFilters := make(map[ChatFilter][]*wakutypes.Message)
+	chatFilters := make(map[types.ChatFilter][]*wakutypes.Message)
 	for k, v := range filters {
-		chatFilters[*fromTransportFilter(&k)] = v
+		chatFilters[*adapters.FromTransportFilter(&k)] = v
 	}
 	return chatFilters, nil
 }
@@ -138,16 +140,16 @@ func (a *API) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *wakuty
 	return a.transport.SendPrivateOnPersonalTopic(ctx, newMessage, publicKey)
 }
 
-func (a *API) PersonalTopicFilter() *ChatFilter {
-	return fromTransportFilter(a.transport.PersonalTopicFilter())
+func (a *API) PersonalTopicFilter() *types.ChatFilter {
+	return adapters.FromTransportFilter(a.transport.PersonalTopicFilter())
 }
 
-func (a *API) LoadKeyFilters(key *ecdsa.PrivateKey) (*ChatFilter, error) {
+func (a *API) LoadKeyFilters(key *ecdsa.PrivateKey) (*types.ChatFilter, error) {
 	filter, err := a.transport.LoadKeyFilters(key)
 	if err != nil {
 		return nil, err
 	}
-	return fromTransportFilter(filter), nil
+	return adapters.FromTransportFilter(filter), nil
 }
 
 func (a *API) SendCommunityMessage(ctx context.Context, newMessage *wakutypes.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
@@ -190,7 +192,7 @@ func (a *API) CleanMessagesProcessed(timestamp uint64) error {
 	return a.transport.CleanMessagesProcessed(timestamp)
 }
 
-func (a *API) SetEnvelopeEventsHandler(handler EnvelopeEventsHandler) error {
+func (a *API) SetEnvelopeEventsHandler(handler types.EnvelopeEventsHandler) error {
 	return a.transport.SetEnvelopeEventsHandler(handler)
 }
 
@@ -258,8 +260,8 @@ func (a *API) ConfirmMessageDelivered(messageID string) {
 	a.transport.ConfirmMessageDelivered(messageID)
 }
 
-func (a *API) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters ChatFilters) {
-	a.transport.SetCriteriaForMissingMessageVerification(peerInfo, filters.toTransportFilters())
+func (a *API) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters types.ChatFilters) {
+	a.transport.SetCriteriaForMissingMessageVerification(peerInfo, adapters.ToTransportFilters(filters))
 }
 
 func (a *API) GetActiveStorenode() peer.AddrInfo {

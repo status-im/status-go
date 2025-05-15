@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -74,7 +74,7 @@ type MessengerSignalsHandler interface {
 type config struct {
 	// systemMessagesTranslations holds translations for system-messages
 	systemMessagesTranslations *systemMessageTranslationsMap
-	envelopeEventsConfig       *messaging.EnvelopeEventsConfig
+	envelopeEventsConfig       *messagingtypes.EnvelopeEventsConfig
 
 	featureFlags     common.FeatureFlags
 	codeControlFlags common.CodeControlFlags
@@ -314,7 +314,7 @@ func WithAutoMessageDisabled() func(c *config) error {
 	}
 }
 
-func WithEnvelopeEventsConfig(emc *messaging.EnvelopeEventsConfig) Option {
+func WithEnvelopeEventsConfig(emc *messagingtypes.EnvelopeEventsConfig) Option {
 	return func(c *config) error {
 		c.envelopeEventsConfig = emc
 		return nil

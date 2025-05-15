@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -526,7 +527,7 @@ func (m *Messenger) addContact(ctx context.Context,
 	if !deprecation.ChatProfileDeprecated {
 		response.AddChat(profileChat)
 
-		err := m.messaging.InitChats(messaging.ChatsToInitialize{{ChatID: profileChat.ID}}, []*ecdsa.PublicKey{publicKey})
+		err := m.messaging.InitChats(messagingtypes.ChatsToInitialize{{ChatID: profileChat.ID}}, []*ecdsa.PublicKey{publicKey})
 		if err != nil {
 			return nil, err
 		}
@@ -1284,12 +1285,12 @@ func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, erro
 	return contact, nil
 }
 
-func (m *Messenger) scheduleSyncFiltersForContact(publicKey *ecdsa.PublicKey) (*messaging.ChatFilter, error) {
+func (m *Messenger) scheduleSyncFiltersForContact(publicKey *ecdsa.PublicKey) (*messagingtypes.ChatFilter, error) {
 	filter, err := m.messaging.JoinPrivateChat(publicKey)
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.scheduleSyncFilters(messaging.ChatFilters{filter})
+	_, err = m.scheduleSyncFilters(messagingtypes.ChatFilters{filter})
 	if err != nil {
 		return filter, err
 	}

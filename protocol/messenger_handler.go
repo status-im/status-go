@@ -12,7 +12,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/signal"
@@ -39,6 +38,7 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -1454,7 +1454,7 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 
 func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage) (*MessengerResponse, error) {
 
-	messagesToHandle := make(map[messaging.ChatFilter][]*wakutypes.Message)
+	messagesToHandle := make(map[messagingtypes.ChatFilter][]*wakutypes.Message)
 
 	for _, message := range archiveMessages {
 		filter := m.messaging.ChatFilterByTopic(message.Topic)
@@ -1472,8 +1472,8 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 		}
 	}
 
-	importedMessages := make(map[messaging.ChatFilter][]*wakutypes.Message, 0)
-	otherMessages := make(map[messaging.ChatFilter][]*wakutypes.Message, 0)
+	importedMessages := make(map[messagingtypes.ChatFilter][]*wakutypes.Message, 0)
+	otherMessages := make(map[messagingtypes.ChatFilter][]*wakutypes.Message, 0)
 
 	for filter, messages := range messagesToHandle {
 		for _, message := range messages {

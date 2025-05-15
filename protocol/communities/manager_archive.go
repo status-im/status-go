@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/signal"
@@ -227,13 +228,13 @@ func (m *ArchiveManager) IsReady() bool {
 		m.torrentClientStarted()
 }
 
-func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) (messaging.ChatFilters, error) {
+func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error) {
 	chatIDs, err := m.persistence.GetCommunityChatIDs(communityID)
 	if err != nil {
 		return nil, err
 	}
 
-	filters := messaging.ChatFilters{}
+	filters := messagingtypes.ChatFilters{}
 	for _, cid := range chatIDs {
 		filters = append(filters, m.messaging.ChatFilterByChatID(cid))
 	}
