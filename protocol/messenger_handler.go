@@ -11,16 +11,17 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
+	gocommon "github.com/status-im/status-go/v10/common"
 	"github.com/status-im/status-go/v10/services/accounts/accountsevent"
 	"github.com/status-im/status-go/v10/services/browsers"
 	"github.com/status-im/status-go/v10/signal"
-	gocommon "github.com/status-im/status-go/v10/common"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/google/uuid"
 
+	utils "github.com/status-im/status-go/v10/common"
 	"github.com/status-im/status-go/v10/eth-node/crypto"
 	"github.com/status-im/status-go/v10/eth-node/types"
 	"github.com/status-im/status-go/v10/images"
@@ -36,7 +37,6 @@ import (
 	"github.com/status-im/status-go/v10/protocol/requests"
 	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
 	"github.com/status-im/status-go/v10/protocol/verification"
-	utils "github.com/status-im/status-go/v10/common"
 
 	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
 	wakutypes "github.com/status-im/status-go/v10/waku/types"

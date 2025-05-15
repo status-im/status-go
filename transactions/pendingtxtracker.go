@@ -22,11 +22,11 @@ import (
 	"github.com/status-im/status-go/v10/rpc"
 	"github.com/status-im/status-go/v10/services/rpcfilters"
 	"github.com/status-im/status-go/v10/services/wallet/bigint"
+	"github.com/status-im/status-go/v10/services/wallet/common"
+	wallet_common "github.com/status-im/status-go/v10/services/wallet/common"
 	"github.com/status-im/status-go/v10/services/wallet/responses"
 	"github.com/status-im/status-go/v10/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/v10/services/wallet/walletevent"
-	"github.com/status-im/status-go/v10/services/wallet/common"
-	wallet_common "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 const (

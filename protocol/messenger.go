@@ -27,6 +27,8 @@ import (
 
 	"github.com/status-im/status-go/v10/account"
 	"github.com/status-im/status-go/v10/appmetrics"
+	gocommon "github.com/status-im/status-go/v10/common"
+	utils "github.com/status-im/status-go/v10/common"
 	"github.com/status-im/status-go/v10/connection"
 	"github.com/status-im/status-go/v10/contracts"
 	"github.com/status-im/status-go/v10/eth-node/crypto"
@@ -37,8 +39,6 @@ import (
 	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
 	"github.com/status-im/status-go/v10/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/v10/multiaccounts/common"
-	gocommon "github.com/status-im/status-go/v10/common"
-	utils "github.com/status-im/status-go/v10/common"
 
 	"github.com/status-im/status-go/v10/multiaccounts"
 	"github.com/status-im/status-go/v10/multiaccounts/accounts"

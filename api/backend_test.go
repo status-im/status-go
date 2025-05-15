@@ -36,13 +36,13 @@ import (
 	"github.com/status-im/status-go/v10/protocol/tt"
 	"github.com/status-im/status-go/v10/rpc"
 	"github.com/status-im/status-go/v10/services/typeddata"
+	"github.com/status-im/status-go/v10/services/wallet"
+	walletservice "github.com/status-im/status-go/v10/services/wallet"
 	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
 	"github.com/status-im/status-go/v10/signal"
 	"github.com/status-im/status-go/v10/sqlite"
 	"github.com/status-im/status-go/v10/t/helpers"
 	"github.com/status-im/status-go/v10/t/utils"
-	"github.com/status-im/status-go/v10/services/wallet"
-	walletservice "github.com/status-im/status-go/v10/services/wallet"
 	"github.com/status-im/status-go/v10/walletdatabase"
 )
 

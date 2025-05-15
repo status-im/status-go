@@ -23,9 +23,9 @@ import (
 
 	"go.uber.org/zap"
 
-	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
 	gocommon "github.com/status-im/status-go/v10/common"
 	utils "github.com/status-im/status-go/v10/common"
+	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
 
 	"github.com/status-im/status-go/v10/account"
 	multiaccountscommon "github.com/status-im/status-go/v10/multiaccounts/common"
