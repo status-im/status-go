@@ -1818,7 +1818,6 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 	message1 := &wakutypes.Message{
 		Hash:      []byte{1},
 		Sig:       []byte{2},
-		TTL:       1,
 		Timestamp: 2,
 		Payload:   []byte{3},
 	}
@@ -1828,12 +1827,10 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 	message2 := &wakutypes.Message{
 		Hash:      []byte{2},
 		Sig:       []byte{2},
-		TTL:       1,
 		Topic:     wakutypes.BytesToTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
-		P2P:       true,
 	}
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID2, keyID, message2))
@@ -1912,7 +1909,6 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 	message1 := &wakutypes.Message{
 		Hash:      []byte{1},
 		Sig:       []byte{2},
-		TTL:       1,
 		Timestamp: 2,
 		Payload:   []byte{3},
 	}
@@ -1922,12 +1918,10 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 	message2 := &wakutypes.Message{
 		Hash:      []byte{2},
 		Sig:       []byte{2},
-		TTL:       1,
 		Topic:     wakutypes.BytesToTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
-		P2P:       true,
 	}
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message2))
@@ -1935,12 +1929,10 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 	message3 := &wakutypes.Message{
 		Hash:      []byte{3},
 		Sig:       []byte{2},
-		TTL:       1,
 		Topic:     wakutypes.BytesToTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
-		P2P:       true,
 	}
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message3))

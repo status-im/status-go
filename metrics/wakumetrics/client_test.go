@@ -39,9 +39,8 @@ func createTestClient(t *testing.T) *Client {
 
 func createTestMessage(pubsubTopic string, contentTopic wakutypes.TopicType, payload []byte) *wakutypes.Message {
 	return &wakutypes.Message{
-		PubsubTopic: pubsubTopic,
-		Topic:       contentTopic,
-		Payload:     payload,
+		Topic:   contentTopic,
+		Payload: payload,
 	}
 }
 

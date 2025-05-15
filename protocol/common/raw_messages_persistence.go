@@ -331,14 +331,14 @@ func (db RawMessagesPersistence) InsertPendingConfirmation(confirmation *RawMess
 }
 
 func (db RawMessagesPersistence) SaveHashRatchetMessage(groupID []byte, keyID []byte, m *wakutypes.Message) error {
-	_, err := db.db.Exec(`INSERT INTO hash_ratchet_encrypted_messages(hash, sig, TTL, timestamp, topic, payload, dst, p2p, padding, group_id, key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, m.Hash, m.Sig, m.TTL, m.Timestamp, wakutypes.TopicTypeToByteArray(m.Topic), m.Payload, m.Dst, m.P2P, m.Padding, groupID, keyID)
+	_, err := db.db.Exec(`INSERT INTO hash_ratchet_encrypted_messages(hash, sig, timestamp, topic, payload, dst, padding, group_id, key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, m.Hash, m.Sig, m.Timestamp, wakutypes.TopicTypeToByteArray(m.Topic), m.Payload, m.Dst, m.Padding, groupID, keyID)
 	return err
 }
 
 func (db RawMessagesPersistence) GetHashRatchetMessages(keyID []byte) ([]*wakutypes.Message, error) {
 	var messages []*wakutypes.Message
 
-	rows, err := db.db.Query(`SELECT hash, sig, TTL, timestamp, topic, payload, dst, p2p, padding FROM hash_ratchet_encrypted_messages WHERE key_id = ?`, keyID)
+	rows, err := db.db.Query(`SELECT hash, sig, timestamp, topic, payload, dst, padding FROM hash_ratchet_encrypted_messages WHERE key_id = ?`, keyID)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +347,7 @@ func (db RawMessagesPersistence) GetHashRatchetMessages(keyID []byte) ([]*wakuty
 		var topic []byte
 		message := &wakutypes.Message{}
 
-		err := rows.Scan(&message.Hash, &message.Sig, &message.TTL, &message.Timestamp, &topic, &message.Payload, &message.Dst, &message.P2P, &message.Padding)
+		err := rows.Scan(&message.Hash, &message.Sig, &message.Timestamp, &topic, &message.Payload, &message.Dst, &message.Padding)
 		if err != nil {
 			return nil, err
 		}
