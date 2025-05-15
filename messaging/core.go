@@ -13,6 +13,7 @@ import (
 )
 
 type Core struct {
+	waku                   wakutypes.Waku
 	transport              *transport.Transport
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
 	logger                 *zap.Logger
@@ -20,6 +21,7 @@ type Core struct {
 
 func NewCore(waku wakutypes.Waku, identity *ecdsa.PrivateKey, persistence types.Persistence, options ...Options) (*Core, error) {
 	core := &Core{
+		waku: waku,
 		envelopesMonitorConfig: &transport.EnvelopesMonitorConfig{
 			IsMailserver: func(ethtypes.EnodeID) bool { return false },
 		},
@@ -51,7 +53,7 @@ func NewCore(waku wakutypes.Waku, identity *ecdsa.PrivateKey, persistence types.
 }
 
 func (m *Core) API() *API {
-	return NewAPI(m.transport)
+	return NewAPI(m.waku, m.transport)
 }
 
 type Options func(*Core)

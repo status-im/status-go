@@ -20,11 +20,13 @@ import (
 )
 
 type API struct {
+	waku      wakutypes.Waku
 	transport *transport.Transport
 }
 
-func NewAPI(transport *transport.Transport) *API {
+func NewAPI(waku wakutypes.Waku, transport *transport.Transport) *API {
 	return &API{
+		waku:      waku,
 		transport: transport,
 	}
 }

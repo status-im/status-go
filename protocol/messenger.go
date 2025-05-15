@@ -103,7 +103,6 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
 type Messenger struct {
-	waku                      wakutypes.Waku
 	config                    *config
 	identity                  *ecdsa.PrivateKey
 	messaging                 *messaging.API
@@ -521,7 +520,6 @@ func NewMessenger(
 	ctx, cancel := context.WithCancel(context.Background())
 	messenger = &Messenger{
 		config:                     &c,
-		waku:                       waku,
 		identity:                   identity,
 		messaging:                  messaging.API(),
 		persistence:                sqlitePersistence,
@@ -1531,14 +1529,14 @@ func (m *Messenger) watchConnectionChange() {
 		m.handleConnectionChange(state)
 	}
 
-	subscribedConnectionStatus := func(subscription *wakutypes.ConnStatusSubscription) {
+	subscribedConnectionStatus := func(subscription messagingtypes.ConnectionStatusSubscription) {
 		defer gocommon.LogOnPanic()
 		defer subscription.Unsubscribe()
 		ticker := time.NewTicker(keepAlivePeriod)
 		defer ticker.Stop()
 		for {
 			select {
-			case status := <-subscription.C:
+			case status := <-subscription.C():
 				processNewState(status.IsOnline)
 			case <-ticker.C:
 				processNewState(m.Online())
@@ -1551,7 +1549,11 @@ func (m *Messenger) watchConnectionChange() {
 	m.logger.Debug("watching connection changes")
 	m.handleConnectionChange(state)
 
-	subscription, _ := m.waku.SubscribeToConnStatusChanges()
+	subscription, err := m.messaging.SubscribeToConnStatusChanges()
+	if err != nil {
+		m.logger.Error("failed to subscribe to connection status changes", zap.Error(err))
+		return
+	}
 	go subscribedConnectionStatus(subscription)
 }
 
