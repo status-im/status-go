@@ -21,7 +21,6 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const (
@@ -197,13 +196,13 @@ func (m *Messenger) filtersForChat(chatID string) (messagingtypes.ChatFilters, e
 	return filters, nil
 }
 
-func (m *Messenger) topicsForChat(chatID string) (string, []wakutypes.TopicType, error) {
+func (m *Messenger) topicsForChat(chatID string) (string, []messagingtypes.ContentTopic, error) {
 	filters, err := m.filtersForChat(chatID)
 	if err != nil {
 		return "", nil, err
 	}
 
-	var contentTopics []wakutypes.TopicType
+	var contentTopics []messagingtypes.ContentTopic
 
 	for _, filter := range filters {
 		contentTopics = append(contentTopics, filter.ContentTopic)
@@ -237,7 +236,7 @@ func (m *Messenger) syncBackup() error {
 
 	from, to := m.calculateMailserverTimeBounds(oneMonthDuration)
 
-	batch := wakutypes.MailserverBatch{From: from, To: to, Topics: []wakutypes.TopicType{filter.ContentTopic}}
+	batch := messagingtypes.StoreNodeBatch{From: from, To: to, Topics: []messagingtypes.ContentTopic{filter.ContentTopic}}
 	ms := m.getCommunityStorenode(filter.ChatID)
 	err = m.processMailserverBatch(ms, batch)
 	if err != nil {
@@ -419,7 +418,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 		topicsData[fmt.Sprintf("%s-%s", topic.PubsubTopic, topic.ContentTopic)] = topic
 	}
 
-	batches := make(map[string]map[int]wakutypes.MailserverBatch)
+	batches := make(map[string]map[int]messagingtypes.StoreNodeBatch)
 
 	to := m.calculateMailserverTo()
 	var syncedTopics []mailservers.MailserverTopic
@@ -457,7 +456,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 
 	for pubsubTopic, contentTopics := range contentTopicsPerPubsubTopic {
 		if _, ok := batches[pubsubTopic]; !ok {
-			batches[pubsubTopic] = make(map[int]wakutypes.MailserverBatch)
+			batches[pubsubTopic] = make(map[int]messagingtypes.StoreNodeBatch)
 		}
 
 		for _, filter := range contentTopics {
@@ -516,7 +515,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 						return nil, err
 					}
 				}
-				batch = wakutypes.MailserverBatch{From: time.Unix(int64(from), 0), To: to}
+				batch = messagingtypes.StoreNodeBatch{From: time.Unix(int64(from), 0), To: to}
 			}
 
 			batch.ChatIDs = append(batch.ChatIDs, chatID)
@@ -652,7 +651,7 @@ func (m *Messenger) DisableStoreNodes() {
 	m.featureFlags.StoreNodesDisabled = true
 }
 
-func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch wakutypes.MailserverBatch) error {
+func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch messagingtypes.StoreNodeBatch) error {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return err
@@ -664,7 +663,7 @@ func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch wakutyp
 	return m.messaging.ProcessMailserverBatch(m.ctx, batch, peerInfo, defaultStoreNodeRequestPageSize, nil, false)
 }
 
-func (m *Messenger) processMailserverBatchWithOptions(peerInfo peer.AddrInfo, batch wakutypes.MailserverBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {
+func (m *Messenger) processMailserverBatchWithOptions(peerInfo peer.AddrInfo, batch messagingtypes.StoreNodeBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return err
@@ -703,7 +702,7 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 			return nil, err
 		}
 
-		batch := wakutypes.MailserverBatch{
+		batch := messagingtypes.StoreNodeBatch{
 			ChatIDs:     []string{chatID},
 			To:          time.Unix(int64(chat.SyncedFrom), 0),
 			From:        time.Unix(int64(chat.SyncedFrom-defaultSyncPeriod), 0),
@@ -771,7 +770,7 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		}
 	}
 
-	batch := wakutypes.MailserverBatch{
+	batch := messagingtypes.StoreNodeBatch{
 		ChatIDs:     []string{chatID},
 		To:          time.Unix(int64(highestTo), 0),
 		From:        time.Unix(int64(lowestFrom), 0),
@@ -862,7 +861,7 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 			return nil, nil
 		}
 
-		batch := wakutypes.MailserverBatch{
+		batch := messagingtypes.StoreNodeBatch{
 			ChatIDs:     []string{chatID},
 			From:        from,
 			To:          to,

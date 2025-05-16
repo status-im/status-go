@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -1829,34 +1828,4 @@ func (api *PublicAPI) GetCommunityMemberAllMessages(request *requests.CommunityM
 // Delete a specific community member messages or all community member messages (based on provided parameters)
 func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
-}
-
-// -----
-// HELPER
-// -----
-
-func createBloomFilter(r MessagesRequest) []byte {
-	if len(r.Topics) > 0 {
-		return topicsToBloom(r.Topics...)
-	}
-	return wakutypes.TopicToBloom(r.Topic)
-}
-
-func topicsToBloom(topics ...wakutypes.TopicType) []byte {
-	i := new(big.Int)
-	for _, topic := range topics {
-		bloom := wakutypes.TopicToBloom(topic)
-		i.Or(i, new(big.Int).SetBytes(bloom[:]))
-	}
-
-	combined := make([]byte, wakutypes.BloomFilterSize)
-	data := i.Bytes()
-	copy(combined[wakutypes.BloomFilterSize-len(data):], data[:])
-
-	return combined
-}
-
-// TopicsToBloom squashes all topics into a single bloom filter.
-func TopicsToBloom(topics ...wakutypes.TopicType) []byte {
-	return topicsToBloom(topics...)
 }

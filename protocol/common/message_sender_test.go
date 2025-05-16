@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/t/helpers"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
@@ -120,7 +121,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesWrapped() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	message := &wakutypes.Message{}
+	message := &messagingtypes.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = wrappedPayload
 
@@ -158,7 +159,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	}
 	marshalledDataSyncMessage, err := proto.Marshal(&dataSyncMessage)
 	s.Require().NoError(err)
-	message := &wakutypes.Message{}
+	message := &messagingtypes.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = marshalledDataSyncMessage
 
@@ -217,7 +218,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	encryptedPayload, err := proto.Marshal(messageSpec.Message)
 	s.Require().NoError(err)
 
-	message := &wakutypes.Message{}
+	message := &messagingtypes.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = encryptedPayload
 
@@ -280,7 +281,7 @@ func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
 	encryptedPayload2, err := proto.Marshal(messageSpec2.Message)
 	s.Require().NoError(err)
 
-	message := &wakutypes.Message{}
+	message := &messagingtypes.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
 	message.Hash = []byte{0x1}
 	message.Payload = encryptedPayload2
@@ -296,7 +297,7 @@ func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
 
 	s.Require().Len(msgs, 1)
 
-	message = &wakutypes.Message{}
+	message = &messagingtypes.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
 	message.Hash = []byte{0x2}
 	message.Payload = encryptedPayload1
@@ -334,7 +335,7 @@ func (s *MessageSenderSuite) TestHandleSegmentMessages() {
 	s.Require().NoError(err)
 	s.Require().Len(segmentedMessages, 2)
 
-	message := &wakutypes.Message{}
+	message := &messagingtypes.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = segmentedMessages[0].Payload
 

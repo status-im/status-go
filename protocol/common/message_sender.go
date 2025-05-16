@@ -855,16 +855,16 @@ func (s *MessageSender) unwrapDatasyncMessage(m *v1protocol.StatusMessage, respo
 // layer message, or in case of Raw methods, the processing stops at the layer
 // before.
 // It returns an error only if the processing of required steps failed.
-func (s *MessageSender) HandleMessages(wakuMessage *wakutypes.Message) (*HandleMessageResponse, error) {
+func (s *MessageSender) HandleMessages(msg *messagingtypes.ReceivedMessage) (*HandleMessageResponse, error) {
 	logger := s.logger.With(zap.String("site", "HandleMessages"))
-	hlogger := logger.With(zap.String("hash", types.HexBytes(wakuMessage.Hash).String()))
+	hlogger := logger.With(zap.String("hash", types.HexBytes(msg.Hash).String()))
 
-	response, err := s.handleMessage(wakuMessage)
+	response, err := s.handleMessage(msg)
 	if err != nil {
 		// Hash ratchet with a group id not found yet, save the message for future processing
 		if err == encryption.ErrHashRatchetGroupIDNotFound && len(response.Message.EncryptionLayer.HashRatchetInfo) == 1 {
 			info := response.Message.EncryptionLayer.HashRatchetInfo[0]
-			return nil, s.persistence.SaveHashRatchetMessage(info.GroupID, info.KeyID, wakuMessage)
+			return nil, s.persistence.SaveHashRatchetMessage(info.GroupID, info.KeyID, msg)
 		}
 
 		// The current message segment has been successfully retrieved.
@@ -949,20 +949,20 @@ func (h *handleMessageResponse) Messages() []*v1protocol.StatusMessage {
 	return []*v1protocol.StatusMessage{h.Message}
 }
 
-func (s *MessageSender) handleMessage(wakuMessage *wakutypes.Message) (*handleMessageResponse, error) {
+func (s *MessageSender) handleMessage(msg *messagingtypes.ReceivedMessage) (*handleMessageResponse, error) {
 	logger := s.logger.With(zap.String("site", "handleMessage"))
-	hlogger := logger.With(zap.String("hash", types.EncodeHex(wakuMessage.Hash)))
+	hlogger := logger.With(zap.String("hash", types.EncodeHex(msg.Hash)))
 
 	message := &v1protocol.StatusMessage{}
 
 	response := &handleMessageResponse{
-		Hash:             wakuMessage.Hash,
+		Hash:             msg.Hash,
 		Message:          message,
 		DatasyncMessages: []*v1protocol.StatusMessage{},
 		DatasyncAcks:     [][]byte{},
 	}
 
-	err := message.HandleTransportLayer(wakuMessage)
+	err := message.HandleTransportLayer(msg)
 	if err != nil {
 		hlogger.Error("failed to handle transport layer message", zap.Error(err))
 		return nil, err

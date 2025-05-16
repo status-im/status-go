@@ -40,7 +40,6 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/server"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerCommunitiesSuite(t *testing.T) {
@@ -3637,12 +3636,12 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	)
 	s.Require().NoError(err)
 
-	message := &wakutypes.Message{}
+	message := &messagingtypes.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&s.owner.identity.PublicKey)
 	message.Payload = wrappedPayload
 
 	filter := s.alice.messaging.ChatFilterByChatID(chat.ID)
-	importedMessages := make(map[messagingtypes.ChatFilter][]*wakutypes.Message, 0)
+	importedMessages := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, 0)
 
 	importedMessages[*filter] = append(importedMessages[*filter], message)
 

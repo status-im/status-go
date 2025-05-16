@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
@@ -400,7 +401,7 @@ func (s *MessengerStoreNodeRequestSuite) TestSimultaneousCommunityInfoRequests()
 	community := s.createCommunity(s.owner)
 
 	storeNodeRequestsCount := 0
-	s.bob.storeNodeRequestsManager.onPerformingBatch = func(batch wakutypes.MailserverBatch) {
+	s.bob.storeNodeRequestsManager.onPerformingBatch = func(batch messagingtypes.StoreNodeBatch) {
 		storeNodeRequestsCount++
 	}
 

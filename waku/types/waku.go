@@ -3,10 +3,7 @@ package types
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -237,14 +234,7 @@ type Waku interface {
 type MailserverBatch struct {
 	From        time.Time
 	To          time.Time
-	Cursor      string
 	PubsubTopic string
 	Topics      []TopicType
 	ChatIDs     []string
-}
-
-func (mb *MailserverBatch) Hash() string {
-	data := fmt.Sprintf("%d%d%s%s%v%v", mb.From.UnixNano(), mb.To.UnixNano(), mb.Cursor, mb.PubsubTopic, mb.Topics, mb.ChatIDs)
-	hash := sha256.Sum256([]byte(data))
-	return hex.EncodeToString(hash[:4])
 }

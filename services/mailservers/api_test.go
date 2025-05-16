@@ -78,14 +78,14 @@ func TestTopic(t *testing.T) {
 		// Existing topic, is not updated
 		{
 			PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
-			ContentTopic: wakutypes.BytesToTopic([]byte{0x61}),
+			ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x61}),
 		},
 		// Non existing topic is not inserted
 		{
 			Discovery:    true,
 			Negotiated:   true,
 			PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
-			ContentTopic: wakutypes.BytesToTopic([]byte{0x64}),
+			ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x64}),
 		},
 	}
 

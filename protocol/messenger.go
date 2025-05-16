@@ -186,7 +186,7 @@ type Messenger struct {
 	unhandledMessagesTracker func(*v1protocol.StatusMessage, error)
 
 	// enables control over chat messages iteration
-	retrievedMessagesIteratorFactory func(map[messagingtypes.ChatFilter][]*wakutypes.Message) MessagesIterator
+	retrievedMessagesIteratorFactory func(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) MessagesIterator
 
 	peersyncing         *peersyncing.PeerSyncing
 	peersyncingOffers   map[string]uint64
@@ -3146,7 +3146,7 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 	}
 }
 
-func (m *Messenger) outputToCSV(timestamp uint32, messageID types.HexBytes, from string, topic wakutypes.TopicType, chatID string, msgType protobuf.ApplicationMetadataMessage_Type, parsedMessage interface{}) {
+func (m *Messenger) outputToCSV(timestamp uint32, messageID types.HexBytes, from string, topic messagingtypes.ContentTopic, chatID string, msgType protobuf.ApplicationMetadataMessage_Type, parsedMessage interface{}) {
 	if !m.outputCSV {
 		return
 	}
@@ -3178,7 +3178,7 @@ func (m *Messenger) shouldSkipDuplicate(messageType protobuf.ApplicationMetadata
 	return true
 }
 
-func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.ChatFilter][]*wakutypes.Message) error {
+func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) error {
 
 	messageState := m.buildMessageState()
 
@@ -3319,7 +3319,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.C
 	return nil
 }
 
-func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.ChatFilter][]*wakutypes.Message, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
+func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
 
 	m.handleMessagesMutex.Lock()
 	defer m.handleMessagesMutex.Unlock()

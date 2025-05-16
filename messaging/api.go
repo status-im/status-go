@@ -114,14 +114,14 @@ func (a *API) GetStats() wakutypes.StatsSummary {
 	return a.transport.GetStats()
 }
 
-func (a *API) RetrieveRawAll() (map[types.ChatFilter][]*wakutypes.Message, error) {
+func (a *API) RetrieveRawAll() (map[types.ChatFilter][]*types.ReceivedMessage, error) {
 	filters, err := a.transport.RetrieveRawAll()
 	if err != nil {
 		return nil, err
 	}
-	chatFilters := make(map[types.ChatFilter][]*wakutypes.Message)
+	chatFilters := make(map[types.ChatFilter][]*types.ReceivedMessage)
 	for k, v := range filters {
-		chatFilters[*adapters.FromTransportFilter(&k)] = v
+		chatFilters[*adapters.FromTransportFilter(&k)] = adapters.FromWakuMessages(v)
 	}
 	return chatFilters, nil
 }
@@ -300,13 +300,13 @@ func (a *API) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTas
 
 func (a *API) ProcessMailserverBatch(
 	ctx context.Context,
-	batch wakutypes.MailserverBatch,
+	batch types.StoreNodeBatch,
 	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	return a.transport.ProcessMailserverBatch(ctx, batch, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return a.transport.ProcessMailserverBatch(ctx, *adapters.ToWakuBatch(&batch), storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (a *API) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {

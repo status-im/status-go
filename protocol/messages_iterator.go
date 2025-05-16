@@ -4,21 +4,20 @@ import (
 	"golang.org/x/exp/maps"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type MessagesIterator interface {
 	HasNext() bool
-	Next() (messagingtypes.ChatFilter, []*wakutypes.Message)
+	Next() (messagingtypes.ChatFilter, []*messagingtypes.ReceivedMessage)
 }
 
 type DefaultMessagesIterator struct {
-	chatWithMessages map[messagingtypes.ChatFilter][]*wakutypes.Message
+	chatWithMessages map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage
 	keys             []messagingtypes.ChatFilter
 	currentIndex     int
 }
 
-func NewDefaultMessagesIterator(chatWithMessages map[messagingtypes.ChatFilter][]*wakutypes.Message) MessagesIterator {
+func NewDefaultMessagesIterator(chatWithMessages map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) MessagesIterator {
 	return &DefaultMessagesIterator{
 		chatWithMessages: chatWithMessages,
 		keys:             maps.Keys(chatWithMessages),
@@ -30,7 +29,7 @@ func (it *DefaultMessagesIterator) HasNext() bool {
 	return it.currentIndex < len(it.keys)
 }
 
-func (it *DefaultMessagesIterator) Next() (messagingtypes.ChatFilter, []*wakutypes.Message) {
+func (it *DefaultMessagesIterator) Next() (messagingtypes.ChatFilter, []*messagingtypes.ReceivedMessage) {
 	if it.HasNext() {
 		key := it.keys[it.currentIndex]
 		it.currentIndex++

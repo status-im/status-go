@@ -11,14 +11,13 @@ import (
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerContactRequestSuite(t *testing.T) {
@@ -1295,7 +1294,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	state.CurrentMessageState = &CurrentMessageState{
 		PublicKey:        &contactKey.PublicKey,
 		MessageID:        "0xa",
-		StatusMessage:    &v1protocol.StatusMessage{TransportLayer: v1protocol.TransportLayer{Message: &wakutypes.Message{Timestamp: 1}}, ApplicationLayer: v1protocol.ApplicationLayer{ID: []byte("test-id")}},
+		StatusMessage:    &v1protocol.StatusMessage{TransportLayer: v1protocol.TransportLayer{Message: &messagingtypes.ReceivedMessage{Timestamp: 1}}, ApplicationLayer: v1protocol.ApplicationLayer{ID: []byte("test-id")}},
 		Contact:          contact,
 		WhisperTimestamp: 1,
 	}

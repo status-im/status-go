@@ -28,8 +28,6 @@ import (
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/signal"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
-
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"go.uber.org/zap"
@@ -241,13 +239,13 @@ func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) (m
 	return filters, nil
 }
 
-func (m *ArchiveManager) GetCommunityChatsTopics(communityID types.HexBytes) ([]wakutypes.TopicType, error) {
+func (m *ArchiveManager) GetCommunityChatsTopics(communityID types.HexBytes) ([]messagingtypes.ContentTopic, error) {
 	filters, err := m.GetCommunityChatsFilters(communityID)
 	if err != nil {
 		return nil, err
 	}
 
-	topics := []wakutypes.TopicType{}
+	topics := []messagingtypes.ContentTopic{}
 	for _, filter := range filters {
 		topics = append(topics, filter.ContentTopic)
 	}
@@ -255,7 +253,7 @@ func (m *ArchiveManager) GetCommunityChatsTopics(communityID types.HexBytes) ([]
 	return topics, nil
 }
 
-func (m *ArchiveManager) getOldestWakuMessageTimestamp(topics []wakutypes.TopicType) (uint64, error) {
+func (m *ArchiveManager) getOldestWakuMessageTimestamp(topics []messagingtypes.ContentTopic) (uint64, error) {
 	return m.persistence.GetOldestWakuMessageTimestamp(topics)
 }
 
@@ -277,7 +275,7 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 		return 0, nil
 	}
 
-	topics := []wakutypes.TopicType{}
+	topics := []messagingtypes.ContentTopic{}
 
 	for _, filter := range filters {
 		topics = append(topics, filter.ContentTopic)
@@ -310,7 +308,7 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 	return lastArchiveEndDateTimestamp, nil
 }
 
-func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []wakutypes.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
+func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
 	m.UnseedHistoryArchiveTorrent(communityID)
 	_, err := m.ArchiveFileManager.CreateHistoryArchiveTorrentFromDB(communityID, topics, startDate, endDate, partition, encrypt)
 	if err != nil {
@@ -653,11 +651,10 @@ func (m *ArchiveManager) TorrentFileExists(communityID string) bool {
 	return err == nil
 }
 
-func topicsAsByteArrays(topics []wakutypes.TopicType) [][]byte {
+func topicsAsByteArrays(topics []messagingtypes.ContentTopic) [][]byte {
 	var topicsAsByteArrays [][]byte
 	for _, t := range topics {
-		topic := wakutypes.TopicTypeToByteArray(t)
-		topicsAsByteArrays = append(topicsAsByteArrays, topic)
+		topicsAsByteArrays = append(topicsAsByteArrays, t.Bytes())
 	}
 	return topicsAsByteArrays
 }

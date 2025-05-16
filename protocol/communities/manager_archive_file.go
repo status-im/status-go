@@ -17,13 +17,12 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/signal"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
@@ -53,7 +52,7 @@ func NewArchiveFileManager(amc *ArchiveManagerConfig) *ArchiveFileManager {
 	}
 }
 
-func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBytes, msgs []*wakutypes.Message, topics []wakutypes.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBytes, msgs []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 
 	loadFromDB := len(msgs) == 0
 
@@ -121,7 +120,7 @@ func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBy
 			zap.Any("to", to),
 		)
 
-		var messages []wakutypes.Message
+		var messages []messagingtypes.ReceivedMessage
 		if loadFromDB {
 			messages, err = m.persistence.GetWakuMessagesByFilterTopic(topics, uint64(from.Unix()), uint64(to.Unix()))
 			if err != nil {
@@ -151,9 +150,9 @@ func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBy
 		// Not only do we partition messages, we also chunk them
 		// roughly by size, such that each chunk will not exceed a given
 		// size and archive data doesn't get too big
-		messageChunks := make([][]wakutypes.Message, 0)
+		messageChunks := make([][]messagingtypes.ReceivedMessage, 0)
 		currentChunkSize := 0
-		currentChunk := make([]wakutypes.Message, 0)
+		currentChunk := make([]messagingtypes.ReceivedMessage, 0)
 
 		for _, msg := range messages {
 			msgSize := len(msg.Payload) + len(msg.Sig)
@@ -164,7 +163,7 @@ func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBy
 
 			if currentChunkSize+msgSize > maxArchiveSizeInBytes {
 				messageChunks = append(messageChunks, currentChunk)
-				currentChunk = make([]wakutypes.Message, 0)
+				currentChunk = make([]messagingtypes.ReceivedMessage, 0)
 				currentChunkSize = 0
 			}
 			currentChunk = append(currentChunk, msg)
@@ -341,15 +340,14 @@ func (m *ArchiveFileManager) archiveIndexFile(communityID string) string {
 	return path.Join(m.torrentConfig.DataDir, communityID, "index")
 }
 
-func (m *ArchiveFileManager) createWakuMessageArchive(from time.Time, to time.Time, messages []wakutypes.Message, topics [][]byte) *protobuf.WakuMessageArchive {
+func (m *ArchiveFileManager) createWakuMessageArchive(from time.Time, to time.Time, messages []messagingtypes.ReceivedMessage, topics [][]byte) *protobuf.WakuMessageArchive {
 	var wakuMessages []*protobuf.WakuMessage
 
 	for _, msg := range messages {
-		topic := wakutypes.TopicTypeToByteArray(msg.Topic)
 		wakuMessage := &protobuf.WakuMessage{
 			Sig:          msg.Sig,
 			Timestamp:    uint64(msg.Timestamp),
-			Topic:        topic,
+			Topic:        msg.Topic.Bytes(),
 			Payload:      msg.Payload,
 			Padding:      msg.Padding,
 			Hash:         msg.Hash,
@@ -371,12 +369,12 @@ func (m *ArchiveFileManager) createWakuMessageArchive(from time.Time, to time.Ti
 	return wakuMessageArchive
 }
 
-func (m *ArchiveFileManager) CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*wakutypes.Message, topics []wakutypes.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (m *ArchiveFileManager) CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 	return m.createHistoryArchiveTorrent(communityID, messages, topics, startDate, endDate, partition, encrypt)
 }
 
-func (m *ArchiveFileManager) CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []wakutypes.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
-	return m.createHistoryArchiveTorrent(communityID, make([]*wakutypes.Message, 0), topics, startDate, endDate, partition, encrypt)
+func (m *ArchiveFileManager) CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+	return m.createHistoryArchiveTorrent(communityID, make([]*messagingtypes.ReceivedMessage, 0), topics, startDate, endDate, partition, encrypt)
 }
 
 func (m *ArchiveFileManager) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {

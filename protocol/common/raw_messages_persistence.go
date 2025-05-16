@@ -12,9 +12,8 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type RawMessageConfirmation struct {
@@ -330,13 +329,13 @@ func (db RawMessagesPersistence) InsertPendingConfirmation(confirmation *RawMess
 	return err
 }
 
-func (db RawMessagesPersistence) SaveHashRatchetMessage(groupID []byte, keyID []byte, m *wakutypes.Message) error {
-	_, err := db.db.Exec(`INSERT INTO hash_ratchet_encrypted_messages(hash, sig, timestamp, topic, payload, dst, padding, group_id, key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, m.Hash, m.Sig, m.Timestamp, wakutypes.TopicTypeToByteArray(m.Topic), m.Payload, m.Dst, m.Padding, groupID, keyID)
+func (db RawMessagesPersistence) SaveHashRatchetMessage(groupID []byte, keyID []byte, m *messagingtypes.ReceivedMessage) error {
+	_, err := db.db.Exec(`INSERT INTO hash_ratchet_encrypted_messages(hash, sig, timestamp, topic, payload, dst, padding, group_id, key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, m.Hash, m.Sig, m.Timestamp, m.Topic.Bytes(), m.Payload, m.Dst, m.Padding, groupID, keyID)
 	return err
 }
 
-func (db RawMessagesPersistence) GetHashRatchetMessages(keyID []byte) ([]*wakutypes.Message, error) {
-	var messages []*wakutypes.Message
+func (db RawMessagesPersistence) GetHashRatchetMessages(keyID []byte) ([]*messagingtypes.ReceivedMessage, error) {
+	var messages []*messagingtypes.ReceivedMessage
 
 	rows, err := db.db.Query(`SELECT hash, sig, timestamp, topic, payload, dst, padding FROM hash_ratchet_encrypted_messages WHERE key_id = ?`, keyID)
 	if err != nil {
@@ -345,14 +344,14 @@ func (db RawMessagesPersistence) GetHashRatchetMessages(keyID []byte) ([]*wakuty
 
 	for rows.Next() {
 		var topic []byte
-		message := &wakutypes.Message{}
+		message := &messagingtypes.ReceivedMessage{}
 
 		err := rows.Scan(&message.Hash, &message.Sig, &message.Timestamp, &topic, &message.Payload, &message.Dst, &message.Padding)
 		if err != nil {
 			return nil, err
 		}
 
-		message.Topic = wakutypes.BytesToTopic(topic)
+		message.Topic = messagingtypes.BytesToContentTopic(topic)
 		messages = append(messages, message)
 	}
 

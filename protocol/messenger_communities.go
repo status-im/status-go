@@ -47,8 +47,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/wakuv2"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // 7 days interval
@@ -3941,7 +3939,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				continue
 			}
 
-			topics := []wakutypes.TopicType{}
+			topics := []messagingtypes.ContentTopic{}
 
 			for _, filter := range filters {
 				topics = append(topics, filter.ContentTopic)
@@ -4384,8 +4382,8 @@ func (m *Messenger) generateSystemPinnedMessage(pinMessage *common.PinMessage, c
 	return systemMessage, nil
 }
 
-func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, c *communities.Community) ([]*wakutypes.Message, error) {
-	wakuMessages := make([]*wakutypes.Message, 0)
+func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, c *communities.Community) ([]*messagingtypes.ReceivedMessage, error) {
+	wakuMessages := make([]*messagingtypes.ReceivedMessage, 0)
 	for _, msg := range pinMessages {
 
 		filter := m.messaging.ChatFilterByChatID(msg.LocalChatID)
@@ -4399,7 +4397,7 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 		}
 
 		hash := crypto.Keccak256Hash(append([]byte(c.IDString()), wrappedPayload...))
-		wakuMessage := &wakutypes.Message{
+		wakuMessage := &messagingtypes.ReceivedMessage{
 			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
 			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
 			Topic:        filter.ContentTopic,
@@ -4414,8 +4412,8 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 	return wakuMessages, nil
 }
 
-func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c *communities.Community) ([]*wakutypes.Message, error) {
-	wakuMessages := make([]*wakutypes.Message, 0)
+func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c *communities.Community) ([]*messagingtypes.ReceivedMessage, error) {
+	wakuMessages := make([]*messagingtypes.ReceivedMessage, 0)
 	for _, msg := range chatMessages {
 
 		filter := m.messaging.ChatFilterByChatID(msg.LocalChatID)
@@ -4430,7 +4428,7 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 		}
 
 		hash := crypto.Keccak256Hash([]byte(msg.ID))
-		wakuMessage := &wakutypes.Message{
+		wakuMessage := &messagingtypes.ReceivedMessage{
 			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
 			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
 			Topic:        filter.ContentTopic,
