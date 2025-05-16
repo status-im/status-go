@@ -11,7 +11,7 @@ import (
 )
 
 const STATUS_DESKTOP_FEED_URL = "https://status-website-git-add-rss-status-im-web.vercel.app/desktop-news/rss?_vercel_share=IySrfv1xyphlMgEp3rAfrCnzT19yjzG9&x-vercel-protection-bypass=I4euHZRiK3TEnAE5Kw73tQxhmxjBThSS"
-const STATUS_MOBILE_FEED_URL = "https://status-website-git-add-rss-status-im-web.vercel.app/mobile-news/rss?_vercel_share=IySrfv1xyphlMgEp3rAfrCnzT19yjzG9&x-vercel-protection-bypass=I4euHZRiK3TEnAE5Kw73tQxhmxjBThSS"
+const STATUS_MOBILE_FEED_URL = "https://status-website-git-rss-mobile-status-im-web.vercel.app/mobile-news/rss?_vercel_share=ngAjqR0PVZuCcAwEVG9kCb0kytFvlfI4&x-vercel-protection-bypass=I4euHZRiK3TEnAE5Kw73tQxhmxjBThSS"
 
 type FeedParser interface {
 	ParseURL(url string) (*gofeed.Feed, error)
