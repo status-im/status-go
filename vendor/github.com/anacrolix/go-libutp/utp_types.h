@@ -117,7 +117,11 @@ typedef const char * cstr;
 typedef char * str;
 
 #ifndef __cplusplus
+#if defined __STDC_VERSION__ && __STDC_VERSION__ > 201710L
+/* bool, true and false are keywords.  */
+#else
 typedef uint8 bool;
+#endif
 #endif
 
 #endif //__UTP_TYPES_H__
