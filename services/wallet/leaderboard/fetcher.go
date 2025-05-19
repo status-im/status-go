@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/internal/security"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
@@ -215,8 +217,8 @@ func (f *ProxyFetcher) fetchData(ctx context.Context, endpoint string, etag stri
 	}
 
 	options = append(options, thirdparty.WithCredentials(&thirdparty.BasicCreds{
-		User:     f.config.User,
-		Password: f.config.Password,
+		User:     security.NewSensitiveString(f.config.User),
+		Password: security.NewSensitiveString(f.config.Password),
 	}))
 
 	body, newEtag, err := f.client.DoGetRequestWithEtag(ctx, url, nil, etag, options...)

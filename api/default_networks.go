@@ -390,8 +390,8 @@ func bnbSmartChain(proxyHost string) params.Network {
 		// Smart proxy provider
 		*params.NewEthRpcProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(proxyHost, chainName, networkName), false),
 		// Direct providers
-		*params.NewDirectProvider(chainID, DirectInfura, "https://bsc-mainnet.infura.io/v3/", true),
-		*params.NewDirectProvider(chainID, DirectGrove, "https://bsc.rpc.grove.city/v1/", false),
+		*params.NewDirectProvider(chainID, DirectInfura, security.NewSensitiveString("https://bsc-mainnet.infura.io/v3/"), true),
+		*params.NewDirectProvider(chainID, DirectGrove, security.NewSensitiveString("https://bsc.rpc.grove.city/v1/"), false),
 	}
 
 	return params.Network{
@@ -423,7 +423,7 @@ func bnbSmartChainTestnet(proxyHost string) params.Network {
 		// Smart proxy provider
 		*params.NewEthRpcProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(proxyHost, chainName, networkName), false),
 		// Direct providers
-		*params.NewDirectProvider(chainID, DirectInfura, "https://bsc-testnet.infura.io/v3/", true),
+		*params.NewDirectProvider(chainID, DirectInfura, security.NewSensitiveString("https://bsc-testnet.infura.io/v3/"), true),
 	}
 
 	return params.Network{

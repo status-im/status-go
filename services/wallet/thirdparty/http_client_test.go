@@ -246,7 +246,7 @@ func TestFetchDataCompression(t *testing.T) {
 
 	ctx := context.Background()
 	client := NewHTTPClient()
-	creds := BasicCreds{User: "testuser", Password: "testpass"}
+	creds := BasicCreds{User: security.NewSensitiveString("testuser"), Password: security.NewSensitiveString("testpass")}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test server
