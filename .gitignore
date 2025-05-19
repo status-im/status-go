@@ -118,16 +118,16 @@ tests-functional/*.log
 
 
 # generated files
-mock
-mock.go
-*_mock_test.go
-*.pb.go
-bindata.go
-migrations.go
-cmd/status-backend/server/endpoints.go
-protocol/messenger_handlers.go
-internal/version/VERSION
-internal/version/GIT_COMMIT
+#mock
+#mock.go
+#*_mock_test.go
+#*.pb.go
+#bindata.go
+#migrations.go
+#cmd/status-backend/server/endpoints.go
+#protocol/messenger_handlers.go
+#internal/version/VERSION
+#internal/version/GIT_COMMIT
 internal/sentry/SENTRY_CONTEXT_NAME
 internal/sentry/SENTRY_CONTEXT_VERSION
 internal/sentry/SENTRY_PRODUCTION
