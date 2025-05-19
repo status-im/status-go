@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/storenodes"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 func (m *Messenger) sendCommunityPublicStorenodesInfo(community *communities.Community, snodes storenodes.Storenodes) error {
@@ -50,7 +51,7 @@ func (m *Messenger) sendCommunityPublicStorenodesInfo(community *communities.Com
 		Sender:              community.PrivateKey(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_STORENODES_INFO,
-		PubsubTopic:         community.PubsubTopic(),
+		PubsubTopic:         community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 		Priority:            &common.HighPriority,
 	}
 

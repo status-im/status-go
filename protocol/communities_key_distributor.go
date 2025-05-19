@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 type CommunitiesKeyDistributorImpl struct {
@@ -95,7 +96,7 @@ func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *comm
 		Recipients:            pubkeys,
 		MessageType:           protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		HashRatchetGroupID:    hashRatchetGroupID,
-		PubsubTopic:           community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		PubsubTopic:           community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 	}
 	_, err := ckd.sender.SendCommunityMessage(context.Background(), &rawMessage)
 

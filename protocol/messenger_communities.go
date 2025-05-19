@@ -146,7 +146,7 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 		SkipEncryptionLayer: true,
 		CommunityID:         org.ID(),
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
-		PubsubTopic:         org.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		PubsubTopic:         org.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 		Priority:            &common.HighPriority,
 	}
 	if org.Encrypted() {
@@ -162,7 +162,7 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 	messageID, err := m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
 	if err == nil {
 		m.logger.Debug("published community",
-			zap.String("pubsubTopic", org.PubsubTopic()),
+			zap.String("pubsubTopic", org.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic())),
 			zap.String("communityID", org.IDString()),
 			zap.String("messageID", hexutil.Encode(messageID)),
 			zap.Uint64("clock", org.Clock()),
@@ -185,7 +185,7 @@ func (m *Messenger) publishCommunityEvents(community *communities.Community, msg
 		// we don't want to wrap in an encryption layer message
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE,
-		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		PubsubTopic:         community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()), // TODO: confirm if it should be sent in community pubsub topic
 		Priority:            &common.LowPriority,
 	}
 
@@ -213,6 +213,7 @@ func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities
 		Sender:              community.PrivateKey(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
+		PubsubTopic:         community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 	}
 
 	for _, receivers := range msg.Receivers {
@@ -348,7 +349,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					Sender:              community.PrivateKey(),
 					SkipEncryptionLayer: true,
 					MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_USER_KICKED,
-					PubsubTopic:         wakuv2.DefaultNonProtectedPubsubTopic(),
+					PubsubTopic:         wakuv2.GlobalCommunityControlPubsubTopic(),
 				}
 
 				_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
@@ -683,7 +684,7 @@ func (m *Messenger) handleCommunitySharedAddressesRequest(state *ReceivedMessage
 		CommunityID:         community.ID(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_RESPONSE,
-		PubsubTopic:         wakuv2.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         wakuv2.GlobalCommunityControlPubsubTopic(),
 		ResendType:          common.ResendTypeRawMessage,
 		ResendMethod:        common.ResendMethodSendPrivate,
 		Recipients:          []*ecdsa.PublicKey{signer},
@@ -770,7 +771,7 @@ func (m *Messenger) publishGroupGrantMessage(community *communities.Community, t
 		Sender:              community.PrivateKey(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_UPDATE_GRANT,
-		PubsubTopic:         community.PubsubTopic(),
+		PubsubTopic:         community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 		Priority:            &common.LowPriority,
 	}
 
@@ -962,10 +963,17 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 		}
 	}
 
+	for _, chat := range publicChatsToInit {
+		fmt.Printf(">>> publicChatsToInit: %s %s\n", chat.ChatID, chat.PubsubTopic)
+	}
 	filters, err := m.messaging.InitPublicChats(publicChatsToInit)
 	if err != nil {
 		logger.Debug("InitPublicChats error", zap.Error(err))
 		return nil, err
+	}
+
+	for _, filter := range filters {
+		fmt.Printf(">>> filter: %s %s\n", filter.ChatID, filter.PubsubTopic)
 	}
 
 	if community.IsControlNode() {
@@ -1476,7 +1484,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		ResendType:          common.ResendTypeRawMessage,
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
-		PubsubTopic:         wakuv2.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         wakuv2.GlobalCommunityControlPubsubTopic(),
 		Priority:            &common.HighPriority,
 	}
 
@@ -1650,7 +1658,7 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		CommunityID:         community.ID(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_EDIT_SHARED_ADDRESSES,
-		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		PubsubTopic:         community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()), // TODO: confirm if it should be sent in community pubsub topic
 		ResendType:          common.ResendTypeRawMessage,
 	}
 
@@ -1693,7 +1701,7 @@ func (m *Messenger) PublishTokenActionToPrivilegedMembers(communityID []byte, ch
 		ResendType:   common.ResendTypeRawMessage,
 		ResendMethod: common.ResendMethodSendPrivate,
 		MessageType:  protobuf.ApplicationMetadataMessage_COMMUNITY_TOKEN_ACTION,
-		PubsubTopic:  community.PubsubTopic(),
+		PubsubTopic:  community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 	}
 
 	skipMembers := make(map[string]struct{})
@@ -1854,7 +1862,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 		CommunityID:         community.ID(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
-		PubsubTopic:         wakuv2.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         wakuv2.GlobalCommunityControlPubsubTopic(),
 		ResendType:          common.ResendTypeRawMessage,
 		Priority:            &common.HighPriority,
 	}
@@ -1987,7 +1995,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			Community:                           encryptedDescription, // Deprecated but kept for backward compatibility, to be removed in future
 			Grant:                               grant,
 			ProtectedTopicPrivateKey:            crypto.FromECDSA(key),
-			Shard:                               community.Shard().Protobuffer(),
+			Shard:                               community.Shard().Protobuffer(), // TODO p test
 			CommunityDescriptionProtocolMessage: descriptionMessage,
 		}
 
@@ -2012,7 +2020,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			CommunityID:         community.ID(),
 			SkipEncryptionLayer: true,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
-			PubsubTopic:         wakuv2.DefaultNonProtectedPubsubTopic(),
+			PubsubTopic:         wakuv2.GlobalCommunityControlPubsubTopic(),
 			ResendType:          common.ResendTypeRawMessage,
 			ResendMethod:        common.ResendMethodSendPrivate,
 			Recipients:          []*ecdsa.PublicKey{pk},
@@ -2116,6 +2124,7 @@ func (m *Messenger) declineRequestToJoinCommunity(requestToJoin *communities.Req
 			Sender:              community.PrivateKey(),
 			SkipEncryptionLayer: true,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
+			PubsubTopic:         wakuv2.GlobalCommunityControlPubsubTopic(),
 		}
 
 		privilegedMembers := community.GetPrivilegedMembers()
@@ -2220,7 +2229,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 			CommunityID:         communityID,
 			SkipEncryptionLayer: true,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
-			PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in the community pubsub topic
+			PubsubTopic:         community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()), // TODO: confirm if it should be sent in the community pubsub topic
 			ResendType:          common.ResendTypeRawMessage,
 			Priority:            &common.HighPriority,
 		}
@@ -2886,7 +2895,7 @@ func (m *Messenger) ReevaluateCommunityMembersPermissions(request *requests.Reev
 			CommunityID:         request.CommunityID,
 			SkipEncryptionLayer: true,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REEVALUATE_PERMISSIONS_REQUEST,
-			PubsubTopic:         community.PubsubTopic(),
+			PubsubTopic:         community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 		}
 		_, err = m.SendMessageToControlNode(community, &rawMessage)
 		if err != nil {
@@ -3414,6 +3423,10 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 				ChatID:      chat.ID,
 				PubsubTopic: community.PubsubTopic(),
 			})
+			publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{
+				ChatID:      chat.ID,
+				PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic(),
+			})
 			// Update name, currently is the only field is mutable
 		} else if oldChat.Name != chat.Name ||
 			oldChat.Description != chat.Description ||
@@ -3712,7 +3725,7 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 		CommunityID:         community.ID(),
 		SkipEncryptionLayer: false,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
-		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		PubsubTopic:         community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()), // TODO: confirm if it should be sent in community pubsub topic
 		ResendType:          common.ResendTypeDataSync,
 		ResendMethod:        common.ResendMethodSendPrivate,
 		Recipients:          []*ecdsa.PublicKey{receiver},
@@ -4237,7 +4250,7 @@ func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_MESSAGE_ARCHIVE_MAGNETLINK,
 		SkipGroupMessageWrap: true,
-		PubsubTopic:          community.PubsubTopic(),
+		PubsubTopic:          community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 		Priority:             &common.LowPriority,
 	}
 
@@ -5034,7 +5047,7 @@ func (m *Messenger) DeleteCommunityMemberMessages(request *requests.DeleteCommun
 		Sender:              community.PrivateKey(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_DELETE_COMMUNITY_MEMBER_MESSAGES,
-		PubsubTopic:         community.PubsubTopic(),
+		PubsubTopic:         community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 	}
 
 	_, err = m.sender.SendPublic(context.Background(), community.IDString(), rawMessage)

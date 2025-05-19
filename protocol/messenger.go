@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -1093,7 +1094,7 @@ func (m *Messenger) publishContactCode() error {
 	}
 	for _, community := range joinedCommunities {
 		rawMessage.LocalChatID = community.MemberUpdateChannelID()
-		rawMessage.PubsubTopic = community.PubsubTopic()
+		rawMessage.PubsubTopic = community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic())
 		_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 		if err != nil {
 			return err
@@ -1997,7 +1998,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		// Use a single content-topic for all community chats.
 		// Reasoning: https://github.com/status-im/status-go/pull/5864
 		rawMessage.ContentTopic = community.UniversalChatID()
-		rawMessage.PubsubTopic = community.PubsubTopic()
+		rawMessage.PubsubTopic = community.PubsubTopic(wakuv2.GlobalCommunityContentPubsubTopic())
 
 		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID(), rawMessage.MessageType)
 		if err != nil {

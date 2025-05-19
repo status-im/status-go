@@ -1539,8 +1539,14 @@ func (o *Community) MemberUpdateChannelID() string {
 	return o.IDString() + "-memberUpdate"
 }
 
-func (o *Community) PubsubTopic() string {
-	return o.Shard().PubsubTopic()
+func (o *Community) PubsubTopic(fallbackPubsubTopic ...string) string {
+	if o.Shard().PubsubTopic() != "" {
+		return o.Shard().PubsubTopic()
+	}
+	if len(fallbackPubsubTopic) > 0 {
+		return fallbackPubsubTopic[0]
+	}
+	return ""
 }
 
 func (o *Community) PubsubTopicPrivateKey() *ecdsa.PrivateKey {

@@ -13,6 +13,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/messaging"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
+	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
@@ -89,7 +90,7 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 	}
 	for _, community := range joinedCommunities {
 		rawMessage.LocalChatID = community.StatusUpdatesChannelID()
-		rawMessage.PubsubTopic = community.PubsubTopic()
+		rawMessage.PubsubTopic = community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic())
 		_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 		if err != nil {
 			return err
@@ -178,7 +179,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 		MessageType: protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
 		ResendType:  common.ResendTypeNone, // does this need to be resent?
 		Ephemeral:   statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
-		PubsubTopic: community.PubsubTopic(),
+		PubsubTopic: community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 		Priority:    &common.LowPriority,
 	}
 

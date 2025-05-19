@@ -58,7 +58,7 @@ func (m *Messenger) sendPublicCommunityShardInfo(community *communities.Communit
 		// we don't want to wrap in an encryption layer message
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_SHARD_INFO,
-		PubsubTopic:         wakuv2.DefaultNonProtectedPubsubTopic(), // it must be sent always to default shard pubsub topic
+		PubsubTopic:         wakuv2.GlobalCommunityControlPubsubTopic(), // it must be sent always to default shard pubsub topic
 		Priority:            &common.HighPriority,
 	}
 

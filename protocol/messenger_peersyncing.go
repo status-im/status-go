@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/peersyncing"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 var peerSyncingLoopInterval time.Duration = 60 * time.Second
@@ -179,7 +180,7 @@ func (m *Messenger) sendDatasyncOffersForCommunities() error {
 			Payload:             payload,
 			Ephemeral:           true,
 			SkipApplicationWrap: true,
-			PubsubTopic:         community.PubsubTopic(),
+			PubsubTopic:         community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 			Priority:            &common.LowPriority,
 		}
 		_, err = m.sender.SendPublic(context.Background(), community.IDString(), rawMessage)
