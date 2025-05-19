@@ -19,7 +19,7 @@ reviewing and maintaining code in the `status-go` repository.
  
 - For **existing** code:
   - Any CC MAY nominate themselves as a code owner for any part of the existing code.
-  - Nominations SHOULD be discussed and agreed upon with other CCs if there are overlaps or concerns.
+  - Nominations SHOULD be discussed and agreed upon with other CCs to prevent and address overlaps or concerns.
 - For **new** code:
   - When introducing a new module or substantial new component, CCs SHOULD assign ownership.
   - File-level ownership MAY be used where appropriate but is not required.
@@ -27,5 +27,5 @@ reviewing and maintaining code in the `status-go` repository.
 ### Pull Request Reviews
 
 - At least one of the code owners for the affected files MUST review a PR for it to be eligible for merging.
-- If a code owner is unresponsive within a reasonable timeframe, another CC from the relevant area MAY approve 
+- If a code owner is unresponsive within a reasonable timeframe, another CC from the relevant area may approve 
 the PR in their place.
