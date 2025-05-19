@@ -3066,7 +3066,7 @@ func (b *GethStatusBackend) releaseOSMemory() {
 
 	// Collect stats before GC
 	runtime.ReadMemStats(&before)
-	b.logger.Info("Before garbage collection",
+	b.logger.Debug("Before garbage collection",
 		zap.Uint64("heap_alloc_mb", before.HeapAlloc/1024/1024),
 		zap.Uint64("heap_objects", before.HeapObjects),
 		zap.Uint64("sys_mb", before.Sys/1024/1024),
@@ -3079,7 +3079,7 @@ func (b *GethStatusBackend) releaseOSMemory() {
 	runtime.ReadMemStats(&after)
 
 	// Log results with differences
-	b.logger.Info("After garbage collection",
+	b.logger.Debug("After garbage collection",
 		zap.Uint64("heap_alloc_mb", after.HeapAlloc/1024/1024),
 		zap.Uint64("heap_objects", after.HeapObjects),
 		zap.Uint64("sys_mb", after.Sys/1024/1024),
