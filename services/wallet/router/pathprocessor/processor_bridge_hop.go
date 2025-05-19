@@ -65,6 +65,13 @@ type BonderFee struct {
 }
 
 func (bf *BonderFee) UnmarshalJSON(data []byte) error {
+	var errorResponse struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(data, &errorResponse); err == nil && errorResponse.Error != "" {
+		return createBridgeHopErrorResponse(fmt.Errorf(errorResponse.Error))
+	}
+
 	type Alias BonderFee
 	aux := &struct {
 		AmountIn                string  `json:"amountIn"`
