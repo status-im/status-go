@@ -141,7 +141,7 @@ func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[strin
 			}
 
 			for suffix, token := range authTokens {
-				if strings.HasSuffix(host, suffix) && token.NotEmpty() {
+				if strings.HasSuffix(host, suffix) && !token.Empty() {
 					provider.AuthType = params.TokenAuth
 					provider.AuthToken = token
 					break

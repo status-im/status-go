@@ -50,7 +50,7 @@ func (o *HTTPClient) doGetRequest(ctx context.Context, url string, apiKey securi
 
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0")
-		if tmpAPIKey.NotEmpty() {
+		if !tmpAPIKey.Empty() {
 			req.Header.Set("X-API-KEY", tmpAPIKey.Reveal())
 		}
 
@@ -83,7 +83,7 @@ func (o *HTTPClient) doGetRequest(ctx context.Context, url string, apiKey securi
 			// break and error
 		case http.StatusForbidden:
 			// Request requires an apiKey, set it and retry
-			if tmpAPIKey.Empty() && apiKey.NotEmpty() {
+			if tmpAPIKey.Empty() && !apiKey.Empty() {
 				tmpAPIKey = apiKey
 				// sleep and retry
 				time.Sleep(getRequestWaitTime)

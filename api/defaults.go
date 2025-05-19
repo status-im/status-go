@@ -174,54 +174,54 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 		walletConfig.StatusProxyStageName = request.StatusProxyStageName
 	}
 
-	if request.OpenseaAPIKey.NotEmpty() {
+	if !request.OpenseaAPIKey.Empty() {
 		walletConfig.OpenseaAPIKey = request.OpenseaAPIKey
 	}
 
-	if request.RaribleMainnetAPIKey.NotEmpty() {
+	if !request.RaribleMainnetAPIKey.Empty() {
 		walletConfig.RaribleMainnetAPIKey = request.RaribleMainnetAPIKey
 	}
 
-	if request.RaribleTestnetAPIKey.NotEmpty() {
+	if !request.RaribleTestnetAPIKey.Empty() {
 		walletConfig.RaribleTestnetAPIKey = request.RaribleTestnetAPIKey
 	}
 
-	if request.InfuraToken.NotEmpty() {
+	if !request.InfuraToken.Empty() {
 		walletConfig.InfuraAPIKey = request.InfuraToken
 	}
 
-	if request.InfuraSecret.NotEmpty() {
+	if !request.InfuraSecret.Empty() {
 		walletConfig.InfuraAPIKeySecret = request.InfuraSecret
 	}
 
-	if request.AlchemyEthereumMainnetToken.NotEmpty() {
+	if !request.AlchemyEthereumMainnetToken.Empty() {
 		walletConfig.AlchemyAPIKeys[common.MainnetChainID] = request.AlchemyEthereumMainnetToken
 	}
-	if request.AlchemyEthereumSepoliaToken.NotEmpty() {
+	if !request.AlchemyEthereumSepoliaToken.Empty() {
 		walletConfig.AlchemyAPIKeys[common.SepoliaChainID] = request.AlchemyEthereumSepoliaToken
 	}
-	if request.AlchemyArbitrumMainnetToken.NotEmpty() {
+	if !request.AlchemyArbitrumMainnetToken.Empty() {
 		walletConfig.AlchemyAPIKeys[common.ArbitrumChainID] = request.AlchemyArbitrumMainnetToken
 	}
-	if request.AlchemyArbitrumSepoliaToken.NotEmpty() {
+	if !request.AlchemyArbitrumSepoliaToken.Empty() {
 		walletConfig.AlchemyAPIKeys[common.ArbitrumSepoliaChainID] = request.AlchemyArbitrumSepoliaToken
 	}
-	if request.AlchemyOptimismMainnetToken.NotEmpty() {
+	if !request.AlchemyOptimismMainnetToken.Empty() {
 		walletConfig.AlchemyAPIKeys[common.OptimismChainID] = request.AlchemyOptimismMainnetToken
 	}
-	if request.AlchemyOptimismSepoliaToken.NotEmpty() {
+	if !request.AlchemyOptimismSepoliaToken.Empty() {
 		walletConfig.AlchemyAPIKeys[common.OptimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
 	}
-	if request.AlchemyBaseMainnetToken.NotEmpty() {
+	if !request.AlchemyBaseMainnetToken.Empty() {
 		walletConfig.AlchemyAPIKeys[common.BaseChainID] = request.AlchemyBaseMainnetToken
 	}
-	if request.AlchemyBaseSepoliaToken.NotEmpty() {
+	if !request.AlchemyBaseSepoliaToken.Empty() {
 		walletConfig.AlchemyAPIKeys[common.BaseSepoliaChainID] = request.AlchemyBaseSepoliaToken
 	}
-	if request.StatusProxyMarketUser.NotEmpty() {
+	if !request.StatusProxyMarketUser.Empty() {
 		walletConfig.StatusProxyMarketUser = request.StatusProxyMarketUser
 	}
-	if request.StatusProxyMarketPassword.NotEmpty() {
+	if !request.StatusProxyMarketPassword.Empty() {
 		walletConfig.StatusProxyMarketPassword = request.StatusProxyMarketPassword
 	}
 	if request.MarketDataProxyUser != "" {
@@ -241,20 +241,20 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	}
 
 	// FIXME: remove when EthRpcProxy* is integrated
-	if request.StatusProxyBlockchainUser.NotEmpty() {
+	if !request.StatusProxyBlockchainUser.Empty() {
 		walletConfig.StatusProxyBlockchainUser = request.StatusProxyBlockchainUser
 	}
-	if request.StatusProxyBlockchainPassword.NotEmpty() {
+	if !request.StatusProxyBlockchainPassword.Empty() {
 		walletConfig.StatusProxyBlockchainPassword = request.StatusProxyBlockchainPassword
 	}
 
-	if request.EthRpcProxyUrl.NotEmpty() {
+	if !request.EthRpcProxyUrl.Empty() {
 		walletConfig.EthRpcProxyUrl = request.EthRpcProxyUrl
 	}
-	if request.EthRpcProxyUser.NotEmpty() {
+	if !request.EthRpcProxyUser.Empty() {
 		walletConfig.EthRpcProxyUser = request.EthRpcProxyUser
 	}
-	if request.EthRpcProxyPassword.NotEmpty() {
+	if !request.EthRpcProxyPassword.Empty() {
 		walletConfig.EthRpcProxyPassword = request.EthRpcProxyPassword
 	}
 

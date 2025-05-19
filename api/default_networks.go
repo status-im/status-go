@@ -470,7 +470,7 @@ func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConf
 	networks = networkhelper.OverrideDirectProvidersAuth(networks, authTokens)
 
 	// Apply auth for new smart proxy
-	hasSmartProxyCredentials := walletConfig.EthRpcProxyUser.NotEmpty() && walletConfig.EthRpcProxyPassword.NotEmpty()
+	hasSmartProxyCredentials := !walletConfig.EthRpcProxyUser.Empty() && !walletConfig.EthRpcProxyPassword.Empty()
 	networks = networkhelper.OverrideBasicAuth(
 		networks,
 		params.EmbeddedEthRpcProxyProviderType,
@@ -479,7 +479,7 @@ func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConf
 		walletConfig.EthRpcProxyPassword)
 
 	// Apply auth for old proxy
-	hasOldProxyCredentials := walletConfig.StatusProxyBlockchainUser.NotEmpty() && walletConfig.StatusProxyBlockchainPassword.NotEmpty()
+	hasOldProxyCredentials := !walletConfig.StatusProxyBlockchainUser.Empty() && !walletConfig.StatusProxyBlockchainPassword.Empty()
 	networks = networkhelper.OverrideBasicAuth(
 		networks,
 		params.EmbeddedProxyProviderType,

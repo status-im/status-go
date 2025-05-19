@@ -20,7 +20,7 @@ func rpcProviderStructLevelValidation(sl validator.StructLevel) {
 
 	switch provider.AuthType {
 	case params.NoAuth:
-		if provider.AuthLogin.NotEmpty() || provider.AuthPassword.NotEmpty() || provider.AuthToken.NotEmpty() {
+		if !provider.AuthLogin.Empty() || !provider.AuthPassword.Empty() || !provider.AuthToken.Empty() {
 			sl.ReportError(provider.AuthLogin, "AuthLogin", "authLogin", "noauth_fields_empty", "")
 			sl.ReportError(provider.AuthPassword, "AuthPassword", "authPassword", "noauth_fields_empty", "")
 			sl.ReportError(provider.AuthToken, "AuthToken", "authToken", "noauth_fields_empty", "")
@@ -32,14 +32,14 @@ func rpcProviderStructLevelValidation(sl validator.StructLevel) {
 		if provider.AuthPassword.Empty() {
 			sl.ReportError(provider.AuthPassword, "AuthPassword", "authPassword", "required", "")
 		}
-		if provider.AuthToken.NotEmpty() {
+		if !provider.AuthToken.Empty() {
 			sl.ReportError(provider.AuthToken, "AuthToken", "authToken", "basic_auth_token_empty", "")
 		}
 	case params.TokenAuth:
 		if provider.AuthToken.Empty() {
 			sl.ReportError(provider.AuthToken, "AuthToken", "authToken", "required", "")
 		}
-		if provider.AuthLogin.NotEmpty() || provider.AuthPassword.NotEmpty() {
+		if !provider.AuthLogin.Empty() || !provider.AuthPassword.Empty() {
 			sl.ReportError(provider.AuthLogin, "AuthLogin", "authLogin", "tokenauth_fields_empty", "")
 			sl.ReportError(provider.AuthPassword, "AuthPassword", "authPassword", "tokenauth_fields_empty", "")
 		}

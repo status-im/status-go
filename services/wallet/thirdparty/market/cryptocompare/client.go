@@ -63,7 +63,7 @@ func NewClient() *Client {
 
 func NewClientWithParams(params Params) *Client {
 	var creds *thirdparty.BasicCreds
-	if params.User.NotEmpty() {
+	if !params.User.Empty() {
 		creds = &thirdparty.BasicCreds{
 			User:     params.User,
 			Password: params.Password,
