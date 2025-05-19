@@ -3050,15 +3050,13 @@ func (b *GethStatusBackend) ReleaseOSMemory() error {
 	b.lastGCTimeLock.Lock()
 	defer b.lastGCTimeLock.Unlock()
 
-	var err error
 	// Only run GC if 10 seconds have passed since the last call
-	if time.Since(b.lastGCTime) >= gcInterval {
-		b.releaseOSMemory()
-		b.lastGCTime = time.Now()
-	} else {
-		err = errors.New("skipping GC because it was called too recently")
+	if time.Since(b.lastGCTime) < gcInterval {
+		return errors.New("skipping GC because it was called too recently")
 	}
-	return err
+	b.releaseOSMemory()
+	b.lastGCTime = time.Now()
+	return nil
 }
 
 func (b *GethStatusBackend) releaseOSMemory() {
