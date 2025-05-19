@@ -8,6 +8,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
+	"github.com/waku-org/go-waku/waku/v2/api/history"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/connection"
@@ -16,7 +18,6 @@ import (
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/waku/types"
-	"github.com/waku-org/go-waku/waku/v2/api/history"
 )
 
 type API struct {

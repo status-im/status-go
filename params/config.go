@@ -429,7 +429,7 @@ type WalletConfig struct {
 	InfuraAPIKeySecret        security.SensitiveString            `json:"InfuraAPIKeySecret"`
 	StatusProxyMarketUser     security.SensitiveString            `json:"StatusProxyMarketUser"`
 	StatusProxyMarketPassword security.SensitiveString            `json:"StatusProxyMarketPassword"`
-	MarketDataProxyConfig     MarketDataProxyConfig `json:"MarketDataProxyConfig"`
+	MarketDataProxyConfig     MarketDataProxyConfig               `json:"MarketDataProxyConfig"`
 	// FIXME: remove when EthRpcProxy* is integrated
 	StatusProxyBlockchainUser     security.SensitiveString `json:"StatusProxyBlockchainUser"`
 	StatusProxyBlockchainPassword security.SensitiveString `json:"StatusProxyBlockchainPassword"`
