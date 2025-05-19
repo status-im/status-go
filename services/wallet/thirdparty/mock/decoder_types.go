@@ -12,7 +12,7 @@ package mock_thirdparty
 import (
 	reflect "reflect"
 
-	thirdparty "github.com/status-im/status-go/v10/services/wallet/thirdparty"
+	thirdparty "github.com/status-im/status-go/services/wallet/thirdparty"
 	gomock "go.uber.org/mock/gomock"
 )
 
