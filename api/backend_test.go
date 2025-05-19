@@ -1926,3 +1926,17 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, acc)
 }
+
+func TestReleaseOSMemory(t *testing.T) {
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+
+	// the first call should succeed
+	require.NoError(t, b.ReleaseOSMemory())
+
+	// the second immediate call should be skipped due to rate limiting
+	require.Error(t, b.ReleaseOSMemory())
+
+	// reset the lastGCTime to allow the next call
+	b.lastGCTime = time.Now().Add(-(gcInterval + time.Second))
+	require.NoError(t, b.ReleaseOSMemory())
+}

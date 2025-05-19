@@ -9,6 +9,8 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -66,6 +68,10 @@ import (
 	"github.com/status-im/status-go/walletdatabase"
 )
 
+const (
+	gcInterval = 10 * time.Second
+)
+
 var (
 	// ErrWhisperClearIdentitiesFailure clearing whisper identities has failed.
 	ErrWhisperClearIdentitiesFailure = errors.New("failed to clear whisper identities")
@@ -110,6 +116,9 @@ type GethStatusBackend struct {
 
 	logger            *zap.Logger
 	preLoginLogConfig *logutils.PreLoginLogConfig
+
+	lastGCTime     time.Time
+	lastGCTimeLock sync.Mutex
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -3035,4 +3044,47 @@ func (b *GethStatusBackend) SetPreLoginLogLevel(level string) error {
 		return err
 	}
 	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
+}
+
+func (b *GethStatusBackend) ReleaseOSMemory() error {
+	b.lastGCTimeLock.Lock()
+	defer b.lastGCTimeLock.Unlock()
+
+	var err error
+	// Only run GC if 10 seconds have passed since the last call
+	if time.Since(b.lastGCTime) >= gcInterval {
+		b.releaseOSMemory()
+		b.lastGCTime = time.Now()
+	} else {
+		err = errors.New("skipping GC because it was called too recently")
+	}
+	return err
+}
+
+func (b *GethStatusBackend) releaseOSMemory() {
+	var before, after runtime.MemStats
+
+	// Collect stats before GC
+	runtime.ReadMemStats(&before)
+	b.logger.Info("Before garbage collection",
+		zap.Uint64("heap_alloc_mb", before.HeapAlloc/1024/1024),
+		zap.Uint64("heap_objects", before.HeapObjects),
+		zap.Uint64("sys_mb", before.Sys/1024/1024),
+	)
+
+	runtime.GC()
+	debug.FreeOSMemory()
+
+	// Collect stats after GC
+	runtime.ReadMemStats(&after)
+
+	// Log results with differences
+	b.logger.Info("After garbage collection",
+		zap.Uint64("heap_alloc_mb", after.HeapAlloc/1024/1024),
+		zap.Uint64("heap_objects", after.HeapObjects),
+		zap.Uint64("sys_mb", after.Sys/1024/1024),
+		zap.Int64("freed_mb", int64(before.HeapAlloc-after.HeapAlloc)/1024/1024),
+		zap.Int64("objects_freed", int64(before.HeapObjects-after.HeapObjects)),
+		zap.Int64("released_mb", int64(after.HeapReleased-before.HeapReleased)/1024/1024),
+	)
 }
