@@ -60,16 +60,16 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 		// check fallback options
 		if strings.Contains(n.RPCURL, "infura.io") {
-			require.True(t, strings.Contains(n.RPCURL, infuraToken.Reveal()))
+			require.True(t, infuraToken.ContainedIn(n.RPCURL))
 		}
 		if strings.Contains(n.FallbackURL, "grove.city") {
-			require.True(t, strings.Contains(n.FallbackURL, poktToken.Reveal()))
+			require.True(t, poktToken.ContainedIn(n.FallbackURL))
 		}
 
 		// Check proxy providers for stageName
 		for _, provider := range n.RpcProviders {
 			if provider.Type == params.EmbeddedProxyProviderType {
-				require.Contains(t, provider.URL.Reveal(), stageName, "Proxy provider URL should contain stageName")
+				require.True(t, provider.URL.Contains(stageName), "Proxy provider URL should contain stageName")
 			}
 		}
 

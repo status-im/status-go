@@ -73,6 +73,10 @@ func (s SensitiveString) Contains(substr any) bool {
 	return strings.Contains(s.value, getValue(substr))
 }
 
+func (s SensitiveString) ContainedIn(str any) bool {
+	return strings.Contains(getValue(str), s.value)
+}
+
 func (s SensitiveString) Append(others ...any) SensitiveString {
 	result := s.value
 	for _, other := range others {

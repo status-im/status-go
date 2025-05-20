@@ -22,9 +22,9 @@ func TestRpcProvider_GetFullURL(t *testing.T) {
 		AuthToken: security.NewSensitiveString("mytoken"),
 	}
 	expectedFullURL := "https://api.example.com/mytoken"
-	assert.Equal(t, expectedFullURL, provider.GetFullURL().Reveal())
+	assert.True(t, provider.GetFullURL().Equal(expectedFullURL))
 
 	provider.AuthType = params.NoAuth
 	expectedFullURL = "https://api.example.com"
-	assert.Equal(t, expectedFullURL, provider.GetFullURL().Reveal())
+	assert.True(t, provider.GetFullURL().Equal(expectedFullURL))
 }
