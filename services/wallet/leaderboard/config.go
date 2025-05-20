@@ -3,6 +3,8 @@ package leaderboard
 import (
 	"time"
 
+	"github.com/status-im/status-go/internal/security"
+
 	"github.com/status-im/status-go/params"
 )
 
@@ -15,8 +17,8 @@ const (
 type ServiceConfig struct {
 	// API connection settings
 	ProxyURL string
-	User     string
-	Password string
+	User     security.SensitiveString
+	Password security.SensitiveString
 
 	// Refresh intervals (in seconds)
 	FullDataInterval    time.Duration
