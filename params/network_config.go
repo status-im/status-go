@@ -95,6 +95,8 @@ type Network struct {
 	IsActive               bool            `json:"isActive"`
 	IsDeactivatable        bool            `json:"isDeactivatable"`
 	EIP1559Enabled         bool            `json:"eip1559Enabled"`
+	NoBaseFee              bool            `json:"noBaseFee"`
+	NoPriorityFee          bool            `json:"noPriorityFee"`
 }
 
 func (n *Network) DeepCopy() Network {

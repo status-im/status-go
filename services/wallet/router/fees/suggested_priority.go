@@ -68,8 +68,8 @@ func (f *FeeManager) getNonEIP1559SuggestedFees(ctx context.Context, chainID uin
 
 // getEIP1559SuggestedFees returns suggested fees for EIP-1559 compatible chains
 // source https://github.com/brave/brave-core/blob/master/components/brave_wallet/browser/eth_gas_utils.cc
-func getEIP1559SuggestedFees(feeHistory *FeeHistory) (lowPriorityFee, avgPriorityFee, highPriorityFee, suggestedBaseFee *big.Int, err error) {
-	if feeHistory == nil || !feeHistory.isEIP1559Compatible() {
+func getEIP1559SuggestedFees(chainID uint64, feeHistory *FeeHistory) (lowPriorityFee, avgPriorityFee, highPriorityFee, suggestedBaseFee *big.Int, err error) {
+	if feeHistory == nil || !feeHistory.isEIP1559Compatible(chainID) {
 		return nil, nil, nil, nil, ErrEIP1559IncompaibleChain
 	}
 

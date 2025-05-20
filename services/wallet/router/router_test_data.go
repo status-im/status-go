@@ -129,6 +129,8 @@ var mainnet = params.Network{
 	Enabled:                true,
 	RelatedChainID:         walletCommon.EthereumMainnet,
 	EIP1559Enabled:         true,
+	NoBaseFee:              false,
+	NoPriorityFee:          false,
 }
 
 var optimism = params.Network{
@@ -153,6 +155,8 @@ var optimism = params.Network{
 	Enabled:                true,
 	RelatedChainID:         walletCommon.OptimismMainnet,
 	EIP1559Enabled:         true,
+	NoBaseFee:              false,
+	NoPriorityFee:          false,
 }
 
 var arbitrum = params.Network{
@@ -177,6 +181,8 @@ var arbitrum = params.Network{
 	Enabled:                true,
 	RelatedChainID:         walletCommon.ArbitrumMainnet,
 	EIP1559Enabled:         true,
+	NoBaseFee:              false,
+	NoPriorityFee:          false,
 }
 
 var base = params.Network{
@@ -201,6 +207,8 @@ var base = params.Network{
 	Enabled:                true,
 	RelatedChainID:         walletCommon.BaseMainnet,
 	EIP1559Enabled:         true,
+	NoBaseFee:              false,
+	NoPriorityFee:          false,
 }
 
 var bsc = params.Network{
@@ -222,6 +230,8 @@ var bsc = params.Network{
 	Enabled:                true,
 	RelatedChainID:         walletCommon.BSCMainnet,
 	EIP1559Enabled:         true,
+	NoBaseFee:              false,
+	NoPriorityFee:          false,
 }
 
 var defaultNetworks = []params.Network{

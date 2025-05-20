@@ -110,6 +110,10 @@ type FeeManager struct {
 }
 
 func (f *FeeManager) IsEIP1559Enabled(ctx context.Context, chainID uint64) (bool, error) {
+	if common.IsGaslessChainAndEIP1559Compatible(chainID) {
+		return true, nil
+	}
+
 	backend, err := f.RPCClient.EthClient(chainID)
 	if err != nil {
 		return false, err
@@ -118,7 +122,7 @@ func (f *FeeManager) IsEIP1559Enabled(ctx context.Context, chainID uint64) (bool
 	if err != nil {
 		return false, err
 	}
-	return block.BaseFee() != nil, nil
+	return block.BaseFee() != nil && block.BaseFee().Cmp(big.NewInt(0)) > 0, nil
 }
 
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
@@ -127,7 +131,7 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 		return f.getNonEIP1559SuggestedFees(ctx, chainID)
 	}
 
-	lowPriorityFeePerGasLowerBound, mediumPriorityFeePerGas, maxPriorityFeePerGasUpperBound, baseFee, err := getEIP1559SuggestedFees(feeHistory)
+	lowPriorityFeePerGasLowerBound, mediumPriorityFeePerGas, maxPriorityFeePerGasUpperBound, baseFee, err := getEIP1559SuggestedFees(chainID, feeHistory)
 	if err != nil {
 		return f.getNonEIP1559SuggestedFees(ctx, chainID)
 	}

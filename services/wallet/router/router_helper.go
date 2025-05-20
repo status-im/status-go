@@ -387,10 +387,16 @@ func (r *Router) applyCustomTxFeeMode(ctx context.Context, path *routes.Path, fe
 	return nil
 }
 
+func (r *Router) updatePathFields(path *routes.Path, fetchedFees *fees.SuggestedFees) {
+	path.FromChain.EIP1559Enabled = fetchedFees.EIP1559Enabled
+	path.FromChain.NoBaseFee = walletCommon.HasNoBaseFee(path.FromChain.ChainID)
+	path.FromChain.NoPriorityFee = walletCommon.HasNoPriorityFee(path.FromChain.ChainID)
+}
+
 func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees,
 	usedNonces map[uint64]uint64, testsMode bool, testApprovalL1Fee uint64) (err error) {
 
-	path.FromChain.EIP1559Enabled = fetchedFees.EIP1559Enabled
+	r.updatePathFields(path, fetchedFees)
 
 	l1TxFeeWei := big.NewInt(0)
 	l1ApprovalFeeWei := big.NewInt(0)
