@@ -8,30 +8,22 @@ import (
 	stdlog "log"
 	"math/rand"
 	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
+	"path"
 	"time"
+
+	"go.uber.org/zap"
+
+	abi_spec "github.com/status-im/status-go/abi-spec"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh/terminal"
 
-	"github.com/ethereum/go-ethereum/log"
-
-	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/cmd/utils"
-	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	wakuextn "github.com/status-im/status-go/services/wakuv2ext"
@@ -43,45 +35,23 @@ func (t *testTimeSource) GetCurrentTime() uint64 {
 	return uint64(time.Now().Unix()) * 1000
 }
 
-const (
-	serverClientName = "Statusd"
-)
-
 var (
-	configFiles      configFlags
-	logLevel         = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
-	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
-	ipcEnabled       = flag.Bool("ipc", false, "Enable IPC RPC endpoint")
-	ipcFile          = flag.String("ipcfile", "", "Set IPC file path")
-	seedPhrase       = flag.String("seed-phrase", "", "Seed phrase")
-	version          = flag.Bool("version", false, "Print version and dump configuration")
-	nAddedContacts   = flag.Int("added-contacts", 100, "Number of added contacts to create")
-	nContacts        = flag.Int("contacts", 100, "Number of contacts to create")
-	nPublicChats     = flag.Int("public-chats", 5, "Number of public chats")
-	nCommunities     = flag.Int("communities", 5, "Number of communities")
-	nMessages        = flag.Int("number-of-messages", 0, "Number of messages for each chat")
-	nOneToOneChats   = flag.Int("one-to-one-chats", 5, "Number of one to one chats")
+	seedPhrase     = flag.String("seed-phrase", "", "Seed phrase")
+	nAddedContacts = flag.Int("added-contacts", 100, "Number of added contacts to create")
+	nContacts      = flag.Int("contacts", 100, "Number of contacts to create")
+	nPublicChats   = flag.Int("public-chats", 5, "Number of public chats")
+	nCommunities   = flag.Int("communities", 5, "Number of communities")
+	nMessages      = flag.Int("number-of-messages", 0, "Number of messages for each chat")
+	nOneToOneChats = flag.Int("one-to-one-chats", 5, "Number of one to one chats")
 
-	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
-	networkID = flag.Int(
-		"network-id",
-		params.SepoliaNetworkID,
-		fmt.Sprintf(
-			"A network ID: %d (Ethereum), %d (Sepolia)",
-			params.MainNetworkID, params.SepoliaNetworkID,
-		),
-	)
-	listenAddr = flag.String("addr", "", "address to bind listener to")
+	logLevel      = flag.String("log", "DEBUG", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	fetchBackup   = flag.Bool("fetch-backup", false, "Fetch backup")
+	proxyUser     = flag.String("proxy-user", os.Getenv("STATUS_BUILD_PROXY_USER"), "Proxy user, defaults to STATUS_BUILD_PROXY_USER env var")
+	proxyPassword = flag.String("proxy-password", os.Getenv("STATUS_BUILD_PROXY_PASSWORD"), "Proxy password, defaults to STATUS_BUILD_PROXY_PASSWORD env var")
+	dataDir       = flag.String("root-data-dir", getDefaultDataDir(), "Root data directory, use current directory if not specified")
+	password      = flag.String("password", "1234567890", "password to encrypt db")
 )
 
-// All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/cmd/statusd")
-
-func init() {
-	flag.Var(&configFiles, "c", "JSON configuration file(s). Multiple configuration files can be specified, and will be merged in occurrence order")
-}
-
-// nolint:gocyclo
 func main() {
 	if err := logutils.OverrideRootLoggerWithConfig(logutils.LogSettings{
 		Enabled:   true,
@@ -91,56 +61,80 @@ func main() {
 		stdlog.Fatalf("Error initializing logger: %v", err)
 	}
 
-	flag.Usage = printUsage
+	logger := logutils.ZapLogger()
+
 	flag.Parse()
-	if flag.NArg() > 0 {
-		printUsage()
-		logger.Error("Extra args in command line: %v", flag.Args())
+
+	logDir := path.Join(*dataDir, "logs")
+	err := os.MkdirAll(logDir, 0700)
+	if err != nil {
+		logger.Error("failed to create log directory", zap.Error(err))
 		os.Exit(1)
 	}
 
-	opts := []params.Option{}
+	backend := api.NewGethStatusBackend(logger)
+	sha3Password := abi_spec.Sha3WithHexPrefix(*password)
+	backend.UpdateRootDataDir(*dataDir)
+	err = backend.OpenAccounts()
+	if err != nil {
+		logger.Error("failed to open accounts", zap.Error(err))
+		os.Exit(1)
+	}
 
-	config, err := params.NewNodeConfigWithDefaultsAndFiles(
+	restoreAccountRequestTemplate := `
+	{
+  "customizationColor": "blue",
+  "fetchBackup": %t,
+  "kdfIterations": 3200,
+  "logEnabled": true,
+  "logFilePath": "%s",
+  "logLevel": "%s",
+  "mnemonic": "%s",
+  "password": "%s",
+  "poktToken": "3ef2018191814b7e1009b8d9",
+  "rootDataDir": "%s",
+  "rootKeystoreDir": "%s/keystore",
+  "statusProxyBlockchainPassword": "%s",
+  "statusProxyBlockchainUser": "%s",
+  "statusProxyEnabled": true,
+  "statusProxyMarketPassword": "%s",
+  "statusProxyMarketUser": "%s",
+  "statusProxyStageName": "test",
+  "testNetworksEnabled": true,
+  "verifyENSContractAddress": "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
+  "verifyENSURL": "https://eth-archival.rpc.grove.city/v1/3ef2018191814b7e1009b8d9",
+  "verifyTransactionChainID": 1,
+  "verifyTransactionURL": "https://eth-archival.rpc.grove.city/v1/3ef2018191814b7e1009b8d9",
+  "wakuV2EnableMissingMessageVerification": true,
+  "wakuV2EnableStoreConfirmationForMessagesSent": false,
+  "wakuV2LightClient": true,
+  "wakuV2Nameserver": "8.8.8.8"
+}`
+	restoreAccountRequestJSON := fmt.Sprintf(restoreAccountRequestTemplate,
+		*fetchBackup,
+		logDir,
+		*logLevel,
+		*seedPhrase,
+		sha3Password,
 		*dataDir,
-		uint64(*networkID),
-		opts,
-		configFiles,
+		*dataDir,
+		*proxyPassword,
+		*proxyUser,
+		*proxyPassword,
+		*proxyUser,
 	)
+	restoreAccountRequest := &requests.RestoreAccount{}
+	err = json.Unmarshal([]byte(restoreAccountRequestJSON), restoreAccountRequest)
 	if err != nil {
-		printUsage()
-		logger.Error(err.Error())
+		logger.Error("failed to unmarshal restore account request", zap.Error(err))
 		os.Exit(1)
 	}
+	logger.Info("final restoreAccountRequest", zap.Any("restoreAccountRequest", restoreAccountRequest))
 
-	// Use listenAddr if and only if explicitly provided in the arguments.
-	// The default value is set in params.NewNodeConfigWithDefaultsAndFiles().
-	if *listenAddr != "" {
-		config.ListenAddr = *listenAddr
-	}
-
-	// enable IPC RPC
-	if *ipcEnabled {
-		config.IPCEnabled = true
-		config.IPCFile = *ipcFile
-	}
-
-	// set up logging options
-	utils.SetupLogging(logLevel, logWithoutColors, config)
-
-	// We want statusd to be distinct from StatusIM client.
-	config.Name = serverClientName
-
-	if *version {
-		printVersion(config)
-		return
-	}
-
-	backend := api.NewGethStatusBackend(logutils.ZapLogger())
-	err = ImportAccount(*seedPhrase, backend)
+	_, err = backend.RestoreAccountAndLogin(restoreAccountRequest)
 	if err != nil {
-		logger.Error("failed import account", "err", err)
-		return
+		logger.Error("failed to restore account and login", zap.Error(err))
+		os.Exit(1)
 	}
 
 	wakuextservice := backend.StatusNode().WakuV2ExtService()
@@ -155,7 +149,7 @@ func main() {
 	// the config is set to Enabled
 	_, err = wakuext.StartMessenger()
 	if err != nil {
-		logger.Error("failed to start messenger", "error", err)
+		logger.Error("failed to start messenger", zap.Error(err))
 		return
 	}
 
@@ -164,14 +158,14 @@ func main() {
 	for i := 0; i < *nAddedContacts; i++ {
 		key, err := crypto.GenerateKey()
 		if err != nil {
-			logger.Error("failed generate key", err)
+			logger.Error("failed generate key", zap.Error(err))
 			return
 		}
 
 		keyString := common.PubkeyToHex(&key.PublicKey)
 		_, err = wakuext.AddContact(context.Background(), &requests.AddContact{ID: keyString})
 		if err != nil {
-			logger.Error("failed Add contact", "err", err)
+			logger.Error("failed Add contact", zap.Error(err))
 			return
 		}
 	}
@@ -222,7 +216,7 @@ func main() {
 
 	}
 
-	logger.Info("Creating communities", "num", *nCommunities)
+	logger.Info("Creating communities", zap.Int("num", *nCommunities))
 	for i := 0; i < *nCommunities; i++ {
 		request := requests.CreateCommunity{
 			Name:        randomString(10),
@@ -232,7 +226,7 @@ func main() {
 		}
 		_, err = wakuext.CreateCommunity(&request)
 		if err != nil {
-			logger.Error("failed to create community", "error", err)
+			logger.Error("failed to create community", zap.Error(err))
 			return
 		}
 	}
@@ -270,221 +264,11 @@ func main() {
 }
 
 func getDefaultDataDir() string {
-	if home := os.Getenv("HOME"); home != "" {
-		return filepath.Join(home, ".statusd")
-	}
-	return "./statusd-data"
-}
-
-// printVersion prints verbose output about version and config.
-func printVersion(config *params.NodeConfig) {
-	fmt.Println(strings.Title(config.Name))
-	fmt.Println("Version:", config.Version)
-	fmt.Println("Network ID:", config.NetworkID)
-	fmt.Println("Go Version:", runtime.Version())
-	fmt.Println("OS:", runtime.GOOS)
-	fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))
-	fmt.Printf("GOROOT=%s\n", runtime.GOROOT())
-
-	fmt.Println("Loaded Config: ", config)
-}
-
-func printUsage() {
-	usage := `
-Usage: statusd [options]
-Examples:
-  statusd                                        # run regular Whisper node that joins Status network
-  statusd -c ./default.json                      # run node with configuration specified in ./default.json file
-  statusd -c ./default.json -c ./standalone.json # run node with configuration specified in ./default.json file, after merging ./standalone.json file
-  statusd -c ./default.json -metrics             # run node with configuration specified in ./default.json file, and expose ethereum metrics with debug_metrics jsonrpc call
-
-Options:
-`
-	fmt.Fprint(os.Stderr, usage)
-	flag.PrintDefaults()
-}
-
-const pathWalletRoot = "m/44'/60'/0'/0"
-const pathEIP1581 = "m/43'/60'/1581'"
-const pathDefaultChat = pathEIP1581 + "/0'/0"
-const pathDefaultWallet = pathWalletRoot + "/0"
-
-var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
-
-func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
-	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
-
-	defaultSettings := &settings.Settings{}
-	defaultSettings.KeyUID = generatedAccountInfo.KeyUID
-	defaultSettings.Address = types.HexToAddress(generatedAccountInfo.Address)
-	defaultSettings.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
-
-	// Set chat key & name
-	name, err := alias.GenerateFromPublicKeyString(chatKeyString)
+	dir, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	defaultSettings.Name = name
-	defaultSettings.PublicKey = chatKeyString
-
-	defaultSettings.DappsAddress = types.HexToAddress(derivedAddresses[pathDefaultWallet].Address)
-	defaultSettings.EIP1581Address = types.HexToAddress(derivedAddresses[pathEIP1581].Address)
-	defaultSettings.Mnemonic = mnemonic
-
-	signingPhrase, err := buildSigningPhrase()
-	if err != nil {
-		return nil, err
-	}
-	defaultSettings.SigningPhrase = signingPhrase
-
-	defaultSettings.SendPushNotifications = true
-	defaultSettings.InstallationID = uuid.New().String()
-	defaultSettings.UseMailservers = true
-
-	defaultSettings.PreviewPrivacy = true
-	defaultSettings.PeerSyncingEnabled = false
-	defaultSettings.Currency = "usd"
-	defaultSettings.ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
-	defaultSettings.LinkPreviewRequestEnabled = true
-
-	defaultSettings.TestNetworksEnabled = false
-
-	defaultSettings.AutoRefreshTokensEnabled = true
-
-	visibleTokens := make(map[string][]string)
-	visibleTokens["mainnet"] = []string{"SNT"}
-	visibleTokensJSON, err := json.Marshal(visibleTokens)
-	if err != nil {
-		return nil, err
-	}
-	visibleTokenJSONRaw := json.RawMessage(visibleTokensJSON)
-	defaultSettings.WalletVisibleTokens = &visibleTokenJSONRaw
-
-	// TODO: fix this
-	networks := make([]map[string]string, 0)
-	networksJSON, err := json.Marshal(networks)
-	if err != nil {
-		return nil, err
-	}
-	networkRawMessage := json.RawMessage(networksJSON)
-	defaultSettings.Networks = &networkRawMessage
-	defaultSettings.CurrentNetwork = "mainnet_rpc"
-
-	return defaultSettings, nil
-}
-
-func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
-	// Set mainnet
-	nodeConfig := &params.NodeConfig{}
-	nodeConfig.NetworkID = 1
-	nodeConfig.LogLevel = "ERROR"
-	nodeConfig.DataDir = api.DefaultDataDir
-
-	nodeConfig.Name = "StatusIM"
-	clusterConfig, err := params.LoadClusterConfigFromFleet("eth.prod")
-	if err != nil {
-		return nil, err
-	}
-	nodeConfig.ClusterConfig = *clusterConfig
-
-	nodeConfig.WalletConfig = params.WalletConfig{Enabled: true}
-	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
-	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
-	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
-	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
-	nodeConfig.WakuV2Config = params.WakuV2Config{
-		Enabled:     true,
-		LightClient: true,
-	}
-
-	nodeConfig.ShhextConfig = params.ShhextConfig{
-		InstallationID:             installationID,
-		MaxMessageDeliveryAttempts: api.DefaultMaxMessageDeliveryAttempts,
-		MailServerConfirmations:    true,
-		VerifyTransactionURL:       "",
-		VerifyENSURL:               "",
-		VerifyENSContractAddress:   "",
-		VerifyTransactionChainID:   api.DefaultVerifyTransactionChainID,
-		DataSyncEnabled:            true,
-		PFSEnabled:                 true,
-	}
-
-	// TODO: check topics
-
-	return nodeConfig, nil
-}
-
-func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
-	backend.UpdateRootDataDir("./tmp")
-	manager := backend.AccountManager()
-	if err := manager.InitKeystore("./tmp"); err != nil {
-		return err
-	}
-	err := backend.OpenAccounts()
-	if err != nil {
-		logger.Error("failed open accounts", err)
-		return err
-	}
-	generator := manager.AccountsGenerator()
-	generatedAccountInfo, err := generator.ImportMnemonic(seedPhrase, "")
-	if err != nil {
-		return err
-	}
-
-	derivedAddresses, err := generator.DeriveAddresses(generatedAccountInfo.ID, paths)
-	if err != nil {
-		return err
-	}
-
-	_, err = generator.StoreDerivedAccounts(generatedAccountInfo.ID, "", paths)
-	if err != nil {
-		return err
-	}
-
-	account := multiaccounts.Account{
-		KeyUID:        generatedAccountInfo.KeyUID,
-		KDFIterations: dbsetup.ReducedKDFIterationsNumber,
-	}
-	settings, err := defaultSettings(generatedAccountInfo, derivedAddresses, &seedPhrase)
-	if err != nil {
-		return err
-	}
-
-	nodeConfig, err := defaultNodeConfig(settings.InstallationID)
-	if err != nil {
-		return err
-	}
-
-	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
-	walletAccount := &accounts.Account{
-		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
-		KeyUID:    generatedAccountInfo.KeyUID,
-		Address:   types.HexToAddress(walletDerivedAccount.Address),
-		ColorID:   "",
-		Wallet:    true,
-		Path:      pathDefaultWallet,
-		Name:      "Ethereum account",
-	}
-
-	chatDerivedAccount := derivedAddresses[pathDefaultChat]
-	chatAccount := &accounts.Account{
-		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
-		KeyUID:    generatedAccountInfo.KeyUID,
-		Address:   types.HexToAddress(chatDerivedAccount.Address),
-		Name:      settings.Name,
-		Chat:      true,
-		Path:      pathDefaultChat,
-	}
-
-	fmt.Println(nodeConfig)
-	accounts := []*accounts.Account{walletAccount, chatAccount}
-	err = backend.StartNodeWithAccountAndInitialConfig(account, "", *settings, nodeConfig, accounts, nil)
-	if err != nil {
-		logger.Error("start node", err)
-		return err
-	}
-
-	return nil
+	return dir
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -492,7 +276,7 @@ var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 func buildMessage(chat *protocol.Chat, count int) *common.Message {
 	key, err := crypto.GenerateKey()
 	if err != nil {
-		logger.Error("failed build message", err)
+		logutils.ZapLogger().Error("failed build message", zap.Error(err))
 		return nil
 	}
 

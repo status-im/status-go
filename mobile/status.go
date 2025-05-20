@@ -2172,7 +2172,7 @@ func numberToHex(numString string) string {
 }
 
 func Sha3(str string) string {
-	return "0x" + abi_spec.Sha3(str)
+	return abi_spec.Sha3WithHexPrefix(str)
 }
 
 // Deprecated: no usage in mobile

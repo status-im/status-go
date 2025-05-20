@@ -59,6 +59,10 @@ func Sha3(str string) string {
 	return common.Bytes2Hex(bytes)
 }
 
+func Sha3WithHexPrefix(str string) string {
+	return "0x" + Sha3(str)
+}
+
 func reverse(str string) string {
 	bytes := []byte(str)
 	var out []byte
