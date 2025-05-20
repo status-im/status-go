@@ -25,8 +25,8 @@ func TestServiceConfigValidate(t *testing.T) {
 		require.Equal(t, defaultFullDataInterval, config.FullDataInterval)
 		require.Equal(t, defaultPriceUpdateInterval, config.PriceUpdateInterval)
 		require.Equal(t, "https://example.com", config.ProxyURL)
-		require.Equal(t, "user", config.User.Reveal())
-		require.Equal(t, "pass", config.Password.Reveal())
+		require.True(t, config.User.Equal("user"))
+		require.True(t, config.Password.Equal("pass"))
 		require.Equal(t, true, config.AllowGzip)
 		require.Equal(t, true, config.AllowETag)
 	}
@@ -44,8 +44,8 @@ func TestServiceConfigValidate(t *testing.T) {
 		require.Equal(t, defaultFullDataInterval, config.FullDataInterval)
 		require.Equal(t, defaultPriceUpdateInterval, config.PriceUpdateInterval)
 		require.Equal(t, "https://example.com", config.ProxyURL)
-		require.Equal(t, "user", config.User.Reveal())
-		require.Equal(t, "pass", config.Password.Reveal())
+		require.True(t, config.User.Equal("user"))
+		require.True(t, config.Password.Equal("pass"))
 		require.Equal(t, true, config.AllowGzip)
 		require.Equal(t, true, config.AllowETag)
 	}
@@ -63,8 +63,8 @@ func TestServiceConfigValidate(t *testing.T) {
 		require.Equal(t, 50*time.Second, config.FullDataInterval)
 		require.Equal(t, 65*time.Second, config.PriceUpdateInterval)
 		require.Equal(t, "https://example.com", config.ProxyURL)
-		require.Equal(t, "user", config.User.Reveal())
-		require.Equal(t, "pass", config.Password.Reveal())
+		require.True(t, config.User.Equal("user"))
+		require.True(t, config.Password.Equal("pass"))
 		require.Equal(t, true, config.AllowGzip)
 		require.Equal(t, true, config.AllowETag)
 	}

@@ -112,3 +112,15 @@ func (s *SensitiveString) Scan(value interface{}) error {
 	}
 	return nil
 }
+
+// Equal compares a SensitiveString with another value
+func (s SensitiveString) Equal(other any) bool {
+	switch v := other.(type) {
+	case string:
+		return s.value == v
+	case SensitiveString:
+		return s.value == v.value
+	default:
+		return false
+	}
+}
