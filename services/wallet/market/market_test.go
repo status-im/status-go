@@ -260,7 +260,12 @@ func TestGetOrFetchTokenMarketValues(t *testing.T) {
 			}
 
 			if tc.fetchTokenMarketValues != nil || tc.fetchErr != nil {
-				provider.EXPECT().FetchTokenMarketValues(tc.wantFetchSymbols, requestCurrency).Return(tc.fetchTokenMarketValues, tc.fetchErr)
+				provider.EXPECT().FetchTokenMarketValues(gomock.Any(), requestCurrency).DoAndReturn(
+					func(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
+						require.ElementsMatch(t, tc.wantFetchSymbols, symbols)
+						return tc.fetchTokenMarketValues, tc.fetchErr
+					},
+				)
 			}
 
 			gotValues, gotErr := manager.GetOrFetchTokenMarketValues(requestSymbols, requestCurrency, tc.requestMaxCachedAgeSeconds)

@@ -10,11 +10,39 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethTrie "github.com/ethereum/go-ethereum/trie"
 	"github.com/status-im/status-go/eth-node/types"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
+)
+
+const (
+	blocksToCheck = 5
+	blockNumber   = uint64(10)
+)
+
+var blockToReturn = gethTypes.NewBlock(&gethTypes.Header{
+	Number: big.NewInt(10),
+	Time:   uint64(time.Now().Unix()),
+},
+	[]*gethTypes.Transaction{
+		gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(1), nil),
+		gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(2), nil),
+		gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(3), nil),
+		gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(4), nil),
+		gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(5), nil),
+		gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(6), nil),
+		gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(7), nil),
+		gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(8), nil),
+		gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(9), nil),
+		gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(10), nil),
+	},
+	nil,
+	nil,
+	gethTrie.NewStackTrie(nil),
 )
 
 func prepareSendTransactionRequest(dApp signal.ConnectorDApp, from types.Address) (RPCRequest, error) {
@@ -85,7 +113,12 @@ func TestSendTransactionWithSignalTimout(t *testing.T) {
 	feeHistory := &fees.FeeHistory{}
 	percentiles := []int{fees.RewardPercentiles1, fees.RewardPercentiles2, fees.RewardPercentiles3}
 	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil)
-	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
+	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(2).Return(mockedChainClient, nil)
+	mockedChainClient.EXPECT().BlockNumber(state.ctx).Times(1).Return(blockNumber, nil)
+	for i := uint64(0); i < uint64(blocksToCheck); i++ {
+		blockNum := big.NewInt(0).SetUint64(blockNumber - i)
+		mockedChainClient.EXPECT().BlockByNumber(state.ctx, blockNum).Times(1).Return(blockToReturn, nil)
+	}
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().PendingNonceAt(state.ctx, common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
@@ -132,7 +165,12 @@ func TestSendTransactionWithSignalAccepted(t *testing.T) {
 	feeHistory := &fees.FeeHistory{}
 	percentiles := []int{fees.RewardPercentiles1, fees.RewardPercentiles2, fees.RewardPercentiles3}
 	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil)
-	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
+	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(2).Return(mockedChainClient, nil)
+	mockedChainClient.EXPECT().BlockNumber(state.ctx).Times(1).Return(blockNumber, nil)
+	for i := uint64(0); i < uint64(blocksToCheck); i++ {
+		blockNum := big.NewInt(0).SetUint64(blockNumber - i)
+		mockedChainClient.EXPECT().BlockByNumber(state.ctx, blockNum).Times(1).Return(blockToReturn, nil)
+	}
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().PendingNonceAt(state.ctx, common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
@@ -176,7 +214,12 @@ func TestSendTransactionWithSignalRejected(t *testing.T) {
 	feeHistory := &fees.FeeHistory{}
 	percentiles := []int{fees.RewardPercentiles1, fees.RewardPercentiles2, fees.RewardPercentiles3}
 	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil)
-	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
+	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(2).Return(mockedChainClient, nil)
+	mockedChainClient.EXPECT().BlockNumber(state.ctx).Times(1).Return(blockNumber, nil)
+	for i := uint64(0); i < uint64(blocksToCheck); i++ {
+		blockNum := big.NewInt(0).SetUint64(blockNumber - i)
+		mockedChainClient.EXPECT().BlockByNumber(state.ctx, blockNum).Times(1).Return(blockToReturn, nil)
+	}
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().PendingNonceAt(state.ctx, common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
