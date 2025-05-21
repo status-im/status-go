@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	api_common "github.com/status-im/status-go/api/common"
-	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network/testutil"
 )
 

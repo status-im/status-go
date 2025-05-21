@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/status-im/status-go/internal/security"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
 )

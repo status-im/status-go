@@ -6,12 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/internal/security"
-
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 

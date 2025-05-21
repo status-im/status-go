@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/internal/security"
+	"github.com/status-im/status-go/pkg/security"
 )
 
 // RpcProviderAuthType defines the different types of authentication for RPC providers

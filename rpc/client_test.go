@@ -17,9 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/ethereum/go-ethereum/common"

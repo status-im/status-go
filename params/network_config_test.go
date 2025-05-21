@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
 )
 
 func TestRpcProvider_GetHost(t *testing.T) {

@@ -7,9 +7,9 @@ import (
 
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/pkg/security"
 )
 
 func TestValidation(t *testing.T) {

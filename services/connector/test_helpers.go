@@ -9,11 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
+
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network"
 	network_testutil "github.com/status-im/status-go/rpc/network/testutil"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"

@@ -4,8 +4,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network/db"
 )
 

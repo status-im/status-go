@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network/testutil"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -19,15 +19,16 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
+
+	mock_reader "github.com/status-im/status-go/services/wallet/mock/reader"
+	mock_onramp "github.com/status-im/status-go/services/wallet/onramp/mock"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	mock_reader "github.com/status-im/status-go/services/wallet/mock/reader"
 	"github.com/status-im/status-go/services/wallet/onramp"
-	mock_onramp "github.com/status-im/status-go/services/wallet/onramp/mock"
 	"github.com/status-im/status-go/services/wallet/requests"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
