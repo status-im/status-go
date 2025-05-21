@@ -73,6 +73,10 @@ func (s SensitiveString) Contains(substr any) bool {
 	return strings.Contains(s.value, getValue(substr))
 }
 
+func (s SensitiveString) ContainedIn(str any) bool {
+	return strings.Contains(getValue(str), s.value)
+}
+
 func (s SensitiveString) Append(others ...any) SensitiveString {
 	result := s.value
 	for _, other := range others {
@@ -111,4 +115,16 @@ func (s *SensitiveString) Scan(value interface{}) error {
 		return fmt.Errorf("cannot scan type %T into SensitiveString", value)
 	}
 	return nil
+}
+
+// Equal compares a SensitiveString with another value
+func (s SensitiveString) Equal(other any) bool {
+	switch v := other.(type) {
+	case string:
+		return s.value == v
+	case SensitiveString:
+		return s.value == v.value
+	default:
+		return false
+	}
 }

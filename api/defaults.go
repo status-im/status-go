@@ -224,10 +224,10 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if !request.StatusProxyMarketPassword.Empty() {
 		walletConfig.StatusProxyMarketPassword = request.StatusProxyMarketPassword
 	}
-	if request.MarketDataProxyUser != "" {
+	if !request.MarketDataProxyUser.Empty() {
 		walletConfig.MarketDataProxyConfig.User = request.MarketDataProxyUser
 	}
-	if request.MarketDataProxyPassword != "" {
+	if !request.MarketDataProxyPassword.Empty() {
 		walletConfig.MarketDataProxyConfig.Password = request.MarketDataProxyPassword
 	}
 	if request.MarketDataProxyUrl != "" {

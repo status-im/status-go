@@ -324,5 +324,5 @@ func TestMarshalWalletConfigJSON(t *testing.T) {
 	walletConfig = params.WalletConfig{}
 	err = json.Unmarshal([]byte(`{"OpenseaAPIKey":"some-key"}`), &walletConfig)
 	require.NoError(t, err)
-	require.Equal(t, "some-key", walletConfig.OpenseaAPIKey.Reveal())
+	require.True(t, walletConfig.OpenseaAPIKey.Equal("some-key"))
 }
