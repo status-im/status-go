@@ -21,8 +21,8 @@ func TestBeforeSend(t *testing.T) {
 				Stacktrace: &sentry.Stacktrace{
 					Frames: []sentry.Frame{
 						{Module: "github.com/status-im/status-go/other", Function: "OtherFunction"},
-						{Module: "github.com/status-im/status-go/internal/sentry", Function: "Recover"},
-						{Module: "github.com/status-im/status-go/internal/sentry", Function: "RecoverError"},
+						{Module: "github.com/status-im/status-go/pkg/sentry", Function: "Recover"},
+						{Module: "github.com/status-im/status-go/pkg/sentry", Function: "RecoverError"},
 					},
 				},
 			},

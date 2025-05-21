@@ -95,7 +95,7 @@ To cover these requirements, I added these environment variables:
         <summary>Why can't we consume `STATUS_GO_SENTRY_DSN` directly in status-go build?</summary>
 
         In theory, we could. But this would require us to mix approaches of getting the env variable to the code.
-        Right now we prefer `go:generate + go:embed` approach (e.g. https://github.com/status-im/status-go/pull/6014), but we can't do it in this case, because we must not write the DSN to a local file, which would be a bit vulnerable. And I don't want to go back to `-ldflags="-X github.com/status-im/status-go/internal/sentry.sentryDSN=$(STATUS_GO_SENTRY_DSN:v%=%)` approach.
+        Right now we prefer `go:generate + go:embed` approach (e.g. https://github.com/status-im/status-go/pull/6014), but we can't do it in this case, because we must not write the DSN to a local file, which would be a bit vulnerable. And I don't want to go back to `-ldflags="-X github.com/status-im/status-go/pkg/sentry.sentryDSN=$(STATUS_GO_SENTRY_DSN:v%=%)` approach.
     </details>
 
 # Implementation details

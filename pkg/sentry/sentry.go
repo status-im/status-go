@@ -5,7 +5,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 
-	"github.com/status-im/status-go/internal/version"
+	"github.com/status-im/status-go/pkg/version"
 )
 
 func Init(opts ...Option) error {
