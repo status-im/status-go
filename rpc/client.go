@@ -113,6 +113,12 @@ type Client struct {
 	logger     *zap.Logger
 
 	walletNotifier func(chainID uint64, message string)
+
+	// callsContext must only be used inside CallRaw.
+	// When shutting down, callsCancel will be used to stop all calls.
+	callsContext context.Context
+	callsCancel  context.CancelFunc
+	wg           sync.WaitGroup
 }
 
 // Is initialized in a build-tag-dependent module
@@ -159,8 +165,10 @@ func NewClient(config ClientConfig) (*Client, error) {
 		walletFeed:         config.WalletFeed,
 		settingsFeed:       config.SettingsFeed,
 		networksFeed:       config.NetworksFeed,
+		wg:                 sync.WaitGroup{},
 	}
 
+	c.callsContext, c.callsCancel = context.WithCancel(context.Background())
 	c.UpstreamChainID = config.UpstreamChainID
 	c.router = newRouter(true)
 
@@ -186,6 +194,9 @@ func (c *Client) Start(ctx context.Context) {
 }
 
 func (c *Client) Stop() {
+	c.callsCancel()
+	c.wg.Wait()
+
 	c.NetworkManager.Stop()
 
 	c.healthMgr.Stop()

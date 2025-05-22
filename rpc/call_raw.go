@@ -27,8 +27,9 @@ var defaultMsgID = json.RawMessage(`0`)
 // CallRaw performs a JSON-RPC call with already crafted JSON-RPC body. It
 // returns string in JSON format with response (successul or error).
 func (c *Client) CallRaw(body string) string {
-	ctx := context.Background()
-	return c.callRawContext(ctx, json.RawMessage(body))
+	c.wg.Add(1)
+	defer c.wg.Done()
+	return c.callRawContext(c.callsContext, json.RawMessage(body))
 }
 
 // jsonrpcMessage represents JSON-RPC message
