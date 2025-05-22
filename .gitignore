@@ -117,21 +117,21 @@ tests-functional/*.log
 .venv
 
 
-# generated files
-mock
-mock.go
-*_mock_test.go
-*.pb.go
-bindata.go
-migrations.go
-cmd/status-backend/server/endpoints.go
-protocol/messenger_handlers.go
-pkg/version/VERSION
-pkg/version/GIT_COMMIT
-pkg/sentry/SENTRY_CONTEXT_NAME
-pkg/sentry/SENTRY_CONTEXT_VERSION
-pkg/sentry/SENTRY_PRODUCTION
-
+## generated files
+#mock
+#mock.go
+#*_mock_test.go
+#*.pb.go
+#bindata.go
+#migrations.go
+#cmd/status-backend/server/endpoints.go
+#protocol/messenger_handlers.go
+#pkg/version/VERSION
+#pkg/version/GIT_COMMIT
+#pkg/sentry/SENTRY_CONTEXT_NAME
+#pkg/sentry/SENTRY_CONTEXT_VERSION
+#pkg/sentry/SENTRY_PRODUCTION
+#
 # Don't ignore generated files in the vendor/ directory
 !vendor/**/*.pb.go
 !vendor/**/migrations.go
