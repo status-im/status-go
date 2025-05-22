@@ -15,10 +15,10 @@ sed -i '' '/# generated files/,/^$/ s/^/#/' .gitignore
 make GO_GENERATE_FAST_RECACHE=true generate
 
 # Remove `-dirty` suffix from the generated version file
-sed -i '' 's/-dirty$//' internal/version/VERSION
+sed -i '' 's/-dirty$//' pkg/version/VERSION
 
 # Commit
 git add .gitignore
-git add *
+git add .
 git commit -m "feat_: version ${latest_tag} with generated files included"
 git push origin

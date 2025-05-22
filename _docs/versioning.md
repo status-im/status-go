@@ -63,7 +63,7 @@ Additionally, we have removed generated files from the main repository ([PR #587
 For rare cases where status-go needs to be used as an importable Go module (e.g., by projects such as [matterbridge](https://github.com/status-im/matterbridge)), we provide a workaround:
 
 1. **Create a `generated/{version}` branch:**
-   - Use the script `_assets/scripts/tag_version_generated.sh` to automate the process of creating a branch with generated files
+   - Use the script `_assets/scripts/branch_version_generated.sh` to automate the process of creating a branch with generated files
    - This script:
      - Checks out a branch named `generated/{version}` based on the latest tag
      - Un-gitignores generated files
