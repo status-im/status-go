@@ -264,11 +264,9 @@ func main() {
 		}
 
 		messenger, err := protocol.NewMessenger(
-			config.Name,
 			identity,
 			backend.StatusNode().WakuV2Service(),
 			installationID.String(),
-			config.Version,
 			options...,
 		)
 
@@ -336,11 +334,9 @@ func main() {
 			}
 
 			messenger, err := protocol.NewMessenger(
-				config.Name,
 				identity,
 				backend.StatusNode().WakuV2Service(),
 				installationID.String(),
-				config.Version,
 				options...,
 			)
 			if err != nil {
