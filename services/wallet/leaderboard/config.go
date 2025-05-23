@@ -3,6 +3,8 @@ package leaderboard
 import (
 	"time"
 
+	"github.com/status-im/status-go/pkg/security"
+
 	"github.com/status-im/status-go/params"
 )
 
@@ -14,9 +16,10 @@ const (
 // ServiceConfig defines the configuration for the market data service
 type ServiceConfig struct {
 	// API connection settings
-	ProxyURL string
-	User     string
-	Password string
+	UrlOverride security.SensitiveString
+	User        security.SensitiveString
+	Password    security.SensitiveString
+	StageName   string
 
 	// Refresh intervals (in seconds)
 	FullDataInterval    time.Duration
@@ -42,9 +45,10 @@ func (c *ServiceConfig) setDefaults() {
 func NewLeaderbordConfig(config params.MarketDataProxyConfig) ServiceConfig {
 	// Create a new ServiceConfig instance with default values
 	serviceConfig := ServiceConfig{
-		ProxyURL:            config.Url,
+		UrlOverride:         config.UrlOverride,
 		User:                config.User,
 		Password:            config.Password,
+		StageName:           config.StageName,
 		FullDataInterval:    time.Duration(config.FullDataRefreshInterval) * time.Second,
 		PriceUpdateInterval: time.Duration(config.PriceRefreshInterval) * time.Second,
 		AllowGzip:           true,

@@ -447,11 +447,12 @@ type WalletConfig struct {
 }
 
 type MarketDataProxyConfig struct {
-	Url                     string `json:"Url"`
-	User                    string `json:"User"`
-	Password                string `json:"Password"`
-	FullDataRefreshInterval int    `json:"FullDataRefreshInterval"`
-	PriceRefreshInterval    int    `json:"PriceRefreshInterval"`
+	UrlOverride             security.SensitiveString `json:"UrlOverride"`
+	StageName               string                   `json:"StageName"`
+	User                    security.SensitiveString `json:"User"`
+	Password                security.SensitiveString `json:"Password"`
+	FullDataRefreshInterval int                      `json:"FullDataRefreshInterval"`
+	PriceRefreshInterval    int                      `json:"PriceRefreshInterval"`
 }
 
 // MarshalJSON custom marshalling to avoid exposing sensitive data in log,

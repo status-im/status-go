@@ -117,9 +117,9 @@ type WalletSecretsConfig struct {
 	StatusProxyMarketUser     security.SensitiveString `json:"statusProxyMarketUser"`
 	StatusProxyMarketPassword security.SensitiveString `json:"statusProxyMarketPassword"`
 
-	MarketDataProxyUrl      string `json:"marketDataProxyUrl"`
-	MarketDataProxyUser     string `json:"marketDataProxyUser"`
-	MarketDataProxyPassword string `json:"marketDataProxyPassword"`
+	MarketDataProxyUrl      security.SensitiveString `json:"marketDataProxyUrl"`
+	MarketDataProxyUser     security.SensitiveString `json:"marketDataProxyUser"`
+	MarketDataProxyPassword security.SensitiveString `json:"marketDataProxyPassword"`
 	// FIXME: remove when EthRpcProxy* is integrated
 	StatusProxyBlockchainUser     security.SensitiveString `json:"statusProxyBlockchainUser"`
 	StatusProxyBlockchainPassword security.SensitiveString `json:"statusProxyBlockchainPassword"`
