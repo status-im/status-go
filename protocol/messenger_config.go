@@ -97,6 +97,7 @@ type config struct {
 	tokenManager           communities.TokenManager
 	collectiblesManager    communities.CollectiblesManager
 	accountsManager        account.Manager
+	signer                 communities.MessageSigner
 
 	verifyTransactionClient EthClient
 	ensVerifier             *ens.Verifier
@@ -408,6 +409,13 @@ func WithCollectiblesManager(collectiblesManager communities.CollectiblesManager
 func WithAccountManager(accountManager account.Manager) Option {
 	return func(c *config) error {
 		c.accountsManager = accountManager
+		return nil
+	}
+}
+
+func WithMessageSigner(signer communities.MessageSigner) Option {
+	return func(c *config) error {
+		c.signer = signer
 		return nil
 	}
 }

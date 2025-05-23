@@ -7,44 +7,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/t/utils"
 )
 
 func TestHashMessage(t *testing.T) {
 	utils.Init()
-
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	require.NoError(t, err)
-
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
-	require.NoError(t, err)
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
-	err = backend.StartNode(config)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, backend.StopNode())
-	}()
 
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -77,24 +49,33 @@ func TestHashMessage(t *testing.T) {
 		},
 	}
 
+	publicAPI := personal.NewAPI()
+
 	for _, s := range scenarios {
 		t.Run(s.message, func(t *testing.T) {
 			hash, err := HashMessage(s.message)
 			require.Nil(t, err)
 			require.Equal(t, s.expectedHash, fmt.Sprintf("%x", hash))
 
+			signParams := personal.SignParams{
+				Data: hash,
+			}
+
 			// simulate signature from external signer like a keycard
-			sig, err := crypto.Sign(hash, key)
+			sig, err := publicAPI.Sign(signParams, &account.SelectedExtKey{
+				AccountKey: &types.Key{
+					PrivateKey: key,
+				},
+			})
 			require.NoError(t, err)
-			sig[64] += 27 // Transform V from 0/1 to 27/28 according to the yellow paper
 
 			// check that the message was wrapped correctly before hashing it
 			recParams := personal.RecoverParams{
-				Message:   s.recoverMessage,
-				Signature: fmt.Sprintf("0x%x", sig),
+				Message:   hexutil.Encode(hash),
+				Signature: hexutil.Encode(sig),
 			}
 
-			recoveredAddr, err := backend.Recover(recParams)
+			recoveredAddr, err := publicAPI.Recover(recParams)
 			require.NoError(t, err)
 			assert.Equal(t, addr, recoveredAddr)
 		})

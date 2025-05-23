@@ -1,7 +1,6 @@
 package account
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
@@ -11,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -20,15 +18,12 @@ import (
 
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account/generator"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
 )
 
 // errors
@@ -40,7 +35,6 @@ var (
 	ErrOnboardingNotStarted           = errors.New("onboarding must be started before choosing an account")
 	ErrOnboardingAccountNotFound      = errors.New("cannot find onboarding account with the given id")
 	ErrAccountKeyStoreMissing         = errors.New("account key store is not set")
-	ErrInvalidPersonalSignAccount     = errors.New("invalid account as only the selected one can generate a signature")
 )
 
 type ErrCannotLocateKeyFile struct {
@@ -53,48 +47,17 @@ func (e ErrCannotLocateKeyFile) Error() string {
 
 var zeroAddress = types.Address{}
 
-type SignParams struct {
-	Data     interface{} `json:"data"`
-	Address  string      `json:"account"`
-	Password string      `json:"password,omitempty"`
-}
-
-func (sp *SignParams) Validate(checkPassword bool) error {
-	if len(sp.Address) != 2*types.AddressLength+2 {
-		return errors.New("address has to be provided")
-	}
-
-	if sp.Data == "" {
-		return errors.New("data has to be provided")
-	}
-
-	if checkPassword && sp.Password == "" {
-		return errors.New("password has to be provided")
-	}
-
-	return nil
-}
-
-type RecoverParams struct {
-	Message   string `json:"message"`
-	Signature string `json:"signature"`
-}
-
 // Manager represents account manager interface
 type Manager interface {
 	GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error)
-	Sign(rpcParams SignParams, verifiedAccount *SelectedExtKey) (result types.HexBytes, err error)
-	CanRecover(rpcParams RecoverParams, revealedAddress types.Address) (bool, error)
 	DeleteAccount(address types.Address) error
 }
 
 // DefaultManager represents default account manager implementation
 type DefaultManager struct {
-	mu         sync.RWMutex
-	rpcClient  *rpc.Client
-	rpcTimeout time.Duration
-	Keydir     string
-	keystore   types.KeyStore
+	mu       sync.RWMutex
+	Keydir   string
+	keystore types.KeyStore
 
 	accountsGenerator *generator.Generator
 	onboarding        *Onboarding
@@ -718,47 +681,4 @@ func (m *DefaultManager) generatePartialAccountKey(db *accounts.Database, addres
 	}
 
 	return key, nil
-}
-
-func (m *DefaultManager) Recover(rpcParams RecoverParams) (addr types.Address, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), m.rpcTimeout)
-	defer cancel()
-	var gethAddr gethcommon.Address
-	err = m.rpcClient.CallContextIgnoringLocalHandlers(
-		ctx,
-		&gethAddr,
-		m.rpcClient.UpstreamChainID,
-		params.PersonalRecoverMethodName,
-		rpcParams.Message, rpcParams.Signature)
-	addr = types.Address(gethAddr)
-
-	return
-}
-
-func (m *DefaultManager) CanRecover(rpcParams RecoverParams, revealedAddress types.Address) (bool, error) {
-	recovered, err := m.Recover(rpcParams)
-	if err != nil {
-		return false, err
-	}
-	return recovered == revealedAddress, nil
-}
-
-func (m *DefaultManager) Sign(rpcParams SignParams, verifiedAccount *SelectedExtKey) (result types.HexBytes, err error) {
-	if !strings.EqualFold(rpcParams.Address, verifiedAccount.Address.Hex()) {
-		err = ErrInvalidPersonalSignAccount
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), m.rpcTimeout)
-	defer cancel()
-	var gethResult hexutil.Bytes
-	err = m.rpcClient.CallContextIgnoringLocalHandlers(
-		ctx,
-		&gethResult,
-		m.rpcClient.UpstreamChainID,
-		params.PersonalSignMethodName,
-		rpcParams.Data, rpcParams.Address, rpcParams.Password)
-	result = types.HexBytes(gethResult)
-
-	return
 }

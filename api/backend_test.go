@@ -273,7 +273,7 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		assert.NotNil(t, backend.personalAPI)
+		assert.NotNil(t, backend.signer)
 		wg.Done()
 	}()
 

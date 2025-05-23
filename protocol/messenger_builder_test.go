@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 
@@ -84,6 +85,8 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		"",
 	)
 
+	personalAPI := personal.NewMockedAPI()
+
 	options := []Option{
 		WithCustomLogger(config.logger),
 		WithDatabase(appDb),
@@ -96,6 +99,7 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		WithCuratedCommunitiesUpdateLoop(false),
 		WithStubOnlineChecker(),
 		WithENSVerifier(ensVerifier),
+		WithMessageSigner(personalAPI),
 	}
 	options = append(options, config.extraOptions...)
 

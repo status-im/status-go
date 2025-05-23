@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/wakuv2"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -55,6 +56,8 @@ type MessengerBaseTestSuite struct {
 }
 
 func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, extraOptions []Option) (*Messenger, error) {
+	personalAPI := personal.NewMockedAPI()
+
 	options := []Option{
 		WithAppSettings(settings.Settings{
 			DisplayName:               DefaultProfileDisplayName,
@@ -62,6 +65,7 @@ func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logge
 			ProfilePicturesVisibility: 1,
 			URLUnfurlingMode:          settings.URLUnfurlingAlwaysAsk,
 		}, params.NodeConfig{}),
+		WithMessageSigner(personalAPI),
 	}
 	options = append(options, extraOptions...)
 

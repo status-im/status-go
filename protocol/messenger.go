@@ -105,6 +105,7 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 type Messenger struct {
 	config                    *config
 	identity                  *ecdsa.PrivateKey
+	signer                    communities.MessageSigner
 	messaging                 *messaging.API
 	persistence               *sqlitePersistence
 	encryptor                 *encryption.Protocol
@@ -413,7 +414,7 @@ func NewMessenger(
 	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, sender, sqlitePersistence)
 
 	managerOptions := []communities.ManagerOption{
-		communities.WithAccountManager(c.accountsManager),
+		communities.WithMessageSigner(c.signer),
 	}
 
 	var walletAPI *wallet.API
@@ -532,6 +533,7 @@ func NewMessenger(
 		archiveManager:             archiveManager,
 		accountsManager:            c.accountsManager,
 		ensVerifier:                c.ensVerifier,
+		signer:                     c.signer,
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,
 		allChats:                   new(chatMap),

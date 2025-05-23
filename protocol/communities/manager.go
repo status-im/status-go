@@ -41,6 +41,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -87,6 +88,12 @@ var (
 	ErrInvalidClock                    = errors.New("invalid clock to cancel request to join")
 )
 
+type MessageSigner interface {
+	Recover(rpcParams personal.RecoverParams) (addr types.Address, err error)
+	CanRecover(rpcParams personal.RecoverParams, revealedAddress types.Address) (bool, error)
+	Sign(rpcParams personal.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error)
+}
+
 type Manager struct {
 	persistence              *Persistence
 	encryptor                *encryption.Protocol
@@ -100,6 +107,7 @@ type Manager struct {
 	tokenManager             TokenManager
 	collectiblesManager      CollectiblesManager
 	logger                   *zap.Logger
+	signer                   MessageSigner
 	messaging                *messaging.API
 	timesource               common.TimeSource
 	quit                     chan struct{}
@@ -244,7 +252,7 @@ type managerOptions struct {
 	walletConfig           *params.WalletConfig
 	communityTokensService CommunityTokensServiceInterface
 	permissionChecker      PermissionChecker
-
+	signer                 MessageSigner
 	// allowForcingCommunityMembersReevaluation indicates whether we should allow forcing community members reevaluation.
 	// This will allow using `force` argument in ScheduleMembersReevaluation.
 	// Should only be used in tests.
@@ -341,9 +349,9 @@ func (m *DefaultTokenManager) FindOrCreateTokenByAddress(ctx context.Context, ch
 
 type ManagerOption func(*managerOptions)
 
-func WithAccountManager(accountsManager account.Manager) ManagerOption {
+func WithMessageSigner(signer MessageSigner) ManagerOption {
 	return func(opts *managerOptions) {
-		opts.accountsManager = accountsManager
+		opts.signer = signer
 	}
 }
 
@@ -444,6 +452,10 @@ func NewManager(
 
 	if managerConfig.accountsManager != nil {
 		manager.accountsManager = managerConfig.accountsManager
+	}
+
+	if managerConfig.signer != nil {
+		manager.signer = managerConfig.signer
 	}
 
 	if managerConfig.collectiblesManager != nil {
@@ -3142,12 +3154,12 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 	if community.IsControlNode() {
 		// verify if revealed addresses indeed belong to requester
 		for _, revealedAccount := range request.RevealedAccounts {
-			recoverParams := account.RecoverParams{
+			recoverParams := personal.RecoverParams{
 				Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
 				Signature: types.EncodeHex(revealedAccount.Signature),
 			}
 
-			matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
+			matching, err := m.signer.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -3229,12 +3241,12 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 	community.UpdateMemberLastUpdateClock(publicKey, request.Clock)
 	// verify if revealed addresses indeed belong to requester
 	for _, revealedAccount := range request.RevealedAccounts {
-		recoverParams := account.RecoverParams{
+		recoverParams := personal.RecoverParams{
 			Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID())),
 			Signature: types.EncodeHex(revealedAccount.Signature),
 		}
 
-		matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
+		matching, err := m.signer.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
 		if err != nil {
 			return err
 		}

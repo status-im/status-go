@@ -27,7 +27,6 @@ import (
 	utils "github.com/status-im/status-go/common"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 
-	"github.com/status-im/status-go/account"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -44,6 +43,7 @@ import (
 	"github.com/status-im/status-go/protocol/storenodes"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/wakuv2"
@@ -1311,7 +1311,7 @@ func (m *Messenger) SetMutePropertyOnChatsByCategory(request *requests.MuteCateg
 // Generates a single hash for each address that needs to be revealed to a community.
 // Each hash needs to be signed.
 // The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
-func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string, isEdit bool) ([]account.SignParams, error) {
+func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string, isEdit bool) ([]personal.SignParams, error) {
 	walletAccounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
 		return nil, err
@@ -1326,7 +1326,7 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 		return false
 	}
 
-	msgsToSign := make([]account.SignParams, 0)
+	msgsToSign := make([]personal.SignParams, 0)
 	for _, walletAccount := range walletAccounts {
 		if walletAccount.Chat || walletAccount.Type == accounts.AccountTypeWatch {
 			continue
@@ -1340,7 +1340,7 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 		if !isEdit {
 			requestID = communities.CalculateRequestID(memberPubKey, communityID)
 		}
-		msgsToSign = append(msgsToSign, account.SignParams{
+		msgsToSign = append(msgsToSign, personal.SignParams{
 			Data:    types.EncodeHex(crypto.Keccak256(m.IdentityPublicKeyCompressed(), communityID, requestID)),
 			Address: walletAccount.Address.Hex(),
 		})
@@ -1349,21 +1349,21 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 	return msgsToSign, nil
 }
 
-func (m *Messenger) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+func (m *Messenger) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	if len(communityID) == 0 {
 		return nil, errors.New(ErrMissingCommunityID)
 	}
 	return m.generateCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal, false)
 }
 
-func (m *Messenger) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+func (m *Messenger) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	return m.generateCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal, true)
 }
 
 // Signs the provided messages with the provided accounts and password.
 // Provided accounts must not belong to a keypair that is migrated to a keycard.
 // Otherwise, the signing will fail, cause such accounts should be signed with a keycard.
-func (m *Messenger) SignData(signParams []account.SignParams) ([]string, error) {
+func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error) {
 	signatures := make([]string, len(signParams))
 	for i, param := range signParams {
 		if err := param.Validate(true); err != nil {
@@ -1393,7 +1393,7 @@ func (m *Messenger) SignData(signParams []account.SignParams) ([]string, error) 
 			return nil, err
 		}
 
-		signature, err := m.accountsManager.Sign(param, verifiedAccount)
+		signature, err := m.signer.Sign(param, verifiedAccount)
 		if err != nil {
 			return nil, err
 		}

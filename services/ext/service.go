@@ -49,6 +49,7 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/communitytokens"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
@@ -371,6 +372,7 @@ func buildMessengerOptions(
 	accountsFeed *event.Feed,
 	ensVerifier *ens.Verifier,
 ) ([]protocol.Option, error) {
+	personalAPI := personal.NewAPI()
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
 		protocol.WithPushNotifications(),
@@ -395,6 +397,7 @@ func buildMessengerOptions(
 		protocol.WithAccountManager(accountManager),
 		protocol.WithAccountsFeed(accountsFeed),
 		protocol.WithNewsFeed(),
+		protocol.WithMessageSigner(personalAPI),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {

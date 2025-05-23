@@ -48,6 +48,7 @@ import (
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/communities"
 	identityutils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/requests"
@@ -94,7 +95,7 @@ type GethStatusBackend struct {
 	config      *params.NodeConfig
 
 	statusNode               *node.StatusNode
-	personalAPI              *personal.PublicAPI
+	signer                   communities.MessageSigner
 	multiaccountsDB          *multiaccounts.Database
 	account                  *multiaccounts.Account
 	accountManager           *account.GethManager
@@ -142,7 +143,7 @@ func (b *GethStatusBackend) initialize() {
 	b.statusNode = statusNode
 	b.accountManager = accountManager
 	b.transactor = transactor
-	b.personalAPI = personalAPI
+	b.signer = personalAPI
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
 	b.LocalPairingStateManager = new(statecontrol.ProcessStateManager)
 	b.LocalPairingStateManager.SetPairing(false)
@@ -161,6 +162,10 @@ func (b *GethStatusBackend) AccountManager() *account.GethManager {
 // Transactor returns reference to a status transactor
 func (b *GethStatusBackend) Transactor() *transactions.Transactor {
 	return b.transactor
+}
+
+func (b *GethStatusBackend) MessageSigner() communities.MessageSigner {
+	return b.signer
 }
 
 // SelectedAccountKeyID returns a Whisper key ID of the selected chat key pair.
@@ -2275,12 +2280,11 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}); err != nil {
 		return
 	}
-	b.accountManager.SetRPCClient(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
-	signal.SendNodeStarted()
 
 	b.transactor.SetNetworkID(config.NetworkID)
 	b.transactor.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
-	b.personalAPI.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
+
+	signal.SendNodeStarted()
 
 	if err = b.registerHandlers(); err != nil {
 		b.logger.Error("Handler registration failed", zap.Error(err))
@@ -2417,13 +2421,13 @@ func (b *GethStatusBackend) SignMessage(rpcParams personal.SignParams) (types.He
 	if err != nil {
 		return types.HexBytes{}, err
 	}
-	return b.personalAPI.Sign(rpcParams, verifiedAccount)
+	return b.signer.Sign(rpcParams, verifiedAccount)
 }
 
 // Recover calls the personalAPI to return address associated with the private
 // key that was used to calculate the signature in the message
 func (b *GethStatusBackend) Recover(rpcParams personal.RecoverParams) (types.Address, error) {
-	return b.personalAPI.Recover(rpcParams)
+	return b.signer.Recover(rpcParams)
 }
 
 // SignTypedData accepts data and password. Gets verified account and signs typed data.
