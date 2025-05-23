@@ -3,7 +3,6 @@ package common
 import (
 	"crypto/ecdsa"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -59,8 +58,6 @@ type ReceivedMessage struct {
 	SymKeyHash common.Hash // The Keccak256Hash of the key
 
 	hash common.Hash
-
-	Processed atomic.Bool
 }
 
 // EnvelopeError code and optional description of the error.

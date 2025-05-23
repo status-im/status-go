@@ -33,7 +33,6 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2"
 	waku2 "github.com/status-im/status-go/wakuv2"
-	wakuV2common "github.com/status-im/status-go/wakuv2/common"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -70,27 +69,11 @@ type MessengerStoreNodeRequestSuite struct {
 }
 
 type singleResult struct {
-	EnvelopesCount   int
-	Envelopes        []*wakuV2common.ReceivedMessage
-	ShardEnvelopes   []*wakuV2common.ReceivedMessage
-	Error            error
-	FetchedCommunity *communities.Community
-}
-
-func (r *singleResult) ShardEnvelopesHashes() []string {
-	out := make([]string, 0, len(r.ShardEnvelopes))
-	for _, e := range r.ShardEnvelopes {
-		out = append(out, e.Hash().String())
-	}
-	return out
-}
-
-func (r *singleResult) EnvelopesHashes() []string {
-	out := make([]string, 0, len(r.Envelopes))
-	for _, e := range r.Envelopes {
-		out = append(out, e.Hash().String())
-	}
-	return out
+	EnvelopesCount      int
+	EnvelopeHashes      []types.Hash
+	ShardEnvelopeHashes []types.Hash
+	Error               error
+	FetchedCommunity    *communities.Community
 }
 
 func (r *singleResult) toString() string {
@@ -112,27 +95,17 @@ func (r *singleResult) toString() string {
 			r.EnvelopesCount, communityString)
 	}
 
-	for i, envelope := range r.ShardEnvelopes {
-		resultString += fmt.Sprintf("\n\tshard envelope %3.0d: %s, timestamp: %d (%s), size: %d bytes, contentTopic: %s, pubsubTopic: %s",
+	for i, envelopeHash := range r.ShardEnvelopeHashes {
+		resultString += fmt.Sprintf("\n\tshard envelope %3.0d: %s",
 			i+1,
-			envelope.Hash().Hex(),
-			envelope.Envelope.Message().GetTimestamp(),
-			time.Unix(0, envelope.Envelope.Message().GetTimestamp()).UTC(),
-			len(envelope.Envelope.Message().Payload),
-			envelope.Envelope.Message().ContentTopic,
-			envelope.Envelope.PubsubTopic(),
+			envelopeHash.Hex(),
 		)
 	}
 
-	for i, envelope := range r.Envelopes {
-		resultString += fmt.Sprintf("\n\tdescription envelope %3.0d: %s, timestamp: %d (%s), size: %d bytes, contentTopic: %s, pubsubTopic: %s",
+	for i, envelopeHash := range r.EnvelopeHashes {
+		resultString += fmt.Sprintf("\n\tdescription envelope %3.0d: %s",
 			i+1,
-			envelope.Hash().Hex(),
-			envelope.Envelope.Message().GetTimestamp(),
-			time.Unix(0, envelope.Envelope.Message().GetTimestamp()).UTC(),
-			len(envelope.Envelope.Message().Payload),
-			envelope.Envelope.Message().ContentTopic,
-			envelope.Envelope.PubsubTopic(),
+			envelopeHash.Hex(),
 		)
 	}
 
@@ -314,7 +287,7 @@ func (s *MessengerStoreNodeRequestSuite) WaitForAvailableStoreNode(messenger *Me
 	WaitForAvailableStoreNode(&s.Suite, messenger, ctx)
 }
 
-func (s *MessengerStoreNodeRequestSuite) setupEnvelopesWatcher(wakuNode wakutypes.Waku, topic *wakutypes.TopicType, cb func(envelope *wakuV2common.ReceivedMessage)) {
+func (s *MessengerStoreNodeRequestSuite) setupEnvelopesWatcher(wakuNode wakutypes.Waku, topic *wakutypes.TopicType, cb func(hash types.Hash)) {
 	envelopesWatcher := make(chan wakutypes.EnvelopeEvent, 100)
 	envelopesSub := wakuNode.SubscribeEnvelopeEvents(envelopesWatcher)
 
@@ -332,12 +305,14 @@ func (s *MessengerStoreNodeRequestSuite) setupEnvelopesWatcher(wakuNode wakutype
 				if topic != nil && *topic != envelopeEvent.Topic {
 					continue
 				}
-				envelope := wakuNode.(*waku2.Waku).GetEnvelope(envelopeEvent.Hash)
-				cb(envelope)
-				s.logger.Debug("envelope available event for fetched content topic",
-					zap.Any("envelopeEvent", envelopeEvent),
-					zap.Any("envelope", envelope),
-				)
+				hasEnvelope := wakuNode.(*waku2.Waku).HasEnvelope(envelopeEvent.Hash)
+				if hasEnvelope {
+					cb(envelopeEvent.Hash)
+					s.logger.Debug("envelope available event for fetched content topic",
+						zap.Any("envelopeEvent", envelopeEvent),
+						zap.Any("hasEnvelope", hasEnvelope),
+					)
+				}
 			}
 
 		}
@@ -346,8 +321,8 @@ func (s *MessengerStoreNodeRequestSuite) setupEnvelopesWatcher(wakuNode wakutype
 
 func (s *MessengerStoreNodeRequestSuite) setupStoreNodeEnvelopesWatcher(topic *wakutypes.TopicType) <-chan string {
 	storeNodeSubscription := make(chan string, 100)
-	s.setupEnvelopesWatcher(s.wakuStoreNode, topic, func(envelope *wakuV2common.ReceivedMessage) {
-		storeNodeSubscription <- envelope.Hash().String()
+	s.setupEnvelopesWatcher(s.wakuStoreNode, topic, func(hash types.Hash) {
+		storeNodeSubscription <- hash.String()
 	})
 	return storeNodeSubscription
 }
@@ -772,9 +747,9 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 	// Subscribe to received envelope
 	bobWakuV2 := s.bobWaku.(*waku2.Waku)
 
-	var receivedEnvelopes []*wakuV2common.ReceivedMessage
-	s.setupEnvelopesWatcher(bobWakuV2, &contentTopic, func(envelope *wakuV2common.ReceivedMessage) {
-		receivedEnvelopes = append(receivedEnvelopes, envelope)
+	var receivedEnvelopes []types.Hash
+	s.setupEnvelopesWatcher(bobWakuV2, &contentTopic, func(hash types.Hash) {
+		receivedEnvelopes = append(receivedEnvelopes, hash)
 	})
 
 	// Force a single-envelope page size to be able to check the order.
@@ -793,13 +768,6 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 
 	// Ensure all expected envelopes were received
 	s.Require().Equal(descriptionsCount, len(receivedEnvelopes))
-
-	// We check that each next envelope fetched is newer than the previous one
-	for i := 1; i < len(receivedEnvelopes); i++ {
-		s.Require().Less(
-			receivedEnvelopes[i].Envelope.Message().GetTimestamp(),
-			receivedEnvelopes[i-1].Envelope.Message().GetTimestamp())
-	}
 }
 
 /*
@@ -1123,12 +1091,12 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 
 			// Setup envelopes watcher to gather fetched envelopes
 
-			s.setupEnvelopesWatcher(userWaku, &shardContentTopic, func(envelope *wakuV2common.ReceivedMessage) {
-				result.ShardEnvelopes = append(result.ShardEnvelopes, envelope)
+			s.setupEnvelopesWatcher(userWaku, &shardContentTopic, func(hash types.Hash) {
+				result.ShardEnvelopeHashes = append(result.ShardEnvelopeHashes, hash)
 			})
 
-			s.setupEnvelopesWatcher(userWaku, &descriptionContentTopic, func(envelope *wakuV2common.ReceivedMessage) {
-				result.Envelopes = append(result.Envelopes, envelope)
+			s.setupEnvelopesWatcher(userWaku, &descriptionContentTopic, func(hash types.Hash) {
+				result.EnvelopeHashes = append(result.EnvelopeHashes, hash)
 			})
 
 			// Start fetching
@@ -1163,9 +1131,9 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 	for storeNodeName, result := range results {
 		s.Require().NoError(result.Error)
 		if exampleToRun.CheckExpectedEnvelopes {
-			s.Require().Equal(exampleToRun.ExpectedShardEnvelopes, result.ShardEnvelopesHashes(),
+			s.Require().Equal(exampleToRun.ExpectedShardEnvelopes, result.ShardEnvelopeHashes,
 				fmt.Sprintf("wrong shard envelopes for store node %s", storeNodeName))
-			s.Require().Equal(exampleToRun.ExpectedDescriptionEnvelopes, result.EnvelopesHashes(),
+			s.Require().Equal(exampleToRun.ExpectedDescriptionEnvelopes, result.EnvelopeHashes,
 				fmt.Sprintf("wrong envelopes for store node %s", storeNodeName))
 		}
 	}

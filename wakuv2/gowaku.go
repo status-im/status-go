@@ -151,8 +151,8 @@ type Waku struct {
 	symKeys     map[string][]byte            // Symmetric key storage
 	keyMu       sync.RWMutex                 // Mutex associated with key stores
 
-	envelopeCache *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] // Pool of envelopes currently tracked by this node
-	poolMu        sync.RWMutex                                              // Mutex to sync the message and expiration pools
+	envelopeCache *ttlcache.Cache[gethcommon.Hash, bool] // [Hash of envelope -> Processed] cache
+	poolMu        sync.RWMutex                           // Mutex to sync the message and expiration pools
 
 	bandwidthCounter *metrics.BandwidthCounter
 
@@ -217,8 +217,8 @@ func (w *Waku) SetMetricsHandler(client IMetricsHandler) {
 	w.metricsHandler = client
 }
 
-func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
-	cache := ttlcache.New[gethcommon.Hash, *common.ReceivedMessage](ttlcache.WithTTL[gethcommon.Hash, *common.ReceivedMessage](cacheTTL))
+func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
+	cache := ttlcache.New(ttlcache.WithTTL[gethcommon.Hash, bool](cacheTTL))
 	go func() {
 		defer gocommon.LogOnPanic()
 		cache.Start()
@@ -1535,7 +1535,8 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 // addEnvelope adds an envelope to the envelope map, used for sending
 func (w *Waku) addEnvelope(envelope *common.ReceivedMessage) {
 	w.poolMu.Lock()
-	w.envelopeCache.Set(envelope.Hash(), envelope, ttlcache.DefaultTTL)
+	// Add the envelope to the cache with Processed set to false
+	w.envelopeCache.Set(envelope.Hash(), false, ttlcache.DefaultTTL)
 	w.poolMu.Unlock()
 }
 
@@ -1543,13 +1544,14 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool)
 	common.EnvelopesReceivedCounter.Inc()
 
 	w.poolMu.Lock()
-	envelope := w.envelopeCache.Get(recvMessage.Hash())
-	alreadyCached := envelope != nil
+	alreadyCached := w.envelopeCache.Has(recvMessage.Hash())
+	envelopeProcessed := false
 	w.poolMu.Unlock()
 
 	if !alreadyCached {
-		recvMessage.Processed.Store(false)
 		w.addEnvelope(recvMessage)
+	} else {
+		envelopeProcessed = w.envelopeCache.Get(recvMessage.Hash()).Value()
 	}
 
 	logger := w.logger.With(zap.String("envelopeHash", recvMessage.Hash().Hex()))
@@ -1563,7 +1565,7 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool)
 		common.EnvelopesSizeMeter.Observe(float64(len(recvMessage.Envelope.Message().Payload)))
 	}
 
-	if !alreadyCached || !envelope.Value().Processed.Load() {
+	if !envelopeProcessed {
 		if processImmediately {
 			logger.Debug("immediately processing envelope")
 			w.processMessage(recvMessage)
@@ -1627,7 +1629,7 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 		if w.metricsHandler != nil && e.MsgType == common.MissingMessageType {
 			w.metricsHandler.PushMissedRelevantMessage(e)
 		}
-		e.Processed.Store(true)
+		w.envelopeCache.Set(e.Hash(), true, ttlcache.DefaultTTL)
 	}
 
 	w.envelopeFeed.Send(common.EnvelopeEvent{
@@ -1637,18 +1639,12 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 	})
 }
 
-// GetEnvelope retrieves an envelope from the message queue by its hash.
-// It returns nil if the envelope can not be found.
-func (w *Waku) GetEnvelope(hash ethtypes.Hash) *common.ReceivedMessage {
+// HasEnvelope returns true if the envelope with the given hash is present in the cache.
+func (w *Waku) HasEnvelope(hash ethtypes.Hash) bool {
 	w.poolMu.RLock()
 	defer w.poolMu.RUnlock()
 
-	envelope := w.envelopeCache.Get(gethcommon.Hash(hash))
-	if envelope == nil {
-		return nil
-	}
-
-	return envelope.Value()
+	return w.envelopeCache.Has(gethcommon.Hash(hash))
 }
 
 // isEnvelopeCached checks if envelope with specific hash has already been received and cached.
