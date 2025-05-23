@@ -104,7 +104,7 @@ type WakuKeyManager interface {
 type Waku interface {
 	PublicWakuAPI() PublicWakuAPI
 
-	Start() error
+	Start(ctx context.Context) error
 	Stop() error
 
 	// Waku protocol version
@@ -121,10 +121,6 @@ type Waku interface {
 
 	Peers() PeerStats
 
-	StartDiscV5() error
-
-	StopDiscV5() error
-
 	SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error
 
 	UnsubscribeFromPubsubTopic(topic string) error
@@ -137,9 +133,9 @@ type Waku interface {
 
 	AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error)
 
-	DialPeer(address multiaddr.Multiaddr) error
+	DialPeer(ctx context.Context, address multiaddr.Multiaddr) error
 
-	DialPeerByID(peerID peer.ID) error
+	DialPeerByID(ctx context.Context, peerID peer.ID) error
 
 	DropPeer(peerID peer.ID) error
 
@@ -184,7 +180,7 @@ type Waku interface {
 	MarkP2PMessageAsProcessed(common.Hash)
 
 	// ConnectionChanged is called whenever the client knows its connection status has changed
-	ConnectionChanged(connection.State)
+	ConnectionChanged(context.Context, connection.State)
 
 	// ClearEnvelopesCache clears waku envelopes cache
 	ClearEnvelopesCache()

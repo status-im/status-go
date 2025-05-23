@@ -59,8 +59,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
@@ -164,10 +162,6 @@ type Waku struct {
 
 	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-
 	cfg     *Config
 	options []node.WakuNodeOption
 
@@ -209,6 +203,8 @@ type Waku struct {
 	metricsHandler IMetricsHandler
 
 	defaultShardInfo protocol.RelayShards
+
+	addSubscription chan *relay.Subscription
 }
 
 var _ types.Waku = (*Waku)(nil)
@@ -218,16 +214,15 @@ func (w *Waku) SetMetricsHandler(client IMetricsHandler) {
 }
 
 func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
-	cache := ttlcache.New[gethcommon.Hash, *common.ReceivedMessage](ttlcache.WithTTL[gethcommon.Hash, *common.ReceivedMessage](cacheTTL))
-	go func() {
-		defer gocommon.LogOnPanic()
-		cache.Start()
-	}()
-	return cache
+	return ttlcache.New[gethcommon.Hash, *common.ReceivedMessage](
+		ttlcache.WithTTL[gethcommon.Hash, *common.ReceivedMessage](cacheTTL),
+	)
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+// The passed ctx is only used during the initialization of the node, and is not used for any other purpose.
+// TODO: Extract initialization logic from New to a separate function.
+func New(ctx context.Context, nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -247,8 +242,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 
 	logger.Info("starting wakuv2 with config", zap.Any("config", cfg))
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	waku := &Waku{
 		appDB:                           appDB,
 		cfg:                             cfg,
@@ -259,9 +252,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
 		connectionNotifChan:             make(chan node.PeerConnection, 20),
 		connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
-		ctx:                             ctx,
-		cancel:                          cancel,
-		wg:                              sync.WaitGroup{},
 		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
 		dnsAddressCacheLock:             &sync.RWMutex{},
 		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
@@ -274,6 +264,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 		onPeerStats:                     onPeerStats,
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
 		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
+		addSubscription:                 make(chan *relay.Subscription, 10), // TODO: Not sure if we need the buffer, or what size should it be.
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
@@ -311,7 +302,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 	}
 
 	if cfg.EnableDiscV5 {
-		bootnodes, err := waku.getDiscV5BootstrapNodes(waku.ctx, cfg.DiscV5BootstrapNodes, false)
+		bootnodes, err := waku.getDiscV5BootstrapNodes(ctx, cfg.DiscV5BootstrapNodes, false)
 		if err != nil {
 			logger.Error("failed to get bootstrap nodes", zap.Error(err))
 			return nil, err
@@ -407,10 +398,9 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, 
 
 	w.seededBootnodesForDiscV5 = true
 
-	retrieveENR := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
+	retrieveENR := func(ctx context.Context, d dnsdisc.DiscoveredNode) {
 		mu.Lock()
 		defer mu.Unlock()
-		defer wg.Done()
 		if d.ENR != nil {
 			result = append(result, d.ENR)
 		}
@@ -429,10 +419,10 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, 
 				defer wg.Done()
 				if err := w.dnsDiscover(ctx, addr, retrieveENR, useOnlyDnsDiscCache); err != nil {
 					// prevent w.ctx in retryDnsDiscoveryWithBackoff from set to nil when w.Stop() is called
-					w.wg.Add(1)
+					wg.Add(1)
 					go func() {
 						defer gocommon.LogOnPanic()
-						defer w.wg.Done()
+						defer wg.Done()
 						w.retryDnsDiscoveryWithBackoff(ctx, addr, w.dnsDiscAsyncRetrievedSignal)
 					}()
 				}
@@ -457,7 +447,7 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, 
 	return result, nil
 }
 
-type fnApplyToEachPeer func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup)
+type fnApplyToEachPeer func(ctx context.Context, d dnsdisc.DiscoveredNode)
 
 func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnApplyToEachPeer, useOnlyCache bool) error {
 	w.logger.Info("retrieving nodes", zap.String("enr", enrtreeAddress))
@@ -492,23 +482,21 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 		}
 	}
 
-	wg := &sync.WaitGroup{}
-	wg.Add(len(discNodes))
-	for _, d := range discNodes {
-		apply(d, wg)
+	if apply == nil {
+		return nil
 	}
-	wg.Wait()
+
+	for _, d := range discNodes {
+		apply(ctx, d)
+	}
 
 	return nil
 }
 
 func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, successChan chan<- struct{}) {
 	retries := 0
-	applyFn := func(_ dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
-		wg.Done()
-	}
 	for {
-		err := w.dnsDiscover(ctx, addr, applyFn, false)
+		err := w.dnsDiscover(ctx, addr, nil, false)
 		if err == nil {
 			select {
 			case successChan <- struct{}{}:
@@ -526,7 +514,7 @@ func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, su
 
 		t := time.NewTimer(backoff)
 		select {
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			t.Stop()
 			return
 		case <-t.C:
@@ -536,30 +524,31 @@ func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, su
 }
 
 type peerAddressHandler interface {
-	discoverAndConnect(addr string)
+	discoverAndConnect(ctx context.Context, addr string)
 	connect(peerInfo peer.AddrInfo, node *enode.Node, origin wps.Origin)
 }
 
-func (w *Waku) discoverAndConnectPeers() {
+func (w *Waku) discoverAndConnectPeers(ctx context.Context) {
 	for _, addrString := range w.cfg.WakuNodes {
-		err := handlePeerAddress(addrString, w)
+		err := handlePeerAddress(ctx, addrString, w)
 		if err != nil {
 			w.logger.Warn("failed to handle peer address", zap.String("addr", addrString), zap.Error(err))
 		}
 	}
 }
 
-func (w *Waku) discoverAndConnect(address string) {
-	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
-		defer wg.Done()
-		if len(d.PeerInfo.Addrs) != 0 {
-			go w.connect(d.PeerInfo, d.ENR, wps.DNSDiscovery)
+func (w *Waku) discoverAndConnect(ctx context.Context, address string) {
+	fnApply := func(ctx context.Context, d dnsdisc.DiscoveredNode) {
+		if len(d.PeerInfo.Addrs) == 0 {
+			return
 		}
+		// NOTE: Ideally we should pass ctx to `connect`, but this function uses some internally stored context
+		w.connect(d.PeerInfo, d.ENR, wps.DNSDiscovery)
 	}
 
 	go func() {
 		defer gocommon.LogOnPanic()
-		if err := w.dnsDiscover(w.ctx, address, fnApply, false); err != nil {
+		if err := w.dnsDiscover(ctx, address, fnApply, false); err != nil {
 			w.logger.Error("dns discovery failed",
 				zap.String("dnsDiscURL", address),
 				zap.Error(err))
@@ -567,9 +556,9 @@ func (w *Waku) discoverAndConnect(address string) {
 	}()
 }
 
-func handlePeerAddress(addr string, handler peerAddressHandler) error {
+func handlePeerAddress(ctx context.Context, addr string, handler peerAddressHandler) error {
 	if strings.HasPrefix(addr, "enrtree://") {
-		handler.discoverAndConnect(addr)
+		handler.discoverAndConnect(ctx, addr)
 		return nil
 	}
 
@@ -607,10 +596,7 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
-func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
-
+func (w *Waku) telemetryBandwidthStats(ctx context.Context, telemetryServerURL string) {
 	if telemetryServerURL == "" {
 		return
 	}
@@ -622,7 +608,7 @@ func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
 
 	for {
 		select {
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			bandwidthPerProtocol := w.bandwidthCounter.GetBandwidthByProtocol()
@@ -640,12 +626,9 @@ func (w *Waku) GetStats() types.StatsSummary {
 	}
 }
 
-func (w *Waku) runPeerExchangeLoop() {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
-
+func (w *Waku) runPeerExchangeLoop(ctx context.Context) {
 	if !w.cfg.EnablePeerExchangeClient {
-		// Currently peer exchange client is only used for light nodes
+		// Currently, the peer exchange client is only used for light nodes
 		return
 	}
 
@@ -654,7 +637,7 @@ func (w *Waku) runPeerExchangeLoop() {
 
 	for {
 		select {
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			w.logger.Debug("Peer exchange loop stopped")
 			return
 		case <-ticker.C:
@@ -679,7 +662,7 @@ func (w *Waku) runPeerExchangeLoop() {
 			w.dnsAddressCacheLock.RUnlock()
 
 			if len(peers) != 0 {
-				err := w.node.PeerExchange().Request(w.ctx, w.cfg.DiscoveryLimit, peer_exchange.WithAutomaticPeerSelection(peers...),
+				err := w.node.PeerExchange().Request(ctx, w.cfg.DiscoveryLimit, peer_exchange.WithAutomaticPeerSelection(peers...),
 					peer_exchange.FilterByShard(int(w.defaultShardInfo.ClusterID), int(w.defaultShardInfo.ShardIDs[0])))
 				if err != nil {
 					w.logger.Error("couldnt request peers via peer exchange", zap.Error(err))
@@ -706,7 +689,8 @@ func (w *Waku) unsubscribeFromPubsubTopicWithWakuRelay(topic string) error {
 
 	contentFilter := protocol.NewContentFilter(topic)
 
-	return w.node.Relay().Unsubscribe(w.ctx, contentFilter)
+	// NOTE: Using context.TODO(), because this context is not used anyway inside Relay().Unsubscribe()
+	return w.node.Relay().Unsubscribe(context.TODO(), contentFilter)
 }
 
 func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.PublicKey) error {
@@ -729,31 +713,12 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 
 	contentFilter := protocol.NewContentFilter(topic)
 
-	sub, err := w.node.Relay().Subscribe(w.ctx, contentFilter)
+	sub, err := w.node.Relay().Subscribe(nil, contentFilter)
 	if err != nil {
 		return err
 	}
 
-	w.wg.Add(1)
-	go func() {
-		defer gocommon.LogOnPanic()
-		defer w.wg.Done()
-		for {
-			select {
-			case <-w.ctx.Done():
-				err := w.node.Relay().Unsubscribe(w.ctx, contentFilter)
-				if err != nil && !errors.Is(err, context.Canceled) {
-					w.logger.Error("could not unsubscribe", zap.Error(err))
-				}
-				return
-			case env := <-sub[0].Ch:
-				err := w.OnNewEnvelopes(env, common.RelayedMessageType, false)
-				if err != nil {
-					w.logger.Error("OnNewEnvelopes error", zap.Error(err))
-				}
-			}
-		}
-	}()
+	w.addSubscription <- sub[0]
 
 	return nil
 }
@@ -766,18 +731,6 @@ func (w *Waku) MaxMessageSize() uint32 {
 // CurrentTime returns current time.
 func (w *Waku) CurrentTime() time.Time {
 	return w.timesource.Now()
-}
-
-// APIs returns the RPC descriptors the Waku implementation offers
-func (w *Waku) APIs() []rpc.API {
-	return []rpc.API{
-		{
-			Namespace: Name,
-			Version:   VersionStr,
-			Service:   NewPublicWakuAPI(w),
-			Public:    false,
-		},
-	}
 }
 
 func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
@@ -1108,10 +1061,35 @@ func (w *Waku) OnNewEnvelope(env *protocol.Envelope) error {
 
 // Start implements node.Service, starting the background data propagation thread
 // of the Waku protocol.
-func (w *Waku) Start() error {
-	if w.ctx == nil {
-		w.ctx, w.cancel = context.WithCancel(context.Background())
-	}
+func (w *Waku) Start(ctx context.Context) error {
+
+	w.logger.Info("starting Waku node")
+	ctx, cancel := context.WithCancel(ctx)
+
+	defer func() {
+		// Stop
+		cancel()
+		w.envelopeCache.Stop()
+		w.node.Stop()
+
+		if w.protectedTopicStore != nil {
+			err := w.protectedTopicStore.Close()
+			if err != nil {
+				w.logger.Error("failed to close protected topic store", zap.Error(err))
+			}
+		}
+
+		close(w.goingOnline)
+	}()
+
+	wg := &sync.WaitGroup{}
+
+	wg.Add(1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer wg.Done()
+		w.envelopeCache.Start()
+	}()
 
 	var err error
 	if w.node, err = node.New(w.options...); err != nil {
@@ -1120,51 +1098,51 @@ func (w *Waku) Start() error {
 
 	w.goingOnline = make(chan struct{})
 
-	if err = w.node.Start(w.ctx); err != nil {
+	if err = w.node.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start go-waku node: %v", err)
 	}
 
 	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, commonapi.NewDefaultPinger(w.node.Host()))
 	w.HistoryRetriever = history.NewHistoryRetriever(missing.NewDefaultStorenodeRequestor(w.node.Store()), NewHistoryProcessorWrapper(w), w.logger)
 
-	w.StorenodeCycle.Start(w.ctx)
+	w.StorenodeCycle.Start(ctx)
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.node.Host().ID()))
 
-	w.discoverAndConnectPeers()
+	w.discoverAndConnectPeers(ctx)
 
 	if w.cfg.EnableDiscV5 {
-		err := w.node.DiscV5().Start(w.ctx)
+		err := w.node.DiscV5().Start(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
-	w.wg.Add(1)
+	wg.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
-		defer w.wg.Done()
+		defer wg.Done()
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
-			case <-w.ctx.Done():
+			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				w.checkForConnectionChanges()
+				w.checkForConnectionChanges(ctx)
 			case <-w.topicHealthStatusChan:
 				// TODO: https://github.com/status-im/status-go/issues/4628
 			case <-w.connectionNotifChan:
-				w.checkForConnectionChanges()
+				w.checkForConnectionChanges(ctx)
 			}
 		}
 	}()
 
 	if w.cfg.TelemetryServerURL != "" {
-		w.wg.Add(1)
+		wg.Add(1)
 		go func() {
 			defer gocommon.LogOnPanic()
-			defer w.wg.Done()
+			defer wg.Done()
 			peerTelemetryTickerInterval := time.Duration(w.cfg.TelemetryPeerCountSendPeriod) * time.Millisecond
 			if peerTelemetryTickerInterval == 0 {
 				peerTelemetryTickerInterval = 10 * time.Second
@@ -1192,7 +1170,7 @@ func (w *Waku) Start() error {
 
 			for {
 				select {
-				case <-w.ctx.Done():
+				case <-ctx.Done():
 					return
 				case <-peerTelemetryTicker.C:
 					w.reportPeerMetrics()
@@ -1208,13 +1186,21 @@ func (w *Waku) Start() error {
 		}()
 	}
 
-	w.wg.Add(1)
-	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
+	wg.Add(1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer wg.Done()
+		w.telemetryBandwidthStats(ctx, w.cfg.TelemetryServerURL)
+	}()
 	//TODO: commenting for now so that only fleet nodes are used.
 	//Need to uncomment once filter peer scoring etc is implemented.
 
-	w.wg.Add(1)
-	go w.runPeerExchangeLoop()
+	wg.Add(1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer wg.Done()
+		w.runPeerExchangeLoop(ctx)
+	}()
 
 	if w.cfg.EnableMissingMessageVerification {
 		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
@@ -1223,16 +1209,16 @@ func (w *Waku) Start() error {
 			w.node.Timesource(),
 			w.logger)
 
-		w.missingMsgVerifier.Start(w.ctx)
+		w.missingMsgVerifier.Start(ctx)
 		w.logger.Info("Started missing message verifier")
 
-		w.wg.Add(1)
+		wg.Add(1)
 		go func() {
 			defer gocommon.LogOnPanic()
-			w.wg.Done()
+			defer wg.Done()
 			for {
 				select {
-				case <-w.ctx.Done():
+				case <-ctx.Done():
 					return
 				case envelope := <-w.missingMsgVerifier.C:
 					err = w.OnNewEnvelopes(envelope, common.MissingMessageType, false)
@@ -1248,7 +1234,7 @@ func (w *Waku) Start() error {
 		// Create FilterManager that will main peer connectivity
 		// for installed filters
 		w.filterManager = filterapi.NewFilterManager(
-			w.ctx,
+			ctx,
 			w.logger,
 			w.cfg.MinPeersForFilter,
 			w,
@@ -1261,33 +1247,80 @@ func (w *Waku) Start() error {
 		return err
 	}
 
-	numCPU := runtime.NumCPU()
-	for i := 0; i < numCPU; i++ {
-		w.wg.Add(1)
-		go w.processQueueLoop()
-	}
-
-	w.wg.Add(1)
-	go w.broadcast()
-
+	wg.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
-		w.sendQueue.Start(w.ctx)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case sub := <-w.addSubscription:
+				wg.Add(1)
+				go func() {
+					defer gocommon.LogOnPanic()
+					defer wg.Done()
+					for {
+						select {
+						case <-ctx.Done():
+							err := w.node.Relay().Unsubscribe(ctx, sub.ContentFilter())
+							if err != nil && !errors.Is(err, context.Canceled) {
+								w.logger.Error("could not unsubscribe", zap.Error(err))
+							}
+							return
+						case env := <-sub.Ch:
+							err := w.OnNewEnvelopes(env, common.RelayedMessageType, false)
+							if err != nil {
+								w.logger.Error("OnNewEnvelopes error", zap.Error(err))
+							}
+						}
+					}
+				}()
+			}
+		}
 	}()
 
-	err = w.startMessageSender()
+	numCPU := runtime.NumCPU()
+	for i := 0; i < numCPU; i++ {
+		wg.Add(1)
+		go func() {
+			defer gocommon.LogOnPanic()
+			defer wg.Done()
+			w.processQueueLoop(ctx)
+		}()
+	}
+
+	wg.Add(1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer wg.Done()
+		w.broadcast(ctx, wg)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer wg.Done()
+		w.sendQueue.Start(ctx)
+	}()
+
+	err = w.startMessageSender(ctx, wg)
 	if err != nil {
 		return err
 	}
 
 	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set w.ctx to nil within `w.Stop()`
-	w.wg.Add(1)
-	go w.seedBootnodesForDiscV5()
+	wg.Add(1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer wg.Done()
+		w.seedBootnodesForDiscV5(ctx)
+	}()
 
+	wg.Wait()
 	return nil
 }
 
-func (w *Waku) checkForConnectionChanges() {
+func (w *Waku) checkForConnectionChanges(ctx context.Context) {
 
 	isOnline := len(w.node.Host().Network().Peers()) > 0
 
@@ -1313,7 +1346,7 @@ func (w *Waku) checkForConnectionChanges() {
 		w.onPeerStats(latestConnStatus)
 	}
 
-	w.ConnectionChanged(connection.State{
+	w.ConnectionChanged(ctx, connection.State{
 		Type:    w.state.Type, //setting state type as previous one since there won't be a change here
 		Offline: !latestConnStatus.IsOnline,
 	})
@@ -1360,7 +1393,7 @@ func (w *Waku) reportPeerMetrics() {
 	}
 }
 
-func (w *Waku) startMessageSender() error {
+func (w *Waku) startMessageSender(ctx context.Context, wg *sync.WaitGroup) error {
 	publishMethod := publish.Relay
 	if w.cfg.LightClient {
 		publishMethod = publish.LightPush
@@ -1379,16 +1412,16 @@ func (w *Waku) startMessageSender() error {
 	if w.cfg.EnableStoreConfirmationForMessagesSent {
 		msgStoredChan := make(chan gethcommon.Hash, 1000)
 		msgExpiredChan := make(chan gethcommon.Hash, 1000)
-		messageSentCheck := publish.NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), w.StorenodeCycle, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
+		messageSentCheck := publish.NewMessageSentCheck(ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), w.StorenodeCycle, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
 		sender.WithMessageSentCheck(messageSentCheck)
 
-		w.wg.Add(1)
+		wg.Add(1)
 		go func() {
 			defer gocommon.LogOnPanic()
-			defer w.wg.Done()
+			defer wg.Done()
 			for {
 				select {
-				case <-w.ctx.Done():
+				case <-ctx.Done():
 					return
 				case hash := <-msgStoredChan:
 					w.SendEnvelopeEvent(common.EnvelopeEvent{
@@ -1412,7 +1445,7 @@ func (w *Waku) startMessageSender() error {
 	}
 
 	if !w.cfg.UseThrottledPublish || testing.Testing() {
-		// To avoid delaying the tests, or for when we dont want to rate limit, we set up an infinite rate limiter,
+		// To avoid delaying the tests, or for when we don't want to rate limit, we set up an infinite rate limiter,
 		// basically disabling the rate limit functionality
 		limiter := publish.NewDefaultRateLimiter(rate.Inf, 1)
 		sender.WithRateLimiting(limiter)
@@ -1468,24 +1501,6 @@ func (w *Waku) setupRelaySubscriptions() error {
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Stop() error {
-	w.cancel()
-
-	w.envelopeCache.Stop()
-
-	w.node.Stop()
-
-	if w.protectedTopicStore != nil {
-		err := w.protectedTopicStore.Close()
-		if err != nil {
-			return err
-		}
-	}
-
-	close(w.goingOnline)
-	w.wg.Wait()
-
-	w.ctx = nil
-	w.cancel = nil
 
 	return nil
 }
@@ -1582,15 +1597,10 @@ func (w *Waku) postEvent(envelope *common.ReceivedMessage) {
 }
 
 // processQueueLoop delivers the messages to the watchers during the lifetime of the waku node.
-func (w *Waku) processQueueLoop() {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
-	if w.ctx == nil {
-		return
-	}
+func (w *Waku) processQueueLoop(ctx context.Context) {
 	for {
 		select {
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			return
 		case e := <-w.msgQueue:
 			w.processMessage(e)
@@ -1662,9 +1672,7 @@ func (w *Waku) IsEnvelopeCached(hash gethcommon.Hash) bool {
 func (w *Waku) ClearEnvelopesCache() {
 	w.poolMu.Lock()
 	defer w.poolMu.Unlock()
-
-	w.envelopeCache.Stop()
-	w.envelopeCache = newTTLCache()
+	w.envelopeCache.DeleteAll()
 }
 
 func (w *Waku) PeerCount() int {
@@ -1750,23 +1758,6 @@ func (w *Waku) RemovePubsubTopicKey(topic string) error {
 	return w.protectedTopicStore.Delete(topic)
 }
 
-func (w *Waku) StartDiscV5() error {
-	if w.node.DiscV5() == nil {
-		return errors.New("discv5 is not setup")
-	}
-
-	return w.node.DiscV5().Start(w.ctx)
-}
-
-func (w *Waku) StopDiscV5() error {
-	if w.node.DiscV5() == nil {
-		return errors.New("discv5 is not setup")
-	}
-
-	w.node.DiscV5().Stop()
-	return nil
-}
-
 func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
 	//If connection state is reported by something other than peerCount becoming 0 e.g from mobile app, disconnect all peers
 	if (state.Offline && len(w.node.Host().Network().Peers()) > 0) ||
@@ -1787,11 +1778,11 @@ func (w *Waku) isGoingOffline(state connection.State) bool {
 	return state.Offline && w.onlineChecker.IsOnline()
 }
 
-func (w *Waku) ConnectionChanged(state connection.State) {
+func (w *Waku) ConnectionChanged(ctx context.Context, state connection.State) {
 	if w.isGoingOnline(state) {
-		w.discoverAndConnectPeers()
+		w.discoverAndConnectPeers(ctx)
 		if w.cfg.EnableMissingMessageVerification {
-			w.missingMsgVerifier.Start(w.ctx)
+			w.missingMsgVerifier.Start(ctx)
 		}
 	}
 	if w.isGoingOffline(state) && w.cfg.EnableMissingMessageVerification {
@@ -1801,6 +1792,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 
 	if w.cfg.LightClient {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
+		// FIXME: Dangling goroutine
 		go func() {
 			defer gocommon.LogOnPanic()
 			w.filterManager.OnConnectionStatusChange("", isOnline, byte(state.Type))
@@ -1825,10 +1817,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 // from an ENR periodically.
 // It backs off exponentially until maxRetries, at which point it restarts from 0
 // It also restarts if there's a connection change signalled from the client
-func (w *Waku) seedBootnodesForDiscV5() {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
-
+func (w *Waku) seedBootnodesForDiscV5(ctx context.Context) {
 	if !w.cfg.EnableDiscV5 || w.node.DiscV5() == nil {
 		return
 	}
@@ -1857,7 +1846,7 @@ func (w *Waku) seedBootnodesForDiscV5() {
 				continue
 			}
 
-			err := w.restartDiscV5(true)
+			err := w.restartDiscV5(ctx, true)
 			if err != nil {
 				w.logger.Warn("failed to restart discv5", zap.Error(err))
 			}
@@ -1865,7 +1854,9 @@ func (w *Waku) seedBootnodesForDiscV5() {
 			lastTry = now()
 		case <-ticker.C:
 			if w.seededBootnodesForDiscV5 && len(w.node.Host().Network().Peers()) > 3 {
-				w.logger.Debug("not querying bootnodes", zap.Bool("seeded", w.seededBootnodesForDiscV5), zap.Int("peer-count", len(w.node.Host().Network().Peers())))
+				w.logger.Debug("not querying bootnodes",
+					zap.Bool("seeded", w.seededBootnodesForDiscV5),
+					zap.Int("peer-count", len(w.node.Host().Network().Peers())))
 				continue
 			}
 
@@ -1879,8 +1870,10 @@ func (w *Waku) seedBootnodesForDiscV5() {
 				continue
 			}
 
-			w.logger.Info("querying bootnodes to restore connectivity", zap.Int("peer-count", len(w.node.Host().Network().Peers())))
-			err := w.restartDiscV5(false)
+			w.logger.Info("querying bootnodes to restore connectivity",
+				zap.Int("peer-count", len(w.node.Host().Network().Peers())))
+
+			err := w.restartDiscV5(ctx, false)
 			if err != nil {
 				w.logger.Warn("failed to restart discv5", zap.Error(err))
 			}
@@ -1898,14 +1891,14 @@ func (w *Waku) seedBootnodesForDiscV5() {
 				continue
 			}
 
-			err := w.restartDiscV5(false)
+			err := w.restartDiscV5(ctx, false)
 			if err != nil {
 				w.logger.Warn("failed to restart discv5", zap.Error(err))
 			}
 			retries = 0
 			lastTry = now()
 
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			w.logger.Debug("bootnode seeding stopped")
 			return
 		}
@@ -1913,8 +1906,8 @@ func (w *Waku) seedBootnodesForDiscV5() {
 }
 
 // Restart discv5, re-retrieving bootstrap nodes
-func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
-	ctx, cancel := context.WithTimeout(w.ctx, 30*time.Second)
+func (w *Waku) restartDiscV5(ctx context.Context, useOnlyDNSDiscCache bool) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	bootnodes, err := w.getDiscV5BootstrapNodes(ctx, w.discV5BootstrapNodes, useOnlyDNSDiscCache)
 	if err != nil {
@@ -1926,7 +1919,7 @@ func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
 
 	if w.node.DiscV5().ErrOnNotRunning() != nil {
 		w.logger.Info("is not started restarting")
-		err := w.node.DiscV5().Start(w.ctx)
+		err := w.node.DiscV5().Start(ctx)
 		if err != nil {
 			w.logger.Error("Could not start DiscV5", zap.Error(err))
 		}
@@ -1935,12 +1928,12 @@ func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
 		w.logger.Info("is started restarting")
 
 		select {
-		case <-w.ctx.Done(): // Don't start discv5 if we are stopping waku
+		case <-ctx.Done(): // Don't start discv5 if we are stopping waku
 			return nil
 		default:
 		}
 
-		err := w.node.DiscV5().Start(w.ctx)
+		err := w.node.DiscV5().Start(ctx)
 		if err != nil {
 			w.logger.Error("Could not start DiscV5", zap.Error(err))
 		}
@@ -1962,14 +1955,14 @@ func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return peerID, nil
 }
 
-func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
-	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
+func (w *Waku) DialPeer(ctx context.Context, address multiaddr.Multiaddr) error {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	return w.node.DialPeerWithMultiAddress(ctx, address)
 }
 
-func (w *Waku) DialPeerByID(peerID peer.ID) error {
-	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
+func (w *Waku) DialPeerByID(ctx context.Context, peerID peer.ID) error {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	return w.node.DialPeerByID(ctx, peerID)
 }

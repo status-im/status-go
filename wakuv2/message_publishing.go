@@ -1,7 +1,9 @@
 package wakuv2
 
 import (
+	"context"
 	"errors"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -11,13 +13,14 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
-func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]byte, error) {
+func (w *Waku) Send(ctx context.Context, pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]byte, error) {
 	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
 	if w.protectedTopicStore != nil {
 		privKey, err := w.protectedTopicStore.FetchPrivateKey(pubsubTopic)
@@ -36,12 +39,12 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]b
 	envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
 
 	if priority != nil {
-		err := w.sendQueue.Push(w.ctx, envelope, *priority)
+		err := w.sendQueue.Push(ctx, envelope, *priority)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		err := w.sendQueue.Push(w.ctx, envelope)
+		err := w.sendQueue.Push(ctx, envelope)
 		if err != nil {
 			return nil, err
 		}
@@ -59,29 +62,29 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]b
 	return envelope.Hash().Bytes(), nil
 }
 
-func (w *Waku) broadcast() {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
+func (w *Waku) broadcast(ctx context.Context, wg *sync.WaitGroup) {
 	for {
-		var envelope *protocol.Envelope
-
 		select {
-		case envelope = <-w.sendQueue.Pop(w.ctx):
-
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			return
+		case envelope := <-w.sendQueue.Pop(ctx):
+			wg.Add(1)
+			go func() {
+				defer gocommon.LogOnPanic()
+				defer wg.Done()
+				w.publishEnvelope(ctx, envelope)
+			}()
 		}
-
-		w.wg.Add(1)
-		go w.publishEnvelope(envelope)
 	}
 }
 
-func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
-
-	logger := w.logger.With(zap.Stringer("envelopeHash", envelope.Hash()), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().GetTimestamp()))
+func (w *Waku) publishEnvelope(ctx context.Context, envelope *protocol.Envelope) {
+	logger := w.logger.With(
+		zap.Stringer("envelopeHash", envelope.Hash()),
+		zap.String("pubsubTopic", envelope.PubsubTopic()),
+		zap.String("contentTopic", envelope.Message().ContentTopic),
+		zap.Int64("timestamp", envelope.Message().GetTimestamp()),
+	)
 
 	var err error
 	// only used in testing to simulate going offline
@@ -89,7 +92,8 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 		logger.Info("skipping publish to topic")
 		err = errors.New("test send failure")
 	} else {
-		err = w.messageSender.Send(publish.NewRequest(w.ctx, envelope))
+		request := publish.NewRequest(ctx, envelope)
+		err = w.messageSender.Send(request)
 	}
 
 	if w.metricsHandler != nil {

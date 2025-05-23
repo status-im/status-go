@@ -16,6 +16,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -490,12 +491,12 @@ func (t *Transport) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return t.waku.AddRelayPeer(address)
 }
 
-func (t *Transport) DialPeer(address multiaddr.Multiaddr) error {
-	return t.waku.DialPeer(address)
+func (t *Transport) DialPeer(ctx context.Context, address multiaddr.Multiaddr) error {
+	return t.waku.DialPeer(ctx, address)
 }
 
-func (t *Transport) DialPeerByID(peerID peer.ID) error {
-	return t.waku.DialPeerByID(peerID)
+func (t *Transport) DialPeerByID(ctx context.Context, peerID peer.ID) error {
+	return t.waku.DialPeerByID(ctx, peerID)
 }
 
 func (t *Transport) DropPeer(peerID peer.ID) error {
@@ -506,8 +507,8 @@ func (t *Transport) MarkP2PMessageAsProcessed(hash common.Hash) {
 	t.waku.MarkP2PMessageAsProcessed(hash)
 }
 
-func (t *Transport) ConnectionChanged(state connection.State) {
-	t.waku.ConnectionChanged(state)
+func (t *Transport) ConnectionChanged(ctx context.Context, state connection.State) {
+	t.waku.ConnectionChanged(ctx, state)
 }
 
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected

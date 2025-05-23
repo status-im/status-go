@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/connection"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging/adapters"
@@ -219,12 +220,12 @@ func (a *API) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return a.transport.AddRelayPeer(address)
 }
 
-func (a *API) DialPeer(address multiaddr.Multiaddr) error {
-	return a.transport.DialPeer(address)
+func (a *API) DialPeer(ctx context.Context, address multiaddr.Multiaddr) error {
+	return a.transport.DialPeer(ctx, address)
 }
 
-func (a *API) DialPeerByID(peerID peer.ID) error {
-	return a.transport.DialPeerByID(peerID)
+func (a *API) DialPeerByID(ctx context.Context, peerID peer.ID) error {
+	return a.transport.DialPeerByID(ctx, peerID)
 }
 
 func (a *API) DropPeer(peerID peer.ID) error {
@@ -235,8 +236,8 @@ func (a *API) MarkP2PMessageAsProcessed(hash common.Hash) {
 	a.transport.MarkP2PMessageAsProcessed(hash)
 }
 
-func (a *API) ConnectionChanged(state connection.State) {
-	a.transport.ConnectionChanged(state)
+func (a *API) ConnectionChanged(ctx context.Context, state connection.State) {
+	a.transport.ConnectionChanged(ctx, state)
 }
 
 func (a *API) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {

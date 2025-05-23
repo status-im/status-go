@@ -822,7 +822,7 @@ func (m *Messenger) RemoveFilters(filters []*messagingtypes.ChatFilter) error {
 }
 
 func (m *Messenger) ConnectionChanged(state connection.State) {
-	m.messaging.ConnectionChanged(state)
+	m.messaging.ConnectionChanged(m.ctx, state)
 	if !m.connectionState.Offline && state.Offline {
 		m.sender.StopDatasync()
 	}

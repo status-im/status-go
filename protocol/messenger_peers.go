@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"crypto/ecdsa"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -15,12 +16,12 @@ func (m *Messenger) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return m.messaging.AddRelayPeer(address)
 }
 
-func (m *Messenger) DialPeer(address multiaddr.Multiaddr) error {
-	return m.messaging.DialPeer(address)
+func (m *Messenger) DialPeer(ctx context.Context, address multiaddr.Multiaddr) error {
+	return m.messaging.DialPeer(ctx, address)
 }
 
-func (m *Messenger) DialPeerByID(peerID peer.ID) error {
-	return m.messaging.DialPeerByID(peerID)
+func (m *Messenger) DialPeerByID(ctx context.Context, peerID peer.ID) error {
+	return m.messaging.DialPeerByID(ctx, peerID)
 }
 
 func (m *Messenger) DropPeer(peerID peer.ID) error {

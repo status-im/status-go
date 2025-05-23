@@ -246,7 +246,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byt
 		Ephemeral:    &req.Ephemeral,
 	}
 
-	hash, err := api.w.Send(req.PubsubTopic, wakuMsg, req.Priority)
+	hash, err := api.w.Send(ctx, req.PubsubTopic, wakuMsg, req.Priority)
 
 	if err != nil {
 		return nil, err

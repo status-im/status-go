@@ -1443,20 +1443,20 @@ func (api *PublicAPI) AddRelayPeer(address string) (peer.ID, error) {
 	return api.service.messenger.AddRelayPeer(maddr)
 }
 
-func (api *PublicAPI) DialPeer(address string) error {
+func (api *PublicAPI) DialPeer(ctx context.Context, address string) error {
 	maddr, err := multiaddr.NewMultiaddr(address)
 	if err != nil {
 		return err
 	}
-	return api.service.messenger.DialPeer(maddr)
+	return api.service.messenger.DialPeer(ctx, maddr)
 }
 
-func (api *PublicAPI) DialPeerByID(peerID string) error {
+func (api *PublicAPI) DialPeerByID(ctx context.Context, peerID string) error {
 	pID, err := peer.Decode(peerID)
 	if err != nil {
 		return err
 	}
-	return api.service.messenger.DialPeerByID(pID)
+	return api.service.messenger.DialPeerByID(ctx, pID)
 }
 
 func (api *PublicAPI) DropPeer(peerID string) error {
