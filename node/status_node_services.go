@@ -2,30 +2,23 @@ package node
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"os"
 	"reflect"
 	"time"
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/wakuv2"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/server"
+	wakuv2service "github.com/status-im/status-go/services/wakuv2"
+	"github.com/status-im/status-go/transactions"
+
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -56,7 +49,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
-	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
 
 var (
@@ -176,7 +168,7 @@ func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Ser
 		return nil, errors.New("geth node not initialized")
 	}
 	if b.wakuV2ExtSrvc == nil {
-		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.wakuV2Srvc, b.rpcClient)
+		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.wakuV2Srvc.Waku(), b.rpcClient)
 	}
 
 	return b.wakuV2ExtSrvc, nil
@@ -208,77 +200,17 @@ func (b *StatusNode) EnsService() *ens.Service {
 func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
 	return b.wakuV2ExtSrvc
 }
-func (b *StatusNode) WakuV2Service() *wakuv2.Waku {
+func (b *StatusNode) WakuV2Service() *wakuv2service.Service {
 	return b.wakuV2Srvc
 }
 
-func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku, error) {
+func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2service.Service, error) {
 	if b.wakuV2Srvc == nil {
-		cfg := &wakuv2.Config{
-			MaxMessageSize:                         wakuv2common.DefaultMaxMessageSize,
-			Host:                                   nodeConfig.WakuV2Config.Host,
-			Port:                                   nodeConfig.WakuV2Config.Port,
-			LightClient:                            nodeConfig.WakuV2Config.LightClient,
-			WakuNodes:                              nodeConfig.ClusterConfig.WakuNodes,
-			EnableStore:                            nodeConfig.WakuV2Config.EnableStore,
-			StoreCapacity:                          nodeConfig.WakuV2Config.StoreCapacity,
-			StoreSeconds:                           nodeConfig.WakuV2Config.StoreSeconds,
-			DiscoveryLimit:                         nodeConfig.WakuV2Config.DiscoveryLimit,
-			DiscV5BootstrapNodes:                   nodeConfig.ClusterConfig.DiscV5BootstrapNodes,
-			Nameserver:                             nodeConfig.WakuV2Config.Nameserver,
-			UDPPort:                                nodeConfig.WakuV2Config.UDPPort,
-			AutoUpdate:                             nodeConfig.WakuV2Config.AutoUpdate,
-			DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
-			TelemetryServerURL:                     nodeConfig.WakuV2Config.TelemetryServerURL,
-			ClusterID:                              nodeConfig.ClusterConfig.ClusterID,
-			EnableMissingMessageVerification:       nodeConfig.WakuV2Config.EnableMissingMessageVerification,
-			EnableStoreConfirmationForMessagesSent: nodeConfig.WakuV2Config.EnableStoreConfirmationForMessagesSent,
-			UseThrottledPublish:                    true,
-		}
-
-		// Configure peer exchange and discv5 settings based on node type
-		if cfg.LightClient {
-			cfg.EnablePeerExchangeServer = false
-			cfg.EnablePeerExchangeClient = true
-			cfg.EnableDiscV5 = false
-		} else {
-			cfg.EnablePeerExchangeServer = true
-			cfg.EnablePeerExchangeClient = false
-			cfg.EnableDiscV5 = true
-		}
-
-		if nodeConfig.WakuV2Config.MaxMessageSize > 0 {
-			cfg.MaxMessageSize = nodeConfig.WakuV2Config.MaxMessageSize
-		}
-
-		var nodeKey *ecdsa.PrivateKey
-		var err error
-		if nodeConfig.NodeKey != "" {
-			nodeKey, err = crypto.HexToECDSA(nodeConfig.NodeKey)
-			if err != nil {
-				return nil, fmt.Errorf("could not convert nodekey into a valid private key: %v", err)
-			}
-		} else {
-			nodeKeyStr := os.Getenv("WAKUV2_NODE_KEY")
-			if nodeKeyStr != "" {
-				nodeKeyBytes, err := hexutil.Decode(nodeKeyStr)
-				if err != nil {
-					return nil, fmt.Errorf("failed to decode the go-waku private key: %v", err)
-				}
-
-				nodeKey, err = crypto.ToECDSA(nodeKeyBytes)
-				if err != nil {
-					return nil, fmt.Errorf("could not convert nodekey into a valid private key: %v", err)
-				}
-			}
-		}
-
-		w, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
-
+		service, err := wakuv2service.NewService(nodeConfig, b.appDB, b.timeSource())
 		if err != nil {
 			return nil, err
 		}
-		b.wakuV2Srvc = w
+		b.wakuV2Srvc = service
 	}
 
 	return b.wakuV2Srvc, nil

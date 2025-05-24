@@ -2821,7 +2821,7 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyMan
 	if st != nil {
 		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.walletDB,
 			b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, b.statusNode.RPCClient(),
-			b.statusNode.WalletService(), b.statusNode.CommunityTokensService(), b.statusNode.WakuV2Service(),
+			b.statusNode.WalletService(), b.statusNode.CommunityTokensService(), b.statusNode.WakuV2Service().Waku(),
 			logutils.ZapLogger(), b.statusNode.AccountsFeed()); err != nil {
 			return err
 		}
@@ -2863,7 +2863,7 @@ func (b *GethStatusBackend) KeyUID() string {
 
 func (b *GethStatusBackend) injectAccountsIntoServices() error {
 	if b.statusNode.WakuV2Service() != nil {
-		return b.injectAccountsIntoWakuService(b.statusNode.WakuV2Service(), func() *ext.Service {
+		return b.injectAccountsIntoWakuService(b.statusNode.WakuV2Service().Waku(), func() *ext.Service {
 			if b.statusNode.WakuV2ExtService() == nil {
 				return nil
 			}
