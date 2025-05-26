@@ -19,4 +19,4 @@ shell.nix             @status-im/devops
 /healthmanager        @friofry
 /rpc/network          @friofry
 
-/services/wallet/leaderboard @cuteivist @friofry
+/services/wallet/leaderboard @friofry
