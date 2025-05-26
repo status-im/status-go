@@ -209,7 +209,7 @@ func NewService(
 
 	routeExecutionManager := routeexecution.NewManager(db, feed, router, transactionManager, transferController)
 
-	leaderboardConfig := leaderboard.NewLeaderbordConfig(config.WalletConfig.MarketDataProxyConfig)
+	leaderboardConfig := leaderboard.NewLeaderboardConfig(config.WalletConfig.MarketDataProxyConfig)
 	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, db, feed)
 
 	return &Service{
