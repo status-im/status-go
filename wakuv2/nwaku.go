@@ -35,7 +35,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -736,11 +735,6 @@ func (w *Waku) APIs() []rpc.API {
 			Public:    false,
 		},
 	}
-}
-
-// Protocols returns the waku sub-protocols ran by this particular client.
-func (w *Waku) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{}
 }
 
 func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
@@ -1965,12 +1959,6 @@ func (w *Waku) DropPeer(peerID peer.ID) error {
 	return w.node.DisconnectPeerByID(peerID)
 }
 
-func (w *Waku) ProcessingP2PMessages() bool {
-	w.storeMsgIDsMu.Lock()
-	defer w.storeMsgIDsMu.Unlock()
-	return len(w.storeMsgIDs) != 0
-}
-
 func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
 	w.storeMsgIDsMu.Lock()
 	defer w.storeMsgIDsMu.Unlock()
@@ -2066,8 +2054,9 @@ func (w *Waku) LegacyStoreNode() legacy_store.Store {
 }
 
 // GetCurrentTime returns current time.
-func (w *Waku) GetCurrentTime() time.Time {
-	return w.CurrentTime()
+// Implements protocol/common.TimeSource
+func (w *Waku) GetCurrentTime() uint64 {
+	return uint64(w.CurrentTime().UnixNano() / int64(time.Millisecond))
 }
 
 func (w *Waku) GetActiveStorenode() peer.AddrInfo {
