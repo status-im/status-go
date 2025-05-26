@@ -42,7 +42,7 @@ func (c *ServiceConfig) setDefaults() {
 	}
 }
 
-func NewLeaderbordConfig(config params.MarketDataProxyConfig) ServiceConfig {
+func NewLeaderboardConfig(config params.MarketDataProxyConfig) ServiceConfig {
 	// Create a new ServiceConfig instance with default values
 	serviceConfig := ServiceConfig{
 		UrlOverride:         config.UrlOverride,

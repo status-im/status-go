@@ -13,7 +13,7 @@ import (
 func TestServiceConfigValidate(t *testing.T) {
 	{
 		// Zero intervals
-		config := NewLeaderbordConfig(params.MarketDataProxyConfig{
+		config := NewLeaderboardConfig(params.MarketDataProxyConfig{
 			UrlOverride:             security.NewSensitiveString("https://example.com"),
 			User:                    security.NewSensitiveString("user"),
 			Password:                security.NewSensitiveString("pass"),
@@ -32,7 +32,7 @@ func TestServiceConfigValidate(t *testing.T) {
 
 	{
 		// Negative intervals
-		config := NewLeaderbordConfig(params.MarketDataProxyConfig{
+		config := NewLeaderboardConfig(params.MarketDataProxyConfig{
 			UrlOverride:             security.NewSensitiveString("https://example.com"),
 			User:                    security.NewSensitiveString("user"),
 			Password:                security.NewSensitiveString("pass"),
@@ -51,7 +51,7 @@ func TestServiceConfigValidate(t *testing.T) {
 
 	{
 		// Custom intervals
-		config := NewLeaderbordConfig(params.MarketDataProxyConfig{
+		config := NewLeaderboardConfig(params.MarketDataProxyConfig{
 			UrlOverride:             security.NewSensitiveString("https://example.com"),
 			User:                    security.NewSensitiveString("user"),
 			Password:                security.NewSensitiveString("pass"),
