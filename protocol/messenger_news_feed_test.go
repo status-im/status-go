@@ -14,9 +14,9 @@ type MessengerNewsFeedSuite struct {
 }
 
 func (s *MessengerNewsFeedSuite) SetupTest() {
-	s.MessengerBaseTestSuite.setupWaku()
+	s.MessengerBaseTestSuite.setupMessaging()
 
-	messenger, err := newRunningTestMessenger(s.shh, testMessengerConfig{extraOptions: []Option{WithNewsFeed()}})
+	messenger, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{extraOptions: []Option{WithNewsFeed()}})
 	s.Require().NoError(err)
 
 	s.m = messenger

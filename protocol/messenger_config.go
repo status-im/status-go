@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/status-im/status-go/accounts-management/generator"
@@ -14,11 +13,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/appdatabase/migrations"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
@@ -184,37 +180,6 @@ func WithWalletDatabase(db *sql.DB) Option {
 	}
 }
 
-func WithToplevelDatabaseMigrations() Option {
-	return func(c *config) error {
-		c.afterDbCreatedHooks = append(c.afterDbCreatedHooks, func(c *config) error {
-			return migrations.Migrate(c.appDb, nil)
-		})
-		return nil
-	}
-}
-
-func WithAppSettings(s settings.Settings, nc params.NodeConfig) Option {
-	return func(c *config) error {
-		c.afterDbCreatedHooks = append(c.afterDbCreatedHooks, func(c *config) error {
-			if s.Networks == nil {
-				networks := new(json.RawMessage)
-				if err := networks.UnmarshalJSON([]byte("net")); err != nil {
-					return err
-				}
-
-				s.Networks = networks
-			}
-
-			sDB, err := accounts.NewDB(c.appDb)
-			if err != nil {
-				return err
-			}
-			return sDB.CreateSettings(s, nc)
-		})
-		return nil
-	}
-}
-
 func WithMultiAccounts(ma *multiaccounts.Database) Option {
 	return func(c *config) error {
 		c.multiAccount = ma
@@ -239,12 +204,6 @@ func WithAccount(acc *multiaccounts.Account) Option {
 func WithBrowserDatabase(bd *browsers.Database) Option {
 	return func(c *config) error {
 		c.browserDatabase = bd
-		if c.browserDatabase == nil {
-			c.afterDbCreatedHooks = append(c.afterDbCreatedHooks, func(c *config) error {
-				c.browserDatabase = browsers.NewDB(c.appDb)
-				return nil
-			})
-		}
 		return nil
 	}
 }

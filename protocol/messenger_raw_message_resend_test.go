@@ -27,11 +27,11 @@ type MessengerRawMessageResendTest struct {
 }
 
 func (s *MessengerRawMessageResendTest) SetupTest() {
-	s.MessengerBaseTestSuite.setupWaku()
+	s.MessengerBaseTestSuite.setupMessaging()
 
 	s.mockedBalances = make(communities.BalancesByChain)
 
-	s.aliceMessenger = newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	s.aliceMessenger = newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			name: "alice",
 		},
@@ -43,7 +43,7 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 	_, err := s.aliceMessenger.Start()
 	s.Require().NoError(err)
 
-	s.bobMessenger = newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	s.bobMessenger = newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			name: "bob",
 		},

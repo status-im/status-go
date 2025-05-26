@@ -36,7 +36,7 @@ type MessengerCommunitiesShardingSuite struct {
 }
 
 func (s *MessengerCommunitiesShardingSuite) SetupTest() {
-	s.MessengerBaseTestSuite.setupWaku()
+	s.MessengerBaseTestSuite.setupMessaging()
 
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 	s.mockedCollectibles = make(communities.CollectiblesByChain)
@@ -48,7 +48,7 @@ func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 
 	nodeConfig := defaultTestCommunitiesMessengerNodeConfig()
 
-	s.owner = newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	s.owner = newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			name:       "owner",
 			nodeConfig: nodeConfig,
@@ -63,7 +63,7 @@ func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 		messages: map[protobuf.ApplicationMetadataMessage_Type][]*unhandedMessage{},
 	}
 
-	s.alice = newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	s.alice = newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			name:                     "alice",
 			unhandledMessagesTracker: s.aliceUnhandledMessagesTracker,

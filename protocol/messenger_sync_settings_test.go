@@ -63,7 +63,7 @@ type MessengerSyncSettingsSuite struct {
 }
 
 func (s *MessengerSyncSettingsSuite) SetupTest() {
-	s.MessengerBaseTestSuite.setupWaku()
+	s.MessengerBaseTestSuite.setupMessaging()
 
 	networks := json.RawMessage("{}")
 	settings := settings.Settings{
@@ -94,7 +94,7 @@ func (s *MessengerSyncSettingsSuite) SetupTest() {
 	}
 
 	var err error
-	s.m, err = newRunningTestMessenger(s.shh, testMessengerConfig{appSettings: &settings})
+	s.m, err = newRunningTestMessenger(s.messagingEnv, testMessengerConfig{appSettings: &settings})
 	s.Require().NoError(err)
 	s.privateKey = s.m.identity
 	s.alice = s.m

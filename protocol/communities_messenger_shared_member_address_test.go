@@ -35,7 +35,7 @@ type MessengerCommunitiesSharedMemberAddressSuite struct {
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) SetupTest() {
-	s.MessengerBaseTestSuite.setupWaku()
+	s.MessengerBaseTestSuite.setupMessaging()
 
 	communities.SetValidateInterval(300 * time.Millisecond)
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
@@ -74,7 +74,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) newMessenger(password str
 	}
 	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
 
-	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	return newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			extraOptions: extraOptions,
 		},

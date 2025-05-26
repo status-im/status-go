@@ -26,7 +26,7 @@ type CommunitiesMessengerTestSuiteBase struct {
 }
 
 func (s *CommunitiesMessengerTestSuiteBase) SetupTest() {
-	s.MessengerBaseTestSuite.setupWaku()
+	s.MessengerBaseTestSuite.setupMessaging()
 
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 	s.accountsTestData = make(map[string][]string)
@@ -55,7 +55,7 @@ func (s *CommunitiesMessengerTestSuiteBase) newMessengerWithKey(privateKey *ecds
 }
 
 func (s *CommunitiesMessengerTestSuiteBase) newMessengerWithConfig(config testMessengerConfig, password string, walletAddresses []string) *Messenger {
-	messenger := newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	messenger := newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: config,
 		password:            password,
 		walletAddresses:     walletAddresses,

@@ -1347,7 +1347,7 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 	s.Require().NotNil(contactRequest)
 
 	// Bob resets his device
-	bob2, err := newRunningTestMessenger(s.shh, testMessengerConfig{privateKey: bob1.identity})
+	bob2, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{privateKey: bob1.identity})
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 

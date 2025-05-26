@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/metrics/wakumetrics"
 	"github.com/status-im/status-go/multiaccounts"
@@ -45,6 +46,7 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -254,6 +256,22 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		s.config.ShhextConfig.VerifyENSContractAddress,
 	)
 
+	err = sqlite.Migrate(params.AppDB)
+	if err != nil {
+		return err
+	}
+
+	messaging, err := messaging.NewCore(
+		s.waku,
+		params.Identity,
+		common.NewMessagingPersistence(params.AppDB),
+		messaging.WithLogger(params.Logger.Named("messaging")),
+		messaging.WithEnvelopeEventsConfig(envelopeEventsConfig),
+	)
+	if err != nil {
+		return err
+	}
+
 	options, err := buildMessengerOptions(s.config, params.Identity, params.AppDB, params.WalletDB, params.HTTPServer, s.rpcClient, s.multiAccountsDB, params.Account, envelopeEventsConfig, s.accountsDB, params.WalletService, params.CommunityTokensService, params.Logger, &MessengerSignalsHandler{}, params.AccountsManager, params.AccountsPublisher, ensVerifier)
 	if err != nil {
 		return err
@@ -261,7 +279,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 
 	messenger, err := protocol.NewMessenger(
 		params.Identity,
-		s.waku,
+		messaging.API(),
 		s.config.ShhextConfig.InstallationID,
 		options...,
 	)

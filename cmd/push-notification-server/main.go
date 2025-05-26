@@ -20,11 +20,14 @@ import (
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
+	"github.com/status-im/status-go/protocol/sqlite"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/timesource"
@@ -56,6 +59,7 @@ const (
 	exitCodeInvalidKey
 	exitCodeCreateWakuFailed
 	exitCodeStartWakuFailed
+	exitCodeDBMigrationFailed
 	exitCodeCreateMessengerFailed
 	exitCodeCreateDatabaseFailed
 	exitCodeStartServerFailed
@@ -140,6 +144,22 @@ func main() {
 		}
 	}()
 
+	err = sqlite.Migrate(db)
+	if err != nil {
+		logger.Error("failed to migrate database", zap.Error(err))
+		os.Exit(exitCodeDBMigrationFailed)
+	}
+
+	messaging, err := messaging.NewCore(
+		waku,
+		privateKey,
+		common.NewMessagingPersistence(db),
+		messaging.WithLogger(logger.Named("messaging")),
+	)
+	if err != nil {
+		os.Exit(exitCodeCreateMessengerFailed)
+	}
+
 	// Set up the push notifications server
 	config := &pushnotificationserver.Config{
 		Enabled:   true,
@@ -158,7 +178,7 @@ func main() {
 		protocol.WithMessageSigner(personal.New()),
 		protocol.WithPushNotificationServer(server),
 	}
-	messenger, err := protocol.NewMessenger(privateKey, waku, installationID, options...)
+	messenger, err := protocol.NewMessenger(privateKey, messaging.API(), installationID, options...)
 	if err != nil {
 		logger.Error("failed to create messenger", zap.Error(err))
 		os.Exit(exitCodeCreateMessengerFailed)
