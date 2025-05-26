@@ -82,7 +82,7 @@ type MessengerMessagesTrackingSuite struct {
 }
 
 func (s *MessengerMessagesTrackingSuite) SetupTest() {
-	s.MessengerBaseTestSuite.setupWaku()
+	s.MessengerBaseTestSuite.setupMessaging()
 	s.bob, s.bobInterceptor = s.newMessenger()
 	s.alice, s.aliceInterceptor = s.newMessenger()
 }
@@ -99,7 +99,7 @@ func (s *MessengerMessagesTrackingSuite) newMessenger() (*Messenger, *EnvelopeEv
 		MailServerConfirmations:    false,
 	}
 
-	messenger, err := newRunningTestMessenger(s.shh, testMessengerConfig{extraOptions: []Option{WithEnvelopeEventsConfig(envelopeEventsConfig)}})
+	messenger, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{extraOptions: []Option{WithEnvelopeEventsConfig(envelopeEventsConfig)}})
 	s.Require().NoError(err)
 
 	interceptor := &EnvelopeEventsInterceptorMock{

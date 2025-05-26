@@ -148,7 +148,7 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
-	s.MessengerBaseTestSuite.setupWaku()
+	s.MessengerBaseTestSuite.setupMessaging()
 
 	s.accountsTestData = make(map[string][]string)
 	s.accountsPasswords = make(map[string]string)
@@ -187,7 +187,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string
 	}
 	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
 
-	messenger := newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	messenger := newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			extraOptions: extraOptions,
 		},

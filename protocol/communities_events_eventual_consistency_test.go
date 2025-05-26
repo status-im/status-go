@@ -22,22 +22,20 @@ type CommunityEventsEventualConsistencySuite struct {
 }
 
 func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
+	s.setupMessaging()
+
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 	s.accountsTestData = make(map[string][]string)
 	s.accountsPasswords = make(map[string]string)
 	s.mockedBalances = createMockedWalletBalance(&s.Suite)
 
-	wakuWrapper, err := newTestWakuWrapper()
-	s.Require().NoError(err)
-	s.shh = wakuWrapper
-
 	s.messagesOrderController = NewMessagesOrderController(messagesOrderRandom)
-	s.messagesOrderController.Start(wakuWrapper.SubscribePostEvents())
+	s.messagesOrderController.Start(s.messagingEnv.SubscribePostEvents())
 
 	s.owner = s.newMessenger("", []string{})
 	s.eventSender = s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
 	s.alice = s.newMessenger(accountPassword, []string{aliceAccountAddress})
-	_, err = s.owner.Start()
+	_, err := s.owner.Start()
 	s.Require().NoError(err)
 	_, err = s.eventSender.Start()
 	s.Require().NoError(err)
@@ -47,7 +45,7 @@ func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
 }
 
 func (s *CommunityEventsEventualConsistencySuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	messenger := newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	messenger := newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			messagesOrderController: s.messagesOrderController,
 		},

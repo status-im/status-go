@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 const minimumResendDelay = 500 * time.Millisecond
@@ -39,7 +38,7 @@ func TestMessengerOfflineSuite(t *testing.T) {
 }
 
 func (s *MessengerOfflineSuite) SetupTest() {
-	s.MessengerBaseTestSuite.setupWaku()
+	s.MessengerBaseTestSuite.setupMessaging()
 
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 	s.collectiblesManagerMock = &CollectiblesManagerMock{}
@@ -68,7 +67,7 @@ func (s *MessengerOfflineSuite) TearDownTest() {
 }
 
 func (s *MessengerOfflineSuite) newMessenger(password string, accounts []string) *Messenger {
-	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	return newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			extraOptions: []Option{
 				WithResendParams(minimumResendDelay, 1),
@@ -104,16 +103,14 @@ func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
 	s.checkMessageDelivery(ctx, inputMessage)
 
 	// Simulate going offline
-	wakuv2 := s.shh.(*wakuv2.Waku)
-	wakuv2.SkipPublishToTopic(true)
+	getOnline := s.messagingEnv.SimulateOffline()
 
 	resp, err := s.alice.SendChatMessage(ctx, inputMessage)
 	messageID := types.Hex2Bytes(resp.Messages()[0].ID)
 	s.Require().NoError(err)
 
 	// Check that message is re-sent once back online
-	wakuv2.SkipPublishToTopic(false)
-	time.Sleep(waitForResentDelay)
+	getOnline()
 
 	s.checkMessageDelivery(ctx, inputMessage)
 
@@ -123,13 +120,14 @@ func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
 		Text: editedText,
 	}
 
-	wakuv2.SkipPublishToTopic(true)
+	// Simulate going offline
+	getOnline = s.messagingEnv.SimulateOffline()
 	sendResponse, err := s.alice.EditMessage(ctx, editedMessage)
 	s.Require().NotNil(sendResponse)
 	s.Require().NoError(err)
 
 	// Check that message is re-sent once back online
-	wakuv2.SkipPublishToTopic(false)
+	getOnline()
 	time.Sleep(waitForResentDelay)
 	inputMessage.Text = editedText
 

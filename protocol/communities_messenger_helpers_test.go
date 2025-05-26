@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -31,8 +32,6 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type AccountsManagerMock struct {
@@ -310,7 +309,7 @@ func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
 }
 
-func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config testCommunitiesMessengerConfig) *Messenger {
+func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMessagingEnvironment, config testCommunitiesMessengerConfig) *Messenger {
 	err := config.complete()
 	s.Require().NoError(err)
 
@@ -334,7 +333,7 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config tes
 
 	config.extraOptions = append(config.extraOptions, options...)
 
-	messenger, err := newTestMessenger(waku, config.testMessengerConfig)
+	messenger, err := newTestMessenger(messagingEnv, config.testMessengerConfig)
 	s.Require().NoError(err)
 
 	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)

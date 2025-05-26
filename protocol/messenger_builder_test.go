@@ -2,28 +2,31 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/wakuv2"
 	"github.com/status-im/status-go/walletdatabase"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type testMessengerConfig struct {
@@ -68,7 +71,7 @@ func (tmc *testMessengerConfig) complete() error {
 	return nil
 }
 
-func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messenger, error) {
+func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
 	err := config.complete()
 	if err != nil {
 		return nil, err
@@ -94,9 +97,41 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		return nil, err
 	}
 
+	err = sqlite.Migrate(appDb)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to apply migrations")
+	}
+
+	if config.appSettings.Networks == nil {
+		networks := new(json.RawMessage)
+		if err := networks.UnmarshalJSON([]byte("net")); err != nil {
+			return nil, err
+		}
+
+		config.appSettings.Networks = networks
+	}
+
+	sDB, err := accounts.NewDB(appDb)
+	if err != nil {
+		return nil, err
+	}
+
+	err = sDB.CreateSettings(*config.appSettings, *config.nodeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	messaging, err := messagingEnv.NewTestCore(
+		config.privateKey,
+		common.NewMessagingPersistence(appDb),
+		messaging.WithLogger(config.logger))
+	if err != nil {
+		return nil, err
+	}
+
 	ensVerifier := ens.New(
 		config.logger,
-		waku, // timesource
+		messaging.API(), // timesource
 		appDb,
 		"",
 		"",
@@ -106,22 +141,20 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		WithCustomLogger(config.logger),
 		WithDatabase(appDb),
 		WithWalletDatabase(walletDb),
+		WithBrowserDatabase(browsers.NewDB(appDb)),
 		WithMultiAccounts(madb),
 		WithAccount(multiAcc),
 		WithDatasync(),
-		WithToplevelDatabaseMigrations(),
-		WithBrowserDatabase(nil),
 		WithCuratedCommunitiesUpdateLoop(false),
 		WithStubOnlineChecker(),
 		WithENSVerifier(ensVerifier),
 		WithMessageSigner(NewSignerStub()),
-		WithAppSettings(*config.appSettings, *config.nodeConfig),
 	}
 	options = append(options, config.extraOptions...)
 
 	m, err := NewMessenger(
 		config.privateKey,
-		waku,
+		messaging.API(),
 		uuid.New().String(),
 		options...,
 	)
@@ -155,8 +188,8 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 	return m, nil
 }
 
-func newRunningTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messenger, error) {
-	m, err := newTestMessenger(waku, config)
+func newRunningTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
+	m, err := newTestMessenger(messagingEnv, config)
 	if err != nil {
 		return nil, err
 	}
@@ -169,18 +202,6 @@ func newRunningTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*
 	}
 
 	return m, nil
-}
-
-func newTestWakuNode() (wakutypes.Waku, error) {
-	return wakuv2.New(
-		nil,
-		&wakuv2.DefaultConfig,
-		zap.NewNop(),
-		nil,
-		nil,
-		func([]byte, peer.AddrInfo, error) {},
-		nil,
-	)
 }
 
 type unhandedMessage struct {

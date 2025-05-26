@@ -75,13 +75,13 @@ func (s *MessengerPushNotificationSuite) TearDownSuite() {
 }
 
 func (s *MessengerPushNotificationSuite) SetupTest() {
-	s.MessengerBaseTestSuite.setupWaku()
+	s.MessengerBaseTestSuite.setupMessaging()
 	s.m = s.newMessenger()
 	s.privateKey = s.m.identity
 }
 
 func (s *MessengerPushNotificationSuite) newMessenger() *Messenger {
-	messenger, err := newRunningTestMessenger(s.shh, testMessengerConfig{extraOptions: []Option{WithPushNotifications()}})
+	messenger, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{extraOptions: []Option{WithPushNotifications()}})
 	s.Require().NoError(err)
 	return messenger
 }
@@ -99,7 +99,7 @@ func (s *MessengerPushNotificationSuite) newPushNotificationServer() (*Messenger
 
 	server := pushnotificationserver.New(serverConfig)
 
-	messenger, err := newRunningTestMessenger(s.shh, testMessengerConfig{privateKey: privateKey, extraOptions: []Option{WithPushNotificationServer(server)}})
+	messenger, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{privateKey: privateKey, extraOptions: []Option{WithPushNotificationServer(server)}})
 	s.Require().NoError(err)
 
 	serverPersistence := pushnotificationserver.NewSQLitePersistence(messenger.database)
@@ -111,7 +111,7 @@ func (s *MessengerPushNotificationSuite) newPushNotificationServer() (*Messenger
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	bob1 := s.m
-	bob2, err := newRunningTestMessenger(s.shh, testMessengerConfig{privateKey: s.m.identity, extraOptions: []Option{WithPushNotifications()}})
+	bob2, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{privateKey: s.m.identity, extraOptions: []Option{WithPushNotifications()}})
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
@@ -974,7 +974,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevices() {
 
 	bob1 := s.m
-	bob2, err := newRunningTestMessenger(s.shh, testMessengerConfig{privateKey: s.m.identity, extraOptions: []Option{WithPushNotifications()}})
+	bob2, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{privateKey: s.m.identity, extraOptions: []Option{WithPushNotifications()}})
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 

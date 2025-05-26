@@ -56,7 +56,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/storenodes"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
@@ -292,7 +291,7 @@ func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash types
 
 func NewMessenger(
 	identity *ecdsa.PrivateKey,
-	waku wakutypes.Waku,
+	messaging *messaging.API,
 	installationID string,
 	opts ...Option,
 ) (*Messenger, error) {
@@ -331,23 +330,6 @@ func NewMessenger(
 		}
 	}
 
-	// Apply migrations for all components.
-	err := sqlite.Migrate(database)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to apply migrations")
-	}
-
-	messaging, err := messaging.NewCore(
-		waku,
-		identity,
-		common.NewMessagingPersistence(database),
-		messaging.WithLogger(logger),
-		messaging.WithEnvelopeEventsConfig(c.envelopeEventsConfig),
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create  messaging core")
-	}
-
 	// Initialize encryption layer.
 	encryptionProtocol := encryption.New(
 		database,
@@ -358,7 +340,7 @@ func NewMessenger(
 	sender, err := common.NewMessageSender(
 		identity,
 		database,
-		messaging.API(),
+		messaging,
 		encryptionProtocol,
 		logger,
 		c.featureFlags,
@@ -449,8 +431,8 @@ func NewMessenger(
 		logger,
 		c.ensVerifier,
 		c.communityTokensService,
-		messaging.API(),
-		messaging.API(),
+		messaging,
+		messaging,
 		communitiesKeyDistributor,
 		c.httpServer,
 		managerOptions...,
@@ -463,7 +445,7 @@ func NewMessenger(
 		TorrentConfig: c.torrentConfig,
 		Logger:        logger,
 		Persistence:   communitiesManager.GetPersistence(),
-		Messaging:     messaging.API(),
+		Messaging:     messaging,
 		Identity:      identity,
 		Encryptor:     encryptionProtocol,
 		Publisher:     communitiesManager,
@@ -490,7 +472,7 @@ func NewMessenger(
 	messenger = &Messenger{
 		config:                     &c,
 		identity:                   identity,
-		messaging:                  messaging.API(),
+		messaging:                  messaging,
 		persistence:                sqlitePersistence,
 		encryptor:                  encryptionProtocol,
 		sender:                     sender,
@@ -520,7 +502,7 @@ func NewMessenger(
 		database:                database,
 		multiAccounts:           c.multiAccount,
 		settings:                settings,
-		peersyncing:             peersyncing.New(peersyncing.Config{Database: database, Timesource: messaging.API()}),
+		peersyncing:             peersyncing.New(peersyncing.Config{Database: database, Timesource: messaging}),
 		peersyncingOffers:       make(map[string]uint64),
 		peersyncingRequests:     make(map[string]uint64),
 		mvdsStatusChangeEvent:   make(chan datasyncnode.PeerStatusChangeEvent, 5),
@@ -549,7 +531,7 @@ func NewMessenger(
 			func() error {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 				defer cancel()
-				err := messaging.API().ResetChatFilters(ctx)
+				err := messaging.ResetChatFilters(ctx)
 				if err != nil {
 					logger.Warn("could not reset filters", zap.Error(err))
 				}
@@ -557,7 +539,7 @@ func NewMessenger(
 				// fail
 				return nil
 			},
-			messaging.API().Stop,
+			messaging.Stop,
 			func() error { sender.Stop(); return nil },
 			// Currently this often fails, seems like it's safe to ignore them
 			// https://github.com/uber-go/zap/issues/328

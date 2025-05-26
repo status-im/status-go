@@ -595,7 +595,7 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 	}
 
 	// Create alice second instance
-	alice2, err := newRunningTestMessenger(s.shh, testMessengerConfig{
+	alice2, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{
 		privateKey:   s.alice.identity,
 		extraOptions: []Option{WithCommunityTokensService(s.collectiblesServiceMock)},
 	})

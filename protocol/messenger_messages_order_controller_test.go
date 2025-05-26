@@ -4,6 +4,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
 
@@ -32,7 +33,7 @@ func NewMessagesOrderController(order messagesOrderType) *MessagesOrderControlle
 	}
 }
 
-func (m *MessagesOrderController) Start(c chan *PostMessageSubscription) {
+func (m *MessagesOrderController) Start(c chan *messaging.PostMessageSubscription) {
 	go func() {
 		for {
 			select {
@@ -41,7 +42,7 @@ func (m *MessagesOrderController) Start(c chan *PostMessageSubscription) {
 					return
 				}
 				m.mutex.Lock()
-				m.messagesInPostOrder = append(m.messagesInPostOrder, sub.id)
+				m.messagesInPostOrder = append(m.messagesInPostOrder, sub.ID)
 				m.mutex.Unlock()
 
 			case <-m.quit:

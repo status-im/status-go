@@ -881,7 +881,7 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 
 	// Create bob2
 	accountsPublisher := pubsub.NewPublisher()
-	bob2, err := newRunningTestMessenger(s.shh, testMessengerConfig{privateKey: bob1.identity, extraOptions: []Option{WithAccountsPublisher(accountsPublisher)}})
+	bob2, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{privateKey: bob1.identity, extraOptions: []Option{WithAccountsPublisher(accountsPublisher)}})
 	s.Require().NoError(err)
 	s.Require().NotNil(bob2.config.accountsPublisher)
 	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsAddedEvent](accountsPublisher, 10)
@@ -1028,7 +1028,7 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 
 	// Create bob2
 	accountsPublisher := pubsub.NewPublisher()
-	bob2, err := newRunningTestMessenger(s.shh, testMessengerConfig{privateKey: bob1.identity, extraOptions: []Option{WithAccountsPublisher(accountsPublisher)}})
+	bob2, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{privateKey: bob1.identity, extraOptions: []Option{WithAccountsPublisher(accountsPublisher)}})
 	s.Require().NoError(err)
 	s.Require().NotNil(bob2.config.accountsPublisher)
 	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsAddedEvent](accountsPublisher, 10)
