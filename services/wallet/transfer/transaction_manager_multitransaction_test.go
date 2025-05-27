@@ -245,7 +245,7 @@ func TestWatchTransaction(t *testing.T) {
 	}).AnyTimes()
 	eventFeed := &event.Feed{}
 	// For now, pending tracker is not interface, so we have to use a real one
-	tm.pendingTracker = transactions.NewPendingTxTracker(walletDB, rpcClient, nil, eventFeed, pendingTxTimeout)
+	tm.pendingTracker = transactions.NewPendingTxTracker(walletDB, rpcClient, eventFeed, pendingTxTimeout)
 	tm.eventFeed = eventFeed
 
 	// Create a context with timeout
@@ -297,7 +297,7 @@ func TestWatchTransaction_Timeout(t *testing.T) {
 	}).AnyTimes()
 	eventFeed := &event.Feed{}
 	// For now, pending tracker is not interface, so we have to use a real one
-	tm.pendingTracker = transactions.NewPendingTxTracker(walletDB, rpcClient, nil, eventFeed, pendingTxTimeout)
+	tm.pendingTracker = transactions.NewPendingTxTracker(walletDB, rpcClient, eventFeed, pendingTxTimeout)
 	tm.eventFeed = eventFeed
 
 	// Create a context with timeout

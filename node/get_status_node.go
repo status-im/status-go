@@ -35,7 +35,6 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
@@ -43,7 +42,6 @@ import (
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/wakuv2"
@@ -86,7 +84,6 @@ type StatusNode struct {
 	publicMethods map[string]bool
 	// we explicitly list every service, we could use interfaces
 	// and store them in a nicer way and user reflection, but for now stupid is good
-	rpcFiltersSrvc         *rpcfilters.Service
 	subscriptionsSrvc      *subscriptions.Service
 	rpcStatsSrvc           *rpcstats.Service
 	statusPublicSrvc       *status.Service
@@ -94,7 +91,6 @@ type StatusNode struct {
 	browsersSrvc           *browsers.Service
 	permissionsSrvc        *permissions.Service
 	mailserversSrvc        *mailservers.Service
-	providerSrvc           *web3provider.Service
 	appMetricsSrvc         *appmetricsservice.Service
 	walletSrvc             *wallet.Service
 	localNotificationsSrvc *localnotifications.Service
@@ -329,14 +325,12 @@ func (n *StatusNode) stop() error {
 	n.downloader.Stop()
 	n.downloader = nil
 
-	n.rpcFiltersSrvc = nil
 	n.subscriptionsSrvc = nil
 	n.rpcStatsSrvc = nil
 	n.accountsSrvc = nil
 	n.browsersSrvc = nil
 	n.permissionsSrvc = nil
 	n.mailserversSrvc = nil
-	n.providerSrvc = nil
 	n.appMetricsSrvc = nil
 	n.walletSrvc = nil
 	n.localNotificationsSrvc = nil

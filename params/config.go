@@ -387,10 +387,6 @@ type NodeConfig struct {
 	// (persistent storage of user's mailserver records).
 	MailserversConfig MailserversConfig
 
-	// Web3ProviderConfig extra configuration for provider.Service.
-	// (desktop provider API)
-	Web3ProviderConfig Web3ProviderConfig
-
 	// ConnectorConfig extra configuration for connector.Service
 	ConnectorConfig ConnectorConfig
 
@@ -490,11 +486,6 @@ type PermissionsConfig struct {
 
 // MailserversConfig extra configuration for mailservers.Service.
 type MailserversConfig struct {
-	Enabled bool
-}
-
-// ProviderAuthConfig extra configuration for provider.Service
-type Web3ProviderConfig struct {
 	Enabled bool
 }
 

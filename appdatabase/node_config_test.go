@@ -139,7 +139,6 @@ func randomNodeConfig() *params.NodeConfig {
 		BrowsersConfig:            params.BrowsersConfig{Enabled: randomBool()},
 		PermissionsConfig:         params.PermissionsConfig{Enabled: randomBool()},
 		MailserversConfig:         params.MailserversConfig{Enabled: randomBool()},
-		Web3ProviderConfig:        params.Web3ProviderConfig{Enabled: randomBool()},
 		ConnectorConfig:           params.ConnectorConfig{Enabled: randomBool()},
 		SwarmConfig:               params.SwarmConfig{Enabled: randomBool()},
 		MailServerRegistryAddress: randomString(),

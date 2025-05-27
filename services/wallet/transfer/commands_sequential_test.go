@@ -1407,7 +1407,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	defer ctrl.Finish()
 	rpcClient := mock_rpcclient.NewMockClientInterface(ctrl)
 	rpcClient.EXPECT().AbstractEthClient(tc.NetworkID()).Return(chainClient, nil).AnyTimes()
-	tracker := transactions.NewPendingTxTracker(db, rpcClient, nil, &event.Feed{}, transactions.PendingCheckInterval)
+	tracker := transactions.NewPendingTxTracker(db, rpcClient, &event.Feed{}, transactions.PendingCheckInterval)
 	accDB, err := accounts.NewDB(appdb)
 	require.NoError(t, err)
 

@@ -137,16 +137,17 @@ func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 	require.NotNil(t, client)
 
 	// call public API with public RPC Client
-	result, err := statusNode.CallRPC(`{"jsonrpc": "2.0", "id": 1, "method": "eth_uninstallFilter", "params": ["id"]}`)
+	result, err := statusNode.CallRPC(`{"jsonrpc":"2.0", "id": 1, "method":"rpcstats_reset"}`)
 	require.NoError(t, err)
 
 	// the call is successful
-	require.False(t, strings.Contains(result, "error"))
+	require.False(t, strings.Contains(result, "error"), result)
 
+	// call private API with public RPC client
 	result, err = statusNode.CallRPC(`{"jsonrpc": "2.0", "id": 1, "method": "waku_info"}`)
 	require.NoError(t, err)
 
-	// call private API with public RPC client
+	// the call fails
 	require.Equal(t, ErrRPCMethodUnavailable, result)
 
 }

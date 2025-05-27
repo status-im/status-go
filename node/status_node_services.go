@@ -45,7 +45,6 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
@@ -54,7 +53,6 @@ import (
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
@@ -76,7 +74,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	setSettingsNotifier(accDB, &b.settingsFeed)
 
 	services := []common.StatusService{}
-	services = append(services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
 	services = append(services, b.rpcStatsService())
 	services = append(services, b.appmetricsService())
@@ -92,7 +89,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
-	services = appendIf(config.Web3ProviderConfig.Enabled, services, b.providerService(accDB))
 	services = appendIf(config.ConnectorConfig.Enabled, services, b.connectorService())
 	services = append(services, b.gifService(accDB))
 	services = append(services, b.ChatService(accDB))
@@ -301,13 +297,6 @@ func (b *StatusNode) connectorService() *connector.Service {
 	return b.connectorSrvc
 }
 
-func (b *StatusNode) rpcFiltersService() *rpcfilters.Service {
-	if b.rpcFiltersSrvc == nil {
-		b.rpcFiltersSrvc = rpcfilters.New(b)
-	}
-	return b.rpcFiltersSrvc
-}
-
 func (b *StatusNode) subscriptionService() *subscriptions.Service {
 	if b.subscriptionsSrvc == nil {
 
@@ -355,7 +344,7 @@ func (b *StatusNode) ensService(timesource func() time.Time) *ens.Service {
 
 func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *transactions.PendingTxTracker {
 	if b.pendingTracker == nil {
-		b.pendingTracker = transactions.NewPendingTxTracker(b.walletDB, b.rpcClient, b.rpcFiltersSrvc, walletFeed, transactions.PendingCheckInterval)
+		b.pendingTracker = transactions.NewPendingTxTracker(b.walletDB, b.rpcClient, walletFeed, transactions.PendingCheckInterval)
 		if b.transactor != nil {
 			b.transactor.SetPendingTracker(b.pendingTracker)
 		}
@@ -412,14 +401,6 @@ func (b *StatusNode) mailserversService() *mailservers.Service {
 		b.mailserversSrvc = mailservers.NewService(mailservers.NewDB(b.appDB))
 	}
 	return b.mailserversSrvc
-}
-
-func (b *StatusNode) providerService(accountsDB *accounts.Database) *web3provider.Service {
-	web3S := web3provider.NewService(b.appDB, accountsDB, b.rpcClient, b.config, b.gethAccountManager, b.rpcFiltersSrvc, b.transactor)
-	if b.providerSrvc == nil {
-		b.providerSrvc = web3S
-	}
-	return b.providerSrvc
 }
 
 func (b *StatusNode) appmetricsService() common.StatusService {
@@ -487,10 +468,6 @@ func appendIf(condition bool, services []common.StatusService, service common.St
 		return services
 	}
 	return append(services, service)
-}
-
-func (b *StatusNode) RPCFiltersService() *rpcfilters.Service {
-	return b.rpcFiltersSrvc
 }
 
 func (b *StatusNode) PendingTracker() *transactions.PendingTxTracker {

@@ -86,7 +86,7 @@ func setupTestService(tb testing.TB) (state testState) {
 
 	// Ensure we process pending transactions as needed, only once
 	pendingCheckInterval := time.Second
-	state.pendingTracker = transactions.NewPendingTxTracker(db, state.rpcClient, nil, state.eventFeed, pendingCheckInterval)
+	state.pendingTracker = transactions.NewPendingTxTracker(db, state.rpcClient, state.eventFeed, pendingCheckInterval)
 
 	state.service = NewService(db, accountsDB, state.tokenMock, state.collectiblesMock, state.eventFeed)
 	state.service.debounceDuration = 0

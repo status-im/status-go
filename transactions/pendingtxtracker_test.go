@@ -46,7 +46,7 @@ func setupTestTransactionDB(t *testing.T, checkInterval *time.Duration) (*Pendin
 	rpcClient.EXPECT().AbstractEthClient(gomock.Any()).DoAndReturn(func(chainID common.ChainID) (ethclient.BatchCallClient, error) {
 		return chainClient.AbstractEthClient(chainID)
 	}).AnyTimes()
-	return NewPendingTxTracker(db, rpcClient, nil, eventFeed, pendingCheckInterval), func() {
+	return NewPendingTxTracker(db, rpcClient, eventFeed, pendingCheckInterval), func() {
 		require.NoError(t, db.Close())
 	}, chainClient, eventFeed
 }
