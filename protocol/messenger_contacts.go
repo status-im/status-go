@@ -1125,6 +1125,9 @@ func (m *Messenger) sendContactUpdate(ctx context.Context,
 }
 
 func (m *Messenger) addENSNameToContact(contact *Contact) error {
+	if m.ensVerifier == nil {
+		return nil
+	}
 
 	// Check if there's already a verified record
 	ensRecord, err := m.ensVerifier.GetVerifiedRecord(contact.ID)
