@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,9 +31,10 @@ func TestNewEnvelope(t *testing.T) {
 		"messageHash": "` + hashStr + `"
 	}`
 
-	env, err := NewEnvelope(jsonStr)
+	// Create a WakuEnvelope instance and unmarshal into it
+	var env WakuEnvelope
+	err := json.Unmarshal([]byte(jsonStr), &env)
 	assert.NoError(t, err)
-	assert.NotNil(t, env)
 
 	msg := env.Message()
 	assert.NotNil(t, msg)

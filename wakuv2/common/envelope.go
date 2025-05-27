@@ -48,31 +48,32 @@ func NewWakuEnvelope(msg *pb.WakuMessage, topic string, hash pb.MessageHash) *Wa
 }
 
 // NewEnvelope creates a new Envelope from a json string generated in nwaku
-func NewEnvelope(jsonEventStr string) (Envelope, error) {
+func (e *WakuEnvelope) UnmarshalJSON(input []byte) error {
 	nwakuEnvelope := nwakuEnvelope{}
-	err := json.Unmarshal([]byte(jsonEventStr), &nwakuEnvelope)
+	err := json.Unmarshal(input, &nwakuEnvelope)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	hash, err := hexutil.Decode(nwakuEnvelope.MessageHash)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &WakuEnvelope{
-		msg: &pb.WakuMessage{
-			Payload:        nwakuEnvelope.WakuMessage.Payload,
-			ContentTopic:   nwakuEnvelope.WakuMessage.ContentTopic,
-			Version:        nwakuEnvelope.WakuMessage.Version,
-			Timestamp:      nwakuEnvelope.WakuMessage.Timestamp,
-			Meta:           nwakuEnvelope.WakuMessage.Meta,
-			Ephemeral:      nwakuEnvelope.WakuMessage.Ephemeral,
-			RateLimitProof: nwakuEnvelope.WakuMessage.RateLimitProof,
-		},
-		topic: nwakuEnvelope.PubsubTopic,
-		hash:  pb.ToMessageHash(hash),
-	}, nil
+	// Modify the receiver instead of returning a new instance
+	e.msg = &pb.WakuMessage{
+		Payload:        nwakuEnvelope.WakuMessage.Payload,
+		ContentTopic:   nwakuEnvelope.WakuMessage.ContentTopic,
+		Version:        nwakuEnvelope.WakuMessage.Version,
+		Timestamp:      nwakuEnvelope.WakuMessage.Timestamp,
+		Meta:           nwakuEnvelope.WakuMessage.Meta,
+		Ephemeral:      nwakuEnvelope.WakuMessage.Ephemeral,
+		RateLimitProof: nwakuEnvelope.WakuMessage.RateLimitProof,
+	}
+	e.topic = nwakuEnvelope.PubsubTopic
+	e.hash = pb.ToMessageHash(hash)
+
+	return nil
 }
 
 func (e *WakuEnvelope) Message() *pb.WakuMessage {
