@@ -54,10 +54,10 @@ func (cli *StatusCLI) randomFailure() func() {
 		return nil
 	}
 
-	cli.backend.StatusNode().WakuV2Service().SkipPublishToTopic(true)
+	cli.backend.StatusNode().WakuV2Service().Waku().SkipPublishToTopic(true)
 
 	return func() {
-		cli.backend.StatusNode().WakuV2Service().SkipPublishToTopic(false)
+		cli.backend.StatusNode().WakuV2Service().Waku().SkipPublishToTopic(false)
 	}
 }
 

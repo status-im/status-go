@@ -32,6 +32,7 @@ type MessengerPeersyncingSuite struct {
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
 	shh               wakutypes.Waku
+	stopWaku          context.CancelFunc
 	logger            *zap.Logger
 	accountsTestData  map[string][]string
 	accountsPasswords map[string]string
@@ -43,8 +44,11 @@ func (s *MessengerPeersyncingSuite) SetupTest() {
 
 	shh, err := newTestWakuNode(s.logger)
 	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.Require().NoError(shh.Start(ctx))
 	s.shh = shh
+	s.stopWaku = cancel
 
 	s.owner = s.newMessenger()
 	s.bob = s.newMessenger()

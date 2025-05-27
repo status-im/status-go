@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -31,7 +32,11 @@ func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
 
 	wakuWrapper, err := newTestWakuWrapper(s.logger)
 	s.Require().NoError(err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.Require().NoError(wakuWrapper.Start(ctx))
 	s.shh = wakuWrapper
+	s.stopWaku = cancel
 
 	s.messagesOrderController = NewMessagesOrderController(messagesOrderRandom)
 	s.messagesOrderController.Start(wakuWrapper.SubscribePostEvents())

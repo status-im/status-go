@@ -97,6 +97,7 @@ func (s *MessengerStoreNodeCommunitySuite) createStore(name string) (*waku2.Waku
 	}
 
 	storeNode := NewTestWakuV2(&s.Suite, cfg)
+
 	addresses, err := storeNode.ListenAddresses()
 	s.Require().NoError(err)
 	s.Require().GreaterOrEqual(len(addresses), 1, "no storenode listen address")
@@ -259,9 +260,9 @@ func (s *MessengerStoreNodeCommunitySuite) waitForEnvelopes(subscription <-chan 
 }
 
 func (s *MessengerStoreNodeCommunitySuite) TestSetCommunityStorenodesAndFetch() {
-	err := s.owner.DialPeer(s.storeNodeAddress)
+	err := s.owner.DialPeer(context.Background(), s.storeNodeAddress)
 	s.Require().NoError(err)
-	err = s.bob.DialPeer(s.storeNodeAddress)
+	err = s.bob.DialPeer(context.Background(), s.storeNodeAddress)
 	s.Require().NoError(err)
 
 	// Create a community
@@ -290,9 +291,9 @@ func (s *MessengerStoreNodeCommunitySuite) TestSetCommunityStorenodesAndFetch() 
 func (s *MessengerStoreNodeCommunitySuite) TestSetStorenodeForCommunity_fetchMessagesFromNewStorenode() {
 	s.T().Skip("flaky")
 
-	err := s.owner.DialPeer(s.storeNodeAddress)
+	err := s.owner.DialPeer(context.Background(), s.storeNodeAddress)
 	s.Require().NoError(err)
-	err = s.bob.DialPeer(s.storeNodeAddress)
+	err = s.bob.DialPeer(context.Background(), s.storeNodeAddress)
 	s.Require().NoError(err)
 
 	ownerPeerID := s.ownerWaku.PeerID()
@@ -312,9 +313,9 @@ func (s *MessengerStoreNodeCommunitySuite) TestSetStorenodeForCommunity_fetchMes
 
 	// waits for onwer and bob to connect to the community store node
 	WaitForPeersConnected(&s.Suite, s.communityStoreNode, func() peer.IDSlice {
-		err := s.bob.DialPeer(s.communityStoreNodeAddress)
+		err := s.bob.DialPeer(context.Background(), s.communityStoreNodeAddress)
 		s.Require().NoError(err)
-		err = s.owner.DialPeer(s.communityStoreNodeAddress)
+		err = s.owner.DialPeer(context.Background(), s.communityStoreNodeAddress)
 		s.Require().NoError(err)
 
 		return peer.IDSlice{ownerPeerID, bobPeerID}

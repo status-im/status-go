@@ -29,8 +29,9 @@ type MessengerDeleteMessageForMeSuite struct {
 	alice2     *Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single waku service should be shared.
-	shh    wakutypes.Waku
-	logger *zap.Logger
+	shh      wakutypes.Waku
+	stopWaku context.CancelFunc
+	logger   *zap.Logger
 }
 
 func (s *MessengerDeleteMessageForMeSuite) newMessenger() *Messenger {
@@ -60,8 +61,11 @@ func (s *MessengerDeleteMessageForMeSuite) SetupTest() {
 
 	shh, err := newTestWakuNode(s.logger)
 	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.Require().NoError(shh.Start(ctx))
 	s.shh = shh
+	s.stopWaku = cancel
 
 	s.alice1 = s.newMessenger()
 	s.alice2 = s.newMessenger()

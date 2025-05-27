@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"database/sql"
 
@@ -49,6 +50,7 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 	}
 
 	wakuNode, err := waku2.New(
+		context.TODO(),
 		nodeKey,
 		wakuConfig,
 		cfg.logger,
@@ -59,12 +61,15 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 
 	s.Require().NoError(err)
 
-	err = wakuNode.Start()
+	go func() {
+		err = wakuNode.Start(context.TODO())
+		s.Require().NoError(err)
+	}()
+
 	if cfg.enableStore {
 		err := wakuNode.SubscribeToPubsubTopic(wakuv2.DefaultNonProtectedPubsubTopic(), nil)
 		s.Require().NoError(err)
 	}
-	s.Require().NoError(err)
 
 	return wakuNode
 }

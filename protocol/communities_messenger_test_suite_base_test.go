@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"math/big"
 
@@ -8,7 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -26,6 +27,7 @@ type CommunitiesMessengerTestSuiteBase struct {
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
 	shh                     wakutypes.Waku
+	stopWaku                context.CancelFunc
 	logger                  *zap.Logger
 	mockedBalances          communities.BalancesByChain
 	mockedCollectibles      communities.CollectiblesByChain
@@ -49,12 +51,16 @@ func (s *CommunitiesMessengerTestSuiteBase) SetupTest() {
 
 	shh, err := newTestWakuNode(s.logger)
 	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.Require().NoError(shh.Start(ctx))
 	s.shh = shh
+	s.stopWaku = cancel
 }
 
 func (s *CommunitiesMessengerTestSuiteBase) TearDownTest() {
 	_ = s.logger.Sync()
+	s.stopWaku()
 }
 
 func (s *CommunitiesMessengerTestSuiteBase) newMessenger(password string, walletAddresses []string) *Messenger {

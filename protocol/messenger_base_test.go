@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"crypto/ecdsa"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -23,14 +24,18 @@ func (s *MessengerBaseTestSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 	shh, err := newTestWakuNode(s.logger)
 	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.Require().NoError(shh.Start(ctx))
 	s.shh = shh
+	s.stopWaku = cancel
 
 	s.m = s.newMessenger()
 	s.privateKey = s.m.identity
 }
 
 func (s *MessengerBaseTestSuite) TearDownTest() {
+	s.stopWaku()
 	TearDownMessenger(&s.Suite, s.m)
 	_ = s.logger.Sync()
 }
@@ -50,8 +55,9 @@ type MessengerBaseTestSuite struct {
 	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single waku service should be shared.
-	shh    wakutypes.Waku
-	logger *zap.Logger
+	shh      wakutypes.Waku
+	stopWaku context.CancelFunc
+	logger   *zap.Logger
 }
 
 func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, extraOptions []Option) (*Messenger, error) {
@@ -86,6 +92,7 @@ func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logge
 
 func newTestWakuNode(logger *zap.Logger) (wakutypes.Waku, error) {
 	return wakuv2.New(
+		context.Background(),
 		nil,
 		&wakuv2.DefaultConfig,
 		logger,

@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
@@ -92,6 +93,7 @@ func (s *FiltersManagerSuite) SetupTest() {
 	keysPersistence := newTestKeysPersistence()
 
 	waku, err := wakuv2.New(
+		context.Background(),
 		nil,
 		&wakuv2.DefaultConfig,
 		s.logger,

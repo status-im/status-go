@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -66,8 +67,9 @@ type MessengerSyncSettingsSuite struct {
 	alice2 *Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
-	shh    wakutypes.Waku
-	logger *zap.Logger
+	shh      wakutypes.Waku
+	stopWaku context.CancelFunc
+	logger   *zap.Logger
 
 	ignoreTests bool
 }
@@ -81,8 +83,11 @@ func (s *MessengerSyncSettingsSuite) SetupTest() {
 
 	shh, err := newTestWakuNode(s.logger)
 	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.Require().NoError(shh.Start(ctx))
 	s.shh = shh
+	s.stopWaku = cancel
 
 	s.alice = s.newMessenger()
 	_, err = s.alice.Start()

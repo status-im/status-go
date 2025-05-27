@@ -69,5 +69,6 @@ func newTestWakuWrapper(logger *zap.Logger) (*testWakuWrapper, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newTestWaku(w.(*wakuv2.Waku)).(*testWakuWrapper), w.Start()
+	tw := newTestWaku(w.(*wakuv2.Waku)).(*testWakuWrapper)
+	return tw, nil
 }

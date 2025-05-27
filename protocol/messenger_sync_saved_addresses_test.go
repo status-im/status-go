@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -32,7 +33,8 @@ type MessengerSyncSavedAddressesSuite struct {
 
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
-	shh wakutypes.Waku
+	shh      wakutypes.Waku
+	stopWaku context.CancelFunc
 
 	logger *zap.Logger
 }
@@ -42,8 +44,11 @@ func (s *MessengerSyncSavedAddressesSuite) SetupTest() {
 
 	shh, err := newTestWakuNode(s.logger)
 	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.Require().NoError(shh.Start(ctx))
 	s.shh = shh
+	s.stopWaku = cancel
 
 	s.main = s.newMessenger(s.logger.Named("main"))
 	s.privateKey = s.main.identity

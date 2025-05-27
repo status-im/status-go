@@ -335,7 +335,7 @@ func main() {
 
 			messenger, err := protocol.NewMessenger(
 				identity,
-				backend.StatusNode().WakuV2Service(),
+				backend.StatusNode().WakuV2Service().Waku(),
 				installationID.String(),
 				options...,
 			)

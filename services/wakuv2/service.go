@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
@@ -113,6 +114,7 @@ func (s *Service) Start() error {
 
 	s.wg.Add(1)
 	go func() {
+		defer common.LogOnPanic()
 		defer s.wg.Done()
 		s.waku.Start(ctx) // FIXME: check error
 	}()

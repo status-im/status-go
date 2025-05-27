@@ -28,7 +28,8 @@ type MessengerSyncKeycardsStateSuite struct {
 
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
-	shh wakutypes.Waku
+	shh      wakutypes.Waku
+	stopWaku context.CancelFunc
 
 	logger *zap.Logger
 }
@@ -38,8 +39,11 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 
 	shh, err := newTestWakuNode(s.logger)
 	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.Require().NoError(shh.Start(ctx))
 	s.shh = shh
+	s.stopWaku = cancel
 
 	s.main = s.newMessenger(s.shh)
 	s.privateKey = s.main.identity

@@ -188,7 +188,7 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 
 	// We force the owner to use the store node as relay peer
 	WaitForPeersConnected(&s.Suite, s.ownerWaku, func() peer.IDSlice {
-		err := s.owner.DialPeer(s.storeNodeAddress)
+		err := s.owner.DialPeer(context.Background(), s.storeNodeAddress)
 		s.Require().NoError(err)
 		peerID := s.wakuStoreNode.PeerID()
 		return peer.IDSlice{peerID}
@@ -1228,7 +1228,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 	// Connect to store node to force "online" status
 	{
 		WaitForPeersConnected(&s.Suite, s.bobWaku, func() peer.IDSlice {
-			err := s.bob.DialPeer(storeAddress)
+			err := s.bob.DialPeer(context.Background(), storeAddress)
 			s.Require().NoError(err)
 			return peer.IDSlice{storePeerID}
 		})
@@ -1285,7 +1285,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 		s.bob.config.codeControlFlags.AutoRequestHistoricMessages = true
 
 		WaitForPeersConnected(&s.Suite, s.bobWaku, func() peer.IDSlice {
-			err := s.bob.DialPeer(storeAddress)
+			err := s.bob.DialPeer(context.Background(), storeAddress)
 			s.Require().NoError(err)
 			return peer.IDSlice{storePeerID}
 		})

@@ -19,7 +19,8 @@ import (
 	"golang.org/x/exp/maps"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging"
@@ -525,7 +526,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 
 	// Force the owner to use the store node as relay peer
 
-	err = s.owner.DialPeer(storeNodeAddress)
+	err = s.owner.DialPeer(context.Background(), storeNodeAddress)
 	s.Require().NoError(err)
 
 	// Create a community

@@ -73,12 +73,12 @@ func start(p StartParams, logger *zap.SugaredLogger) (*StatusCLI, error) {
 	}
 
 	if p.TelemetryURL != "" {
-		waku := backend.StatusNode().WakuV2Service()
+		waku := backend.StatusNode().WakuV2Service().Waku()
 		telemetryClient, err := wakumetrics.NewClient(wakumetrics.WithPeerID(waku.PeerID().String()))
 		if err != nil {
 			return nil, err
 		}
-		backend.StatusNode().WakuV2Service().SetMetricsHandler(telemetryClient)
+		waku.SetMetricsHandler(telemetryClient)
 	}
 	wakuAPI := wakuv2ext.NewPublicAPI(wakuService)
 

@@ -4,13 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
-
-	"github.com/stretchr/testify/suite"
 )
 
 func TestMessengerSettings(t *testing.T) {
@@ -23,18 +21,9 @@ type MessengerSettingsSuite struct {
 }
 
 func (s *MessengerSettingsSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.MessengerBaseTestSuite.SetupTest()
 
-	shh, err := newTestWakuNode(s.logger)
-	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
-	s.shh = shh
-
-	pk, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	s.m, err = newMessengerWithKey(s.shh, pk, s.logger, nil)
-	s.Require().NoError(err)
-
+	var err error
 	s.m2, err = newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
 	s.Require().NoError(err)
 
@@ -42,7 +31,7 @@ func (s *MessengerSettingsSuite) SetupTest() {
 }
 
 func (s *MessengerSettingsSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.m)
+	s.MessengerBaseTestSuite.TearDownTest()
 	TearDownMessenger(&s.Suite, s.m2)
 	_ = s.logger.Sync()
 }
