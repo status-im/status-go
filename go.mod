@@ -97,7 +97,7 @@ require (
 	github.com/status-im/extkeys v1.1.0
 	github.com/urfave/cli/v2 v2.27.2
 	github.com/waku-org/go-waku v0.8.1-0.20250411145637-900b98812a91
-	github.com/waku-org/waku-go-bindings v0.0.0-20250411112228-442f6baabd20
+	github.com/waku-org/waku-go-bindings v0.0.0-20250527143900-e37fbd26d67a
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1

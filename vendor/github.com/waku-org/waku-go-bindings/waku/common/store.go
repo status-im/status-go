@@ -1,15 +1,15 @@
 package common
 
 type StoreQueryRequest struct {
-	RequestId         string         `json:"requestId"`
-	IncludeData       bool           `json:"includeData"`
+	RequestId         string         `json:"request_id"`
+	IncludeData       bool           `json:"include_data"`
 	PubsubTopic       string         `json:"pubsubTopic,omitempty"`
 	ContentTopics     *[]string      `json:"contentTopics,omitempty"`
 	TimeStart         *int64         `json:"timeStart,omitempty"`
 	TimeEnd           *int64         `json:"timeEnd,omitempty"`
 	MessageHashes     *[]MessageHash `json:"messageHashes,omitempty"`
 	PaginationCursor  *MessageHash   `json:"paginationCursor,omitempty"`
-	PaginationForward bool           `json:"paginationForward"`
+	PaginationForward bool           `json:"pagination_forward"`
 	PaginationLimit   *uint64        `json:"paginationLimit,omitempty"`
 }
 

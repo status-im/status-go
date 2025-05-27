@@ -31,27 +31,27 @@ type wakuEnvelope struct {
 	MessageHash MessageHash `json:"messageHash"`
 }
 
-// NewEnvelope creates a new Envelope from a json string generated in nwaku
-func NewEnvelope(jsonEventStr string) (*Envelope, error) {
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (e *Envelope) UnmarshalJSON(input []byte) error {
 	wakuEnvelope := wakuEnvelope{}
-	err := json.Unmarshal([]byte(jsonEventStr), &wakuEnvelope)
+	err := json.Unmarshal(input, &wakuEnvelope)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &Envelope{
-		msg: &pb.WakuMessage{
-			Payload:        wakuEnvelope.WakuMessage.Payload,
-			ContentTopic:   wakuEnvelope.WakuMessage.ContentTopic,
-			Version:        wakuEnvelope.WakuMessage.Version,
-			Timestamp:      wakuEnvelope.WakuMessage.Timestamp,
-			Meta:           wakuEnvelope.WakuMessage.Meta,
-			Ephemeral:      wakuEnvelope.WakuMessage.Ephemeral,
-			RateLimitProof: wakuEnvelope.WakuMessage.RateLimitProof,
-		},
-		topic: wakuEnvelope.PubsubTopic,
-		hash:  wakuEnvelope.MessageHash,
-	}, nil
+	e.msg = &pb.WakuMessage{
+		Payload:        wakuEnvelope.WakuMessage.Payload,
+		ContentTopic:   wakuEnvelope.WakuMessage.ContentTopic,
+		Version:        wakuEnvelope.WakuMessage.Version,
+		Timestamp:      wakuEnvelope.WakuMessage.Timestamp,
+		Meta:           wakuEnvelope.WakuMessage.Meta,
+		Ephemeral:      wakuEnvelope.WakuMessage.Ephemeral,
+		RateLimitProof: wakuEnvelope.WakuMessage.RateLimitProof,
+	}
+	e.topic = wakuEnvelope.PubsubTopic
+	e.hash = wakuEnvelope.MessageHash
+
+	return nil
 }
 
 func (e *Envelope) Message() *pb.WakuMessage {

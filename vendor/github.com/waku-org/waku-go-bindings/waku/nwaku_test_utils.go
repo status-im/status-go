@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/waku-go-bindings/utils"
 	"github.com/waku-org/waku-go-bindings/waku/common"
 	"google.golang.org/protobuf/proto"
 )
@@ -287,4 +289,16 @@ func recordMemoryMetricsPX(testName, phase string, heapAllocKB, rssKB uint64) er
 		time.Now().Format(time.RFC3339),
 	}
 	return writer.Write(row)
+}
+
+func captureMemory(testName, phase string) {
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+
+	heapKB := ms.HeapAlloc / 1024
+	rssKB, _ := utils.GetRSSKB() 
+
+	Debug("[%s] Memory usage  (%s): %d KB (RSS %d KB)", testName, phase, heapKB, rssKB)
+
+	_ = recordMemoryMetricsPX(testName, phase, heapKB, rssKB)
 }

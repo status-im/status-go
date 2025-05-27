@@ -480,12 +480,14 @@ func (n *WakuNode) OnEvent(eventStr string) {
 }
 
 func (n *WakuNode) parseMessageEvent(eventStr string) {
-	envelope, err := common.NewEnvelope(eventStr)
+	var envelope common.Envelope
+	err := json.Unmarshal([]byte(eventStr), &envelope)
 	if err != nil {
 		Error("could not parse message %v", err)
+		return
 	}
 	select {
-	case n.MsgChan <- *envelope:
+	case n.MsgChan <- envelope:
 	default:
 		Warn("Can't deliver message to subscription, MsgChan is full")
 	}
