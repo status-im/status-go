@@ -370,29 +370,6 @@ func (b *GethStatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string
 	return os.RemoveAll(keyStoreDir)
 }
 
-func (b *GethStatusBackend) DeleteImportedKey(address, password, keyStoreDir string) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	err := filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if strings.Contains(fileInfo.Name(), address) {
-			_, err := b.accountManager.VerifyAccountPassword(keyStoreDir, "0x"+address, password)
-			if err != nil {
-				b.logger.Error("failed to verify account", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
-				return err
-			}
-
-			return os.Remove(path)
-		}
-		return nil
-	})
-
-	return err
-}
-
 func (b *GethStatusBackend) runDBFileMigrations(account multiaccounts.Account, password string) (string, error) {
 	// Migrate file path to fix issue https://github.com/status-im/status-go/issues/2027
 	unsupportedPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))
