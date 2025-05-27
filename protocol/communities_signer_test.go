@@ -1,26 +1,20 @@
-package personal
+package protocol
 
 import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/services/personal"
 )
 
-type MockedPersonalAPI struct {
-}
-
-func NewMockedAPI() *MockedPersonalAPI {
-	return &MockedPersonalAPI{}
-}
-
-func (api *MockedPersonalAPI) Recover(rpcParams RecoverParams) (addr types.Address, err error) {
+func mockRecover(rpcParams personal.RecoverParams) (addr types.Address, err error) {
 	sig := types.HexBytes(rpcParams.Signature)
 	if len(sig) != 65 {
-		return types.Address{}, ErrInvalidSignatureLength
+		return types.Address{}, personal.ErrInvalidSignatureLength
 	}
 	if sig[64] != 27 && sig[64] != 28 {
-		return types.Address{}, ErrInvalidSignatureV
+		return types.Address{}, personal.ErrInvalidSignatureV
 	}
 	sig[64] -= 27 // Transform yellow paper V from 27/28 to 0/1
 	hash := crypto.TextHash(types.HexBytes(rpcParams.Message))
@@ -31,11 +25,11 @@ func (api *MockedPersonalAPI) Recover(rpcParams RecoverParams) (addr types.Addre
 	return crypto.PubkeyToAddress(*rpk), nil
 }
 
-func (api *MockedPersonalAPI) CanRecover(rpcParams RecoverParams, revealedAddress types.Address) (bool, error) {
+func mockCanRecover(rpcParams personal.RecoverParams, revealedAddress types.Address) (bool, error) {
 	return true, nil
 }
 
-func (api *MockedPersonalAPI) Sign(rpcParams SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
+func mockSign(rpcParams personal.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
 	bytesArray := []byte(rpcParams.Address)
 	bytesArray = append(bytesArray, []byte(rpcParams.Password)...)
 	bytesArray = common.Shake256(bytesArray)

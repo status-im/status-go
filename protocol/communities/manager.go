@@ -1,5 +1,7 @@
 package communities
 
+//go:generate mockgen -source=manager.go -destination=mock/manager.go
+
 import (
 	"bytes"
 	"context"
@@ -24,6 +26,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/account"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"

@@ -5,14 +5,15 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	communitiesmock "github.com/status-im/status-go/protocol/communities/mock"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/wakuv2"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -56,7 +57,11 @@ type MessengerBaseTestSuite struct {
 }
 
 func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, extraOptions []Option) (*Messenger, error) {
-	personalAPI := personal.NewMockedAPI()
+	ctrl := gomock.NewController(nil)
+	signer := communitiesmock.NewMockMessageSigner(ctrl)
+	signer.EXPECT().CanRecover(gomock.Any(), gomock.Any()).DoAndReturn(mockCanRecover).AnyTimes()
+	signer.EXPECT().Sign(gomock.Any(), gomock.Any()).DoAndReturn(mockSign).AnyTimes()
+	signer.EXPECT().Recover(gomock.Any()).DoAndReturn(mockRecover).AnyTimes()
 
 	options := []Option{
 		WithAppSettings(settings.Settings{
@@ -65,7 +70,7 @@ func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logge
 			ProfilePicturesVisibility: 1,
 			URLUnfurlingMode:          settings.URLUnfurlingAlwaysAsk,
 		}, params.NodeConfig{}),
-		WithMessageSigner(personalAPI),
+		WithMessageSigner(signer),
 	}
 	options = append(options, extraOptions...)
 

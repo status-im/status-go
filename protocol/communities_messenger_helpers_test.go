@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -26,13 +27,14 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
+
+	communitiesmock "github.com/status-im/status-go/protocol/communities/mock"
 )
 
 type AccountManagerMock struct {
@@ -329,12 +331,16 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config tes
 		Balances: config.mockedBalances,
 	}
 
-	personalAPI := personal.NewMockedAPI()
+	ctrl := gomock.NewController(s.T())
+	signer := communitiesmock.NewMockMessageSigner(ctrl)
+	signer.EXPECT().CanRecover(gomock.Any(), gomock.Any()).DoAndReturn(mockCanRecover).AnyTimes()
+	signer.EXPECT().Sign(gomock.Any(), gomock.Any()).DoAndReturn(mockSign).AnyTimes()
+	signer.EXPECT().Recover(gomock.Any()).DoAndReturn(mockRecover).AnyTimes()
 
 	options := []Option{
 		WithAccountManager(accountsManagerMock),
 		WithTokenManager(tokenManagerMock),
-		WithMessageSigner(personalAPI),
+		WithMessageSigner(signer),
 		WithCollectiblesManager(config.collectiblesManager),
 		WithCommunityTokensService(config.collectiblesService),
 		WithAppSettings(*config.appSettings, *config.nodeConfig),

@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/google/uuid"
+	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/account/generator"
@@ -12,11 +13,11 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	communitiesmock "github.com/status-im/status-go/protocol/communities/mock"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 
@@ -85,7 +86,11 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		"",
 	)
 
-	personalAPI := personal.NewMockedAPI()
+	ctrl := gomock.NewController(nil)
+	signer := communitiesmock.NewMockMessageSigner(ctrl)
+	signer.EXPECT().CanRecover(gomock.Any(), gomock.Any()).DoAndReturn(mockCanRecover).AnyTimes()
+	signer.EXPECT().Sign(gomock.Any(), gomock.Any()).DoAndReturn(mockSign).AnyTimes()
+	signer.EXPECT().Recover(gomock.Any()).DoAndReturn(mockRecover).AnyTimes()
 
 	options := []Option{
 		WithCustomLogger(config.logger),
@@ -99,7 +104,7 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		WithCuratedCommunitiesUpdateLoop(false),
 		WithStubOnlineChecker(),
 		WithENSVerifier(ensVerifier),
-		WithMessageSigner(personalAPI),
+		WithMessageSigner(signer),
 	}
 	options = append(options, config.extraOptions...)
 
