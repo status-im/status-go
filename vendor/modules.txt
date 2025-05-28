@@ -1133,7 +1133,7 @@ github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-pc-windows-gnu
 github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-unknown-linux-gnu
 github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-unknown-linux-musl
 github.com/waku-org/go-zerokit-rln-x86_64/rln
-# github.com/waku-org/waku-go-bindings v0.0.0-20250527143900-e37fbd26d67a
+# github.com/waku-org/waku-go-bindings v0.0.0-20250528131356-4af668737057
 ## explicit; go 1.21
 github.com/waku-org/waku-go-bindings/utils
 github.com/waku-org/waku-go-bindings/waku
