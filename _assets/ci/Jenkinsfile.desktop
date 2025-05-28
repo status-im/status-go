@@ -93,9 +93,9 @@ pipeline {
         steps {
             script {
                 shell('make statusgo-shared-library')
+                }
             }
         }
-    }
 
     stage('Archive') {
         steps {
