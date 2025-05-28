@@ -259,7 +259,6 @@ func main() {
 			protocol.WithDatabase(backend.StatusNode().GetAppDB()),
 			protocol.WithWalletDatabase(backend.StatusNode().GetWalletDB()),
 			protocol.WithTorrentConfig(&config.TorrentConfig),
-			protocol.WithWalletConfig(&config.WalletConfig),
 			protocol.WithAccountManager(backend.AccountManager()),
 			protocol.WithMessageSigner(backend.MessageSigner()),
 		}
@@ -330,7 +329,6 @@ func main() {
 				protocol.WithDatabase(appDB),
 				protocol.WithWalletDatabase(walletDB),
 				protocol.WithTorrentConfig(&config.TorrentConfig),
-				protocol.WithWalletConfig(&config.WalletConfig),
 				protocol.WithAccountManager(backend.AccountManager()),
 				protocol.WithMessageSigner(backend.MessageSigner()),
 			}

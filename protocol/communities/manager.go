@@ -112,7 +112,6 @@ type Manager struct {
 	messaging                *messaging.API
 	timesource               common.TimeSource
 	quit                     chan struct{}
-	walletConfig             *params.WalletConfig
 	communityTokensService   CommunityTokensServiceInterface
 	membersReevaluationTasks sync.Map // stores `membersReevaluationTask`
 	forceMembersReevaluation map[string]chan struct{}
@@ -250,7 +249,6 @@ type managerOptions struct {
 	accountsManager        account.Manager
 	tokenManager           TokenManager
 	collectiblesManager    CollectiblesManager
-	walletConfig           *params.WalletConfig
 	communityTokensService CommunityTokensServiceInterface
 	permissionChecker      PermissionChecker
 	signer                 MessageSigner
@@ -374,12 +372,6 @@ func WithTokenManager(tokenManager TokenManager) ManagerOption {
 	}
 }
 
-func WithWalletConfig(walletConfig *params.WalletConfig) ManagerOption {
-	return func(opts *managerOptions) {
-		opts.walletConfig = walletConfig
-	}
-}
-
 func WithCommunityTokensService(communityTokensService CommunityTokensServiceInterface) ManagerOption {
 	return func(opts *managerOptions) {
 		opts.communityTokensService = communityTokensService
@@ -465,10 +457,6 @@ func NewManager(
 
 	if managerConfig.tokenManager != nil {
 		manager.tokenManager = managerConfig.tokenManager
-	}
-
-	if managerConfig.walletConfig != nil {
-		manager.walletConfig = managerConfig.walletConfig
 	}
 
 	if managerConfig.communityTokensService != nil {
