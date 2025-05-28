@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -33,8 +32,6 @@ import (
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
-
-	communitiesmock "github.com/status-im/status-go/protocol/communities/mock"
 )
 
 type AccountManagerMock struct {
@@ -331,16 +328,10 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config tes
 		Balances: config.mockedBalances,
 	}
 
-	ctrl := gomock.NewController(s.T())
-	signer := communitiesmock.NewMockMessageSigner(ctrl)
-	signer.EXPECT().CanRecover(gomock.Any(), gomock.Any()).DoAndReturn(mockCanRecover).AnyTimes()
-	signer.EXPECT().Sign(gomock.Any(), gomock.Any()).DoAndReturn(mockSign).AnyTimes()
-	signer.EXPECT().Recover(gomock.Any()).DoAndReturn(mockRecover).AnyTimes()
-
 	options := []Option{
 		WithAccountManager(accountsManagerMock),
 		WithTokenManager(tokenManagerMock),
-		WithMessageSigner(signer),
+		WithMessageSigner(NewSignerStub()),
 		WithCollectiblesManager(config.collectiblesManager),
 		WithCommunityTokensService(config.collectiblesService),
 		WithAppSettings(*config.appSettings, *config.nodeConfig),

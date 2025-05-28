@@ -1,7 +1,5 @@
 package communities
 
-//go:generate mockgen -source=manager.go -destination=mock/manager.go
-
 import (
 	"bytes"
 	"context"

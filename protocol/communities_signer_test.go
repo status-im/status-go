@@ -8,7 +8,13 @@ import (
 	"github.com/status-im/status-go/services/personal"
 )
 
-func mockRecover(rpcParams personal.RecoverParams) (addr types.Address, err error) {
+type SignerStub struct{}
+
+func NewSignerStub() *SignerStub {
+	return &SignerStub{}
+}
+
+func (s *SignerStub) Recover(rpcParams personal.RecoverParams) (addr types.Address, err error) {
 	sig := types.HexBytes(rpcParams.Signature)
 	if len(sig) != 65 {
 		return types.Address{}, personal.ErrInvalidSignatureLength
@@ -25,11 +31,11 @@ func mockRecover(rpcParams personal.RecoverParams) (addr types.Address, err erro
 	return crypto.PubkeyToAddress(*rpk), nil
 }
 
-func mockCanRecover(rpcParams personal.RecoverParams, revealedAddress types.Address) (bool, error) {
+func (s *SignerStub) CanRecover(rpcParams personal.RecoverParams, revealedAddress types.Address) (bool, error) {
 	return true, nil
 }
 
-func mockSign(rpcParams personal.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
+func (s *SignerStub) Sign(rpcParams personal.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
 	bytesArray := []byte(rpcParams.Address)
 	bytesArray = append(bytesArray, []byte(rpcParams.Password)...)
 	bytesArray = common.Shake256(bytesArray)
