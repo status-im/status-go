@@ -44,4 +44,10 @@ func TestNewEnvelope(t *testing.T) {
 	assert.Equal(t, ephemeral, *msg.Ephemeral)
 	assert.Equal(t, "test-pubsub", env.PubsubTopic())
 	assert.Equal(t, pb.ToMessageHash(hashBytes), env.Hash())
+
+	// Test NewWakuEnvelope constructor
+	newEnv := NewWakuEnvelope(msg, "new-topic", pb.ToMessageHash([]byte{0xaa, 0xbb}))
+	assert.Equal(t, msg, newEnv.Message())
+	assert.Equal(t, "new-topic", newEnv.PubsubTopic())
+	assert.Equal(t, pb.ToMessageHash([]byte{0xaa, 0xbb}), newEnv.Hash())
 }
