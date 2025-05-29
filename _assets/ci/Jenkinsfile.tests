@@ -85,7 +85,7 @@ pipeline {
 
   stages {
     stage('Prep') {
-      steps { /* Go needs to find status-go in GOPATH. */
+      steps { /* Go needs find status-go in GOPATH. */
         sh "mkdir -p \$(dirname ${REPO_SRC})"
         sh "ln -s ${WORKSPACE} ${REPO_SRC}"
       }
