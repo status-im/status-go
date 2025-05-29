@@ -1,8 +1,8 @@
 package fetcher
 
-// TODO: update the link once we decide where to host the list of token lists.
-// remoteListOfTokenLists is the URL to fetch the list of token lists from. It needs to follow the schema defined below.
-// var remoteListOfTokenLists = fmt.Sprintf("https://raw.githubusercontent.com/status-im/status-go/refs/heads/release/%s/token-lists.json", version.Version())
+// RemoteListOfTokenLists is the URL to fetch the list of token lists from. It needs to follow the schema defined below.
+// #nosec G101
+const RemoteListOfTokenLists = "https://prod.market.status.im/static/token-lists.json"
 
 // sourceList is a hardcoded list of URLs to fetch token lists from (list format as below) will be used if fetching the remote list fails.
 // #nosec G101

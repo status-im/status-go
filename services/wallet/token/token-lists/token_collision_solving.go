@@ -23,33 +23,60 @@ func (t *TokenLists) solveCollision() {
 		tokenList.Tokens = removeDuplicateSymbolOnTheSameChain(tokenList.Tokens)
 	}
 
-	// Remove duplicate tokens from the token lists if they have different symbols for the same chainId + address pair (main source of collisions is uniswap token list, then status)
+	// Remove duplicate tokens from the token lists if they have different symbols for the same chainId + address pair (main source for solving collisions is uniswap token list, then status)
 	referenceTokenList := t.tokensLists[defaulttokenlists.UniswapTokenListID].Tokens
-	t.tokensLists[defaulttokenlists.StatusTokenListID].Tokens = removeTokenIfAppearsInTheReferenceList(t.tokensLists[defaulttokenlists.StatusTokenListID].Tokens, referenceTokenList)
-	t.tokensLists[defaulttokenlists.AaveTokenListID].Tokens = removeTokenIfAppearsInTheReferenceList(t.tokensLists[defaulttokenlists.AaveTokenListID].Tokens, referenceTokenList)
+	for listID, tokenList := range t.tokensLists {
+		if listID == defaulttokenlists.UniswapTokenListID {
+			continue
+		}
+		tokenList.Tokens = removeTokenIfAppearsInTheReferenceList(tokenList.Tokens, referenceTokenList)
+	}
+
+	// handling remote token lists + aave token list as the last one of hardcoded token lists
 	referenceTokenList = t.tokensLists[defaulttokenlists.StatusTokenListID].Tokens
-	t.tokensLists[defaulttokenlists.AaveTokenListID].Tokens = removeTokenIfAppearsInTheReferenceList(t.tokensLists[defaulttokenlists.AaveTokenListID].Tokens, referenceTokenList)
+	for listID, tokenList := range t.tokensLists {
+		if listID == defaulttokenlists.StatusTokenListID ||
+			listID == defaulttokenlists.UniswapTokenListID {
+			continue
+		}
+		tokenList.Tokens = removeTokenIfAppearsInTheReferenceList(tokenList.Tokens, referenceTokenList)
+	}
 
 	// Use uniswap tokens map as reference for solving collisions, that's why it is processed first
-	uniswapTokensMap := solveDecimalsCollision(t.tokensLists[defaulttokenlists.UniswapTokenListID].Tokens, nil)
+	processedTokensMap := solveDecimalsCollision(t.tokensLists[defaulttokenlists.UniswapTokenListID].Tokens, nil)
 	t.tokensLists[defaulttokenlists.UniswapTokenListID].Tokens = make([]*tokenTypes.Token, 0)
-	for _, tokens := range uniswapTokensMap {
+	for _, tokens := range processedTokensMap {
 		t.tokensLists[defaulttokenlists.UniswapTokenListID].Tokens = append(t.tokensLists[defaulttokenlists.UniswapTokenListID].Tokens, tokens...)
 	}
 
 	// Use Status tokens list and process tokens using uniswap tokens map as reference
-	statusTokensMap := solveDecimalsCollision(t.tokensLists[defaulttokenlists.StatusTokenListID].Tokens, uniswapTokensMap)
+	tokensMap := solveDecimalsCollision(t.tokensLists[defaulttokenlists.StatusTokenListID].Tokens, processedTokensMap)
 	t.tokensLists[defaulttokenlists.StatusTokenListID].Tokens = make([]*tokenTypes.Token, 0)
-	for symbol, tokens := range statusTokensMap {
+	for symbol, tokens := range tokensMap {
 		t.tokensLists[defaulttokenlists.StatusTokenListID].Tokens = append(t.tokensLists[defaulttokenlists.StatusTokenListID].Tokens, tokens...)
-		uniswapTokensMap[symbol] = append(uniswapTokensMap[symbol], tokens...)
+		processedTokensMap[symbol] = append(processedTokensMap[symbol], tokens...)
 	}
 
 	// Use Aave tokens list and process tokens using uniswap and status tokens map as reference
-	aaveTokensMap := solveDecimalsCollision(t.tokensLists[defaulttokenlists.AaveTokenListID].Tokens, uniswapTokensMap)
+	tokensMap = solveDecimalsCollision(t.tokensLists[defaulttokenlists.AaveTokenListID].Tokens, processedTokensMap)
 	t.tokensLists[defaulttokenlists.AaveTokenListID].Tokens = make([]*tokenTypes.Token, 0)
-	for _, tokens := range aaveTokensMap {
+	for symbol, tokens := range tokensMap {
 		t.tokensLists[defaulttokenlists.AaveTokenListID].Tokens = append(t.tokensLists[defaulttokenlists.AaveTokenListID].Tokens, tokens...)
+		processedTokensMap[symbol] = append(processedTokensMap[symbol], tokens...)
+	}
+
+	// handling remote token lists
+	for listID, tokenList := range t.tokensLists {
+		if listID == defaulttokenlists.UniswapTokenListID ||
+			listID == defaulttokenlists.StatusTokenListID ||
+			listID == defaulttokenlists.AaveTokenListID {
+			continue
+		}
+		tokensMap = solveDecimalsCollision(tokenList.Tokens, processedTokensMap)
+		for symbol, tokens := range tokensMap {
+			t.tokensLists[listID].Tokens = append(t.tokensLists[listID].Tokens, tokens...)
+			processedTokensMap[symbol] = append(processedTokensMap[symbol], tokens...)
+		}
 	}
 }
 
