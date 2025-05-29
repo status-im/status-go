@@ -38,7 +38,6 @@ import (
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
-	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
@@ -84,7 +83,6 @@ type StatusNode struct {
 	publicMethods map[string]bool
 	// we explicitly list every service, we could use interfaces
 	// and store them in a nicer way and user reflection, but for now stupid is good
-	subscriptionsSrvc      *subscriptions.Service
 	rpcStatsSrvc           *rpcstats.Service
 	statusPublicSrvc       *status.Service
 	accountsSrvc           *accountssvc.Service
@@ -325,7 +323,6 @@ func (n *StatusNode) stop() error {
 	n.downloader.Stop()
 	n.downloader = nil
 
-	n.subscriptionsSrvc = nil
 	n.rpcStatsSrvc = nil
 	n.accountsSrvc = nil
 	n.browsersSrvc = nil
