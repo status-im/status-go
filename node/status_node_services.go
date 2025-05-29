@@ -32,7 +32,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/accounts/settingsevent"
 	appgeneral "github.com/status-im/status-go/services/app-general"
@@ -51,7 +50,6 @@ import (
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
-	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
@@ -77,7 +75,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	setSettingsNotifier(accDB, &b.settingsFeed)
 
 	services := []common.StatusService{}
-	services = append(services, b.subscriptionService())
 	services = append(services, b.rpcStatsService())
 	services = append(services, b.appmetricsService())
 	services = append(services, b.appgeneralService())
@@ -307,14 +304,6 @@ func (b *StatusNode) connectorService() *connector.Service {
 		b.connectorSrvc = connector.NewService(b.walletDB, b.rpcClient, b.rpcClient.NetworkManager)
 	}
 	return b.connectorSrvc
-}
-
-func (b *StatusNode) subscriptionService() *subscriptions.Service {
-	if b.subscriptionsSrvc == nil {
-
-		b.subscriptionsSrvc = subscriptions.New(func() *rpc.Client { return b.RPCClient() })
-	}
-	return b.subscriptionsSrvc
 }
 
 func (b *StatusNode) rpcStatsService() *rpcstats.Service {
