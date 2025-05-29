@@ -41,7 +41,7 @@ func TestDbActions(t *testing.T) {
 	require.Empty(t, etag)
 
 	for _, tokenList := range tokenListsFetched {
-		err := tokenListsFetcher.StoreTokenList(tokenList.ID, tokenList.Etag, tokenList.JsonData)
+		err := tokenListsFetcher.StoreTokenList(tokenList.ID, tokenList.SourceURL, tokenList.Etag, tokenList.JsonData)
 		require.NoError(t, err)
 	}
 
@@ -54,11 +54,13 @@ func TestDbActions(t *testing.T) {
 	}
 
 	require.Equal(t, tokenListsFetched[0].ID, dbTokenLists[uniswapIndex].ID)
+	require.Equal(t, tokenListsFetched[0].SourceURL, dbTokenLists[uniswapIndex].SourceURL)
 	require.Equal(t, tokenListsFetched[0].Etag, dbTokenLists[uniswapIndex].Etag)
 	require.Equal(t, tokenListsFetched[0].JsonData, dbTokenLists[uniswapIndex].JsonData)
 	require.True(t, dbTokenLists[uniswapIndex].Fetched.Compare(tokenListsFetched[0].Fetched) == 1)
 
 	require.Equal(t, tokenListsFetched[1].ID, dbTokenLists[1-uniswapIndex].ID)
+	require.Equal(t, tokenListsFetched[1].SourceURL, dbTokenLists[1-uniswapIndex].SourceURL)
 	require.Equal(t, tokenListsFetched[1].Etag, dbTokenLists[1-uniswapIndex].Etag)
 	require.Equal(t, tokenListsFetched[1].JsonData, dbTokenLists[1-uniswapIndex].JsonData)
 	require.True(t, dbTokenLists[1-uniswapIndex].Fetched.Compare(tokenListsFetched[1].Fetched) == 1)

@@ -91,7 +91,7 @@ func (t *TokenListsFetcher) FetchAndStore(ctx context.Context) (int, error) {
 
 	var successfullyFetchedListsCount int
 	for fetchedList := range tokenChannel {
-		if err := t.StoreTokenList(fetchedList.ID, fetchedList.Etag, fetchedList.JsonData); err != nil {
+		if err := t.StoreTokenList(fetchedList.ID, fetchedList.SourceURL, fetchedList.Etag, fetchedList.JsonData); err != nil {
 			logutils.ZapLogger().Error("Failed to store token list", zap.Error(err))
 		} else {
 			successfullyFetchedListsCount++
