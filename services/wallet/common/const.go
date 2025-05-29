@@ -43,6 +43,8 @@ const (
 	BaseMainnet          uint64 = 8453
 	BaseSepolia          uint64 = 84532
 	StatusNetworkSepolia uint64 = 1660990954
+	PolygonMainnet       uint64 = 137
+	PolygonAmoy          uint64 = 80002
 	TestnetChainID       uint64 = 777333
 )
 
@@ -53,6 +55,7 @@ var (
 		ArbitrumMainnet: true,
 		BaseMainnet:     true,
 		BSCMainnet:      true,
+		PolygonMainnet:  true,
 	}
 
 	SupportedTestNetworks = map[uint64]bool{
@@ -62,6 +65,7 @@ var (
 		BaseSepolia:          true,
 		BSCTestnet:           true,
 		StatusNetworkSepolia: true,
+		PolygonAmoy:          true,
 	}
 )
 
@@ -96,9 +100,9 @@ func (c ChainID) ToUint() uint64 {
 
 func (c ChainID) IsMainnet() bool {
 	switch uint64(c) {
-	case EthereumMainnet, OptimismMainnet, ArbitrumMainnet, BaseMainnet, BSCMainnet:
+	case EthereumMainnet, OptimismMainnet, ArbitrumMainnet, BaseMainnet, BSCMainnet, PolygonMainnet:
 		return true
-	case EthereumSepolia, OptimismSepolia, ArbitrumSepolia, BaseSepolia, BSCTestnet, StatusNetworkSepolia:
+	case EthereumSepolia, OptimismSepolia, ArbitrumSepolia, BaseSepolia, BSCTestnet, PolygonAmoy, StatusNetworkSepolia:
 		return false
 	case UnknownChainID:
 		return false
@@ -116,6 +120,8 @@ func AllChainIDs() []ChainID {
 		ChainID(ArbitrumSepolia),
 		ChainID(BaseMainnet),
 		ChainID(BaseSepolia),
+		ChainID(PolygonMainnet),
+		ChainID(PolygonAmoy),
 		ChainID(StatusNetworkSepolia),
 		ChainID(BSCMainnet),
 		ChainID(BSCTestnet),
@@ -132,4 +138,5 @@ var AverageBlockDurationForChain = map[ChainID]time.Duration{
 	ChainID(BaseMainnet):          time.Duration(2000) * time.Millisecond,
 	ChainID(BSCMainnet):           time.Duration(3000) * time.Millisecond,
 	ChainID(StatusNetworkSepolia): time.Duration(2000) * time.Millisecond,
+	ChainID(PolygonMainnet):       time.Duration(2130) * time.Millisecond,
 }

@@ -446,6 +446,72 @@ func bnbSmartChainTestnet(proxyHost string) params.Network {
 	}
 }
 
+func polygon(proxyHost string) params.Network {
+	const chainID = common.PolygonChainID
+	const chainName = "polygon"
+	const networkName = "mainnet"
+
+	rpcProviders := []params.RpcProvider{
+		// Smart proxy provider
+		*params.NewEthRpcProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(proxyHost, chainName, networkName), false),
+		// Direct providers
+		*params.NewDirectProvider(chainID, DirectInfura, security.NewSensitiveString("https://polygon-mainnet.infura.io/v3/"), true),
+		*params.NewDirectProvider(chainID, DirectGrove, security.NewSensitiveString("https://polygon.rpc.grove.city/v1/"), false),
+	}
+
+	return params.Network{
+		ChainID:                chainID,
+		ChainName:              "Polygon",
+		RpcProviders:           rpcProviders,
+		BlockExplorerURL:       "https://polygonscan.com",
+		IconURL:                "network/Network=Polygon",
+		ChainColor:             "#6C00F6",
+		ShortName:              "polygon",
+		NativeCurrencyName:     "Polygon",
+		NativeCurrencySymbol:   "MATIC",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 false,
+		Layer:                  1,
+		Enabled:                false,
+		RelatedChainID:         common.PolygonAmoyChainID,
+		IsActive:               false,
+		IsDeactivatable:        true,
+	}
+}
+
+func polygonAmoy(proxyHost string) params.Network {
+	const chainID = common.PolygonAmoyChainID
+	const chainName = "polygon"
+	const networkName = "amoy"
+
+	rpcProviders := []params.RpcProvider{
+		// Smart proxy provider
+		*params.NewEthRpcProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(proxyHost, chainName, networkName), false),
+		// Direct providers
+		*params.NewDirectProvider(chainID, DirectInfura, security.NewSensitiveString("https://polygon-amoy.infura.io/v3/"), true),
+		*params.NewDirectProvider(chainID, DirectGrove, security.NewSensitiveString("https://polygon-amoy-testnet.rpc.grove.city/v1/"), false),
+	}
+
+	return params.Network{
+		ChainID:                chainID,
+		ChainName:              "Polygon Amoy",
+		RpcProviders:           rpcProviders,
+		BlockExplorerURL:       "https://amoy.polygonscan.com/",
+		IconURL:                "network/Network=Polygon-amoy",
+		ChainColor:             "#6C00F6",
+		ShortName:              "polygon",
+		NativeCurrencyName:     "Polygon",
+		NativeCurrencySymbol:   "MATIC",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 true,
+		Layer:                  1,
+		Enabled:                false,
+		RelatedChainID:         common.PolygonChainID,
+		IsActive:               false,
+		IsDeactivatable:        true,
+	}
+}
+
 func defaultNetworks(proxyHost, stageName string) []params.Network {
 	return []params.Network{
 		mainnet(proxyHost, stageName),
@@ -459,6 +525,8 @@ func defaultNetworks(proxyHost, stageName string) []params.Network {
 		statusNetworkSepolia(proxyHost),
 		bnbSmartChain(proxyHost),
 		bnbSmartChainTestnet(proxyHost),
+		polygon(proxyHost),
+		polygonAmoy(proxyHost),
 	}
 }
 

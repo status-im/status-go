@@ -40,9 +40,12 @@ type StorageToken struct {
 }
 
 func (t *Token) IsNative() bool {
-	if t.ChainID == wallet_common.BSCMainnet ||
-		t.ChainID == wallet_common.BSCTestnet {
+	switch t.ChainID {
+	case wallet_common.BSCMainnet, wallet_common.BSCTestnet:
 		return strings.EqualFold(t.Symbol, "BNB")
+	case wallet_common.PolygonMainnet, wallet_common.PolygonAmoy:
+		return strings.EqualFold(t.Symbol, "MATIC")
+	default:
+		return strings.EqualFold(t.Symbol, "ETH")
 	}
-	return strings.EqualFold(t.Symbol, "ETH")
 }

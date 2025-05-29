@@ -52,6 +52,7 @@ var (
 	sepoliaErc20ArbitrumBatchSize      = big.NewInt(10000)
 	sepoliaErc20OptimismBatchSize      = big.NewInt(10000)
 	sepoliaErc20BaseBatchSize          = big.NewInt(10000)
+	sepoliaErc20PolygonBatchSize       = big.NewInt(10000)
 	sepoliaErc20StatusNetworkBatchSize = big.NewInt(10000)
 	erc20BatchSize                     = big.NewInt(100000)
 
@@ -156,6 +157,8 @@ func getErc20BatchSize(chainID uint64) *big.Int {
 		return sepoliaErc20ArbitrumBatchSize
 	case w_common.BaseSepolia:
 		return sepoliaErc20BaseBatchSize
+	case w_common.PolygonAmoy:
+		return sepoliaErc20PolygonBatchSize
 	case w_common.StatusNetworkSepolia:
 		return sepoliaErc20StatusNetworkBatchSize
 	case w_common.BSCMainnet:

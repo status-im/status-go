@@ -529,7 +529,7 @@ func fetchPrices(sendType sendtype.SendType, marketManager *market.Manager, toke
 	slices.Sort(nonUniqueSymbols)
 	symbols := slices.Compact(nonUniqueSymbols)
 	if sendType.IsCollectiblesTransfer() {
-		symbols = []string{"ETH", "BNB"}
+		symbols = []string{"ETH", "BNB", "MATIC"}
 	}
 
 	pricesMap, err := marketManager.GetOrFetchPrices(symbols, []string{"USD"}, market.MaxAgeInSecondsForFresh)

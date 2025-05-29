@@ -44,9 +44,9 @@ func (o *Client) IsConnected() bool {
 
 func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 	switch uint64(chainID) {
-	case walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet:
+	case walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.PolygonMainnet:
 		return "https://api.rarible.org", nil
-	case walletCommon.EthereumSepolia, walletCommon.ArbitrumSepolia, walletCommon.BaseSepolia:
+	case walletCommon.EthereumSepolia, walletCommon.ArbitrumSepolia, walletCommon.BaseSepolia, walletCommon.PolygonAmoy:
 		return "https://testnet-api.rarible.org", nil
 	}
 

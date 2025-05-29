@@ -21,10 +21,12 @@ const (
 	arbitrumMainnetString = "arbitrum"
 	optimismMainnetString = "optimism"
 	baseMainnetString     = "base"
+	polygonMainnetString  = "matic"
 	ethereumSepoliaString = "sepolia"
 	arbitrumSepoliaString = "arbitrum_sepolia"
 	optimismSepoliaString = "optimism_sepolia"
 	baseSepoliaString     = "base_sepolia"
+	polygonAmoyString     = "amoy"
 )
 
 type urlGetter func(walletCommon.ChainID, string) (string, error)
@@ -48,6 +50,10 @@ func chainIDToChainString(chainID walletCommon.ChainID) string {
 		chainString = optimismSepoliaString
 	case walletCommon.BaseSepolia:
 		chainString = baseSepoliaString
+	case walletCommon.PolygonMainnet:
+		chainString = polygonMainnetString
+	case walletCommon.PolygonAmoy:
+		chainString = polygonAmoyString
 	}
 	return chainString
 }

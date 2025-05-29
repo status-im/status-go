@@ -36,7 +36,7 @@ const (
 )
 
 func belongsToMandatoryTokens(symbol string) bool {
-	var mandatoryTokens = []string{"ETH", "DAI", "SNT", "STT", "USDC", "BNB"}
+	var mandatoryTokens = []string{"ETH", "DAI", "SNT", "STT", "USDC", "BNB", "MATIC"}
 	for _, t := range mandatoryTokens {
 		if t == symbol {
 			return true

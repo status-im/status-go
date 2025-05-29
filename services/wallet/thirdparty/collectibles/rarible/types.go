@@ -23,6 +23,7 @@ const (
 	ethereumString = "ETHEREUM"
 	arbitrumString = "ARBITRUM"
 	baseString     = "BASE"
+	polygonString  = "POLYGON"
 )
 
 func chainStringToChainID(chainString string, isMainnet bool) walletCommon.ChainID {
@@ -46,6 +47,12 @@ func chainStringToChainID(chainString string, isMainnet bool) walletCommon.Chain
 		} else {
 			chainID = walletCommon.BaseSepolia
 		}
+	case polygonString:
+		if isMainnet {
+			chainID = walletCommon.PolygonMainnet
+		} else {
+			chainID = walletCommon.PolygonAmoy
+		}
 	}
 	return walletCommon.ChainID(chainID)
 }
@@ -59,6 +66,8 @@ func chainIDToChainString(chainID walletCommon.ChainID) string {
 		chainString = arbitrumString
 	case walletCommon.BaseMainnet, walletCommon.BaseSepolia:
 		chainString = baseString
+	case walletCommon.PolygonMainnet, walletCommon.PolygonAmoy:
+		chainString = polygonString
 	}
 	return chainString
 }

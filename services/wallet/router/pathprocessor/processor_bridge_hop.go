@@ -489,6 +489,8 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 		walletCommon.ArbitrumSepolia: "arbitrum",
 		walletCommon.BaseMainnet:     "base",
 		walletCommon.BaseSepolia:     "base",
+		walletCommon.PolygonMainnet:  "polygon",
+		walletCommon.PolygonAmoy:     "polygon",
 	}
 
 	fromChainName, ok := hopChainsMap[params.FromChain.ChainID]
@@ -773,5 +775,26 @@ func (h *HopBridgeProcessor) sendL2BridgeTx(contractAddress common.Address, ethC
 			bonderFee.AmountOutMin.Int,
 			big.NewInt(bonderFee.Deadline))
 	}
+
+	// if fromChainID == walletCommon.PolygonMainnet ||
+	// 	fromChainID == walletCommon.PolygonAmoy {
+	// 	contractInstance, err := hopL2PolygonBridge.NewHopL2BaseBridge(
+	// 		contractAddress,
+	// 		ethClient,
+	// 	)
+	// 	if err != nil {
+	// 		return tx, createBridgeHopErrorResponse(err)
+	// 	}
+
+	// 	return contractInstance.Send(
+	// 		txOpts,
+	// 		big.NewInt(int64(toChainID)),
+	// 		to,
+	// 		bonderFee.AmountIn.Int,
+	// 		bonderFee.BonderFee.Int,
+	// 		bonderFee.AmountOutMin.Int,
+	// 		big.NewInt(bonderFee.Deadline))
+	// }
+
 	return tx, ErrTxForChainNotSupported
 }

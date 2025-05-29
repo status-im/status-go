@@ -42,6 +42,8 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		case common.StatusNetworkSepoliaChainID:
 		case common.BNBSmartChainID:
 		case common.BNBSmartChainTestnetChainID:
+		case common.PolygonChainID:
+		case common.PolygonAmoyChainID:
 		default:
 			err = errors.Errorf("unexpected chain id: %d", n.ChainID)
 		}

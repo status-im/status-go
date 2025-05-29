@@ -132,6 +132,7 @@ func (s SendType) IsAvailableFor(network *params.Network) bool {
 			walletCommon.ArbitrumMainnet: true,
 			walletCommon.BaseMainnet:     true,
 			walletCommon.BSCMainnet:      true,
+			walletCommon.PolygonMainnet:  true,
 		}
 		_, ok := swapAllowedNetworks[network.ChainID]
 		return ok
@@ -147,6 +148,8 @@ func (s SendType) IsAvailableFor(network *params.Network) bool {
 			walletCommon.ArbitrumSepolia: true,
 			walletCommon.BaseMainnet:     true,
 			walletCommon.BaseSepolia:     true,
+			walletCommon.PolygonMainnet:  true,
+			walletCommon.PolygonAmoy:     true,
 		}
 		_, ok := bridgeAllowedNetworks[network.ChainID]
 		return ok

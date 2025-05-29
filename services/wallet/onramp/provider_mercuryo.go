@@ -18,7 +18,7 @@ import (
 )
 
 const mercuryoID = "mercuryo"
-const mercuryioNoFeesBaseURL = "https://exchange.mercuryo.io/?type=buy&networks=ETHEREUM,ARBITRUM,OPTIMISM,BASE&currency=ETH"
+const mercuryioNoFeesBaseURL = "https://exchange.mercuryo.io/?type=buy&networks=ETHEREUM,ARBITRUM,OPTIMISM,BASE,BINANCESMARTCHAIN,POLYGON&currency=ETH"
 const supportedAssetsUpdateInterval = 24 * time.Hour
 
 type MercuryoProvider struct {
@@ -54,7 +54,7 @@ func (p *MercuryoProvider) GetCryptoOnRamp(ctx context.Context) (CryptoOnRamp, e
 		Hostname:                  "mercuryo.io",
 		SupportsSinglePurchase:    true,
 		SupportsRecurrentPurchase: true,
-		SupportedChainIDs:         []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
+		SupportedChainIDs:         []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet, walletCommon.PolygonMainnet},
 		URLsNeedParameters:        true,
 		SiteURL:                   mercuryioNoFeesBaseURL,
 		RecurrentSiteURL:          mercuryioNoFeesBaseURL + "&widget_flow=recurrent",
