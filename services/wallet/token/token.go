@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token/balancefetcher"
 	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
+	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -137,7 +138,7 @@ func (tm *Manager) Start(ctx context.Context, autoRefreshInterval time.Duration,
 
 	// For now we don't have the list of tokens lists remotely set so we're uisng the harcoded default lists. Once we have it
 	//we will just need to update the empty string with the correct URL.
-	tm.tokenLists.Start(ctx, "", autoRefreshInterval, autoRefreshCheckInterval)
+	tm.tokenLists.Start(ctx, fetcher.RemoteListOfTokenLists, autoRefreshInterval, autoRefreshCheckInterval)
 }
 
 func (tm *Manager) startAccountsWatcher() {

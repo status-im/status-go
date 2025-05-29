@@ -2,13 +2,13 @@ package fetcher
 
 import "database/sql"
 
-func (t *TokenListsFetcher) StoreTokenList(id string, etag string, jsonData string) error {
+func (t *TokenListsFetcher) StoreTokenList(id string, source string, etag string, jsonData string) error {
 	_, err := t.walletDb.Exec(`
 	INSERT INTO
-		token_lists (id, etag, tokens_json)
+		token_lists (id, source, etag, tokens_json)
 	VALUES
-		(?, ?, ?)`,
-		id, etag, jsonData)
+		(?, ?, ?, ?)`,
+		id, source, etag, jsonData)
 	return err
 }
 
@@ -27,7 +27,7 @@ func (t *TokenListsFetcher) GetEtagForTokenList(id string) (string, error) {
 }
 
 func (t *TokenListsFetcher) GetAllTokenLists() ([]FetchedTokenList, error) {
-	rows, err := t.walletDb.Query("SELECT id, etag, fetched, tokens_json FROM token_lists")
+	rows, err := t.walletDb.Query("SELECT id, source, etag, fetched, tokens_json FROM token_lists")
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (t *TokenListsFetcher) GetAllTokenLists() ([]FetchedTokenList, error) {
 			etag      sql.NullString
 			fetched   sql.NullTime
 		)
-		err = rows.Scan(&tokenList.ID, &etag, &fetched, &tokenList.JsonData)
+		err = rows.Scan(&tokenList.ID, &tokenList.SourceURL, &etag, &fetched, &tokenList.JsonData)
 		if err != nil {
 			return nil, err
 		}
