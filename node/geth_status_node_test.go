@@ -17,7 +17,7 @@ import (
 func TestStatusNodeStart(t *testing.T) {
 	config, err := utils.MakeTestNodeConfigWithDataDir("", "", params.StatusChainNetworkID)
 	require.NoError(t, err)
-	n := New(nil, tt.MustCreateTestLogger())
+	n := New(nil, nil, tt.MustCreateTestLogger())
 
 	// checks before node is started
 	require.Nil(t, n.GethNode())
@@ -36,7 +36,7 @@ func TestStatusNodeStart(t *testing.T) {
 	n.walletDB = walletDB
 
 	// start node
-	require.NoError(t, n.Start(config, nil))
+	require.NoError(t, n.Start(config))
 
 	// checks after node is started
 	require.True(t, n.IsRunning())
@@ -47,7 +47,7 @@ func TestStatusNodeStart(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, accountManager)
 	// try to start already started node
-	require.EqualError(t, n.Start(config, nil), ErrNodeRunning.Error())
+	require.EqualError(t, n.Start(config), ErrNodeRunning.Error())
 
 	// stop node
 	require.NoError(t, n.Stop())
@@ -87,6 +87,6 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 	}()
 	require.NoError(t, err)
 
-	require.NoError(t, n.Start(&config, nil))
+	require.NoError(t, n.Start(&config))
 	require.NoError(t, n.Stop())
 }

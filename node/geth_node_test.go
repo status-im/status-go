@@ -5,8 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ethereum/go-ethereum/accounts"
-
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/utils"
 )
@@ -16,7 +14,7 @@ func TestMakeNodeDefaultConfig(t *testing.T) {
 	config, err := utils.MakeTestNodeConfig(3)
 	require.NoError(t, err)
 
-	_, err = MakeNode(config, &accounts.Manager{})
+	_, err = MakeNode(config)
 	require.NoError(t, err)
 }
 

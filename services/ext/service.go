@@ -372,7 +372,7 @@ func buildMessengerOptions(
 	accountsFeed *event.Feed,
 	ensVerifier *ens.Verifier,
 ) ([]protocol.Option, error) {
-	personalAPI := personal.NewAPI()
+	personalService := personal.New()
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
 		protocol.WithPushNotifications(),
@@ -397,7 +397,7 @@ func buildMessengerOptions(
 		protocol.WithAccountManager(accountManager),
 		protocol.WithAccountsFeed(accountsFeed),
 		protocol.WithNewsFeed(),
-		protocol.WithMessageSigner(personalAPI),
+		protocol.WithMessageSigner(personalService),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {

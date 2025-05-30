@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
@@ -68,7 +69,8 @@ func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
 }
 
 func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
-	statusNode := New(nil, tt.MustCreateTestLogger())
+	accountManager := account.NewGethManager(tt.MustCreateTestLogger())
+	statusNode := New(nil, accountManager, tt.MustCreateTestLogger())
 
 	appDB, walletDB, stop, err := setupTestDBs()
 	defer func() {
@@ -95,7 +97,7 @@ func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
 	}
 	statusNode.multiaccountsDB = ma
 
-	err = statusNode.Start(config, nil)
+	err = statusNode.Start(config)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +110,8 @@ func createStatusNode() (*StatusNode, func() error, func() error, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	statusNode := New(nil, tt.MustCreateTestLogger())
+	accountManager := account.NewGethManager(tt.MustCreateTestLogger())
+	statusNode := New(nil, accountManager, tt.MustCreateTestLogger())
 	statusNode.SetAppDB(appDB)
 	statusNode.SetWalletDB(walletDB)
 

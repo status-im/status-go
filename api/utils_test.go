@@ -49,7 +49,7 @@ func TestHashMessage(t *testing.T) {
 		},
 	}
 
-	publicAPI := personal.NewAPI()
+	personalService := personal.New()
 
 	for _, s := range scenarios {
 		t.Run(s.message, func(t *testing.T) {
@@ -62,7 +62,7 @@ func TestHashMessage(t *testing.T) {
 			}
 
 			// simulate signature from external signer like a keycard
-			sig, err := publicAPI.Sign(signParams, &account.SelectedExtKey{
+			sig, err := personalService.Sign(signParams, &account.SelectedExtKey{
 				AccountKey: &types.Key{
 					PrivateKey: key,
 				},
@@ -75,7 +75,7 @@ func TestHashMessage(t *testing.T) {
 				Signature: hexutil.Encode(sig),
 			}
 
-			recoveredAddr, err := publicAPI.Recover(recParams)
+			recoveredAddr, err := personalService.Recover(recParams)
 			require.NoError(t, err)
 			assert.Equal(t, addr, recoveredAddr)
 		})

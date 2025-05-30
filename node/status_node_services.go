@@ -523,15 +523,9 @@ func (b *StatusNode) StartLocalNotifications() error {
 	return nil
 }
 
-// `personal_sign` and `personal_ecRecover` methods are important to
-// keep DApps working.
-// Usually, they are provided by an ETH or a LES service, but when using
-// upstream, we don't start any of these, so we need to start our own
-// implementation.
-
 func (b *StatusNode) personalService() *personal.Service {
 	if b.personalSrvc == nil {
-		b.personalSrvc = personal.New(b.accountsManager)
+		b.personalSrvc = personal.New()
 	}
 	return b.personalSrvc
 }
