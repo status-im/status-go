@@ -50,7 +50,6 @@ import (
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
@@ -2026,12 +2025,6 @@ func FormatPeerStats(wakuNode *node.WakuNode) types.PeerStats {
 	return p
 }
 
-// TODO-nwaku
-func (w *Waku) StoreNode() *store.WakuStore {
-	// return w.node.Store()
-	return nil
-}
-
 func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 	p := make(map[string]int)
 	for _, peerID := range wakuNode.Host().Network().Peers() {
@@ -2044,12 +2037,6 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 	return p
 }
 
-// TODO-nwaku
-func (w *Waku) LegacyStoreNode() legacy_store.Store {
-	// return w.node.LegacyStore()
-	return nil
-}
-
 // GetCurrentTime returns current time.
 // Implements protocol/common.TimeSource
 func (w *Waku) GetCurrentTime() uint64 {
@@ -2057,8 +2044,7 @@ func (w *Waku) GetCurrentTime() uint64 {
 }
 
 func (w *Waku) GetActiveStorenode() peer.AddrInfo {
-	// TODO-nwaku
-	return peer.AddrInfo{}
+	return w.StorenodeCycle.GetActiveStorenodePeerInfo()
 }
 
 func (w *Waku) OnStorenodeChanged() <-chan peer.ID {
@@ -2113,8 +2099,13 @@ func (w *Waku) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTa
 }
 
 func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool) {
-	// TODO-nwaku
-	return
+	w.StorenodeCycle.Lock()
+	defer w.StorenodeCycle.Unlock()
+
+	w.StorenodeCycle.DisconnectActiveStorenode(backoff)
+	if shouldCycle {
+		w.StorenodeCycle.Cycle(ctx)
+	}
 }
 
 func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
