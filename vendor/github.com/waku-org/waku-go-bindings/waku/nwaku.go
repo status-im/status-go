@@ -311,6 +311,10 @@ package waku
 							resp);
 	}
 
+	static void cGoWakuIsOnline(void* wakuCtx, void* resp) {
+		waku_is_online(wakuCtx, (WakuCallBack) GoCallback, resp);
+	}
+
 */
 import "C"
 import (
@@ -1589,4 +1593,38 @@ func (n *WakuNode) DisconnectPeer(target *WakuNode) error {
 
 	Debug("Successfully disconnected %s from %s", n.nodeName, target.nodeName)
 	return nil
+}
+
+func (n *WakuNode) IsOnline() (bool, error) {
+	if n == nil {
+		err := errors.New("waku node is nil")
+		Error("Failed to get online state %v", err)
+		return false, err
+	}
+
+	Debug("Querying online state for %v", n.nodeName)
+
+	wg := sync.WaitGroup{}
+	var resp = C.allocResp(unsafe.Pointer(&wg))
+	defer C.freeResp(resp)
+
+	wg.Add(1)
+	C.cGoWakuIsOnline(n.wakuCtx, resp)
+	wg.Wait()
+
+	if C.getRet(resp) == C.RET_OK {
+		onlineStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+
+		if onlineStr == "true" {
+			return true, nil
+		}
+
+		return false, nil
+
+	}
+
+	errMsg := "error IsOnline: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to query online state for %v: %v", n.nodeName, errMsg)
+
+	return false, errors.New(errMsg)
 }
