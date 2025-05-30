@@ -8,7 +8,7 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	accountJson "github.com/status-im/status-go/account/json"
+	"github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
@@ -70,7 +70,7 @@ type AccountInfo struct {
 
 func (a AccountInfo) MarshalJSON() ([]byte, error) {
 	type Alias AccountInfo
-	ext, err := accountJson.ExtendStructWithPubKeyData(a.PublicKey, Alias(a))
+	ext, err := common.ExtendStructWithPubKeyData(a.PublicKey, Alias(a))
 	if err != nil {
 		return nil, err
 	}

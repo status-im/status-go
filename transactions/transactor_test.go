@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/account"
+	accounttypes "github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
@@ -24,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -102,7 +103,7 @@ var (
 	testNonce    = hexutil.Uint64(10)
 )
 
-func (s *TransactorSuite) setupTransactionPoolAPI(args wallettypes.SendTxArgs, returnNonce, resultNonce hexutil.Uint64, account *account.SelectedExtKey, txErr error) {
+func (s *TransactorSuite) setupTransactionPoolAPI(args wallettypes.SendTxArgs, returnNonce, resultNonce hexutil.Uint64, account *accounttypes.SelectedExtKey, txErr error) {
 	// Expect calls to gas functions only if there are no user defined values.
 	// And also set the expected gas and gas price for RLP encoding the expected tx.
 	var usedGas hexutil.Uint64
@@ -129,7 +130,7 @@ func (s *TransactorSuite) setupTransactionPoolAPI(args wallettypes.SendTxArgs, r
 	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), data).Return(common.Hash{}, txErr)
 }
 
-func (s *TransactorSuite) rlpEncodeTx(args wallettypes.SendTxArgs, config *params.NodeConfig, account *account.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
+func (s *TransactorSuite) rlpEncodeTx(args wallettypes.SendTxArgs, config *params.NodeConfig, account *accounttypes.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
 	var txData gethtypes.TxData
 	to := common.Address(*args.To)
 	if args.IsDynamicFeeTx() {
@@ -168,8 +169,8 @@ func (s *TransactorSuite) rlpEncodeTx(args wallettypes.SendTxArgs, config *param
 
 func (s *TransactorSuite) TestGasValues() {
 	key, _ := gethcrypto.GenerateKey()
-	selectedAccount := &account.SelectedExtKey{
-		Address:    account.FromAddress(utils.TestConfig.Account1.WalletAddress),
+	selectedAccount := &accounttypes.SelectedExtKey{
+		Address:    types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
 		AccountKey: &types.Key{PrivateKey: key},
 	}
 	testCases := []struct {
@@ -220,9 +221,10 @@ func (s *TransactorSuite) TestGasValues() {
 	for _, testCase := range testCases {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.SetupTest()
+			to := types.FromStringToAddress(utils.TestConfig.Account2.WalletAddress)
 			args := wallettypes.SendTxArgs{
-				From:                 account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-				To:                   account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+				From:                 types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
+				To:                   &to,
 				Gas:                  testCase.gas,
 				GasPrice:             testCase.gasPrice,
 				MaxFeePerGas:         testCase.maxFeePerGas,
@@ -237,7 +239,7 @@ func (s *TransactorSuite) TestGasValues() {
 	}
 }
 
-func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *account.SelectedExtKey) {
+func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *accounttypes.SelectedExtKey) {
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(account.Address)), gethrpc.PendingBlockNumber).Return(&testNonce, nil)
 
 	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
@@ -251,14 +253,14 @@ func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs
 
 func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	key, _ := gethcrypto.GenerateKey()
-	selectedAccount := &account.SelectedExtKey{
-		Address:    account.FromAddress(utils.TestConfig.Account1.WalletAddress),
+	selectedAccount := &accounttypes.SelectedExtKey{
+		Address:    types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
 		AccountKey: &types.Key{PrivateKey: key},
 	}
 
 	chainID := s.nodeConfig.NetworkID
-	fromAddress := account.FromAddress(utils.TestConfig.Account1.WalletAddress)
-	toAddress := account.ToAddress(utils.TestConfig.Account2.WalletAddress)
+	fromAddress := types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress)
+	toAddress := types.FromStringToAddress(utils.TestConfig.Account2.WalletAddress)
 	value := (*hexutil.Big)(big.NewInt(10))
 
 	expectedGasPrice := (*big.Int)(testGasPrice)
@@ -271,7 +273,7 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 		gas := hexutil.Uint64(21000)
 		args := wallettypes.SendTxArgs{
 			From:                 fromAddress,
-			To:                   toAddress,
+			To:                   &toAddress,
 			Gas:                  &gas,
 			Value:                value,
 			MaxFeePerGas:         testGasPrice,
@@ -291,7 +293,7 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 		s.SetupTest()
 		args := wallettypes.SendTxArgs{
 			From:                 fromAddress,
-			To:                   toAddress,
+			To:                   &toAddress,
 			Value:                value,
 			MaxFeePerGas:         testGasPrice,
 			MaxPriorityFeePerGas: testGasPrice,
@@ -314,7 +316,7 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 		gasPrice := (*hexutil.Big)(big.NewInt(10))
 		args := wallettypes.SendTxArgs{
 			From:     fromAddress,
-			To:       toAddress,
+			To:       &toAddress,
 			Value:    value,
 			Gas:      &gas,
 			GasPrice: gasPrice,
@@ -332,7 +334,7 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 
 		args := wallettypes.SendTxArgs{
 			From:  fromAddress,
-			To:    toAddress,
+			To:    &toAddress,
 			Value: value,
 		}
 		s.setupBuildTransactionMocks(args, selectedAccount)
@@ -346,24 +348,26 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 }
 
 func (s *TransactorSuite) TestArgsValidation() {
+	to := types.FromStringToAddress(utils.TestConfig.Account2.WalletAddress)
 	args := wallettypes.SendTxArgs{
-		From:  account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:    account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+		From:  types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
+		To:    &to,
 		Data:  types.HexBytes([]byte{0x01, 0x02}),
 		Input: types.HexBytes([]byte{0x02, 0x01}),
 	}
 	s.False(args.Valid())
-	selectedAccount := &account.SelectedExtKey{
-		Address: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
+	selectedAccount := &accounttypes.SelectedExtKey{
+		Address: types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
 	}
 	_, _, err := s.manager.SendTransaction(args, selectedAccount, -1)
 	s.EqualError(err, wallettypes.ErrInvalidSendTxArgs.Error())
 }
 
 func (s *TransactorSuite) TestAccountMismatch() {
+	to := types.FromStringToAddress(utils.TestConfig.Account2.WalletAddress)
 	args := wallettypes.SendTxArgs{
-		From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:   account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+		From: types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
+		To:   &to,
 	}
 
 	var err error
@@ -373,8 +377,8 @@ func (s *TransactorSuite) TestAccountMismatch() {
 	s.EqualError(err, account.ErrNoAccountSelected.Error())
 
 	// mismatched accounts
-	selectedAccount := &account.SelectedExtKey{
-		Address: account.FromAddress(utils.TestConfig.Account2.WalletAddress),
+	selectedAccount := &accounttypes.SelectedExtKey{
+		Address: types.FromStringToAddress(utils.TestConfig.Account2.WalletAddress),
 	}
 	_, _, err = s.manager.SendTransaction(args, selectedAccount, -1)
 	s.EqualError(err, wallettypes.ErrInvalidTxSender.Error())

@@ -7,16 +7,17 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/account/common"
+	"github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 )
 
 // OnboardingAccount is returned during onboarding and contains its ID and the mnemonic to re-generate the same account Info keys.
 type OnboardingAccount struct {
 	ID       string `json:"id"`
 	mnemonic string
-	Info     Info `json:"info"`
+	Info     types.Info `json:"info"`
 }
 
 // Onboarding is a struct contains a slice of OnboardingAccount.
@@ -62,7 +63,7 @@ func (o *Onboarding) Account(id string) (*OnboardingAccount, error) {
 }
 
 func (o *Onboarding) generateAccount(mnemonicPhraseLength int) (*OnboardingAccount, error) {
-	entropyStrength, err := generator.MnemonicPhraseLengthToEntropyStrength(mnemonicPhraseLength)
+	entropyStrength, err := common.LengthToEntropyStrength(mnemonicPhraseLength)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +84,7 @@ func (o *Onboarding) generateAccount(mnemonicPhraseLength int) (*OnboardingAccou
 		return nil, err
 	}
 
-	info := Info{
+	info := types.Info{
 		WalletAddress: walletAddress,
 		WalletPubKey:  walletPubKey,
 		ChatAddress:   walletAddress,
@@ -107,7 +108,7 @@ func (o *Onboarding) deriveAccount(masterExtendedKey *extkeys.ExtendedKey, purpo
 
 	privateKeyECDSA := extendedKey.ToECDSA()
 	address := crypto.PubkeyToAddress(privateKeyECDSA.PublicKey)
-	publicKeyHex := types.EncodeHex(crypto.FromECDSAPub(&privateKeyECDSA.PublicKey))
+	publicKeyHex := ethtypes.EncodeHex(crypto.FromECDSAPub(&privateKeyECDSA.PublicKey))
 
 	return address.Hex(), publicKeyHex, nil
 }

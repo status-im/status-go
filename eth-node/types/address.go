@@ -17,6 +17,10 @@ import (
 // AddressLength is the expected length of the address
 const AddressLength = 20
 
+func ZeroAddress() Address {
+	return Address{}
+}
+
 var (
 	addressT = reflect.TypeOf(Address{})
 )

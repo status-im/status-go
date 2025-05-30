@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/account"
+	accounttypes "github.com/status-im/status-go/account/types"
 	communitytokens "github.com/status-im/status-go/contracts/community-tokens"
 	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/errors"
@@ -161,7 +161,7 @@ func (s *CommunityDeployOwnerTokenProcessor) EstimateGas(params ProcessorInputPa
 	return uint64(increasedEstimation), nil
 }
 
-func (s *CommunityDeployOwnerTokenProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
+func (s *CommunityDeployOwnerTokenProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *accounttypes.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
 	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce, verifiedAccount)
 }
 

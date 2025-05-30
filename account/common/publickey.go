@@ -1,18 +1,19 @@
-package json
+package common
 
 import (
 	"reflect"
 
+	"github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/protocol/identity/emojihash"
 )
 
-type PublicKeyData struct {
-	CompressedKey string   `json:"compressedKey"`
-	EmojiHash     []string `json:"emojiHash"`
-}
+// GetPublicKeyData processes a public key and returns its compressed form and emoji hash
+func GetPublicKeyData(publicKey string) (*types.PublicKeyData, error) {
+	if publicKey == "" {
+		return nil, nil
+	}
 
-func getPubKeyData(publicKey string) (*PublicKeyData, error) {
 	compressedKey, err := multiformat.SerializeLegacyKey(publicKey)
 	if err != nil {
 		return nil, err
@@ -23,8 +24,10 @@ func getPubKeyData(publicKey string) (*PublicKeyData, error) {
 		return nil, err
 	}
 
-	return &PublicKeyData{compressedKey, emojiHash}, nil
-
+	return &types.PublicKeyData{
+		CompressedKey: compressedKey,
+		EmojiHash:     emojiHash,
+	}, nil
 }
 
 func ExtendStructWithPubKeyData(publicKey string, item any) (any, error) {
@@ -33,7 +36,7 @@ func ExtendStructWithPubKeyData(publicKey string, item any) (any, error) {
 		return item, nil
 	}
 
-	pkd, err := getPubKeyData(publicKey)
+	pkd, err := GetPublicKeyData(publicKey)
 	if err != nil {
 		return nil, err
 	}

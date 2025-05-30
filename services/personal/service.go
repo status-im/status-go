@@ -4,7 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/account"
+	accounttypes "github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -81,7 +81,7 @@ func (s *Service) CanRecover(rpcParams RecoverParams, revealedAddress types.Addr
 }
 
 // Sign is an implementation of `personal_sign` or `web3.personal.sign` API
-func (s *Service) Sign(rpcParams SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
+func (s *Service) Sign(rpcParams SignParams, verifiedAccount *accounttypes.SelectedExtKey) (result types.HexBytes, err error) {
 	var dBytes []byte
 	switch d := rpcParams.Data.(type) {
 	case string:

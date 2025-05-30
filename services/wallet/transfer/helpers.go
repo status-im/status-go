@@ -12,7 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/account"
+	accounttypes "github.com/status-im/status-go/account/types"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -134,7 +134,7 @@ func updateDataFromMultiTx(data []*pathprocessor.MultipathProcessorTxArgs, multi
 	}
 }
 
-func sendTransactions(data []*pathprocessor.MultipathProcessorTxArgs, pathProcessors map[string]pathprocessor.PathProcessor, account *account.SelectedExtKey) (
+func sendTransactions(data []*pathprocessor.MultipathProcessorTxArgs, pathProcessors map[string]pathprocessor.PathProcessor, account *accounttypes.SelectedExtKey) (
 	map[uint64][]types.Hash, error) {
 
 	hashes := make(map[uint64][]types.Hash)

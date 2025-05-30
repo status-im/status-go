@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/account"
+	accounttypes "github.com/status-im/status-go/account/types"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -92,7 +93,7 @@ var (
 type MessageSigner interface {
 	Recover(rpcParams personal.RecoverParams) (addr types.Address, err error)
 	CanRecover(rpcParams personal.RecoverParams, revealedAddress types.Address) (bool, error)
-	Sign(rpcParams personal.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error)
+	Sign(rpcParams personal.SignParams, verifiedAccount *accounttypes.SelectedExtKey) (result types.HexBytes, err error)
 }
 
 type Manager struct {

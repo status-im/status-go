@@ -27,6 +27,7 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/account/generator"
+	accounttypes "github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/centralizedmetrics"
 	centralizedmetricscommon "github.com/status-im/status-go/centralizedmetrics/common"
@@ -785,7 +786,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get wallet addresses")
 	}
-	login := account.LoginParams{
+	login := accounttypes.LoginParams{
 		Password:       request.Password,
 		ChatAddress:    chatAddr,
 		WatchAddresses: watchAddrs,
@@ -903,7 +904,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		return err
 	}
-	login := account.LoginParams{
+	login := accounttypes.LoginParams{
 		Password:       password,
 		ChatAddress:    chatAddr,
 		WatchAddresses: watchAddrs,
@@ -2448,7 +2449,7 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 	return types.Hash(hash), err
 }
 
-func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
+func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*accounttypes.SelectedExtKey, error) {
 	config := b.StatusNode().Config()
 	db, err := accounts.NewDB(b.appDB)
 	if err != nil {
@@ -2481,7 +2482,7 @@ func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (
 		return nil, err
 	}
 
-	return &account.SelectedExtKey{
+	return &accounttypes.SelectedExtKey{
 		Address:    key.Address,
 		AccountKey: key,
 	}, nil
@@ -2730,7 +2731,7 @@ func (b *GethStatusBackend) closeWalletDB() error {
 // SelectAccount selects current wallet and chat accounts, by verifying that each address has corresponding account which can be decrypted
 // using provided password. Once verification is done, the decrypted chat key is injected into Whisper (as a single identity,
 // all previous identities are removed).
-func (b *GethStatusBackend) SelectAccount(loginParams account.LoginParams) error {
+func (b *GethStatusBackend) SelectAccount(loginParams accounttypes.LoginParams) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

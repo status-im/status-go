@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/account"
+	accounttypes "github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/personal"
@@ -62,7 +62,7 @@ func TestHashMessage(t *testing.T) {
 			}
 
 			// simulate signature from external signer like a keycard
-			sig, err := personalService.Sign(signParams, &account.SelectedExtKey{
+			sig, err := personalService.Sign(signParams, &accounttypes.SelectedExtKey{
 				AccountKey: &types.Key{
 					PrivateKey: key,
 				},
