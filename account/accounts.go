@@ -18,23 +18,14 @@ import (
 
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/account/types"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
-	"github.com/status-im/status-go/eth-node/types"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-)
-
-// errors
-var (
-	ErrAddressToAccountMappingFailure = errors.New("cannot retrieve a valid account for a given address")
-	ErrAccountToKeyMappingFailure     = errors.New("cannot retrieve a valid key for a given account")
-	ErrNoAccountSelected              = errors.New("no account has been selected, please login")
-	ErrInvalidMasterKeyCreated        = errors.New("can not create master extended key")
-	ErrOnboardingNotStarted           = errors.New("onboarding must be started before choosing an account")
-	ErrOnboardingAccountNotFound      = errors.New("cannot find onboarding account with the given id")
-	ErrAccountKeyStoreMissing         = errors.New("account key store is not set")
 )
 
 type ErrCannotLocateKeyFile struct {
@@ -45,32 +36,30 @@ func (e ErrCannotLocateKeyFile) Error() string {
 	return e.Msg
 }
 
-var zeroAddress = types.Address{}
-
 // Manager represents account manager interface
 type Manager interface {
-	GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error)
-	DeleteAccount(address types.Address) error
+	GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*types.SelectedExtKey, error)
+	DeleteAccount(address ethtypes.Address) error
 }
 
 // DefaultManager represents default account manager implementation
 type DefaultManager struct {
 	mu       sync.RWMutex
 	Keydir   string
-	keystore types.KeyStore
+	keystore ethtypes.KeyStore
 
 	accountsGenerator *generator.Generator
 	onboarding        *Onboarding
 
-	selectedChatAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
-	mainAccountAddress  types.Address
-	watchAddresses      []types.Address
+	selectedChatAccount *types.SelectedExtKey // account that was processed during the last call to SelectAccount()
+	mainAccountAddress  ethtypes.Address
+	watchAddresses      []ethtypes.Address
 
 	logger *zap.Logger
 }
 
 // GetKeystore is only used in tests
-func (m *DefaultManager) GetKeystore() types.KeyStore {
+func (m *DefaultManager) GetKeystore() ethtypes.KeyStore {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.keystore
@@ -85,9 +74,9 @@ func (m *DefaultManager) AccountsGenerator() *generator.Generator {
 // BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
 // Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
 // sub-account derivations)
-func (m *DefaultManager) CreateAccount(password string) (generator.GeneratedAccountInfo, Info, string, error) {
+func (m *DefaultManager) CreateAccount(password string) (generator.GeneratedAccountInfo, types.Info, string, error) {
 	var mkInfo generator.GeneratedAccountInfo
-	info := Info{}
+	info := types.Info{}
 
 	// generate mnemonic phrase
 	mn := extkeys.NewMnemonic()
@@ -96,21 +85,16 @@ func (m *DefaultManager) CreateAccount(password string) (generator.GeneratedAcco
 		return mkInfo, info, "", fmt.Errorf("can not create mnemonic seed: %v", err)
 	}
 
-	// Generate extended master key (see BIP32)
-	// We call extkeys.NewMaster with a seed generated with the 12 mnemonic words
-	// but without using the optional password as an extra entropy as described in BIP39.
-	// Future ideas/iterations in Status can add an an advanced options
-	// for expert users, to be able to add a passphrase to the generation of the seed.
-	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
+	extendedKey, err := common.CreateExtendedKeyFromMnemonic(mnemonic, "")
 	if err != nil {
-		return mkInfo, info, "", fmt.Errorf("can not create master extended key: %v", err)
+		return mkInfo, info, "", err
 	}
 
-	acc := generator.NewAccount(nil, extKey)
+	acc := generator.NewAccount(nil, extendedKey)
 	mkInfo = acc.ToGeneratedAccountInfo("", mnemonic)
 
 	// import created key into account keystore
-	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
+	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extendedKey, password)
 	if err != nil {
 		return mkInfo, info, "", err
 	}
@@ -123,17 +107,16 @@ func (m *DefaultManager) CreateAccount(password string) (generator.GeneratedAcco
 
 // RecoverAccount re-creates master key using given details.
 // Once master key is re-generated, it is inserted into keystore (if not already there).
-func (m *DefaultManager) RecoverAccount(password, mnemonic string) (Info, error) {
-	info := Info{}
+func (m *DefaultManager) RecoverAccount(password, mnemonic string) (types.Info, error) {
+	info := types.Info{}
 	// re-create extended key (see BIP32)
-	mn := extkeys.NewMnemonic()
-	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
+	extendedKey, err := common.CreateExtendedKeyFromMnemonic(mnemonic, "")
 	if err != nil {
-		return info, ErrInvalidMasterKeyCreated
+		return info, err
 	}
 
 	// import re-created key into account keystore
-	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
+	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extendedKey, password)
 	if err != nil {
 		return info, err
 	}
@@ -146,11 +129,11 @@ func (m *DefaultManager) RecoverAccount(password, mnemonic string) (Info, error)
 
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
 // If no error is returned, then account is considered verified.
-func (m *DefaultManager) VerifyAccountPassword(keyStoreDir, address, password string) (*types.Key, error) {
+func (m *DefaultManager) VerifyAccountPassword(keyStoreDir, address, password string) (*ethtypes.Key, error) {
 	var err error
 	var foundKeyFile []byte
 
-	addressObj := types.BytesToAddress(types.FromHex(address))
+	addressObj := ethtypes.BytesToAddress(ethtypes.FromHex(address))
 	checkAccountKey := func(path string, fileInfo os.FileInfo) error {
 		if len(foundKeyFile) > 0 || fileInfo.IsDir() {
 			return nil
@@ -167,7 +150,7 @@ func (m *DefaultManager) VerifyAccountPassword(keyStoreDir, address, password st
 		if e := json.Unmarshal(rawKeyFile, &accountKey); e != nil {
 			return fmt.Errorf("failed to read key file: %s", e)
 		}
-		if types.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
+		if ethtypes.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
 			foundKeyFile = rawKeyFile
 		}
 
@@ -203,7 +186,7 @@ func (m *DefaultManager) VerifyAccountPassword(keyStoreDir, address, password st
 
 // SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
 // using provided password. Once verification is done, all previous identities are removed).
-func (m *DefaultManager) SelectAccount(loginParams LoginParams) error {
+func (m *DefaultManager) SelectAccount(loginParams types.LoginParams) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -219,8 +202,8 @@ func (m *DefaultManager) SelectAccount(loginParams LoginParams) error {
 	return nil
 }
 
-func (m *DefaultManager) SetAccountAddresses(main types.Address, secondary ...types.Address) {
-	m.watchAddresses = []types.Address{main}
+func (m *DefaultManager) SetAccountAddresses(main ethtypes.Address, secondary ...ethtypes.Address) {
+	m.watchAddresses = []ethtypes.Address{main}
 	m.watchAddresses = append(m.watchAddresses, secondary...)
 	m.mainAccountAddress = main
 }
@@ -236,13 +219,13 @@ func (m *DefaultManager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
 		return err
 	}
 
-	key := &types.Key{
+	key := &ethtypes.Key{
 		ID:         id,
 		Address:    address,
 		PrivateKey: privKey,
 	}
 
-	m.selectedChatAccount = &SelectedExtKey{
+	m.selectedChatAccount = &types.SelectedExtKey{
 		Address:    address,
 		AccountKey: key,
 	}
@@ -250,19 +233,19 @@ func (m *DefaultManager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
 }
 
 // MainAccountAddress returns main account address set during login
-func (m *DefaultManager) MainAccountAddress() (types.Address, error) {
+func (m *DefaultManager) MainAccountAddress() (ethtypes.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if m.mainAccountAddress == zeroAddress {
-		return zeroAddress, ErrNoAccountSelected
+	if m.mainAccountAddress == ethtypes.ZeroAddress() {
+		return ethtypes.ZeroAddress(), ErrNoAccountSelected
 	}
 
 	return m.mainAccountAddress, nil
 }
 
 // WatchAddresses returns currently selected watch addresses.
-func (m *DefaultManager) WatchAddresses() []types.Address {
+func (m *DefaultManager) WatchAddresses() []ethtypes.Address {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -270,7 +253,7 @@ func (m *DefaultManager) WatchAddresses() []types.Address {
 }
 
 // SelectedChatAccount returns currently selected chat account
-func (m *DefaultManager) SelectedChatAccount() (*SelectedExtKey, error) {
+func (m *DefaultManager) SelectedChatAccount() (*types.SelectedExtKey, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -286,15 +269,15 @@ func (m *DefaultManager) Logout() {
 	defer m.mu.Unlock()
 
 	m.accountsGenerator.Reset()
-	m.mainAccountAddress = zeroAddress
+	m.mainAccountAddress = ethtypes.ZeroAddress()
 	m.watchAddresses = nil
 	m.selectedChatAccount = nil
 }
 
 // ImportAccount imports the account specified with privateKey.
-func (m *DefaultManager) ImportAccount(privateKey *ecdsa.PrivateKey, password string) (types.Address, error) {
+func (m *DefaultManager) ImportAccount(privateKey *ecdsa.PrivateKey, password string) (ethtypes.Address, error) {
 	if m.keystore == nil {
-		return types.Address{}, ErrAccountKeyStoreMissing
+		return ethtypes.Address{}, ErrAccountKeyStoreMissing
 	}
 
 	account, err := m.keystore.ImportECDSA(privateKey, password)
@@ -325,7 +308,7 @@ func (m *DefaultManager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, pa
 		return address, "", err
 	}
 
-	pubKey = types.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+	pubKey = ethtypes.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
 	return
 }
@@ -349,18 +332,18 @@ func (m *DefaultManager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey
 	if err != nil {
 		return address, "", err
 	}
-	pubKey = types.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+	pubKey = ethtypes.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
 	return
 }
 
 // Accounts returns list of addresses for selected account, including
 // subaccounts.
-func (m *DefaultManager) Accounts() ([]types.Address, error) {
+func (m *DefaultManager) Accounts() ([]ethtypes.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	addresses := make([]types.Address, 0)
-	if m.mainAccountAddress != zeroAddress {
+	addresses := make([]ethtypes.Address, 0)
+	if m.mainAccountAddress != ethtypes.ZeroAddress() {
 		addresses = append(addresses, m.mainAccountAddress)
 	}
 
@@ -391,8 +374,8 @@ func (m *DefaultManager) RemoveOnboarding() {
 }
 
 // ImportOnboardingAccount imports the account specified by id and encrypts it with password.
-func (m *DefaultManager) ImportOnboardingAccount(id string, password string) (Info, string, error) {
-	var info Info
+func (m *DefaultManager) ImportOnboardingAccount(id string, password string) (types.Info, string, error) {
+	var info types.Info
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -419,14 +402,14 @@ func (m *DefaultManager) ImportOnboardingAccount(id string, password string) (In
 // AddressToDecryptedAccount tries to load decrypted key for a given account.
 // The running node, has a keystore directory which is loaded on start. Key file
 // for a given address is expected to be in that directory prior to node start.
-func (m *DefaultManager) AddressToDecryptedAccount(address, password string) (types.Account, *types.Key, error) {
+func (m *DefaultManager) AddressToDecryptedAccount(address, password string) (ethtypes.Account, *ethtypes.Key, error) {
 	if m.keystore == nil {
-		return types.Account{}, nil, ErrAccountKeyStoreMissing
+		return ethtypes.Account{}, nil, ErrAccountKeyStoreMissing
 	}
 
-	account, err := ParseAccountString(address)
+	account, err := ethtypes.AddressToAccount(address)
 	if err != nil {
-		return types.Account{}, nil, ErrAddressToAccountMappingFailure
+		return ethtypes.Account{}, nil, ErrAddressToAccountMappingFailure
 	}
 
 	account, key, err := m.keystore.AccountDecryptedKey(account, password)
@@ -437,13 +420,13 @@ func (m *DefaultManager) AddressToDecryptedAccount(address, password string) (ty
 	return account, key, err
 }
 
-func (m *DefaultManager) unlockExtendedKey(address, password string) (*SelectedExtKey, error) {
+func (m *DefaultManager) unlockExtendedKey(address, password string) (*types.SelectedExtKey, error) {
 	account, accountKey, err := m.AddressToDecryptedAccount(address, password)
 	if err != nil {
 		return nil, err
 	}
 
-	selectedExtendedKey := &SelectedExtKey{
+	selectedExtendedKey := &types.SelectedExtKey{
 		Address:    account.Address,
 		AccountKey: accountKey,
 	}
@@ -476,7 +459,7 @@ func (m *DefaultManager) MigrateKeyStoreDir(oldDir, newDir string, addresses []s
 			return fmt.Errorf("failed to read key file: %s", err)
 		}
 
-		address := types.HexToAddress("0x" + accountKey.Address).Hex()
+		address := ethtypes.HexToAddress("0x" + accountKey.Address).Hex()
 		if _, ok := addressesMap[address]; ok {
 			paths = append(paths, path)
 		}
@@ -621,12 +604,12 @@ func (m *DefaultManager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass strin
 	return nil
 }
 
-func (m *DefaultManager) DeleteAccount(address types.Address) error {
-	return m.keystore.Delete(types.Account{Address: address})
+func (m *DefaultManager) DeleteAccount(address ethtypes.Address) error {
+	return m.keystore.Delete(ethtypes.Account{Address: address})
 }
 
-func (m *DefaultManager) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error) {
-	exists, err := db.AddressExists(types.HexToAddress(address))
+func (m *DefaultManager) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*types.SelectedExtKey, error) {
+	exists, err := db.AddressExists(ethtypes.HexToAddress(address))
 	if err != nil {
 		return nil, err
 	}
@@ -647,14 +630,14 @@ func (m *DefaultManager) GetVerifiedWalletAccount(db *accounts.Database, address
 		return nil, err
 	}
 
-	return &SelectedExtKey{
+	return &types.SelectedExtKey{
 		Address:    key.Address,
 		AccountKey: key,
 	}, nil
 }
 
-func (m *DefaultManager) generatePartialAccountKey(db *accounts.Database, address string, password string) (*types.Key, error) {
-	dbPath, err := db.GetPath(types.HexToAddress(address))
+func (m *DefaultManager) generatePartialAccountKey(db *accounts.Database, address string, password string) (*ethtypes.Key, error) {
+	dbPath, err := db.GetPath(ethtypes.HexToAddress(address))
 	path := "m/" + dbPath[strings.LastIndex(dbPath, "/")+1:]
 	if err != nil {
 		return nil, err

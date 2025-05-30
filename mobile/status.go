@@ -22,7 +22,7 @@ import (
 	"github.com/status-im/extkeys"
 
 	abi_spec "github.com/status-im/status-go/abi-spec"
-	"github.com/status-im/status-go/account"
+	accountcommon "github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/centralizedmetrics"
@@ -2218,7 +2218,7 @@ func deserializeAndCompressKey(DesktopKey string) string {
 }
 
 func GetRandomMnemonic() string {
-	mnemonic, err := account.GetRandomMnemonic()
+	mnemonic, err := accountcommon.CreateRandomMnemonicWithDefaultLength()
 	if err != nil {
 		return makeJSONResponse(err)
 	}

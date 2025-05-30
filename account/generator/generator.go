@@ -2,7 +2,6 @@ package generator
 
 import (
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -11,18 +10,10 @@ import (
 
 	"github.com/status-im/extkeys"
 
+	"github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
-)
-
-var (
-	// ErrAccountNotFoundByID is returned when the selected account doesn't exist in memory.
-	ErrAccountNotFoundByID = errors.New("account not found")
-	// ErrAccountCannotDeriveChildKeys is returned when trying to derive child accounts from a normal key.
-	ErrAccountCannotDeriveChildKeys = errors.New("selected account cannot derive child keys")
-	// ErrAccountManagerNotSet is returned when the account mananger instance is not set.
-	ErrAccountManagerNotSet = errors.New("account manager not set")
 )
 
 type AccountManager interface {
@@ -45,18 +36,12 @@ func New(am AccountManager) *Generator {
 }
 
 func (g *Generator) Generate(mnemonicPhraseLength int, n int, bip39Passphrase string) ([]GeneratedAccountInfo, error) {
-	entropyStrength, err := MnemonicPhraseLengthToEntropyStrength(mnemonicPhraseLength)
-	if err != nil {
-		return nil, err
-	}
-
 	infos := make([]GeneratedAccountInfo, 0)
 
 	for i := 0; i < n; i++ {
-		mnemonic := extkeys.NewMnemonic()
-		mnemonicPhrase, err := mnemonic.MnemonicPhrase(entropyStrength, extkeys.EnglishLanguage)
+		mnemonicPhrase, err := common.CreateRandomMnemonic(mnemonicPhraseLength)
 		if err != nil {
-			return nil, fmt.Errorf("can not create mnemonic seed: %v", err)
+			return nil, fmt.Errorf("failed to create mnemonic seed: %w", err)
 		}
 
 		info, err := g.ImportMnemonic(mnemonicPhrase, bip39Passphrase)
@@ -67,7 +52,7 @@ func (g *Generator) Generate(mnemonicPhraseLength int, n int, bip39Passphrase st
 		infos = append(infos, info)
 	}
 
-	return infos, err
+	return infos, nil
 }
 
 func (g *Generator) CreateAccountFromPrivateKey(privateKeyHex string) (IdentifiedAccountInfo, error) {
@@ -116,8 +101,7 @@ func (g *Generator) ImportJSONKey(json string, password string) (IdentifiedAccou
 }
 
 func (g *Generator) CreateAccountFromMnemonicAndDeriveAccountsForPaths(mnemonicPhrase string, bip39Passphrase string, paths []string) (GeneratedAndDerivedAccountInfo, error) {
-	mnemonic := extkeys.NewMnemonic()
-	masterExtendedKey, err := extkeys.NewMaster(mnemonic.MnemonicSeed(mnemonicPhrase, bip39Passphrase))
+	masterExtendedKey, err := common.CreateExtendedKeyFromMnemonic(mnemonicPhrase, bip39Passphrase)
 	if err != nil {
 		return GeneratedAndDerivedAccountInfo{}, fmt.Errorf("can not create master extended key: %v", err)
 	}
@@ -145,8 +129,7 @@ func (g *Generator) CreateAccountFromMnemonicAndDeriveAccountsForPaths(mnemonicP
 }
 
 func (g *Generator) ImportMnemonic(mnemonicPhrase string, bip39Passphrase string) (GeneratedAccountInfo, error) {
-	mnemonic := extkeys.NewMnemonic()
-	masterExtendedKey, err := extkeys.NewMaster(mnemonic.MnemonicSeed(mnemonicPhrase, bip39Passphrase))
+	masterExtendedKey, err := common.CreateExtendedKeyFromMnemonic(mnemonicPhrase, bip39Passphrase)
 	if err != nil {
 		return GeneratedAccountInfo{}, fmt.Errorf("can not create master extended key: %v", err)
 	}
@@ -254,7 +237,7 @@ func (g *Generator) LoadAccount(address string, password string) (IdentifiedAcco
 		return IdentifiedAccountInfo{}, err
 	}
 
-	if err := ValidateKeystoreExtendedKey(key); err != nil {
+	if err := common.ValidateExtendedKey(key); err != nil {
 		return IdentifiedAccountInfo{}, err
 	}
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	accountJson "github.com/status-im/status-go/account/json"
+	accountcommon "github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -79,7 +79,7 @@ func (e *EmojiReaction) MarshalJSON() ([]byte, error) {
 		EmojiID:     e.Type,
 	}
 
-	ext, err := accountJson.ExtendStructWithPubKeyData(item.From, item)
+	ext, err := accountcommon.ExtendStructWithPubKeyData(item.From, item)
 	if err != nil {
 		return nil, err
 	}

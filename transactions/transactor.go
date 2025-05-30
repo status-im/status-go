@@ -18,6 +18,7 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/account"
+	accounttypes "github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
@@ -53,8 +54,8 @@ func (e *ErrBadNonce) Error() string {
 type TransactorIface interface {
 	NextNonce(ctx context.Context, rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error)
 	EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error)
-	SendTransaction(sendArgs wallettypes.SendTxArgs, verifiedAccount *account.SelectedExtKey, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error)
-	SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, nonce uint64, err error)
+	SendTransaction(sendArgs wallettypes.SendTxArgs, verifiedAccount *accounttypes.SelectedExtKey, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error)
+	SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64, verifiedAccount *accounttypes.SelectedExtKey) (hash types.Hash, nonce uint64, err error)
 	ValidateAndBuildTransaction(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64) (tx *gethtypes.Transaction, nonce uint64, err error)
 	AddSignatureToTransaction(chainID uint64, tx *gethtypes.Transaction, sig []byte) (*gethtypes.Transaction, error)
 	SendRawTransaction(chainID uint64, rawTx string) error
@@ -124,12 +125,12 @@ func (t *Transactor) EstimateGas(network *params.Network, from common.Address, t
 }
 
 // SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.
-func (t *Transactor) SendTransaction(sendArgs wallettypes.SendTxArgs, verifiedAccount *account.SelectedExtKey, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error) {
+func (t *Transactor) SendTransaction(sendArgs wallettypes.SendTxArgs, verifiedAccount *accounttypes.SelectedExtKey, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error) {
 	hash, nonce, err = t.validateAndPropagate(t.rpcWrapper, verifiedAccount, sendArgs, lastUsedNonce)
 	return
 }
 
-func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, nonce uint64, err error) {
+func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64, verifiedAccount *accounttypes.SelectedExtKey) (hash types.Hash, nonce uint64, err error) {
 	wrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
 	hash, nonce, err = t.validateAndPropagate(wrapper, verifiedAccount, sendArgs, lastUsedNonce)
 	return
@@ -348,7 +349,7 @@ func (t *Transactor) HashTransaction(args wallettypes.SendTxArgs) (validatedArgs
 }
 
 // make sure that only account which created the tx can complete it
-func (t *Transactor) validateAccount(args wallettypes.SendTxArgs, selectedAccount *account.SelectedExtKey) error {
+func (t *Transactor) validateAccount(args wallettypes.SendTxArgs, selectedAccount *accounttypes.SelectedExtKey) error {
 	if selectedAccount == nil {
 		return account.ErrNoAccountSelected
 	}
@@ -435,7 +436,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args wa
 	return tx, nil
 }
 
-func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccount *account.SelectedExtKey, args wallettypes.SendTxArgs, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error) {
+func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccount *accounttypes.SelectedExtKey, args wallettypes.SendTxArgs, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error) {
 	symbol := args.Symbol
 	if args.Version == wallettypes.SendTxArgsVersion1 {
 		symbol = args.FromTokenID

@@ -17,11 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/celer"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 
+	accounttypes "github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/utils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -425,7 +425,7 @@ func (s *CelerBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, s
 	return tx, nil
 }
 
-func (s *CelerBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types.Hash, uint64, error) {
+func (s *CelerBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *accounttypes.SelectedExtKey) (types.Hash, uint64, error) {
 	tx, err := s.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.ChainID, sendArgs.CbridgeTx.From, verifiedAccount.AccountKey.PrivateKey), lastUsedNonce)
 	if err != nil {
 		return types.HexToHash(""), 0, createBridgeCellerErrorResponse(err)

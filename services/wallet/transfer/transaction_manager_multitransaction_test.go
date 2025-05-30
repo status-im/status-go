@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/status-im/status-go/account"
+	accounttypes "github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
@@ -63,9 +63,9 @@ func setupTransactionManager(t *testing.T) (*TransactionManager, *mock_transacto
 	return tm, transactor, ctrl
 }
 
-func setupAccount(_ *testing.T, address common.Address) *account.SelectedExtKey {
+func setupAccount(_ *testing.T, address common.Address) *accounttypes.SelectedExtKey {
 	// Dummy account
-	return &account.SelectedExtKey{
+	return &accounttypes.SelectedExtKey{
 		Address:    types.Address(address),
 		AccountKey: &types.Key{},
 	}

@@ -18,7 +18,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	abi_spec "github.com/status-im/status-go/abi-spec"
-	"github.com/status-im/status-go/account"
+	accounttypes "github.com/status-im/status-go/account/types"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -822,7 +822,7 @@ func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int
 	return client.ChainID(ctx)
 }
 
-func (api *API) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
+func (api *API) getVerifiedWalletAccount(address, password string) (*accounttypes.SelectedExtKey, error) {
 	exists, err := api.s.accountsDB.AddressExists(types.HexToAddress(address))
 	if err != nil {
 		logutils.ZapLogger().Error("failed to query db for a given address", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
@@ -841,7 +841,7 @@ func (api *API) getVerifiedWalletAccount(address, password string) (*account.Sel
 		return nil, err
 	}
 
-	return &account.SelectedExtKey{
+	return &accounttypes.SelectedExtKey{
 		Address:    key.Address,
 		AccountKey: key,
 	}, nil

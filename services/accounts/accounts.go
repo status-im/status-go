@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/account"
+	accountcommon "github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -471,7 +472,7 @@ func (api *API) MakeSeedPhraseKeypairFullyOperable(ctx context.Context, mnemonic
 
 // Creates a random new mnemonic.
 func (api *API) GetRandomMnemonic(ctx context.Context) (string, error) {
-	return account.GetRandomMnemonic()
+	return accountcommon.CreateRandomMnemonicWithDefaultLength()
 }
 
 func (api *API) VerifyKeystoreFileForAccount(address types.Address, password string) bool {

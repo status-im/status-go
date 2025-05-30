@@ -15,7 +15,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/account"
+	accounttypes "github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -38,8 +38,8 @@ type AccountManagerMock struct {
 	AccountsMap map[string]string
 }
 
-func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*account.SelectedExtKey, error) {
-	return &account.SelectedExtKey{
+func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*accounttypes.SelectedExtKey, error) {
+	return &accounttypes.SelectedExtKey{
 		Address: types.HexToAddress(address),
 	}, nil
 }
