@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 
@@ -26,7 +25,7 @@ var (
 )
 
 // MakeNode creates a geth node entity
-func MakeNode(config *params.NodeConfig, accs *accounts.Manager) (*node.Node, error) {
+func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	// If DataDir is empty, it means we want to create an ephemeral node
 	// keeping data only in memory.
 	if config.DataDir != "" {

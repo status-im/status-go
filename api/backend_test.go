@@ -1049,7 +1049,8 @@ func TestConvertAccount(t *testing.T) {
 
 	rootDataDir := t.TempDir()
 
-	keyStoreDir := filepath.Join(rootDataDir, "keystore")
+	keyStoreDirName := "keystore"
+	keyStoreDirPath := filepath.Join(rootDataDir, keyStoreDirName)
 
 	utils.Init()
 
@@ -1075,7 +1076,7 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	backend.rootDataDir = rootDataDir
-	require.NoError(t, backend.AccountManager().InitKeystore(keyStoreDir))
+	require.NoError(t, backend.AccountManager().InitKeystore(keyStoreDirPath))
 	err = backend.OpenAccounts()
 	require.NoError(t, err)
 
@@ -1087,7 +1088,7 @@ func TestConvertAccount(t *testing.T) {
 	accountInfo, err := backend.AccountManager().AccountsGenerator().StoreAccount(genAccInfo.ID, password)
 	assert.NoError(t, err)
 
-	found := keystoreContainsFileForAccount(keyStoreDir, accountInfo.Address)
+	found := keystoreContainsFileForAccount(keyStoreDirPath, accountInfo.Address)
 	require.True(t, found)
 
 	derivedAccounts, err := backend.AccountManager().AccountsGenerator().StoreDerivedAccounts(genAccInfo.ID, password, allGeneratedPaths)
@@ -1095,7 +1096,7 @@ func TestConvertAccount(t *testing.T) {
 
 	chatKey := derivedAccounts[pathEIP1581Chat].PrivateKey[2:]
 	chatAddress := derivedAccounts[pathEIP1581Chat].Address
-	found = keystoreContainsFileForAccount(keyStoreDir, chatAddress)
+	found = keystoreContainsFileForAccount(keyStoreDirPath, chatAddress)
 	require.True(t, found)
 
 	defaultSettings, err := defaultSettings(genAccInfo.KeyUID, genAccInfo.Address, derivedAccounts)
@@ -1105,7 +1106,7 @@ func TestConvertAccount(t *testing.T) {
 	})
 	require.NoError(t, err)
 	nodeConfig.DataDir = rootDataDir
-	nodeConfig.KeyStoreDir = keyStoreDir
+	nodeConfig.KeyStoreDir = keyStoreDirName
 
 	profileKeypair := &accounts.Keypair{
 		KeyUID:      genAccInfo.KeyUID,
@@ -1126,7 +1127,7 @@ func TestConvertAccount(t *testing.T) {
 	})
 
 	for p, dAccInfo := range derivedAccounts {
-		found = keystoreContainsFileForAccount(keyStoreDir, dAccInfo.Address)
+		found = keystoreContainsFileForAccount(keyStoreDirPath, dAccInfo.Address)
 		require.NoError(t, err)
 		require.True(t, found)
 
@@ -1200,18 +1201,18 @@ func TestConvertAccount(t *testing.T) {
 
 	// Validating results of converting to a keycard account.
 	// All keystore files for the account which is migrated need to be removed.
-	found = keystoreContainsFileForAccount(keyStoreDir, masterAddress)
+	found = keystoreContainsFileForAccount(keyStoreDirPath, masterAddress)
 	require.False(t, found)
 
 	for _, dAccInfo := range derivedAccounts {
-		found = keystoreContainsFileForAccount(keyStoreDir, dAccInfo.Address)
+		found = keystoreContainsFileForAccount(keyStoreDirPath, dAccInfo.Address)
 		require.False(t, found)
 	}
 
 	require.NoError(t, backend.Logout())
 	require.NoError(t, backend.StopNode())
 
-	require.NoError(t, backend.AccountManager().InitKeystore(keyStoreDir))
+	require.NoError(t, backend.AccountManager().InitKeystore(keyStoreDirPath))
 	require.NoError(t, backend.OpenAccounts())
 
 	require.NoError(t, backend.StartNodeWithKey(account, keycardPassword, chatKey, nodeConfig))
@@ -1239,15 +1240,15 @@ func TestConvertAccount(t *testing.T) {
 
 	// Validating results of converting to a regular account.
 	// All keystore files for need to be created.
-	found = keystoreContainsFileForAccount(keyStoreDir, accountInfo.Address)
+	found = keystoreContainsFileForAccount(keyStoreDirPath, accountInfo.Address)
 	require.True(t, found)
 
 	for _, dAccInfo := range derivedAccounts {
-		found = keystoreContainsFileForAccount(keyStoreDir, dAccInfo.Address)
+		found = keystoreContainsFileForAccount(keyStoreDirPath, dAccInfo.Address)
 		require.True(t, found)
 	}
 
-	found = keystoreContainsFileForAccount(keyStoreDir, masterAddress)
+	found = keystoreContainsFileForAccount(keyStoreDirPath, masterAddress)
 	require.True(t, found)
 
 	// Ensure we're able to open the DB
