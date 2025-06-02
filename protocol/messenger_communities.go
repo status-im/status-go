@@ -2679,7 +2679,7 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 			return err
 		}
 	}
-	_, err := m.transport.InitPublicFilters(publicFiltersToInit)
+	_, err := m.messaging.InitPublicChats(publicFiltersToInit)
 	if err != nil {
 		return err
 	}
