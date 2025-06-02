@@ -20,16 +20,16 @@ func TestGetMarketProxyHost(t *testing.T) {
 			expectedUrl: "https://test.market.status.im",
 		},
 		{
-			name:        "Empty custom URL with prod stage - should still use test",
+			name:        "Empty custom URL with prod stage",
 			customUrl:   "",
 			stageName:   "prod",
-			expectedUrl: "https://test.market.status.im",
+			expectedUrl: "https://prod.market.status.im",
 		},
 		{
-			name:        "Empty custom URL with random stage - should still use test",
+			name:        "Empty custom URL with staging stage",
 			customUrl:   "",
 			stageName:   "staging",
-			expectedUrl: "https://test.market.status.im",
+			expectedUrl: "https://staging.market.status.im",
 		},
 		{
 			name:        "Custom URL provided - should use custom URL",
@@ -56,10 +56,16 @@ func TestGetMarketProxyHost(t *testing.T) {
 			expectedUrl: "http://localhost:8080",
 		},
 		{
-			name:        "Empty stage name with empty custom URL",
+			name:        "Empty stage name with empty custom URL - should default to test",
 			customUrl:   "",
 			stageName:   "",
 			expectedUrl: "https://test.market.status.im",
+		},
+		{
+			name:        "Empty custom URL with dev stage",
+			customUrl:   "",
+			stageName:   "dev",
+			expectedUrl: "https://dev.market.status.im",
 		},
 	}
 
