@@ -29,10 +29,11 @@ func getMarketProxyHost(customUrl, stageName string) string {
 	if customUrl != "" {
 		return strings.TrimRight(customUrl, "/")
 	}
-	// For now always use "test" as prod is not deployed yet
-	// TODO: Uncomment the line below when prod is deployed
-	// return fmt.Sprintf("https://%s.%s", stageName, MarketProxyHostSuffix)
-	return fmt.Sprintf("https://test.%s", MarketProxyHostSuffix)
+	// Use stageName if provided, otherwise default to "test"
+	if stageName == "" {
+		stageName = "test"
+	}
+	return fmt.Sprintf("https://%s.%s", stageName, MarketProxyHostSuffix)
 }
 
 // DataFetcher defines the interface for fetching market and price data
