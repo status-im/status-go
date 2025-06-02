@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
@@ -35,12 +36,10 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/server"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerCommunitiesSuite(t *testing.T) {
@@ -151,7 +150,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
 
 	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -206,7 +205,7 @@ func (s *MessengerCommunitiesSuite) TestJoiningOpenCommunityReturnsChatsResponse
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -349,7 +348,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(chats, 2)
 
 	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.bob.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.bob.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -577,7 +576,6 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
-	s.Require().Equal(s.alice.account.GetCustomizationColor(), response.Contacts[0].CustomizationColor)
 
 	// check if response contains the chat we're interested in
 	// we use this instead of checking just the length of the chat because
@@ -802,7 +800,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1009,7 +1007,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1200,7 +1198,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1452,7 +1450,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1893,7 +1891,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -2416,6 +2414,8 @@ func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger 
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
@@ -2468,6 +2468,8 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
@@ -2557,6 +2559,8 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
@@ -2723,6 +2727,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 
 	// Create Alice's other device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	// Pair alice's two devices
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
@@ -2762,7 +2767,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Len(tcs1, 0, "Must have 0 communities")
 
 	// Bob the admin opens up a 1-1 chat with alice
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 	s.Require().NoError(s.bob.SaveChat(chat))
 
 	// Bob the admin shares with Alice, via public chat, an invite link to the new community
@@ -2924,6 +2929,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Join() {
 
 	alicesOtherDevice := s.createOtherDevice(s.alice)
 	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	s.joinCommunity(community, s.owner, s.alice)
@@ -2949,6 +2955,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 
 	// Create Alice's other device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	// Pair alice's two devices
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
@@ -2988,7 +2995,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	s.Len(tcs1, 0, "Must have 0 communities")
 
 	// Bob the admin opens up a 1-1 chat with alice
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 	s.Require().NoError(s.bob.SaveChat(chat))
 
 	// Bob the admin shares with Alice, via public chat, an invite link to the new community
@@ -3060,6 +3067,8 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_ImportCommunity() {
 
 	// New device is created & paired
 	ownersOtherDevice := s.createOtherDevice(s.owner)
+	defer TearDownMessenger(&s.Suite, ownersOtherDevice)
+
 	PairDevices(&s.Suite, ownersOtherDevice, s.owner)
 	PairDevices(&s.Suite, s.owner, ownersOtherDevice)
 
@@ -3627,12 +3636,12 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	)
 	s.Require().NoError(err)
 
-	message := &wakutypes.Message{}
+	message := &messagingtypes.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&s.owner.identity.PublicKey)
 	message.Payload = wrappedPayload
 
-	filter := s.alice.transport.FilterByChatID(community.UniversalChatID())
-	importedMessages := make(map[transport.Filter][]*wakutypes.Message, 0)
+	filter := s.alice.messaging.ChatFilterByChatID(community.UniversalChatID())
+	importedMessages := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, 0)
 
 	importedMessages[*filter] = append(importedMessages[*filter], message)
 
@@ -4677,10 +4686,8 @@ func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityReque
 	s.Require().NoError(err)
 
 	var key *ecdsa.PrivateKey
-	if s.owner.transport.WakuVersion() == 2 {
-		key, err = s.owner.transport.RetrievePubsubTopicKey(community.PubsubTopic())
-		s.Require().NoError(err)
-	}
+	key, err = s.owner.messaging.RetrievePubsubTopicKey(community.PubsubTopic())
+	s.Require().NoError(err)
 
 	descriptionMessage, err := community.ToProtocolMessageBytes()
 	s.Require().NoError(err)

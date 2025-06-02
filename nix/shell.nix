@@ -1,5 +1,6 @@
-{ config ? {}
-, pkgs ? import ./pkgs.nix { inherit config; } }:
+{
+  pkgs,
+}:
 
 let
   inherit (pkgs) lib stdenv callPackage;
@@ -8,7 +9,7 @@ let
 
   /* Lock requires Xcode verison. */
   xcodeWrapper = callPackage ./pkgs/xcodeenv/compose-xcodewrapper.nix { } {
-      versions = ["14.3" "15.1" "15.2" "15.3" "15.4"];
+      versions = [ ];
   };
 
   /* Gomobile also needs the Xcode wrapper. */
@@ -27,11 +28,11 @@ in mkShell {
   buildInputs = with pkgs; [
     git jq which
     go golangci-lint go-junit-report gopls go-bindata gomobileMod codecov-cli go-generate-fast
-    mockgen protobuf3_20 protoc-gen-go gotestsum go-modvendor openjdk
+    mockgen protobuf3_20 protoc-gen-go gotestsum go-modvendor openjdk openssl
    ] ++ lib.optionals (stdenv.isDarwin) [ xcodeWrapper ];
 
    shellHook = lib.optionalString (!isMacM1) ''
-     ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk
+     ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
      ANDROID_NDK=$ANDROID_HOME/ndk-bundle
      ANDROID_SDK_ROOT=$ANDROID_HOME
      ANDROID_NDK_HOME=$ANDROID_NDK

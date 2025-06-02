@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,7 +27,6 @@ import (
 	"github.com/status-im/status-go/cmd/status-backend/server"
 	"github.com/status-im/status-go/cmd/utils"
 	"github.com/status-im/status-go/common/dbsetup"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/metrics"
@@ -63,7 +63,7 @@ var (
 		"network-id",
 		params.SepoliaNetworkID,
 		fmt.Sprintf(
-			"A network ID: %d (Mainnet), %d (Sepolia)",
+			"A network ID: %d (Ethereum), %d (Sepolia)",
 			params.MainNetworkID, params.SepoliaNetworkID,
 		),
 	)
@@ -261,15 +261,13 @@ func main() {
 			protocol.WithTorrentConfig(&config.TorrentConfig),
 			protocol.WithWalletConfig(&config.WalletConfig),
 			protocol.WithAccountManager(backend.AccountManager()),
+			protocol.WithMessageSigner(backend.MessageSigner()),
 		}
 
 		messenger, err := protocol.NewMessenger(
-			config.Name,
 			identity,
-			gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
+			backend.StatusNode().WakuV2Service(),
 			installationID.String(),
-			nil,
-			config.Version,
 			options...,
 		)
 
@@ -313,7 +311,7 @@ func main() {
 		if *metricsEnabled || gethmetrics.Enabled {
 			go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
 			go gethmetrics.CollectProcessMetrics(3 * time.Second)
-			go metrics.NewMetricsServer(*metricsPort, gethmetrics.DefaultRegistry).Listen()
+			go metrics.NewMetricsServer("localhost:"+strconv.Itoa(*metricsPort), gethmetrics.DefaultRegistry).Listen()
 		}
 
 		// Check if profiling shall be enabled.
@@ -334,15 +332,13 @@ func main() {
 				protocol.WithTorrentConfig(&config.TorrentConfig),
 				protocol.WithWalletConfig(&config.WalletConfig),
 				protocol.WithAccountManager(backend.AccountManager()),
+				protocol.WithMessageSigner(backend.MessageSigner()),
 			}
 
 			messenger, err := protocol.NewMessenger(
-				config.Name,
 				identity,
-				gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
+				backend.StatusNode().WakuV2Service(),
 				installationID.String(),
-				nil,
-				config.Version,
 				options...,
 			)
 			if err != nil {

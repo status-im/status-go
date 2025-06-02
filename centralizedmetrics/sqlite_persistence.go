@@ -189,7 +189,7 @@ func (r *SQLiteMetricRepository) ToggleEnabled(enabled bool) error {
 
 func (r *SQLiteMetricRepository) Info() (*MetricsInfo, error) {
 	info := MetricsInfo{}
-	err := r.db.QueryRow("SELECT enabled,user_confirmed FROM centralizedmetrics_uuid LIMIT 1").Scan(&info.Enabled, &info.UserConfirmed)
+	err := r.db.QueryRow("SELECT enabled,user_confirmed,uuid FROM centralizedmetrics_uuid LIMIT 1").Scan(&info.Enabled, &info.UserConfirmed, &info.UserID)
 	if err == sql.ErrNoRows {
 		return &info, nil
 	}

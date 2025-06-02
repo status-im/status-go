@@ -9,11 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
+
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network"
+	network_testutil "github.com/status-im/status-go/rpc/network/testutil"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
@@ -66,19 +69,18 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 	state.db, closeDb = createDB(t)
 	state.walletDb, closeWalletDb = createWalletDB(t)
 
-	networkManager := network.NewManager(state.db)
+	networkManager := network.NewManager(state.db, nil, nil, nil)
 	require.NotNil(t, networkManager)
 
-	err := networkManager.Init([]params.Network{
-		{
-			ChainID: walletCommon.EthereumMainnet,
-			Layer:   1,
-		},
-		{
-			ChainID: walletCommon.OptimismMainnet,
-			Layer:   1,
-		},
-	})
+	initNetworks := []params.Network{
+		*network_testutil.CreateNetwork(walletCommon.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
+			network_testutil.CreateProvider(walletCommon.EthereumMainnet, "Infura Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
+		}),
+		*network_testutil.CreateNetwork(walletCommon.OptimismMainnet, "Optimism Mainnet", []params.RpcProvider{
+			network_testutil.CreateProvider(walletCommon.OptimismMainnet, "Optimism Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.optimism.io")),
+		}),
+	}
+	err := networkManager.InitEmbeddedNetworks(initNetworks)
 	require.NoError(t, err)
 
 	state.handler = NewClientSideHandler(state.db)

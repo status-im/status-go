@@ -121,13 +121,3 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]chain.ClientInterf
 		r.blockChainState,
 	)
 }
-
-func (r *Reactor) getTransfersByAddress(ctx context.Context, chainID uint64, address common.Address, toBlock *big.Int,
-	limit int64) ([]Transfer, error) {
-
-	if r.strategy != nil {
-		return r.strategy.getTransfersByAddress(ctx, chainID, address, toBlock, limit)
-	}
-
-	return nil, errors.New(ReactorNotStarted)
-}

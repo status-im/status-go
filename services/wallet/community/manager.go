@@ -1,5 +1,7 @@
 package community
 
+//go:generate mockgen -package=mock_community -source=manager.go -destination=mock/manager.go
+
 import (
 	"database/sql"
 	"encoding/json"
@@ -13,6 +15,13 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
+
+type CommunityManagerInterface interface {
+	FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error)
+	GetCommunityInfo(id string) (*thirdparty.CommunityInfo, *InfoState, error)
+	GetCommunityID(tokenURI string) string
+	FillCollectiblesMetadata(communityID string, cs []*thirdparty.FullCollectibleData) (bool, error)
+}
 
 // These events are used to notify the UI of state changes
 const (
@@ -74,7 +83,7 @@ func (cm *Manager) fetchCommunityInfo(communityID string, fetcher func() (*third
 	if err != nil {
 		dbErr := cm.setCommunityInfo(communityID, nil)
 		if dbErr != nil {
-			logutils.ZapLogger().Error("SetCommunityInfo failed", zap.String("communityID", communityID), zap.Error(dbErr))
+			logutils.ZapLogger().Error("SetCommunityInfo failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(dbErr))
 		}
 		return nil, err
 	}
@@ -93,7 +102,7 @@ func (cm *Manager) FetchCommunityMetadataAsync(communityID string) {
 		defer gocommon.LogOnPanic()
 		communityInfo, err := cm.FetchCommunityMetadata(communityID)
 		if err != nil {
-			logutils.ZapLogger().Error("FetchCommunityInfo failed", zap.String("communityID", communityID), zap.Error(err))
+			logutils.ZapLogger().Error("FetchCommunityInfo failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 		}
 		cm.signalUpdatedCommunityMetadata(communityID, communityInfo)
 	}()

@@ -39,7 +39,7 @@ type CryptoCurrency struct {
 }
 
 func (c *Client) FetchCurrencies(ctx context.Context) ([]CryptoCurrency, error) {
-	response, err := c.httpClient.DoGetRequest(ctx, currenciesURL, nil, nil)
+	response, err := c.httpClient.DoGetRequest(ctx, currenciesURL, nil)
 	if err != nil {
 		return nil, err
 	}

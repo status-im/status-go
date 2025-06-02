@@ -9,22 +9,28 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/rpc/network/testutil"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
+
+	mock_reader "github.com/status-im/status-go/services/wallet/mock/reader"
+	mock_onramp "github.com/status-im/status-go/services/wallet/onramp/mock"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	mock_reader "github.com/status-im/status-go/services/wallet/mock/reader"
 	"github.com/status-im/status-go/services/wallet/onramp"
-	mock_onramp "github.com/status-im/status-go/services/wallet/onramp/mock"
 	"github.com/status-im/status-go/services/wallet/requests"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
@@ -125,14 +131,6 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	chainID := uint64(1)
 	address := "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-	providerConfig := params.ProviderConfig{
-		Enabled:  true,
-		Name:     rpc.ProviderStatusProxy,
-		User:     "user1",
-		Password: "pass1",
-	}
-	providerConfigs := []params.ProviderConfig{providerConfig}
-
 	// Create a new server that delays the response by 1 second
 	serverWith1SecDelay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(1 * time.Second)
@@ -141,18 +139,21 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	defer serverWith1SecDelay.Close()
 
 	networks := []params.Network{
-		{
-			ChainID:       chainID,
-			DefaultRPCURL: serverWith1SecDelay.URL + "/nodefleet/",
+		*testutil.CreateNetwork(chainID, "Ethereum Mainnet", []params.RpcProvider{
+			*params.NewProxyProvider(chainID, "Test Provider", security.NewSensitiveString(serverWith1SecDelay.URL+"/nodefleet/"), false),
 		},
+		),
 	}
+
+	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, security.NewSensitiveString(gofakeit.Username()), security.NewSensitiveString(gofakeit.LetterN(5)))
+	require.NotEmpty(t, networks)
+
 	config := rpc.ClientConfig{
 		Client:          nil,
 		UpstreamChainID: chainID,
 		Networks:        networks,
 		DB:              appDB,
 		WalletFeed:      nil,
-		ProviderConfigs: providerConfigs,
 	}
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)
@@ -215,13 +216,6 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	mockReader := mock_reader.NewMockReaderInterface(mockCtrl)
-	providerConfig := params.ProviderConfig{
-		Enabled:  true,
-		Name:     rpc.ProviderStatusProxy,
-		User:     "user1",
-		Password: "pass1",
-	}
-	providerConfigs := []params.ProviderConfig{providerConfig}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{"result": "0x10"}`)
@@ -232,8 +226,20 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 
 	networks := []params.Network{
 		{
-			ChainID:       chainID,
-			DefaultRPCURL: server.URL + "/nodefleet/",
+			ChainID:   chainID,
+			ChainName: "Ethereum Mainnet",
+			RpcProviders: []params.RpcProvider{
+				{
+					ChainID:      chainID,
+					Name:         "Test Provider",
+					URL:          security.NewSensitiveString(server.URL + "/nodefleet/"),
+					Type:         params.EmbeddedProxyProviderType,
+					Enabled:      true,
+					AuthType:     params.BasicAuth,
+					AuthLogin:    security.NewSensitiveString("user1"),
+					AuthPassword: security.NewSensitiveString("pass1"),
+				},
+			},
 		},
 	}
 	config := rpc.ClientConfig{
@@ -242,20 +248,19 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 		Networks:        networks,
 		DB:              appDB,
 		WalletFeed:      nil,
-		ProviderConfigs: providerConfigs,
 	}
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)
 
 	testTokenAddress1 := common.Address{0x34}
 	testAccAddress1 := common.Address{0x12}
-	storageToken := token.StorageToken{
-		Token: token.Token{
+	storageToken := tokentypes.StorageToken{
+		Token: tokentypes.Token{
 			Name:     "USD Tether",
 			Symbol:   "USDT",
 			Decimals: 18,
 		},
-		BalancesPerChain: map[uint64]token.ChainBalance{
+		BalancesPerChain: map[uint64]tokentypes.ChainBalance{
 			1: {
 				RawBalance: "1000000000000000000",
 				Balance:    nil,
@@ -265,7 +270,7 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 			},
 		},
 	}
-	expectedTokens := map[common.Address][]token.StorageToken{
+	expectedTokens := map[common.Address][]tokentypes.StorageToken{
 		testAccAddress1: {storageToken},
 	}
 

@@ -22,15 +22,6 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-type BuildRouteExtraParams struct {
-	AddressFrom        common.Address
-	AddressTo          common.Address
-	Username           string
-	PublicKey          string
-	PackID             *big.Int
-	SlippagePercentage float32
-}
-
 func (tm *TransactionManager) ClearLocalRouterTransactionsData() {
 	tm.routerTransactions = nil
 }
@@ -66,6 +57,10 @@ func (tm *TransactionManager) TxPlacedForPath(pathProcessorName string) bool {
 func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *wallettypes.RouterTransactionDetails {
 	for _, desc := range tm.routerTransactions {
 		if desc.RouterPath.PathIdentity() == path.PathIdentity() {
+			if desc.RouterPath.ProcessorName == pathProcessorCommon.ProcessorSwapParaswapName {
+				// since the path is re-evaluated for swap after approval tx is placed we need to use the latest path
+				desc.RouterPath = path
+			}
 			return desc
 		}
 	}
@@ -85,29 +80,31 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 		lastUsedNonce = nonce
 	}
 
-	data, err := walletCommon.PackApprovalInputData(path.AmountIn.ToInt(), path.ApprovalContractAddress)
-	if err != nil {
-		return nil, err
-	}
-
 	addrTo := types.Address(path.FromToken.Address)
 	approavalSendArgs := &wallettypes.SendTxArgs{
 		Version: wallettypes.SendTxArgsVersion1,
 
 		// tx fields
-		From:                 types.Address(addressFrom),
-		To:                   &addrTo,
-		Value:                (*hexutil.Big)(big.NewInt(0)),
-		Data:                 data,
-		Nonce:                path.ApprovalTxNonce,
-		Gas:                  (*hexutil.Uint64)(&path.ApprovalGasAmount),
-		MaxFeePerGas:         path.ApprovalMaxFeesPerGas,
-		MaxPriorityFeePerGas: path.ApprovalPriorityFee,
-		ValueOut:             (*hexutil.Big)(big.NewInt(0)),
+		From:     types.Address(addressFrom),
+		To:       &addrTo,
+		Value:    (*hexutil.Big)(big.NewInt(0)),
+		Data:     path.ApprovalPackedData,
+		Nonce:    path.ApprovalTxNonce,
+		Gas:      (*hexutil.Uint64)(&path.ApprovalGasAmount),
+		ValueOut: (*hexutil.Big)(big.NewInt(0)),
 
 		// additional fields version 1
 		FromChainID: path.FromChain.ChainID,
 	}
+
+	// set appropriate fields based on EIP-1559 compatibility of the chain
+	if !path.FromChain.EIP1559Enabled {
+		approavalSendArgs.GasPrice = path.ApprovalGasPrice
+	} else {
+		approavalSendArgs.MaxFeePerGas = path.ApprovalMaxFeesPerGas
+		approavalSendArgs.MaxPriorityFeePerGas = path.ApprovalPriorityFee
+	}
+
 	if path.FromToken != nil {
 		approavalSendArgs.FromTokenID = path.FromToken.Symbol
 	}
@@ -127,53 +124,44 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 }
 
 func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.PathProcessor,
-	usedNonces map[uint64]int64, signer ethTypes.Signer, params BuildRouteExtraParams) (*wallettypes.TransactionData, error) {
+	usedNonces map[uint64]int64, signer ethTypes.Signer, processorInputParams *pathprocessor.ProcessorInputParams) (*wallettypes.TransactionData, error) {
 	lastUsedNonce := int64(-1)
 	if nonce, ok := usedNonces[path.FromChain.ChainID]; ok {
 		lastUsedNonce = nonce
 	}
 
-	processorInputParams := pathprocessor.ProcessorInputParams{
-		FromAddr:  params.AddressFrom,
-		ToAddr:    params.AddressTo,
-		FromChain: path.FromChain,
-		ToChain:   path.ToChain,
-		FromToken: path.FromToken,
-		ToToken:   path.ToToken,
-		AmountIn:  path.AmountIn.ToInt(),
-		AmountOut: path.AmountOut.ToInt(),
-
-		Username:  params.Username,
-		PublicKey: params.PublicKey,
-		PackID:    params.PackID,
-	}
-
-	data, err := pathProcessors[path.ProcessorName].PackTxInputData(processorInputParams)
-	if err != nil {
-		return nil, err
-	}
-
-	addrTo := types.Address(params.AddressTo)
 	sendArgs := &wallettypes.SendTxArgs{
 		Version: wallettypes.SendTxArgsVersion1,
 
 		// tx fields
-		From:                 types.Address(params.AddressFrom),
-		To:                   &addrTo,
-		Value:                path.AmountIn,
-		Data:                 data,
-		Nonce:                path.TxNonce,
-		Gas:                  (*hexutil.Uint64)(&path.TxGasAmount),
-		MaxFeePerGas:         path.TxMaxFeesPerGas,
-		MaxPriorityFeePerGas: path.TxPriorityFee,
+		From:  types.Address(processorInputParams.FromAddr),
+		Value: path.AmountIn,
+		Data:  path.TxPackedData,
+		Nonce: path.TxNonce,
+		Gas:   (*hexutil.Uint64)(&path.TxGasAmount),
 
 		// additional fields version 1
 		ValueIn:            path.AmountIn,
 		ValueOut:           path.AmountOut,
 		FromChainID:        path.FromChain.ChainID,
 		ToChainID:          path.ToChain.ChainID,
-		SlippagePercentage: params.SlippagePercentage,
+		SlippagePercentage: processorInputParams.SlippagePercentage,
 	}
+
+	if !path.FromChain.EIP1559Enabled {
+		sendArgs.GasPrice = path.TxGasPrice
+	} else {
+		sendArgs.MaxFeePerGas = path.TxMaxFeesPerGas
+		sendArgs.MaxPriorityFeePerGas = path.TxPriorityFee
+	}
+
+	isContractDeployment := path.ProcessorName == pathProcessorCommon.ProcessorCommunityDeployCollectiblesName ||
+		path.ProcessorName == pathProcessorCommon.ProcessorCommunityDeployAssetsName
+	if !isContractDeployment {
+		addrTo := types.Address(processorInputParams.ToAddr)
+		sendArgs.To = &addrTo
+	}
+
 	if path.FromToken != nil {
 		sendArgs.FromTokenID = path.FromToken.Symbol
 		sendArgs.ToContractAddress = types.Address(path.FromToken.Address)
@@ -195,6 +183,14 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 				toContractAddr := types.Address(path.FromToken.Address)
 				sendArgs.To = &toContractAddr
 			}
+		} else if path.ProcessorName == pathProcessorCommon.ProcessorCommunityDeployOwnerTokenName || // special handling for community related txs, tokenID for those txs is ETH
+			path.ProcessorName == pathProcessorCommon.ProcessorCommunityMintTokensName ||
+			path.ProcessorName == pathProcessorCommon.ProcessorCommunityRemoteBurnName ||
+			path.ProcessorName == pathProcessorCommon.ProcessorCommunityBurnName ||
+			path.ProcessorName == pathProcessorCommon.ProcessorCommunitySetSignerPubKeyName {
+			toContractAddr := types.Address(*path.UsedContractAddress)
+			sendArgs.To = &toContractAddr
+			sendArgs.ToContractAddress = toContractAddr
 		}
 	}
 	if path.ToToken != nil {
@@ -216,12 +212,12 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 }
 
 func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pathProcessors map[string]pathprocessor.PathProcessor,
-	params BuildRouteExtraParams) (*responses.SigningDetails, uint64, uint64, error) {
+	processorInputParams *pathprocessor.ProcessorInputParams) (*responses.SigningDetails, uint64, uint64, error) {
 	if len(route) == 0 {
 		return nil, 0, 0, ErrNoRoute
 	}
 
-	accFrom, err := tm.accountsDB.GetAccountByAddress(types.Address(params.AddressFrom))
+	accFrom, err := tm.accountsDB.GetAccountByAddress(types.Address(processorInputParams.FromAddr))
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -246,7 +242,7 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 
 		// always check for approval tx first for the path and build it if needed
 		if path.ApprovalRequired && !tm.ApprovalPlacedForPath(path.ProcessorName) {
-			txDetails.ApprovalTxData, err = buildApprovalTxForPath(tm.transactor, path, params.AddressFrom, usedNonces, signer)
+			txDetails.ApprovalTxData, err = buildApprovalTxForPath(tm.transactor, path, processorInputParams.FromAddr, usedNonces, signer)
 			if err != nil {
 				return nil, path.FromChain.ChainID, path.ToChain.ChainID, err
 			}
@@ -259,7 +255,7 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 		}
 
 		// build tx for the path
-		txDetails.TxData, err = buildTxForPath(path, pathProcessors, usedNonces, signer, params)
+		txDetails.TxData, err = buildTxForPath(path, pathProcessors, usedNonces, signer, processorInputParams)
 		if err != nil {
 			return nil, path.FromChain.ChainID, path.ToChain.ChainID, err
 		}
@@ -353,6 +349,11 @@ func addSignatureAndSendTransaction(
 	}
 
 	txData.TxArgs.MultiTransactionID = multiTransactionID
+
+	if txWithSignature.To() == nil {
+		toAddr := crypto.CreateAddress(txData.TxArgs.From, txData.Tx.Nonce())
+		txData.TxArgs.To = &toAddr
+	}
 
 	return responses.NewRouterSentTransaction(txData.TxArgs, txData.SentHash, isApproval), nil
 }

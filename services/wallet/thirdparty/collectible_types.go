@@ -5,7 +5,6 @@ package thirdparty
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -15,19 +14,8 @@ import (
 	w_common "github.com/status-im/status-go/services/wallet/common"
 )
 
-var (
-	ErrChainIDNotSupported  = errors.New("chainID not supported")
-	ErrEndpointNotSupported = errors.New("endpoint not supported")
-)
-
-const FetchNoLimit = 0
-const FetchFromStartCursor = ""
-const FetchFromAnyProvider = ""
-
 type CollectibleProvider interface {
-	ID() string
-	IsChainSupported(chainID w_common.ChainID) bool
-	IsConnected() bool
+	ChainProvider
 }
 
 type ContractID struct {

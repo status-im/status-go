@@ -1,0 +1,156 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "items": {
+                "properties": {
+                    "active": {
+                        "type": "boolean"
+                    },
+                    "alias": {
+                        "type": "string"
+                    },
+                    "chatType": {
+                        "type": "integer"
+                    },
+                    "color": {
+                        "type": "string"
+                    },
+                    "communityId": {
+                        "type": "string"
+                    },
+                    "contentType": {
+                        "type": "integer"
+                    },
+                    "deleted": {
+                        "type": "boolean"
+                    },
+                    "deletedAtClockValue": {
+                        "type": "integer"
+                    },
+                    "deletedForMe": {
+                        "type": "boolean"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "emoji": {
+                        "type": "string"
+                    },
+                    "from": {
+                        "type": "string"
+                    },
+                    "highlight": {
+                        "type": "boolean"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "identicon": {
+                        "type": "string"
+                    },
+                    "joined": {
+                        "type": "integer"
+                    },
+                    "lastClockValue": {
+                        "type": "integer"
+                    },
+                    "members": {
+                        "anyOf": [
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "items": {
+                                    "properties": {
+                                        "admin": {
+                                            "type": "boolean"
+                                        },
+                                        "id": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "admin",
+                                        "id"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            }
+                        ]
+                    },
+                    "muteTill": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "outgoingStatus": {
+                        "type": "string"
+                    },
+                    "responseTo": {
+                        "type": "string"
+                    },
+                    "syncedFrom": {
+                        "type": "integer"
+                    },
+                    "syncedTo": {
+                        "type": "integer"
+                    },
+                    "text": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "integer"
+                    },
+                    "unviewedMentionsCount": {
+                        "type": "integer"
+                    },
+                    "unviewedMessagesCount": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "active",
+                    "chatType",
+                    "color",
+                    "contentType",
+                    "deleted",
+                    "deletedAtClockValue",
+                    "deletedForMe",
+                    "description",
+                    "emoji",
+                    "from",
+                    "id",
+                    "identicon",
+                    "joined",
+                    "lastClockValue",
+                    "members",
+                    "muteTill",
+                    "name",
+                    "outgoingStatus",
+                    "responseTo",
+                    "text",
+                    "timestamp",
+                    "unviewedMentionsCount",
+                    "unviewedMessagesCount"
+                ],
+                "type": "object"
+            },
+            "type": "array"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

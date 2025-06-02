@@ -1,8 +1,8 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.6'
+library 'status-jenkins-lib@v1.9.20'
 
 pipeline {
-  agent { label 'macos && aarch64 && xcode-15.1 && nix-2.24' }
+  agent { label 'macos && aarch64 && xcode-16.2 && nix-2.24' }
 
   parameters {
     string(
@@ -61,13 +61,13 @@ pipeline {
 
     stage('Generate') {
       steps { script {
-        nix.shell('make generate', pure: false)
+        nix.develop('make generate', pure: false)
       } }
     }
 
     stage('Compile') {
       steps { script {
-        nix.shell('make statusgo-ios', pure: false, sandbox: false)
+        nix.develop('make statusgo-ios', pure: false, sandbox: false)
       } }
     }
 
@@ -82,7 +82,7 @@ pipeline {
 
     stage('Upload') {
       steps { script {
-        env.PKG_URL = s3.uploadArtifact(ARTIFACT)
+        env.PKG_URL = s5cmd.upload(ARTIFACT)
       } }
     }
   } // stages

@@ -12,17 +12,18 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	validator "gopkg.in/go-playground/validator.v9"
+	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
 
+	"github.com/status-im/status-go/pkg/version"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/static"
-	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
 
@@ -66,91 +67,10 @@ type PGConfig struct {
 }
 
 // ----------
-// WakuConfig
-// ----------
-
-// WakuConfig provides a configuration for Waku service.
-type WakuConfig struct {
-	// Enabled set to true enables Waku subprotocol.
-	Enabled bool
-
-	// LightClient should be true if the node should start with an empty bloom filter and not forward messages from other nodes
-	LightClient bool
-
-	// FullNode should be true if waku should always acta as a full node
-	FullNode bool
-
-	// EnableMailServer is mode when node is capable of delivering expired messages on demand
-	EnableMailServer bool
-
-	// DataDir is the file system folder Waku should use for any data storage needs.
-	// For instance, MailServer will use this directory to store its data.
-	DataDir string
-
-	// MinimumPoW minimum PoW for Waku messages
-	// We enforce a minimum as a bland spam prevention mechanism.
-	MinimumPoW float64
-
-	// MailServerPassword for symmetric encryption of waku message history requests.
-	// (if no account file selected, then this password is used for symmetric encryption).
-	MailServerPassword string
-
-	// MailServerRateLimit minimum time between queries to mail server per peer.
-	MailServerRateLimit int
-
-	// MailServerDataRetention is a number of days data should be stored by MailServer.
-	MailServerDataRetention int
-
-	// TTL time to live for messages, in seconds
-	TTL int
-
-	// MaxMessageSize is a maximum size of a devp2p packet handled by the Waku protocol,
-	// not only the size of envelopes sent in that packet.
-	MaxMessageSize uint32
-
-	// DatabaseConfig is configuration for which data store we use.
-	DatabaseConfig DatabaseConfig
-
-	// EnableRateLimiter set to true enables IP and peer ID rate limiting.
-	EnableRateLimiter bool
-
-	// PacketRateLimitIP sets the limit on the number of packets per second
-	// from a given IP.
-	PacketRateLimitIP int64
-
-	// PacketRateLimitPeerID sets the limit on the number of packets per second
-	// from a given peer ID.
-	PacketRateLimitPeerID int64
-
-	// BytesRateLimitIP sets the limit on the number of bytes per second
-	// from a given IP.
-	BytesRateLimitIP int64
-
-	// BytesRateLimitPeerID sets the limit on the number of bytes per second
-	// from a given peer ID.
-	BytesRateLimitPeerID int64
-
-	// RateLimitTolerance is a number of how many a limit must be exceeded
-	// in order to drop a peer.
-	// If equal to 0, the peers are never dropped.
-	RateLimitTolerance int64
-
-	// BloomFilterMode tells us whether we should be sending a bloom
-	// filter rather than TopicInterest
-	BloomFilterMode bool
-
-	// SoftBlacklistedPeerIDs is a list of peer ids that should be soft-blacklisted (messages should be dropped but connection kept)
-	SoftBlacklistedPeerIDs []string
-
-	// EnableConfirmations when true, instructs that confirmation should be sent for received messages
-	EnableConfirmations bool
-}
-
-// ----------
 // WakuV2Config
 // ----------
 
-// WakuConfig provides a configuration for Waku service.
+// WakuV2Config provides a configuration for Waku service.
 type WakuV2Config struct {
 	// Enabled set to true enables Waku subprotocol.
 	Enabled bool
@@ -182,6 +102,7 @@ type WakuV2Config struct {
 	EnableConfirmations bool
 
 	// A name->libp2p_addr map for Wakuv2 custom nodes
+	// Deprecated: simply unused
 	CustomNodes map[string]string
 
 	// PeerExchange determines whether WakuV2 Peer Exchange is enabled or not
@@ -252,16 +173,19 @@ type ClusterConfig struct {
 	Fleet string
 
 	// StaticNodes is a list of static nodes.
+	// Deprecated: Not used in Waku V2
 	StaticNodes []string
 
 	// BootNodes is a list of bootnodes.
-	// Deprecated: won't be used at all in wakuv2
+	// Deprecated: Not used in Waku V2
 	BootNodes []string
 
 	// TrustedMailServers is a list of verified and trusted Mail Server nodes.
+	// Deprecated: Not used in Waku V2
 	TrustedMailServers []string
 
 	// PushNotificationsServers is a list of default push notification servers.
+	// Deprecated: Use ShhextConfig.DefaultPushNotificationsServers instead
 	PushNotificationsServers []string
 
 	// WakuNodes is a list of waku2 multiaddresses
@@ -293,21 +217,6 @@ func NewLimits(min, max int) Limits {
 	}
 }
 
-type ProviderConfig struct {
-	// Enabled flag specifies whether feature is enabled
-	Enabled bool `validate:"required"`
-
-	// To identify provider
-	Name string `validate:"required"`
-
-	// URL sets the rpc upstream host address for communication with
-	// a non-local infura endpoint.
-	User         string `json:",omitempty"`
-	Password     string `json:",omitempty"`
-	APIKey       string `json:"APIKey,omitempty"`
-	APIKeySecret string `json:"APIKeySecret,omitempty"`
-}
-
 // ----------
 // NodeConfig
 // ----------
@@ -337,7 +246,7 @@ type NodeConfig struct {
 	NodeKey string
 
 	// NoDiscovery set to true will disable discovery protocol.
-	// Deprecated: won't be used at all in wakuv2
+	// Deprecated: won't be used at all in wakuv2 and is always `true`.
 	NoDiscovery bool
 
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
@@ -453,9 +362,6 @@ type NodeConfig struct {
 	// LightEthConfig extra configuration for LES
 	LightEthConfig LightEthConfig `json:"LightEthConfig," validate:"structonly"`
 
-	// WakuConfig provides a configuration for Waku subprotocol.
-	WakuConfig WakuConfig `json:"WakuConfig" validate:"structonly"`
-
 	// WakuV2Config provides a configuration for WakuV2 protocol.
 	WakuV2Config WakuV2Config `json:"WakuV2Config" validate:"structonly"`
 
@@ -480,10 +386,6 @@ type NodeConfig struct {
 	// MailserversConfig extra configuration for mailservers.Service
 	// (persistent storage of user's mailserver records).
 	MailserversConfig MailserversConfig
-
-	// Web3ProviderConfig extra configuration for provider.Service.
-	// (desktop provider API)
-	Web3ProviderConfig Web3ProviderConfig
 
 	// ConnectorConfig extra configuration for connector.Service
 	ConnectorConfig ConnectorConfig
@@ -515,36 +417,55 @@ type NodeConfig struct {
 
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
-	Enabled                       bool
-	OpenseaAPIKey                 string            `json:"OpenseaAPIKey"`
-	RaribleMainnetAPIKey          string            `json:"RaribleMainnetAPIKey"`
-	RaribleTestnetAPIKey          string            `json:"RaribleTestnetAPIKey"`
-	AlchemyAPIKeys                map[uint64]string `json:"AlchemyAPIKeys"`
-	InfuraAPIKey                  string            `json:"InfuraAPIKey"`
-	InfuraAPIKeySecret            string            `json:"InfuraAPIKeySecret"`
-	StatusProxyMarketUser         string            `json:"StatusProxyMarketUser"`
-	StatusProxyMarketPassword     string            `json:"StatusProxyMarketPassword"`
-	StatusProxyBlockchainUser     string            `json:"StatusProxyBlockchainUser"`
-	StatusProxyBlockchainPassword string            `json:"StatusProxyBlockchainPassword"`
-	StatusProxyEnabled            bool              `json:"StatusProxyEnabled"`
-	StatusProxyStageName          string            `json:"StatusProxyStageName"`
-	EnableCelerBridge             bool              `json:"EnableCelerBridge"`
-	EnableMercuryoProvider        bool              `json:"EnableMercuryoProvider"`
+	Enabled                   bool
+	OpenseaAPIKey             security.SensitiveString            `json:"OpenseaAPIKey"`
+	RaribleMainnetAPIKey      security.SensitiveString            `json:"RaribleMainnetAPIKey"`
+	RaribleTestnetAPIKey      security.SensitiveString            `json:"RaribleTestnetAPIKey"`
+	AlchemyAPIKeys            map[uint64]security.SensitiveString `json:"AlchemyAPIKeys"`
+	InfuraAPIKey              security.SensitiveString            `json:"InfuraAPIKey"`
+	InfuraAPIKeySecret        security.SensitiveString            `json:"InfuraAPIKeySecret"`
+	StatusProxyMarketUser     security.SensitiveString            `json:"StatusProxyMarketUser"`
+	StatusProxyMarketPassword security.SensitiveString            `json:"StatusProxyMarketPassword"`
+	MarketDataProxyConfig     MarketDataProxyConfig               `json:"MarketDataProxyConfig"`
+	// FIXME: remove when EthRpcProxy* is integrated
+	StatusProxyBlockchainUser     security.SensitiveString `json:"StatusProxyBlockchainUser"`
+	StatusProxyBlockchainPassword security.SensitiveString `json:"StatusProxyBlockchainPassword"`
+
+	StatusProxyStageName   string                   `json:"StatusProxyStageName"`
+	EnableCelerBridge      bool                     `json:"EnableCelerBridge"`
+	EnableMercuryoProvider bool                     `json:"EnableMercuryoProvider"`
+	EthRpcProxyUrl         security.SensitiveString `json:"EthRpcProxyUrl"`
+	EthRpcProxyUser        security.SensitiveString `json:"EthRpcProxyUser"`
+	EthRpcProxyPassword    security.SensitiveString `json:"EthRpcProxyPassword"`
+
+	TokensListsAutoRefreshInterval      int `json:"TokensListsAutoRefreshInterval"`      // in seconds
+	TokensListsAutoRefreshCheckInterval int `json:"TokensListsAutoRefreshCheckInterval"` // in seconds
+}
+
+type MarketDataProxyConfig struct {
+	UrlOverride             security.SensitiveString `json:"UrlOverride"`
+	StageName               string                   `json:"StageName"`
+	User                    security.SensitiveString `json:"User"`
+	Password                security.SensitiveString `json:"Password"`
+	FullDataRefreshInterval int                      `json:"FullDataRefreshInterval"`
+	PriceRefreshInterval    int                      `json:"PriceRefreshInterval"`
 }
 
 // MarshalJSON custom marshalling to avoid exposing sensitive data in log,
 // there's a function called `startNode` will log NodeConfig which include WalletConfig
 func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Enabled                bool `json:"Enabled"`
-		StatusProxyEnabled     bool `json:"StatusProxyEnabled"`
-		EnableCelerBridge      bool `json:"EnableCelerBridge"`
-		EnableMercuryoProvider bool `json:"EnableMercuryoProvider"`
+		Enabled                             bool `json:"Enabled"`
+		EnableCelerBridge                   bool `json:"EnableCelerBridge"`
+		EnableMercuryoProvider              bool `json:"EnableMercuryoProvider"`
+		TokensListsAutoRefreshInterval      int  `json:"TokensListsAutoRefreshInterval"`
+		TokensListsAutoRefreshCheckInterval int  `json:"TokensListsAutoRefreshCheckInterval"`
 	}{
-		Enabled:                wc.Enabled,
-		StatusProxyEnabled:     wc.StatusProxyEnabled,
-		EnableCelerBridge:      wc.EnableCelerBridge,
-		EnableMercuryoProvider: wc.EnableMercuryoProvider,
+		Enabled:                             wc.Enabled,
+		EnableCelerBridge:                   wc.EnableCelerBridge,
+		EnableMercuryoProvider:              wc.EnableMercuryoProvider,
+		TokensListsAutoRefreshInterval:      wc.TokensListsAutoRefreshInterval,
+		TokensListsAutoRefreshCheckInterval: wc.TokensListsAutoRefreshCheckInterval,
 	})
 }
 
@@ -565,11 +486,6 @@ type PermissionsConfig struct {
 
 // MailserversConfig extra configuration for mailservers.Service.
 type MailserversConfig struct {
-	Enabled bool
-}
-
-// ProviderAuthConfig extra configuration for provider.Service
-type Web3ProviderConfig struct {
 	Enabled bool
 }
 
@@ -757,7 +673,7 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 	c.LogCompressRotated = true
 	c.LogMaxBackups = 3
 	c.LogToStderr = true
-	c.WakuConfig.Enabled = true
+	c.WakuV2Config.Enabled = true
 
 	for _, opt := range opts {
 		if err := opt(c); err != nil {
@@ -775,37 +691,33 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 }
 
 func (c *NodeConfig) setDefaultPushNotificationsServers() error {
-	if c.ClusterConfig.Fleet == FleetUndefined {
+	if len(c.ShhextConfig.DefaultPushNotificationsServers) > 0 {
 		return nil
 	}
 
-	// If empty load defaults from the fleet
-	if len(c.ClusterConfig.PushNotificationsServers) == 0 {
-		logutils.ZapLogger().Debug("empty push notification servers, setting", zap.String("fleet", c.ClusterConfig.Fleet))
-		defaultConfig := &NodeConfig{}
-		err := loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", c.ClusterConfig.Fleet), defaultConfig)
+	servers := DefaultPushNotificationServers()
+
+	// If empty set the default servers
+	logutils.ZapLogger().Debug("setting default push notification servers",
+		zap.Strings("servers", servers))
+
+	for _, pk := range servers {
+		keyBytes, err := hex.DecodeString("04" + pk)
 		if err != nil {
 			return err
 		}
-		c.ClusterConfig.PushNotificationsServers = defaultConfig.ClusterConfig.PushNotificationsServers
-	}
 
-	// If empty set the default servers
-	if len(c.ShhextConfig.DefaultPushNotificationsServers) == 0 {
-		logutils.ZapLogger().Debug("setting default push notification servers", zap.Strings("cluster servers", c.ClusterConfig.PushNotificationsServers))
-		for _, pk := range c.ClusterConfig.PushNotificationsServers {
-			keyBytes, err := hex.DecodeString("04" + pk)
-			if err != nil {
-				return err
-			}
-
-			key, err := crypto.UnmarshalPubkey(keyBytes)
-			if err != nil {
-				return err
-			}
-			c.ShhextConfig.DefaultPushNotificationsServers = append(c.ShhextConfig.DefaultPushNotificationsServers, &PushNotificationServer{PublicKey: key})
+		key, err := crypto.UnmarshalPubkey(keyBytes)
+		if err != nil {
+			return err
 		}
+
+		c.ShhextConfig.DefaultPushNotificationsServers = append(
+			c.ShhextConfig.DefaultPushNotificationsServers,
+			&PushNotificationServer{PublicKey: key},
+		)
 	}
+
 	return nil
 }
 
@@ -820,11 +732,6 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 	// More: https://github.com/status-im/status-go/issues/1870.
 	if c.APIModules == "" {
 		c.APIModules = "net,web3,eth"
-	}
-
-	// Override defaultMinPoW passed by the client
-	if c.WakuConfig.Enabled {
-		c.WakuConfig.MinimumPoW = WakuMinimumPoW
 	}
 
 	// Ensure TorrentConfig is valid
@@ -878,13 +785,12 @@ func (c *NodeConfig) updatePeerLimits() {
 // NewNodeConfig creates new node configuration object with bare-minimum defaults.
 // Important: the returned config is not validated.
 func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
-	var keyStoreDir, keycardPairingDataFile, wakuDir, wakuV2Dir string
+	var keyStoreDir, keycardPairingDataFile, wakuV2Dir string
 
 	if dataDir != "" {
 		keyStoreDir = filepath.Join(dataDir, "keystore")
 		keycardPairingDataFile = filepath.Join(dataDir, "keycard", "pairings.json")
 
-		wakuDir = filepath.Join(dataDir, "waku")
 		wakuV2Dir = filepath.Join(dataDir, "wakuv2")
 	}
 
@@ -908,12 +814,6 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		NoDiscovery:            true,
 		LightEthConfig: LightEthConfig{
 			DatabaseCache: 16,
-		},
-		WakuConfig: WakuConfig{
-			DataDir:        wakuDir,
-			MinimumPoW:     WakuMinimumPoW,
-			TTL:            WakuTTL,
-			MaxMessageSize: wakuv1common.DefaultMaxMessageSize,
 		},
 		WakuV2Config: WakuV2Config{
 			Host:           "0.0.0.0",
@@ -954,6 +854,7 @@ func NewConfigFromJSON(configJSON string) (*NodeConfig, error) {
 	return config, nil
 }
 
+// Deprecated: `fleet-*.json` files are deprecated. Use params.GetSupportedFleets instead.
 func LoadClusterConfigFromFleet(fleet string) (*ClusterConfig, error) {
 	nodeConfig := &NodeConfig{}
 	err := loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet), nodeConfig)
@@ -1015,18 +916,6 @@ func (c *NodeConfig) Validate() error {
 
 	if err := c.validateChildStructs(validate); err != nil {
 		return err
-	}
-
-	if c.WakuConfig.Enabled && c.WakuV2Config.Enabled && c.WakuConfig.DataDir == c.WakuV2Config.DataDir {
-		return fmt.Errorf("both Waku and WakuV2 are enabled and use the same data dir")
-	}
-
-	// Waku's data directory must be relative to the main data directory
-	// if EnableMailServer is true.
-	if c.WakuConfig.Enabled && c.WakuConfig.EnableMailServer {
-		if !strings.HasPrefix(c.WakuConfig.DataDir, c.DataDir) {
-			return fmt.Errorf("WakuConfig.DataDir must start with DataDir fragment")
-		}
 	}
 
 	if !c.NoDiscovery && len(c.ClusterConfig.BootNodes) == 0 {
@@ -1128,6 +1017,7 @@ func (c *NodeConfig) Save() error {
 	}
 
 	configFilePath := filepath.Join(c.DataDir, "config.json")
+	//nolint:gosec
 	if err := ioutil.WriteFile(configFilePath, data, os.ModePerm); err != nil {
 		return err
 	}
@@ -1166,12 +1056,19 @@ func LesTopic(netid int) string {
 	}
 }
 
-func (c *NodeConfig) LogSettings() logutils.LogSettings {
+func (c *NodeConfig) LogFilePath() string {
+	if c.LogDir == "" {
+		return filepath.Join(c.RootDataDir, c.LogFile)
+	}
+	return filepath.Join(c.LogDir, c.LogFile)
+}
+
+func (c *NodeConfig) ProfileLogSettings() logutils.LogSettings {
 	return logutils.LogSettings{
 		Enabled:         c.LogEnabled,
 		Level:           c.LogLevel,
 		Namespaces:      c.LogNamespaces,
-		File:            c.LogFile,
+		File:            c.LogFilePath(),
 		MaxSize:         c.LogMaxSize,
 		MaxBackups:      c.LogMaxBackups,
 		CompressRotated: c.LogCompressRotated,

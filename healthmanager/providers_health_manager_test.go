@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/healthmanager/aggregator"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 )
 
@@ -64,15 +65,59 @@ func (s *ProvidersHealthManagerSuite) TestInitialStatus() {
 func (s *ProvidersHealthManagerSuite) TestUpdateProviderStatuses() {
 	ch := s.phm.Subscribe()
 	defer s.phm.Unsubscribe(ch)
+
+	now := time.Now()
+	duration1 := 100 * time.Millisecond
+	duration2 := 200 * time.Millisecond
+
 	s.updateAndWait(ch, []rpcstatus.RpcProviderCallStatus{
-		{Name: "Provider1", Timestamp: time.Now(), Err: nil},
-		{Name: "Provider2", Timestamp: time.Now(), Err: errors.New("connection error")},
+		{
+			Name:      "Provider1",
+			Timestamp: now,
+			Err:       nil,
+			StartTime: now.Add(-duration1),
+		},
+		{
+			Name:      "Provider2",
+			Timestamp: now,
+			Err:       context.DeadlineExceeded,
+			StartTime: now.Add(-duration2),
+		},
 	}, rpcstatus.StatusUp, time.Second)
 
 	statusMap := s.phm.GetStatuses()
 	s.Len(statusMap, 2, "Expected 2 provider statuses")
 	s.Equal(rpcstatus.StatusUp, statusMap["Provider1"].Status, "Expected Provider1 status to be Up")
 	s.Equal(rpcstatus.StatusDown, statusMap["Provider2"].Status, "Expected Provider2 status to be Down")
+
+	// Verify metrics for Provider1
+	s.Equal(duration1, statusMap["Provider1"].TotalDuration, "Expected Provider1 TotalDuration to match")
+	s.Equal(int64(1), statusMap["Provider1"].TotalRequests, "Expected Provider1 TotalRequests to be 1")
+	s.Equal(int64(0), statusMap["Provider1"].TotalTimeoutCount, "Expected Provider1 TotalTimeoutCount to be 0")
+
+	// Verify metrics for Provider2
+	s.Equal(duration2, statusMap["Provider2"].TotalDuration, "Expected Provider2 TotalDuration to match")
+	s.Equal(int64(1), statusMap["Provider2"].TotalRequests, "Expected Provider2 TotalRequests to be 1")
+	s.Equal(int64(1), statusMap["Provider2"].TotalTimeoutCount, "Expected Provider2 TotalTimeoutCount to be 1")
+
+	// Update with additional metrics
+	laterTime := now.Add(1 * time.Minute)
+	duration3 := 150 * time.Millisecond
+
+	s.updateAndExpectNoNotification(ch, []rpcstatus.RpcProviderCallStatus{
+		{
+			Name:      "Provider1",
+			Timestamp: laterTime,
+			Err:       nil,
+			StartTime: laterTime.Add(-duration3),
+		},
+	}, rpcstatus.StatusUp, 100*time.Millisecond)
+
+	// Verify accumulated metrics for Provider1
+	statusMap = s.phm.GetStatuses()
+	s.Equal(duration1+duration3, statusMap["Provider1"].TotalDuration, "Expected Provider1 TotalDuration to accumulate")
+	s.Equal(int64(2), statusMap["Provider1"].TotalRequests, "Expected Provider1 TotalRequests to be 2")
+	s.Equal(int64(0), statusMap["Provider1"].TotalTimeoutCount, "Expected Provider1 TotalTimeoutCount to remain 0")
 }
 
 func (s *ProvidersHealthManagerSuite) TestChainStatusUpdatesOnce() {
@@ -138,6 +183,83 @@ func (s *ProvidersHealthManagerSuite) TestConcurrency() {
 
 	chainStatus := s.phm.Status().Status
 	s.Equal(chainStatus, rpcstatus.StatusUp, "Expected chain status to be either Up or Down")
+}
+
+// TestPanicWithNilAggregator tests that Update handles nil aggregator without panicking
+// (refs https://github.com/status-im/status-go/issues/6462)
+func (s *ProvidersHealthManagerSuite) TestPanicWithNilAggregator() {
+	// Create ProvidersHealthManager with nil aggregator for testing
+	phm := &ProvidersHealthManager{
+		chainID:             1,
+		aggregator:          nil, // Explicitly set to nil
+		subscriptionManager: NewSubscriptionManager(),
+	}
+
+	// Test data
+	callStatuses := []rpcstatus.RpcProviderCallStatus{
+		{Name: "Provider1", Timestamp: time.Now(), Err: nil},
+	}
+
+	// Call should not panic due to our nil check
+	s.NotPanics(func() {
+		phm.Update(context.Background(), callStatuses)
+	}, "Update should not panic with nil aggregator thanks to nil check")
+}
+
+// TestPanicWithNilSubscriptionManager tests that emitChainStatus handles nil subscriptionManager without panicking
+// (refs https://github.com/status-im/status-go/issues/6462)
+func (s *ProvidersHealthManagerSuite) TestPanicWithNilSubscriptionManager() {
+	// Create ProvidersHealthManager with nil subscriptionManager for testing
+	phm := &ProvidersHealthManager{
+		chainID:             1,
+		aggregator:          aggregator.NewAggregator("1"),
+		subscriptionManager: nil, // Explicitly set to nil
+	}
+
+	// Call should not panic due to our nil check
+	s.NotPanics(func() {
+		phm.emitChainStatus(context.Background())
+	}, "emitChainStatus should not panic with nil subscriptionManager thanks to nil check")
+}
+
+// TestReset verifies that Reset sets lastStatus to nil and creates a new aggregator
+func (s *ProvidersHealthManagerSuite) TestReset() {
+	// First, update the providers to establish a known state
+	ch := s.phm.Subscribe()
+	defer s.phm.Unsubscribe(ch)
+
+	// Update provider to Up and wait for notification
+	upStatuses := []rpcstatus.RpcProviderCallStatus{
+		{Name: "Provider1", Timestamp: time.Now(), Err: nil},
+	}
+	s.updateAndWait(ch, upStatuses, rpcstatus.StatusUp, time.Second)
+
+	// Verify providers are in statuses
+	statusesBeforeReset := s.phm.GetStatuses()
+	s.Len(statusesBeforeReset, 1, "Expected 1 provider status before reset")
+	s.Contains(statusesBeforeReset, "Provider1", "Expected Provider1 in statuses before reset")
+
+	// Capture the aggregator and lastStatus references before reset
+	originalAggregator := s.phm.aggregator
+
+	// Access the lastStatus field directly
+	s.NotNil(s.phm.lastStatus, "lastStatus should not be nil before reset")
+
+	// Reset the providers health manager
+	s.phm.Reset()
+
+	// Verify lastStatus is nil
+	s.Nil(s.phm.lastStatus, "lastStatus should be nil after reset")
+
+	// Verify aggregator was recreated (different instance)
+	s.NotSame(originalAggregator, s.phm.aggregator, "Aggregator should be a new instance after reset")
+
+	// Verify statuses are cleared
+	statusesAfterReset := s.phm.GetStatuses()
+	s.Empty(statusesAfterReset, "Expected no provider statuses after reset")
+
+	// Verify chain ID remains the same
+	s.Equal(uint64(1), s.phm.ChainID(), "Chain ID should remain unchanged after reset")
 }
 
 func TestProvidersHealthManagerSuite(t *testing.T) {

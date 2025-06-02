@@ -1,3 +1,6 @@
+//go:build !use_nwaku
+// +build !use_nwaku
+
 package wakuv2
 
 import (
@@ -66,7 +69,7 @@ func TestDiscoveryV5(t *testing.T) {
 	setDefaultConfig(config, false)
 	config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
 	config.DiscoveryLimit = 20
-	w, err := New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
+	w, err := New(nil, config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, w.Start())
@@ -92,7 +95,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	config.DiscoveryLimit = 20
 	config.UDPPort = 10002
 	config.ClusterID = 16
-	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
+	w, err := New(nil, config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, w.Start())
@@ -136,7 +139,7 @@ func TestRelayPeers(t *testing.T) {
 		EnableMissingMessageVerification: true,
 	}
 	setDefaultConfig(config, false)
-	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
+	w, err := New(nil, config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
@@ -146,7 +149,7 @@ func TestRelayPeers(t *testing.T) {
 	config = &Config{}
 	config.ClusterID = 16
 	config.LightClient = true
-	w, err = New(nil, "", config, nil, nil, nil, nil, nil)
+	w, err = New(nil, config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
@@ -194,7 +197,7 @@ func TestBasicWakuV2(t *testing.T) {
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
 	config.WakuNodes = []string{enrTreeAddress}
-	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
+	w, err := New(nil, config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
@@ -250,7 +253,7 @@ func TestBasicWakuV2(t *testing.T) {
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
 	}
 
-	_, err = w.Subscribe(filter)
+	_, err = w.subscribe(filter)
 	require.NoError(t, err)
 
 	msgTimestamp := w.timestamp()
@@ -334,7 +337,7 @@ func TestPeerExchange(t *testing.T) {
 	config.EnableDiscV5 = true
 	config.EnablePeerExchangeServer = true
 	config.EnablePeerExchangeClient = false
-	pxServerNode, err := New(nil, "", config, logger.Named("pxServerNode"), nil, nil, nil, nil)
+	pxServerNode, err := New(nil, config, logger.Named("pxServerNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, pxServerNode.Start())
 
@@ -347,7 +350,7 @@ func TestPeerExchange(t *testing.T) {
 	config.EnablePeerExchangeServer = false
 	config.EnablePeerExchangeClient = false
 	config.DiscV5BootstrapNodes = []string{pxServerNode.node.ENR().String()}
-	discV5Node, err := New(nil, "", config, logger.Named("discV5Node"), nil, nil, nil, nil)
+	discV5Node, err := New(nil, config, logger.Named("discV5Node"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, discV5Node.Start())
 
@@ -366,7 +369,7 @@ func TestPeerExchange(t *testing.T) {
 	config.Resolver = resolver
 
 	config.WakuNodes = []string{url}
-	lightNode, err := New(nil, "", config, logger.Named("lightNode"), nil, nil, nil, nil)
+	lightNode, err := New(nil, config, logger.Named("lightNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, lightNode.Start())
 
@@ -413,7 +416,7 @@ func TestWakuV2Filter(t *testing.T) {
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
 	config.WakuNodes = []string{enrTreeAddress}
-	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
+	w, err := New(nil, config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
@@ -444,7 +447,7 @@ func TestWakuV2Filter(t *testing.T) {
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{contentTopicBytes}),
 	}
 
-	fID, err := w.Subscribe(filter)
+	fID, err := w.subscribe(filter)
 	require.NoError(t, err)
 
 	msgTimestamp := w.timestamp()
@@ -510,7 +513,7 @@ func TestWakuV2Store(t *testing.T) {
 	w1PeersCh := make(chan peer.IDSlice, 100) // buffered not to block on the send side
 
 	// Start the first Waku node
-	w1, err := New(nil, "", config1, nil, nil, nil, nil, func(cs wakutypes.ConnStatus) {
+	w1, err := New(nil, config1, nil, nil, nil, nil, func(cs wakutypes.ConnStatus) {
 		w1PeersCh <- maps.Keys(cs.Peers)
 	})
 	require.NoError(t, err)
@@ -534,19 +537,20 @@ func TestWakuV2Store(t *testing.T) {
 	}
 
 	// Start the second Waku node
-	w2, err := New(nil, "", config2, nil, sql2, nil, nil, nil)
+	w2, err := New(nil, config2, nil, sql2, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w2.Start())
 	w2EnvelopeCh := make(chan common.EnvelopeEvent, 100)
-	w2.SubscribeEnvelopeEvents(w2EnvelopeCh)
+	w2.subscribeEnvelopeEvents(w2EnvelopeCh)
 	defer func() {
 		require.NoError(t, w2.Stop())
 		close(w2EnvelopeCh)
 	}()
 
 	// Connect the two nodes directly
-	peer2Addr := w2.node.ListenAddresses()[0].String()
-	err = w1.node.DialPeer(context.Background(), peer2Addr)
+	peer2Addr, err := w2.ListenAddresses()
+	require.NoError(t, err)
+	err = w1.node.DialPeer(context.Background(), peer2Addr[0].String())
 	require.NoError(t, err)
 
 	waitForPeerConnection(t, w2.node.Host().ID(), w1PeersCh)
@@ -558,7 +562,7 @@ func TestWakuV2Store(t *testing.T) {
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
 	}
 
-	_, err = w2.Subscribe(filter)
+	_, err = w2.subscribe(filter)
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
@@ -635,7 +639,7 @@ func waitForEnvelope(t *testing.T, contentTopic string, envCh chan common.Envelo
 }
 
 func TestOnlineChecker(t *testing.T) {
-	w, err := New(nil, "shards.staging", nil, nil, nil, nil, nil, nil)
+	w, err := New(nil, nil, nil, nil, nil, nil, nil)
 	require.NoError(t, w.Start())
 
 	require.NoError(t, err)
@@ -661,7 +665,7 @@ func TestOnlineChecker(t *testing.T) {
 	config := &Config{}
 	config.ClusterID = 16
 	config.LightClient = true
-	lightNode, err := New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
+	lightNode, err := New(nil, config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	err = lightNode.Start()
@@ -682,7 +686,7 @@ func TestLightpushRateLimit(t *testing.T) {
 	w0PeersCh := make(chan peer.IDSlice, 5) // buffered not to block on the send side
 
 	// Start the relayu node
-	w0, err := New(nil, "", config0, logger.Named("relayNode"), nil, nil, nil, func(cs wakutypes.ConnStatus) {
+	w0, err := New(nil, config0, logger.Named("relayNode"), nil, nil, nil, func(cs wakutypes.ConnStatus) {
 		w0PeersCh <- maps.Keys(cs.Peers)
 	})
 	require.NoError(t, err)
@@ -699,7 +703,7 @@ func TestLightpushRateLimit(t *testing.T) {
 		ContentTopics: contentTopics,
 	}
 
-	_, err = w0.Subscribe(filter)
+	_, err = w0.subscribe(filter)
 	require.NoError(t, err)
 
 	config1 := &Config{}
@@ -707,7 +711,7 @@ func TestLightpushRateLimit(t *testing.T) {
 	w1PeersCh := make(chan peer.IDSlice, 5) // buffered not to block on the send side
 
 	// Start the full node
-	w1, err := New(nil, "", config1, logger.Named("fullNode"), nil, nil, nil, func(cs wakutypes.ConnStatus) {
+	w1, err := New(nil, config1, logger.Named("fullNode"), nil, nil, nil, func(cs wakutypes.ConnStatus) {
 		w1PeersCh <- maps.Keys(cs.Peers)
 	})
 	require.NoError(t, err)
@@ -720,7 +724,10 @@ func TestLightpushRateLimit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	//Connect the relay peer and full node
-	err = w1.node.DialPeer(ctx, w0.node.ListenAddresses()[0].String())
+	peerAddr, err := w0.ListenAddresses()
+
+	require.NoError(t, err)
+	err = w1.node.DialPeer(ctx, peerAddr[0].String())
 	require.NoError(t, err)
 
 	err = tt.RetryWithBackOff(func() error {
@@ -736,7 +743,7 @@ func TestLightpushRateLimit(t *testing.T) {
 	w2PeersCh := make(chan peer.IDSlice, 5) // buffered not to block on the send side
 
 	// Start the light node
-	w2, err := New(nil, "", config2, logger.Named("lightNode"), nil, nil, nil, func(cs wakutypes.ConnStatus) {
+	w2, err := New(nil, config2, logger.Named("lightNode"), nil, nil, nil, func(cs wakutypes.ConnStatus) {
 		w2PeersCh <- maps.Keys(cs.Peers)
 	})
 	require.NoError(t, err)
@@ -747,12 +754,15 @@ func TestLightpushRateLimit(t *testing.T) {
 	}()
 
 	//Use this instead of DialPeer to make sure the peer is added to PeerStore and can be selected for Lighpush
-	w2.node.AddDiscoveredPeer(w1.PeerID(), w1.node.ListenAddresses(), wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
+	addresses, err := w1.ListenAddresses()
+	require.NoError(t, err)
+	peerID := w1.PeerID()
+	w2.node.AddDiscoveredPeer(peerID, addresses, wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
 
 	waitForPeerConnectionWithTimeout(t, w2.node.Host().ID(), w1PeersCh, 5*time.Second)
 
 	event := make(chan common.EnvelopeEvent, 10)
-	w2.SubscribeEnvelopeEvents(event)
+	w2.subscribeEnvelopeEvents(event)
 
 	for i := range [15]int{} {
 		msgTimestamp := w2.timestamp()

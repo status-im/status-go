@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
+	gaspriceproxy "github.com/status-im/status-go/contracts/gas-price-proxy"
 	"github.com/status-im/status-go/services/wallet/common"
 )
 
@@ -15,7 +15,12 @@ type FeeHistory struct {
 	Reward        [][]string `json:"reward,omitempty"`
 }
 
-func (fh *FeeHistory) isEIP1559Compatible() bool {
+func (fh *FeeHistory) isEIP1559Compatible(chainID uint64) bool {
+	// Since the Status Network is gasless chain, but EIP-1559 compatible, we should not rely on checking the BaseFeePerGas, that's why we have this special case.
+	if common.IsGaslessChainAndEIP1559Compatible(chainID) {
+		return true
+	}
+
 	if len(fh.BaseFeePerGas) == 0 {
 		return false
 	}
@@ -29,14 +34,17 @@ func (fh *FeeHistory) isEIP1559Compatible() bool {
 	return false
 }
 
-func (f *FeeManager) getFeeHistory(ctx context.Context, chainID uint64, blockCount uint64, newestBlock string, rewardPercentiles []int) (feeHistory *FeeHistory, err error) {
-	feeHistory = &FeeHistory{}
-	err = f.RPCClient.Call(feeHistory, chainID, "eth_feeHistory", blockCount, newestBlock, rewardPercentiles)
-	if err != nil {
-		return nil, err
+func (f *FeeManager) getFeeHistory(ctx context.Context, chainID uint64, newestBlock string, rewardPercentiles []int) (*FeeHistory, error) {
+	blockCount := uint64(10) // use the last 10 blocks for L1 chains
+	if chainID != common.EthereumMainnet &&
+		chainID != common.EthereumSepolia &&
+		chainID != common.AnvilMainnet {
+		blockCount = 50 // use the last 50 blocks for L2 chains
 	}
 
-	return feeHistory, nil
+	feeHistory := &FeeHistory{}
+	err := f.RPCClient.Call(feeHistory, chainID, "eth_feeHistory", blockCount, newestBlock, rewardPercentiles)
+	return feeHistory, err
 }
 
 // GetL1Fee returns L1 fee for placing a transaction to L1 chain, appicable only for txs made from L2.
@@ -50,12 +58,12 @@ func (f *FeeManager) GetL1Fee(ctx context.Context, chainID uint64, input []byte)
 		return 0, err
 	}
 
-	contractAddress, err := gaspriceoracle.ContractAddress(chainID)
+	contractAddress, err := gaspriceproxy.ContractAddress(chainID)
 	if err != nil {
 		return 0, err
 	}
 
-	contract, err := gaspriceoracle.NewGaspriceoracleCaller(contractAddress, ethClient)
+	contract, err := gaspriceproxy.NewGaspriceproxy(contractAddress, ethClient)
 	if err != nil {
 		return 0, err
 	}

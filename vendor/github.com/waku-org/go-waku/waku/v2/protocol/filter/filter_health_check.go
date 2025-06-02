@@ -25,7 +25,7 @@ func (wf *WakuFilterLightNode) PingPeer(peer peer.ID) {
 	defer cancel()
 	err := wf.Ping(ctxWithTimeout, peer)
 	if err != nil && wf.onlineChecker.IsOnline() {
-		wf.log.Warn("Filter ping failed towards peer", zap.Stringer("peer", peer), zap.Error(err))
+		wf.log.Info("Filter ping failed towards peer", zap.Stringer("peer", peer), zap.Error(err))
 		//quickly retry ping again before marking subscription as failure
 		//Note that PingTimeout is a fraction of PingInterval so this shouldn't cause parallel pings being sent.
 		ctxWithTimeout, cancel := context.WithTimeout(wf.CommonService.Context(), PingTimeout)

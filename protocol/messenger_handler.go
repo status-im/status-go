@@ -35,11 +35,10 @@ import (
 	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
 
 const (
@@ -179,7 +178,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		if err != nil {
 			return errors.Wrap(err, "failed to get group members")
 		}
-		filters, err := m.transport.JoinGroup(publicKeys)
+		filters, err := m.messaging.JoinGroupChat(publicKeys)
 		if err != nil {
 			return errors.Wrap(err, "failed to join group")
 		}
@@ -486,7 +485,7 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 	}
 
 	if chat == nil {
-		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", contact.ID)
+		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", gocommon.TruncateWithDot(contact.ID))
 	}
 
 	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(contact.ID)
@@ -499,7 +498,7 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 		return nil
 	}
 
-	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+	clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
 	contactRequest, err := m.generateContactRequest(clock, timestamp, contact, defaultContactRequestText(), outgoing)
 	if err != nil {
 		return err
@@ -1048,7 +1047,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 
 		// Add mutual state update message for incoming contact request
 		if !previouslyAccepted {
-			clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+			clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
 
 			updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, false)
 			if err != nil {
@@ -1454,15 +1453,15 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 
 func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage) (*MessengerResponse, error) {
 
-	messagesToHandle := make(map[transport.Filter][]*wakutypes.Message)
+	messagesToHandle := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage)
 
 	for _, message := range archiveMessages {
-		filter := m.transport.FilterByTopic(message.Topic)
+		filter := m.messaging.ChatFilterByTopic(message.Topic)
 		if filter != nil {
-			shhMessage := &wakutypes.Message{
+			shhMessage := &messagingtypes.ReceivedMessage{
 				Sig:          message.Sig,
 				Timestamp:    uint32(message.Timestamp),
-				Topic:        wakutypes.BytesToTopic(message.Topic),
+				Topic:        messagingtypes.BytesToContentTopic(message.Topic),
 				Payload:      message.Payload,
 				Padding:      message.Padding,
 				Hash:         message.Hash,
@@ -1472,8 +1471,8 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 		}
 	}
 
-	importedMessages := make(map[transport.Filter][]*wakutypes.Message, 0)
-	otherMessages := make(map[transport.Filter][]*wakutypes.Message, 0)
+	importedMessages := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, 0)
+	otherMessages := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, 0)
 
 	for filter, messages := range messagesToHandle {
 		for _, message := range messages {
@@ -2198,7 +2197,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			return err
 		}
 
-		community, err := m.GetCommunityByID(communityID)
+		community, err := m.communitiesManager.GetByIDReadonly(communityID)
 		if err != nil {
 			return err
 		}
@@ -3965,7 +3964,7 @@ func (m *Messenger) HandleSyncClearHistory(state *ReceivedMessageState, message 
 	}
 
 	if existingChat.Public() {
-		err = m.transport.ClearProcessedMessageIDsCache()
+		err = m.messaging.ClearProcessedMessageIDsCache()
 		if err != nil {
 			return err
 		}

@@ -63,8 +63,8 @@ type Manager struct {
 
 	collectiblesDataDB CollectibleDataStorage
 	collectionsDataDB  CollectionDataStorage
-	communityManager   *community.Manager
-	ownershipDB        *OwnershipDB
+	communityManager   community.CommunityManagerInterface
+	ownershipDB        OwnershipStorage
 
 	mediaServer *server.MediaServer
 
@@ -77,12 +77,12 @@ type Manager struct {
 func NewManager(
 	db *sql.DB,
 	rpcClient rpc.ClientInterface,
-	communityManager *community.Manager,
+	communityManager community.CommunityManagerInterface,
 	providers thirdparty.CollectibleProviders,
 	mediaServer *server.MediaServer,
 	feed *event.Feed) *Manager {
 
-	var ownershipDB *OwnershipDB
+	var ownershipDB OwnershipStorage
 	var statuses *sync.Map
 	var statusNotifier *connection.StatusNotifier
 	if db != nil {
@@ -241,8 +241,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 						zap.Error(err))
 				}
 				return []interface{}{assetContainer}, err
-			}, getCircuitName(provider, chainID),
-		)
+			}, getCircuitName(provider, chainID), provider.ID())
 		cmd.Add(f)
 	}
 
@@ -259,8 +258,9 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 		return nil, cmdRes.Error()
 	}
 
+	var err error
 	assetContainer := cmdRes.Result()[0].(*thirdparty.FullCollectibleDataContainer)
-	_, err := o.processFullCollectibleData(ctx, assetContainer.Items, true)
+	_, assetContainer.Items, err = o.processFullCollectibleData(ctx, assetContainer.Items, true)
 	if err != nil {
 		return nil, err
 	}
@@ -292,8 +292,7 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 					)
 				}
 				return []interface{}{assetContainer}, err
-			}, getCircuitName(provider, chainID),
-		)
+			}, getCircuitName(provider, chainID), provider.ID())
 		cmd.Add(f)
 	}
 
@@ -311,12 +310,13 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 	}
 
 	assetContainer := cmdRes.Result()[0].(*thirdparty.FullCollectibleDataContainer)
-	_, err := o.processFullCollectibleData(ctx, assetContainer.Items, true)
+	var err error
+	_, assetContainer.Items, err = o.processFullCollectibleData(ctx, assetContainer.Items, true)
 	if err != nil {
 		return nil, err
 	}
 
-	return assetContainer, nil
+	return assetContainer, err
 }
 
 func (o *Manager) FetchERC1155Balances(ctx context.Context, owner common.Address, chainID walletCommon.ChainID, contractAddress common.Address, tokenIDs []*bigint.BigInt) ([]*bigint.BigInt, error) {
@@ -459,7 +459,7 @@ func (o *Manager) FetchMissingAssetsByCollectibleUniqueID(ctx context.Context, u
 				return err
 			}
 
-			updatedCollectibles, err := o.processFullCollectibleData(ctx, fetchedAssets, asyncFetch)
+			updatedCollectibles, _, err := o.processFullCollectibleData(ctx, fetchedAssets, asyncFetch)
 			if err != nil {
 				logutils.ZapLogger().Error("processFullCollectibleData failed for",
 					zap.Stringer("chainID", chainID),
@@ -501,7 +501,7 @@ func (o *Manager) fetchMissingAssetsForChainByCollectibleUniqueID(ctx context.Co
 			}
 
 			return []any{fetchedAssets}, err
-		}, getCircuitName(provider, chainID)))
+		}, getCircuitName(provider, chainID), provider.ID()))
 	}
 
 	if cmd.IsEmpty() {
@@ -543,7 +543,7 @@ func (o *Manager) FetchCollectionsDataByContractID(ctx context.Context, ids []th
 				cmd.Add(circuitbreaker.NewFunctor(func() ([]any, error) {
 					fetchedCollections, err := provider.FetchCollectionsDataByContractID(ctx, idsToFetch)
 					return []any{fetchedCollections}, err
-				}, getCircuitName(provider, chainID)))
+				}, getCircuitName(provider, chainID), provider.ID()))
 			}
 
 			if cmd.IsEmpty() {
@@ -607,7 +607,7 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(ctx context.Context, c
 				)
 			}
 			return []any{res}, err
-		}, getCircuitName(provider, chainID)))
+		}, getCircuitName(provider, chainID), provider.ID()))
 	}
 
 	if cmd.IsEmpty() {
@@ -667,9 +667,11 @@ func isMetadataEmpty(asset thirdparty.CollectibleData) bool {
 // Processes collectible metadata obtained from a provider and ensures any missing data is fetched.
 // If asyncFetch is true, community collectibles metadata will be fetched async and an EventCollectiblesDataUpdated will be sent when the data is ready.
 // If asyncFetch is false, it will wait for all community collectibles' metadata to be retrieved before returning.
-func (o *Manager) processFullCollectibleData(ctx context.Context, assets []thirdparty.FullCollectibleData, asyncFetch bool) ([]thirdparty.CollectibleUniqueID, error) {
+// Returns the IDs of successfully processed collectibles and the list of full collectible data.
+func (o *Manager) processFullCollectibleData(ctx context.Context, assets []thirdparty.FullCollectibleData, asyncFetch bool) ([]thirdparty.CollectibleUniqueID, []thirdparty.FullCollectibleData, error) {
 	fullyFetchedAssets := make(map[string]*thirdparty.FullCollectibleData)
 	communityCollectibles := make(map[string][]*thirdparty.FullCollectibleData)
+	allIDs := make([]thirdparty.CollectibleUniqueID, 0, len(assets))
 	processedIDs := make([]thirdparty.CollectibleUniqueID, 0, len(assets))
 
 	// Start with all assets, remove if any of the fetch steps fail
@@ -677,6 +679,7 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 		asset := &assets[idx]
 		id := asset.CollectibleData.ID
 		fullyFetchedAssets[id.HashKey()] = asset
+		allIDs = append(allIDs, id)
 	}
 
 	// Detect community collectibles
@@ -720,7 +723,7 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 		} else {
 			err := o.fetchCommunityAssets(communityID, communityAssets)
 			if err != nil {
-				logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", communityID), zap.Error(err))
+				logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 				continue
 			}
 			for _, asset := range communityAssets {
@@ -757,23 +760,29 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 
 	err := o.collectiblesDataDB.SetData(collectiblesData, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = o.collectionsDataDB.SetData(collectionsData, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(missingCollectionIDs) > 0 {
 		// Calling this ensures collection data is fetched and cached (if not already available)
 		_, err := o.FetchCollectionsDataByContractID(ctx, missingCollectionIDs)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	return processedIDs, nil
+	// Return latest up to date data from DB
+	items, err := o.getCacheFullCollectibleData(allIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return processedIDs, items, nil
 }
 
 func (o *Manager) fillTokenURI(ctx context.Context, asset *thirdparty.FullCollectibleData) error {
@@ -808,7 +817,7 @@ func (o *Manager) fillCommunityID(asset *thirdparty.FullCollectibleData) error {
 func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
 	communityFound, err := o.communityManager.FillCollectiblesMetadata(communityID, communityAssets)
 	if err != nil {
-		logutils.ZapLogger().Error("FillCollectiblesMetadata failed", zap.String("communityID", communityID), zap.Error(err))
+		logutils.ZapLogger().Error("FillCollectiblesMetadata failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 	} else if !communityFound {
 		logutils.ZapLogger().Warn("fetchCommunityAssets community not found", zap.String("communityID", communityID))
 	}
@@ -829,13 +838,13 @@ func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*th
 
 	err = o.collectiblesDataDB.SetData(collectiblesData, allowUpdate)
 	if err != nil {
-		logutils.ZapLogger().Error("collectiblesDataDB SetData failed", zap.String("communityID", communityID), zap.Error(err))
+		logutils.ZapLogger().Error("collectiblesDataDB SetData failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 		return err
 	}
 
 	err = o.collectionsDataDB.SetData(collectionsData, allowUpdate)
 	if err != nil {
-		logutils.ZapLogger().Error("collectionsDataDB SetData failed", zap.String("communityID", communityID), zap.Error(err))
+		logutils.ZapLogger().Error("collectionsDataDB SetData failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 		return err
 	}
 
@@ -843,7 +852,7 @@ func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*th
 		if asset.CollectibleCommunityInfo != nil {
 			err = o.collectiblesDataDB.SetCommunityInfo(asset.CollectibleData.ID, *asset.CollectibleCommunityInfo)
 			if err != nil {
-				logutils.ZapLogger().Error("collectiblesDataDB SetCommunityInfo failed", zap.String("communityID", communityID), zap.Error(err))
+				logutils.ZapLogger().Error("collectiblesDataDB SetCommunityInfo failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 				return err
 			}
 		}
@@ -861,7 +870,7 @@ func (o *Manager) fetchCommunityAssetsAsync(_ context.Context, communityID strin
 		defer gocommon.LogOnPanic()
 		err := o.fetchCommunityAssets(communityID, communityAssets)
 		if err != nil {
-			logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", communityID), zap.Error(err))
+			logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 			return
 		}
 
@@ -1060,7 +1069,7 @@ func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.C
 			continue
 		}
 
-		_, err = o.processFullCollectibleData(ctx, container.Items, true)
+		_, container.Items, err = o.processFullCollectibleData(ctx, container.Items, true)
 		if err != nil {
 			return nil, err
 		}
@@ -1183,7 +1192,7 @@ func (o *Manager) fetchSocialsForCollection(ctx context.Context, contractID thir
 				)
 			}
 			return []interface{}{socials}, err
-		}, getCircuitName(provider, contractID.ChainID)))
+		}, getCircuitName(provider, contractID.ChainID), provider.ID()))
 	}
 
 	if cmd.IsEmpty() {
@@ -1213,7 +1222,7 @@ func (o *Manager) updateStatusNotifier() {
 	o.statusNotifier = createStatusNotifier(o.statuses, o.feed)
 }
 
-func initStatuses(ownershipDB *OwnershipDB) *sync.Map {
+func initStatuses(ownershipDB OwnershipStorage) *sync.Map {
 	statuses := &sync.Map{}
 	for _, chainID := range walletCommon.AllChainIDs() {
 		status := connection.NewStatus()

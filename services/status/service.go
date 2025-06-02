@@ -5,12 +5,11 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 // Make sure that Service implements node.Lifecycle interface.
@@ -29,11 +28,6 @@ func New() *Service {
 
 func (s *Service) Init(messenger *protocol.Messenger) {
 	s.messenger = messenger
-}
-
-// Protocols returns a new protocols list. In this case, there are none.
-func (s *Service) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{}
 }
 
 // APIs returns a list of new APIs.
@@ -70,7 +64,7 @@ type PublicAPI struct {
 	service *Service
 }
 
-func (p *PublicAPI) CommunityInfo(communityID types.HexBytes, shard *shard.Shard) (json.RawMessage, error) {
+func (p *PublicAPI) CommunityInfo(communityID types.HexBytes, shard *wakuv2.Shard) (json.RawMessage, error) {
 	if p.service.messenger == nil {
 		return nil, ErrNotInitialized
 	}

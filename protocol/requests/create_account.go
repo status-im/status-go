@@ -5,6 +5,7 @@ import (
 
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
 )
 
 var ErrCreateAccountInvalidDisplayName = errors.New("create-account: invalid display name")
@@ -70,6 +71,9 @@ type CreateAccount struct {
 
 	TestNetworksEnabled bool `json:"testNetworksEnabled"`
 
+	AutoRefreshTokensEnabled bool `json:"autoRefreshTokensEnabled"`
+
+	WalletConfig
 	WalletSecretsConfig
 
 	TorrentConfigEnabled *bool
@@ -85,34 +89,44 @@ type CreateAccount struct {
 	// for recovering account
 	KeycardPairingKey      string  `json:"keycardPairingKey"`
 	KeycardPairingDataFile *string `json:"keycardPairingDataFile"`
-	StatusProxyEnabled     bool    `json:"statusProxyEnabled"`
 }
-
+type WalletConfig struct {
+	TokensListsAutoRefreshInterval      int `json:"tokensListsAutoRefreshInterval"`      // in seconds
+	TokensListsAutoRefreshCheckInterval int `json:"tokensListsAutoRefreshCheckInterval"` // in seconds
+	MarketDataFullDataRefreshInterval   int `json:"marketDataFullDataRefreshInterval"`   // in seconds
+	MarketDataPriceRefreshInterval      int `json:"marketDataPriceRefreshInterval"`      // in seconds
+}
 type WalletSecretsConfig struct {
-	PoktToken            string `json:"poktToken"`
-	InfuraToken          string `json:"infuraToken"`
-	InfuraSecret         string `json:"infuraSecret"`
-	OpenseaAPIKey        string `json:"openseaApiKey"`
-	RaribleMainnetAPIKey string `json:"raribleMainnetApiKey"`
-	RaribleTestnetAPIKey string `json:"raribleTestnetApiKey"`
+	PoktToken            security.SensitiveString `json:"poktToken"`
+	InfuraToken          security.SensitiveString `json:"infuraToken"`
+	InfuraSecret         security.SensitiveString `json:"infuraSecret"`
+	OpenseaAPIKey        security.SensitiveString `json:"openseaApiKey"`
+	RaribleMainnetAPIKey security.SensitiveString `json:"raribleMainnetApiKey"`
+	RaribleTestnetAPIKey security.SensitiveString `json:"raribleTestnetApiKey"`
 
-	AlchemyEthereumMainnetToken string `json:"alchemyEthereumMainnetToken"`
-	AlchemyEthereumSepoliaToken string `json:"alchemyEthereumSepoliaToken"`
-	AlchemyArbitrumMainnetToken string `json:"alchemyArbitrumMainnetToken"`
-	AlchemyArbitrumSepoliaToken string `json:"alchemyArbitrumSepoliaToken"`
-	AlchemyOptimismMainnetToken string `json:"alchemyOptimismMainnetToken"`
-	AlchemyOptimismSepoliaToken string `json:"alchemyOptimismSepoliaToken"`
-	AlchemyBaseMainnetToken     string `json:"alchemyBaseMainnetToken"`
-	AlchemyBaseSepoliaToken     string `json:"alchemyBaseSepoliaToken"`
+	AlchemyEthereumMainnetToken security.SensitiveString `json:"alchemyEthereumMainnetToken"`
+	AlchemyEthereumSepoliaToken security.SensitiveString `json:"alchemyEthereumSepoliaToken"`
+	AlchemyArbitrumMainnetToken security.SensitiveString `json:"alchemyArbitrumMainnetToken"`
+	AlchemyArbitrumSepoliaToken security.SensitiveString `json:"alchemyArbitrumSepoliaToken"`
+	AlchemyOptimismMainnetToken security.SensitiveString `json:"alchemyOptimismMainnetToken"`
+	AlchemyOptimismSepoliaToken security.SensitiveString `json:"alchemyOptimismSepoliaToken"`
+	AlchemyBaseMainnetToken     security.SensitiveString `json:"alchemyBaseMainnetToken"`
+	AlchemyBaseSepoliaToken     security.SensitiveString `json:"alchemyBaseSepoliaToken"`
 
-	StatusProxyStageName          string `json:"statusProxyStageName"`
-	StatusProxyMarketUser         string `json:"statusProxyMarketUser"`
-	StatusProxyMarketPassword     string `json:"statusProxyMarketPassword"`
-	StatusProxyBlockchainUser     string `json:"statusProxyBlockchainUser"`
-	StatusProxyBlockchainPassword string `json:"statusProxyBlockchainPassword"`
+	StatusProxyStageName      string                   `json:"statusProxyStageName"`
+	StatusProxyMarketUser     security.SensitiveString `json:"statusProxyMarketUser"`
+	StatusProxyMarketPassword security.SensitiveString `json:"statusProxyMarketPassword"`
 
-	// Testing
-	GanacheURL string `json:"ganacheURL"`
+	MarketDataProxyUrl      security.SensitiveString `json:"marketDataProxyUrl"`
+	MarketDataProxyUser     security.SensitiveString `json:"marketDataProxyUser"`
+	MarketDataProxyPassword security.SensitiveString `json:"marketDataProxyPassword"`
+	// FIXME: remove when EthRpcProxy* is integrated
+	StatusProxyBlockchainUser     security.SensitiveString `json:"statusProxyBlockchainUser"`
+	StatusProxyBlockchainPassword security.SensitiveString `json:"statusProxyBlockchainPassword"`
+
+	EthRpcProxyUrl      security.SensitiveString `json:"ethRpcProxyUrl"`
+	EthRpcProxyUser     security.SensitiveString `json:"ethRpcProxyUser"`
+	EthRpcProxyPassword security.SensitiveString `json:"ethRpcProxyPassword"`
 }
 
 func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {

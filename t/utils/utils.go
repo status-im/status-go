@@ -50,7 +50,7 @@ var (
 
 	// TestNetworkNames network ID to name mapping
 	TestNetworkNames = map[int]string{
-		params.MainNetworkID:        "Mainnet",
+		params.MainNetworkID:        "Ethereum",
 		params.StatusChainNetworkID: "StatusChain",
 		params.SepoliaNetworkID:     "Sepolia",
 	}

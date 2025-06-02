@@ -15,8 +15,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/wakuv2"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -84,20 +84,20 @@ func (s *MessengerOfflineSuite) TearDownTest() {
 		s.Require().NoError(s.owner.Shutdown())
 	}
 	if s.ownerWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.ownerWaku).Stop())
+		s.Require().NoError(s.ownerWaku.Stop())
 	}
 
 	if s.bob != nil {
 		s.Require().NoError(s.bob.Shutdown())
 	}
 	if s.bobWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.bobWaku).Stop())
+		s.Require().NoError(s.bobWaku.Stop())
 	}
 	if s.alice != nil {
 		s.Require().NoError(s.alice.Shutdown())
 	}
 	if s.aliceWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.aliceWaku).Stop())
+		s.Require().NoError(s.aliceWaku.Stop())
 	}
 	_ = s.logger.Sync()
 }
@@ -140,7 +140,7 @@ func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
 	s.checkMessageDelivery(ctx, inputMessage)
 
 	// Simulate going offline
-	wakuv2 := bridge.GetGethWakuV2From(s.aliceWaku)
+	wakuv2 := s.aliceWaku.(*wakuv2.Waku)
 	wakuv2.SkipPublishToTopic(true)
 
 	resp, err := s.alice.SendChatMessage(ctx, inputMessage)

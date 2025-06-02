@@ -411,7 +411,6 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 		Networks:        nil,
 		DB:              appDB,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	rpcClient, _ := rpc.NewClient(config)
 	rpcClient.UpstreamChainID = chainID

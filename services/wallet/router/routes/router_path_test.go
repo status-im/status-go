@@ -11,20 +11,19 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/router/fees"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 func TestCopyPath(t *testing.T) {
 	addr := common.HexToAddress("0x123")
 	path := &Path{
-		ProcessorName:  "test",
-		FromChain:      &params.Network{ChainID: 1},
-		ToChain:        &params.Network{ChainID: 2},
-		FromToken:      &token.Token{Symbol: "symbol1"},
-		ToToken:        &token.Token{Symbol: "symbol2"},
-		AmountIn:       (*hexutil.Big)(big.NewInt(100)),
-		AmountInLocked: true,
-		AmountOut:      (*hexutil.Big)(big.NewInt(200)),
+		ProcessorName: "test",
+		FromChain:     &params.Network{ChainID: 1},
+		ToChain:       &params.Network{ChainID: 2},
+		FromToken:     &tokenTypes.Token{Symbol: "symbol1"},
+		ToToken:       &tokenTypes.Token{Symbol: "symbol2"},
+		AmountIn:      (*hexutil.Big)(big.NewInt(100)),
+		AmountOut:     (*hexutil.Big)(big.NewInt(200)),
 		SuggestedLevelsForMaxFeesPerGas: &fees.MaxFeesLevels{
 			Low:    (*hexutil.Big)(big.NewInt(100)),
 			Medium: (*hexutil.Big)(big.NewInt(200)),
@@ -36,7 +35,7 @@ func TestCopyPath(t *testing.T) {
 		TxGasAmount:             100,
 		TxBonderFees:            (*hexutil.Big)(big.NewInt(100)),
 		TxTokenFees:             (*hexutil.Big)(big.NewInt(100)),
-		TxEstimatedTime:         fees.TransactionEstimation(100),
+		TxEstimatedTime:         100,
 		TxFee:                   (*hexutil.Big)(big.NewInt(100)),
 		TxL1Fee:                 (*hexutil.Big)(big.NewInt(100)),
 		ApprovalRequired:        true,
@@ -46,7 +45,7 @@ func TestCopyPath(t *testing.T) {
 		ApprovalBaseFee:         (*hexutil.Big)(big.NewInt(100)),
 		ApprovalPriorityFee:     (*hexutil.Big)(big.NewInt(100)),
 		ApprovalGasAmount:       100,
-		ApprovalEstimatedTime:   fees.TransactionEstimation(100),
+		ApprovalEstimatedTime:   100,
 		ApprovalFee:             (*hexutil.Big)(big.NewInt(100)),
 		ApprovalL1Fee:           (*hexutil.Big)(big.NewInt(100)),
 		TxTotalFee:              (*hexutil.Big)(big.NewInt(100)),

@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/rpc/network/db"
 )
 
 // MergeProvidersPreservingUsersAndEnabledState merges new embedded providers with the current ones,
@@ -51,7 +53,7 @@ func ToggleUserProviders(providers []params.RpcProvider, enabled bool) []params.
 
 // GetEmbeddedProviders returns the embedded providers from the list.
 func GetEmbeddedProviders(providers []params.RpcProvider) []params.RpcProvider {
-	var embeddedProviders []params.RpcProvider
+	embeddedProviders := make([]params.RpcProvider, 0, len(providers))
 	for _, provider := range providers {
 		if provider.Type != params.UserProviderType {
 			embeddedProviders = append(embeddedProviders, provider)
@@ -62,7 +64,7 @@ func GetEmbeddedProviders(providers []params.RpcProvider) []params.RpcProvider {
 
 // GetUserProviders returns the user-defined providers from the list.
 func GetUserProviders(providers []params.RpcProvider) []params.RpcProvider {
-	var userProviders []params.RpcProvider
+	userProviders := make([]params.RpcProvider, 0, len(providers))
 	for _, provider := range providers {
 		if provider.Type == params.UserProviderType {
 			userProviders = append(userProviders, provider)
@@ -91,45 +93,37 @@ func ReplaceEmbeddedProviders(currentProviders, newEmbeddedProviders []params.Rp
 	return append(userProviders, embeddedProviders...)
 }
 
-// OverrideEmbeddedProxyProviders updates all embedded-proxy providers in the given networks.
-// It sets the `Enabled` flag and configures the `AuthLogin` and `AuthPassword` for each provider.
-func OverrideEmbeddedProxyProviders(networks []params.Network, enabled bool, user, password string) []params.Network {
-	updatedNetworks := make([]params.Network, len(networks))
-	for i, network := range networks {
-		// Deep copy the network to avoid mutating the input slice
-		updatedNetwork := network
-		updatedProviders := make([]params.RpcProvider, len(network.RpcProviders))
+// OverrideBasicAuth updates providers of the specified type in the given networks.
+// It sets the `Enabled` flag and configures the `AuthLogin` and `AuthPassword` for each matching provider.
+func OverrideBasicAuth(networks []params.Network, providerType params.RpcProviderType, enabled bool, user, password security.SensitiveString) []params.Network {
+	updatedNetworks := DeepCopyNetworks(networks)
 
-		// Update the embedded-proxy providers
-		for j, provider := range network.RpcProviders {
-			if provider.Type == params.EmbeddedProxyProviderType {
+	for i := range updatedNetworks {
+		network := &updatedNetworks[i]
+		for j := range network.RpcProviders {
+			provider := &network.RpcProviders[j]
+			if provider.Type == providerType {
 				provider.Enabled = enabled
+				provider.AuthType = params.BasicAuth
 				provider.AuthLogin = user
 				provider.AuthPassword = password
 			}
-			updatedProviders[j] = provider
 		}
-
-		updatedNetwork.RpcProviders = updatedProviders
-		updatedNetworks[i] = updatedNetwork
 	}
 
 	return updatedNetworks
 }
 
-func deepCopyNetworks(networks []params.Network) []params.Network {
+func DeepCopyNetworks(networks []params.Network) []params.Network {
 	updatedNetworks := make([]params.Network, len(networks))
 	for i, network := range networks {
-		updatedNetwork := network
-		updatedNetwork.RpcProviders = make([]params.RpcProvider, len(network.RpcProviders))
-		copy(updatedNetwork.RpcProviders, network.RpcProviders)
-		updatedNetworks[i] = updatedNetwork
+		updatedNetworks[i] = network.DeepCopy()
 	}
 	return updatedNetworks
 }
 
-func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[string]string) []params.Network {
-	updatedNetworks := deepCopyNetworks(networks)
+func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[string]security.SensitiveString) []params.Network {
+	updatedNetworks := DeepCopyNetworks(networks)
 
 	for i := range updatedNetworks {
 		network := &updatedNetworks[i]
@@ -141,38 +135,20 @@ func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[strin
 				continue
 			}
 
-			host, err := extractHost(provider.URL)
+			host, err := extractHost(provider.URL.Reveal())
 			if err != nil {
 				continue
 			}
 
 			for suffix, token := range authTokens {
-				if strings.HasSuffix(host, suffix) && token != "" {
+				if strings.HasSuffix(host, suffix) && !token.Empty() {
 					provider.AuthType = params.TokenAuth
 					provider.AuthToken = token
 					break
 				}
 			}
 		}
-	}
-	return updatedNetworks
-}
-
-func OverrideGanacheToken(networks []params.Network, ganacheURL string, chainID uint64, tokenOverride params.TokenOverride) []params.Network {
-	updatedNetworks := deepCopyNetworks(networks)
-
-	for i := range updatedNetworks {
-		network := &updatedNetworks[i]
-
-		if network.ChainID != chainID {
-			continue
-		}
-		for j := range network.RpcProviders {
-			if ganacheURL != "" {
-				network.RpcProviders[j].URL = ganacheURL
-			}
-		}
-		network.TokenOverrides = []params.TokenOverride{tokenOverride}
+		db.FillDeprecatedURLs(network, network.RpcProviders)
 	}
 	return updatedNetworks
 }

@@ -28,7 +28,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
-	walletToken "github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -39,12 +39,6 @@ var (
 		Policy: async.ReplacementPolicyCancelOld,
 	}
 )
-
-type amountOption struct {
-	amount       *big.Int
-	locked       bool
-	subtractFees bool
-}
 
 func makeBalanceKey(chainID uint64, symbol string) string {
 	return fmt.Sprintf("%d-%s", chainID, symbol)
@@ -142,14 +136,18 @@ func (r *Router) SetTestBalanceMap(balanceMap map[string]*big.Int) {
 	}
 }
 
-func (r *Router) setCustomTxDetails(pathTxIdentity *requests.PathTxIdentity, pathTxCustomParams *requests.PathTxCustomParams) error {
+func (r *Router) setCustomTxDetails(ctx context.Context, pathTxIdentity *requests.PathTxIdentity, pathTxCustomParams *requests.PathTxCustomParams) error {
 	if pathTxIdentity == nil {
 		return ErrTxIdentityNotProvided
+	}
+	err := pathTxIdentity.Validate()
+	if err != nil {
+		return err
 	}
 	if pathTxCustomParams == nil {
 		return ErrTxCustomParamsNotProvided
 	}
-	err := pathTxCustomParams.Validate()
+	err = pathTxCustomParams.Validate()
 	if err != nil {
 		return err
 	}
@@ -160,17 +158,33 @@ func (r *Router) setCustomTxDetails(pathTxIdentity *requests.PathTxIdentity, pat
 		return ErrCannotCustomizeIfNoRoute
 	}
 
+	fetchedFees, err := r.feesManager.SuggestedFees(ctx, pathTxIdentity.ChainID)
+	if err != nil {
+		return err
+	}
+
 	for _, path := range r.activeRoutes.Best {
 		if path.PathIdentity() != pathTxIdentity.PathIdentity() {
 			continue
 		}
 
+		// update the custom params
 		r.lastInputParamsMutex.Lock()
 		if r.lastInputParams.PathTxCustomParams == nil {
 			r.lastInputParams.PathTxCustomParams = make(map[string]*requests.PathTxCustomParams)
 		}
 		r.lastInputParams.PathTxCustomParams[pathTxIdentity.TxIdentityKey()] = pathTxCustomParams
 		r.lastInputParamsMutex.Unlock()
+
+		// update the path details
+		usedNonces := make(map[uint64]uint64)
+		err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, false, 0)
+		if err != nil {
+			return err
+		}
+		_, err = r.checkBalancesForTheBestRoute(ctx, r.activeRoutes.Best)
+		// inform the client about the changes
+		sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, err)
 
 		return nil
 	}
@@ -183,14 +197,88 @@ func (r *Router) SetFeeMode(ctx context.Context, pathTxIdentity *requests.PathTx
 		return ErrCustomFeeModeCannotBeSetThisWay
 	}
 
-	return r.setCustomTxDetails(pathTxIdentity, &requests.PathTxCustomParams{GasFeeMode: feeMode})
+	return r.setCustomTxDetails(ctx, pathTxIdentity, &requests.PathTxCustomParams{GasFeeMode: feeMode})
 }
 
 func (r *Router) SetCustomTxDetails(ctx context.Context, pathTxIdentity *requests.PathTxIdentity, pathTxCustomParams *requests.PathTxCustomParams) error {
 	if pathTxCustomParams != nil && pathTxCustomParams.GasFeeMode != fees.GasFeeCustom {
 		return ErrOnlyCustomFeeModeCanBeSetThisWay
 	}
-	return r.setCustomTxDetails(pathTxIdentity, pathTxCustomParams)
+	return r.setCustomTxDetails(ctx, pathTxIdentity, pathTxCustomParams)
+}
+
+// ReevaluateRouterPath reevaluates the tx-fields from the router path that matches the provided pathTxIdentity and sends signal.SuggestedRoutes.
+func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *requests.PathTxIdentity) error {
+	if pathTxIdentity == nil {
+		return ErrTxIdentityNotProvided
+	}
+	err := pathTxIdentity.Validate()
+	if err != nil {
+		return err
+	}
+
+	r.activeRoutesMutex.Lock()
+	defer r.activeRoutesMutex.Unlock()
+	if r.activeRoutes == nil || len(r.activeRoutes.Best) == 0 {
+		return ErrNoBestRouteFound
+	}
+
+	fetchedFees, err := r.feesManager.SuggestedFees(ctx, pathTxIdentity.ChainID)
+	if err != nil {
+		return err
+	}
+
+	for _, path := range r.activeRoutes.Best {
+		if path.PathIdentity() != pathTxIdentity.PathIdentity() {
+			continue
+		}
+
+		for _, pProcessor := range r.pathProcessors {
+			if pProcessor.Name() != path.ProcessorName {
+				continue
+			}
+
+			processorInputParams, err := r.CreateProcessorInputParams(r.lastInputParams, path.FromChain, path.ToChain, path.FromToken, path.ToToken, 0)
+			if err != nil {
+				return err
+			}
+
+			txPackedData, err := pProcessor.PackTxInputData(processorInputParams)
+			if err != nil {
+				return err
+			}
+
+			gasLimit, err := pProcessor.EstimateGas(processorInputParams, txPackedData)
+			if err != nil {
+				return err
+			}
+
+			path.SuggestedTxGasAmount = gasLimit
+			path.TxGasAmount = gasLimit
+			path.TxPackedData = txPackedData
+
+			// update the path details
+			usedNonces := make(map[uint64]uint64)
+			if path.ApprovalRequired {
+				usedNonces[path.FromChain.ChainID] = uint64(*path.ApprovalTxNonce) - 1
+			} else {
+				usedNonces[path.FromChain.ChainID] = uint64(*path.TxNonce - 1)
+			}
+			err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, false, 0)
+			if err != nil {
+				return err
+			}
+
+			// inform the client about the changes
+			sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, err)
+
+			return nil
+		}
+
+		return ErrCannotFindPathProcessorForProvidedIdentity
+	}
+
+	return ErrCannotFindPathForProvidedIdentity
 }
 
 func newSuggestedRoutes(
@@ -207,12 +295,18 @@ func newSuggestedRoutes(
 		return suggestedRoutes, nil
 	}
 
+	if input.SendType.IsCommunityRelatedTransfer() {
+		res := make([]routes.Route, 0)
+		res = append(res, candidates)
+		return suggestedRoutes, res
+	}
+
 	node := &routes.Node{
 		Path:     nil,
 		Children: routes.BuildGraph(input.AmountIn.ToInt(), candidates, 0, []uint64{}),
 	}
 	allRoutes := node.BuildAllRoutes()
-	allRoutes = filterRoutes(allRoutes, input.AmountIn.ToInt(), input.FromLockedAmount)
+	allRoutes = filterRoutes(allRoutes, input.AmountIn.ToInt())
 
 	if len(allRoutes) > 0 {
 		sort.Slice(allRoutes, func(i, j int) bool {
@@ -230,15 +324,22 @@ func sendRouterResult(uuid string, result interface{}, err error) {
 		Uuid: uuid,
 	}
 
+	emptySignal := true
 	if err != nil {
 		errorResponse := errors.CreateErrorResponseFromError(err)
 		routesResponse.ErrorResponse = errorResponse.(*errors.ErrorResponse)
+		emptySignal = false
 	}
 
 	if suggestedRoutes, ok := result.(*SuggestedRoutes); ok && suggestedRoutes != nil {
 		routesResponse.Best = suggestedRoutes.Best
 		routesResponse.Candidates = suggestedRoutes.Candidates
 		routesResponse.UpdatedPrices = suggestedRoutes.UpdatedPrices
+		emptySignal = false
+	}
+
+	if emptySignal {
+		return
 	}
 
 	signal.SendWalletEvent(signal.SuggestedRoutes, routesResponse)
@@ -347,7 +448,11 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
-	suggestedRoutes, err = r.resolveRoutes(ctx, input, candidates)
+	nativeTokenSymbol := walletCommon.EthSymbol
+	if len(selectedFromChains) == 1 {
+		nativeTokenSymbol = selectedFromChains[0].NativeCurrencySymbol
+	}
+	suggestedRoutes, err = r.resolveRoutes(ctx, input, candidates, nativeTokenSymbol)
 
 	if err == nil && (suggestedRoutes == nil || len(suggestedRoutes.Best) == 0) {
 		// No best route found, but no error given.
@@ -460,155 +565,6 @@ func (r *Router) prepareBalanceMapForTokenOnChains(ctx context.Context, input *r
 	return
 }
 
-func (r *Router) getSelectedUnlockedChains(input *requests.RouteInputParams, processingChain *params.Network, selectedFromChains []*params.Network) []*params.Network {
-	selectedButNotLockedChains := []*params.Network{processingChain} // always add the processing chain at the beginning
-	for _, net := range selectedFromChains {
-		if net.ChainID == processingChain.ChainID {
-			continue
-		}
-		if _, ok := input.FromLockedAmount[net.ChainID]; !ok {
-			selectedButNotLockedChains = append(selectedButNotLockedChains, net)
-		}
-	}
-	return selectedButNotLockedChains
-}
-
-func (r *Router) getOptionsForAmoutToSplitAccrossChainsForProcessingChain(input *requests.RouteInputParams, amountToSplit *big.Int, processingChain *params.Network,
-	selectedFromChains []*params.Network) map[uint64][]amountOption {
-	selectedButNotLockedChains := r.getSelectedUnlockedChains(input, processingChain, selectedFromChains)
-
-	crossChainAmountOptions := make(map[uint64][]amountOption)
-	for _, chain := range selectedButNotLockedChains {
-		var (
-			ok           bool
-			tokenBalance *big.Int
-		)
-
-		value, ok := r.activeBalanceMap.Load(makeBalanceKey(chain.ChainID, input.TokenID))
-		if !ok {
-			continue
-		}
-		tokenBalance, ok = value.(*big.Int)
-		if !ok {
-			continue
-		}
-
-		if tokenBalance.Cmp(walletCommon.ZeroBigIntValue()) > 0 {
-			if tokenBalance.Cmp(amountToSplit) <= 0 {
-				crossChainAmountOptions[chain.ChainID] = append(crossChainAmountOptions[chain.ChainID], amountOption{
-					amount:       tokenBalance,
-					locked:       false,
-					subtractFees: true, // for chains where we're taking the full balance, we want to subtract the fees
-				})
-				amountToSplit = new(big.Int).Sub(amountToSplit, tokenBalance)
-			} else if amountToSplit.Cmp(walletCommon.ZeroBigIntValue()) > 0 {
-				crossChainAmountOptions[chain.ChainID] = append(crossChainAmountOptions[chain.ChainID], amountOption{
-					amount: amountToSplit,
-					locked: false,
-				})
-				// break since amountToSplit is fully addressed and the rest is 0
-				break
-			}
-		}
-	}
-
-	return crossChainAmountOptions
-}
-
-func (r *Router) getCrossChainsOptionsForSendingAmount(input *requests.RouteInputParams, selectedFromChains []*params.Network) map[uint64][]amountOption {
-	// All we do in this block we're free to do, because of the validateInputData function which checks if the locked amount
-	// was properly set and if there is something unexpected it will return an error and we will not reach this point
-	finalCrossChainAmountOptions := make(map[uint64][]amountOption) // represents all possible amounts that can be sent from the "from" chain
-
-	for _, selectedFromChain := range selectedFromChains {
-
-		amountLocked := false
-		amountToSend := input.AmountIn.ToInt()
-
-		if amountToSend.Cmp(walletCommon.ZeroBigIntValue()) == 0 {
-			finalCrossChainAmountOptions[selectedFromChain.ChainID] = append(finalCrossChainAmountOptions[selectedFromChain.ChainID], amountOption{
-				amount: amountToSend,
-				locked: false,
-			})
-			continue
-		}
-
-		lockedAmount, fromChainLocked := input.FromLockedAmount[selectedFromChain.ChainID]
-		if fromChainLocked {
-			amountToSend = lockedAmount.ToInt()
-			amountLocked = true
-		} else if len(input.FromLockedAmount) > 0 {
-			for chainID, lockedAmount := range input.FromLockedAmount {
-				if chainID == selectedFromChain.ChainID {
-					continue
-				}
-				amountToSend = new(big.Int).Sub(amountToSend, lockedAmount.ToInt())
-			}
-		}
-
-		if amountToSend.Cmp(walletCommon.ZeroBigIntValue()) > 0 {
-			// add full amount always, cause we want to check for balance errors at the end of the routing algorithm
-			// TODO: once we introduce bettwer error handling and start checking for the balance at the beginning of the routing algorithm
-			// we can remove this line and optimize the routing algorithm more
-			finalCrossChainAmountOptions[selectedFromChain.ChainID] = append(finalCrossChainAmountOptions[selectedFromChain.ChainID], amountOption{
-				amount: amountToSend,
-				locked: amountLocked,
-			})
-
-			if amountLocked {
-				continue
-			}
-
-			// If the amount that need to be send is bigger than the balance on the chain, then we want to check options if that
-			// amount can be splitted and sent across multiple chains.
-			if input.SendType == sendtype.Transfer && len(selectedFromChains) > 1 {
-				// All we do in this block we're free to do, because of the validateInputData function which checks if the locked amount
-				// was properly set and if there is something unexpected it will return an error and we will not reach this point
-				amountToSplitAccrossChains := new(big.Int).Set(amountToSend)
-
-				crossChainAmountOptions := r.getOptionsForAmoutToSplitAccrossChainsForProcessingChain(input, amountToSend, selectedFromChain, selectedFromChains)
-
-				// sum up all the allocated amounts accorss all chains
-				allocatedAmount := big.NewInt(0)
-				for _, amountOptions := range crossChainAmountOptions {
-					for _, amountOption := range amountOptions {
-						allocatedAmount = new(big.Int).Add(allocatedAmount, amountOption.amount)
-					}
-				}
-
-				// if the allocated amount is the same as the amount that need to be sent, then we can add the options to the finalCrossChainAmountOptions
-				if allocatedAmount.Cmp(amountToSplitAccrossChains) == 0 {
-					for cID, amountOptions := range crossChainAmountOptions {
-						finalCrossChainAmountOptions[cID] = append(finalCrossChainAmountOptions[cID], amountOptions...)
-					}
-				}
-			}
-		}
-	}
-
-	return finalCrossChainAmountOptions
-}
-
-func (r *Router) findOptionsForSendingAmount(input *requests.RouteInputParams, selectedFromChains []*params.Network) (map[uint64][]amountOption, error) {
-
-	crossChainAmountOptions := r.getCrossChainsOptionsForSendingAmount(input, selectedFromChains)
-
-	// filter out duplicates values for the same chain
-	for chainID, amountOptions := range crossChainAmountOptions {
-		uniqueAmountOptions := make(map[string]amountOption)
-		for _, amountOption := range amountOptions {
-			uniqueAmountOptions[amountOption.amount.String()] = amountOption
-		}
-
-		crossChainAmountOptions[chainID] = make([]amountOption, 0)
-		for _, amountOption := range uniqueAmountOptions {
-			crossChainAmountOptions[chainID] = append(crossChainAmountOptions[chainID], amountOption)
-		}
-	}
-
-	return crossChainAmountOptions, nil
-}
-
 func (r *Router) getSelectedChains(input *requests.RouteInputParams) (selectedFromChains []*params.Network, selectedToChains []*params.Network, err error) {
 	var networks []*params.Network
 	networks, err = r.rpcClient.NetworkManager.Get(false)
@@ -633,6 +589,84 @@ func (r *Router) getSelectedChains(input *requests.RouteInputParams) (selectedFr
 	return selectedFromChains, selectedToChains, nil
 }
 
+func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fromNetwork *params.Network, toNetwork *params.Network,
+	fromToken *tokenTypes.Token, toToken *tokenTypes.Token, useCommunityTokenTransferDetailsAtIndex int) (pathprocessor.ProcessorInputParams, error) {
+	var err error
+	processorInputParams := pathprocessor.ProcessorInputParams{
+		FromChain:          fromNetwork,
+		ToChain:            toNetwork,
+		FromToken:          fromToken,
+		ToToken:            toToken,
+		ToAddr:             input.AddrTo,
+		FromAddr:           input.AddrFrom,
+		AmountIn:           input.AmountIn.ToInt(),
+		SlippagePercentage: input.SlippagePercentage,
+
+		Username:  input.Username,
+		PublicKey: input.PublicKey,
+		PackID:    input.PackID.ToInt(),
+	}
+
+	if input.AmountOut != nil {
+		processorInputParams.AmountOut = input.AmountOut.ToInt()
+	}
+
+	if input.PackID != nil {
+		processorInputParams.PackID = input.PackID.ToInt()
+	}
+
+	if input.SendType.IsCommunityRelatedTransfer() {
+		processorInputParams.CommunityParams = input.CommunityRouteInputParams
+
+		if input.CommunityRouteInputParams.UseTransferDetails() && fromNetwork != nil {
+			tokenContractAddress := input.CommunityRouteInputParams.TransferDetails[useCommunityTokenTransferDetailsAtIndex].TokenContractAddress
+			tokenType, err := r.tokenManager.GetCommunityTokenType(fromNetwork.ChainID, tokenContractAddress.String())
+			if err != nil {
+				return processorInputParams, err
+			}
+
+			privilegeLevel, err := r.tokenManager.GetCommunityTokenPrivilegesLevel(fromNetwork.ChainID, tokenContractAddress.String())
+			if err != nil {
+				return processorInputParams, err
+			}
+
+			input.CommunityRouteInputParams.TransferDetails[useCommunityTokenTransferDetailsAtIndex].TokenType = tokenType
+			input.CommunityRouteInputParams.TransferDetails[useCommunityTokenTransferDetailsAtIndex].PrivilegeLevel = privilegeLevel
+
+			err = input.CommunityRouteInputParams.SetInternalParams(useCommunityTokenTransferDetailsAtIndex)
+			if err != nil {
+				return processorInputParams, err
+			}
+		}
+	}
+
+	if input.TestsMode {
+		processorInputParams.TestsMode = input.TestsMode
+		processorInputParams.TestEstimationMap = input.TestParams.EstimationMap
+		processorInputParams.TestBonderFeeMap = input.TestParams.BonderFeeMap
+		processorInputParams.TestApprovalGasEstimation = input.TestParams.ApprovalGasEstimation
+		processorInputParams.TestApprovalL1Fee = input.TestParams.ApprovalL1Fee
+	}
+
+	return processorInputParams, err
+}
+
+func (r *Router) findFromAndToTokens(testsMode bool, input *requests.RouteInputParams, network *params.Network) (fromToken *tokenTypes.Token, toToken *tokenTypes.Token) {
+	if testsMode {
+		fromToken = input.TestParams.TokenFrom
+	} else {
+		fromToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.TokenID)
+	}
+	if fromToken == nil {
+		return
+	}
+
+	if input.SendType == sendtype.Swap {
+		toToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, common.Address{}, network, input.ToTokenID)
+	}
+	return
+}
+
 func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInputParams, selectedFromChains []*params.Network,
 	selectedToChains []*params.Network) (candidates routes.Route, processorErrors []*ProcessorError, err error) {
 	var (
@@ -644,11 +678,6 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 		usedNonces   = make(map[uint64]uint64)
 		usedNoncesMu sync.Mutex
 	)
-
-	crossChainAmountOptions, err := r.findOptionsForSendingAmount(input, selectedFromChains)
-	if err != nil {
-		return nil, nil, errors.CreateErrorResponseFromError(err)
-	}
 
 	appendProcessorErrorFn := func(processorName string, sendType sendtype.SendType, fromChainID uint64, toChainID uint64, amount *big.Int, err error) {
 		logutils.ZapLogger().Error("router.resolveCandidates error",
@@ -679,22 +708,9 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 			continue
 		}
 
-		var (
-			token   *walletToken.Token
-			toToken *walletToken.Token
-		)
-
-		if testsMode {
-			token = input.TestParams.TokenFrom
-		} else {
-			token = findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.TokenID)
-		}
+		token, toToken := r.findFromAndToTokens(testsMode, input, network)
 		if token == nil {
 			continue
-		}
-
-		if input.SendType == sendtype.Swap {
-			toToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, common.Address{}, network, input.ToTokenID)
 		}
 
 		var fetchedFees *fees.SuggestedFees
@@ -708,149 +724,55 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 		}
 
 		group.Add(func(c context.Context) error {
-			for _, amountOption := range crossChainAmountOptions[network.ChainID] {
-				for _, pProcessor := range r.pathProcessors {
-					// With the condition below we're eliminating `Swap` as potential path that can participate in calculating the best route
-					// once we decide to inlcude `Swap` in the calculation we need to update `canUseProcessor` function.
-					// This also applies to including another (Celer) bridge in the calculation.
-					// TODO:
-					// this algorithm, includeing finding the best route, has to be updated to include more bridges and one (for now) or more swap options
-					// it means that candidates should not be treated linearly, but improve the logic to have multiple routes with different processors of the same type.
-					// Example:
-					// Routes for sending SNT from Ethereum to Optimism can be:
-					// 1. Swap SNT(mainnet) to ETH(mainnet); then bridge via Hop ETH(mainnet) to ETH(opt); then Swap ETH(opt) to SNT(opt); then send SNT (opt) to the destination
-					// 2. Swap SNT(mainnet) to ETH(mainnet); then bridge via Celer ETH(mainnet) to ETH(opt); then Swap ETH(opt) to SNT(opt); then send SNT (opt) to the destination
-					// 3. Swap SNT(mainnet) to USDC(mainnet); then bridge via Hop USDC(mainnet) to USDC(opt); then Swap USDC(opt) to SNT(opt); then send SNT (opt) to the destination
-					// 4. Swap SNT(mainnet) to USDC(mainnet); then bridge via Celer USDC(mainnet) to USDC(opt); then Swap USDC(opt) to SNT(opt); then send SNT (opt) to the destination
-					// 5. ...
-					// 6. ...
-					//
-					// With the current routing algorithm atm we're not able to generate all possible routes.
-					if !input.SendType.CanUseProcessor(pProcessor.Name()) {
-						continue
-					}
+			for _, pProcessor := range r.pathProcessors {
+				// With the condition below we're eliminating `Swap` as potential path that can participate in calculating the best route
+				// once we decide to inlcude `Swap` in the calculation we need to update `canUseProcessor` function.
+				// This also applies to including another (Celer) bridge in the calculation.
+				// TODO:
+				// this algorithm, includeing finding the best route, has to be updated to include more bridges and one (for now) or more swap options
+				// it means that candidates should not be treated linearly, but improve the logic to have multiple routes with different processors of the same type.
+				// Example:
+				// Routes for sending SNT from Ethereum to Optimism can be:
+				// 1. Swap SNT(mainnet) to ETH(mainnet); then bridge via Hop ETH(mainnet) to ETH(opt); then Swap ETH(opt) to SNT(opt); then send SNT (opt) to the destination
+				// 2. Swap SNT(mainnet) to ETH(mainnet); then bridge via Celer ETH(mainnet) to ETH(opt); then Swap ETH(opt) to SNT(opt); then send SNT (opt) to the destination
+				// 3. Swap SNT(mainnet) to USDC(mainnet); then bridge via Hop USDC(mainnet) to USDC(opt); then Swap USDC(opt) to SNT(opt); then send SNT (opt) to the destination
+				// 4. Swap SNT(mainnet) to USDC(mainnet); then bridge via Celer USDC(mainnet) to USDC(opt); then Swap USDC(opt) to SNT(opt); then send SNT (opt) to the destination
+				// 5. ...
+				// 6. ...
+				//
+				// With the current routing algorithm atm we're not able to generate all possible routes.
+				if !input.SendType.CanUseProcessor(pProcessor.Name()) {
+					continue
+				}
 
-					// if we're doing a single chain operation, we can skip bridge processors
-					if walletCommon.IsSingleChainOperation(selectedFromChains, selectedToChains) && walletCommon.IsProcessorBridge(pProcessor.Name()) {
-						continue
-					}
+				// if we're doing a single chain operation, we can skip bridge processors
+				if walletCommon.IsSingleChainOperation(selectedFromChains, selectedToChains) && walletCommon.IsProcessorBridge(pProcessor.Name()) {
+					continue
+				}
 
-					if !input.SendType.ProcessZeroAmountInProcessor(amountOption.amount, input.AmountOut.ToInt(), pProcessor.Name()) {
-						continue
-					}
+				if !input.SendType.ProcessZeroAmountInProcessor(input.AmountIn.ToInt(), input.AmountOut.ToInt(), pProcessor.Name()) {
+					continue
+				}
 
-					for _, dest := range selectedToChains {
-
-						if !input.SendType.IsAvailableFor(network) {
-							continue
-						}
-
-						if !input.SendType.IsAvailableBetween(network, dest) {
-							continue
-						}
-
-						processorInputParams := pathprocessor.ProcessorInputParams{
-							FromChain: network,
-							ToChain:   dest,
-							FromToken: token,
-							ToToken:   toToken,
-							ToAddr:    input.AddrTo,
-							FromAddr:  input.AddrFrom,
-							AmountIn:  amountOption.amount,
-							AmountOut: input.AmountOut.ToInt(),
-
-							Username:  input.Username,
-							PublicKey: input.PublicKey,
-							PackID:    input.PackID.ToInt(),
-						}
-						if input.TestsMode {
-							processorInputParams.TestsMode = input.TestsMode
-							processorInputParams.TestEstimationMap = input.TestParams.EstimationMap
-							processorInputParams.TestBonderFeeMap = input.TestParams.BonderFeeMap
-							processorInputParams.TestApprovalGasEstimation = input.TestParams.ApprovalGasEstimation
-							processorInputParams.TestApprovalL1Fee = input.TestParams.ApprovalL1Fee
-						}
-
-						can, err := pProcessor.AvailableFor(processorInputParams)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-							continue
-						}
-						if !can {
-							continue
-						}
-
-						bonderFees, tokenFees, err := pProcessor.CalculateFees(processorInputParams)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-							continue
-						}
-
-						gasLimit, err := pProcessor.EstimateGas(processorInputParams)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-							continue
-						}
-
-						approvalContractAddress, err := pProcessor.GetContractAddress(processorInputParams)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-							continue
-						}
-						approvalRequired, approvalAmountRequired, err := r.requireApproval(ctx, input.SendType, &approvalContractAddress, processorInputParams)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-							continue
-						}
-
-						var approvalGasLimit uint64
-						if approvalRequired {
-							if processorInputParams.TestsMode {
-								approvalGasLimit = processorInputParams.TestApprovalGasEstimation
-							} else {
-								approvalGasLimit, err = r.estimateGasForApproval(processorInputParams, &approvalContractAddress)
-								if err != nil {
-									appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-									continue
-								}
+				for _, dest := range selectedToChains {
+					if input.UseCommunityTransferDetails() {
+						for i := 0; i < len(input.CommunityRouteInputParams.TransferDetails); i++ {
+							usedNoncesMu.Lock()
+							path, err := r.buildPath(ctx, input, network, dest, token, toToken, pProcessor, fetchedFees, usedNonces, i)
+							usedNoncesMu.Unlock()
+							if err != nil {
+								appendProcessorErrorFn(pProcessor.Name(), input.SendType, network.ChainID, dest.ChainID, input.AmountIn.ToInt(), err)
+								continue
 							}
+
+							appendPathFn(path)
 						}
-
-						amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-							continue
-						}
-
-						path := &routes.Path{
-							RouterInputParamsUuid: input.Uuid,
-							ProcessorName:         pProcessor.Name(),
-							FromChain:             network,
-							ToChain:               dest,
-							FromToken:             token,
-							ToToken:               toToken,
-							AmountIn:              (*hexutil.Big)(amountOption.amount),
-							AmountInLocked:        amountOption.locked,
-							AmountOut:             (*hexutil.Big)(amountOut),
-
-							// set params that we don't want to be recalculated with every new block creation
-							TxGasAmount:  gasLimit,
-							TxBonderFees: (*hexutil.Big)(bonderFees),
-							TxTokenFees:  (*hexutil.Big)(tokenFees),
-
-							ApprovalRequired:        approvalRequired,
-							ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
-							ApprovalContractAddress: &approvalContractAddress,
-							ApprovalGasAmount:       approvalGasLimit,
-
-							SubtractFees: amountOption.subtractFees,
-						}
-
+					} else {
 						usedNoncesMu.Lock()
-						err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, processorInputParams.TestsMode, processorInputParams.TestApprovalL1Fee)
+						path, err := r.buildPath(ctx, input, network, dest, token, toToken, pProcessor, fetchedFees, usedNonces, 0)
 						usedNoncesMu.Unlock()
 						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
+							appendProcessorErrorFn(pProcessor.Name(), input.SendType, network.ChainID, dest.ChainID, input.AmountIn.ToInt(), err)
 							continue
 						}
 
@@ -870,6 +792,143 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 
 	group.Wait()
 	return candidates, processorErrors, nil
+}
+
+func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams, fromNetwork *params.Network,
+	toNetwork *params.Network, fromToken *tokenTypes.Token, toToken *tokenTypes.Token,
+	pathProcessor pathprocessor.PathProcessor, fetchedFees *fees.SuggestedFees, usedNonces map[uint64]uint64,
+	useCommunityTokenTransferDetailsAtIndex int) (*routes.Path, error) {
+	if !input.SendType.IsAvailableFor(fromNetwork) {
+		return nil, ErrPathNotSupportedForProvidedChain
+	}
+
+	if !input.SendType.IsAvailableBetween(fromNetwork, toNetwork) {
+		return nil, ErrPathNotSupportedBetweenProvidedChains
+	}
+
+	processorInputParams, err := r.CreateProcessorInputParams(input, fromNetwork, toNetwork, fromToken, toToken, useCommunityTokenTransferDetailsAtIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	can, err := pathProcessor.AvailableFor(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+	if !can {
+		return nil, ErrPathNotAvaliableForProvidedParameters
+	}
+
+	bonderFees, tokenFees, err := pathProcessor.CalculateFees(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	contractAddress, err := pathProcessor.GetContractAddress(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+	approvalRequired, approvalAmountRequired, err := r.requireApproval(ctx, input.SendType, &contractAddress, processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		approvalGasLimit   uint64
+		approvalPackedData []byte
+		gasLimit           uint64
+		txPackedData       []byte
+	)
+	if approvalRequired {
+		if processorInputParams.TestsMode {
+			approvalGasLimit = processorInputParams.TestApprovalGasEstimation
+		} else {
+			approvalPackedData, err = walletCommon.PackApprovalInputData(processorInputParams.AmountIn, &contractAddress)
+			if err != nil {
+				return nil, err
+			}
+			approvalGasLimit, err = r.estimateGasForApproval(processorInputParams, approvalPackedData)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Until we change the logic for Bridge to follow the same logic as for Swap (meaning first approval, then bridge tx) we have to provide txPackedData
+	// otherwise we could do the logic below in the else block of `if approvalRequired` codition.
+	if input.SendType != sendtype.Swap || !approvalRequired {
+		txPackedData, err = pathProcessor.PackTxInputData(processorInputParams)
+		if err != nil {
+			return nil, err
+		}
+
+		gasLimit, err = pathProcessor.EstimateGas(processorInputParams, txPackedData)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	amountOut, err := pathProcessor.CalculateAmountOut(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	path := &routes.Path{
+		RouterInputParamsUuid: input.Uuid,
+		ProcessorName:         pathProcessor.Name(),
+		FromChain:             fromNetwork,
+		ToChain:               toNetwork,
+		FromToken:             fromToken,
+		ToToken:               toToken,
+		AmountIn:              (*hexutil.Big)(processorInputParams.AmountIn),
+		AmountOut:             (*hexutil.Big)(amountOut),
+
+		// set params that we don't want to be recalculated with every new block creation
+		SuggestedTxGasAmount:       gasLimit,
+		SuggestedApprovalGasAmount: approvalGasLimit,
+
+		UsedContractAddress: &contractAddress,
+		TxPackedData:        txPackedData,
+		TxGasAmount:         gasLimit,
+		TxBonderFees:        (*hexutil.Big)(bonderFees),
+		TxTokenFees:         (*hexutil.Big)(tokenFees),
+
+		ApprovalRequired:        approvalRequired,
+		ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
+		ApprovalContractAddress: &contractAddress,
+		ApprovalPackedData:      approvalPackedData,
+		ApprovalGasAmount:       approvalGasLimit,
+	}
+
+	tokenBalance, ok := r.activeBalanceMap.Load(makeBalanceKey(path.FromChain.ChainID, path.FromToken.Symbol))
+	if ok {
+		tokenBalanceBigInt, ok := tokenBalance.(*big.Int)
+		if ok &&
+			processorInputParams.AmountIn.Cmp(walletCommon.ZeroBigIntValue()) > 0 &&
+			tokenBalanceBigInt.Cmp(processorInputParams.AmountIn) == 0 {
+			path.SubtractFees = true
+		}
+	}
+
+	if input.SendType.IsCommunityRelatedTransfer() {
+		// set community params copy as community params for the path instance
+		communityParams := processorInputParams.CommunityParams.Copy()
+		if input.UseCommunityTransferDetails() {
+			// in case of multi token community transfer we need to set the internal params to refer to the correct token
+			err = communityParams.SetInternalParams(useCommunityTokenTransferDetailsAtIndex)
+			if err != nil {
+				return nil, err
+			}
+		}
+		path.SetCommunityParams(communityParams)
+	}
+
+	err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, processorInputParams.TestsMode, processorInputParams.TestApprovalL1Fee)
+	if err != nil {
+		return nil, err
+	}
+
+	return path, nil
 }
 
 func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute routes.Route) (hasPositiveBalance bool, err error) {
@@ -913,16 +972,16 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute rou
 			}
 		}
 
-		ethKey := makeBalanceKey(path.FromChain.ChainID, walletCommon.EthSymbol)
-		if nativeBalance, ok := balanceMapCopy[ethKey]; ok {
+		nativeTokenKey := makeBalanceKey(path.FromChain.ChainID, path.FromChain.NativeCurrencySymbol)
+		if nativeBalance, ok := balanceMapCopy[nativeTokenKey]; ok {
 			if nativeBalance.Cmp(path.RequiredNativeBalance) == -1 {
 				err := &errors.ErrorResponse{
 					Code:    ErrNotEnoughNativeBalance.Code,
-					Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, walletCommon.EthSymbol, path.FromChain.ChainID),
+					Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, path.FromChain.NativeCurrencySymbol, path.FromChain.ChainID),
 				}
 				return hasPositiveBalance, err
 			}
-			balanceMapCopy[ethKey].Sub(nativeBalance, path.RequiredNativeBalance)
+			balanceMapCopy[nativeTokenKey].Sub(nativeBalance, path.RequiredNativeBalance)
 		} else {
 			return hasPositiveBalance, ErrNativeTokenNotFound
 		}
@@ -931,7 +990,7 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute rou
 	return hasPositiveBalance, nil
 }
 
-func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputParams, candidates routes.Route) (suggestedRoutes *SuggestedRoutes, err error) {
+func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputParams, candidates routes.Route, nativeTokenSymbol string) (suggestedRoutes *SuggestedRoutes, err error) {
 	var prices map[string]float64
 	if input.TestsMode {
 		prices = input.TestParams.TokenPrices
@@ -943,13 +1002,13 @@ func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputPa
 	}
 
 	tokenPrice := prices[input.TokenID]
-	nativeTokenPrice := prices[walletCommon.EthSymbol]
+	nativeTokenPrice := prices[nativeTokenSymbol]
 
 	var allRoutes []routes.Route
 	suggestedRoutes, allRoutes = newSuggestedRoutes(input, candidates, prices)
 
 	defer func() {
-		if suggestedRoutes.Best != nil && len(suggestedRoutes.Best) > 0 {
+		if len(suggestedRoutes.Best) > 0 {
 			sort.Slice(suggestedRoutes.Best, func(i, j int) bool {
 				iChain := getChainPriority(suggestedRoutes.Best[i].FromChain.ChainID)
 				jChain := getChainPriority(suggestedRoutes.Best[j].FromChain.ChainID)
@@ -998,7 +1057,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputPa
 	}
 
 	if len(bestRoute) > 0 {
-		// At this point we have to do the final check and update the amountIn (subtracting fees) if complete balance is going to be sent for native token (ETH)
+		// At this point we have to do the final check and update the amountIn (subtracting fees) if complete balance is going to be sent for native token (ETH/BNB)
 		for _, path := range bestRoute {
 			if path.SubtractFees && path.FromToken.IsNative() {
 				path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxFee.ToInt())

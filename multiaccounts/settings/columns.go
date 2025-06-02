@@ -227,6 +227,26 @@ var (
 		dBColumnName:   "networks",
 		valueHandler:   JSONBlobHandler,
 	}
+	NewsFeedEnabled = SettingField{
+		reactFieldName: "news-feed-enabled?",
+		dBColumnName:   "news_feed_enabled",
+		valueHandler:   BoolHandler,
+	}
+	NewsFeedLastFetchedTimestamp = SettingField{
+		reactFieldName: "news-feed-last-fetched-timestamp",
+		dBColumnName:   "news_feed_last_fetched_timestamp",
+		valueHandler:   TimeHandler,
+	}
+	NewsNotificationsEnabled = SettingField{
+		reactFieldName: "news-notifications-enabled?",
+		dBColumnName:   "news_notifications_enabled",
+		valueHandler:   BoolHandler,
+	}
+	NewsRSSEnabled = SettingField{
+		reactFieldName: "news-rss-enabled?",
+		dBColumnName:   "news_rss_enabled",
+		valueHandler:   BoolHandler,
+	}
 	NodeConfig = SettingField{
 		reactFieldName: "node-config",
 		dBColumnName:   "node_config",
@@ -322,6 +342,11 @@ var (
 	RemotePushNotificationsEnabled = SettingField{
 		reactFieldName: "remote-push-notifications-enabled?",
 		dBColumnName:   "remote_push_notifications_enabled",
+		valueHandler:   BoolHandler,
+	}
+	MessengerNotificationsEnabled = SettingField{
+		reactFieldName: "messenger-notifications-enabled?",
+		dBColumnName:   "messenger_notifications_enabled",
 		valueHandler:   BoolHandler,
 	}
 	SendPushNotifications = SettingField{
@@ -501,6 +526,22 @@ var (
 		dBColumnName:   "peer_syncing_enabled",
 		valueHandler:   BoolHandler,
 	}
+	AutoRefreshTokensEnabled = SettingField{
+		reactFieldName: "auto-refresh-tokens-enabled",
+		dBColumnName:   "auto_refresh_tokens_enabled",
+		valueHandler:   BoolHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			fromInterface:     autoRefreshTokensEnabledProtobufFactory,
+			fromStruct:        autoRefreshTokensEnabledProtobufFactoryStruct,
+			valueFromProtobuf: BoolFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_AUTO_REFRESH_TOKENS_ENABLED,
+		},
+	}
+	LastTokensUpdate = SettingField{
+		reactFieldName: "last-tokens-update",
+		dBColumnName:   "last_tokens_update",
+		valueHandler:   TimeHandler,
+	}
 	SettingFieldRegister = []SettingField{
 		AnonMetricsShouldSend,
 		Appearance,
@@ -543,6 +584,11 @@ var (
 		Name,
 		NetworksCurrentNetwork,
 		NetworksNetworks,
+		NewsFeedEnabled,
+		NewsFeedLastFetchedTimestamp,
+		NewsNotificationsEnabled,
+		NewsRSSEnabled,
+		MessengerNotificationsEnabled,
 		NodeConfig,
 		NotificationsEnabled,
 		OpenseaEnabled,
@@ -577,6 +623,8 @@ var (
 		WalletSetUpPassed,
 		WalletVisibleTokens,
 		WebviewAllowPermissionRequests,
+		AutoRefreshTokensEnabled,
+		LastTokensUpdate,
 	}
 )
 

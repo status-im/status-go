@@ -9,16 +9,49 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	mock_paraswap "github.com/status-im/status-go/services/wallet/thirdparty/paraswap/mock"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func expectClientFetchPriceRoute(clientMock *mock_paraswap.MockClientInterface, route paraswap.Route, err error) {
+	clientMock.EXPECT().FetchPriceRoute(
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+	).Return(route, err)
+}
+
+func expectClientBuildTransaction(clientMock *mock_paraswap.MockClientInterface, transaction paraswap.Transaction, priceRoute *paraswap.Route, err error) {
+	clientMock.EXPECT().BuildTransactionWithRetry(
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+	).Return(transaction, priceRoute, err)
+}
 
 func TestParaswapWithPartnerFee(t *testing.T) {
 	testPriceRoute := &paraswap.Route{
@@ -34,12 +67,29 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 		TokenTransferProxy: common.HexToAddress("0xabc"),
 	}
 
-	processor := NewSwapParaswapProcessor(nil, nil, nil)
+	testTransaction := &paraswap.Transaction{
+		From:     "0x111",
+		To:       "0x222",
+		Value:    testPriceRoute.SrcAmount.Int.String(),
+		Data:     "0xabcd",
+		GasPrice: "100",
+		Gas:      "1000",
+		ChainID:  1,
+		Error:    "",
+	}
 
-	fromToken := token.Token{
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := mock_paraswap.NewMockClientInterface(ctrl)
+
+	processor := NewSwapParaswapProcessor(nil, nil, nil)
+	processor.paraswapClient = client
+
+	fromToken := tokenTypes.Token{
 		Symbol: walletCommon.EthSymbol,
 	}
-	toToken := token.Token{
+	toToken := tokenTypes.Token{
 		Symbol: walletCommon.UsdcSymbol,
 	}
 	chainIDs := []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.UnknownChainID}
@@ -49,6 +99,8 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 		processor.priceRoute.Store(key, testPriceRoute)
 
 		testInputParams := ProcessorInputParams{
+			FromAddr:  common.HexToAddress(testTransaction.From),
+			ToAddr:    common.HexToAddress(testTransaction.To),
 			FromChain: &params.Network{ChainID: chainID},
 			ToChain:   &params.Network{ChainID: chainID},
 			FromToken: &fromToken,
@@ -78,24 +130,16 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 		}
 
 		// Check contract address
+		expectClientFetchPriceRoute(client, *testPriceRoute, nil)
 		contractAddress, err := processor.GetContractAddress(testInputParams)
 		require.NoError(t, err)
 		require.Equal(t, testPriceRoute.TokenTransferProxy, contractAddress)
-	}
-}
 
-func expectClientFetchPriceRoute(clientMock *mock_paraswap.MockClientInterface, route paraswap.Route, err error) {
-	clientMock.EXPECT().FetchPriceRoute(
-		gomock.Any(),
-		gomock.Any(),
-		gomock.Any(),
-		gomock.Any(),
-		gomock.Any(),
-		gomock.Any(),
-		gomock.Any(),
-		gomock.Any(),
-		gomock.Any(),
-	).Return(route, err)
+		expectClientBuildTransaction(client, *testTransaction, nil, nil)
+		inputData, err := processor.PackTxInputData(testInputParams)
+		assert.NoError(t, err)
+		assert.Equal(t, testTransaction.Data, hexutil.Encode(inputData))
+	}
 }
 
 func TestParaswapErrors(t *testing.T) {
@@ -107,10 +151,10 @@ func TestParaswapErrors(t *testing.T) {
 	processor := NewSwapParaswapProcessor(nil, nil, nil)
 	processor.paraswapClient = client
 
-	fromToken := token.Token{
+	fromToken := tokenTypes.Token{
 		Symbol: walletCommon.EthSymbol,
 	}
-	toToken := token.Token{
+	toToken := tokenTypes.Token{
 		Symbol: walletCommon.UsdcSymbol,
 	}
 	chainID := walletCommon.EthereumMainnet
@@ -136,7 +180,7 @@ func TestParaswapErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		expectClientFetchPriceRoute(client, paraswap.Route{}, errors.New(tc.clientError))
-		_, err := processor.EstimateGas(testInputParams)
+		_, err := processor.GetContractAddress(testInputParams)
 		require.Equal(t, tc.processorError.Error(), err.Error())
 	}
 }

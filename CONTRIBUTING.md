@@ -82,4 +82,3 @@ PRs should not decrease the overall coverage. If possible, aim to increase the o
 Thank you for your contribution!
 
 Happy coding!
->>>>>>> b0d37d2fa (Update CONTRIBUTING.md)

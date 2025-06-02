@@ -9,9 +9,14 @@ shell.nix             @status-im/devops
 /_assets/ci/          @status-im/devops
 /_assets/hooks/       @status-im/devops
 /_assets/scripts/     @status-im/devops
+/.github/workflows/   @status-im/devops @0xM3R
 
 # Custom ownership for specific folders
 # Feel free to add yourself for any new packages you implement.
+/_docs/policies       @status-im/status-go-guild @jrainville @alaibe @plopezlpz
 /cmd/status-backend   @igor-sirotin
 /internal/sentry      @igor-sirotin
-/healthmanager	      @friofry
+/healthmanager        @friofry
+/rpc/network          @friofry
+
+/services/wallet/leaderboard @friofry

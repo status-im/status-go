@@ -1,0 +1,62 @@
+services:
+  boot-1:
+    image: wakuorg/nwaku:v0.34.0
+    entrypoint: [
+      "/usr/bin/wakunode",
+      "--discv5-discovery=true",
+      "--discv5-enr-auto-update=True",
+      "--discv5-udp-port=9000",
+      "--cluster-id=16",
+      # Docker DNS server
+      "--dns-addrs-name-server=127.0.0.11",
+      "--dns4-domain-name=boot-1",
+      "--filter=true",
+      "--keep-alive=true",
+      "--lightpush=true",
+      "--log-level=INFO",
+      "--max-connections=18000",
+      "--nodekey=03ce9122016be1f80a23df36525103bed1c7c4b9a0ff7605d97553ed8ed96bcf",
+      "--peer-exchange=true",
+      "--relay=true",
+      "--rest-address=0.0.0.0",
+      "--rest-admin",
+      "--shard=32",
+      "--shard=64",
+      "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
+      "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
+      "--tcp-port=60001"
+    ]
+    depends_on:
+      - store
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
+
+  store:
+    image: wakuorg/nwaku:v0.34.0
+    entrypoint: [
+      "/usr/bin/wakunode",
+      "--discv5-discovery=true",
+      "--discv5-enr-auto-update=True",
+      "--discv5-udp-port=9000",
+      "--cluster-id=16",
+      # Docker DNS server
+      "--dns-addrs-name-server=127.0.0.11",
+      "--dns4-domain-name=store",
+      "--keep-alive=true",
+      "--log-level=INFO",
+      "--max-connections=18000",
+      "--nodekey=3190bc9b55b18dbc171997a7a67abcd5bbf0c81002ad9617b1cb67f2f15daa64",
+      "--peer-exchange=false",
+      "--relay=true",
+      "--rest-address=0.0.0.0",
+      "--rest-admin",
+      "--shard=32",
+      "--shard=64",
+      "--staticnode=/dns4/boot-1/tcp/60001/p2p/16Uiu2HAm3vFYHkGRURyJ6F7bwDyzMLtPEuCg4DU89T7km2u8Fjyb",
+      "--store=true",
+      "--tcp-port=60002"
+    ]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
+

@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap"
 
 	commongethtypes "github.com/ethereum/go-ethereum/common"
@@ -21,22 +20,18 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/api/multiformat"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/db"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
-	gethnode "github.com/status-im/status-go/eth-node/node"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -45,20 +40,21 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/communitytokens"
-	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
 )
 
@@ -78,13 +74,9 @@ type Service struct {
 	messenger       *protocol.Messenger
 	identity        *ecdsa.PrivateKey
 	cancelMessenger chan struct{}
-	storage         db.TransactionalStorage
-	n               gethnode.Node
+	waku            wakutypes.Waku
 	rpcClient       *rpc.Client
 	config          params.NodeConfig
-	mailMonitor     *MailRequestMonitor
-	server          *p2p.Server
-	peerStore       *mailservers.PeerStore
 	accountsDB      *accounts.Database
 	multiAccountsDB *multiaccounts.Database
 	account         *multiaccounts.Account
@@ -95,39 +87,21 @@ var _ node.Lifecycle = (*Service)(nil)
 
 func New(
 	config params.NodeConfig,
-	n gethnode.Node,
+	waku wakutypes.Waku,
 	rpcClient *rpc.Client,
-	ldb *leveldb.DB,
-	mailMonitor *MailRequestMonitor,
-	eventSub mailservers.EnvelopeEventSubscriber,
 ) *Service {
-	cache := mailservers.NewCache(ldb)
-	peerStore := mailservers.NewPeerStore(cache)
 	return &Service{
-		storage:     db.NewLevelDBStorage(ldb),
-		n:           n,
-		rpcClient:   rpcClient,
-		config:      config,
-		mailMonitor: mailMonitor,
-		peerStore:   peerStore,
+		waku:      waku,
+		rpcClient: rpcClient,
+		config:    config,
 	}
 }
 
-func (s *Service) NodeID() *ecdsa.PrivateKey {
-	if s.server == nil {
-		return nil
-	}
-	return s.server.PrivateKey
-}
-
-func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
-	if len(rawURL) == 0 {
-		return mailservers.GetFirstConnected(s.server, s.peerStore)
-	}
-	return enode.ParseV4(rawURL)
-}
-
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service, communityTokensService *communitytokens.Service, wakuService *wakuv2.Waku, logger *zap.Logger, accountsFeed *event.Feed) error {
+func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB,
+	httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account,
+	accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service,
+	communityTokensService *communitytokens.Service, wakuService *wakuv2.Waku, logger *zap.Logger,
+	accountsFeed *event.Feed) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
@@ -151,14 +125,10 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		return err
 	}
 
-	envelopesMonitorConfig := &transport.EnvelopesMonitorConfig{
-		MaxAttempts:                      s.config.ShhextConfig.MaxMessageDeliveryAttempts,
-		AwaitOnlyMailServerConfirmations: s.config.ShhextConfig.MailServerConfirmations,
-		IsMailserver: func(peer types.EnodeID) bool {
-			return s.peerStore.Exist(peer)
-		},
-		EnvelopeEventsHandler: EnvelopeSignalHandler{},
-		Logger:                logger,
+	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
+		MaxMessageDeliveryAttempts: s.config.ShhextConfig.MaxMessageDeliveryAttempts,
+		MailServerConfirmations:    s.config.ShhextConfig.MailServerConfirmations,
+		EnvelopeEventsHandler:      EnvelopeSignalHandler{},
 	}
 	s.accountsDB, err = accounts.NewDB(appDb)
 	if err != nil {
@@ -167,25 +137,29 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
-	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsFeed)
+	ensVerifier := ens.New(
+		logger,
+		s.waku, // timesource
+		appDb,
+		s.config.ShhextConfig.VerifyENSURL,
+		s.config.ShhextConfig.VerifyENSContractAddress,
+	)
+
+	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsFeed, ensVerifier)
 	if err != nil {
 		return err
 	}
 
 	messenger, err := protocol.NewMessenger(
-		nodeName,
 		identity,
-		s.n,
+		s.waku,
 		s.config.ShhextConfig.InstallationID,
-		s.peerStore,
-		version.Version(),
 		options...,
 	)
 	if err != nil {
 		return err
 	}
 	s.messenger = messenger
-	s.messenger.SetP2PServer(s.server)
 	if s.config.ProcessBackedupMessages {
 		s.messenger.EnableBackedupMessagesProcessing()
 	}
@@ -343,18 +317,9 @@ func (s *Service) DisableInstallation(installationID string) error {
 	return s.messenger.DisableInstallation(installationID)
 }
 
-// Protocols returns a new protocols list. In this case, there are none.
-func (s *Service) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{}
-}
-
 // APIs returns a list of new APIs.
 func (s *Service) APIs() []gethrpc.API {
 	panic("this is abstract service, use shhext or wakuext implementation")
-}
-
-func (s *Service) SetP2PServer(server *p2p.Server) {
-	s.server = server
 }
 
 // Start is run when a service is started.
@@ -396,7 +361,7 @@ func buildMessengerOptions(
 	rpcClient *rpc.Client,
 	multiAccounts *multiaccounts.Database,
 	account *multiaccounts.Account,
-	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
+	envelopeEventsConfig *messagingtypes.EnvelopeEventsConfig,
 	accountsDB *accounts.Database,
 	walletService *wallet.Service,
 	communityTokensService *communitytokens.Service,
@@ -405,7 +370,9 @@ func buildMessengerOptions(
 	messengerSignalsHandler protocol.MessengerSignalsHandler,
 	accountManager account.Manager,
 	accountsFeed *event.Feed,
+	ensVerifier *ens.Verifier,
 ) ([]protocol.Option, error) {
+	personalAPI := personal.NewAPI()
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
 		protocol.WithPushNotifications(),
@@ -415,9 +382,9 @@ func buildMessengerOptions(
 		protocol.WithMailserversDatabase(mailserversDB.NewDB(appDb)),
 		protocol.WithAccount(account),
 		protocol.WithBrowserDatabase(browsers.NewDB(appDb)),
-		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
+		protocol.WithEnvelopeEventsConfig(envelopeEventsConfig),
 		protocol.WithSignalsHandler(messengerSignalsHandler),
-		protocol.WithENSVerificationConfig(config.ShhextConfig.VerifyENSURL, config.ShhextConfig.VerifyENSContractAddress),
+		protocol.WithENSVerifier(ensVerifier),
 		protocol.WithClusterConfig(config.ClusterConfig),
 		protocol.WithTorrentConfig(&config.TorrentConfig),
 		protocol.WithHTTPServer(httpServer),
@@ -429,6 +396,8 @@ func buildMessengerOptions(
 		protocol.WithWakuService(wakuService),
 		protocol.WithAccountManager(accountManager),
 		protocol.WithAccountsFeed(accountsFeed),
+		protocol.WithNewsFeed(),
+		protocol.WithMessageSigner(personalAPI),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {

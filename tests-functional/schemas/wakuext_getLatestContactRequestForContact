@@ -1,0 +1,172 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "properties": {
+                "discordOldestMessageTimestamp": {
+                    "type": "integer"
+                },
+                "messages": {
+                    "items": {
+                        "properties": {
+                            "alias": {
+                                "type": "string"
+                            },
+                            "chatId": {
+                                "type": "string"
+                            },
+                            "clock": {
+                                "type": "integer"
+                            },
+                            "compressedKey": {
+                                "type": "string"
+                            },
+                            "contactRequestState": {
+                                "type": "integer"
+                            },
+                            "contentType": {
+                                "type": "integer"
+                            },
+                            "displayName": {
+                                "type": "string"
+                            },
+                            "emojiHash": {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            },
+                            "ensName": {
+                                "type": "string"
+                            },
+                            "from": {
+                                "type": "string"
+                            },
+                            "gapParameters": {
+                                "type": "object"
+                            },
+                            "id": {
+                                "type": "string"
+                            },
+                            "identicon": {
+                                "type": "string"
+                            },
+                            "lineCount": {
+                                "type": "integer"
+                            },
+                            "localChatId": {
+                                "type": "string"
+                            },
+                            "messageType": {
+                                "type": "integer"
+                            },
+                            "parsedText": {
+                                "items": {
+                                    "properties": {
+                                        "children": {
+                                            "items": {
+                                                "properties": {
+                                                    "literal": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "literal"
+                                                ],
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        },
+                                        "type": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "children",
+                                        "type"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            },
+                            "quotedMessage": {
+                                "type": "null"
+                            },
+                            "replace": {
+                                "type": "string"
+                            },
+                            "responseTo": {
+                                "type": "string"
+                            },
+                            "rtl": {
+                                "type": "boolean"
+                            },
+                            "seen": {
+                                "type": "boolean"
+                            },
+                            "text": {
+                                "type": "string"
+                            },
+                            "timestamp": {
+                                "type": "integer"
+                            },
+                            "whisperTimestamp": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "alias",
+                            "chatId",
+                            "clock",
+                            "compressedKey",
+                            "contactRequestState",
+                            "contentType",
+                            "displayName",
+                            "emojiHash",
+                            "ensName",
+                            "from",
+                            "gapParameters",
+                            "id",
+                            "identicon",
+                            "lineCount",
+                            "localChatId",
+                            "messageType",
+                            "parsedText",
+                            "quotedMessage",
+                            "replace",
+                            "responseTo",
+                            "rtl",
+                            "seen",
+                            "text",
+                            "timestamp",
+                            "whisperTimestamp"
+                        ],
+                        "type": "object"
+                    },
+                    "type": "array"
+                },
+                "notifications": {
+                    "type": "null"
+                }
+            },
+            "required": [
+                "discordOldestMessageTimestamp",
+                "messages",
+                "notifications"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

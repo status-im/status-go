@@ -34,7 +34,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	wakuextn "github.com/status-im/status-go/services/wakuext"
+	wakuextn "github.com/status-im/status-go/services/wakuv2ext"
 )
 
 type testTimeSource struct{}
@@ -67,7 +67,7 @@ var (
 		"network-id",
 		params.SepoliaNetworkID,
 		fmt.Sprintf(
-			"A network ID: %d (Mainnet), %d (Sepolia)",
+			"A network ID: %d (Ethereum), %d (Sepolia)",
 			params.MainNetworkID, params.SepoliaNetworkID,
 		),
 	)
@@ -143,7 +143,7 @@ func main() {
 		return
 	}
 
-	wakuextservice := backend.StatusNode().WakuExtService()
+	wakuextservice := backend.StatusNode().WakuV2ExtService()
 	if wakuextservice == nil {
 		logger.Error("wakuext not available")
 		return
@@ -215,7 +215,7 @@ func main() {
 		}
 
 		if len(messages) > 0 {
-			if err := wakuext.SaveMessages(context.Background(), messages); err != nil {
+			if err := wakuext.Messenger().SaveMessages(messages); err != nil {
 				return
 			}
 		}
@@ -261,7 +261,7 @@ func main() {
 		}
 
 		if len(messages) > 0 {
-			if err := wakuext.SaveMessages(context.Background(), messages); err != nil {
+			if err := wakuext.Messenger().SaveMessages(messages); err != nil {
 				return
 			}
 		}
@@ -349,6 +349,8 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 
 	defaultSettings.TestNetworksEnabled = false
 
+	defaultSettings.AutoRefreshTokensEnabled = true
+
 	visibleTokens := make(map[string][]string)
 	visibleTokens["mainnet"] = []string{"SNT"}
 	visibleTokensJSON, err := json.Marshal(visibleTokens)
@@ -390,10 +392,9 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
-	nodeConfig.WakuConfig = params.WakuConfig{
+	nodeConfig.WakuV2Config = params.WakuV2Config{
 		Enabled:     true,
 		LightClient: true,
-		MinimumPoW:  0.000001,
 	}
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{

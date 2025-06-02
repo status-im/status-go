@@ -48,11 +48,11 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
 	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 
@@ -109,11 +109,11 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesWithMentionSend() 
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
 	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 
@@ -213,11 +213,11 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageEditText() {
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
 	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 

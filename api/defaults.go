@@ -3,13 +3,17 @@ package api
 import (
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"path/filepath"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/api/common"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity/alias"
@@ -24,14 +28,12 @@ const (
 	pathEncryption           = pathEIP1581 + "/1'/0"
 	pathDefaultWallet        = pathWalletRoot + "/0"
 	defaultMnemonicLength    = 12
-	shardsTestClusterID      = 16
 	walletAccountDefaultName = "Account 1"
 
 	DefaultKeystoreRelativePath   = "keystore"
 	DefaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
 	DefaultDataDir                = "/ethereum/mainnet_rpc"
 	DefaultNodeName               = "StatusIM"
-	DefaultLogFile                = "geth.log"
 	DefaultAPILogFile             = "api.log"
 
 	DefaultLogLevel                   = "ERROR"
@@ -116,6 +118,8 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 
 	s.TestNetworksEnabled = false
 
+	s.AutoRefreshTokensEnabled = true
+
 	// Default user status
 	currentUserStatus, err := json.Marshal(protocol.UserStatus{
 		PublicKey:  chatKeyString,
@@ -130,10 +134,6 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.CurrentUserStatus = &userRawMessage
 
 	return s, nil
-}
-
-func SetDefaultFleet(nodeConfig *params.NodeConfig) error {
-	return SetFleet(DefaultFleet, nodeConfig)
 }
 
 func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
@@ -151,90 +151,115 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		Nameserver:                             specifiedWakuV2Config.Nameserver,
 	}
 
-	clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
-	if err != nil {
-		return err
+	if !params.IsFleetSupported(fleet) {
+		return fmt.Errorf("unknown fleet %s", fleet)
 	}
-	nodeConfig.ClusterConfig = *clusterConfig
-	nodeConfig.ClusterConfig.Fleet = fleet
-	nodeConfig.ClusterConfig.WakuNodes = params.DefaultWakuNodes(fleet)
-	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = params.DefaultDiscV5Nodes(fleet)
 
-	if fleet == params.FleetStatusProd {
-		nodeConfig.ClusterConfig.ClusterID = shardsTestClusterID
-	}
+	nodeConfig.ClusterConfig = params.DefaultClusterConfig(fleet)
 
 	return nil
 }
 
-func buildWalletConfig(request *requests.WalletSecretsConfig, statusProxyEnabled bool) params.WalletConfig {
+func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.WalletSecretsConfig) params.WalletConfig {
 	walletConfig := params.WalletConfig{
-		Enabled:        true,
-		AlchemyAPIKeys: make(map[uint64]string),
+		Enabled:                true,
+		EnableMercuryoProvider: true,
+		AlchemyAPIKeys:         make(map[uint64]security.SensitiveString),
+
+		TokensListsAutoRefreshCheckInterval: walletRequest.TokensListsAutoRefreshCheckInterval,
+		TokensListsAutoRefreshInterval:      walletRequest.TokensListsAutoRefreshInterval,
 	}
 
 	if request.StatusProxyStageName != "" {
 		walletConfig.StatusProxyStageName = request.StatusProxyStageName
 	}
 
-	if request.OpenseaAPIKey != "" {
+	if !request.OpenseaAPIKey.Empty() {
 		walletConfig.OpenseaAPIKey = request.OpenseaAPIKey
 	}
 
-	if request.RaribleMainnetAPIKey != "" {
+	if !request.RaribleMainnetAPIKey.Empty() {
 		walletConfig.RaribleMainnetAPIKey = request.RaribleMainnetAPIKey
 	}
 
-	if request.RaribleTestnetAPIKey != "" {
+	if !request.RaribleTestnetAPIKey.Empty() {
 		walletConfig.RaribleTestnetAPIKey = request.RaribleTestnetAPIKey
 	}
 
-	if request.InfuraToken != "" {
+	if !request.InfuraToken.Empty() {
 		walletConfig.InfuraAPIKey = request.InfuraToken
 	}
 
-	if request.InfuraSecret != "" {
+	if !request.InfuraSecret.Empty() {
 		walletConfig.InfuraAPIKeySecret = request.InfuraSecret
 	}
 
-	if request.AlchemyEthereumMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[MainnetChainID] = request.AlchemyEthereumMainnetToken
+	if !request.AlchemyEthereumMainnetToken.Empty() {
+		walletConfig.AlchemyAPIKeys[common.MainnetChainID] = request.AlchemyEthereumMainnetToken
 	}
-	if request.AlchemyEthereumSepoliaToken != "" {
-		walletConfig.AlchemyAPIKeys[SepoliaChainID] = request.AlchemyEthereumSepoliaToken
+	if !request.AlchemyEthereumSepoliaToken.Empty() {
+		walletConfig.AlchemyAPIKeys[common.SepoliaChainID] = request.AlchemyEthereumSepoliaToken
 	}
-	if request.AlchemyArbitrumMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[ArbitrumChainID] = request.AlchemyArbitrumMainnetToken
+	if !request.AlchemyArbitrumMainnetToken.Empty() {
+		walletConfig.AlchemyAPIKeys[common.ArbitrumChainID] = request.AlchemyArbitrumMainnetToken
 	}
-	if request.AlchemyArbitrumSepoliaToken != "" {
-		walletConfig.AlchemyAPIKeys[ArbitrumSepoliaChainID] = request.AlchemyArbitrumSepoliaToken
+	if !request.AlchemyArbitrumSepoliaToken.Empty() {
+		walletConfig.AlchemyAPIKeys[common.ArbitrumSepoliaChainID] = request.AlchemyArbitrumSepoliaToken
 	}
-	if request.AlchemyOptimismMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[OptimismChainID] = request.AlchemyOptimismMainnetToken
+	if !request.AlchemyOptimismMainnetToken.Empty() {
+		walletConfig.AlchemyAPIKeys[common.OptimismChainID] = request.AlchemyOptimismMainnetToken
 	}
-	if request.AlchemyOptimismSepoliaToken != "" {
-		walletConfig.AlchemyAPIKeys[OptimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
+	if !request.AlchemyOptimismSepoliaToken.Empty() {
+		walletConfig.AlchemyAPIKeys[common.OptimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
 	}
-	if request.AlchemyBaseMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[BaseChainID] = request.AlchemyBaseMainnetToken
+	if !request.AlchemyBaseMainnetToken.Empty() {
+		walletConfig.AlchemyAPIKeys[common.BaseChainID] = request.AlchemyBaseMainnetToken
 	}
-	if request.AlchemyBaseSepoliaToken != "" {
-		walletConfig.AlchemyAPIKeys[BaseSepoliaChainID] = request.AlchemyBaseSepoliaToken
+	if !request.AlchemyBaseSepoliaToken.Empty() {
+		walletConfig.AlchemyAPIKeys[common.BaseSepoliaChainID] = request.AlchemyBaseSepoliaToken
 	}
-	if request.StatusProxyMarketUser != "" {
+	if !request.StatusProxyMarketUser.Empty() {
 		walletConfig.StatusProxyMarketUser = request.StatusProxyMarketUser
 	}
-	if request.StatusProxyMarketPassword != "" {
+	if !request.StatusProxyMarketPassword.Empty() {
 		walletConfig.StatusProxyMarketPassword = request.StatusProxyMarketPassword
 	}
-	if request.StatusProxyBlockchainUser != "" {
+	if !request.MarketDataProxyUser.Empty() {
+		walletConfig.MarketDataProxyConfig.User = request.MarketDataProxyUser
+	}
+	if !request.MarketDataProxyPassword.Empty() {
+		walletConfig.MarketDataProxyConfig.Password = request.MarketDataProxyPassword
+	}
+	if !request.MarketDataProxyUrl.Empty() {
+		walletConfig.MarketDataProxyConfig.UrlOverride = request.MarketDataProxyUrl
+	}
+	if request.StatusProxyStageName != "" {
+		walletConfig.MarketDataProxyConfig.StageName = request.StatusProxyStageName
+	}
+	if walletRequest.MarketDataFullDataRefreshInterval != 0 {
+		walletConfig.MarketDataProxyConfig.FullDataRefreshInterval = walletRequest.MarketDataFullDataRefreshInterval
+	}
+	if walletRequest.MarketDataPriceRefreshInterval != 0 {
+		walletConfig.MarketDataProxyConfig.PriceRefreshInterval = walletRequest.MarketDataPriceRefreshInterval
+	}
+
+	// FIXME: remove when EthRpcProxy* is integrated
+	if !request.StatusProxyBlockchainUser.Empty() {
 		walletConfig.StatusProxyBlockchainUser = request.StatusProxyBlockchainUser
 	}
-	if request.StatusProxyBlockchainPassword != "" {
+	if !request.StatusProxyBlockchainPassword.Empty() {
 		walletConfig.StatusProxyBlockchainPassword = request.StatusProxyBlockchainPassword
 	}
 
-	walletConfig.StatusProxyEnabled = statusProxyEnabled
+	if !request.EthRpcProxyUrl.Empty() {
+		walletConfig.EthRpcProxyUrl = request.EthRpcProxyUrl
+	}
+	if !request.EthRpcProxyUser.Empty() {
+		walletConfig.EthRpcProxyUser = request.EthRpcProxyUser
+	}
+	if !request.EthRpcProxyPassword.Empty() {
+		walletConfig.EthRpcProxyPassword = request.EthRpcProxyPassword
+	}
 
 	return walletConfig
 }
@@ -253,12 +278,28 @@ func overrideApiConfigProd(nodeConfig *params.NodeConfig, config *requests.APICo
 	nodeConfig.WSPort = config.WSPort
 }
 
-func DefaultNodeConfig(installationID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
+// getMainnetRPCURL retuevrns URL of the first provider with TokenAuth from mainnet network
+func getMainnetRPCURL(networks []params.Network) string {
+	for _, network := range networks {
+		if network.ChainID != common.MainnetChainID {
+			continue
+		}
+		for _, provider := range network.RpcProviders {
+			if provider.AuthType == params.TokenAuth && provider.Enabled {
+				return provider.GetFullURL().Reveal()
+			}
+		}
+		break
+	}
+	return ""
+}
+
+func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.RootDataDir = request.RootDataDir
 	nodeConfig.LogEnabled = request.LogEnabled
-	nodeConfig.LogFile = DefaultLogFile
+	nodeConfig.LogFile = gocommon.TruncateWithDot(keyUID) + ".log"
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = DefaultLogLevel
 	nodeConfig.DataDir = DefaultDataDir
@@ -292,7 +333,7 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	nodeConfig.MaxPeers = DefaultMaxPeers
 	nodeConfig.MaxPendingPeers = DefaultMaxPendingPeers
 
-	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig, request.StatusProxyEnabled)
+	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
 
 	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
@@ -343,13 +384,13 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	if request.VerifyTransactionURL != nil {
 		nodeConfig.ShhextConfig.VerifyTransactionURL = *request.VerifyTransactionURL
 	} else {
-		nodeConfig.ShhextConfig.VerifyTransactionURL = mainnet(request.WalletSecretsConfig.StatusProxyStageName).FallbackURL
+		nodeConfig.ShhextConfig.VerifyTransactionURL = getMainnetRPCURL(nodeConfig.Networks)
 	}
 
 	if request.VerifyENSURL != nil {
 		nodeConfig.ShhextConfig.VerifyENSURL = *request.VerifyENSURL
 	} else {
-		nodeConfig.ShhextConfig.VerifyENSURL = mainnet(request.WalletSecretsConfig.StatusProxyStageName).FallbackURL
+		nodeConfig.ShhextConfig.VerifyENSURL = getMainnetRPCURL(nodeConfig.Networks)
 	}
 
 	if request.VerifyTransactionChainID != nil {
@@ -358,10 +399,6 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 
 	if request.VerifyENSContractAddress != nil {
 		nodeConfig.ShhextConfig.VerifyENSContractAddress = *request.VerifyENSContractAddress
-	}
-
-	if request.NetworkID != nil {
-		nodeConfig.NetworkID = *request.NetworkID
 	}
 
 	nodeConfig.TorrentConfig = params.TorrentConfig{

@@ -25,7 +25,6 @@ func (s *BrowserSuite) SetupTest() {
 }
 
 func (s *MessengerBackupSuite) TestBrowsersOrderedNewestFirst() {
-	msngr := s.newMessenger()
 	testBrowsers := []*browsers.Browser{
 		{
 			ID:        "1",
@@ -49,20 +48,19 @@ func (s *MessengerBackupSuite) TestBrowsersOrderedNewestFirst() {
 		},
 	}
 	for i := 0; i < len(testBrowsers); i++ {
-		s.Require().NoError(msngr.AddBrowser(context.TODO(), *testBrowsers[i]))
+		s.Require().NoError(s.m.AddBrowser(context.TODO(), *testBrowsers[i]))
 	}
 
 	sort.Slice(testBrowsers, func(i, j int) bool {
 		return testBrowsers[i].Timestamp > testBrowsers[j].Timestamp
 	})
 
-	rst, err := msngr.GetBrowsers(context.TODO())
+	rst, err := s.m.GetBrowsers(context.TODO())
 	s.Require().NoError(err)
 	s.Require().Equal(testBrowsers, rst)
 }
 
 func (s *MessengerBackupSuite) TestBrowsersHistoryIncluded() {
-	msngr := s.newMessenger()
 	browser := &browsers.Browser{
 		ID:           "1",
 		Name:         "first",
@@ -71,15 +69,14 @@ func (s *MessengerBackupSuite) TestBrowsersHistoryIncluded() {
 		HistoryIndex: 1,
 		History:      []string{"one", "two"},
 	}
-	s.Require().NoError(msngr.AddBrowser(context.TODO(), *browser))
-	rst, err := msngr.GetBrowsers(context.TODO())
+	s.Require().NoError(s.m.AddBrowser(context.TODO(), *browser))
+	rst, err := s.m.GetBrowsers(context.TODO())
 	s.Require().NoError(err)
 	s.Require().Len(rst, 1)
 	s.Require().Equal(browser, rst[0])
 }
 
 func (s *MessengerBackupSuite) TestBrowsersReplaceOnUpdate() {
-	msngr := s.newMessenger()
 	browser := &browsers.Browser{
 		ID:        "1",
 		Name:      "first",
@@ -87,19 +84,18 @@ func (s *MessengerBackupSuite) TestBrowsersReplaceOnUpdate() {
 		Timestamp: 10,
 		History:   []string{"one", "two"},
 	}
-	s.Require().NoError(msngr.AddBrowser(context.TODO(), *browser))
+	s.Require().NoError(s.m.AddBrowser(context.TODO(), *browser))
 	browser.Dapp = false
 	browser.History = []string{"one", "three"}
 	browser.Timestamp = 107
-	s.Require().NoError(msngr.AddBrowser(context.TODO(), *browser))
-	rst, err := msngr.GetBrowsers(context.TODO())
+	s.Require().NoError(s.m.AddBrowser(context.TODO(), *browser))
+	rst, err := s.m.GetBrowsers(context.TODO())
 	s.Require().NoError(err)
 	s.Require().Len(rst, 1)
 	s.Require().Equal(browser, rst[0])
 }
 
 func (s *MessengerBackupSuite) TestDeleteBrowser() {
-	msngr := s.newMessenger()
 	browser := &browsers.Browser{
 		ID:        "1",
 		Name:      "first",
@@ -108,13 +104,13 @@ func (s *MessengerBackupSuite) TestDeleteBrowser() {
 		History:   []string{"one", "two"},
 	}
 
-	s.Require().NoError(msngr.AddBrowser(context.TODO(), *browser))
-	rst, err := msngr.GetBrowsers(context.TODO())
+	s.Require().NoError(s.m.AddBrowser(context.TODO(), *browser))
+	rst, err := s.m.GetBrowsers(context.TODO())
 	s.Require().NoError(err)
 	s.Require().Len(rst, 1)
 
-	s.Require().NoError(msngr.DeleteBrowser(context.TODO(), browser.ID))
-	rst, err = msngr.GetBrowsers(context.TODO())
+	s.Require().NoError(s.m.DeleteBrowser(context.TODO(), browser.ID))
+	rst, err = s.m.GetBrowsers(context.TODO())
 	s.Require().NoError(err)
 	s.Require().Len(rst, 0)
 }

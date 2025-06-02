@@ -12,12 +12,14 @@ import (
 	"unsafe"
 
 	"go.uber.org/zap"
-	validator "gopkg.in/go-playground/validator.v9"
+	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/zxcvbn-go"
 	"github.com/status-im/zxcvbn-go/scoring"
+
+	"github.com/status-im/extkeys"
 
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/account"
@@ -25,14 +27,14 @@ import (
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/centralizedmetrics"
 	"github.com/status-im/status-go/centralizedmetrics/providers"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
-	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/logutils/callog"
 	"github.com/status-im/status-go/logutils/requestlog"
-	"github.com/status-im/status-go/mobile/callog"
 	m_requests "github.com/status-im/status-go/mobile/requests"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -135,6 +137,13 @@ func initializeApplication(requestJSON string) string {
 		}
 	}
 
+	if request.WakuFleetsConfigFilePath != "" {
+		err = params.LoadFleetsFromFile(request.WakuFleetsConfigFilePath)
+		if err != nil {
+			return makeJSONResponse(err)
+		}
+	}
+
 	response := &InitializeApplicationResponse{
 		Accounts:               accs,
 		CentralizedMetricsInfo: metricsInfo,
@@ -151,10 +160,11 @@ func initializeLogging(request *requests.InitializeApplication) error {
 		request.LogDir = request.DataDir
 	}
 
-	logSettings := logutils.LogSettings{
-		Enabled: request.LogEnabled,
-		Level:   request.LogLevel,
-		File:    path.Join(request.LogDir, api.DefaultLogFile),
+	preLoginLog := statusBackend.PreLoginLog()
+	preLoginLog.SetEnabled(request.LogEnabled)
+	if request.LogLevel != "" {
+		// ignore the error since it's already validated
+		_ = preLoginLog.SetLevel(request.LogLevel)
 	}
 
 	err := os.MkdirAll(request.LogDir, 0700)
@@ -162,6 +172,9 @@ func initializeLogging(request *requests.InitializeApplication) error {
 		return err
 	}
 
+	preLoginLog.SetLogDir(request.LogDir)
+
+	logSettings := preLoginLog.ConvertToLogSettings()
 	err = logutils.OverrideRootLoggerWithConfig(logSettings)
 	if err != nil {
 		return err
@@ -178,6 +191,15 @@ func initializeLogging(request *requests.InitializeApplication) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if request.MetricsEnabled {
+		// Start metrics server
+		err := statusBackend.StartPrometheusMetricsServer(request.MetricsAddress)
+		if err != nil {
+			return err
+		}
+		logutils.ZapLogger().Info("metrics prometheus server started", zap.String("address", request.MetricsAddress))
 	}
 
 	return nil
@@ -331,7 +353,7 @@ func resetChainData() string {
 }
 
 func CallRPC(inputJSON string) string {
-	return callWithResponse(callRPC, inputJSON)
+	return callRPC(inputJSON)
 }
 
 // callRPC calls public APIs via RPC.
@@ -344,7 +366,7 @@ func callRPC(inputJSON string) string {
 }
 
 func CallPrivateRPC(inputJSON string) string {
-	return callWithResponse(callPrivateRPC, inputJSON)
+	return callPrivateRPC(inputJSON)
 }
 
 // callPrivateRPC calls both public and private APIs via RPC.
@@ -474,13 +496,13 @@ func login(accountData, password, configJSON string) error {
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.UpdateNodeConfigFleet(account, password, &conf)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to update node config fleet", zap.String("key-uid", account.KeyUID), zap.Error(err))
+			logutils.ZapLogger().Error("failed to update node config fleet", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return statusBackend.LoggedIn(account.KeyUID, err)
 		}
 
 		err = statusBackend.StartNodeWithAccount(account, password, &conf, nil)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", account.KeyUID), zap.Error(err))
+			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
@@ -529,7 +551,7 @@ func createAccountAndLogin(requestJSON string) string {
 	}
 
 	err = request.Validate(&requests.CreateAccountValidation{
-		AllowEmptyDisplayName: false,
+		AllowEmptyDisplayName: true,
 	})
 	if err != nil {
 		return makeJSONResponse(err)
@@ -543,7 +565,7 @@ func createAccountAndLogin(requestJSON string) string {
 			return statusBackend.LoggedIn("", err)
 		}
 		logutils.ZapLogger().Debug("started a node, and created account")
-		return nil
+		return statusBackend.SetupLogSettings()
 	})
 	return makeJSONResponse(nil)
 }
@@ -580,7 +602,7 @@ func loginAccount(requestJSON string) string {
 			return err
 		}
 		logutils.ZapLogger().Debug("loginAccount started node")
-		return nil
+		return statusBackend.SetupLogSettings()
 	})
 	return makeJSONResponse(nil)
 }
@@ -615,7 +637,7 @@ func restoreAccountAndLogin(requestJSON string) string {
 			return statusBackend.LoggedIn("", err)
 		}
 		logutils.ZapLogger().Debug("started a node, and restored account")
-		return nil
+		return statusBackend.SetupLogSettings()
 	})
 
 	return makeJSONResponse(nil)
@@ -654,11 +676,11 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 		logutils.ZapLogger().Debug("starting a node, and saving account with configuration", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs, nil)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", account.KeyUID), zap.Error(err))
+			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
-		return nil
+		return statusBackend.SetupLogSettings()
 	})
 	return makeJSONResponse(nil)
 }
@@ -763,7 +785,7 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 		logutils.ZapLogger().Debug("starting a node, and saving account with configuration", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.SaveAccountAndStartNodeWithKey(account, password, settings, &conf, subaccs, keyHex)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", account.KeyUID), zap.Error(err))
+			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
@@ -790,7 +812,7 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.StartNodeWithKey(account, password, keyHex, &conf)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", account.KeyUID), zap.Error(err))
+			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
@@ -1107,16 +1129,6 @@ func makeJSONResponse(err error) string {
 	return string(outBytes)
 }
 
-func AddPeer(enode string) string {
-	return callWithResponse(addPeer, enode)
-}
-
-// addPeer adds an enode as a peer.
-func addPeer(enode string) string {
-	err := statusBackend.StatusNode().AddPeer(enode)
-	return makeJSONResponse(err)
-}
-
 // Deprecated: Use ConnectionChangeV2 instead.
 func ConnectionChange(typ string, expensive int) {
 	call(connectionChange, typ, expensive)
@@ -1234,7 +1246,7 @@ func exportNodeLogs() string {
 	if config == nil {
 		return makeJSONResponse(errors.New("config and log file are not available"))
 	}
-	data, err := json.Marshal(exportlogs.ExportFromBaseFile(config.LogFile))
+	data, err := json.Marshal(exportlogs.ExportFromBaseFile(config.LogFilePath()))
 	if err != nil {
 		return makeJSONResponse(fmt.Errorf("error marshalling to json: %v", err))
 	}
@@ -1647,10 +1659,23 @@ func Fleets() string {
 	return callWithResponse(fleets)
 }
 
+// convertFleets transforms a FleetsMap into a nested map structure.
+// This is done to keep the old API response format.
+func convertFleets(fleetsMap params.FleetsMap) map[string]map[string][]string {
+	var oldFleetMap = make(map[string]map[string][]string)
+	for fleet, nodes := range fleetsMap {
+		oldFleetMap[fleet] = map[string][]string{
+			"WakuNodes":            nodes.WakuNodes,
+			"DiscV5BootstrapNodes": nodes.DiscV5BootstrapNodes,
+		}
+	}
+	return oldFleetMap
+}
+
 func fleets() string {
 	fleets := FleetDescription{
 		DefaultFleet: api.DefaultFleet,
-		Fleets:       params.GetSupportedFleets(),
+		Fleets:       convertFleets(params.GetSupportedFleets()),
 	}
 
 	data, err := json.Marshal(fleets)
@@ -1674,15 +1699,8 @@ func switchFleet(fleet string, configJSON string) string {
 		}
 	}
 
-	clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
 	conf.ClusterConfig.Fleet = fleet
-	conf.ClusterConfig.ClusterID = clusterConfig.ClusterID
-
-	err = statusBackend.SwitchFleet(fleet, &conf)
+	err := statusBackend.SwitchFleet(fleet, &conf)
 
 	return makeJSONResponse(err)
 }
@@ -2062,7 +2080,7 @@ func EncodeTransfer(to string, value string) string {
 func encodeTransfer(to string, value string) string {
 	result, err := abi_spec.EncodeTransfer(to, value)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to encode transfer", zap.String("to", to), zap.String("value", value), zap.Error(err))
+		logutils.ZapLogger().Error("failed to encode transfer", zap.String("to", gocommon.TruncateWithDot(to)), zap.String("value", gocommon.TruncateWithDot(value)), zap.Error(err))
 		return ""
 	}
 	return result
@@ -2095,6 +2113,7 @@ func encodeFunctionCall(method string, paramsJSON string) string {
 	return result
 }
 
+// Deprecated: no usage in mobile, we might implemented it within other functions
 func EncodeFunctionCallV2(requestJSON string) string {
 	return callWithResponse(encodeFunctionCallV2, requestJSON)
 }
@@ -2108,6 +2127,7 @@ func encodeFunctionCallV2(requestJSON string) string {
 	return encodeFunctionCall(request.Method, request.ParamsJSON)
 }
 
+// Deprecated: no usage in mobile
 func DecodeParameters(decodeParamJSON string) string {
 	return decodeParameters(decodeParamJSON)
 }
@@ -2155,6 +2175,7 @@ func Sha3(str string) string {
 	return "0x" + abi_spec.Sha3(str)
 }
 
+// Deprecated: no usage in mobile
 func Utf8ToHex(str string) string {
 	return callWithResponse(utf8ToHex, str)
 }
@@ -2174,7 +2195,7 @@ func HexToUtf8(hexString string) string {
 func hexToUtf8(hexString string) string {
 	str, err := abi_spec.HexToUtf8(hexString)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to convert hex to utf8", zap.String("hexString", hexString), zap.Error(err))
+		logutils.ZapLogger().Error("failed to convert hex to utf8", zap.String("hexString", gocommon.TruncateWithDot(hexString)), zap.Error(err))
 	}
 	return str
 }
@@ -2186,7 +2207,7 @@ func CheckAddressChecksum(address string) string {
 func checkAddressChecksum(address string) string {
 	valid, err := abi_spec.CheckAddressChecksum(address)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to invoke check address checksum", zap.String("address", address), zap.Error(err))
+		logutils.ZapLogger().Error("failed to invoke check address checksum", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
 	}
 	result, _ := json.Marshal(valid)
 	return string(result)
@@ -2199,7 +2220,7 @@ func IsAddress(address string) string {
 func isAddress(address string) string {
 	valid, err := abi_spec.IsAddress(address)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to invoke IsAddress", zap.String("address", address), zap.Error(err))
+		logutils.ZapLogger().Error("failed to invoke IsAddress", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
 	}
 	result, _ := json.Marshal(valid)
 	return string(result)
@@ -2212,7 +2233,7 @@ func ToChecksumAddress(address string) string {
 func toChecksumAddress(address string) string {
 	address, err := abi_spec.ToChecksumAddress(address)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to convert to checksum address", zap.String("address", address), zap.Error(err))
+		logutils.ZapLogger().Error("failed to convert to checksum address", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
 	}
 	return address
 }
@@ -2304,6 +2325,99 @@ func addCentralizedMetric(requestJSON string) string {
 	}
 
 	return metric.ID
+}
+
+// Deprecated: Use SetProfileLogLevel instead.
+func SetLogLevel(requestJSON string) string {
+	return callWithResponse(setProfileLogLevel, requestJSON)
+}
+
+func SetProfileLogLevel(requestJSON string) string {
+	return callWithResponse(setProfileLogLevel, requestJSON)
+}
+
+func setProfileLogLevel(requestJSON string) string {
+	var request requests.SetLogLevel
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(statusBackend.SetProfileLogLevel(request.LogLevel))
+}
+
+func SetLogNamespaces(requestJSON string) string {
+	return callWithResponse(setLogNamespaces, requestJSON)
+}
+
+func setLogNamespaces(requestJSON string) string {
+	var request requests.SetLogNamespaces
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(statusBackend.SetLogNamespaces(request.LogNamespaces))
+}
+
+// Deprecated: Use SetProfileLogEnabled instead.
+func SetLogEnabled(requestJSON string) string {
+	return callWithResponse(setProfileLogEnabled, requestJSON)
+}
+
+func SetProfileLogEnabled(requestJSON string) string {
+	return callWithResponse(setProfileLogEnabled, requestJSON)
+}
+
+func setProfileLogEnabled(requestJSON string) string {
+	var request requests.SetLogEnabled
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(statusBackend.SetProfileLogEnabled(request.Enabled))
+}
+
+func SetPreLoginLogEnabled(requestJSON string) string {
+	return callWithResponse(setPreLoginLogEnabled, requestJSON)
+}
+
+func setPreLoginLogEnabled(requestJSON string) string {
+	var request requests.SetLogEnabled
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(statusBackend.SetPreLoginLogEnabled(request.Enabled))
+}
+
+func SetPreLoginLogLevel(requestJSON string) string {
+	return callWithResponse(setPreLoginLogLevel, requestJSON)
+}
+
+func setPreLoginLogLevel(requestJSON string) string {
+	var request requests.SetLogLevel
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(statusBackend.SetPreLoginLogLevel(request.LogLevel))
 }
 
 func IntendedPanic(message string) string {

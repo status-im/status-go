@@ -16,9 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -49,11 +47,10 @@ func (s *CommunitiesMessengerTestSuiteBase) SetupTest() {
 
 	s.mockedBalances = make(communities.BalancesByChain)
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = bridge.NewGethWakuWrapper(shh)
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 }
 
 func (s *CommunitiesMessengerTestSuiteBase) TearDownTest() {

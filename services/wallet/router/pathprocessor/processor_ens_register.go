@@ -99,7 +99,7 @@ func (s *ENSRegisterProcessor) PackTxInputData(params ProcessorInputParams) ([]b
 	return sntABI.Pack("approveAndCall", registryAddr, price, extraData)
 }
 
-func (s *ENSRegisterProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *ENSRegisterProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
@@ -110,11 +110,6 @@ func (s *ENSRegisterProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 	}
 
 	contractAddress, err := s.GetContractAddress(params)
-	if err != nil {
-		return 0, createENSRegisterProcessorErrorResponse(err)
-	}
-
-	input, err := s.PackTxInputData(params)
 	if err != nil {
 		return 0, createENSRegisterProcessorErrorResponse(err)
 	}

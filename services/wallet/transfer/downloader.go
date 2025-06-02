@@ -89,49 +89,6 @@ func (d *ETHDownloader) GetTransfersByNumber(ctx context.Context, number *big.In
 	return rst, err
 }
 
-// Only used by status-mobile
-func getTransferByHash(ctx context.Context, client chain.ClientInterface, signer types.Signer, address common.Address, hash common.Hash) (*Transfer, error) {
-	transaction, _, err := client.TransactionByHash(ctx, hash)
-	if err != nil {
-		return nil, err
-	}
-
-	receipt, err := client.TransactionReceipt(ctx, hash)
-	if err != nil {
-		return nil, err
-	}
-
-	eventType, transactionLog := w_common.GetFirstEvent(receipt.Logs)
-	transactionType := w_common.EventTypeToSubtransactionType(eventType)
-
-	from, err := types.Sender(signer, transaction)
-
-	if err != nil {
-		return nil, err
-	}
-
-	baseGasFee, err := client.GetBaseFeeFromBlock(ctx, big.NewInt(int64(transactionLog.BlockNumber)))
-	if err != nil {
-		return nil, err
-	}
-
-	transfer := &Transfer{
-		Type:        transactionType,
-		ID:          hash,
-		Address:     address,
-		BlockNumber: receipt.BlockNumber,
-		BlockHash:   receipt.BlockHash,
-		Timestamp:   uint64(time.Now().Unix()),
-		Transaction: transaction,
-		From:        from,
-		Receipt:     receipt,
-		Log:         transactionLog,
-		BaseGasFees: baseGasFee,
-	}
-
-	return transfer, nil
-}
-
 func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block, accounts []common.Address) ([]Transfer, error) {
 	startTs := time.Now()
 

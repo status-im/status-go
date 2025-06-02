@@ -75,6 +75,10 @@ func (s *BlockchainHealthManagerSuite) TestStatusUpdateNotification() {
 
 // Test getting the full status
 func (s *BlockchainHealthManagerSuite) TestGetFullStatus() {
+	// Create a new manager for this test to avoid accumulated metrics
+	s.manager.Stop()
+	s.manager = NewBlockchainHealthManager()
+
 	phm1 := NewProvidersHealthManager(1)
 	phm2 := NewProvidersHealthManager(2)
 	ctx := context.Background()
@@ -84,17 +88,93 @@ func (s *BlockchainHealthManagerSuite) TestGetFullStatus() {
 	s.Require().NoError(err)
 	ch := s.manager.Subscribe()
 
-	// Update the provider status
+	now := time.Now()
+
+	// Update the provider status for chain 1 with metrics
 	phm1.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{
-		{Name: "providerName1", Timestamp: time.Now(), Err: nil},
+		{
+			Name:      "providerName1",
+			Timestamp: now,
+			Err:       nil,
+			StartTime: now.Add(-100 * time.Millisecond),
+		},
+		{
+			Name:      "providerName2",
+			Timestamp: now,
+			Err:       context.DeadlineExceeded,
+			StartTime: now.Add(-200 * time.Millisecond),
+		},
 	})
+
+	// Update the provider status for chain 2 with metrics
 	phm2.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{
-		{Name: "providerName2", Timestamp: time.Now(), Err: errors.New("connection error")},
+		{
+			Name:      "providerName1",
+			Timestamp: now,
+			Err:       nil,
+			StartTime: now.Add(-150 * time.Millisecond),
+		},
+		{
+			Name:      "providerName2",
+			Timestamp: now,
+			Err:       context.DeadlineExceeded,
+			StartTime: now.Add(-250 * time.Millisecond),
+		},
 	})
 
 	s.waitForUpdate(ch, rpcstatus.StatusUp, 10*time.Millisecond)
 	fullStatus := s.manager.GetFullStatus()
 	s.Len(fullStatus.StatusPerChainPerProvider, 2, "Expected statuses for 2 chains")
+
+	// Verify metrics for chain 1
+	chain1Providers := fullStatus.StatusPerChainPerProvider[1]
+	s.Len(chain1Providers, 2, "Expected 2 providers for chain 1")
+
+	provider1Chain1 := chain1Providers["providerName1"]
+	s.Equal(rpcstatus.StatusUp, provider1Chain1.Status, "Provider1 on Chain1 should be up")
+	s.Greater(provider1Chain1.TotalDuration, time.Duration(0), "Provider1 on Chain1 should have non-zero duration")
+	s.Greater(provider1Chain1.TotalRequests, int64(0), "Provider1 on Chain1 should have non-zero requests")
+
+	provider2Chain1 := chain1Providers["providerName2"]
+	s.Equal(rpcstatus.StatusDown, provider2Chain1.Status, "Provider2 on Chain1 should be down")
+	s.Greater(provider2Chain1.TotalDuration, time.Duration(0), "Provider2 on Chain1 should have non-zero duration")
+	s.Greater(provider2Chain1.TotalRequests, int64(0), "Provider2 on Chain1 should have non-zero requests")
+	s.Greater(provider2Chain1.TotalTimeoutCount, int64(0), "Provider2 on Chain1 should have non-zero timeout count")
+
+	// Verify metrics for chain 2
+	chain2Providers := fullStatus.StatusPerChainPerProvider[2]
+	s.Len(chain2Providers, 2, "Expected 2 providers for chain 2")
+
+	provider1Chain2 := chain2Providers["providerName1"]
+	s.Equal(rpcstatus.StatusUp, provider1Chain2.Status, "Provider1 on Chain2 should be up")
+	s.Greater(provider1Chain2.TotalDuration, time.Duration(0), "Provider1 on Chain2 should have non-zero duration")
+	s.Greater(provider1Chain2.TotalRequests, int64(0), "Provider1 on Chain2 should have non-zero requests")
+
+	provider2Chain2 := chain2Providers["providerName2"]
+	s.Equal(rpcstatus.StatusDown, provider2Chain2.Status, "Provider2 on Chain2 should be down")
+	s.Greater(provider2Chain2.TotalDuration, time.Duration(0), "Provider2 on Chain2 should have non-zero duration")
+	s.Greater(provider2Chain2.TotalRequests, int64(0), "Provider2 on Chain2 should have non-zero requests")
+
+	// Verify aggregated status for chain 1
+	chain1Status := fullStatus.StatusPerChain[1]
+	s.Equal(rpcstatus.StatusUp, chain1Status.Status, "Chain1 should be up")
+	s.Greater(chain1Status.TotalDuration, time.Duration(0), "Chain1 should have non-zero duration")
+	s.Greater(chain1Status.TotalRequests, int64(0), "Chain1 should have non-zero requests")
+	s.Greater(chain1Status.TotalTimeoutCount, int64(0), "Chain1 should have non-zero timeout count")
+
+	// Verify aggregated status for chain 2
+	chain2Status := fullStatus.StatusPerChain[2]
+	s.Equal(rpcstatus.StatusUp, chain2Status.Status, "Chain2 should be up")
+	s.Greater(chain2Status.TotalDuration, time.Duration(0), "Chain2 should have non-zero duration")
+	s.Greater(chain2Status.TotalRequests, int64(0), "Chain2 should have non-zero requests")
+	s.Greater(chain2Status.TotalTimeoutCount, int64(0), "Chain2 should have non-zero timeout count")
+
+	// Verify overall aggregated status
+	overallStatus := fullStatus.Status
+	s.Equal(rpcstatus.StatusUp, overallStatus.Status, "Overall status should be up")
+	s.Greater(overallStatus.TotalDuration, time.Duration(0), "Overall should have non-zero duration")
+	s.Greater(overallStatus.TotalRequests, int64(0), "Overall should have non-zero requests")
+	s.Greater(overallStatus.TotalTimeoutCount, int64(0), "Overall should have non-zero timeout count")
 }
 
 func (s *BlockchainHealthManagerSuite) TestConcurrentSubscriptionUnsubscription() {

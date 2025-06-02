@@ -308,3 +308,7 @@ func (f *Filter) MatchMessage(msg *ReceivedMessage) bool {
 	}
 	return false
 }
+
+func (f *Filter) ID() string {
+	return f.id
+}

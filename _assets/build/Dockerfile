@@ -1,5 +1,5 @@
 # Build status-go in a Go builder container
-FROM golang:1.21-alpine3.18 as builder
+FROM golang:1.22-alpine3.18 as builder
 
 # Set environment variables to use Clang
 ENV CC=clang
@@ -37,6 +37,7 @@ RUN mkdir -p /static/configs
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/$build_target /usr/local/bin/
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/config.json /static/configs/
+COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
 
 RUN ln -s /usr/local/bin/$build_target /usr/local/bin/entrypoint
 

@@ -4,32 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
-	"net"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sync"
 
-	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/p2p/enr"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/db"
-	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
@@ -44,22 +33,17 @@ import (
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
-	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/updates"
-	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/wakuv1"
 	"github.com/status-im/status-go/wakuv2"
 )
 
@@ -70,7 +54,6 @@ var (
 	ErrNoRunningNode          = errors.New("there is no running node")
 	ErrAccountKeyStoreMissing = errors.New("account key store is not set")
 	ErrServiceUnknown         = errors.New("service unknown")
-	ErrDiscoveryRunning       = errors.New("discovery is already running")
 	ErrRPCMethodUnavailable   = `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"the method called does not exist/is not available"}}`
 )
 
@@ -92,23 +75,15 @@ type StatusNode struct {
 	mediaServerEnableTLS *bool
 	httpServer           *server.MediaServer
 
-	discovery discovery.Discovery
-	register  *peers.Register
-	peerPool  *peers.PeerPool
-	db        *leveldb.DB // used as a cache for PeerPool
-
 	logger *zap.Logger
 
 	gethAccountManager *account.GethManager
 	accountsManager    *accounts.Manager
 	transactor         *transactions.Transactor
 
-	// services
-	services      []common.StatusService
 	publicMethods map[string]bool
 	// we explicitly list every service, we could use interfaces
 	// and store them in a nicer way and user reflection, but for now stupid is good
-	rpcFiltersSrvc         *rpcfilters.Service
 	subscriptionsSrvc      *subscriptions.Service
 	rpcStatsSrvc           *rpcstats.Service
 	statusPublicSrvc       *status.Service
@@ -116,15 +91,11 @@ type StatusNode struct {
 	browsersSrvc           *browsers.Service
 	permissionsSrvc        *permissions.Service
 	mailserversSrvc        *mailservers.Service
-	providerSrvc           *web3provider.Service
 	appMetricsSrvc         *appmetricsservice.Service
 	walletSrvc             *wallet.Service
-	peerSrvc               *peer.Service
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         *timesource.NTPTimeSource
-	wakuSrvc               *wakuv1.Waku
-	wakuExtSrvc            *wakuext.Service
 	wakuV2Srvc             *wakuv2.Waku
 	wakuV2ExtSrvc          *wakuv2ext.Service
 	ensSrvc                *ens.Service
@@ -140,6 +111,8 @@ type StatusNode struct {
 
 	accountsFeed event.Feed
 	walletFeed   event.Feed
+	networksFeed event.Feed
+	settingsFeed event.Feed
 }
 
 // New makes new instance of StatusNode.
@@ -176,30 +149,16 @@ func (n *StatusNode) HTTPServer() *server.MediaServer {
 	return n.httpServer
 }
 
-// Server retrieves the currently running P2P network layer.
-func (n *StatusNode) Server() *p2p.Server {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	if n.gethNode == nil {
-		return nil
-	}
-
-	return n.gethNode.Server()
-}
-
 // Start starts current StatusNode, failing if it's already started.
 // It accepts a list of services that should be added to the node.
 func (n *StatusNode) Start(config *params.NodeConfig, accs *accounts.Manager) error {
 	return n.StartWithOptions(config, StartOptions{
-		StartDiscovery:  true,
 		AccountsManager: accs,
 	})
 }
 
 // StartOptions allows to control some parameters of Start() method.
 type StartOptions struct {
-	StartDiscovery  bool
 	AccountsManager *accounts.Manager
 }
 
@@ -250,37 +209,15 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 
 	n.logger.Debug("starting with options", zap.Stringer("ClusterConfig", &config.ClusterConfig))
 
-	db, err := db.Create(config.DataDir, params.StatusDatabase)
-	if err != nil {
-		return fmt.Errorf("failed to create database at %s: %v", config.DataDir, err)
-	}
-
-	n.db = db
-
-	err = n.startWithDB(config, options.AccountsManager, db)
-
-	// continue only if there was no error when starting node with a db
-	if err == nil && options.StartDiscovery && n.discoveryEnabled() {
-		err = n.startDiscovery()
-	}
-
-	if err != nil {
-		if dberr := db.Close(); dberr != nil {
-			n.logger.Error("error while closing leveldb after node crash", zap.Error(dberr))
-		}
-		n.db = nil
-		return err
-	}
-
-	return nil
+	return n.startWithDB(config, options.AccountsManager)
 }
 
 func (n *StatusNode) SetMediaServerEnableTLS(enableTLS *bool) {
 	n.mediaServerEnableTLS = enableTLS
 }
 
-func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) error {
-	if err := n.createNode(config, accs, db); err != nil {
+func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manager) error {
+	if err := n.createNode(config, accs); err != nil {
 		return err
 	}
 	n.config = config
@@ -319,8 +256,8 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 	return n.startGethNode()
 }
 
-func (n *StatusNode) createNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) (err error) {
-	n.gethNode, err = MakeNode(config, accs, db)
+func (n *StatusNode) createNode(config *params.NodeConfig, accs *accounts.Manager) (err error) {
+	n.gethNode, err = MakeNode(config, accs)
 	return err
 }
 
@@ -336,116 +273,22 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		return
 	}
 
-	// ProviderConfigs should be passed not in wallet secrets config on login
-	// but some other way, as it's not wallet specific and should not be passed with login request
-	// but currently there is no other way to pass it
-	providerConfigs := []params.ProviderConfig{
-		{
-			Enabled:  n.config.WalletConfig.StatusProxyEnabled,
-			Name:     rpc.ProviderStatusProxy,
-			User:     n.config.WalletConfig.StatusProxyBlockchainUser,
-			Password: n.config.WalletConfig.StatusProxyBlockchainPassword,
-		},
-	}
-
 	config := rpc.ClientConfig{
 		Client:          gethNodeClient,
 		UpstreamChainID: n.config.NetworkID,
 		Networks:        n.config.Networks,
 		DB:              n.appDB,
+		AccountsFeed:    &n.accountsFeed,
 		WalletFeed:      &n.walletFeed,
-		ProviderConfigs: providerConfigs,
+		SettingsFeed:    &n.settingsFeed,
+		NetworksFeed:    &n.networksFeed,
 	}
 	n.rpcClient, err = rpc.NewClient(config)
-	n.rpcClient.Start(context.Background())
 	if err != nil {
 		return
 	}
+	n.rpcClient.Start(context.Background())
 	return
-}
-
-func (n *StatusNode) discoveryEnabled() bool {
-	return n.config != nil && (!n.config.NoDiscovery) && n.config.ClusterConfig.Enabled
-}
-
-func (n *StatusNode) discoverNode() (*enode.Node, error) {
-	if !n.isRunning() {
-		return nil, nil
-	}
-
-	server := n.gethNode.Server()
-	discNode := server.Self()
-
-	if n.config.AdvertiseAddr == "" {
-		return discNode, nil
-	}
-
-	n.logger.Info("Using AdvertiseAddr for rendezvous", zap.String("addr", n.config.AdvertiseAddr))
-
-	r := discNode.Record()
-	r.Set(enr.IP(net.ParseIP(n.config.AdvertiseAddr)))
-	if err := enode.SignV4(r, server.PrivateKey); err != nil {
-		return nil, err
-	}
-	return enode.New(enode.ValidSchemes[r.IdentityScheme()], r)
-}
-
-// StartDiscovery starts the peers discovery protocols depending on the node config.
-func (n *StatusNode) StartDiscovery() error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if n.discoveryEnabled() {
-		return n.startDiscovery()
-	}
-
-	return nil
-}
-
-func (n *StatusNode) startDiscovery() error {
-	if n.isDiscoveryRunning() {
-		return ErrDiscoveryRunning
-	}
-
-	discoveries := []discovery.Discovery{}
-	if !n.config.NoDiscovery {
-		discoveries = append(discoveries, discovery.NewDiscV5(
-			n.gethNode.Server().PrivateKey,
-			n.config.ListenAddr,
-			parseNodesV5(n.config.ClusterConfig.BootNodes)))
-	}
-
-	if len(discoveries) == 0 {
-		return errors.New("wasn't able to register any discovery")
-	} else if len(discoveries) > 1 {
-		n.discovery = discovery.NewMultiplexer(discoveries)
-	} else {
-		n.discovery = discoveries[0]
-	}
-	n.logger.Debug("using discovery",
-		zap.Any("instance", reflect.TypeOf(n.discovery)),
-		zap.Any("registerTopics", n.config.RegisterTopics),
-		zap.Any("requireTopics", n.config.RequireTopics),
-	)
-	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
-	options := peers.NewDefaultOptions()
-	// TODO(dshulyak) consider adding a flag to define this behaviour
-	options.AllowStop = len(n.config.RegisterTopics) == 0
-	options.TrustedMailServers = parseNodesToNodeID(n.config.ClusterConfig.TrustedMailServers)
-
-	n.peerPool = peers.NewPeerPool(
-		n.discovery,
-		n.config.RequireTopics,
-		peers.NewCache(n.db),
-		options,
-	)
-	if err := n.discovery.Start(); err != nil {
-		return err
-	}
-	if err := n.register.Start(); err != nil {
-		return err
-	}
-	return n.peerPool.Start(n.gethNode.Server())
 }
 
 // Stop will stop current StatusNode. A stopped node cannot be resumed.
@@ -462,15 +305,6 @@ func (n *StatusNode) Stop() error {
 
 // stop will stop current StatusNode. A stopped node cannot be resumed.
 func (n *StatusNode) stop() error {
-	if n.isDiscoveryRunning() {
-		if err := n.stopDiscovery(); err != nil {
-			n.logger.Error("Error stopping the discovery components", zap.Error(err))
-		}
-		n.register = nil
-		n.peerPool = nil
-		n.discovery = nil
-	}
-
 	if err := n.gethNode.Close(); err != nil {
 		return err
 	}
@@ -491,30 +325,17 @@ func (n *StatusNode) stop() error {
 	n.downloader.Stop()
 	n.downloader = nil
 
-	if n.db != nil {
-		if err = n.db.Close(); err != nil {
-			n.logger.Error("Error closing the leveldb of status node", zap.Error(err))
-			return err
-		}
-		n.db = nil
-	}
-
-	n.rpcFiltersSrvc = nil
 	n.subscriptionsSrvc = nil
 	n.rpcStatsSrvc = nil
 	n.accountsSrvc = nil
 	n.browsersSrvc = nil
 	n.permissionsSrvc = nil
 	n.mailserversSrvc = nil
-	n.providerSrvc = nil
 	n.appMetricsSrvc = nil
 	n.walletSrvc = nil
-	n.peerSrvc = nil
 	n.localNotificationsSrvc = nil
 	n.personalSrvc = nil
 	n.timeSourceSrvc = nil
-	n.wakuSrvc = nil
-	n.wakuExtSrvc = nil
 	n.wakuV2Srvc = nil
 	n.wakuV2ExtSrvc = nil
 	n.ensSrvc = nil
@@ -526,16 +347,6 @@ func (n *StatusNode) stop() error {
 	n.appGeneralSrvc = nil
 	n.logger.Debug("status node stopped")
 	return nil
-}
-
-func (n *StatusNode) isDiscoveryRunning() bool {
-	return n.register != nil || n.peerPool != nil || n.discovery != nil
-}
-
-func (n *StatusNode) stopDiscovery() error {
-	n.register.Stop()
-	n.peerPool.Stop()
-	return n.discovery.Stop()
 }
 
 // ResetChainData removes chain data if node is not running.
@@ -570,112 +381,7 @@ func (n *StatusNode) isRunning() bool {
 	return n.gethNode != nil && n.gethNode.Server() != nil
 }
 
-// populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
-func (n *StatusNode) populateStaticPeers() error {
-	if !n.config.ClusterConfig.Enabled {
-		n.logger.Info("Static peers are disabled")
-		return nil
-	}
-
-	for _, enode := range n.config.ClusterConfig.StaticNodes {
-		if err := n.addPeer(enode); err != nil {
-			n.logger.Error("Static peer addition failed", zap.Error(err))
-			return err
-		}
-		n.logger.Info("Static peer added", zap.String("enode", enode))
-	}
-
-	return nil
-}
-
-func (n *StatusNode) removeStaticPeers() error {
-	if !n.config.ClusterConfig.Enabled {
-		n.logger.Info("Static peers are disabled")
-		return nil
-	}
-
-	for _, enode := range n.config.ClusterConfig.StaticNodes {
-		if err := n.removePeer(enode); err != nil {
-			n.logger.Error("Static peer deletion failed", zap.Error(err))
-			return err
-		}
-		n.logger.Info("Static peer deleted", zap.String("enode", enode))
-	}
-	return nil
-}
-
-// ReconnectStaticPeers removes and adds static peers to a server.
-func (n *StatusNode) ReconnectStaticPeers() error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if !n.isRunning() {
-		return ErrNoRunningNode
-	}
-
-	if err := n.removeStaticPeers(); err != nil {
-		return err
-	}
-
-	return n.populateStaticPeers()
-}
-
-// AddPeer adds new static peer node
-func (n *StatusNode) AddPeer(url string) error {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	return n.addPeer(url)
-}
-
-// addPeer adds new static peer node
-func (n *StatusNode) addPeer(url string) error {
-	parsedNode, err := enode.ParseV4(url)
-	if err != nil {
-		return err
-	}
-
-	if !n.isRunning() {
-		return ErrNoRunningNode
-	}
-
-	n.gethNode.Server().AddPeer(parsedNode)
-
-	return nil
-}
-
-func (n *StatusNode) removePeer(url string) error {
-	parsedNode, err := enode.ParseV4(url)
-	if err != nil {
-		return err
-	}
-
-	if !n.isRunning() {
-		return ErrNoRunningNode
-	}
-
-	n.gethNode.Server().RemovePeer(parsedNode)
-
-	return nil
-}
-
-// PeerCount returns the number of connected peers.
-func (n *StatusNode) PeerCount() int {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	if !n.isRunning() {
-		return 0
-	}
-
-	return n.gethNode.Server().PeerCount()
-}
-
 func (n *StatusNode) ConnectionChanged(state connection.State) {
-	if n.wakuExtSrvc != nil {
-		n.wakuExtSrvc.ConnectionChanged(state)
-	}
-
 	if n.wakuV2ExtSrvc != nil {
 		n.wakuV2ExtSrvc.ConnectionChanged(state)
 	}
@@ -698,17 +404,6 @@ func (n *StatusNode) RPCClient() *rpc.Client {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.rpcClient
-}
-
-// Discover sets up the discovery for a specific topic.
-func (n *StatusNode) Discover(topic string, max, min int) (err error) {
-	if n.peerPool == nil {
-		return errors.New("peerPool not running")
-	}
-	return n.peerPool.UpdateTopic(topic, params.Limits{
-		Max: max,
-		Min: min,
-	})
 }
 
 func (n *StatusNode) SetAppDB(db *sql.DB) {

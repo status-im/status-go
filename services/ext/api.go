@@ -3,37 +3,32 @@ package ext
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/rlp"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/mailserver"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
@@ -42,10 +37,10 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/verification"
-	"github.com/status-im/status-go/services/ext/mailservers"
+	"github.com/status-im/status-go/wakuv2"
 
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -155,17 +150,15 @@ type MessagesResponse struct {
 
 // PublicAPI extends whisper public API.
 type PublicAPI struct {
-	service  *Service
-	eventSub mailservers.EnvelopeEventSubscriber
-	logger   *zap.Logger
+	service *Service
+	logger  *zap.Logger
 }
 
 // NewPublicAPI returns instance of the public API.
-func NewPublicAPI(s *Service, eventSub mailservers.EnvelopeEventSubscriber) *PublicAPI {
+func NewPublicAPI(s *Service) *PublicAPI {
 	return &PublicAPI{
-		service:  s,
-		eventSub: eventSub,
-		logger:   logutils.ZapLogger().Named("sshextService"),
+		service: s,
+		logger:  logutils.ZapLogger().Named("sshextService"),
 	}
 }
 
@@ -265,16 +258,8 @@ func (api *PublicAPI) SendGroupChatInvitationRejection(ctx Context, invitationRe
 	return api.service.messenger.SendGroupChatInvitationRejection(ctx, invitationRequestID)
 }
 
-func (api *PublicAPI) LoadFilters(parent context.Context, chats []*transport.Filter) ([]*transport.Filter, error) {
-	return api.service.messenger.LoadFilters(chats)
-}
-
 func (api *PublicAPI) SaveChat(parent context.Context, chat *protocol.Chat) error {
 	return api.service.messenger.SaveChat(chat)
-}
-
-func (api *PublicAPI) SaveMessages(parent context.Context, messages []*common.Message) error {
-	return api.service.messenger.SaveMessages(messages)
 }
 
 func (api *PublicAPI) CreateOneToOneChat(parent context.Context, request *requests.CreateOneToOneChat) (*protocol.MessengerResponse, error) {
@@ -303,10 +288,6 @@ func (api *PublicAPI) Chat(parent context.Context, chatID string) *protocol.Chat
 
 func (api *PublicAPI) ActiveChats(parent context.Context) []*protocol.Chat {
 	return api.service.messenger.ActiveChats()
-}
-
-func (api *PublicAPI) DeleteChat(parent context.Context, chatID string) error {
-	return api.service.messenger.DeleteChat(chatID)
 }
 
 func (api *PublicAPI) MuteCommunityCategory(request *requests.MuteCategory) error {
@@ -363,7 +344,7 @@ func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*protocol
 	return api.service.messenger.FetchContact(pubkey, true)
 }
 
-func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*transport.Filter) error {
+func (api *PublicAPI) RemoveFilters(parent context.Context, chats messagingtypes.ChatFilters) error {
 	return api.service.messenger.RemoveFilters(chats)
 }
 
@@ -618,21 +599,21 @@ func (api *PublicAPI) AllNonApprovedCommunitiesRequestsToJoin() ([]*communities.
 // Generates a single hash for each address that needs to be revealed to a community.
 // Each hash needs to be signed.
 // The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
-func (api *PublicAPI) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+func (api *PublicAPI) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	return api.service.messenger.GenerateJoiningCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal)
 }
 
 // Generates a single hash for each address that needs to be revealed to a community.
 // Each hash needs to be signed.
 // The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
-func (api *PublicAPI) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+func (api *PublicAPI) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	return api.service.messenger.GenerateEditCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal)
 }
 
 // Signs the provided messages with the provided accounts and password.
 // Provided accounts must not belong to a keypair that is migrated to a keycard.
 // Otherwise, the signing will fail, cause such accounts should be signed with a keycard.
-func (api *PublicAPI) SignData(signParams []account.SignParams) ([]string, error) {
+func (api *PublicAPI) SignData(signParams []personal.SignParams) ([]string, error) {
 	return api.service.messenger.SignData(signParams)
 }
 
@@ -1281,7 +1262,7 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*c
 
 // Deprecated: RequestCommunityInfoFromMailserverWithShard is deprecated in favor of
 // configurable FetchCommunity.
-func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID string, shard *shard.Shard) (*communities.Community, error) {
+func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID string, shard *wakuv2.Shard) (*communities.Community, error) {
 	request := &protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
 		Shard:           shard,
@@ -1306,7 +1287,7 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string
 
 // Deprecated: RequestCommunityInfoFromMailserverAsyncWithShard is deprecated in favor of
 // configurable FetchCommunity.
-func (api *PublicAPI) RequestCommunityInfoFromMailserverAsyncWithShard(communityID string, shard *shard.Shard) error {
+func (api *PublicAPI) RequestCommunityInfoFromMailserverAsyncWithShard(communityID string, shard *wakuv2.Shard) error {
 	request := &protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
 		Shard:           shard,
@@ -1373,6 +1354,23 @@ func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids
 	return err
 }
 
+// FetchNewsMessages fetches news messages from the News Feed
+// and returns a MessengerResponse containing the AC notifications
+func (api *PublicAPI) FetchNewsMessages() (*protocol.MessengerResponse, error) {
+	m := api.service.messenger
+	return m.FetchNewsMessages()
+}
+
+func (api *PublicAPI) ToggleNewsFeedEnabled(value bool) error {
+	m := api.service.messenger
+	return m.ToggleNewsFeedEnabled(value)
+}
+
+func (api *PublicAPI) ToggleNewsRSSEnabled(value bool) error {
+	m := api.service.messenger
+	return m.ToggleNewsRSSEnabled(value)
+}
+
 func (api *PublicAPI) RequestAllHistoricMessages(forceFetchingBackup bool) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RequestAllHistoricMessages(forceFetchingBackup, false)
 }
@@ -1392,19 +1390,6 @@ func (api *PublicAPI) FillGaps(chatID string, messageIDs []string) error {
 
 func (api *PublicAPI) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 	return api.service.messenger.SyncChatFromSyncedFrom(chatID)
-}
-
-// BloomFilter returns the current bloom filter bytes
-func (api *PublicAPI) BloomFilter() string {
-	return hexutil.Encode(api.service.messenger.BloomFilter())
-}
-
-func (api *PublicAPI) StartDiscV5() error {
-	return api.service.messenger.StartDiscV5()
-}
-
-func (api *PublicAPI) StopDiscV5() error {
-	return api.service.messenger.StopDiscV5()
 }
 
 func (api *PublicAPI) GetCommunitiesSettings() ([]communities.CommunitySettings, error) {
@@ -1448,14 +1433,6 @@ func (api *PublicAPI) StorePubsubTopicKey(topic string, privKey string) error {
 	}
 
 	return api.service.messenger.StorePubsubTopicKey(topic, p)
-}
-
-func (api *PublicAPI) AddStorePeer(address string) (peer.ID, error) {
-	maddr, err := multiaddr.NewMultiaddr(address)
-	if err != nil {
-		return "", err
-	}
-	return api.service.messenger.AddStorePeer(maddr)
 }
 
 func (api *PublicAPI) AddRelayPeer(address string) (peer.ID, error) {
@@ -1799,12 +1776,19 @@ func (api *PublicAPI) SetStoreConfirmationForMessagesSent(request *requests.SetS
 	return api.service.messenger.SetStoreConfirmationForMessagesSent(request)
 }
 
+// Deprecated: Use SetLogLevel from status.go instead. BTW, mobile don't use this anymore.
 func (api *PublicAPI) SetLogLevel(request *requests.SetLogLevel) error {
 	return api.service.messenger.SetLogLevel(request)
 }
 
+// Deprecated: Use SetLogNamespaces from status.go instead. BTW, mobile don't use this anymore.
 func (api *PublicAPI) SetLogNamespaces(request *requests.SetLogNamespaces) error {
 	return api.service.messenger.SetLogNamespaces(request)
+}
+
+// Deprecated: Use SetLogEnabled from status.go instead. BTW, mobile don't use this anymore.
+func (api *PublicAPI) SetLogEnabled(enabled bool) error {
+	return api.service.messenger.SetLogEnabled(enabled)
 }
 
 func (api *PublicAPI) SetMaxLogBackups(request *requests.SetMaxLogBackups) error {
@@ -1844,74 +1828,4 @@ func (api *PublicAPI) GetCommunityMemberAllMessages(request *requests.CommunityM
 // Delete a specific community member messages or all community member messages (based on provided parameters)
 func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
-}
-
-// -----
-// HELPER
-// -----
-
-// MakeMessagesRequestPayload makes a specific payload for MailServer
-// to request historic messages.
-// DEPRECATED
-func MakeMessagesRequestPayload(r MessagesRequest) ([]byte, error) {
-	cursor, err := hex.DecodeString(r.Cursor)
-	if err != nil {
-		return nil, fmt.Errorf("invalid cursor: %v", err)
-	}
-
-	if len(cursor) > 0 && len(cursor) != mailserver.CursorLength {
-		return nil, fmt.Errorf("invalid cursor size: expected %d but got %d", mailserver.CursorLength, len(cursor))
-	}
-
-	payload := mailserver.MessagesRequestPayload{
-		Lower: r.From,
-		Upper: r.To,
-		// We need to pass bloom filter for
-		// backward compatibility
-		Bloom:  createBloomFilter(r),
-		Topics: topicsToByteArray(r.Topics),
-		Limit:  r.Limit,
-		Cursor: cursor,
-		// Client must tell the MailServer if it supports batch responses.
-		// This can be removed in the future.
-		Batch: true,
-	}
-
-	return rlp.EncodeToBytes(payload)
-}
-
-func topicsToByteArray(topics []wakutypes.TopicType) [][]byte {
-
-	var response [][]byte
-	for idx := range topics {
-		response = append(response, topics[idx][:])
-	}
-
-	return response
-}
-
-func createBloomFilter(r MessagesRequest) []byte {
-	if len(r.Topics) > 0 {
-		return topicsToBloom(r.Topics...)
-	}
-	return wakutypes.TopicToBloom(r.Topic)
-}
-
-func topicsToBloom(topics ...wakutypes.TopicType) []byte {
-	i := new(big.Int)
-	for _, topic := range topics {
-		bloom := wakutypes.TopicToBloom(topic)
-		i.Or(i, new(big.Int).SetBytes(bloom[:]))
-	}
-
-	combined := make([]byte, wakutypes.BloomFilterSize)
-	data := i.Bytes()
-	copy(combined[wakutypes.BloomFilterSize-len(data):], data[:])
-
-	return combined
-}
-
-// TopicsToBloom squashes all topics into a single bloom filter.
-func TopicsToBloom(topics ...wakutypes.TopicType) []byte {
-	return topicsToBloom(topics...)
 }

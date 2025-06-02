@@ -29,8 +29,14 @@ func NewProvidersHealthManager(chainID uint64) *ProvidersHealthManager {
 }
 
 // Update processes a batch of provider call statuses, updates the aggregated status, and emits chain status changes if necessary.
-func (p *ProvidersHealthManager) Update(ctx context.Context, callStatuses []rpcstatus.RpcProviderCallStatus) {
+func (p *ProvidersHealthManager) doUpdate(callStatuses []rpcstatus.RpcProviderCallStatus) (shouldEmit bool, newStatus rpcstatus.ProviderStatus) {
 	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Check if aggregator is nil
+	if p.aggregator == nil {
+		return false, rpcstatus.ProviderStatus{}
+	}
 
 	// Update the aggregator with the new provider statuses
 	for _, rpcCallStatus := range callStatuses {
@@ -38,16 +44,20 @@ func (p *ProvidersHealthManager) Update(ctx context.Context, callStatuses []rpcs
 		p.aggregator.Update(providerStatus)
 	}
 
-	newStatus := p.aggregator.GetAggregatedStatus()
+	newStatus = p.aggregator.GetAggregatedStatus()
+	shouldEmit = p.lastStatus == nil || p.lastStatus.Status != newStatus.Status
+	return
+}
 
-	shouldEmit := p.lastStatus == nil || p.lastStatus.Status != newStatus.Status
-	p.mu.Unlock()
-
+// Update processes a batch of provider call statuses, updates the aggregated status, and emits chain status changes if necessary.
+func (p *ProvidersHealthManager) Update(ctx context.Context, callStatuses []rpcstatus.RpcProviderCallStatus) {
+	shouldEmit, newStatus := p.doUpdate(callStatuses)
 	if !shouldEmit {
 		return
 	}
 
 	p.emitChainStatus(ctx)
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.lastStatus = &newStatus
@@ -74,7 +84,9 @@ func (p *ProvidersHealthManager) Unsubscribe(ch chan struct{}) {
 func (p *ProvidersHealthManager) Reset() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.aggregator = aggregator.NewAggregator(fmt.Sprintf("%d", p.chainID))
+	newAgg := aggregator.NewAggregator(fmt.Sprintf("%d", p.chainID))
+	p.aggregator = newAgg
+	p.lastStatus = nil
 }
 
 // Status returns the current aggregated status.
@@ -91,5 +103,8 @@ func (p *ProvidersHealthManager) ChainID() uint64 {
 
 // emitChainStatus sends a notification to all subscribers.
 func (p *ProvidersHealthManager) emitChainStatus(ctx context.Context) {
+	if p.subscriptionManager == nil {
+		return
+	}
 	p.subscriptionManager.Emit(ctx)
 }

@@ -104,27 +104,7 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 
 func (t *Transactor) NextNonce(ctx context.Context, rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error) {
 	wrapper := newRPCWrapper(rpcClient, chainID)
-	nonce, err := wrapper.PendingNonceAt(ctx, common.Address(from))
-	if err != nil {
-		return 0, err
-	}
-
-	// We need to take into consideration all pending transactions in case of networks based on the Optimism stack, cause the network returns always
-	// the nonce of last executed tx + 1 for the next nonce value.
-	if chainID == wallet_common.OptimismMainnet ||
-		chainID == wallet_common.OptimismSepolia ||
-		chainID == wallet_common.BaseMainnet ||
-		chainID == wallet_common.BaseSepolia {
-		if t.pendingTracker != nil {
-			countOfPendingTXs, err := t.pendingTracker.CountPendingTxsFromNonce(wallet_common.ChainID(chainID), common.Address(from), nonce)
-			if err != nil {
-				return 0, err
-			}
-			return nonce + countOfPendingTXs, nil
-		}
-	}
-
-	return nonce, err
+	return wrapper.PendingNonceAt(ctx, common.Address(from))
 }
 
 func (t *Transactor) EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error) {
@@ -192,13 +172,22 @@ func (t *Transactor) SendRawTransaction(chainID uint64, rawTx string) error {
 }
 
 func createPendingTransaction(from common.Address, symbol string, chainID uint64, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (pTx *PendingTransaction) {
+	var toAddress common.Address
+	if tx.To() != nil {
+		toAddress = *tx.To()
+	} else {
+		// when deploying a new contract we don't know the address beforehand,
+		// so we create it from the address the contract was deployed from and the nonce
+		toAddr := crypto.CreateAddress(types.Address(from), tx.Nonce())
+		toAddress = common.Address(toAddr)
+	}
 
 	pTx = &PendingTransaction{
 		Hash:               tx.Hash(),
 		Timestamp:          uint64(time.Now().Unix()),
 		Value:              bigint.BigInt{Int: tx.Value()},
 		From:               from,
-		To:                 *tx.To(),
+		To:                 toAddress,
 		Nonce:              tx.Nonce(),
 		Data:               string(tx.Data()),
 		Type:               WalletTransfer,
@@ -207,8 +196,8 @@ func createPendingTransaction(from common.Address, symbol string, chainID uint64
 		Symbol:             symbol,
 		AutoDelete:         new(bool),
 	}
-	// Transaction downloader will delete pending transaction as soon as it is confirmed
-	*pTx.AutoDelete = false
+	// Stop tracking as soon as the transaction is confirmed
+	*pTx.AutoDelete = true
 	return
 }
 
@@ -408,8 +397,6 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args wa
 	if args.Gas != nil {
 		gas = uint64(*args.Gas)
 	} else {
-		ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
-		defer cancel()
 
 		var (
 			gethTo    common.Address

@@ -14,9 +14,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/stickers"
-	"github.com/status-im/status-go/wakuv1"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -81,14 +79,13 @@ func (s *MessengerSyncSettingsSuite) SetupSuite() {
 func (s *MessengerSyncSettingsSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = bridge.NewGethWakuWrapper(shh)
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 
 	s.alice = s.newMessenger()
-	_, err := s.alice.Start()
+	_, err = s.alice.Start()
 	s.Require().NoError(err)
 
 	s.alice2, err = newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
@@ -127,7 +124,7 @@ func (s *MessengerSyncSettingsSuite) newMessenger() *Messenger {
 		ProfilePicturesShowTo:     1,
 		ProfilePicturesVisibility: 1,
 		DefaultSyncPeriod:         86400,
-		UseMailservers:            true,
+		UseMailservers:            false,
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900"),

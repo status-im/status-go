@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.6'
+library 'status-jenkins-lib@v1.9.20'
 
 pipeline {
   agent { label 'linux && x86_64 && nix-2.24' }
@@ -93,15 +93,15 @@ pipeline {
 
     stage('Generate') {
       steps { script {
-        nix.shell('make generate', pure: false)
+        nix.develop('make generate', pure: false)
       } }
     }
 
     stage('Vendor Check') {
       steps { script {
-        nix.shell('make vendor', pure: false)
+        nix.develop('make vendor', pure: false)
         /* fail build if vendoring hasn't been done */
-        nix.shell('git diff --exit-code --no-color --stat vendor/')
+        nix.develop('git diff --exit-code --no-color --stat vendor/')
       } }
     }
 
@@ -110,13 +110,13 @@ pipeline {
         expression { isPRJob() }
       }
       steps { script {
-        nix.shell('make migration-check', pure: false)
+        nix.develop('make migration-check', pure: false)
       } }
     }
 
     stage('Lint') {
       steps { script {
-        nix.shell('make lint', pure: true)
+        nix.develop('make lint', pure: false)
       } }
     }
 
@@ -141,8 +141,8 @@ pipeline {
             "--tcp-port=${NWAKU_TCP_PORT}",
             "--discv5-discovery=true",
             "--cluster-id=16",
-            "--pubsub-topic=/waku/2/rs/16/32",
-            "--pubsub-topic=/waku/2/rs/16/64",
+            "--shard=32",
+            "--shard=64",
             "--nat=extip:${ipAddress}",
             "--discv5-discovery",
             "--discv5-udp-port=${NWAKU_UDP_PORT}",
@@ -157,7 +157,7 @@ pipeline {
                 variable: 'CODECOV_TOKEN'
               ),
             ]) {
-              nix.shell('make test-unit V=1', pure: false)
+              nix.develop('make test-unit V=1', pure: false)
             }
             archiveArtifacts('report_*.xml, test_*.log, test-coverage.html')
           }

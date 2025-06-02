@@ -103,7 +103,7 @@ func (t *namespacesTree) Rebuild(namespaces string) error {
 			return errInvalidNamespacesFormat
 		}
 
-		lvl, err := lvlFromString(parts[1])
+		lvl, err := LvlFromString(parts[1])
 		if err != nil {
 			return err
 		}

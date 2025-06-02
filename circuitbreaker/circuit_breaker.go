@@ -23,28 +23,31 @@ type CommandResult struct {
 type FunctorCallStatus struct {
 	Name      string
 	Timestamp time.Time
+	StartTime time.Time
 	Err       error
 }
 
-func (cr CommandResult) Result() []any {
+func (cr *CommandResult) Result() []any {
 	return cr.res
 }
 
-func (cr CommandResult) Error() error {
+func (cr *CommandResult) Error() error {
 	return cr.err
 }
-func (cr CommandResult) Cancelled() bool {
+
+func (cr *CommandResult) Cancelled() bool {
 	return cr.cancelled
 }
 
-func (cr CommandResult) FunctorCallStatuses() []FunctorCallStatus {
+func (cr *CommandResult) FunctorCallStatuses() []FunctorCallStatus {
 	return cr.functorCallStatuses
 }
 
-func (cr *CommandResult) addCallStatus(circuitName string, err error) {
+func (cr *CommandResult) addCallStatus(providerName string, err error, startTime time.Time) {
 	cr.functorCallStatuses = append(cr.functorCallStatuses, FunctorCallStatus{
-		Name:      circuitName,
+		Name:      providerName,
 		Timestamp: time.Now(),
+		StartTime: startTime,
 		Err:       err,
 	})
 }
@@ -62,8 +65,8 @@ func NewCommand(ctx context.Context, functors []*Functor) *Command {
 	}
 }
 
-func (cmd *Command) Add(ftor *Functor) {
-	cmd.functors = append(cmd.functors, ftor)
+func (cmd *Command) Add(functor *Functor) {
+	cmd.functors = append(cmd.functors, functor)
 }
 
 func (cmd *Command) IsEmpty() bool {
@@ -94,14 +97,19 @@ func NewCircuitBreaker(config Config) *CircuitBreaker {
 }
 
 type Functor struct {
-	exec        FallbackFunc
-	circuitName string
+	exec         FallbackFunc
+	circuitName  string
+	providerName string
 }
 
-func NewFunctor(exec FallbackFunc, circuitName string) *Functor {
+// NewFunctor creates a new Functor with the provided FallbackFunc, circuitName and providerName.
+// The circuitName is the name of the circuit to be used by the Functor. If the circuitName is empty,
+// or there is only one Functor in the Command, the command will be executed without a circuit.
+func NewFunctor(exec FallbackFunc, circuitName, providerName string) *Functor {
 	return &Functor{
-		exec:        exec,
-		circuitName: circuitName,
+		exec:         exec,
+		circuitName:  circuitName,
+		providerName: providerName,
 	}
 }
 
@@ -115,7 +123,7 @@ func accumulateCommandError(result CommandResult, circuitName string, err error)
 	return result
 }
 
-// Executes the command in its circuit if set.
+// Execute the command in its circuit if set.
 // If the command's circuit is not configured, the circuit of the CircuitBreaker is used.
 // This is a blocking function.
 func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
@@ -137,19 +145,33 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 
 		var err error
 		circuitName := f.circuitName
+		providerName := f.providerName
 		if cb.circuitNameHandler != nil {
 			circuitName = cb.circuitNameHandler(circuitName)
 		}
 
+		// Record start time before execution
+		startTime := time.Now()
+
 		// if last command, execute without circuit
-		if i == len(cmd.functors)-1 {
+		if i == len(cmd.functors)-1 || circuitName == "" {
 			res, execErr := f.exec()
 			err = execErr
 			if err == nil {
 				result.res = res
 				result.err = nil
 			}
-			result.addCallStatus(circuitName, err)
+			result.addCallStatus(f.providerName, err, startTime)
+
+			// Log error if present
+			if err != nil {
+				// Get the status that was just added
+				status := result.functorCallStatuses[len(result.functorCallStatuses)-1]
+				logutils.ZapLogger().Warn("direct execution error",
+					zap.String("provider", f.providerName),
+					zap.Error(err),
+					zap.Duration("duration", time.Since(status.StartTime)))
+			}
 		} else {
 			if hystrix.GetCircuitSettings()[circuitName] == nil {
 				hystrix.ConfigureCommand(circuitName, hystrix.CommandConfig{
@@ -162,23 +184,30 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 			}
 
 			err = hystrix.DoC(ctx, circuitName, func(ctx context.Context) error {
+				// We need to capture the execution time inside the hystrix function
+				execStartTime := time.Now()
 				res, err := f.exec()
 				// Write to result only if success
 				if err == nil {
 					result.res = res
 					result.err = nil
 				}
-				result.addCallStatus(circuitName, err)
+				result.addCallStatus(f.providerName, err, execStartTime)
 
 				// If the command has been cancelled, we don't count
-				// the error towars breaking the circuit, and then we break
+				// the error towards breaking the circuit, and then we break
 				if cmd.cancel {
 					result = accumulateCommandError(result, circuitName, err)
 					result.cancelled = true
 					return nil
 				}
 				if err != nil {
-					logutils.ZapLogger().Warn("hystrix error", zap.String("provider", circuitName), zap.Error(err))
+					// Get the status that was just added
+					status := result.functorCallStatuses[len(result.functorCallStatuses)-1]
+					logutils.ZapLogger().Warn("hystrix error",
+						zap.String("provider", f.providerName),
+						zap.Error(err),
+						zap.Duration("duration", time.Since(status.StartTime)))
 				}
 				return err
 			}, nil)
@@ -187,25 +216,24 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 			break
 		}
 
-		result = accumulateCommandError(result, circuitName, err)
-
-		// Lets abuse every provider with the same amount of MaxConcurrentRequests,
+		result = accumulateCommandError(result, providerName, err)
+		// Let's abuse every provider with the same amount of MaxConcurrentRequests,
 		// keep iterating even in case of ErrMaxConcurrency error
 	}
 	return result
 }
 
-func (c *CircuitBreaker) SetOverrideCircuitNameHandler(f func(string) string) {
-	c.circuitNameHandler = f
+func (cb *CircuitBreaker) SetOverrideCircuitNameHandler(f func(string) string) {
+	cb.circuitNameHandler = f
 }
 
-// Expects a circuit to exist because a new circuit is always closed.
-// Call CircuitExists to check if a circuit exists.
+// IsCircuitOpen Expects a circuit to exist because a new circuit is always closed.
 func IsCircuitOpen(circuitName string) bool {
 	circuit, wasCreated, _ := hystrix.GetCircuit(circuitName)
 	return !wasCreated && circuit.IsOpen()
 }
 
+// CircuitExists checks if a circuit exists.
 func CircuitExists(circuitName string) bool {
 	_, wasCreated, _ := hystrix.GetCircuit(circuitName)
 	return !wasCreated

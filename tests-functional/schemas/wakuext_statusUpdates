@@ -1,0 +1,51 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "properties": {
+                "statusUpdates": {
+                    "items": {
+                        "properties": {
+                            "clock": {
+                                "type": "integer"
+                            },
+                            "publicKey": {
+                                "type": "string"
+                            },
+                            "statusType": {
+                                "type": "integer"
+                            },
+                            "text": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "clock",
+                            "publicKey",
+                            "statusType",
+                            "text"
+                        ],
+                        "type": "object"
+                    },
+                    "type": "array"
+                }
+            },
+            "required": [
+                "statusUpdates"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

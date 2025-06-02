@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 
-set -e
-set -o pipefail
+set -euo pipefail
+
+source _assets/scripts/colors.sh
 
 check_migration_order() {
   local prev_migration=""
   for file in "$@"; do
-    current_migration=$(echo "$file" | cut -d'-' -f1)
+    current_migration=$(basename "$file")
 
     if [[ ! -z "$prev_migration" && "$current_migration" < "$prev_migration" ]]; then
-      echo "migration ${current_migration} is not in order with ${prev_migration}"
-      echo "Error: Migration files are out of order. Please ensure migrations are added in chronological order."
+      echo -e "${YLW}migration ${RST}${current_migration} ${YLW}is not in order with ${RST}${prev_migration}"
+      echo -e "${YLW}Error: Migration files are out of order. Please ensure migrations are added in chronological order."
       exit 1
     fi
 
@@ -18,31 +19,28 @@ check_migration_order() {
   done
 }
 
-git checkout origin/develop
-git pull origin develop
+BASE_BRANCH=${BASE_BRANCH:-develop}
+BASE_COMMIT=${1:-origin/${BASE_BRANCH}}
+
+MIGRATION_DIRS=( \
+  "protocol/migrations/sqlite" \
+  "appdatabase/migrations/sql" \
+  "protocol/encryption/migrations/sqlite" \
+  "walletdatabase/migrations/sql" \
+)
+
+git checkout ${BASE_COMMIT}
+git pull origin ${BASE_BRANCH}
 git checkout -
-committed_files=$(git ls-tree -r --name-only HEAD protocol/migrations/sqlite/*.sql | sort)
-staged_files=$(git diff --name-only origin/develop protocol/migrations/sqlite/*.sql | sort)
 
-all_files=$(echo -e "$committed_files\n$staged_files")
+for MIGRATION_DIR in ${MIGRATION_DIRS[@]}; do
+  echo -e "${GRN}Checking migrations:${RST} ${MIGRATION_DIR}"
 
-# protocol migrations
-check_migration_order $all_files
+  base_files=$(git ls-tree -r --name-only ${BASE_COMMIT} ${MIGRATION_DIR}/*.sql | sort)
+  new_files=$(git diff --name-only ${BASE_COMMIT} ${MIGRATION_DIR}/*.sql | sort)
+  all_files=$(echo -e "$base_files\n$new_files")
 
-committed_files=$(git ls-tree -r --name-only HEAD appdatabase/migrations/sql/*.sql | sort)
-staged_files=$(git diff --name-only origin/develop appdatabase/migrations/sql/*.sql | sort)
-
-all_files=$(echo -e "$committed_files\n$staged_files")
-
-# account migrations
-check_migration_order $all_files
-
-committed_files=$(git ls-tree -r --name-only HEAD protocol/encryption/migrations/sqlite/*.sql | sort)
-staged_files=$(git diff --name-only origin/develop protocol/encryption/migrations/sqlite/*.sql | sort)
-
-all_files=$(echo -e "$committed_files\n$staged_files")
-
-# encryption migrations
-check_migration_order $all_files
+  check_migration_order $all_files
+done
 
 exit 0

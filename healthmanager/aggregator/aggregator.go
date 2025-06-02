@@ -29,8 +29,12 @@ func (a *Aggregator) RegisterProvider(providerName string) {
 	defer a.mu.Unlock()
 	if _, exists := a.providerStatuses[providerName]; !exists {
 		a.providerStatuses[providerName] = &rpcstatus.ProviderStatus{
-			Name:   providerName,
-			Status: rpcstatus.StatusUnknown,
+			Name:              providerName,
+			Status:            rpcstatus.StatusUnknown,
+			TotalRequests:     0,
+			TotalDuration:     0,
+			TotalTimeoutCount: 0,
+			TotalErrorCount:   0,
 		}
 	}
 }
@@ -50,13 +54,23 @@ func (a *Aggregator) Update(providerStatus rpcstatus.ProviderStatus) {
 			ps.LastErrorAt = providerStatus.LastErrorAt
 			ps.LastError = providerStatus.LastError
 		}
+
+		// Update the counters
+		ps.TotalRequests += providerStatus.TotalRequests
+		ps.TotalDuration += providerStatus.TotalDuration
+		ps.TotalTimeoutCount += providerStatus.TotalTimeoutCount
+		ps.TotalErrorCount += providerStatus.TotalErrorCount
 	} else {
 		a.providerStatuses[providerStatus.Name] = &rpcstatus.ProviderStatus{
-			Name:          providerStatus.Name,
-			LastSuccessAt: providerStatus.LastSuccessAt,
-			LastErrorAt:   providerStatus.LastErrorAt,
-			LastError:     providerStatus.LastError,
-			Status:        providerStatus.Status,
+			Name:              providerStatus.Name,
+			LastSuccessAt:     providerStatus.LastSuccessAt,
+			LastErrorAt:       providerStatus.LastErrorAt,
+			LastError:         providerStatus.LastError,
+			Status:            providerStatus.Status,
+			TotalRequests:     providerStatus.TotalRequests,
+			TotalDuration:     providerStatus.TotalDuration,
+			TotalTimeoutCount: providerStatus.TotalTimeoutCount,
+			TotalErrorCount:   providerStatus.TotalErrorCount,
 		}
 	}
 }
@@ -82,6 +96,10 @@ func (a *Aggregator) ComputeAggregatedStatus() rpcstatus.ProviderStatus {
 	anyUp := false
 	anyUnknown := false
 
+	// Initialize counters for aggregation
+	var totalRequests, totalTimeoutCount, totalErrorCount int64
+	var totalDuration time.Duration
+
 	for _, ps := range a.providerStatuses {
 		switch ps.Status {
 		case rpcstatus.StatusUp:
@@ -97,13 +115,23 @@ func (a *Aggregator) ComputeAggregatedStatus() rpcstatus.ProviderStatus {
 				lastError = ps.LastError
 			}
 		}
+
+		// Aggregate counters
+		totalRequests += ps.TotalRequests
+		totalDuration += ps.TotalDuration
+		totalTimeoutCount += ps.TotalTimeoutCount
+		totalErrorCount += ps.TotalErrorCount
 	}
 
 	aggregatedStatus := rpcstatus.ProviderStatus{
-		Name:          a.name,
-		LastSuccessAt: lastSuccessAt,
-		LastErrorAt:   lastErrorAt,
-		LastError:     lastError,
+		Name:              a.name,
+		LastSuccessAt:     lastSuccessAt,
+		LastErrorAt:       lastErrorAt,
+		LastError:         lastError,
+		TotalRequests:     totalRequests,
+		TotalDuration:     totalDuration,
+		TotalTimeoutCount: totalTimeoutCount,
+		TotalErrorCount:   totalErrorCount,
 	}
 	if len(a.providerStatuses) == 0 {
 		aggregatedStatus.Status = rpcstatus.StatusDown

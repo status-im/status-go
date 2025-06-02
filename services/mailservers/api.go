@@ -1,6 +1,10 @@
 package mailservers
 
-import "context"
+import (
+	"context"
+
+	"github.com/status-im/status-go/waku/types"
+)
 
 func NewAPI(db *Database) *API {
 	return &API{db}
@@ -11,11 +15,11 @@ type API struct {
 	db *Database
 }
 
-func (a *API) AddMailserver(ctx context.Context, m Mailserver) error {
+func (a *API) AddMailserver(ctx context.Context, m types.Mailserver) error {
 	return a.db.Add(m)
 }
 
-func (a *API) GetMailservers(ctx context.Context) ([]Mailserver, error) {
+func (a *API) GetMailservers(ctx context.Context) ([]types.Mailserver, error) {
 	return a.db.Mailservers()
 }
 

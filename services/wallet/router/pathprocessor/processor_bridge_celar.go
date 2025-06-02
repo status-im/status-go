@@ -89,7 +89,7 @@ func (s *CelerBridgeProcessor) estimateAmt(from, to *params.Network, amountIn *b
 	params.Add("slippage_tolerance", "500")
 
 	url := fmt.Sprintf("%s/v2/estimateAmt", base)
-	response, err := s.httpClient.DoGetRequest(context.Background(), url, params, nil)
+	response, err := s.httpClient.DoGetRequest(context.Background(), url, params)
 	if err != nil {
 		return nil, createBridgeCellerErrorResponse(err)
 	}
@@ -116,7 +116,7 @@ func (s *CelerBridgeProcessor) getTransferConfig(isTest bool) (*cbridge.GetTrans
 		base = testBaseURL
 	}
 	url := fmt.Sprintf("%s/v2/getTransferConfigs", base)
-	response, err := s.httpClient.DoGetRequest(context.Background(), url, nil, nil)
+	response, err := s.httpClient.DoGetRequest(context.Background(), url, nil)
 	if err != nil {
 		return nil, createBridgeCellerErrorResponse(err)
 	}
@@ -236,7 +236,7 @@ func (c *CelerBridgeProcessor) PackTxInputData(params ProcessorInputParams) ([]b
 	}
 }
 
-func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
@@ -247,11 +247,6 @@ func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 	}
 
 	value := new(big.Int)
-
-	input, err := s.PackTxInputData(params)
-	if err != nil {
-		return 0, createBridgeCellerErrorResponse(err)
-	}
 
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {

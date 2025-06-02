@@ -36,33 +36,6 @@ func (tm *TransactionManager) UpdateMultiTransaction(multiTransaction *MultiTran
 	return tm.storage.UpdateMultiTransaction(multiTransaction)
 }
 
-func (tm *TransactionManager) CreateMultiTransactionFromCommand(command *MultiTransactionCommand,
-	data []*pathprocessor.MultipathProcessorTxArgs) (*MultiTransaction, error) {
-
-	multiTransaction := multiTransactionFromCommand(command)
-
-	// Extract network from args
-	switch multiTransaction.Type {
-	case MultiTransactionSend, MultiTransactionApprove, MultiTransactionSwap:
-		if multiTransaction.FromNetworkID == wallet_common.UnknownChainID && len(data) == 1 {
-			multiTransaction.FromNetworkID = data[0].ChainID
-		}
-	case MultiTransactionBridge:
-		if len(data) == 1 && data[0].HopTx != nil {
-			if multiTransaction.FromNetworkID == wallet_common.UnknownChainID {
-				multiTransaction.FromNetworkID = data[0].HopTx.ChainID
-			}
-			if multiTransaction.ToNetworkID == wallet_common.UnknownChainID {
-				multiTransaction.ToNetworkID = data[0].HopTx.ChainIDTo
-			}
-		}
-	default:
-		return nil, fmt.Errorf("unsupported multi transaction type: %v", multiTransaction.Type)
-	}
-
-	return multiTransaction, nil
-}
-
 func (tm *TransactionManager) SendTransactionForSigningToKeycard(ctx context.Context, multiTransaction *MultiTransaction, data []*pathprocessor.MultipathProcessorTxArgs, pathProcessors map[string]pathprocessor.PathProcessor) error {
 	acc, err := tm.accountsDB.GetAccountByAddress(types.Address(multiTransaction.FromAddress))
 	if err != nil {

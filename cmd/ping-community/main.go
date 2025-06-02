@@ -30,10 +30,10 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
-	wakuextn "github.com/status-im/status-go/services/wakuext"
+	wakuextn "github.com/status-im/status-go/services/wakuv2ext"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 const (
@@ -49,8 +49,8 @@ var (
 	seedPhrase       = flag.String("seed-phrase", "", "Seed phrase")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
 	communityID      = flag.String("community-id", "", "The id of the community")
-	shardCluster     = flag.Int("shard-cluster", shard.MainStatusShardCluster, "The shard cluster in which the of the community is published")
-	shardIndex       = flag.Int("shard-index", shard.DefaultShardIndex, "The shard index in which the community is published")
+	shardCluster     = flag.Int("shard-cluster", wakuv2.MainStatusShardCluster, "The shard cluster in which the of the community is published")
+	shardIndex       = flag.Int("shard-index", wakuv2.DefaultShardIndex, "The shard index in which the community is published")
 	chatID           = flag.String("chat-id", "", "The id of the chat")
 
 	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
@@ -58,7 +58,7 @@ var (
 		"network-id",
 		params.SepoliaNetworkID,
 		fmt.Sprintf(
-			"A network ID: %d (Mainnet), %d (Sepolia)",
+			"A network ID: %d (Ethereum), %d (Sepolia)",
 			params.MainNetworkID, params.SepoliaNetworkID,
 		),
 	)
@@ -134,7 +134,7 @@ func main() {
 		return
 	}
 
-	wakuextservice := backend.StatusNode().WakuExtService()
+	wakuextservice := backend.StatusNode().WakuV2ExtService()
 	if wakuextservice == nil {
 		logger.Error("wakuext not available")
 		return
@@ -152,9 +152,9 @@ func main() {
 
 	messenger := wakuextservice.Messenger()
 
-	var s *shard.Shard = nil
+	var s *wakuv2.Shard = nil
 	if shardCluster != nil && shardIndex != nil {
-		s = &shard.Shard{
+		s = &wakuv2.Shard{
 			Cluster: uint16(*shardCluster),
 			Index:   uint16(*shardIndex),
 		}
@@ -301,6 +301,8 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 
 	defaultSettings.TestNetworksEnabled = false
 
+	defaultSettings.AutoRefreshTokensEnabled = true
+
 	visibleTokens := make(map[string][]string)
 	visibleTokens["mainnet"] = []string{"SNT"}
 	visibleTokensJSON, err := json.Marshal(visibleTokens)
@@ -342,10 +344,9 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
-	nodeConfig.WakuConfig = params.WakuConfig{
+	nodeConfig.WakuV2Config = params.WakuV2Config{
 		Enabled:     true,
 		LightClient: true,
-		MinimumPoW:  0.000001,
 	}
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{

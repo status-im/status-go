@@ -19,9 +19,9 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	"github.com/status-im/status-go/services/wallet/testutils"
-	"github.com/status-im/status-go/services/wallet/token"
 	mock_balance_persistence "github.com/status-im/status-go/services/wallet/token/mock/balance_persistence"
 	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 var (
@@ -31,10 +31,10 @@ var (
 	testAccAddress1 = common.Address{0x12}
 	testAccAddress2 = common.Address{0x45}
 
-	expectedTokens = map[common.Address][]token.StorageToken{
-		testAccAddress1: []token.StorageToken{
+	expectedTokens = map[common.Address][]tokenTypes.StorageToken{
+		testAccAddress1: []tokenTypes.StorageToken{
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  testTokenAddress1,
 					Name:     "Token 1",
 					Symbol:   "T1",
@@ -43,15 +43,15 @@ var (
 				BalancesPerChain: nil,
 			},
 		},
-		testAccAddress2: []token.StorageToken{
+		testAccAddress2: []tokenTypes.StorageToken{
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  testTokenAddress2,
 					Name:     "Token 2",
 					Symbol:   "T2",
 					Decimals: 18,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					1: {
 						RawBalance: "1000000000000000000",
 						Balance:    big.NewFloat(1),
@@ -65,13 +65,13 @@ var (
 	}
 )
 
-// This matcher is used to compare the expected and actual map[common.Address][]token.StorageToken in parameters to SaveTokens
+// This matcher is used to compare the expected and actual map[common.Address][]tokenTypes.StorageToken in parameters to SaveTokens
 type mapTokenWithBalanceMatcher struct {
 	expected []interface{}
 }
 
 func (m mapTokenWithBalanceMatcher) Matches(x interface{}) bool {
-	actual, ok := x.(map[common.Address][]token.StorageToken)
+	actual, ok := x.(map[common.Address][]tokenTypes.StorageToken)
 	if !ok {
 		return false
 	}
@@ -80,7 +80,7 @@ func (m mapTokenWithBalanceMatcher) Matches(x interface{}) bool {
 		return false
 	}
 
-	expected := m.expected[0].(map[common.Address][]token.StorageToken)
+	expected := m.expected[0].(map[common.Address][]tokenTypes.StorageToken)
 
 	for address, expectedTokens := range expected {
 		actualTokens, ok := actual[address]
@@ -144,7 +144,7 @@ func newMapTokenWithBalanceMatcher(expected []interface{}) gomock.Matcher {
 		expected: expected,
 	}
 }
-func testChainBalancesEqual(t *testing.T, expected, actual token.ChainBalance) {
+func testChainBalancesEqual(t *testing.T, expected, actual tokenTypes.ChainBalance) {
 	assert.Equal(t, expected.RawBalance, actual.RawBalance)
 	assert.Equal(t, 0, expected.Balance.Cmp(actual.Balance))
 	assert.Equal(t, expected.Address, actual.Address)
@@ -153,7 +153,7 @@ func testChainBalancesEqual(t *testing.T, expected, actual token.ChainBalance) {
 	assert.Equal(t, expected.Balance1DayAgo, actual.Balance1DayAgo)
 }
 
-func testBalancePerChainEqual(t *testing.T, expected, actual map[uint64]token.ChainBalance) {
+func testBalancePerChainEqual(t *testing.T, expected, actual map[uint64]tokenTypes.ChainBalance) {
 	assert.Len(t, actual, len(expected))
 	for chainID, expectedBalance := range expected {
 		actualBalance, ok := actual[chainID]
@@ -207,7 +207,7 @@ func TestIsBalanceCacheValid(t *testing.T) {
 
 	// Make cached tokens not contain all the addresses
 	reader.balanceRefreshed()
-	cachedTokens := map[common.Address][]token.StorageToken{
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
 		testAccAddress1: expectedTokens[testAccAddress1],
 	}
 	tokenPersistence.EXPECT().GetTokens().Return(cachedTokens, nil)
@@ -230,7 +230,7 @@ func TestTokensCachedForAddresses(t *testing.T) {
 	addresses := []common.Address{testAccAddress1, testAccAddress2}
 
 	// Test when the cached tokens do not contain all the addresses
-	cachedTokens := map[common.Address][]token.StorageToken{
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
 		testAccAddress1: expectedTokens[testAccAddress1],
 	}
 	persistence.EXPECT().GetTokens().Return(cachedTokens, nil)
@@ -276,16 +276,16 @@ func TestFetchBalancesInternal(t *testing.T) {
 }
 
 func TestTokensToBalancesPerChain(t *testing.T) {
-	cachedTokens := map[common.Address][]token.StorageToken{
-		testAccAddress1: []token.StorageToken{
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
+		testAccAddress1: []tokenTypes.StorageToken{
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  testTokenAddress1,
 					Name:     "Token 1",
 					Symbol:   "T1",
 					Decimals: 18,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					1: {
 						RawBalance: "1000000000000000000",
 						Balance:    big.NewFloat(1),
@@ -296,7 +296,7 @@ func TestTokensToBalancesPerChain(t *testing.T) {
 				},
 			},
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  testTokenAddress2,
 					Name:     "Token 2",
 					Symbol:   "T2",
@@ -305,15 +305,15 @@ func TestTokensToBalancesPerChain(t *testing.T) {
 				BalancesPerChain: nil, // Skip this token
 			},
 		},
-		testAccAddress2: []token.StorageToken{
+		testAccAddress2: []tokenTypes.StorageToken{
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  testTokenAddress2,
 					Name:     "Token 2",
 					Symbol:   "T2",
 					Decimals: 18,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					1: {
 						RawBalance: "2000000000000000000",
 						Balance:    big.NewFloat(2),
@@ -367,7 +367,7 @@ func TestGetBalance1DayAgo(t *testing.T) {
 	expectedBalance := big.NewInt(1000000000000000000)
 	tokenManager.EXPECT().GetTokenHistoricalBalance(address, chainID, symbol, dayAgoTimestamp).Return(expectedBalance, nil)
 
-	balance1DayAgo, err := reader.getBalance1DayAgo(&token.ChainBalance{
+	balance1DayAgo, err := reader.getBalance1DayAgo(&tokenTypes.ChainBalance{
 		ChainID: chainID,
 		Address: address,
 	}, dayAgoTimestamp, symbol, address)
@@ -377,7 +377,7 @@ func TestGetBalance1DayAgo(t *testing.T) {
 
 	// Test error
 	tokenManager.EXPECT().GetTokenHistoricalBalance(address, chainID, symbol, dayAgoTimestamp).Return(nil, errors.New("error"))
-	balance1DayAgo, err = reader.getBalance1DayAgo(&token.ChainBalance{
+	balance1DayAgo, err = reader.getBalance1DayAgo(&tokenTypes.ChainBalance{
 		ChainID: chainID,
 		Address: address,
 	}, dayAgoTimestamp, symbol, address)
@@ -394,7 +394,7 @@ func TestToChainBalance(t *testing.T) {
 			},
 		},
 	}
-	tok := &token.Token{
+	tok := &tokenTypes.Token{
 		ChainID:  1,
 		Address:  common.Address{0x34},
 		Symbol:   "T1",
@@ -402,10 +402,10 @@ func TestToChainBalance(t *testing.T) {
 	}
 	address := common.Address{0x12}
 	decimals := uint(18)
-	cachedTokens := map[common.Address][]token.StorageToken{
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
 		common.Address{0x12}: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  common.Address{0x34},
 					Name:     "Token 1",
 					Symbol:   "T1",
@@ -418,7 +418,7 @@ func TestToChainBalance(t *testing.T) {
 
 	expectedBalance := big.NewFloat(1)
 	hasError := false
-	expectedChainBalance := &token.ChainBalance{
+	expectedChainBalance := &tokenTypes.ChainBalance{
 		RawBalance:     "1000000000000000000",
 		Balance:        expectedBalance,
 		Balance1DayAgo: "0",
@@ -431,7 +431,7 @@ func TestToChainBalance(t *testing.T) {
 	testChainBalancesEqual(t, *expectedChainBalance, *chainBalance)
 
 	// Test when the token is not visible
-	emptyCachedTokens := map[common.Address][]token.StorageToken{}
+	emptyCachedTokens := map[common.Address][]tokenTypes.StorageToken{}
 	isMandatory := false
 	noBalances := map[uint64]map[common.Address]map[common.Address]*hexutil.Big{
 		tok.ChainID: {
@@ -445,16 +445,16 @@ func TestToChainBalance(t *testing.T) {
 }
 
 func TestIsCachedToken(t *testing.T) {
-	cachedTokens := map[common.Address][]token.StorageToken{
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
 		common.Address{0x12}: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  common.Address{0x34},
 					Name:     "Token 1",
 					Symbol:   "T1",
 					Decimals: 18,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					1: {
 						RawBalance: "1000000000000000000",
 						Balance:    big.NewFloat(1),
@@ -501,7 +501,7 @@ func TestCreateBalancePerChainPerSymbol(t *testing.T) {
 		},
 	}
 
-	tokens := []*token.Token{
+	tokens := []*tokenTypes.Token{
 		{
 			Name:     "Token 1 mainnet",
 			ChainID:  1,
@@ -518,16 +518,16 @@ func TestCreateBalancePerChainPerSymbol(t *testing.T) {
 		},
 	}
 	// Let cached tokens not have the token for chain 2, it still should be calculated because of positive balance
-	cachedTokens := map[common.Address][]token.StorageToken{
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
 		address: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  common.Address{0x34},
 					Name:     "Token 1",
 					Symbol:   "T1",
 					Decimals: 18,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					1: {
 						RawBalance: "1000000000000000000",
 						Balance:    big.NewFloat(1),
@@ -546,7 +546,7 @@ func TestCreateBalancePerChainPerSymbol(t *testing.T) {
 	}
 	dayAgoTimestamp := time.Now().Add(-24 * time.Hour).Unix()
 
-	expectedBalancesPerChain := map[uint64]token.ChainBalance{
+	expectedBalancesPerChain := map[uint64]tokenTypes.ChainBalance{
 		1: {
 			RawBalance:     "1000000000000000000",
 			Balance:        big.NewFloat(1),
@@ -577,7 +577,7 @@ func TestCreateBalancePerChainPerSymbol(t *testing.T) {
 
 func TestCreateBalancePerChainPerSymbolWithMissingBalance(t *testing.T) {
 	address := common.Address{0x12}
-	tokens := []*token.Token{
+	tokens := []*tokenTypes.Token{
 		{
 			Name:     "Token 1 mainnet",
 			ChainID:  1,
@@ -600,7 +600,7 @@ func TestCreateBalancePerChainPerSymbolWithMissingBalance(t *testing.T) {
 	}
 
 	dayAgoTimestamp := time.Now().Add(-24 * time.Hour).Unix()
-	emptyCachedTokens := map[common.Address][]token.StorageToken{}
+	emptyCachedTokens := map[common.Address][]tokenTypes.StorageToken{}
 	oneBalanceMissing := map[uint64]map[common.Address]map[common.Address]*hexutil.Big{
 		1: {
 			address: {
@@ -615,7 +615,7 @@ func TestCreateBalancePerChainPerSymbolWithMissingBalance(t *testing.T) {
 		},
 	}
 
-	expectedBalancesPerChain := map[uint64]token.ChainBalance{
+	expectedBalancesPerChain := map[uint64]tokenTypes.ChainBalance{
 		2: {
 			RawBalance:     "1000000000000000000",
 			Balance:        big.NewFloat(1),
@@ -646,7 +646,7 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 		common.HexToAddress("0x456"),
 	}
 
-	allTokens := []*token.Token{
+	allTokens := []*tokenTypes.Token{
 		{
 			Name:     "Token 1",
 			Symbol:   "T1",
@@ -689,10 +689,10 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 		},
 	}
 
-	cachedTokens := map[common.Address][]token.StorageToken{
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
 		addresses[0]: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Name:     "Token 1",
 					Symbol:   "T1",
 					Decimals: 18,
@@ -700,7 +700,7 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 					Address:  common.HexToAddress("0x789"),
 					ChainID:  1,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					1: {
 						RawBalance: "1000000000000000000",
 						Balance:    big.NewFloat(1),
@@ -713,16 +713,16 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 		},
 	}
 
-	expectedTokensPerAddress := map[common.Address][]token.StorageToken{
+	expectedTokensPerAddress := map[common.Address][]tokenTypes.StorageToken{
 		addresses[0]: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Name:     "Token 1",
 					Symbol:   "T1",
 					Decimals: 18,
 					Verified: true,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					1: {
 						RawBalance:     "1000000000000000000",
 						Balance:        big.NewFloat(1),
@@ -736,13 +736,13 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 		},
 		addresses[1]: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Name:     "Token 2",
 					Symbol:   "T2",
 					Decimals: 18,
 					Verified: true,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					1: {
 						RawBalance:     "2000000000000000000",
 						Balance:        big.NewFloat(2),
@@ -798,7 +798,7 @@ func TestGetCachedBalances(t *testing.T) {
 		2: mockClientIface2,
 	}
 
-	allTokens := []*token.Token{
+	allTokens := []*tokenTypes.Token{
 		{
 			Address:  common.HexToAddress("0xabc"),
 			Name:     "Token 1",
@@ -822,10 +822,10 @@ func TestGetCachedBalances(t *testing.T) {
 		},
 	}
 
-	cachedTokens := map[common.Address][]token.StorageToken{
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
 		addresses[0]: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  common.HexToAddress("0xabc"),
 					Name:     "Token 1",
 					Symbol:   "T1",
@@ -837,14 +837,14 @@ func TestGetCachedBalances(t *testing.T) {
 		},
 		addresses[1]: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  common.HexToAddress("0xdef"),
 					Name:     "Token 2",
 					Symbol:   "T2",
 					Decimals: 18,
 					ChainID:  2,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					2: {
 						RawBalance:     "1000000000000000000",
 						Balance:        big.NewFloat(1),
@@ -858,15 +858,15 @@ func TestGetCachedBalances(t *testing.T) {
 		},
 	}
 
-	expectedTokens := map[common.Address][]token.StorageToken{
+	expectedTokens := map[common.Address][]tokenTypes.StorageToken{
 		addresses[1]: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Name:     "Token 2",
 					Symbol:   "T2",
 					Decimals: 18,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					2: {
 						RawBalance:     "1000000000000000000",
 						Balance:        big.NewFloat(1),
@@ -913,7 +913,7 @@ func TestFetchBalances(t *testing.T) {
 		2: mockClientIface2,
 	}
 
-	allTokens := []*token.Token{
+	allTokens := []*tokenTypes.Token{
 		{
 			Address:  common.HexToAddress("0xabc"),
 			Name:     "Token 1",
@@ -937,10 +937,10 @@ func TestFetchBalances(t *testing.T) {
 		},
 	}
 
-	cachedTokens := map[common.Address][]token.StorageToken{
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
 		addresses[0]: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  common.HexToAddress("0xabc"),
 					Name:     "Token 1",
 					Symbol:   "T1",
@@ -952,14 +952,14 @@ func TestFetchBalances(t *testing.T) {
 		},
 		addresses[1]: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Address:  common.HexToAddress("0xdef"),
 					Name:     "Token 2",
 					Symbol:   "T2",
 					Decimals: 18,
 					ChainID:  2,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					2: {
 						RawBalance:     "1000000000000000000",
 						Balance:        big.NewFloat(1),
@@ -973,15 +973,15 @@ func TestFetchBalances(t *testing.T) {
 		},
 	}
 
-	expectedTokens := map[common.Address][]token.StorageToken{
+	expectedTokens := map[common.Address][]tokenTypes.StorageToken{
 		addresses[1]: {
 			{
-				Token: token.Token{
+				Token: tokenTypes.Token{
 					Name:     "Token 2",
 					Symbol:   "T2",
 					Decimals: 18,
 				},
-				BalancesPerChain: map[uint64]token.ChainBalance{
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					2: {
 						RawBalance:     "2000000000000000000",
 						Balance:        big.NewFloat(2),

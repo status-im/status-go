@@ -38,6 +38,7 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -64,6 +65,13 @@ type BonderFee struct {
 }
 
 func (bf *BonderFee) UnmarshalJSON(data []byte) error {
+	var errorResponse struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(data, &errorResponse); err == nil && errorResponse.Error != "" {
+		return createBridgeHopErrorResponse(fmt.Errorf(errorResponse.Error))
+	}
+
 	type Alias BonderFee
 	aux := &struct {
 		AmountIn                string  `json:"amountIn"`
@@ -154,13 +162,18 @@ func (h *HopBridgeProcessor) AvailableFor(params ProcessorInputParams) (bool, er
 	if params.FromChain.ChainID == params.ToChain.ChainID {
 		return false, ErrFromAndToChainsMustBeDifferent
 	}
-	// We chcek if the contract is available on the network for the token
+	// We check if the contract is available on the receiver network for the token
+	if _, _, err := hop.GetContractAddress(params.ToChain.ChainID, params.FromToken.Symbol); err != nil {
+		return false, ErrToChainNotSupported
+	}
+
+	// We check if the contract is available on the sender network for the token
 	_, err := h.GetContractAddress(params)
 	// toToken is not nil only if the send type is Swap
 	return err == nil, err
 }
 
-func (c *HopBridgeProcessor) getAppropriateABI(contractType string, chainID uint64, token *token.Token) (abi.ABI, error) {
+func (c *HopBridgeProcessor) getAppropriateABI(contractType string, chainID uint64, token *tokenTypes.Token) (abi.ABI, error) {
 	switch contractType {
 	case hop.CctpL1Bridge:
 		return abi.JSON(strings.NewReader(hopL1CctpImplementation.HopL1CctpImplementationABI))
@@ -195,6 +208,9 @@ func (c *HopBridgeProcessor) getAppropriateABI(contractType string, chainID uint
 }
 
 func (h *HopBridgeProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+	if params.TestsMode {
+		return []byte{}, nil
+	}
 	_, contractType, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
 	if err != nil {
 		return []byte{}, createBridgeHopErrorResponse(err)
@@ -232,7 +248,7 @@ func (h *HopBridgeProcessor) packTxInputDataInternally(params ProcessorInputPara
 	return []byte{}, ErrContractTypeNotSupported
 }
 
-func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[h.Name()]; ok {
@@ -247,12 +263,7 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, e
 		value = params.AmountIn
 	}
 
-	contractAddress, contractType, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
-	if err != nil {
-		return 0, createBridgeHopErrorResponse(err)
-	}
-
-	input, err := h.packTxInputDataInternally(params, contractType)
+	contractAddress, _, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
 	if err != nil {
 		return 0, createBridgeHopErrorResponse(err)
 	}
@@ -275,13 +286,13 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, e
 			// TODO: this is a temporary solution until we find a better way to estimate the gas
 			// hardcoding the estimation for other than ETH, cause we cannot get a proper estimation without having an approval placed first
 			// this is an error we're facing otherwise: `execution reverted: ERC20: transfer amount exceeds allowance`
-			estimation = 350000
+			estimation = 600000 // temporary increase for the release, an issue for addressing this is https://github.com/status-im/status-desktop/issues/17551
 		} else {
 			return 0, createBridgeHopErrorResponse(err)
 		}
 	}
 
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
 	return uint64(increasedEstimation), nil
 }
 
@@ -471,9 +482,13 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 
 	hopChainsMap := map[uint64]string{
 		walletCommon.EthereumMainnet: "ethereum",
+		walletCommon.EthereumSepolia: "ethereum",
 		walletCommon.OptimismMainnet: "optimism",
+		walletCommon.OptimismSepolia: "optimism",
 		walletCommon.ArbitrumMainnet: "arbitrum",
+		walletCommon.ArbitrumSepolia: "arbitrum",
 		walletCommon.BaseMainnet:     "base",
+		walletCommon.BaseSepolia:     "base",
 	}
 
 	fromChainName, ok := hopChainsMap[params.FromChain.ChainID]
@@ -488,13 +503,13 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 
 	reqParams := netUrl.Values{}
 	reqParams.Add("amount", params.AmountIn.String())
-	reqParams.Add("token", params.FromToken.Symbol)
+	reqParams.Add("token", params.FromToken.TmpSymbol)
 	reqParams.Add("fromChain", fromChainName)
 	reqParams.Add("toChain", toChainName)
 	reqParams.Add("slippage", "0.5") // menas 0.5%
 
 	url := "https://api.hop.exchange/v1/quote"
-	response, err := h.httpClient.DoGetRequest(context.Background(), url, reqParams, nil)
+	response, err := h.httpClient.DoGetRequest(context.Background(), url, reqParams)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -510,7 +525,10 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 	// Remove token fee from bonder fee as said here:
 	// https://docs.hop.exchange/v/developer-docs/api/api#get-v1-quote
 	// `bonderFee` - The suggested bonder fee for the amount in. The bonder fee also includes the cost of the destination transaction fee.
-	tokenFee := new(big.Int).Sub(bonderFee.AmountIn.Int, bonderFee.EstimatedRecieved.Int)
+	tokenFee := new(big.Int).SetUint64(0)
+	if (bonderFee.AmountIn.Int).Cmp(bonderFee.EstimatedRecieved.Int) > 0 {
+		tokenFee = new(big.Int).Sub(bonderFee.AmountIn.Int, bonderFee.EstimatedRecieved.Int)
+	}
 
 	return bonderFee.BonderFee.Int, tokenFee, nil
 }
@@ -563,7 +581,7 @@ func (h *HopBridgeProcessor) packL1BridgeTx(abi abi.ABI, toChainID uint64, to co
 }
 
 func (h *HopBridgeProcessor) sendL1BridgeTx(contractAddress common.Address, ethClient chain.ClientInterface, toChainID uint64,
-	to common.Address, txOpts *bind.TransactOpts, token *token.Token, bonderFee *BonderFee) (tx *ethTypes.Transaction, err error) {
+	to common.Address, txOpts *bind.TransactOpts, token *tokenTypes.Token, bonderFee *BonderFee) (tx *ethTypes.Transaction, err error) {
 	if token.IsNative() {
 		contractInstance, err := hopL1EthBridge.NewHopL1EthBridge(
 			contractAddress,

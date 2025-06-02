@@ -1,0 +1,48 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "properties": {
+                "activityCenterState": {
+                    "properties": {
+                        "hasSeen": {
+                            "type": "boolean"
+                        },
+                        "updatedAt": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "hasSeen",
+                        "updatedAt"
+                    ],
+                    "type": "object"
+                },
+                "discordOldestMessageTimestamp": {
+                    "type": "integer"
+                },
+                "notifications": {
+                    "type": "null"
+                }
+            },
+            "required": [
+                "activityCenterState",
+                "discordOldestMessageTimestamp",
+                "notifications"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

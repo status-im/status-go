@@ -3,13 +3,11 @@ package common
 import (
 	"crypto/ecdsa"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/waku-org/go-waku/waku/v2/payload"
-	"github.com/waku-org/go-waku/waku/v2/protocol"
 
 	"github.com/status-im/status-go/logutils"
 
@@ -41,7 +39,7 @@ type MessageParams struct {
 // ReceivedMessage represents a data packet to be received through the
 // WakuV2 protocol and successfully decrypted.
 type ReceivedMessage struct {
-	Envelope *protocol.Envelope // Wrapped Waku Message
+	Envelope Envelope // Wrapped Waku Message
 
 	MsgType MessageType
 
@@ -59,8 +57,6 @@ type ReceivedMessage struct {
 	SymKeyHash common.Hash // The Keccak256Hash of the key
 
 	hash common.Hash
-
-	Processed atomic.Bool
 }
 
 // EnvelopeError code and optional description of the error.
@@ -105,7 +101,7 @@ type MemoryMessageStore struct {
 	messages map[common.Hash]*ReceivedMessage
 }
 
-func NewReceivedMessage(env *protocol.Envelope, msgType MessageType) *ReceivedMessage {
+func NewReceivedMessage(env Envelope, msgType MessageType) *ReceivedMessage {
 	ct, err := ExtractTopicFromContentTopic(env.Message().ContentTopic)
 	if err != nil {
 		logutils.ZapLogger().Debug("failed to extract content topic from message",

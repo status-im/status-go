@@ -2,6 +2,7 @@ import json
 import logging
 import jsonschema
 import resources.constants as constants
+from clients.signals import SignalType, WalletEventType
 
 from conftest import option
 
@@ -28,33 +29,30 @@ def get_suggested_routes(rpc_client, **kwargs):
     rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
     _ = rpc_client.rpc_valid_request(method, params)
 
-    routes = rpc_client.wait_for_signal("wallet.suggested.routes")
+    routes_signal = rpc_client.wait_for_signal("wallet.suggested.routes")
+    routes = routes_signal["event"]
 
-    return routes["event"]
+    return routes
 
 
-def build_transactions_from_route(rpc_client, **kwargs):
+def build_transactions_from_route(rpc_client, uuid):
     method = "wallet_buildTransactionsFromRoute"
-    required_params = []
-    build_tx_params = {}
-    for key, new_value in kwargs.items():
-        build_tx_params[key] = new_value
+    if uuid is None or uuid == "":
+        logging.info(f"Warning: provided '{uuid}' does not exist or is empty")
 
-    for key in required_params:
-        if key not in build_tx_params:
-            logging.info(f"Warning: The key '{key}' does not exist in the build_tx_params parameters and will be ignored.")
-
-    params = [build_tx_params]
+    params = [uuid]
     _ = rpc_client.rpc_valid_request(method, params)
 
-    wallet_router_sign_transactions = rpc_client.wait_for_signal("wallet.router.sign-transactions")
+    wallet_router_sign_transactions_signal = rpc_client.wait_for_signal("wallet.router.sign-transactions")
+    wallet_router_sign_transactions = wallet_router_sign_transactions_signal["event"]
 
-    assert wallet_router_sign_transactions["event"]["signingDetails"]["signOnKeycard"] is False
-    transaction_hashes = wallet_router_sign_transactions["event"]["signingDetails"]["hashes"]
+    assert "signingDetails" in wallet_router_sign_transactions
+    assert wallet_router_sign_transactions["signingDetails"]["signOnKeycard"] is False
+    transaction_hashes = wallet_router_sign_transactions["signingDetails"]["hashes"]
 
     assert transaction_hashes, "Transaction hashes are empty!"
 
-    return wallet_router_sign_transactions["event"]
+    return wallet_router_sign_transactions
 
 
 def sign_messages(rpc_client, hashes, address):
@@ -93,7 +91,7 @@ def check_tx_details(rpc_client, tx_hash, network_id, address_to, expected_amoun
     assert tx_details["to"].upper() == address_to.upper()
 
 
-def check_fees(fee_mode, base_fee, max_priority_fee_per_gas, max_fee_per_gas):
+def check_fees(fee_mode, base_fee, max_priority_fee_per_gas, max_fee_per_gas, suggested_fee_levels):
     assert base_fee.startswith("0x")
     assert max_priority_fee_per_gas.startswith("0x")
     assert max_fee_per_gas.startswith("0x")
@@ -102,12 +100,31 @@ def check_fees(fee_mode, base_fee, max_priority_fee_per_gas, max_fee_per_gas):
     max_priority_fee_per_gas_int = int(max_priority_fee_per_gas, 16)
     max_fee_per_gas_int = int(max_fee_per_gas, 16)
 
+    low_max_fee_per_gas = int(suggested_fee_levels["low"], 16)
+    low_priority_max_fee_per_gas = int(suggested_fee_levels["lowPriority"], 16)
+    medium_max_fee_per_gas = int(suggested_fee_levels["medium"], 16)
+    medium_priority_max_fee_per_gas = int(suggested_fee_levels["mediumPriority"], 16)
+    high_max_fee_per_gas = int(suggested_fee_levels["high"], 16)
+    high_priority_max_fee_per_gas = int(suggested_fee_levels["highPriority"], 16)
+
     if fee_mode == constants.gas_fee_mode_low:
+        assert max_fee_per_gas_int == low_max_fee_per_gas
+        assert max_priority_fee_per_gas_int == low_priority_max_fee_per_gas
         assert base_fee_int + max_priority_fee_per_gas_int == max_fee_per_gas_int
     elif fee_mode == constants.gas_fee_mode_medium:
-        assert (2 * base_fee_int + max_priority_fee_per_gas_int) == max_fee_per_gas_int
+        # calculate variadic fees from high max fees per gas
+        variadic_fee = high_max_fee_per_gas - high_priority_max_fee_per_gas - 2 * base_fee_int
+
+        assert max_fee_per_gas_int == medium_max_fee_per_gas
+        assert max_priority_fee_per_gas_int == medium_priority_max_fee_per_gas
+        assert base_fee_int + variadic_fee + max_priority_fee_per_gas_int == max_fee_per_gas_int
     elif fee_mode == constants.gas_fee_mode_high:
-        assert 3 * base_fee_int + max_priority_fee_per_gas_int == max_fee_per_gas_int
+        # calculate variadic fees from medium max fees per gas
+        variadic_fee = medium_max_fee_per_gas - medium_priority_max_fee_per_gas - base_fee_int
+
+        assert max_fee_per_gas_int == high_max_fee_per_gas
+        assert max_priority_fee_per_gas_int == high_priority_max_fee_per_gas
+        assert 2 * base_fee_int + variadic_fee + max_priority_fee_per_gas_int == max_fee_per_gas_int
     elif fee_mode == constants.gas_fee_mode_custom:
         assert base_fee_int + max_priority_fee_per_gas_int == max_fee_per_gas_int
     else:
@@ -120,32 +137,41 @@ def check_fees_for_path(path_name, gas_fee_mode, check_approval, route):
             continue
         if check_approval:
             assert path_tx["ApprovalRequired"]
-            check_fees(gas_fee_mode, path_tx["ApprovalBaseFee"], path_tx["ApprovalPriorityFee"], path_tx["ApprovalMaxFeesPerGas"])
+            check_fees(
+                gas_fee_mode,
+                path_tx["ApprovalBaseFee"],
+                path_tx["ApprovalPriorityFee"],
+                path_tx["ApprovalMaxFeesPerGas"],
+                path_tx["SuggestedLevelsForMaxFeesPerGas"],
+            )
             return
-        check_fees(gas_fee_mode, path_tx["TxBaseFee"], path_tx["TxPriorityFee"], path_tx["TxMaxFeesPerGas"])
+        check_fees(
+            gas_fee_mode, path_tx["TxBaseFee"], path_tx["TxPriorityFee"], path_tx["TxMaxFeesPerGas"], path_tx["SuggestedLevelsForMaxFeesPerGas"]
+        )
 
 
 def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
     method = "wallet_sendRouterTransactionsWithSignatures"
     params = [{"uuid": uuid, "Signatures": tx_signatures}]
+    rpc_client.prepare_wait_for_signal(
+        SignalType.WALLET.value,
+        1,
+        lambda signal: signal["event"]["type"] == WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value,
+    )
     _ = rpc_client.rpc_valid_request(method, params)
+    event_response = rpc_client.wait_for_signal(SignalType.WALLET.value)["event"]
+    tx_status = json.loads(event_response["message"].replace("'", '"'))
 
-    tx_status = rpc_client.wait_for_signal("wallet.transaction.status-changed")
+    assert tx_status["status"] == "Success"
 
-    assert tx_status["event"]["status"] == "Success"
-
-    return tx_status["event"]
+    return tx_status
 
 
 def send_router_transaction(rpc_client, **kwargs):
     routes = get_suggested_routes(rpc_client, **kwargs)
+    assert "Best" in routes, f"No best route found: {routes}"
 
-    router_build_tx_params = {}
-    for key in kwargs:
-        if key in ["uuid", "slippagePercentage"]:
-            router_build_tx_params[key] = kwargs[key]
-
-    build_tx = build_transactions_from_route(rpc_client, **router_build_tx_params)
+    build_tx = build_transactions_from_route(rpc_client, kwargs.get("uuid"))
 
     tx_signatures = sign_messages(rpc_client, build_tx["signingDetails"]["hashes"], kwargs.get("addrFrom"))
 

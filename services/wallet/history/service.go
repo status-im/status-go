@@ -103,7 +103,7 @@ func (s *Service) triggerEvent(eventType walletevent.EventType, account statusty
 	})
 }
 
-func (s *Service) Start() {
+func (s *Service) Start(ctx context.Context) {
 	logutils.ZapLogger().Debug("Starting balance history service")
 
 	s.startTransfersWatcher()

@@ -49,6 +49,10 @@ var (
 	ErrPriceTimeout                   = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-037"), Details: "price timeout"}
 	ErrNotEnoughLiquidity             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-038"), Details: "not enough liquidity"}
 	ErrPriceImpactTooHigh             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-039"), Details: "price impact too high"}
+	ErrBurnAmountTooHigh              = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-040"), Details: "burn amount too high"}
+	ErrCommunityTokenType             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-041"), Details: "invalid community token type"}
+	ErrIncorrectSignatureFormat       = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-042"), Details: "incorrect signature length: got %d, want %d"}
+	ErrTransactionNotFound            = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-043"), Details: "transaction not found"}
 )
 
 func createErrorResponse(processorName string, err error) error {

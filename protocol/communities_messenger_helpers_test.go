@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -29,8 +29,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	walletToken "github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -43,18 +42,6 @@ func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, add
 	return &account.SelectedExtKey{
 		Address: types.HexToAddress(address),
 	}, nil
-}
-
-func (m *AccountManagerMock) CanRecover(rpcParams account.RecoverParams, revealedAddress types.Address) (bool, error) {
-	return true, nil
-}
-
-func (m *AccountManagerMock) Sign(rpcParams account.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
-	// mock signature
-	bytesArray := []byte(rpcParams.Address)
-	bytesArray = append(bytesArray, []byte(rpcParams.Password)...)
-	bytesArray = common.Shake256(bytesArray)
-	return append([]byte{0}, bytesArray...), nil
 }
 
 func (m *AccountManagerMock) DeleteAccount(address types.Address) error {
@@ -113,7 +100,7 @@ func (m *TokenManagerMock) GetCachedBalancesByChain(ctx context.Context, account
 	return m.getBalanceBasedOnParams(accounts, tokenAddresses, chainIDs), nil
 }
 
-func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *walletToken.Token {
+func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token {
 	time.Sleep(100 * time.Millisecond) // simulate response time
 	return nil
 }
@@ -201,10 +188,6 @@ func (c *CollectiblesServiceMock) SetSignerPubkeyForCommunity(communityID []byte
 		c.Signers = make(map[string]string)
 	}
 	c.Signers[types.EncodeHex(communityID)] = signerPubKey
-}
-
-func (c *CollectiblesServiceMock) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs wallettypes.SendTxArgs, password string, newSignerPubKey string) (string, error) {
-	return "", nil
 }
 
 func (c *CollectiblesServiceMock) GetCollectibleContractData(chainID uint64, contractAddress string) (*communities.CollectibleContractData, error) {
@@ -325,7 +308,7 @@ func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 		SendPushNotifications:     true,
 		ProfilePicturesVisibility: 1,
 		DefaultSyncPeriod:         777600,
-		UseMailservers:            true,
+		UseMailservers:            false,
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
@@ -348,6 +331,7 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config tes
 	options := []Option{
 		WithAccountManager(accountsManagerMock),
 		WithTokenManager(tokenManagerMock),
+		WithMessageSigner(NewSignerStub()),
 		WithCollectiblesManager(config.collectiblesManager),
 		WithCommunityTokensService(config.collectiblesService),
 		WithAppSettings(*config.appSettings, *config.nodeConfig),

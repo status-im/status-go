@@ -31,7 +31,7 @@ func Test_PutRouteData(t *testing.T) {
 	for _, tt := range testData {
 		t.Run("Put_"+tt.name, func(t *testing.T) {
 			insertedParams := tt.insertedParams
-			routeData := wallettypes.NewRouteData(&insertedParams.routeInputParams, insertedParams.buildInputParams, insertedParams.transactionDetails)
+			routeData := wallettypes.NewRouteData(&insertedParams.routeInputParams, insertedParams.transactionDetails)
 			err := routeDB.PutRouteData(routeData)
 			require.NoError(t, err)
 		})
@@ -40,7 +40,7 @@ func Test_PutRouteData(t *testing.T) {
 	for _, tt := range testData {
 		t.Run("Get_"+tt.name, func(t *testing.T) {
 			expectedParams := tt.expectedParams
-			routeData := wallettypes.NewRouteData(&expectedParams.routeInputParams, expectedParams.buildInputParams, expectedParams.transactionDetails)
+			routeData := wallettypes.NewRouteData(&expectedParams.routeInputParams, expectedParams.transactionDetails)
 			readRouteData, err := routeDB.GetRouteData(routeData.RouteInputParams.Uuid)
 			require.NoError(t, err)
 			require.EqualExportedValues(t, routeData, readRouteData)

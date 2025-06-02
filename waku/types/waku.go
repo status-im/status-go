@@ -3,10 +3,7 @@ package types
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -19,6 +16,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/connection"
 )
 
@@ -106,6 +104,9 @@ type WakuKeyManager interface {
 type Waku interface {
 	PublicWakuAPI() PublicWakuAPI
 
+	Start() error
+	Stop() error
+
 	// Waku protocol version
 	Version() uint
 
@@ -134,8 +135,6 @@ type Waku interface {
 
 	RemovePubsubTopicKey(topic string) error
 
-	AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error)
-
 	AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error)
 
 	DialPeer(address multiaddr.Multiaddr) error
@@ -146,7 +145,7 @@ type Waku interface {
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
-	SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []TopicType) error
+	SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []TopicType) error
 
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64
@@ -157,7 +156,7 @@ type Waku interface {
 	BloomFilter() []byte
 
 	// GetCurrentTime returns current time.
-	GetCurrentTime() time.Time
+	GetCurrentTime() uint64
 
 	// GetPrivateKey retrieves the private key of the specified identity.
 	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)
@@ -181,9 +180,6 @@ type Waku interface {
 	Unsubscribe(ctx context.Context, id string) error
 	UnsubscribeMany(ids []string) error
 
-	// ProcessingP2PMessages indicates whether there are in-flight p2p messages
-	ProcessingP2PMessages() bool
-
 	// MarkP2PMessageAsProcessed tells the waku layer that a P2P message has been processed
 	MarkP2PMessageAsProcessed(common.Hash)
 
@@ -199,8 +195,8 @@ type Waku interface {
 	// PeerID returns node's PeerID
 	PeerID() peer.ID
 
-	// GetActiveStorenode returns the peer ID of the currently active storenode. It will be empty if no storenode is active
-	GetActiveStorenode() peer.ID
+	// GetActiveStorenode returns the peer AddrInfo of the currently active storenode. It will be empty if no storenode is active
+	GetActiveStorenode() peer.AddrInfo
 
 	// OnStorenodeChanged is triggered when a new storenode is promoted to become the active storenode or when the active storenode is removed
 	OnStorenodeChanged() <-chan peer.ID
@@ -221,7 +217,7 @@ type Waku interface {
 	ProcessMailserverBatch(
 		ctx context.Context,
 		batch MailserverBatch,
-		storenodeID peer.ID,
+		storenode peer.AddrInfo,
 		pageLimit uint64,
 		shouldProcessNextPage func(int) (bool, uint64),
 		processEnvelopes bool,
@@ -239,14 +235,7 @@ type Waku interface {
 type MailserverBatch struct {
 	From        time.Time
 	To          time.Time
-	Cursor      string
 	PubsubTopic string
 	Topics      []TopicType
 	ChatIDs     []string
-}
-
-func (mb *MailserverBatch) Hash() string {
-	data := fmt.Sprintf("%d%d%s%s%v%v", mb.From.UnixNano(), mb.To.UnixNano(), mb.Cursor, mb.PubsubTopic, mb.Topics, mb.ChatIDs)
-	hash := sha256.Sum256([]byte(data))
-	return hex.EncodeToString(hash[:4])
 }

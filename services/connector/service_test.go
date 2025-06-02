@@ -41,11 +41,3 @@ func TestService_APIs(t *testing.T) {
 	assert.Equal(t, "0.1.0", apis[0].Version)
 	assert.NotNil(t, apis[0].Service)
 }
-
-func TestService_Protocols(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
-
-	protocols := state.service.Protocols()
-	assert.Nil(t, protocols)
-}

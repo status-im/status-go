@@ -13,6 +13,7 @@ import (
 
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 
 	"github.com/status-im/status-go/api/multiformat"
@@ -221,7 +222,7 @@ func (m *MentionManager) getMentionableUser(chatID string, pk string) (*Mentiona
 	}
 	user, ok := mentionableUsers[pk]
 	if !ok {
-		return nil, fmt.Errorf("user not found when getting mentionable user, pk: %s", pk)
+		return nil, fmt.Errorf("user not found when getting mentionable user, pk: %s", gocommon.TruncateWithDot(pk))
 	}
 	return user, nil
 }
@@ -230,7 +231,7 @@ func (m *MentionManager) getMentionableUsers(chatID string) (map[string]*Mention
 	mentionableUsers := make(map[string]*MentionableUser)
 	chat, _ := m.allChats.Load(chatID)
 	if chat == nil {
-		return nil, fmt.Errorf("chat not found when getting mentionable users, chatID: %s", chatID)
+		return nil, fmt.Errorf("chat not found when getting mentionable users, chatID: %s", gocommon.TruncateWithDot(chatID))
 	}
 
 	var publicKeys []string
@@ -290,7 +291,7 @@ func (m *MentionManager) addMentionableUser(mentionableUsers map[string]*Mention
 func (m *MentionManager) ReplaceWithPublicKey(chatID, text string) (string, error) {
 	chat, _ := m.allChats.Load(chatID)
 	if chat == nil {
-		return "", fmt.Errorf("chat not found when check mentions, chatID: %s", chatID)
+		return "", fmt.Errorf("chat not found when check mentions, chatID: %s", gocommon.TruncateWithDot(chatID))
 	}
 	mentionableUsers, err := m.mentionableUserGetter.getMentionableUsers(chatID)
 	if err != nil {
@@ -386,7 +387,7 @@ func (m *MentionManager) calculateSuggestionsWithMentionableUsers(chatID string,
 	case textOperationReplace:
 		end = state.Start + len([]rune(state.NewText))
 	default:
-		m.logger.Error("calculateSuggestionsWithMentionableUsers: unknown textOperation", zap.String("chatID", chatID), zap.String("fullText", fullText), zap.Any("state", state))
+		m.logger.Error("calculateSuggestionsWithMentionableUsers: unknown textOperation", zap.String("chatID", gocommon.TruncateWithDot(chatID)), zap.Any("state", state))
 	}
 
 	atSignIdx := lastIndexOfAtSign(fullText, end)

@@ -22,6 +22,9 @@ import (
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/brianvoe/gofakeit/v6"
+
+	"github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -31,6 +34,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/rpc"
@@ -269,7 +273,7 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		assert.NotNil(t, backend.personalAPI)
+		assert.NotNil(t, backend.signer)
 		wg.Done()
 	}()
 
@@ -864,6 +868,13 @@ func TestLoginAccount(t *testing.T) {
 	acc, err := b.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
 	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
+
+	accountsDB, err := b.accountsDB()
+	require.NoError(t, err)
+	backupFecthed, err := accountsDB.BackupFetched()
+	require.NoError(t, err)
+	require.True(t, backupFecthed)
+
 	require.True(t, acc.HasAcceptedTerms)
 
 	waitForLogin(c)
@@ -1089,7 +1100,7 @@ func TestConvertAccount(t *testing.T) {
 
 	defaultSettings, err := defaultSettings(genAccInfo.KeyUID, genAccInfo.Address, derivedAccounts)
 	require.NoError(t, err)
-	nodeConfig, err := DefaultNodeConfig(defaultSettings.InstallationID, &requests.CreateAccount{
+	nodeConfig, err := DefaultNodeConfig(defaultSettings.InstallationID, genAccInfo.KeyUID, &requests.CreateAccount{
 		LogLevel: defaultSettings.LogLevel,
 	})
 	require.NoError(t, err)
@@ -1515,22 +1526,26 @@ func TestSetFleet(t *testing.T) {
 	require.NoError(t, b.Logout())
 }
 
+func fakeToken() security.SensitiveString {
+	return security.NewSensitiveString(gofakeit.LetterN(10))
+}
+
 func TestWalletConfigOnLoginAccount(t *testing.T) {
 	utils.Init()
-	password := "some-password2" // nolint: goconst
+	password := "some-password2"
 	tmpdir := t.TempDir()
-	poktToken := "grove-token"    // nolint: goconst
-	infuraToken := "infura-token" // nolint: goconst
-	alchemyEthereumMainnetToken := "alchemy-ethereum-mainnet-token"
-	alchemyEthereumSepoliaToken := "alchemy-ethereum-sepolia-token"
-	alchemyArbitrumMainnetToken := "alchemy-arbitrum-mainnet-token"
-	alchemyArbitrumSepoliaToken := "alchemy-arbitrum-sepolia-token"
-	alchemyOptimismMainnetToken := "alchemy-optimism-mainnet-token"
-	alchemyOptimismSepoliaToken := "alchemy-optimism-sepolia-token"
-	alchemyBaseMainnetToken := "alchemy-base-mainnet-token" // nolint: gosec
-	alchemyBaseSepoliaToken := "alchemy-base-sepolia-token" // nolint: gosec
-	raribleMainnetAPIKey := "rarible-mainnet-api-key"       // nolint: gosec
-	raribleTestnetAPIKey := "rarible-testnet-api-key"       // nolint: gosec
+	poktToken := fakeToken()
+	infuraToken := fakeToken()
+	alchemyEthereumMainnetToken := fakeToken()
+	alchemyEthereumSepoliaToken := fakeToken()
+	alchemyArbitrumMainnetToken := fakeToken()
+	alchemyArbitrumSepoliaToken := fakeToken()
+	alchemyOptimismMainnetToken := fakeToken()
+	alchemyOptimismSepoliaToken := fakeToken()
+	alchemyBaseMainnetToken := fakeToken()
+	alchemyBaseSepoliaToken := fakeToken()
+	raribleMainnetAPIKey := fakeToken()
+	raribleTestnetAPIKey := fakeToken()
 
 	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 	createAccountRequest := &requests.CreateAccount{
@@ -1583,14 +1598,14 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	}
 
 	require.Equal(t, b.config.WalletConfig.InfuraAPIKey, infuraToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[MainnetChainID], alchemyEthereumMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[SepoliaChainID], alchemyEthereumSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[ArbitrumChainID], alchemyArbitrumMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[ArbitrumSepoliaChainID], alchemyArbitrumSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[OptimismChainID], alchemyOptimismMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[OptimismSepoliaChainID], alchemyOptimismSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[BaseChainID], alchemyBaseMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[BaseSepoliaChainID], alchemyBaseSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.MainnetChainID], alchemyEthereumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.SepoliaChainID], alchemyEthereumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.ArbitrumChainID], alchemyArbitrumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.ArbitrumSepoliaChainID], alchemyArbitrumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.OptimismChainID], alchemyOptimismMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.OptimismSepoliaChainID], alchemyOptimismSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.BaseChainID], alchemyBaseMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.BaseSepoliaChainID], alchemyBaseSepoliaToken)
 	require.Equal(t, b.config.WalletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
 	require.Equal(t, b.config.WalletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
 

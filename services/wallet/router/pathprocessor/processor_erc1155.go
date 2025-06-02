@@ -74,7 +74,7 @@ func (s *ERC1155Processor) PackTxInputData(params ProcessorInputParams) ([]byte,
 	)
 }
 
-func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
@@ -90,11 +90,6 @@ func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams) (uint64, err
 	}
 
 	value := new(big.Int)
-
-	input, err := s.PackTxInputData(params)
-	if err != nil {
-		return 0, createERC1155ErrorResponse(err)
-	}
 
 	msg := ethereum.CallMsg{
 		From:  params.FromAddr,

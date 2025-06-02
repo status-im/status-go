@@ -7,7 +7,7 @@ import (
 	"github.com/status-im/status-go/params"
 	mock_network "github.com/status-im/status-go/rpc/network/mock"
 	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
+	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
@@ -37,6 +37,9 @@ func getTokenSymbols(t *testing.T) []string {
 		{
 			ChainID: w_common.BaseMainnet,
 		},
+		{
+			ChainID: w_common.BSCMainnet,
+		},
 	}
 
 	ptrNetworkList := make([]*params.Network, 0, len(networksList))
@@ -49,7 +52,7 @@ func getTokenSymbols(t *testing.T) []string {
 	networkManager := mock_network.NewMockManagerInterface(ctrl)
 	networkManager.EXPECT().Get(gomock.Any()).Return(ptrNetworkList, nil).AnyTimes()
 	networkManager.EXPECT().GetAll().Return(ptrNetworkList, nil).AnyTimes()
-	networkManager.EXPECT().GetConfiguredNetworks().Return(networksList).AnyTimes()
+	networkManager.EXPECT().GetEmbeddedNetworks().Return(networksList).AnyTimes()
 
 	// Skeleton token store to get full list of tokens
 	tm := token.NewTokenManager(walletDB, nil, nil, networkManager, appDB, nil, nil, nil, nil, nil)

@@ -2,50 +2,27 @@ package thirdparty
 
 //go:generate mockgen -package=mock_thirdparty -source=types.go -destination=mock/types.go
 
-type HistoricalPrice struct {
-	Timestamp int64   `json:"time"`
-	Value     float64 `json:"close"`
-}
+import (
+	"errors"
 
-type TokenMarketValues struct {
-	MKTCAP          float64 `json:"MKTCAP"`
-	HIGHDAY         float64 `json:"HIGHDAY"`
-	LOWDAY          float64 `json:"LOWDAY"`
-	CHANGEPCTHOUR   float64 `json:"CHANGEPCTHOUR"`
-	CHANGEPCTDAY    float64 `json:"CHANGEPCTDAY"`
-	CHANGEPCT24HOUR float64 `json:"CHANGEPCT24HOUR"`
-	CHANGE24HOUR    float64 `json:"CHANGE24HOUR"`
-}
+	w_common "github.com/status-im/status-go/services/wallet/common"
+)
 
-type TokenDetails struct {
-	ID                   string  `json:"Id"`
-	Name                 string  `json:"Name"`
-	Symbol               string  `json:"Symbol"`
-	Description          string  `json:"Description"`
-	TotalCoinsMined      float64 `json:"TotalCoinsMined"`
-	AssetLaunchDate      string  `json:"AssetLaunchDate"`
-	AssetWhitepaperURL   string  `json:"AssetWhitepaperUrl"`
-	AssetWebsiteURL      string  `json:"AssetWebsiteUrl"`
-	BuiltOn              string  `json:"BuiltOn"`
-	SmartContractAddress string  `json:"SmartContractAddress"`
-}
+var (
+	ErrChainIDNotSupported  = errors.New("chainID not supported")
+	ErrEndpointNotSupported = errors.New("endpoint not supported")
+)
 
-type MarketDataProvider interface {
+const FetchNoLimit = 0
+const FetchFromStartCursor = ""
+const FetchFromAnyProvider = ""
+
+type Provider interface {
 	ID() string
-	FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error)
-	FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]HistoricalPrice, error)
-	FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]HistoricalPrice, error)
-	FetchTokenMarketValues(symbols []string, currency string) (map[string]TokenMarketValues, error)
-	FetchTokenDetails(symbols []string) (map[string]TokenDetails, error)
+	IsConnected() bool
 }
 
-type DataParsed struct {
-	Name      string            `json:"name"`
-	ID        string            `json:"id"`
-	Inputs    map[string]string `json:"inputs"`
-	Signature string            `json:"signature"`
-}
-
-type DecoderProvider interface {
-	Run(data string) (*DataParsed, error)
+type ChainProvider interface {
+	Provider
+	IsChainSupported(chainID w_common.ChainID) bool
 }

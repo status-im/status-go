@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.6'
+library 'status-jenkins-lib@v1.9.20'
 
 pipeline {
   agent { label 'linux && x86_64 && nix-2.24' }
@@ -20,7 +20,7 @@ pipeline {
   options {
     timestamps()
     /* Prevent Jenkins jobs from running forever */
-    timeout(time: 30, unit: 'MINUTES')
+    timeout(time: 50, unit: 'MINUTES')
     disableConcurrentBuilds()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
@@ -53,7 +53,7 @@ pipeline {
             passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
     ),
         ]) {
-          nix.shell('make test-functional', pure: false)
+          nix.develop('make test-functional', pure: false)
         }
       } }
     }
@@ -76,7 +76,14 @@ pipeline {
     }
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    cleanup { sh 'make git-clean' }
+      cleanup {
+        script {
+          sh '''
+            docker ps -a --filter "name=status-go-func-tests-${BUILD_ID}" -q | xargs -r docker rm -f
+            make git-clean
+          '''
+        }
+      }
   } // post
 } // pipeline
 

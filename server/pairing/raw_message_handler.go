@@ -131,7 +131,7 @@ func (s *SyncRawMessageHandler) HandleRawMessage(
 func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAccountRequest *requests.CreateAccount, rmp *RawMessagesPayload) error {
 	account := accountPayload.multiaccount
 	installationID := multidevice.GenerateInstallationID()
-	nodeConfig, err := api.DefaultNodeConfig(installationID, createAccountRequest)
+	nodeConfig, err := api.DefaultNodeConfig(installationID, account.KeyUID, createAccountRequest)
 	if err != nil {
 		return err
 	}

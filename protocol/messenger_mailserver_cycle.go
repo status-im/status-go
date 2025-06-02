@@ -4,23 +4,25 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
-	"github.com/waku-org/go-waku/waku/v2/utils"
-
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/signal"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
-func (m *Messenger) AllMailservers() ([]mailservers.Mailserver, error) {
+func (m *Messenger) AllMailservers() ([]wakutypes.Mailserver, error) {
 	// Get configured fleet
 	fleet, err := m.getFleet()
 	if err != nil {
 		return nil, err
 	}
 
+	return m.allMailserversByFleet(fleet)
+}
+
+func (m *Messenger) allMailserversByFleet(fleet string) ([]wakutypes.Mailserver, error) {
 	// Get default mailservers for given fleet
-	allMailservers := mailservers.DefaultMailserversByFleet(fleet)
+	allMailservers := params.DefaultStoreNodes(fleet)
 
 	// Add custom configured mailservers
 	if m.mailserversDatabase != nil {
@@ -37,28 +39,6 @@ func (m *Messenger) AllMailservers() ([]mailservers.Mailserver, error) {
 	}
 
 	return allMailservers, nil
-}
-
-func (m *Messenger) setupStorenodes(storenodes []mailservers.Mailserver) error {
-	if m.transport.WakuVersion() != 2 {
-		return nil
-	}
-
-	for _, storenode := range storenodes {
-
-		peerInfo, err := storenode.PeerInfo()
-		if err != nil {
-			return err
-		}
-
-		for _, addr := range utils.EncapsulatePeerID(peerInfo.ID, peerInfo.Addrs...) {
-			_, err := m.transport.AddStorePeer(addr)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func (m *Messenger) getFleet() (string, error) {
@@ -78,7 +58,7 @@ func (m *Messenger) getFleet() (string, error) {
 }
 
 func (m *Messenger) asyncRequestAllHistoricMessages() {
-	if !m.config.codeControlFlags.AutoRequestHistoricMessages || m.transport.WakuVersion() == 1 {
+	if !m.config.codeControlFlags.AutoRequestHistoricMessages {
 		return
 	}
 
@@ -109,24 +89,14 @@ func (m *Messenger) GetPinnedStorenode() (peer.AddrInfo, error) {
 		return peer.AddrInfo{}, nil
 	}
 
-	fleetMailservers := mailservers.DefaultMailservers()
-
-	for _, c := range fleetMailservers {
-		if c.Fleet == fleet && c.ID == pinnedMailserver {
-			return c.PeerInfo()
-		}
+	allMailservers, err := m.allMailserversByFleet(fleet)
+	if err != nil {
+		return peer.AddrInfo{}, err
 	}
 
-	if m.mailserversDatabase != nil {
-		customMailservers, err := m.mailserversDatabase.Mailservers()
-		if err != nil {
-			return peer.AddrInfo{}, err
-		}
-
-		for _, c := range customMailservers {
-			if c.Fleet == fleet && c.ID == pinnedMailserver {
-				return c.PeerInfo()
-			}
+	for _, c := range allMailservers {
+		if c.ID == pinnedMailserver {
+			return c.PeerInfo()
 		}
 	}
 
@@ -159,13 +129,9 @@ func (m *Messenger) Storenodes() ([]peer.AddrInfo, error) {
 func (m *Messenger) checkForStorenodeCycleSignals() {
 	defer gocommon.LogOnPanic()
 
-	if m.transport.WakuVersion() != 2 {
-		return
-	}
-
-	changed := m.transport.OnStorenodeChanged()
-	notWorking := m.transport.OnStorenodeNotWorking()
-	available := m.transport.OnStorenodeAvailable()
+	changed := m.messaging.OnStorenodeChanged()
+	notWorking := m.messaging.OnStorenodeNotWorking()
+	available := m.messaging.OnStorenodeAvailable()
 
 	allMailservers, err := m.AllMailservers()
 	if err != nil {
@@ -173,7 +139,7 @@ func (m *Messenger) checkForStorenodeCycleSignals() {
 		return
 	}
 
-	mailserverMap := make(map[peer.ID]mailservers.Mailserver)
+	mailserverMap := make(map[peer.ID]wakutypes.Mailserver)
 	for _, ms := range allMailservers {
 		peerID, err := ms.PeerID()
 		if err != nil {

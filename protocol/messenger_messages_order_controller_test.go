@@ -4,9 +4,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/status-im/status-go/protocol/transport"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
 
 type messagesOrderType int
@@ -59,7 +57,7 @@ func (m *MessagesOrderController) Stop() {
 	})
 }
 
-func (m *MessagesOrderController) newMessagesIterator(chatWithMessages map[transport.Filter][]*wakutypes.Message) MessagesIterator {
+func (m *MessagesOrderController) newMessagesIterator(chatWithMessages map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) MessagesIterator {
 	switch m.order {
 	case messagesOrderAsPosted, messagesOrderReversed:
 		return &messagesIterator{chatWithMessages: m.sort(chatWithMessages, m.order)}
@@ -77,7 +75,7 @@ func buildIndexMap(messages [][]byte) map[string]int {
 	return indexMap
 }
 
-func (m *MessagesOrderController) sort(chatWithMessages map[transport.Filter][]*wakutypes.Message, order messagesOrderType) []*chatWithMessage {
+func (m *MessagesOrderController) sort(chatWithMessages map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, order messagesOrderType) []*chatWithMessage {
 	allMessages := make([]*chatWithMessage, 0)
 	for chat, messages := range chatWithMessages {
 		for _, message := range messages {
@@ -107,8 +105,8 @@ func (m *MessagesOrderController) sort(chatWithMessages map[transport.Filter][]*
 }
 
 type chatWithMessage struct {
-	chat    transport.Filter
-	message *wakutypes.Message
+	chat    messagingtypes.ChatFilter
+	message *messagingtypes.ReceivedMessage
 }
 
 type messagesIterator struct {
@@ -120,12 +118,12 @@ func (it *messagesIterator) HasNext() bool {
 	return it.currentIndex < len(it.chatWithMessages)
 }
 
-func (it *messagesIterator) Next() (transport.Filter, []*wakutypes.Message) {
+func (it *messagesIterator) Next() (messagingtypes.ChatFilter, []*messagingtypes.ReceivedMessage) {
 	if it.HasNext() {
 		m := it.chatWithMessages[it.currentIndex]
 		it.currentIndex++
-		return m.chat, []*wakutypes.Message{m.message}
+		return m.chat, []*messagingtypes.ReceivedMessage{m.message}
 	}
 
-	return transport.Filter{}, nil
+	return messagingtypes.ChatFilter{}, nil
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/services/mailservers"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 var (
@@ -44,13 +44,13 @@ type storenodesData struct {
 }
 
 // GetStorenodeByCommunityID returns the active storenode for a community
-func (m *CommunityStorenodes) GetStorenodeByCommunityID(communityID string) (mailservers.Mailserver, error) {
+func (m *CommunityStorenodes) GetStorenodeByCommunityID(communityID string) (wakutypes.Mailserver, error) {
 	m.storenodesByCommunityIDMutex.RLock()
 	defer m.storenodesByCommunityIDMutex.RUnlock()
 
 	msData, ok := m.storenodesByCommunityID[communityID]
 	if !ok || len(msData.storenodes) == 0 {
-		return mailservers.Mailserver{}, ErrNotFound
+		return wakutypes.Mailserver{}, ErrNotFound
 	}
 	return toMailserver(msData.storenodes[0]), nil
 }

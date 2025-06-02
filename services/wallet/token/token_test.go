@@ -1,6 +1,7 @@
 package token
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -25,6 +26,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/community"
 
+	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
@@ -32,24 +35,31 @@ import (
 )
 
 func setupTestTokenDB(t *testing.T) (*Manager, func()) {
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	tokensLists, err := tokenlists.NewTokenLists(appDb, walletDb)
 	require.NoError(t, err)
 
 	return &Manager{
-			db:                   db,
+			db:                   walletDb,
 			RPCClient:            nil,
 			ContractMaker:        nil,
 			networkManager:       nil,
-			stores:               nil,
 			communityTokensDB:    nil,
 			communityManager:     nil,
-			tokenBalancesStorage: NewPersistence(db),
+			tokenBalancesStorage: NewPersistence(walletDb),
+			tokenLists:           tokensLists,
 		}, func() {
-			require.NoError(t, db.Close())
+			require.NoError(t, appDb.Close())
+			require.NoError(t, walletDb.Close())
 		}
 }
 
-func upsertCommunityToken(t *testing.T, token *Token, manager *Manager) {
+func upsertCommunityToken(t *testing.T, token *tokenTypes.Token, manager *Manager) {
 	require.NotNil(t, token.CommunityData)
 
 	err := manager.UpsertCustom(*token)
@@ -68,7 +78,7 @@ func TestCustoms(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	token := Token{
+	token := tokenTypes.Token{
 		Address:  common.Address{1},
 		Name:     "Zilliqa",
 		Symbol:   "ZIL",
@@ -100,7 +110,7 @@ func TestCommunityTokens(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	token := Token{
+	token := tokenTypes.Token{
 		Address:  common.Address{1},
 		Name:     "Zilliqa",
 		Symbol:   "ZIL",
@@ -111,7 +121,7 @@ func TestCommunityTokens(t *testing.T) {
 	err = manager.UpsertCustom(token)
 	require.NoError(t, err)
 
-	communityToken := Token{
+	communityToken := tokenTypes.Token{
 		Address:  common.Address{2},
 		Name:     "Communitia",
 		Symbol:   "COM",
@@ -136,7 +146,7 @@ func TestCommunityTokens(t *testing.T) {
 	require.Equal(t, communityToken, *rst[0])
 }
 
-func toTokenMap(tokens []*Token) storeMap {
+func toTokenMap(tokens []*tokenTypes.Token) storeMap {
 	tokenMap := storeMap{}
 
 	for _, token := range tokens {
@@ -175,35 +185,31 @@ func TestTokenOverride(t *testing.T) {
 		},
 	}
 
-	tokenList := []*Token{
-		&Token{
+	tokenList := []*tokenTypes.Token{
+		&tokenTypes.Token{
 			Address: common.Address{1},
 			Symbol:  "SNT",
 			ChainID: 1,
 		},
-		&Token{
+		&tokenTypes.Token{
 			Address: common.Address{2},
 			Symbol:  "TNT",
 			ChainID: 1,
 		},
-		&Token{
+		&tokenTypes.Token{
 			Address: common.Address{3},
 			Symbol:  "STT",
 			ChainID: 2,
 		},
-		&Token{
+		&tokenTypes.Token{
 			Address: common.Address{4},
 			Symbol:  "TTT",
 			ChainID: 2,
 		},
 	}
-	testStore := &DefaultStore{
-		tokenList,
-	}
 
 	overrideTokensInPlace(networks, tokenList)
-	tokens := testStore.GetTokens()
-	tokenMap := toTokenMap(tokens)
+	tokenMap := toTokenMap(tokenList)
 	_, found := tokenMap[1][common.Address{1}]
 	require.False(t, found)
 	require.Equal(t, common.Address{11}, tokenMap[1][common.Address{11}].Address)
@@ -219,7 +225,7 @@ func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
 	defer stop()
 
 	owner := common.HexToAddress("0x1234567890abcdef")
-	token := &Token{
+	token := &tokenTypes.Token{
 		Address:  common.HexToAddress("0xabcdef1234567890"),
 		Name:     "TestToken",
 		Symbol:   "TT",
@@ -338,19 +344,18 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 		Networks:        nil,
 		DB:              appDB,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	rpcClient, _ := rpc.NewClient(config)
 
 	rpcClient.UpstreamChainID = chainID
-	nm := network.NewManager(appDB)
+	nm := network.NewManager(appDB, nil, nil, nil)
 	mediaServer, err := mediaserver.NewMediaServer(appDB, nil, nil, walletDB)
 	require.NoError(t, err)
 
 	manager := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, mediaServer, nil, &accountFeed, accountsDB, NewPersistence(walletDB))
 
 	// Insert balances for address
-	marked, err := manager.MarkAsPreviouslyOwnedToken(&Token{
+	marked, err := manager.MarkAsPreviouslyOwnedToken(&tokenTypes.Token{
 		Address:  common.HexToAddress("0x1234"),
 		Symbol:   "Dummy",
 		Decimals: 18,
@@ -407,20 +412,22 @@ func Test_tokensListsValidity(t *testing.T) {
 	accountsDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 
-	nm := network.NewManager(appDB)
+	nm := network.NewManager(appDB, nil, nil, nil)
 
 	manager := NewTokenManager(walletDB, nil, nil, nm, appDB, nil, nil, nil, accountsDB, NewPersistence(walletDB))
 	require.NotNil(t, manager)
+
+	manager.Start(context.Background(), 1*time.Hour, 1*time.Hour)
 
 	tokensListWrapper := manager.GetList()
 	require.NotNil(t, tokensListWrapper)
 	allLists := tokensListWrapper.Data
 	require.Greater(t, len(allLists), 0)
 
-	tmpMap := make(map[string][]*Token)
+	tmpMap := make(map[string][]*tokenTypes.Token)
 	for _, list := range allLists {
 		for _, token := range list.Tokens {
-			key := fmt.Sprintf("%d-%s", token.ChainID, token.Symbol)
+			key := fmt.Sprintf("%d-%s", token.ChainID, token.Address)
 			if added, ok := tmpMap[key]; ok {
 				found := false
 				for _, a := range added {
@@ -432,7 +439,7 @@ func Test_tokensListsValidity(t *testing.T) {
 
 				require.True(t, found, "Token %s not found in list %s", token.Symbol, list.Name)
 			} else {
-				tmpMap[key] = []*Token{token}
+				tmpMap[key] = []*tokenTypes.Token{token}
 			}
 		}
 	}

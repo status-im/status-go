@@ -15,13 +15,13 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 func TestPersistenceSuite(t *testing.T) {
@@ -64,7 +64,7 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 			ControlDevice:        true,
 			ID:                   &s.identity.PublicKey,
 			Joined:               true,
-			Spectated:            true,
+			Spectated:            false,
 			Verified:             true,
 			Muted:                true,
 			MuteTill:             time.Time{},
@@ -78,10 +78,34 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 	s.Require().Len(communities, 1)
 	s.Equal(types.HexBytes(crypto.CompressPubkey(&s.identity.PublicKey)), communities[0].ID())
 	s.Equal(true, communities[0].Joined())
-	s.Equal(true, communities[0].Spectated())
+	s.Equal(false, communities[0].Spectated())
 	s.Equal(true, communities[0].Verified())
 	s.Equal(true, communities[0].Muted())
 	s.Equal(time.Time{}, communities[0].MuteTill())
+
+	communities, err = s.db.JoinedCommunities(&s.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().Len(communities, 1)
+	communities, err = s.db.SpectatedCommunities(&s.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().Empty(communities)
+	communities, err = s.db.JoinedOrSpectatedCommunities(&s.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().Len(communities, 1)
+
+	community.config.Joined = false
+	community.config.Spectated = true
+	s.Require().NoError(s.db.SaveCommunity(&community))
+
+	communities, err = s.db.JoinedCommunities(&s.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().Empty(communities)
+	communities, err = s.db.SpectatedCommunities(&s.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().Len(communities, 1)
+	communities, err = s.db.JoinedOrSpectatedCommunities(&s.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().Len(communities, 1)
 }
 
 func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {
@@ -787,7 +811,7 @@ func (s *PersistenceSuite) TestSaveShardInfo() {
 	s.Require().Nil(resultShard)
 
 	// not nil shard
-	expectedShard := &shard.Shard{
+	expectedShard := &wakuv2.Shard{
 		Cluster: 1,
 		Index:   2,
 	}

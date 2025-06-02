@@ -10,11 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/wakuv2"
 	waku2 "github.com/status-im/status-go/wakuv2"
 
-	"github.com/status-im/status-go/waku/bridge"
+	"github.com/waku-org/waku-go-bindings/waku/common"
+
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -34,6 +35,15 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 		EnableDiscV5:             false,
 	}
 
+	wakuConfig.NwakuConfig = &common.WakuConfig{
+		Relay:         true,
+		LogLevel:      "DEBUG",
+		ClusterID:     cfg.clusterID,
+		Shards:        []uint16{wakuv2.DefaultShardIndex},
+		Discv5UdpPort: 0,
+		TcpPort:       0,
+	}
+
 	var nodeKey *ecdsa.PrivateKey
 	if len(cfg.nodekey) != 0 {
 		nodeKey, _ = crypto.ToECDSA(cfg.nodekey)
@@ -51,7 +61,6 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 
 	wakuNode, err := waku2.New(
 		nodeKey,
-		"",
 		wakuConfig,
 		cfg.logger,
 		db,
@@ -63,7 +72,7 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 
 	err = wakuNode.Start()
 	if cfg.enableStore {
-		err := wakuNode.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
+		err := wakuNode.SubscribeToPubsubTopic(wakuv2.DefaultNonProtectedPubsubTopic(), nil)
 		s.Require().NoError(err)
 	}
 	s.Require().NoError(err)
@@ -72,14 +81,13 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 }
 
 func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []string) []wakutypes.Waku {
-	nodes := make([]*waku2.Waku, len(nodeNames))
-	wrappers := make([]wakutypes.Waku, len(nodes))
+	nodes := make([]wakutypes.Waku, len(nodeNames))
 
 	for i, name := range nodeNames {
 		nodes[i] = NewTestWakuV2(s, testWakuV2Config{
 			logger:      parentLogger.Named("waku-" + name),
 			enableStore: false,
-			clusterID:   shard.MainStatusShardCluster,
+			clusterID:   wakuv2.MainStatusShardCluster,
 		})
 	}
 
@@ -90,16 +98,15 @@ func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []s
 				continue
 			}
 
-			addrs := nodes[j].ListenAddresses()
+			addrs, err := nodes[j].ListenAddresses()
+			s.Require().NoError(err)
 			s.Require().Greater(len(addrs), 0)
-			_, err := nodes[i].AddRelayPeer(addrs[0])
+			_, err = nodes[i].AddRelayPeer(addrs[0])
 			s.Require().NoError(err)
 			err = nodes[i].DialPeer(addrs[0])
 			s.Require().NoError(err)
 		}
 	}
-	for i, n := range nodes {
-		wrappers[i] = bridge.NewGethWakuV2Wrapper(n)
-	}
-	return wrappers
+
+	return nodes
 }

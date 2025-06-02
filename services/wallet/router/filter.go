@@ -3,9 +3,6 @@ package router
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/services/wallet/common"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 
 	"go.uber.org/zap"
@@ -21,7 +18,7 @@ func init() {
 	}
 }
 
-func filterRoutes(routes []routes.Route, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) []routes.Route {
+func filterRoutes(routes []routes.Route, amountIn *big.Int) []routes.Route {
 	for i := len(routes) - 1; i >= 0; i-- {
 		routeAmount := big.NewInt(0)
 		for _, p := range routes[i] {
@@ -35,34 +32,7 @@ func filterRoutes(routes []routes.Route, amountIn *big.Int, fromLockedAmount map
 		routes = append(routes[:i], routes[i+1:]...)
 	}
 
-	if len(fromLockedAmount) == 0 {
-		return routes
-	}
-
-	routesAfterNetworkCompliance := filterNetworkCompliance(routes, fromLockedAmount)
-	return filterCapacityValidation(routesAfterNetworkCompliance, amountIn, fromLockedAmount)
-}
-
-// filterNetworkCompliance performs the first level of filtering based on network inclusion/exclusion criteria.
-func filterNetworkCompliance(allRoutes []routes.Route, fromLockedAmount map[uint64]*hexutil.Big) []routes.Route {
-	filteredRoutes := make([]routes.Route, 0)
-	if allRoutes == nil || fromLockedAmount == nil {
-		return filteredRoutes
-	}
-
-	fromIncluded, fromExcluded := setupRouteValidationMaps(fromLockedAmount)
-
-	for _, route := range allRoutes {
-		if route == nil {
-			continue
-		}
-
-		// Create fresh copies of the maps for each route check, because they are manipulated
-		if isValidForNetworkCompliance(route, common.CopyMapGeneric(fromIncluded, nil).(map[uint64]bool), common.CopyMapGeneric(fromExcluded, nil).(map[uint64]bool)) {
-			filteredRoutes = append(filteredRoutes, route)
-		}
-	}
-	return filteredRoutes
+	return routes
 }
 
 // isValidForNetworkCompliance checks if a route complies with network inclusion/exclusion criteria.
@@ -99,57 +69,6 @@ func isValidForNetworkCompliance(route routes.Route, fromIncluded, fromExcluded 
 		}
 	}
 
-	return true
-}
-
-// setupRouteValidationMaps initializes maps for network inclusion and exclusion based on locked amounts.
-func setupRouteValidationMaps(fromLockedAmount map[uint64]*hexutil.Big) (map[uint64]bool, map[uint64]bool) {
-	fromIncluded := make(map[uint64]bool)
-	fromExcluded := make(map[uint64]bool)
-
-	for chainID, amount := range fromLockedAmount {
-		if amount.ToInt().Cmp(walletCommon.ZeroBigIntValue()) <= 0 {
-			fromExcluded[chainID] = false
-		} else {
-			fromIncluded[chainID] = false
-		}
-	}
-	return fromIncluded, fromExcluded
-}
-
-// filterCapacityValidation performs the second level of filtering based on amount and capacity validation.
-func filterCapacityValidation(allRoutes []routes.Route, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) []routes.Route {
-	filteredRoutes := make([]routes.Route, 0)
-
-	for _, route := range allRoutes {
-		if hasSufficientCapacity(route, amountIn, fromLockedAmount) {
-			filteredRoutes = append(filteredRoutes, route)
-		}
-	}
-	return filteredRoutes
-}
-
-// hasSufficientCapacity checks if a route has sufficient capacity to handle the required amount.
-func hasSufficientCapacity(route routes.Route, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) bool {
-	for _, path := range route {
-		if amount, ok := fromLockedAmount[path.FromChain.ChainID]; ok {
-			if path.AmountIn.ToInt().Cmp(amount.ToInt()) != 0 {
-				logger.Debug("Amount in does not match locked amount", zap.Any("path", path))
-				return false
-			}
-			requiredAmountIn := new(big.Int).Sub(amountIn, amount.ToInt())
-			restAmountIn := calculateRestAmountIn(route, path)
-
-			logger.Debug("Checking path", zap.Any("path", path))
-			logger.Debug("Required amount in", zap.String("requiredAmountIn", requiredAmountIn.String()))
-			logger.Debug("Rest amount in", zap.String("restAmountIn", restAmountIn.String()))
-
-			if restAmountIn.Cmp(requiredAmountIn) < 0 {
-				logger.Debug("Path does not have sufficient capacity", zap.Any("path", path))
-				return false
-			}
-		}
-	}
 	return true
 }
 

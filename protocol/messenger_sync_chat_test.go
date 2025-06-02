@@ -13,9 +13,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -61,11 +59,10 @@ func (s *MessengerSyncChatSuite) otherNewMessenger() *Messenger {
 func (s *MessengerSyncChatSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = bridge.NewGethWakuWrapper(shh)
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 
 	s.alice1 = s.newMessenger()
 	s.alice2 = s.newMessenger()
@@ -108,11 +105,11 @@ func (s *MessengerSyncChatSuite) Pair() {
 }
 
 func (s *MessengerSyncChatSuite) TestRemovePubChat() {
-	chat := CreatePublicChat(publicChatName, s.alice1.transport)
+	chat := CreatePublicChat(publicChatName, s.alice1.getTimesource())
 	err := s.alice1.SaveChat(chat)
 	s.Require().NoError(err)
 
-	chat = CreatePublicChat(publicChatName, s.alice2.transport)
+	chat = CreatePublicChat(publicChatName, s.alice2.getTimesource())
 	err = s.alice2.SaveChat(chat)
 	s.Require().NoError(err)
 

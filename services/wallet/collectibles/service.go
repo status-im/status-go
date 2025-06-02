@@ -94,7 +94,7 @@ type Service struct {
 	manager          *Manager
 	controller       *Controller
 	db               *sql.DB
-	ownershipDB      *OwnershipDB
+	ownershipDB      OwnershipStorage
 	transferDB       *transfer.Database
 	communityManager *community.Manager
 	walletFeed       *event.Feed
@@ -107,13 +107,13 @@ func NewService(
 	walletFeed *event.Feed,
 	accountsDB *accounts.Database,
 	accountsFeed *event.Feed,
-	settingsFeed *event.Feed,
+	networksFeed *event.Feed,
 	communityManager *community.Manager,
 	networkManager *network.Manager,
 	manager *Manager) *Service {
 	s := &Service{
 		manager:          manager,
-		controller:       NewController(db, walletFeed, accountsDB, accountsFeed, settingsFeed, networkManager, manager),
+		controller:       NewController(db, walletFeed, accountsDB, accountsFeed, networksFeed, networkManager, manager),
 		db:               db,
 		ownershipDB:      NewOwnershipDB(db),
 		transferDB:       transfer.NewDB(db),
@@ -330,7 +330,7 @@ func (s *Service) RefetchOwnedCollectibles() {
 	s.controller.RefetchOwnedCollectibles()
 }
 
-func (s *Service) Start() {
+func (s *Service) Start(ctx context.Context) {
 	s.controller.Start()
 }
 

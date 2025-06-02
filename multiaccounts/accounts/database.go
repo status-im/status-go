@@ -116,7 +116,7 @@ const (
 
 	ProdPreferredChainIDsDefault        = "1:10:42161:8453"
 	TestPreferredChainIDsDefault        = "5:420:421613"
-	TestSepoliaPreferredChainIDsDefault = "11155111:11155420:421614:84532"
+	TestSepoliaPreferredChainIDsDefault = "11155111:11155420:421614:84532:1660990954"
 )
 
 // Returns true if an account is a wallet account that logged in user has a control over, otherwise returns false.

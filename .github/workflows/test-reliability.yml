@@ -7,15 +7,30 @@ on:
 
 env:
   FORCE_COLOR: "1"
-  DEPLOY_TEST_REPORTS_PAT: ${{ secrets.DEPLOY_TEST_REPORTS_PAT }}
 
 jobs:
   test-reliability:
     timeout-minutes: 90
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      checks: write
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: ipv4
+            docker_compose_file: docker-compose.test.reliability.ipv4.yml
+            use_ipv6: "No"
+          - name: ipv6
+            docker_compose_file: docker-compose.test.reliability.ipv6.yml
+            use_ipv6: "Yes"
     steps:
 
     - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
 
     - uses: actions/setup-python@v4
       with:
@@ -31,53 +46,18 @@ jobs:
       run: pip install -r tests-functional/requirements.txt
 
     - name: Build status-backend
-      run: cd tests-functional; docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f docker-compose.status-go.local.yml up --build --remove-orphans -d
+      run: cd tests-functional; docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
 
     - name: Run tests
-      run: pytest -m "reliability" -c tests-functional/pytest.ini --alluredir=allure-results
-
-    - name: Get allure history
-      if: always()
-      uses: actions/checkout@v4
-      continue-on-error: true
-      with:
-        repository: status-im/status-go-allure
-        ref: gh-pages
-        path: gh-pages
-        token: ${{ env.DEPLOY_TEST_REPORTS_PAT }}
-
-    - name: Setup allure report
-      uses: simple-elf/allure-report-action@master
-      if: always()
-      id: allure-report
-      with:
-        allure_results: allure-results
-        gh_pages: gh-pages
-        allure_history: allure-history
-        keep_reports: 30
-        report_url: 'https://status-im.github.io/status-go-allure/'
-
-    - name: Deploy report to Github Pages
-      uses: peaceiris/actions-gh-pages@v4
-      if: always()
-      with:
-        personal_token: ${{ env.DEPLOY_TEST_REPORTS_PAT }}
-        external_repository: status-im/status-go-allure
-        publish_branch: gh-pages
-        publish_dir: allure-history
-
-    - name: Create job summary
-      if: always()
       env:
-        JOB_STATUS: ${{ job.status }}
-      run: |
-        echo "## Run Information" >> $GITHUB_STEP_SUMMARY
-        echo "- **Event**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-        echo "Allure report will be available at: https://status-im.github.io/status-go-allure/${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-        {
-          echo 'JOB_SUMMARY<<EOF'
-          cat $GITHUB_STEP_SUMMARY
-          echo EOF
-        } >> $GITHUB_ENV
+        USE_IPV6: ${{ matrix.config.use_ipv6 }}
+      run: pytest --reruns 2 -n auto -m "reliability" -c tests-functional/pytest.ini --junit-xml=pytest_results.xml --tb=short --waku-fleet=status.staging --waku-fleets-config=""
+
+    - name: Test Report
+      if: always()
+      uses: dorny/test-reporter@95058abb17504553158e70e2c058fe1fda4392c2
+      with:
+        name: Pytest JUnit Test Report (${{ matrix.config.name }})
+        path: pytest_results.xml
+        reporter: java-junit
+        use-actions-summary: 'true'

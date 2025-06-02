@@ -10,6 +10,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	libp2pPeerstore "github.com/libp2p/go-libp2p/core/peerstore"
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/waku-org/go-waku/logging"
@@ -196,17 +197,21 @@ func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...Requ
 	return result, nil
 }
 
-func (s *WakuStore) RequestRaw(ctx context.Context, peerID peer.ID, storeRequest *pb.StoreQueryRequest) (Result, error) {
+func (s *WakuStore) RequestRaw(ctx context.Context, peerInfo peer.AddrInfo, storeRequest *pb.StoreQueryRequest) (Result, error) {
 	err := storeRequest.Validate()
 	if err != nil {
 		return nil, err
 	}
 
 	var params Parameters
-	params.selectedPeer = peerID
-	if params.selectedPeer == "" {
+	params.peerAddr = peerInfo.Addrs
+	params.selectedPeer = peerInfo.ID
+	if len(params.peerAddr) == 0 || params.selectedPeer == "" {
 		return nil, ErrMustSelectPeer
 	}
+
+	//Add Peer to peerstore.
+	s.h.Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, libp2pPeerstore.AddressTTL)
 
 	response, err := s.queryFrom(ctx, storeRequest, &params)
 	if err != nil {

@@ -14,9 +14,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -60,11 +58,10 @@ func (s *MessengerDeleteMessageForMeSuite) otherNewMessenger() *Messenger {
 func (s *MessengerDeleteMessageForMeSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = bridge.NewGethWakuWrapper(shh)
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 
 	s.alice1 = s.newMessenger()
 	s.alice2 = s.newMessenger()
@@ -116,6 +113,8 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Require().NoError(err)
 
 	otherMessenger := s.otherNewMessenger()
+	defer TearDownMessenger(&s.Suite, otherMessenger)
+
 	_, err = otherMessenger.createPublicChat(chatID, &MessengerResponse{})
 	s.Require().NoError(err)
 
@@ -217,11 +216,11 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteImageMessageFromReceiverSid
 	bob := s.otherNewMessenger()
 	defer TearDownMessenger(&s.Suite, bob)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, alice.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, alice.getTimesource())
 	err := alice.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.getTimesource())
 	err = bob.SaveChat(ourChat)
 	s.Require().NoError(err)
 

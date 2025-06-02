@@ -4,7 +4,7 @@ import pytest
 import logging
 import resources.constants as constants
 
-from test_cases import StatusBackendTestCase
+from steps.status_backend import StatusBackendSteps
 from clients.signals import SignalType
 from utils import wallet_utils
 
@@ -12,13 +12,13 @@ from utils import wallet_utils
 @pytest.mark.rpc
 @pytest.mark.transaction
 @pytest.mark.wallet
-class TestRouter(StatusBackendTestCase):
+class TestRouter(StatusBackendSteps):
     await_signals = [
         SignalType.NODE_LOGIN.value,
+        SignalType.WALLET.value,
         SignalType.WALLET_SUGGESTED_ROUTES.value,
         SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value,
         SignalType.WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED.value,
-        SignalType.WALLET_TRANSACTION_STATUS_CHANGED.value,
         SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
     ]
 
@@ -39,12 +39,17 @@ class TestRouter(StatusBackendTestCase):
             "disabledFromChainIDs": [1, 10, 42161],
             "disabledToChainIDs": [1, 10, 42161],
             "gasFeeMode": 1,
-            "fromLockedAmount": {},
         }
 
         routes = wallet_utils.get_suggested_routes(self.rpc_client, **params)
         assert len(routes["Best"]) > 0
-        wallet_router_sign_transactions = wallet_utils.build_transactions_from_route(self.rpc_client, **params)
+        wallet_router_sign_transactions = wallet_utils.build_transactions_from_route(self.rpc_client, uuid)
+        if wallet_router_sign_transactions is None:
+            raise ValueError("wallet_router_sign_transactions is None")
+
+        if "signingDetails" not in wallet_router_sign_transactions:
+            raise ValueError("signingDetails not found in wallet_router_sign_transactions")
+
         transaction_hashes = wallet_router_sign_transactions["signingDetails"]["hashes"]
         tx_signatures = wallet_utils.sign_messages(self.rpc_client, transaction_hashes, constants.user_1.address)
         tx_status = wallet_utils.send_router_transactions_with_signatures(self.rpc_client, uuid, tx_signatures)
@@ -68,7 +73,6 @@ class TestRouter(StatusBackendTestCase):
             "disabledFromChainIDs": [1, 10, 42161],
             "disabledToChainIDs": [1, 10, 42161],
             "gasFeeMode": gas_fee_mode,
-            "fromLockedAmount": {},
         }
 
         logging.info("Step: getting the best route")
@@ -135,7 +139,6 @@ class TestRouter(StatusBackendTestCase):
             "disabledFromChainIDs": [1, 10, 42161],
             "disabledToChainIDs": [1, 10, 42161],
             "gasFeeMode": gas_fee_mode,
-            "fromLockedAmount": {},
         }
 
         logging.info("Step: getting the best route")

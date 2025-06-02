@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/jellydator/ttlcache/v3"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -23,31 +24,33 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/account"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 type Publisher interface {
@@ -86,6 +89,12 @@ var (
 	ErrInvalidClock                    = errors.New("invalid clock to cancel request to join")
 )
 
+type MessageSigner interface {
+	Recover(rpcParams personal.RecoverParams) (addr types.Address, err error)
+	CanRecover(rpcParams personal.RecoverParams, revealedAddress types.Address) (bool, error)
+	Sign(rpcParams personal.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error)
+}
+
 type Manager struct {
 	persistence              *Persistence
 	encryptor                *encryption.Protocol
@@ -99,7 +108,8 @@ type Manager struct {
 	tokenManager             TokenManager
 	collectiblesManager      CollectiblesManager
 	logger                   *zap.Logger
-	transport                *transport.Transport
+	signer                   MessageSigner
+	messaging                *messaging.API
 	timesource               common.TimeSource
 	quit                     chan struct{}
 	walletConfig             *params.WalletConfig
@@ -113,6 +123,7 @@ type Manager struct {
 	communityLock            *CommunityLock
 	mediaServer              server.MediaServerInterface
 	communityImageVersions   map[string]uint32
+	cache                    *ttlcache.Cache[string, ReadonlyCommunity]
 }
 
 type CommunityLock struct {
@@ -172,8 +183,8 @@ type HistoryArchiveDownloadTaskInfo struct {
 }
 
 type ArchiveFileService interface {
-	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*wakutypes.Message, topics []wakutypes.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
-	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []wakutypes.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
 	SaveMessageArchiveID(communityID types.HexBytes, hash string) error
 	GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error)
 	SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error
@@ -190,10 +201,10 @@ type ArchiveService interface {
 	StartTorrentClient() error
 	Stop() error
 	IsReady() bool
-	GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error)
-	GetCommunityChatsTopics(communityID types.HexBytes) ([]wakutypes.TopicType, error)
+	GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error)
+	GetCommunityChatsTopics(communityID types.HexBytes) ([]messagingtypes.ContentTopic, error)
 	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
-	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []wakutypes.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
+	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
 	StartHistoryArchiveTasksInterval(community *Community, interval time.Duration)
 	StopHistoryArchiveTasksInterval(communityID types.HexBytes)
 	SeedHistoryArchiveTorrent(communityID types.HexBytes) error
@@ -209,7 +220,7 @@ type ArchiveManagerConfig struct {
 	TorrentConfig *params.TorrentConfig
 	Logger        *zap.Logger
 	Persistence   *Persistence
-	Transport     *transport.Transport
+	Messaging     *messaging.API
 	Identity      *ecdsa.PrivateKey
 	Encryptor     *encryption.Protocol
 	Publisher     Publisher
@@ -242,7 +253,7 @@ type managerOptions struct {
 	walletConfig           *params.WalletConfig
 	communityTokensService CommunityTokensServiceInterface
 	permissionChecker      PermissionChecker
-
+	signer                 MessageSigner
 	// allowForcingCommunityMembersReevaluation indicates whether we should allow forcing community members reevaluation.
 	// This will allow using `force` argument in ScheduleMembersReevaluation.
 	// Should only be used in tests.
@@ -252,7 +263,7 @@ type managerOptions struct {
 type TokenManager interface {
 	GetBalancesByChain(ctx context.Context, accounts, tokens []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
 	GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
-	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *token.Token
+	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token
 	GetAllChainIDs() ([]uint64, error)
 }
 
@@ -270,7 +281,6 @@ type AssetContractData struct {
 
 type CommunityTokensServiceInterface interface {
 	GetCollectibleContractData(chainID uint64, contractAddress string) (*CollectibleContractData, error)
-	SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs wallettypes.SendTxArgs, password string, newSignerPubKey string) (string, error)
 	GetAssetContractData(chainID uint64, contractAddress string) (*AssetContractData, error)
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 	DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error)
@@ -334,15 +344,15 @@ func (m *DefaultTokenManager) GetCachedBalancesByChain(ctx context.Context, acco
 	return resp, nil
 }
 
-func (m *DefaultTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *token.Token {
+func (m *DefaultTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token {
 	return m.tokenManager.FindOrCreateTokenByAddress(ctx, chainID, address)
 }
 
 type ManagerOption func(*managerOptions)
 
-func WithAccountManager(accountsManager account.Manager) ManagerOption {
+func WithMessageSigner(signer MessageSigner) ManagerOption {
 	return func(opts *managerOptions) {
-		opts.accountsManager = accountsManager
+		opts.signer = signer
 	}
 }
 
@@ -394,7 +404,7 @@ func NewManager(
 	logger *zap.Logger,
 	ensverifier *ens.Verifier,
 	ownerVerifier OwnerVerifier,
-	transport *transport.Transport,
+	messaging *messaging.API,
 	timesource common.TimeSource,
 	keyDistributor KeyDistributor,
 	mediaServer server.MediaServerInterface,
@@ -427,12 +437,13 @@ func NewManager(
 		installationID:         installationID,
 		ownerVerifier:          ownerVerifier,
 		quit:                   make(chan struct{}),
-		transport:              transport,
+		messaging:              messaging,
 		timesource:             timesource,
 		keyDistributor:         keyDistributor,
 		communityLock:          NewCommunityLock(logger),
 		mediaServer:            mediaServer,
 		communityImageVersions: make(map[string]uint32),
+		cache:                  ttlcache.New(ttlcache.WithCapacity[string, ReadonlyCommunity](5), ttlcache.WithTTL[string, ReadonlyCommunity](time.Minute)),
 	}
 
 	manager.persistence = &Persistence{
@@ -442,6 +453,10 @@ func NewManager(
 
 	if managerConfig.accountsManager != nil {
 		manager.accountsManager = managerConfig.accountsManager
+	}
+
+	if managerConfig.signer != nil {
+		manager.signer = managerConfig.signer
 	}
 
 	if managerConfig.collectiblesManager != nil {
@@ -678,7 +693,7 @@ func (m *Manager) runOwnerVerificationLoop() {
 func (m *Manager) ValidateCommunityByID(communityID types.HexBytes) (*CommunityResponse, error) {
 	communitiesToValidate, err := m.persistence.getCommunityToValidateByID(communityID)
 	if err != nil {
-		m.logger.Error("failed to validate community by ID", zap.String("id", communityID.String()), zap.Error(err))
+		m.logger.Error("failed to validate community by ID", zap.String("id", utils.TruncateWithDot(communityID.String())), zap.Error(err))
 		return nil, err
 	}
 	return m.validateCommunity(communitiesToValidate)
@@ -770,8 +785,8 @@ func (m *Manager) All() ([]*Community, error) {
 }
 
 type CommunityShard struct {
-	CommunityID string       `json:"communityID"`
-	Shard       *shard.Shard `json:"shard"`
+	CommunityID string        `json:"communityID"`
+	Shard       *wakuv2.Shard `json:"shard"`
 }
 
 type CuratedCommunities struct {
@@ -821,6 +836,10 @@ func (m *Manager) Joined() ([]*Community, error) {
 
 func (m *Manager) Spectated() ([]*Community, error) {
 	return m.persistence.SpectatedCommunities(&m.identity.PublicKey)
+}
+
+func (m *Manager) JoinedOrSpectated() ([]*Community, error) {
+	return m.persistence.JoinedOrSpectatedCommunities(&m.identity.PublicKey)
 }
 
 func (m *Manager) CommunityUpdateLastOpenedAt(communityID types.HexBytes, timestamp int64) (*Community, error) {
@@ -916,7 +935,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	// We join any community we create
 	community.Join()
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -1579,7 +1598,7 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
-func (m *Manager) updateShard(community *Community, shard *shard.Shard, clock uint64) error {
+func (m *Manager) updateShard(community *Community, shard *wakuv2.Shard, clock uint64) error {
 	community.config.Shard = shard
 	if shard == nil {
 		return m.persistence.DeleteCommunityShard(community.ID())
@@ -1588,7 +1607,7 @@ func (m *Manager) updateShard(community *Community, shard *shard.Shard, clock ui
 	return m.persistence.SaveCommunityShard(community.ID(), shard, clock)
 }
 
-func (m *Manager) UpdateShard(community *Community, shard *shard.Shard, clock uint64) error {
+func (m *Manager) UpdateShard(community *Community, shard *wakuv2.Shard, clock uint64) error {
 	m.communityLock.Lock(community.ID())
 	defer m.communityLock.Unlock(community.ID())
 
@@ -1596,7 +1615,7 @@ func (m *Manager) UpdateShard(community *Community, shard *shard.Shard, clock ui
 }
 
 // SetShard assigns a shard to a community
-func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Community, error) {
+func (m *Manager) SetShard(communityID types.HexBytes, shard *wakuv2.Shard) (*Community, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -1622,10 +1641,10 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *shard.Shard) (*Com
 
 func (m *Manager) UpdatePubsubTopicPrivateKey(topic string, privKey *ecdsa.PrivateKey) error {
 	if privKey != nil {
-		return m.transport.StorePubsubTopicKey(topic, privKey)
+		return m.messaging.StorePubsubTopicKey(topic, privKey)
 	}
 
-	return m.transport.RemovePubsubTopicKey(topic)
+	return m.messaging.RemovePubsubTopicKey(topic)
 }
 
 // Managing the version of community images is necessary because image URLs are "constant"
@@ -1724,7 +1743,7 @@ func (m *Manager) RemovePrivateKey(id types.HexBytes) (*Community, error) {
 	}
 
 	community.config.PrivateKey = nil
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return community, err
 	}
@@ -1801,7 +1820,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 	}
 
 	community.Join()
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -2035,7 +2054,7 @@ func (m *Manager) EditChatFirstMessageTimestamp(communityID types.HexBytes, chat
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -2209,11 +2228,11 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		if err != nil {
 			return nil, err
 		}
-		var cShard *shard.Shard
+		var cShard *wakuv2.Shard
 		if communityShard == nil {
-			cShard = &shard.Shard{Cluster: shard.MainStatusShardCluster, Index: shard.DefaultShardIndex}
+			cShard = &wakuv2.Shard{Cluster: wakuv2.MainStatusShardCluster, Index: wakuv2.DefaultShardIndex}
 		} else {
-			cShard = shard.FromProtobuff(communityShard)
+			cShard = wakuv2.FromProtobuff(communityShard)
 		}
 		config := Config{
 			CommunityDescription:                processedDescription,
@@ -2398,7 +2417,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		changes.ShouldMemberJoin = true
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -2485,7 +2504,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 			}
 		}
 
-		err = m.persistence.SaveCommunity(community)
+		err = m.SaveCommunity(community)
 		if err != nil {
 			return nil, err
 		}
@@ -2497,7 +2516,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 
 		m.publish(&Subscription{Community: community})
 	} else {
-		err = m.persistence.SaveCommunity(community)
+		err = m.SaveCommunity(community)
 		if err != nil {
 			return nil, err
 		}
@@ -3136,12 +3155,12 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 	if community.IsControlNode() {
 		// verify if revealed addresses indeed belong to requester
 		for _, revealedAccount := range request.RevealedAccounts {
-			recoverParams := account.RecoverParams{
+			recoverParams := personal.RecoverParams{
 				Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
 				Signature: types.EncodeHex(revealedAccount.Signature),
 			}
 
-			matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
+			matching, err := m.signer.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -3223,12 +3242,12 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 	community.UpdateMemberLastUpdateClock(publicKey, request.Clock)
 	// verify if revealed addresses indeed belong to requester
 	for _, revealedAccount := range request.RevealedAccounts {
-		recoverParams := account.RecoverParams{
+		recoverParams := personal.RecoverParams{
 			Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID())),
 			Signature: types.EncodeHex(revealedAccount.Signature),
 		}
 
-		matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
+		matching, err := m.signer.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
 		if err != nil {
 			return err
 		}
@@ -3243,7 +3262,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 		return err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return err
 	}
@@ -3648,7 +3667,7 @@ func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, 
 		return community, ErrOrgAlreadyJoined
 	}
 	community.Join()
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -3664,7 +3683,7 @@ func (m *Manager) SpectateCommunity(id types.HexBytes) (*Community, error) {
 		return nil, err
 	}
 	community.Spectate()
-	if err = m.persistence.SaveCommunity(community); err != nil {
+	if err = m.SaveCommunity(community); err != nil {
 		return nil, err
 	}
 	return community, nil
@@ -3704,7 +3723,7 @@ func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID t
 		return err
 	}
 	community.config.CommunityDescription.ArchiveMagnetlinkClock = clock
-	return m.persistence.SaveCommunity(community)
+	return m.SaveCommunity(community)
 }
 
 func (m *Manager) UpdateMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
@@ -3731,7 +3750,7 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	community.RemoveOurselvesFromOrg(&m.identity.PublicKey)
 	community.Leave()
 
-	if err = m.persistence.SaveCommunity(community); err != nil {
+	if err = m.SaveCommunity(community); err != nil {
 		return nil, err
 	}
 
@@ -3754,7 +3773,7 @@ func (m *Manager) KickedOutOfCommunity(id types.HexBytes, spectateMode bool) (*C
 		community.Spectate()
 	}
 
-	if err = m.persistence.SaveCommunity(community); err != nil {
+	if err = m.SaveCommunity(community); err != nil {
 		return nil, err
 	}
 
@@ -3775,7 +3794,7 @@ func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecds
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -3858,7 +3877,7 @@ func (m *Manager) AddRoleToMember(request *requests.AddRoleToMember) (*Community
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -3892,7 +3911,7 @@ func (m *Manager) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -3955,9 +3974,9 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 			}
 		}
 
-		if m.transport != nil && m.transport.WakuVersion() == 2 {
+		if m.messaging != nil {
 			topic := community.PubsubTopic()
-			privKey, err := m.transport.RetrievePubsubTopicKey(topic)
+			privKey, err := m.messaging.RetrievePubsubTopicKey(topic)
 			if err != nil {
 				return err
 			}
@@ -3990,6 +4009,10 @@ func (m *Manager) GetByID(id []byte) (*Community, error) {
 	return community, nil
 }
 
+func (m *Manager) GetByIDReadonly(id []byte) (ReadonlyCommunity, error) {
+	return m.GetByIDStringReadonly(types.EncodeHex(id))
+}
+
 func (m *Manager) GetByIDString(idString string) (*Community, error) {
 	id, err := types.DecodeHex(idString)
 	if err != nil {
@@ -3998,11 +4021,26 @@ func (m *Manager) GetByIDString(idString string) (*Community, error) {
 	return m.GetByID(id)
 }
 
-func (m *Manager) GetCommunityShard(communityID types.HexBytes) (*shard.Shard, error) {
+func (m *Manager) GetByIDStringReadonly(idString string) (ReadonlyCommunity, error) {
+	cached := m.cache.Get(idString)
+	if cached != nil {
+		return cached.Value(), nil
+	}
+
+	community, err := m.GetByIDString(idString)
+	if err != nil {
+		return nil, err
+	}
+	m.cache.Set(idString, ReadonlyCommunity(community), ttlcache.DefaultTTL)
+
+	return ReadonlyCommunity(community), err
+}
+
+func (m *Manager) GetCommunityShard(communityID types.HexBytes) (*wakuv2.Shard, error) {
 	return m.persistence.GetCommunityShard(communityID)
 }
 
-func (m *Manager) SaveCommunityShard(communityID types.HexBytes, shard *shard.Shard, clock uint64) error {
+func (m *Manager) SaveCommunityShard(communityID types.HexBytes, shard *wakuv2.Shard, clock uint64) error {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -4127,7 +4165,7 @@ func (m *Manager) RequestsToJoinForCommunityAwaitingAddresses(id types.HexBytes)
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error) {
-	community, err := m.GetByIDString(communityID)
+	community, err := m.GetByIDStringReadonly(communityID)
 	if err != nil {
 		return false, err
 	}
@@ -4293,15 +4331,15 @@ func (m *Manager) GetOwnedCommunitiesUniversalChatIDs() (map[string]bool, error)
 	return chatIDs, nil
 }
 
-func (m *Manager) StoreWakuMessage(message *wakutypes.Message) error {
+func (m *Manager) StoreWakuMessage(message *messagingtypes.ReceivedMessage) error {
 	return m.persistence.SaveWakuMessage(message)
 }
 
-func (m *Manager) StoreWakuMessages(messages []*wakutypes.Message) error {
+func (m *Manager) StoreWakuMessages(messages []*messagingtypes.ReceivedMessage) error {
 	return m.persistence.SaveWakuMessages(messages)
 }
 
-func (m *Manager) GetLatestWakuMessageTimestamp(topics []wakutypes.TopicType) (uint64, error) {
+func (m *Manager) GetLatestWakuMessageTimestamp(topics []messagingtypes.ContentTopic) (uint64, error) {
 	return m.persistence.GetLatestWakuMessageTimestamp(topics)
 }
 
@@ -4491,7 +4529,7 @@ func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembe
 	}
 
 	if updated {
-		if err = m.persistence.SaveCommunity(community); err != nil {
+		if err = m.SaveCommunity(community); err != nil {
 			return err
 		}
 
@@ -4540,7 +4578,7 @@ func (m *Manager) SaveAndPublish(community *Community) error {
 }
 
 func (m *Manager) saveAndPublish(community *Community) error {
-	err := m.persistence.SaveCommunity(community)
+	err := m.SaveCommunity(community)
 	if err != nil {
 		return err
 	}
@@ -4895,7 +4933,7 @@ func (m *Manager) handleCommunityEvents(community *Community) error {
 	community.config.EventsData = nil // clear events, they are already applied
 	community.increaseClock()
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return err
 	}
@@ -5034,6 +5072,7 @@ func (m *Manager) GetCommunityRequestsToJoinWithRevealedAddresses(communityID ty
 }
 
 func (m *Manager) SaveCommunity(community *Community) error {
+	m.cache.Delete(community.IDString())
 	return m.persistence.SaveCommunity(community)
 }
 

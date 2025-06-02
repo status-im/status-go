@@ -34,7 +34,7 @@ func (p *MoonPayProvider) GetCryptoOnRamp(ctx context.Context) (CryptoOnRamp, er
 		Hostname:                  "moonpay.com",
 		SupportsSinglePurchase:    true,
 		SupportsRecurrentPurchase: false,
-		SupportedChainIDs:         []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet},
+		SupportedChainIDs:         []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
 		URLsNeedParameters:        false,
 		SiteURL:                   moonpayURL,
 	}

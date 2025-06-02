@@ -13,11 +13,10 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/transport"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/signal"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -108,14 +107,14 @@ func (s *MessengerMessagesTrackingSuite) TearDownTest() {
 
 	}
 	if s.bobWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.bobWaku).Stop())
+		s.Require().NoError(s.bobWaku.Stop())
 	}
 
 	if s.alice != nil {
 		TearDownMessenger(&s.Suite, s.alice)
 	}
 	if s.aliceWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.aliceWaku).Stop())
+		s.Require().NoError(s.aliceWaku.Stop())
 	}
 
 	_ = s.logger.Sync()
@@ -125,25 +124,23 @@ func (s *MessengerMessagesTrackingSuite) newMessenger(waku wakutypes.Waku, logge
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	envelopesMonitorConfig := &transport.EnvelopesMonitorConfig{
-		EnvelopeEventsHandler:            EnvelopeSignalHandlerMock{},
-		MaxAttempts:                      1,
-		AwaitOnlyMailServerConfirmations: false,
-		IsMailserver:                     func(peer types.EnodeID) bool { return false },
-		Logger:                           s.logger,
+	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
+		EnvelopeEventsHandler:      EnvelopeSignalHandlerMock{},
+		MaxMessageDeliveryAttempts: 1,
+		MailServerConfirmations:    false,
 	}
 
-	messenger, err := newMessengerWithKey(waku, privateKey, s.logger, []Option{WithEnvelopesMonitorConfig(envelopesMonitorConfig)})
+	messenger, err := newMessengerWithKey(waku, privateKey, s.logger, []Option{WithEnvelopeEventsConfig(envelopeEventsConfig)})
 	s.Require().NoError(err)
 
 	interceptor := &EnvelopeEventsInterceptorMock{
 		EnvelopeEventsInterceptor: EnvelopeEventsInterceptor{
-			EnvelopeEventsHandler: envelopesMonitorConfig.EnvelopeEventsHandler,
+			EnvelopeEventsHandler: envelopeEventsConfig.EnvelopeEventsHandler,
 			Messenger:             messenger,
 		},
 	}
 
-	err = messenger.transport.SetEnvelopeEventsHandler(interceptor)
+	err = messenger.messaging.SetEnvelopeEventsHandler(interceptor)
 	s.Require().NoError(err)
 
 	return messenger, interceptor

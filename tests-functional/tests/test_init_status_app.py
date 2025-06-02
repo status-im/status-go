@@ -1,5 +1,4 @@
-from resources.constants import USER_DIR
-from test_cases import StatusBackend
+from clients.status_backend import StatusBackend
 import pytest
 from clients.signals import SignalType
 import os
@@ -55,26 +54,28 @@ def assert_file_first_line(path, pattern: str, expected: bool):
 
 @pytest.mark.rpc
 @pytest.mark.init
-@pytest.mark.parametrize("log_enabled,api_logging_enabled", [(True, True), (False, False)])
+@pytest.mark.parametrize("log_enabled,api_logging_enabled", [(False, False), (True, True)])
 def test_check_logs(log_enabled: bool, api_logging_enabled: bool):
-    data_dir = os.path.join(USER_DIR, "data")
-    logs_dir = os.path.join(USER_DIR, "logs")
-
     backend = StatusBackend()
+
+    data_dir = os.path.join(backend.data_dir, "data")
+    logs_dir = os.path.join(backend.data_dir, "logs")
+
     backend.api_valid_request(
         "InitializeApplication",
         {
             "dataDir": str(data_dir),
             "logDir": str(logs_dir),
             "logEnabled": log_enabled,
+            "logLevel": "INFO",
             "apiLoggingEnabled": api_logging_enabled,
         },
     )
 
-    local_geth_log = backend.extract_data(os.path.join(logs_dir, "geth.log"))
+    pre_login_log = backend.extract_data(os.path.join(logs_dir, "pre_login.log"))
     local_api_log = backend.extract_data(os.path.join(logs_dir, "api.log"))
 
-    assert_file_first_line(path=local_geth_log, pattern="logging initialised", expected=log_enabled)
+    assert_file_first_line(path=pre_login_log, pattern="logging initialised", expected=log_enabled)
 
     assert_file_first_line(
         path=local_api_log,

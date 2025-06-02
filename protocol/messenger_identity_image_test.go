@@ -21,9 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -45,17 +43,14 @@ type MessengerProfilePictureHandlerSuite struct {
 func (s *MessengerProfilePictureHandlerSuite) SetupSuite() {
 	s.logger = tt.MustCreateTestLogger()
 
-	// Setup Waku things
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	wakuLogger := s.logger.Named("Waku")
-	shh := wakuv1.New(&config, wakuLogger)
-	s.shh = bridge.NewGethWakuWrapper(shh)
+	shh, err := newTestWakuNode(s.logger.Named("Waku"))
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 }
 
 func (s *MessengerProfilePictureHandlerSuite) TearDownSuite() {
-	_ = bridge.GetGethWakuFrom(s.shh).Stop()
+	_ = s.shh.Stop()
 	_ = s.logger.Sync()
 }
 
@@ -219,7 +214,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided()
 	err = s.alice.settings.SaveSettingField(settings.ProfilePicturesVisibility, settings.ProfilePicturesShowToEveryone)
 	s.Require().NoError(err)
 
-	bChat := CreateOneToOneChat(s.alice.IdentityPublicKeyString(), s.alice.IdentityPublicKey(), s.alice.transport)
+	bChat := CreateOneToOneChat(s.alice.IdentityPublicKeyString(), s.alice.IdentityPublicKey(), s.alice.getTimesource())
 	err = s.bob.SaveChat(bChat)
 	s.Require().NoError(err)
 
@@ -300,8 +295,6 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 			}
 		}
 	}
-
-	s.SetupTest()
 }
 
 func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePicture(args *e2eArgs) {
@@ -343,14 +336,14 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	switch args.chatContext {
 	case publicChat:
 		// Bob opens up the public chat and joins it
-		bChat := CreatePublicChat("status", alice.transport)
+		bChat := CreatePublicChat("status", alice.getTimesource())
 		err = bob.SaveChat(bChat)
 		s.Require().NoError(err)
 
 		_, err = bob.Join(bChat)
 		s.Require().NoError(err)
 	case privateChat:
-		bChat := CreateOneToOneChat(alice.IdentityPublicKeyString(), alice.IdentityPublicKey(), alice.transport)
+		bChat := CreateOneToOneChat(alice.IdentityPublicKeyString(), alice.IdentityPublicKey(), alice.getTimesource())
 		err = bob.SaveChat(bChat)
 		s.Require().NoError(err)
 
@@ -376,7 +369,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	switch args.chatContext {
 	case publicChat:
 		// Alice opens creates a public chat
-		aChat = CreatePublicChat("status", alice.transport)
+		aChat = CreatePublicChat("status", alice.getTimesource())
 		err = alice.SaveChat(aChat)
 		s.Require().NoError(err)
 
@@ -388,7 +381,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		s.Require().Len(response.messages, 1)
 
 	case privateChat:
-		aChat = CreateOneToOneChat(bob.IdentityPublicKeyString(), bob.IdentityPublicKey(), bob.transport)
+		aChat = CreateOneToOneChat(bob.IdentityPublicKeyString(), bob.IdentityPublicKey(), bob.getTimesource())
 		err = alice.SaveChat(aChat)
 		s.Require().NoError(err)
 

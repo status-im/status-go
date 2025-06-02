@@ -5,8 +5,7 @@ import (
 )
 
 type Database struct {
-	db      *sql.DB
-	network uint64
+	db *sql.DB
 }
 
 type NotificationPreference struct {
@@ -16,8 +15,8 @@ type NotificationPreference struct {
 	Identifier string `json:"identifier,omitempty"`
 }
 
-func NewDB(db *sql.DB, network uint64) *Database {
-	return &Database{db: db, network: network}
+func NewDB(db *sql.DB) *Database {
+	return &Database{db: db}
 }
 
 func (db *Database) GetPreferences() (rst []NotificationPreference, err error) {
@@ -37,17 +36,7 @@ func (db *Database) GetPreferences() (rst []NotificationPreference, err error) {
 	return rst, nil
 }
 
-func (db *Database) GetWalletPreference() (rst NotificationPreference, err error) {
-	pref := db.db.QueryRow("SELECT service, event, identifier, enabled FROM local_notifications_preferences WHERE service = 'wallet' AND event = 'transaction' AND identifier = 'all'")
-
-	err = pref.Scan(&rst.Service, &rst.Event, &rst.Identifier, &rst.Enabled)
-	if err == sql.ErrNoRows {
-		return rst, nil
-	}
-	return
-}
-
-func (db *Database) ChangeWalletPreference(preference bool) error {
-	_, err := db.db.Exec("INSERT OR REPLACE INTO local_notifications_preferences (service, event, identifier, enabled) VALUES ('wallet', 'transaction', 'all', ?)", preference)
+func (db *Database) ChangePreference(p NotificationPreference) error {
+	_, err := db.db.Exec("INSERT OR REPLACE INTO local_notifications_preferences (enabled, service, event, identifier) VALUES (?, ?, ?, ?)", p.Enabled, p.Service, p.Event, p.Identifier)
 	return err
 }

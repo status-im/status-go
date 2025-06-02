@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -65,7 +66,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 
 		replacedText, err := m.mentionsManager.ReplaceWithPublicKey(message.ChatId, request.Text)
 		if err != nil {
-			m.logger.Error("failed to replace text with public key", zap.String("chatID", message.ChatId), zap.String("text", request.Text))
+			m.logger.Error("failed to replace text with public key", zap.String("chatID", gocommon.TruncateWithDot(message.ChatId)), zap.Error(err))
 			// use original text as fallback
 			replacedText = request.Text
 		}
@@ -144,7 +145,7 @@ func (m *Messenger) CanDeleteMessageForEveryoneInCommunity(communityID string, p
 	if communityID != "" {
 		community, err := m.communitiesManager.GetByIDString(communityID)
 		if err != nil {
-			m.logger.Error("failed to find community", zap.String("communityID", communityID), zap.Error(err))
+			m.logger.Error("failed to find community", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 			return false
 		}
 		return community.CanDeleteMessageForEveryone(publicKey)
@@ -155,7 +156,7 @@ func (m *Messenger) CanDeleteMessageForEveryoneInCommunity(communityID string, p
 func (m *Messenger) CanDeleteMessageForEveryoneInPrivateGroupChat(chat *Chat, publicKey *ecdsa.PublicKey) bool {
 	group, err := newProtocolGroupFromChat(chat)
 	if err != nil {
-		m.logger.Error("failed to find group", zap.String("chatID", chat.ID), zap.Error(err))
+		m.logger.Error("failed to find group", zap.String("chatID", gocommon.TruncateWithDot(chat.ID)), zap.Error(err))
 		return false
 	}
 	admins := group.Admins()

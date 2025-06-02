@@ -1,14 +1,15 @@
 package currency
 
 import (
-	"errors"
 	"math"
 	"strings"
+
+	"go.uber.org/zap"
 
 	iso4217 "github.com/ladydascalie/currency"
 
 	"github.com/status-im/status-go/services/wallet/market"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 const decimalsCalculationCurrency = "USD"
@@ -26,11 +27,13 @@ type FormatPerSymbol = map[string]Format
 
 type Currency struct {
 	marketManager *market.Manager
+	logger        *zap.Logger
 }
 
-func NewCurrency(marketManager *market.Manager) *Currency {
+func NewCurrency(marketManager *market.Manager, logger *zap.Logger) *Currency {
 	return &Currency{
 		marketManager: marketManager,
+		logger:        logger,
 	}
 }
 
@@ -87,17 +90,6 @@ func calculateTokenDisplayDecimals(price float64) uint {
 }
 
 func (cm *Currency) calculateTokenCurrencyFormat(symbol string, price float64) (*Format, error) {
-	pegSymbol := token.GetTokenPegSymbol(symbol)
-
-	if pegSymbol != "" {
-		var currencyFormat, err = calculateFiatCurrencyFormat(pegSymbol)
-		if err != nil {
-			return nil, err
-		}
-		currencyFormat.Symbol = symbol
-		return currencyFormat, nil
-	}
-
 	currencyFormat := &Format{
 		Symbol:              symbol,
 		DisplayDecimals:     calculateTokenDisplayDecimals(price),
@@ -122,29 +114,57 @@ func GetFiatCurrencyFormats(symbols []string) (FormatPerSymbol, error) {
 	return formats, nil
 }
 
-func (cm *Currency) FetchTokenCurrencyFormats(symbols []string) (FormatPerSymbol, error) {
+func (cm *Currency) FetchTokenCurrencyFormats(tokens []*tokentypes.Token) (FormatPerSymbol, error) {
 	formats := make(FormatPerSymbol)
 
-	// Get latest cached price, fetch only if not available
-	prices, err := cm.marketManager.GetOrFetchPrices(symbols, []string{decimalsCalculationCurrency}, math.MaxInt64)
-	if err != nil {
-		return nil, err
+	peggedTokens := make(map[string]*tokentypes.Token, 0)
+	nonPeggedTokens := make(map[string]*tokentypes.Token, 0)
+
+	for _, token := range tokens {
+		if token.PegSymbol != "" {
+			peggedTokens[token.Symbol] = token
+		} else {
+			nonPeggedTokens[token.Symbol] = token
+		}
 	}
 
-	for _, symbol := range symbols {
-		priceData, ok := prices[symbol][decimalsCalculationCurrency]
+	for _, token := range peggedTokens {
+		var currencyFormat, err = calculateFiatCurrencyFormat(token.PegSymbol)
+		if err != nil {
+			cm.logger.Error("Failed to calculate fiat currency format for pegged token", zap.Error(err))
+			continue
+		}
+		currencyFormat.Symbol = token.Symbol
+		formats[token.Symbol] = *currencyFormat
+	}
 
-		if !ok {
-			return nil, errors.New("Could not get price for: " + symbol)
+	if len(nonPeggedTokens) > 0 {
+		symbols := make([]string, 0, len(nonPeggedTokens))
+		for symbol := range nonPeggedTokens {
+			symbols = append(symbols, symbol)
 		}
 
-		format, err := cm.calculateTokenCurrencyFormat(symbol, priceData.Price)
-
+		// Get latest cached price, fetch only if not available
+		prices, err := cm.marketManager.GetOrFetchPrices(symbols, []string{decimalsCalculationCurrency}, math.MaxInt64)
 		if err != nil {
 			return nil, err
 		}
 
-		formats[symbol] = *format
+		for _, symbol := range symbols {
+			priceData, ok := prices[symbol][decimalsCalculationCurrency]
+
+			if !ok {
+				cm.logger.Error("Could not get price for: " + symbol)
+				continue
+			}
+
+			format, err := cm.calculateTokenCurrencyFormat(symbol, priceData.Price)
+			if err != nil {
+				return nil, err
+			}
+
+			formats[symbol] = *format
+		}
 	}
 
 	return formats, nil

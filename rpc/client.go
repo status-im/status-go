@@ -5,14 +5,10 @@ package rpc
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/url"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 
@@ -21,11 +17,12 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/ethereum/go-ethereum/event"
+
 	appCommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"
-	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
@@ -106,14 +103,16 @@ type Client struct {
 
 	healthMgr          *healthmanager.BlockchainHealthManager
 	stopMonitoringFunc context.CancelFunc
+	accountsFeed       *event.Feed
 	walletFeed         *event.Feed
+	settingsFeed       *event.Feed
+	networksFeed       *event.Feed
 
 	handlersMx sync.RWMutex       // mx guards handlers
 	handlers   map[string]Handler // locally registered handlers
 	logger     *zap.Logger
 
-	walletNotifier  func(chainID uint64, message string)
-	providerConfigs []params.ProviderConfig
+	walletNotifier func(chainID uint64, message string)
 }
 
 // Is initialized in a build-tag-dependent module
@@ -125,8 +124,10 @@ type ClientConfig struct {
 	UpstreamChainID uint64
 	Networks        []params.Network
 	DB              *sql.DB
+	AccountsFeed    *event.Feed
 	WalletFeed      *event.Feed
-	ProviderConfigs []params.ProviderConfig
+	SettingsFeed    *event.Feed
+	NetworksFeed    *event.Feed
 }
 
 // NewClient initializes Client
@@ -134,17 +135,16 @@ type ClientConfig struct {
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
 func NewClient(config ClientConfig) (*Client, error) {
-	var err error
-
 	logger := logutils.ZapLogger().Named("rpcClient")
-	networkManager := network.NewManager(config.DB)
+	networkManager := network.NewManager(config.DB, config.AccountsFeed, config.SettingsFeed, config.NetworksFeed)
 	if networkManager == nil {
 		return nil, errors.New("failed to create network manager")
 	}
 
-	err = networkManager.Init(config.Networks)
+	err := networkManager.InitEmbeddedNetworks(config.Networks)
 	if err != nil {
 		logger.Error("Network manager failed to initialize", zap.Error(err))
+		return nil, err
 	}
 
 	c := Client{
@@ -154,9 +154,11 @@ func NewClient(config ClientConfig) (*Client, error) {
 		rpcClients:         make(map[uint64]chain.ClientInterface),
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		logger:             logger,
-		providerConfigs:    config.ProviderConfigs,
 		healthMgr:          healthmanager.NewBlockchainHealthManager(),
+		accountsFeed:       config.AccountsFeed,
 		walletFeed:         config.WalletFeed,
+		settingsFeed:       config.SettingsFeed,
+		networksFeed:       config.NetworksFeed,
 	}
 
 	c.UpstreamChainID = config.UpstreamChainID
@@ -170,6 +172,8 @@ func NewClient(config ClientConfig) (*Client, error) {
 }
 
 func (c *Client) Start(ctx context.Context) {
+	c.NetworkManager.Start()
+
 	if c.stopMonitoringFunc != nil {
 		c.logger.Warn("Blockchain health manager already started")
 		return
@@ -182,6 +186,8 @@ func (c *Client) Start(ctx context.Context) {
 }
 
 func (c *Client) Stop() {
+	c.NetworkManager.Stop()
+
 	c.healthMgr.Stop()
 	if c.stopMonitoringFunc == nil {
 		return
@@ -221,32 +227,16 @@ func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
 	}
 }
 
+func (c *Client) GetHealthManagerFullStatus() healthmanager.BlockchainFullStatus {
+	return c.healthMgr.GetFullStatus()
+}
+
 func (c *Client) GetNetworkManager() *network.Manager {
 	return c.NetworkManager
 }
 
 func (c *Client) SetWalletNotifier(notifier func(chainID uint64, message string)) {
 	c.walletNotifier = notifier
-}
-
-func extractHostFromURL(inputURL string) (string, error) {
-	parsedURL, err := url.Parse(inputURL)
-	if err != nil {
-		return "", err
-	}
-
-	return parsedURL.Host, nil
-}
-
-func (c *Client) getRPCRpsLimiter(key string) (*rpclimiter.RPCRpsLimiter, error) {
-	c.rpsLimiterMutex.Lock()
-	defer c.rpsLimiterMutex.Unlock()
-	if limiter, ok := c.limiterPerProvider[key]; ok {
-		return limiter, nil
-	}
-	limiter := rpclimiter.NewRPCRpsLimiter()
-	c.limiterPerProvider[key] = limiter
-	return limiter, nil
 }
 
 func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, error) {
@@ -266,7 +256,7 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 
 	ethClients := c.getEthClients(network)
 	if len(ethClients) == 0 {
-		return nil, fmt.Errorf("could not find any RPC URL for chain: %d", chainID)
+		return nil, fmt.Errorf("could not find any enabled RPC providers for chain: %d", chainID)
 	}
 
 	phm := healthmanager.NewProvidersHealthManager(chainID)
@@ -281,51 +271,55 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 	return client, nil
 }
 
+func (c *Client) getProviderRPCLimiter(provider params.RpcProvider) (*rpclimiter.RPCRpsLimiter, string, error) {
+	c.rpsLimiterMutex.Lock()
+	defer c.rpsLimiterMutex.Unlock()
+	if !provider.EnableRPSLimiter {
+		return nil, "", nil
+	}
+	// Generate a unique key for the provider based on its host
+	limiterKey := provider.GetHost()
+
+	// Check if the limiter already exists
+	if limiter, ok := c.limiterPerProvider[limiterKey]; ok {
+		return limiter, limiterKey, nil
+	}
+
+	// Create a new limiter and store it
+	limiter := rpclimiter.NewRPCRpsLimiter()
+	c.limiterPerProvider[limiterKey] = limiter
+	return limiter, limiterKey, nil
+}
+
 func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEthClientInterface {
-	ethClients := make([]ethclient.RPSLimitedEthClientInterface, 0)
+	var ethClients []ethclient.RPSLimitedEthClientInterface
 
-	providers := c.prepareProviders(network)
-	for index, provider := range providers {
-		var rpcClient *gethrpc.Client
-		var rpcLimiter *rpclimiter.RPCRpsLimiter
-		var err error
-		var hostPort string
-
-		if len(provider.URL) > 0 {
-			// For now, we only support auth for status-proxy.
-			var opts []gethrpc.ClientOption
-			if provider.authenticationNeeded() {
-				authEncoded := base64.StdEncoding.EncodeToString([]byte(provider.Auth))
-				opts = append(opts,
-					gethrpc.WithHeaders(http.Header{
-						"Authorization": {"Basic " + authEncoded},
-						"User-Agent":    {rpcUserAgentName},
-					}),
-				)
-			}
-
-			rpcClient, err = gethrpc.DialOptions(context.Background(), provider.URL, opts...)
-			if err != nil {
-				c.logger.Error("dial server "+provider.Key, zap.Error(err))
-			}
-
-			// If using the status-proxy, consider each endpoint as a separate provider
-			circuitKey := fmt.Sprintf("%s-%d", provider.Key, index)
-			// Otherwise host is good enough
-			if !strings.Contains(provider.URL, "status.im") {
-				hostPort, err = extractHostFromURL(provider.URL)
-				if err == nil {
-					circuitKey = hostPort
-				}
-			}
-
-			rpcLimiter, err = c.getRPCRpsLimiter(circuitKey)
-			if err != nil {
-				c.logger.Error("get RPC limiter "+provider.Key, zap.Error(err))
-			}
-
-			ethClients = append(ethClients, ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, circuitKey))
+	// Iterate over providers in order
+	for _, provider := range network.RpcProviders {
+		// Skip disabled providers
+		if !provider.Enabled {
+			continue
 		}
+
+		rpcClient, err := chain.CreateEthClientFromProvider(provider, rpcUserAgentName)
+		if err != nil {
+			c.logger.Error("create eth client failed", zap.String("provider", provider.Name), zap.Error(err))
+			continue
+		}
+		if rpcClient == nil {
+			// Provider is disabled
+			continue
+		}
+
+		rpcLimiter, limiterKey, err := c.getProviderRPCLimiter(provider)
+		if err != nil {
+			c.logger.Error("get RPC limiter failed", zap.String("provider", provider.Name), zap.Error(err))
+			continue
+		}
+
+		// Create ethclient with RPS limiter. If limiter is not enabled, it will be nil
+		ethClient := ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, limiterKey, provider.Name)
+		ethClients = append(ethClients, ethClient)
 	}
 
 	return ethClients

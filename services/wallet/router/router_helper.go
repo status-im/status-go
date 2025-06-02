@@ -12,7 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/contracts"
-	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
+	gaspriceproxy "github.com/status-im/status-go/contracts/gas-price-proxy"
+	"github.com/status-im/status-go/contracts/hop"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/chain"
@@ -20,11 +21,13 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/market"
+	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
@@ -70,12 +73,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 	return true, params.AmountIn, nil
 }
 
-func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParams, approvalContractAddress *common.Address) (uint64, error) {
-	data, err := walletCommon.PackApprovalInputData(params.AmountIn, approvalContractAddress)
-	if err != nil {
-		return 0, err
-	}
-
+func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParams, input []byte) (uint64, error) {
 	ethClient, err := r.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, err
@@ -85,46 +83,36 @@ func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParam
 		From:  params.FromAddr,
 		To:    &params.FromToken.Address,
 		Value: walletCommon.ZeroBigIntValue(),
-		Data:  data,
+		Data:  input,
 	})
 }
 
-func (r *Router) calculateApprovalL1Fee(amountIn *big.Int, chainID uint64, approvalContractAddress *common.Address) (uint64, error) {
+func (r *Router) calculateL1Fee(chainID uint64, data []byte) (*big.Int, error) {
 	ethClient, err := r.rpcClient.EthClient(chainID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return CalculateApprovalL1Fee(amountIn, chainID, approvalContractAddress, ethClient)
+	return CalculateL1Fee(chainID, data, ethClient)
 }
 
-func CalculateApprovalL1Fee(amountIn *big.Int, chainID uint64, approvalContractAddress *common.Address, ethClient chain.ClientInterface) (uint64, error) {
-	data, err := walletCommon.PackApprovalInputData(amountIn, approvalContractAddress)
+func CalculateL1Fee(chainID uint64, data []byte, ethClient chain.ClientInterface) (*big.Int, error) {
+	oracleContractAddress, err := gaspriceproxy.ContractAddress(chainID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	var l1Fee uint64
-	oracleContractAddress, err := gaspriceoracle.ContractAddress(chainID)
-	if err == nil {
-		oracleContract, err := gaspriceoracle.NewGaspriceoracleCaller(oracleContractAddress, ethClient)
-		if err != nil {
-			return 0, err
-		}
-
-		callOpt := &bind.CallOpts{}
-
-		l1FeeResult, err := oracleContract.GetL1Fee(callOpt, data)
-		if err == nil {
-			l1Fee = l1FeeResult.Uint64()
-		}
+	proxyContract, err := gaspriceproxy.NewGaspriceproxy(oracleContractAddress, ethClient)
+	if err != nil {
+		return nil, err
 	}
 
-	// return 0 if we failed to get the fee
-	return l1Fee, nil
+	callOpt := &bind.CallOpts{}
+
+	return proxyContract.GetL1Fee(callOpt, data)
 }
 
-func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
+func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network, token *tokenTypes.Token, account common.Address) (*big.Int, error) {
 	tokenID, success := new(big.Int).SetString(token.Symbol, 10)
 	if !success {
 		return nil, errors.New("failed to convert token symbol to big.Int")
@@ -148,7 +136,7 @@ func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network,
 	return balances[0].Int, nil
 }
 
-func (r *Router) getBalance(ctx context.Context, chainID uint64, token *token.Token, account common.Address) (*big.Int, error) {
+func (r *Router) getBalance(ctx context.Context, chainID uint64, token *tokenTypes.Token, account common.Address) (*big.Int, error) {
 	client, err := r.rpcClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
@@ -157,7 +145,7 @@ func (r *Router) getBalance(ctx context.Context, chainID uint64, token *token.To
 	return r.tokenManager.GetBalance(ctx, client, account, token.Address)
 }
 
-func (r *Router) resolveNonceForPath(ctx context.Context, path *routes.Path, address common.Address, usedNonces map[uint64]uint64) error {
+func (r *Router) resolveSuggestedNonceForPath(ctx context.Context, path *routes.Path, address common.Address, usedNonces map[uint64]uint64) error {
 	var nextNonce uint64
 	if nonce, ok := usedNonces[path.FromChain.ChainID]; ok {
 		nextNonce = nonce + 1
@@ -171,114 +159,260 @@ func (r *Router) resolveNonceForPath(ctx context.Context, path *routes.Path, add
 
 	usedNonces[path.FromChain.ChainID] = nextNonce
 	if !path.ApprovalRequired {
-		path.TxNonce = (*hexutil.Uint64)(&nextNonce)
+		path.SuggestedTxNonce = (*hexutil.Uint64)(&nextNonce)
 	} else {
-		path.ApprovalTxNonce = (*hexutil.Uint64)(&nextNonce)
+		path.SuggestedApprovalTxNonce = (*hexutil.Uint64)(&nextNonce)
 		txNonce := nextNonce + 1
-		path.TxNonce = (*hexutil.Uint64)(&txNonce)
+		path.SuggestedTxNonce = (*hexutil.Uint64)(&txNonce)
 
 		usedNonces[path.FromChain.ChainID] = txNonce
 	}
 	return nil
 }
 
+// applyCustomFields applies custom fields to the path based on fetched fees and used nonces
 func (r *Router) applyCustomFields(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees, usedNonces map[uint64]uint64) error {
 	r.lastInputParamsMutex.Lock()
 	defer r.lastInputParamsMutex.Unlock()
 
-	// set network fields
-	if fetchedFees.CurrentBaseFee != nil {
-		path.CurrentBaseFee = (*hexutil.Big)(fetchedFees.CurrentBaseFee)
+	eipP1559EnabledChain := path.FromChain.EIP1559Enabled
+
+	if err := r.setSuggestedFields(ctx, path, fetchedFees, usedNonces, eipP1559EnabledChain); err != nil {
+		return err
 	}
-	if fetchedFees.MaxPriorityFeeSuggestedBounds != nil {
-		if fetchedFees.MaxPriorityFeeSuggestedBounds.Lower != nil {
-			path.SuggestedMinPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeeSuggestedBounds.Lower)
-		}
-		if fetchedFees.MaxPriorityFeeSuggestedBounds.Upper != nil {
-			path.SuggestedMaxPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeeSuggestedBounds.Upper)
+
+	if err := r.setPathFields(path, fetchedFees); err != nil {
+		return err
+	}
+
+	// Apply fee modes and custom parameters
+	if len(r.lastInputParams.PathTxCustomParams) == 0 {
+		return r.applyDefaultFeeModes(path, fetchedFees, eipP1559EnabledChain)
+	}
+	return r.applyCustomFeeModes(ctx, path, fetchedFees, eipP1559EnabledChain)
+}
+
+// setSuggestedFields sets suggested fee fields
+func (r *Router) setSuggestedFields(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees, usedNonces map[uint64]uint64, eipP1559EnabledChain bool) error {
+	if !eipP1559EnabledChain {
+		path.SuggestedNonEIP1559Fees = fetchedFees.NonEIP1559Fees
+	} else {
+		path.SuggestedLevelsForMaxFeesPerGas = fetchedFees.MaxFeesLevels
+		if fetchedFees.MaxPriorityFeeSuggestedBounds != nil {
+			if fetchedFees.MaxPriorityFeeSuggestedBounds.Lower != nil {
+				path.SuggestedMinPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeeSuggestedBounds.Lower)
+			}
+			if fetchedFees.MaxPriorityFeeSuggestedBounds.Upper != nil {
+				path.SuggestedMaxPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeeSuggestedBounds.Upper)
+			}
 		}
 	}
 
-	// set appropriate nonce/s, and update later in this function if custom nonce/s are provided
-	err := r.resolveNonceForPath(ctx, path, r.lastInputParams.AddrFrom, usedNonces)
+	return r.resolveSuggestedNonceForPath(ctx, path, r.lastInputParams.AddrFrom, usedNonces)
+}
+
+// setPathFields sets path fields
+func (r *Router) setPathFields(path *routes.Path, fetchedFees *fees.SuggestedFees) error {
+	if fetchedFees.CurrentBaseFee != nil {
+		path.CurrentBaseFee = (*hexutil.Big)(fetchedFees.CurrentBaseFee)
+	}
+
+	path.TxGasAmount = path.SuggestedTxGasAmount
+	path.ApprovalGasAmount = path.SuggestedApprovalGasAmount
+	path.TxNonce = path.SuggestedTxNonce
+	path.ApprovalTxNonce = path.SuggestedApprovalTxNonce
+
+	return nil
+}
+
+// applyDefaultFeeModes applies default fee modes to the path
+func (r *Router) applyDefaultFeeModes(path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool) error {
+	if !eipP1559EnabledChain {
+		return r.applyDefaultNonEIP1559Fees(path, fetchedFees)
+	}
+	return r.applyDefaultEIP1559Fees(path, fetchedFees)
+}
+
+// applyDefaultNonEIP1559Fees applies default non-EIP1559 fees
+func (r *Router) applyDefaultNonEIP1559Fees(path *routes.Path, fetchedFees *fees.SuggestedFees) error {
+	if path.ApprovalRequired {
+		path.ApprovalGasFeeMode = r.lastInputParams.GasFeeMode
+		path.ApprovalGasPrice = fetchedFees.NonEIP1559Fees.GasPrice
+		path.ApprovalEstimatedTime = fetchedFees.NonEIP1559Fees.EstimatedTime
+	}
+
+	path.TxGasFeeMode = r.lastInputParams.GasFeeMode
+	path.TxGasPrice = fetchedFees.NonEIP1559Fees.GasPrice
+	path.TxEstimatedTime = fetchedFees.NonEIP1559Fees.EstimatedTime
+	return nil
+}
+
+// applyDefaultEIP1559Fees applies default EIP1559 fees
+func (r *Router) applyDefaultEIP1559Fees(path *routes.Path, fetchedFees *fees.SuggestedFees) error {
+	maxFeesPerGas, priorityFee, estimatedTime, err := fetchedFees.FeeFor(r.lastInputParams.GasFeeMode)
 	if err != nil {
 		return err
 	}
 
-	if r.lastInputParams.PathTxCustomParams == nil || len(r.lastInputParams.PathTxCustomParams) == 0 {
-		// if no custom params are provided, use the initial fee mode
-		maxFeesPerGas, err := fetchedFees.FeeFor(r.lastInputParams.GasFeeMode)
-		if err != nil {
+	if path.ApprovalRequired {
+		path.ApprovalGasFeeMode = r.lastInputParams.GasFeeMode
+		path.ApprovalMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
+		path.ApprovalBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
+		path.ApprovalPriorityFee = (*hexutil.Big)(priorityFee)
+		path.ApprovalEstimatedTime = estimatedTime
+	}
+
+	path.TxGasFeeMode = r.lastInputParams.GasFeeMode
+	path.TxMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
+	path.TxBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
+	path.TxPriorityFee = (*hexutil.Big)(priorityFee)
+	path.TxEstimatedTime = estimatedTime
+	return nil
+}
+
+// applyCustomFeeModes applies custom fee modes to the path
+func (r *Router) applyCustomFeeModes(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool) error {
+	if path.ApprovalRequired {
+		if err := r.applyCustomApprovalFees(ctx, path, fetchedFees, eipP1559EnabledChain); err != nil {
 			return err
-		}
-		if path.ApprovalRequired {
-			path.ApprovalMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
-			path.ApprovalBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
-			path.ApprovalPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas)
-		}
-
-		path.TxMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
-		path.TxBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
-		path.TxPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas)
-	} else {
-		if path.ApprovalRequired {
-			approvalTxIdentityKey := path.TxIdentityKey(true)
-			if approvalTxCustomParams, ok := r.lastInputParams.PathTxCustomParams[approvalTxIdentityKey]; ok {
-				if approvalTxCustomParams.GasFeeMode != fees.GasFeeCustom {
-					maxFeesPerGas, err := fetchedFees.FeeFor(approvalTxCustomParams.GasFeeMode)
-					if err != nil {
-						return err
-					}
-					path.ApprovalMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
-					path.ApprovalBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
-					path.ApprovalPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas)
-				} else {
-					path.ApprovalTxNonce = (*hexutil.Uint64)(&approvalTxCustomParams.Nonce)
-					path.ApprovalGasAmount = approvalTxCustomParams.GasAmount
-					path.ApprovalMaxFeesPerGas = approvalTxCustomParams.MaxFeesPerGas
-					path.ApprovalBaseFee = (*hexutil.Big)(new(big.Int).Sub(approvalTxCustomParams.MaxFeesPerGas.ToInt(), approvalTxCustomParams.PriorityFee.ToInt()))
-					path.ApprovalPriorityFee = approvalTxCustomParams.PriorityFee
-				}
-			}
-		}
-
-		txIdentityKey := path.TxIdentityKey(false)
-		if txCustomParams, ok := r.lastInputParams.PathTxCustomParams[txIdentityKey]; ok {
-			if txCustomParams.GasFeeMode != fees.GasFeeCustom {
-				maxFeesPerGas, err := fetchedFees.FeeFor(txCustomParams.GasFeeMode)
-				if err != nil {
-					return err
-				}
-				path.TxMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
-				path.TxBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
-				path.TxPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas)
-			} else {
-				path.TxNonce = (*hexutil.Uint64)(&txCustomParams.Nonce)
-				path.TxGasAmount = txCustomParams.GasAmount
-				path.TxMaxFeesPerGas = txCustomParams.MaxFeesPerGas
-				path.TxBaseFee = (*hexutil.Big)(new(big.Int).Sub(txCustomParams.MaxFeesPerGas.ToInt(), txCustomParams.PriorityFee.ToInt()))
-				path.TxPriorityFee = txCustomParams.PriorityFee
-			}
 		}
 	}
 
+	return r.applyCustomTxFees(ctx, path, fetchedFees, eipP1559EnabledChain)
+}
+
+// applyCustomApprovalFees applies custom fees for approval transaction
+func (r *Router) applyCustomApprovalFees(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool) error {
+	approvalTxIdentityKey := path.TxIdentityKey(true)
+	approvalTxCustomParams, ok := r.lastInputParams.PathTxCustomParams[approvalTxIdentityKey]
+	if !ok {
+		return nil
+	}
+
+	path.ApprovalGasFeeMode = approvalTxCustomParams.GasFeeMode
+	if approvalTxCustomParams.GasFeeMode != fees.GasFeeCustom {
+		return r.applyNonCustomApprovalFees(path, fetchedFees, eipP1559EnabledChain, approvalTxCustomParams)
+	}
+	return r.applyCustomApprovalFeeMode(ctx, path, fetchedFees, eipP1559EnabledChain, approvalTxCustomParams)
+}
+
+// applyNonCustomApprovalFees applies non-custom fees for approval transaction
+func (r *Router) applyNonCustomApprovalFees(path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool, params *requests.PathTxCustomParams) error {
+	if !eipP1559EnabledChain {
+		path.ApprovalGasPrice = fetchedFees.NonEIP1559Fees.GasPrice
+		path.ApprovalEstimatedTime = fetchedFees.NonEIP1559Fees.EstimatedTime
+		return nil
+	}
+
+	maxFeesPerGas, priorityFee, estimatedTime, err := fetchedFees.FeeFor(params.GasFeeMode)
+	if err != nil {
+		return err
+	}
+
+	path.ApprovalMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
+	path.ApprovalBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
+	path.ApprovalPriorityFee = (*hexutil.Big)(priorityFee)
+	path.ApprovalEstimatedTime = estimatedTime
 	return nil
+}
+
+// applyCustomApprovalFeeMode applies custom fee mode for approval transaction
+func (r *Router) applyCustomApprovalFeeMode(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool, params *requests.PathTxCustomParams) error {
+	path.ApprovalTxNonce = (*hexutil.Uint64)(&params.Nonce)
+	path.ApprovalGasAmount = params.GasAmount
+
+	if !eipP1559EnabledChain {
+		path.ApprovalGasPrice = params.GasPrice
+		path.ApprovalEstimatedTime = r.feesManager.TransactionEstimatedTimeV2Legacy(ctx, path.FromChain.ChainID, path.ApprovalGasPrice.ToInt())
+		return nil
+	}
+
+	path.ApprovalMaxFeesPerGas = params.MaxFeesPerGas
+	path.ApprovalBaseFee = (*hexutil.Big)(new(big.Int).Sub(params.MaxFeesPerGas.ToInt(), params.PriorityFee.ToInt()))
+	path.ApprovalPriorityFee = params.PriorityFee
+	path.ApprovalEstimatedTime = r.feesManager.TransactionEstimatedTimeV2(ctx, path.FromChain.ChainID, path.ApprovalMaxFeesPerGas.ToInt(), path.ApprovalPriorityFee.ToInt())
+	return nil
+}
+
+// applyCustomTxFees applies custom fees for main transaction
+func (r *Router) applyCustomTxFees(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool) error {
+	txIdentityKey := path.TxIdentityKey(false)
+	txCustomParams, ok := r.lastInputParams.PathTxCustomParams[txIdentityKey]
+	if !ok {
+		return nil
+	}
+
+	path.TxGasFeeMode = txCustomParams.GasFeeMode
+	if txCustomParams.GasFeeMode != fees.GasFeeCustom {
+		return r.applyNonCustomTxFees(path, fetchedFees, eipP1559EnabledChain, txCustomParams)
+	}
+	return r.applyCustomTxFeeMode(ctx, path, fetchedFees, eipP1559EnabledChain, txCustomParams)
+}
+
+// applyNonCustomTxFees applies non-custom fees for main transaction
+func (r *Router) applyNonCustomTxFees(path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool, params *requests.PathTxCustomParams) error {
+	if !eipP1559EnabledChain {
+		path.TxGasPrice = fetchedFees.NonEIP1559Fees.GasPrice
+		path.TxEstimatedTime = fetchedFees.NonEIP1559Fees.EstimatedTime
+		return nil
+	}
+
+	maxFeesPerGas, priorityFee, estimatedTime, err := fetchedFees.FeeFor(params.GasFeeMode)
+	if err != nil {
+		return err
+	}
+
+	path.TxMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
+	path.TxBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
+	path.TxPriorityFee = (*hexutil.Big)(priorityFee)
+	path.TxEstimatedTime = estimatedTime
+	return nil
+}
+
+// applyCustomTxFeeMode applies custom fee mode for main transaction
+func (r *Router) applyCustomTxFeeMode(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool, params *requests.PathTxCustomParams) error {
+	path.TxNonce = (*hexutil.Uint64)(&params.Nonce)
+	path.TxGasAmount = params.GasAmount
+
+	if !eipP1559EnabledChain {
+		path.TxGasPrice = params.GasPrice
+		path.TxEstimatedTime = r.feesManager.TransactionEstimatedTimeV2Legacy(ctx, path.FromChain.ChainID, path.TxGasPrice.ToInt())
+		return nil
+	}
+
+	path.TxMaxFeesPerGas = params.MaxFeesPerGas
+	path.TxBaseFee = (*hexutil.Big)(new(big.Int).Sub(params.MaxFeesPerGas.ToInt(), params.PriorityFee.ToInt()))
+	path.TxPriorityFee = params.PriorityFee
+	path.TxEstimatedTime = r.feesManager.TransactionEstimatedTimeV2(ctx, path.FromChain.ChainID, path.TxMaxFeesPerGas.ToInt(), path.TxPriorityFee.ToInt())
+	return nil
+}
+
+func (r *Router) updatePathFields(path *routes.Path, fetchedFees *fees.SuggestedFees) {
+	path.FromChain.EIP1559Enabled = fetchedFees.EIP1559Enabled
+	path.FromChain.NoBaseFee = walletCommon.HasNoBaseFee(path.FromChain.ChainID)
+	path.FromChain.NoPriorityFee = walletCommon.HasNoPriorityFee(path.FromChain.ChainID)
 }
 
 func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees,
 	usedNonces map[uint64]uint64, testsMode bool, testApprovalL1Fee uint64) (err error) {
 
-	var (
-		l1ApprovalFee uint64
-	)
+	r.updatePathFields(path, fetchedFees)
+
+	l1TxFeeWei := big.NewInt(0)
+	l1ApprovalFeeWei := big.NewInt(0)
+
+	needL1Fee := path.FromChain.ChainID == walletCommon.OptimismMainnet ||
+		path.FromChain.ChainID == walletCommon.OptimismSepolia
+
 	if testsMode {
 		usedNonces[path.FromChain.ChainID] = usedNonces[path.FromChain.ChainID] + 1
 	}
-	if path.ApprovalRequired {
+
+	if path.ApprovalRequired && needL1Fee {
 		if testsMode {
-			l1ApprovalFee = testApprovalL1Fee
+			l1ApprovalFeeWei = big.NewInt(int64(testApprovalL1Fee))
 		} else {
-			l1ApprovalFee, err = r.calculateApprovalL1Fee(path.AmountIn.ToInt(), path.FromChain.ChainID, path.ApprovalContractAddress)
+			l1ApprovalFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.ApprovalPackedData)
 			if err != nil {
 				return err
 			}
@@ -290,38 +424,35 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 		return
 	}
 
-	// TODO: keep l1 fees at 0 until we have the correct algorithm, as we do base fee x 2 that should cover the l1 fees
-	var l1FeeWei uint64 = 0
-	// if input.SendType.needL1Fee() {
-	// 	txInputData, err := pProcessor.PackTxInputData(processorInputParams)
-	// 	if err != nil {
-	// 		continue
-	// 	}
-
-	// 	l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, txInputData)
-	// }
+	if needL1Fee {
+		if !testsMode {
+			l1TxFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.TxPackedData)
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	// calculate ETH fees
 	ethTotalFees := big.NewInt(0)
-	txFeeInWei := new(big.Int).Mul(path.TxMaxFeesPerGas.ToInt(), big.NewInt(int64(path.TxGasAmount)))
-	ethTotalFees.Add(ethTotalFees, txFeeInWei)
-
-	txL1FeeInWei := big.NewInt(0)
-	if l1FeeWei > 0 {
-		txL1FeeInWei = big.NewInt(int64(l1FeeWei))
-		ethTotalFees.Add(ethTotalFees, txL1FeeInWei)
+	var txFeeInWei *big.Int
+	if !path.FromChain.EIP1559Enabled {
+		txFeeInWei = new(big.Int).Mul(path.TxGasPrice.ToInt(), big.NewInt(int64(path.TxGasAmount)))
+	} else {
+		txFeeInWei = new(big.Int).Mul(path.TxMaxFeesPerGas.ToInt(), big.NewInt(int64(path.TxGasAmount)))
 	}
+	ethTotalFees.Add(ethTotalFees, txFeeInWei)
+	ethTotalFees.Add(ethTotalFees, l1TxFeeWei)
 
 	approvalFeeInWei := big.NewInt(0)
-	approvalL1FeeInWei := big.NewInt(0)
 	if path.ApprovalRequired {
-		approvalFeeInWei.Mul(path.ApprovalMaxFeesPerGas.ToInt(), big.NewInt(int64(path.ApprovalGasAmount)))
-		ethTotalFees.Add(ethTotalFees, approvalFeeInWei)
-
-		if l1ApprovalFee > 0 {
-			approvalL1FeeInWei = big.NewInt(int64(l1ApprovalFee))
-			ethTotalFees.Add(ethTotalFees, approvalL1FeeInWei)
+		if !path.FromChain.EIP1559Enabled {
+			approvalFeeInWei.Mul(path.ApprovalGasPrice.ToInt(), big.NewInt(int64(path.ApprovalGasAmount)))
+		} else {
+			approvalFeeInWei.Mul(path.ApprovalMaxFeesPerGas.ToInt(), big.NewInt(int64(path.ApprovalGasAmount)))
 		}
+		ethTotalFees.Add(ethTotalFees, approvalFeeInWei)
+		ethTotalFees.Add(ethTotalFees, l1ApprovalFeeWei)
 	}
 
 	// calculate required balances (bonder and token fees are already included in the amountIn by Hop bridge (once we include Celar we need to check how they handle the fees))
@@ -339,27 +470,16 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	}
 
 	// set the values
-	path.SuggestedLevelsForMaxFeesPerGas = fetchedFees.MaxFeesLevels
-
 	path.TxFee = (*hexutil.Big)(txFeeInWei)
-	path.TxL1Fee = (*hexutil.Big)(txL1FeeInWei)
+	path.TxL1Fee = (*hexutil.Big)(l1TxFeeWei)
 
 	path.ApprovalFee = (*hexutil.Big)(approvalFeeInWei)
-	path.ApprovalL1Fee = (*hexutil.Big)(approvalL1FeeInWei)
+	path.ApprovalL1Fee = (*hexutil.Big)(l1ApprovalFeeWei)
 
 	path.TxTotalFee = (*hexutil.Big)(ethTotalFees)
 
 	path.RequiredTokenBalance = requiredTokenBalance
 	path.RequiredNativeBalance = requiredNativeBalance
-
-	path.TxEstimatedTime = r.feesManager.TransactionEstimatedTime(ctx, path.FromChain.ChainID, path.TxMaxFeesPerGas.ToInt())
-	if path.ApprovalRequired {
-		if path.TxMaxFeesPerGas.ToInt().Cmp(path.ApprovalMaxFeesPerGas.ToInt()) == 0 {
-			path.ApprovalEstimatedTime = path.TxEstimatedTime
-		} else {
-			path.ApprovalEstimatedTime = r.feesManager.TransactionEstimatedTime(ctx, path.FromChain.ChainID, path.ApprovalMaxFeesPerGas.ToInt())
-		}
-	}
 
 	return
 }
@@ -376,9 +496,14 @@ func ParseCollectibleID(ID string) (contractAddress common.Address, tokenID *big
 	return
 }
 
-func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *token.Token {
+func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *tokenTypes.Token {
 	if !sendType.IsCollectiblesTransfer() {
 		return tokenManager.FindToken(network, tokenID)
+	}
+
+	if sendType.IsCommunityRelatedTransfer() {
+		// TODO: optimize tokens to handle community tokens
+		return nil
 	}
 
 	contractAddress, collectibleTokenID, success := ParseCollectibleID(tokenID)
@@ -390,7 +515,7 @@ func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collecti
 		return nil
 	}
 
-	return &token.Token{
+	return &tokenTypes.Token{
 		Address:  contractAddress,
 		Symbol:   collectibleTokenID.String(),
 		Decimals: 0,
@@ -399,12 +524,12 @@ func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collecti
 }
 
 func fetchPrices(sendType sendtype.SendType, marketManager *market.Manager, tokenIDs []string) (map[string]float64, error) {
-	nonUniqueSymbols := append(tokenIDs, "ETH")
+	nonUniqueSymbols := append(tokenIDs, "ETH", "BNB")
 	// remove duplicate enteries
 	slices.Sort(nonUniqueSymbols)
 	symbols := slices.Compact(nonUniqueSymbols)
 	if sendType.IsCollectiblesTransfer() {
-		symbols = []string{"ETH"}
+		symbols = []string{"ETH", "BNB"}
 	}
 
 	pricesMap, err := marketManager.GetOrFetchPrices(symbols, []string{"USD"}, market.MaxAgeInSecondsForFresh)
@@ -422,4 +547,18 @@ func fetchPrices(sendType sendtype.SendType, marketManager *market.Manager, toke
 		}
 	}
 	return prices, nil
+}
+
+func (r *Router) GetTokensAvailableForBridgeOnChain(chainID uint64) []*tokenTypes.Token {
+	symbols := hop.GetSymbolsAvailableOnChain(chainID)
+
+	tokens := make([]*tokenTypes.Token, 0)
+	for _, symbol := range symbols {
+		t, _ := r.tokenManager.LookupToken(&chainID, symbol)
+		if t == nil {
+			continue
+		}
+		tokens = append(tokens, t)
+	}
+	return tokens
 }

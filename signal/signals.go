@@ -17,8 +17,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/logutils/callog"
 	"github.com/status-im/status-go/logutils/requestlog"
-	"github.com/status-im/status-go/mobile/callog"
 )
 
 // MobileSignalHandler is a simple callback function that gets called when any signal is received

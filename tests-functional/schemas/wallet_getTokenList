@@ -39,9 +39,6 @@
                                         "symbol": {
                                             "type": "string"
                                         },
-                                        "tokenListId": {
-                                            "type": "string"
-                                        },
                                         "verified": {
                                             "type": "boolean"
                                         }
@@ -53,7 +50,6 @@
                                         "name",
                                         "pegSymbol",
                                         "symbol",
-                                        "tokenListId",
                                         "verified"
                                     ],
                                     "type": "object"

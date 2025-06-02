@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/afex/hystrix-go/hystrix"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -193,6 +195,17 @@ func IsServiceUnavailableError(err error) bool {
 		return statusCode == 503
 	}
 	return false
+}
+
+// IsTimeoutErr checks if the error is a timeout error.
+func IsTimeoutErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, hystrix.ErrTimeout) ||
+		strings.Contains(err.Error(), "timeout") ||
+		strings.Contains(err.Error(), "deadline exceeded")
 }
 
 // determineProviderErrorType determines the ProviderErrorType based on the error.

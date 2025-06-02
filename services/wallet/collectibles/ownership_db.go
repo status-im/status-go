@@ -1,5 +1,7 @@
 package collectibles
 
+//go:generate mockgen -package=mock_collectibles -source=ownership_db.go -destination=mock/ownership_db.go
+
 import (
 	"database/sql"
 	"fmt"
@@ -17,6 +19,21 @@ import (
 )
 
 const InvalidTimestamp = int64(-1)
+
+type OwnershipStorage interface {
+	GetOwnership(id thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error)
+	Update(chainID w_common.ChainID, ownerAddress common.Address, balances thirdparty.TokenBalancesPerContractAddress, timestamp int64) (removedIDs, updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID, err error)
+	SetTransferID(ownerAddress common.Address, id thirdparty.CollectibleUniqueID, transferID common.Hash) (bool, error)
+	GetTransferID(ownerAddress common.Address, id thirdparty.CollectibleUniqueID) (*common.Hash, error)
+	GetCollectiblesWithNoTransferID(account common.Address, chainID w_common.ChainID) ([]thirdparty.CollectibleUniqueID, error)
+	GetLatestOwnershipUpdateTimestamp(chainID w_common.ChainID) (int64, error)
+	GetOwnedCollectibles(chainIDs []w_common.ChainID, ownerAddresses []common.Address, offset int, limit int) ([]thirdparty.CollectibleUniqueID, error)
+	FetchCachedCollectibleOwnersByContractAddress(chainID w_common.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error)
+	GetOwnedCollectible(chainID w_common.ChainID, ownerAddresses common.Address, contractAddress common.Address, tokenID *big.Int) (*thirdparty.CollectibleUniqueID, error)
+	GetIsFirstOfCollection(onwerAddress common.Address, newIDs []thirdparty.CollectibleUniqueID) (map[thirdparty.CollectibleUniqueID]bool, error)
+	GetIDsNotInDB(ownerAddress common.Address, newIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleUniqueID, error)
+	GetOwnershipUpdateTimestamp(owner common.Address, chainID w_common.ChainID) (int64, error)
+}
 
 type OwnershipDB struct {
 	db *sql.DB

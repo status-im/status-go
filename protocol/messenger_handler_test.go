@@ -142,7 +142,7 @@ func (s *EventToSystemMessageSuite) TestHandleMembershipUpdate() {
 
 	state := &ReceivedMessageState{
 		Response:            &MessengerResponse{},
-		Timesource:          s.m.transport,
+		Timesource:          s.m.getTimesource(),
 		CurrentMessageState: currentMessageState,
 		ExistingMessagesMap: map[string]bool{},
 		AllChats:            s.m.allChats,

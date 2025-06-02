@@ -39,7 +39,40 @@ Functional tests for status-go
     * Status-im contracts will be deployed to the network
 
 * In `./tests-functional/tests` directory run `pytest -m rpc`
-* To run tests against binary run `pytest -m <your mark> --url=http:<binary_url>:<binary_port> --user_dir=/<path>`
+* To run tests against binary run `pytest -m <your mark> --status_backend_url=http://<binary_url>:<binary_port>`
+
+### Options
+
+#### Running with a custom Waku fleet
+
+`status-backend` can use a hard-coded list of supported Waku fleets or fleets specified in a config file. Functional tests provide 2 options to specify which Waku fleet to use.
+
+- Use `--waku-fleets-config` to override the hard-coded list of supported fleets. \
+    The value will be passed to `InitializeApplication.wakuFleetsConfigFilePath` parameter. By default, it's set to JSON config for a local waku fleet. To run with a fleet from the hard-coded list use `--waku-fleets-config=""` and corresponding `--waku-fleet` value, e.g. `--waku-fleet=status.prod`
+- Use `--waku-fleet` to select a Waku fleet to be used by `status-go`. \
+    Default is `status-go.test` that will use local waku nodes for functional tests run. 
+    The value will be passed to all of these parameters:
+    - `CreateAccount.wakuV2Fleet`
+    - `RestoreAccount.wakuV2Fleet`
+
+Please refer to the description of these parameters in `status-go` for details.
+
+### Prerequisites for Mac OSx users
+If you see errors at attempt to run tests, try to run in terminal:
+```shell
+sock.connect(self.unix_socket)
+```
+If you see
+```
+PermissionError: [Errno 13] Permission denied
+```
+
+Please follow this fix: https://github.com/docker/compose/issues/10299#issuecomment-1438247730
+
+If you're on MacOS and `/var/run/docker.sock` doesn't exist, you need to create a symlink to the docker socket:
+```shell
+sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
+```
 
 ## Implementation details
 
@@ -51,17 +84,9 @@ Functional tests for status-go
 
 # Known issues
 
-## Docker permission denied
+## Import issues
 
-When running tests with auto-creating status-backend containers, you might face this:
-```shell
-sock.connect(self.unix_socket)
-PermissionError: [Errno 13] Permission denied
-```
+If you see some import issues, make sure that you have all requirements installed from `requirements.txt` 
 
-Please follow this fix: https://github.com/docker/compose/issues/10299#issuecomment-1438247730
-
-If you're on MacOS and `/var/run/docker.sock` doesn't exist, you need to create a symlink to the docker socket:
-```shell
-sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
-```
+### For PyCharm users
+Make sure that you made `test-functional` source folder (Right click > Mark directory as > Source folder)

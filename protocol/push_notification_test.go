@@ -19,9 +19,7 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -48,11 +46,10 @@ type MessengerPushNotificationSuite struct {
 func (s *MessengerPushNotificationSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = bridge.NewGethWakuWrapper(shh)
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
@@ -186,7 +183,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	// Create one to one chat & send message
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
+	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.getTimesource())
 	s.Require().NoError(alice.SaveChat(chat))
 	inputMessage := buildTestMessage(*chat)
 	response, err := alice.SendChatMessage(context.Background(), inputMessage)
@@ -341,7 +338,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 
 	// Create one to one chat & send message
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
+	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.getTimesource())
 	s.Require().NoError(alice.SaveChat(chat))
 	inputMessage := buildTestMessage(*chat)
 	response, err := alice.SendChatMessage(context.Background(), inputMessage)
@@ -494,7 +491,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 
 	// Create one to one chat & send message
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
+	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.getTimesource())
 	s.Require().NoError(alice.SaveChat(chat))
 	inputMessage := buildTestMessage(*chat)
 	_, err = alice.SendChatMessage(context.Background(), inputMessage)
@@ -709,7 +706,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 	bobInstallationIDs := []string{bob.installationID}
 
 	// Create public chat and join for both alice and bob
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat("status", s.m.getTimesource())
 	err = bob.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -900,7 +897,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	community := response.Communities()[0]
 
 	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, alice.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -1062,7 +1059,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 
 	// Create one to one chat & send message
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
+	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.getTimesource())
 	s.Require().NoError(alice.SaveChat(chat))
 	inputMessage := buildTestMessage(*chat)
 	response, err := alice.SendChatMessage(context.Background(), inputMessage)
@@ -1163,7 +1160,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationReply() {
 	bobInstallationIDs := []string{bob.installationID}
 
 	// Create public chat and join for both alice and bob
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat("status", s.m.getTimesource())
 	err = bob.SaveChat(chat)
 	s.Require().NoError(err)
 

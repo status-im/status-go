@@ -11,13 +11,13 @@ import (
 	datasyncnode "github.com/status-im/mvds/node"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/messaging"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -67,7 +67,7 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 		return err
 	}
 
-	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
+	contactCodeTopic := messaging.ContactCodeTopic(&m.identity.PublicKey)
 
 	rawMessage := common.RawMessage{
 		LocalChatID: contactCodeTopic,
@@ -196,13 +196,15 @@ func (m *Messenger) broadcastLatestUserStatus() {
 	ctx := context.Background()
 	go func() {
 		defer gocommon.LogOnPanic()
-		// Ensure that we are connected before sending a message
-		time.Sleep(5 * time.Second)
-		m.sendCurrentUserStatus(ctx)
-	}()
 
-	go func() {
-		defer gocommon.LogOnPanic()
+		select {
+		// Ensure that we are connected before sending a message
+		case <-time.After(5 * time.Second):
+			m.sendCurrentUserStatus(ctx)
+		case <-m.quit:
+			return
+		}
+
 		for {
 			select {
 			case <-time.After(5 * time.Minute):

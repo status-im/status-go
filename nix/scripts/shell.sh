@@ -21,13 +21,19 @@ fi
 
 # Minimal shell with just Nix sourced, useful for `make nix-gc`.
 if [[ "${TARGET}" == "nix" ]]; then
-    eval $@
-    exit 0
+    eval "${@}"
+    exit $?
 fi
 if [[ -n "${IN_NIX_SHELL}" ]] && [[ -n "${NIX_SHELL_TARGET}" ]]; then
     if [[ "${NIX_SHELL_TARGET}" == "${TARGET}" ]]; then
-        echo -e "${YLW}Nix shell for TARGET=${TARGET} is already active.${RST}" >&2
-        exit 0
+        if [[ -z "${@}" ]]; then
+            echo -e "${YLW}Nix shell for TARGET=${TARGET} is already active.${RST}" >&2
+            exit 0
+        else
+            # Nix shell is already started and target matches, just run command.
+            eval "${@}"
+            exit $?
+        fi
     else
         # Nesting nix shells does not work due to how we detect already present shell.
         echo -e "${RED}Cannot nest Nix shells with different targets!${RST}" >&2

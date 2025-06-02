@@ -31,7 +31,7 @@ func (s *BridgeMessageSuite) TestSendBridgeMessage() {
 
 	chatID := statusChatID
 
-	chat := CreatePublicChat(chatID, alice.transport)
+	chat := CreatePublicChat(chatID, alice.getTimesource())
 
 	err = alice.SaveChat(chat)
 	s.Require().NoError(err)
@@ -103,7 +103,7 @@ func (s *BridgeMessageSuite) TestSendBridgeMessage() {
 
 func (s *BridgeMessageSuite) TestSearchForDiscordMessages() {
 	//send bridged message
-	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.NoError(err)
 

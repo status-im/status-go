@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -22,13 +21,13 @@ type Server struct {
 	server *http.Server
 }
 
-func NewMetricsServer(port int, r metrics.Registry) *Server {
+func NewMetricsServer(address string, r metrics.Registry) *Server {
 	mux := http.NewServeMux()
 	mux.Handle("/health", healthHandler())
 	mux.Handle("/metrics", Handler(r))
 	p := Server{
 		server: &http.Server{
-			Addr:              fmt.Sprintf(":%d", port),
+			Addr:              address,
 			ReadHeaderTimeout: 5 * time.Second,
 			Handler:           mux,
 		},
@@ -48,9 +47,13 @@ func healthHandler() http.Handler {
 func Handler(reg metrics.Registry) http.Handler {
 	// we disable compression because geth doesn't support it
 	opts := promhttp.HandlerOpts{DisableCompression: true}
-	// we are combining handlers to avoid having 2 endpoints
-	statusMetrics := promhttp.HandlerFor(prom.DefaultGatherer, opts) // our metrics
-	gethMetrics := gethprom.Handler(reg)                             // geth metrics
+	// we are using only our own metrics
+	statusMetrics := promhttp.HandlerFor(prom.DefaultGatherer, opts)
+	if reg == nil {
+		return statusMetrics
+	}
+	// if registry is provided, combine handlers
+	gethMetrics := gethprom.Handler(reg)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		statusMetrics.ServeHTTP(w, r)
 		gethMetrics.ServeHTTP(w, r)
@@ -61,4 +64,12 @@ func Handler(reg metrics.Registry) http.Handler {
 func (p *Server) Listen() {
 	defer common.LogOnPanic()
 	logutils.ZapLogger().Info("metrics server stopped", zap.Error(p.server.ListenAndServe()))
+}
+
+// Stop gracefully shuts down the metrics server
+func (p *Server) Stop() error {
+	if p.server != nil {
+		return p.server.Close()
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"context"
+	"time"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -47,6 +48,19 @@ func (api *SettingsAPI) NodeConfig(ctx context.Context) (*params.NodeConfig, err
 // Saves the nodeconfig in the database. The node must be restarted for the changes to be applied
 func (api *SettingsAPI) SaveNodeConfig(ctx context.Context, n *params.NodeConfig) error {
 	return nodecfg.SaveNodeConfig(api.db.DB(), n)
+}
+
+// News Settings
+func (api *SettingsAPI) NewsFeedEnabled() (bool, error) {
+	return api.db.NewsFeedEnabled()
+}
+
+func (api *SettingsAPI) NewsNotificationsEnabled() (bool, error) {
+	return api.db.NewsNotificationsEnabled()
+}
+
+func (api *SettingsAPI) NewsRSSEnabled() (bool, error) {
+	return api.db.NewsRSSEnabled()
 }
 
 // Notifications Settings
@@ -171,4 +185,8 @@ func (api *SettingsAPI) SetBio(bio string) error {
 
 func (api *SettingsAPI) MnemonicWasShown() error {
 	return api.db.MnemonicWasShown()
+}
+
+func (api *SettingsAPI) LastTokensUpdate() (time.Time, error) {
+	return api.db.LastTokensUpdate()
 }

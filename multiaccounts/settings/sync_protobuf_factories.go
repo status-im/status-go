@@ -618,3 +618,26 @@ func displayAssetsBelowBalanceThresholdProtobufFactory(value any, clock uint64, 
 func displayAssetsBelowBalanceThresholdProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawDisplayAssetsBelowBalanceThresholdSyncMessage(s.DisplayAssetsBelowBalanceThreshold, clock, chatID)
 }
+
+func buildRawAutoRefreshTokensEnabledSyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_AUTO_REFRESH_TOKENS_ENABLED,
+		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
+		Clock: clock,
+	}
+	rm, err := buildRawSyncSettingMessage(pb, chatID)
+	return rm, pb, err
+}
+
+func autoRefreshTokensEnabledProtobufFactory(value any, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	v, err := assertBool(value)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return buildRawAutoRefreshTokensEnabledSyncMessage(v, clock, chatID)
+}
+
+func autoRefreshTokensEnabledProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	return buildRawAutoRefreshTokensEnabledSyncMessage(s.AutoRefreshTokensEnabled, clock, chatID)
+}

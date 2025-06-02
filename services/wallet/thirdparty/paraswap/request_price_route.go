@@ -29,6 +29,47 @@ type Route struct {
 	TokenTransferProxy common.Address  `json:"tokenTransferProxy"`
 }
 
+func (r *Route) Copy() *Route {
+	gasCost := new(bigint.BigInt)
+	if r.GasCost != nil {
+		var ok bool
+		gasCost.Int, ok = new(big.Int).SetString(r.GasCost.String(), 10)
+		if !ok {
+			gasCost.Int = big.NewInt(0)
+		}
+	}
+	srcAmount := new(bigint.BigInt)
+	if r.SrcAmount != nil {
+		var ok bool
+		srcAmount.Int, ok = new(big.Int).SetString(r.SrcAmount.String(), 10)
+		if !ok {
+			srcAmount.Int = big.NewInt(0)
+		}
+	}
+	destAmount := new(bigint.BigInt)
+	if r.DestAmount != nil {
+		var ok bool
+		destAmount.Int, ok = new(big.Int).SetString(r.DestAmount.String(), 10)
+		if !ok {
+			destAmount.Int = big.NewInt(0)
+		}
+	}
+
+	return &Route{
+		GasCost:            gasCost,
+		SrcAmount:          srcAmount,
+		SrcTokenAddress:    r.SrcTokenAddress,
+		SrcTokenDecimals:   r.SrcTokenDecimals,
+		DestAmount:         destAmount,
+		DestTokenAddress:   r.DestTokenAddress,
+		DestTokenDecimals:  r.DestTokenDecimals,
+		RawPriceRoute:      r.RawPriceRoute,
+		Side:               r.Side,
+		ContractAddress:    r.ContractAddress,
+		TokenTransferProxy: r.TokenTransferProxy,
+	}
+}
+
 type PriceRouteResponse struct {
 	PriceRoute json.RawMessage `json:"priceRoute"`
 	Error      string          `json:"error"`
@@ -53,7 +94,7 @@ func (c *ClientV5) FetchPriceRoute(ctx context.Context, srcTokenAddress common.A
 	params.Add("version", "6.2")
 
 	url := pricesURL
-	response, err := c.httpClient.DoGetRequest(ctx, url, params, nil)
+	response, err := c.httpClient.DoGetRequest(ctx, url, params)
 	if err != nil {
 		return Route{}, err
 	}

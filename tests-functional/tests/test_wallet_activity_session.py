@@ -5,7 +5,7 @@ import uuid as uuid_lib
 import pytest
 
 from resources.constants import user_1, user_2
-from test_cases import StatusBackendTestCase
+from steps.wallet import WalletSteps
 from clients.signals import SignalType
 
 EventActivityFilteringDone = "wallet-activity-filtering-done"
@@ -20,19 +20,21 @@ def validate_entry(entry, tx_data):
 
 @pytest.mark.wallet
 @pytest.mark.rpc
-class TestWalletActivitySession(StatusBackendTestCase):
+@pytest.mark.activity
+@pytest.mark.xdist_group(name="WalletSteps")
+class TestWalletActivitySession(WalletSteps):
     await_signals = [
         SignalType.NODE_LOGIN.value,
-        "wallet",
-        "wallet.suggested.routes",
-        "wallet.router.sign-transactions",
-        "wallet.router.sending-transactions-started",
-        "wallet.transaction.status-changed",
-        "wallet.router.transactions-sent",
+        SignalType.WALLET.value,
+        SignalType.WALLET_SUGGESTED_ROUTES.value,
+        SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value,
+        SignalType.WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED.value,
+        SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
     ]
 
     def setup_method(self):
         self.request_id = str(random.randint(1, 8888))
+        self.mint_snt(user_1.address, 1000000000000000000000000)
 
     def test_wallet_start_activity_filter_session(self):
         uuid = str(uuid_lib.uuid4())
@@ -48,10 +50,9 @@ class TestWalletActivitySession(StatusBackendTestCase):
             "tokenID": "ETH",
             "tokenIDIsOwnerToken": False,
             "toTokenID": "",
-            "disabledFromChainIDs": [10, 42161],
-            "disabledToChainIDs": [10, 42161],
+            "disabledFromChainIDs": [1, 10, 42161, 8453, 56],
+            "disabledToChainIDs": [1, 10, 42161, 8453, 56],
             "gasFeeMode": 1,
-            "fromLockedAmount": {},
             # params for building tx from route
             "slippagePercentage": 0,
         }
@@ -97,10 +98,27 @@ class TestWalletActivitySession(StatusBackendTestCase):
         # First activity entry should match last sent transaction
         validate_entry(message["activities"][0], tx_data[-1])
 
-        # Trigger new transaction
+        # Trigger new ETH transfer
         uuid = str(uuid_lib.uuid4())
         input_params["uuid"] = uuid
 
+        self.rpc_client.prepare_wait_for_signal(
+            "wallet",
+            1,
+            lambda signal: signal["event"]["type"] == EventActivitySessionUpdated and signal["event"]["requestId"] == sessionID,
+        )
+        tx_data.append(wallet_utils.send_router_transaction(self.rpc_client, **input_params))
+        event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
+
+        # Check response event
+        assert int(event_response["requestId"]) == sessionID
+        message = json.loads(event_response["message"].replace("'", '"'))
+        assert message["hasNewOnTop"]  # New entries reported
+
+        # Trigger new STT transfer
+        uuid = str(uuid_lib.uuid4())
+        input_params["uuid"] = uuid
+        input_params["tokenID"] = "SNT"
         self.rpc_client.prepare_wait_for_signal(
             "wallet",
             1,
@@ -129,10 +147,13 @@ class TestWalletActivitySession(StatusBackendTestCase):
         assert int(event_response["requestId"]) == sessionID
         message = json.loads(event_response["message"].replace("'", '"'))
         assert int(message["errorCode"]) == 1
-        assert len(message["activities"]) > 1  # Should have at least 2 entries
+        assert len(message["activities"]) > 2  # Should have at least 3 entries
 
         # First activity entry should match last sent transaction
         validate_entry(message["activities"][0], tx_data[-1])
 
         # Second activity entry should match second to last sent transaction
         validate_entry(message["activities"][1], tx_data[-2])
+
+        # Third activity entry should match third to last sent transaction
+        validate_entry(message["activities"][2], tx_data[-3])

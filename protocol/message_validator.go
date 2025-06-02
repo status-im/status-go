@@ -16,14 +16,14 @@ const maxStatusMessageText = 128
 
 // maxWhisperDrift is how many milliseconds we allow the clock value to differ
 // from whisperTimestamp
-const maxWhisperFutureDriftMs uint64 = 120000
+const MaxWhisperFutureDriftMs uint64 = 120000
 
 func validateClockValue(clock uint64, whisperTimestamp uint64) error {
 	if clock == 0 {
 		return errors.New("clock can't be 0")
 	}
 
-	if clock > whisperTimestamp && clock-whisperTimestamp > maxWhisperFutureDriftMs {
+	if clock > whisperTimestamp && clock-whisperTimestamp > MaxWhisperFutureDriftMs {
 		return errors.New("clock value too high")
 	}
 

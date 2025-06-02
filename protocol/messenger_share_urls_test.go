@@ -52,6 +52,7 @@ func (s *MessengerShareUrlsSuite) createCommunity() *communities.Community {
 
 func (s *MessengerShareUrlsSuite) createContact() (*Messenger, *Contact) {
 	theirMessenger := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	ensName := "blah.stateofus.eth"

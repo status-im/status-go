@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math/big"
 	"sort"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
+	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
 	"github.com/status-im/status-go/t/utils"
 
 	"github.com/pkg/errors"
@@ -321,7 +323,7 @@ func (tc *TestClient) GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.
 }
 
 func (tc *TestClient) NetworkID() uint64 {
-	return 777333
+	return walletcommon.TestnetChainID
 }
 
 func (tc *TestClient) ToBigInt() *big.Int {
@@ -1029,17 +1031,64 @@ func getCases() []findBlockCase {
 var tokenTXXAddress = common.HexToAddress("0x53211")
 var tokenTXYAddress = common.HexToAddress("0x73211")
 
+// #nosec G101
+const sequentialCommandsTestsListJsonData = `{
+	"name": "Sequential Commands Tests List",
+	"timestamp": "2025-03-01T01:01:01.111Z",
+	"version": {
+		"major": 1,
+		"minor": 1,
+		"patch": 1
+	},
+	"tags": {},
+	"logoURI": "",
+	"keywords": [],
+	"tokens": [
+		{
+			"name": "Test Token 1",
+			"address": "0x0000000000000000000000000000000000053211",
+			"symbol": "TXX",
+			"decimals": 18,
+			"chainId": 777333
+		},
+		{
+			"name": "Test Token 2",
+			"address": "0x0000000000000000000000000000000000073211",
+			"symbol": "TXY",
+			"decimals": 18,
+			"chainId": 777333
+		}
+	]
+}`
+
+func setupTestAppDB(t *testing.T) (*sql.DB, func()) {
+	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "app-tests")
+	require.NoError(t, err)
+	return db, func() { require.NoError(t, cleanup()) }
+}
+
+func setupTestWalletDB(t *testing.T) (*sql.DB, func()) {
+	db, cleanup, err := helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "wallet-tests")
+	require.NoError(t, err)
+	return db, func() { require.NoError(t, cleanup()) }
+}
+
 func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlock, toBlock *big.Int, rangeSize int, balances map[common.Address][][]int, outgoingERC20Transfers, incomingERC20Transfers, outgoingERC1155SingleTransfers, incomingERC1155SingleTransfers map[common.Address][]testERC20Transfer) (*findBlocksCommand, *TestClient, chan []*DBHeader, *BlockRangeSequentialDAO) {
-	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	var tokenManager *token.Manager
+	appDb, closeAppDb := setupTestAppDB(t)
+	walletDb, closeWalletDb := setupTestWalletDB(t)
+	t.Cleanup(func() {
+		if tokenManager != nil {
+			tokenManager.Stop()
+		}
+		closeAppDb()
+		closeWalletDb()
+	})
+
+	mediaServer, err := server.NewMediaServer(appDb, nil, nil, walletDb)
 	require.NoError(t, err)
 
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
-	require.NoError(t, err)
-
-	wdb := NewDB(db)
+	wdb := NewDB(walletDb)
 	tc := &TestClient{
 		t:                              t,
 		balances:                       balances,
@@ -1084,33 +1133,22 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		DB:              appDb,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
-	client, _ := statusRpc.NewClient(config)
+	client, err := statusRpc.NewClient(config)
+	require.NoError(t, err)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
-	tokenManager.SetTokens([]*token.Token{
-		{
-			Address:  tokenTXXAddress,
-			Symbol:   "TXX",
-			Decimals: 18,
-			ChainID:  tc.NetworkID(),
-			Name:     "Test Token 1",
-			Verified: true,
-		},
-		{
-			Address:  tokenTXYAddress,
-			Symbol:   "TXY",
-			Decimals: 18,
-			ChainID:  tc.NetworkID(),
-			Name:     "Test Token 2",
-			Verified: true,
-		},
-	})
-	accDB, err := accounts.NewDB(appdb)
+	tokenManager = token.NewTokenManager(walletDb, client, community.NewManager(appDb, nil, nil), network.NewManager(appDb, nil, nil, nil), appDb, mediaServer, nil, nil, nil, token.NewPersistence(walletDb))
+
+	tokenListsFetcher := fetcher.NewTokenListsFetcher(walletDb)
+	err = tokenListsFetcher.StoreTokenList("sequential-commands-tests-list", "", "abcd", sequentialCommandsTestsListJsonData)
+	require.NoError(t, err)
+
+	tokenManager.Start(context.Background(), time.Hour, time.Hour)
+
+	accDB, err := accounts.NewDB(appDb)
 	require.NoError(t, err)
 	blockRangeDAO := &BlockRangeSequentialDAO{wdb.client}
 	fbc := &findBlocksCommand{
@@ -1355,33 +1393,13 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		DB:              appdb,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
-
-	tokenManager.SetTokens([]*token.Token{
-		{
-			Address:  tokenTXXAddress,
-			Symbol:   "TXX",
-			Decimals: 18,
-			ChainID:  tc.NetworkID(),
-			Name:     "Test Token 1",
-			Verified: true,
-		},
-		{
-			Address:  tokenTXYAddress,
-			Symbol:   "TXY",
-			Decimals: 18,
-			ChainID:  tc.NetworkID(),
-			Name:     "Test Token 2",
-			Verified: true,
-		},
-	})
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 	address := common.HexToAddress("0x1234")
 	chainClient := newMockChainClient()
@@ -1389,7 +1407,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	defer ctrl.Finish()
 	rpcClient := mock_rpcclient.NewMockClientInterface(ctrl)
 	rpcClient.EXPECT().AbstractEthClient(tc.NetworkID()).Return(chainClient, nil).AnyTimes()
-	tracker := transactions.NewPendingTxTracker(db, rpcClient, nil, &event.Feed{}, transactions.PendingCheckInterval)
+	tracker := transactions.NewPendingTxTracker(db, rpcClient, &event.Feed{}, transactions.PendingCheckInterval)
 	accDB, err := accounts.NewDB(appdb)
 	require.NoError(t, err)
 
@@ -1487,33 +1505,13 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 			Client:          nil,
 			UpstreamChainID: 1,
 			Networks:        []params.Network{},
-			DB:              db,
+			DB:              appdb,
 			WalletFeed:      nil,
-			ProviderConfigs: nil,
 		}
 		client, _ := statusRpc.NewClient(config)
 
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
-
-		tokenManager.SetTokens([]*token.Token{
-			{
-				Address:  tokenTXXAddress,
-				Symbol:   "TXX",
-				Decimals: 18,
-				ChainID:  tc.NetworkID(),
-				Name:     "Test Token 1",
-				Verified: true,
-			},
-			{
-				Address:  tokenTXYAddress,
-				Symbol:   "TXY",
-				Decimals: 18,
-				ChainID:  tc.NetworkID(),
-				Name:     "Test Token 2",
-				Verified: true,
-			},
-		})
+		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 		cmd := &findNewBlocksCommand{
 			findBlocksCommand: &findBlocksCommand{
@@ -1576,14 +1574,13 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		DB:              appdb,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 	wdb := NewDB(db)
 	blockChannel := make(chan []*DBHeader, 10)
@@ -1699,34 +1696,14 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		DB:              appdb,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
 	client.SetClient(tc.NetworkID(), tc)
 
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
-
-	tokenManager.SetTokens([]*token.Token{
-		{
-			Address:  tokenTXXAddress,
-			Symbol:   "TXX",
-			Decimals: 18,
-			ChainID:  tc.NetworkID(),
-			Name:     "Test Token 1",
-			Verified: true,
-		},
-		{
-			Address:  tokenTXYAddress,
-			Symbol:   "TXY",
-			Decimals: 18,
-			ChainID:  tc.NetworkID(),
-			Name:     "Test Token 2",
-			Verified: true,
-		},
-	})
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 	cmd := &findNewBlocksCommand{
 		findBlocksCommand: &findBlocksCommand{
@@ -1847,9 +1824,8 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		DB:              appdb,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 

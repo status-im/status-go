@@ -30,6 +30,7 @@ func (m *Messenger) SetSyncingOnMobileNetwork(request *requests.SetSyncingOnMobi
 	return nil
 }
 
+// Deprecated: Use SetLogLevel from status.go instead.
 func (m *Messenger) SetLogLevel(request *requests.SetLogLevel) error {
 	if err := request.Validate(); err != nil {
 		return err
@@ -38,12 +39,18 @@ func (m *Messenger) SetLogLevel(request *requests.SetLogLevel) error {
 	return nodecfg.SetLogLevel(m.database, request.LogLevel)
 }
 
+// Deprecated: Use SetLogNamespaces from status.go instead.
 func (m *Messenger) SetLogNamespaces(request *requests.SetLogNamespaces) error {
 	if err := request.Validate(); err != nil {
 		return err
 	}
 
 	return nodecfg.SetLogNamespaces(m.database, request.LogNamespaces)
+}
+
+// Deprecated: Use SetLogEnabled from status.go instead.
+func (m *Messenger) SetLogEnabled(enabled bool) error {
+	return nodecfg.SetLogEnabled(m.database, enabled)
 }
 
 func (m *Messenger) SetMaxLogBackups(request *requests.SetMaxLogBackups) error {

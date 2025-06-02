@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"github.com/ethereum/go-ethereum/p2p"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -39,8 +38,4 @@ func (s *Service) APIs() []gethrpc.API {
 			Service:   NewAPI(s),
 		},
 	}
-}
-
-func (s *Service) Protocols() []p2p.Protocol {
-	return nil
 }

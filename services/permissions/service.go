@@ -1,7 +1,6 @@
 package permissions
 
 import (
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -33,9 +32,4 @@ func (s *Service) APIs() []rpc.API {
 			Service:   NewAPI(s.db),
 		},
 	}
-}
-
-// Protocols returns list of p2p protocols.
-func (s *Service) Protocols() []p2p.Protocol {
-	return nil
 }

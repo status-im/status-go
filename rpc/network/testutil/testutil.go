@@ -3,12 +3,13 @@ package testutil
 import (
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/api"
+	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
 )
 
 // Helper function to create a provider
-func CreateProvider(chainID uint64, name string, providerType params.RpcProviderType, enabled bool, url string) params.RpcProvider {
+func CreateProvider(chainID uint64, name string, providerType params.RpcProviderType, enabled bool, url security.SensitiveString) params.RpcProvider {
 	return params.RpcProvider{
 		ChainID:          chainID,
 		Name:             name,
@@ -17,9 +18,9 @@ func CreateProvider(chainID uint64, name string, providerType params.RpcProvider
 		Type:             providerType,
 		Enabled:          enabled,
 		AuthType:         params.BasicAuth,
-		AuthLogin:        "user1",
-		AuthPassword:     "password1",
-		AuthToken:        "",
+		AuthLogin:        security.NewSensitiveString("user1"),
+		AuthPassword:     security.NewSensitiveString("password1"),
+		AuthToken:        security.NewSensitiveString(""),
 	}
 }
 
@@ -38,8 +39,10 @@ func CreateNetwork(chainID uint64, chainName string, providers []params.RpcProvi
 		Enabled:                true,
 		ChainColor:             "#E90101",
 		ShortName:              "eth",
-		RelatedChainID:         api.OptimismSepoliaChainID,
+		RelatedChainID:         api_common.OptimismSepoliaChainID,
 		RpcProviders:           providers,
+		IsActive:               true,
+		IsDeactivatable:        true,
 	}
 }
 
@@ -71,6 +74,8 @@ func CompareNetworks(t require.TestingT, expected, actual *params.Network) {
 	require.Equal(t, expected.ChainColor, actual.ChainColor)
 	require.Equal(t, expected.ShortName, actual.ShortName)
 	require.Equal(t, expected.RelatedChainID, actual.RelatedChainID)
+	require.Equal(t, expected.IsActive, actual.IsActive)
+	require.Equal(t, expected.IsDeactivatable, actual.IsDeactivatable)
 }
 
 // Helper function to compare lists of providers
@@ -101,4 +106,15 @@ func CompareNetworksList(t require.TestingT, expectedNetworks, actualNetworks []
 		require.True(t, exists, "Unexpected network with ChainID %d", network.ChainID)
 		CompareNetworks(t, expectedNetwork, network)
 	}
+}
+
+func ConvertNetworksToPointers(networks []params.Network) []*params.Network {
+	result := make([]*params.Network, len(networks))
+	for i := range networks {
+		// Create a copy of the current network
+		network := networks[i]
+		// Store a pointer to the copy
+		result[i] = &network
+	}
+	return result
 }

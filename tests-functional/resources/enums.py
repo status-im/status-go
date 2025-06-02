@@ -21,3 +21,29 @@ class MessageContentType(Enum):
     SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED = 16
     SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED = 17
     BRIDGE_MESSAGE = 18
+
+
+class ChatType(Enum):
+    UNKNOWN_TYPE = 0
+    ONE_TO_ONE = 1
+    PUBLIC = 2
+    PRIVATE_GROUP_CHAT = 3
+    PROFILE = 4  # Deprecated
+    TIMELINE = 5  # Deprecated
+    COMMUNITY_CHAT = 6
+
+
+class MuteType(Enum):
+    MUTE_FOR15_MIN = 1
+    MUTE_FOR1_HR = 2
+    MUTE_FOR8_HR = 3
+    MUTE_FOR1_WEEK = 4
+    MUTE_TILL_UNMUTED = 5
+    MUTE_TILL1_MIN = 6
+    UNMUTED = 7
+    MUTE_FOR24_HR = 8
+
+
+class ChatPreviewFilterType(Enum):
+    Community = 0
+    NonCommunity = 1

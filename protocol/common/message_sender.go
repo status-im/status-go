@@ -17,27 +17,24 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/datasync"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
+	wakuv2 "github.com/status-im/status-go/wakuv2"
 )
 
 // Whisper message properties.
 const (
-	whisperTTL        = 15
-	whisperDefaultPoW = 0.002
-	// whisperLargeSizePoW is the PoWTarget for larger payload sizes
-	whisperLargeSizePoW = 0.000002
 	// largeSizeInBytes is when should we be using a lower POW.
 	// Roughly this is 50KB
 	largeSizeInBytes              = 50000
-	whisperPoWTime                = 5
 	maxMessageSenderEphemeralKeys = 3
 )
 
@@ -70,8 +67,8 @@ type MessageSender struct {
 	identity    *ecdsa.PrivateKey
 	datasync    *datasync.DataSync
 	database    *sql.DB
+	messaging   *messaging.API
 	protocol    *encryption.Protocol
-	transport   *transport.Transport
 	logger      *zap.Logger
 	persistence *RawMessagesPersistence
 
@@ -90,13 +87,15 @@ type MessageSender struct {
 
 	// handleSharedSecrets is a callback that is called every time a new shared secret is negotiated
 	handleSharedSecrets func([]*sharedsecret.Secret) error
+
+	metricsHandler wakuv2.IMetricsHandler
 }
 
 func NewMessageSender(
 	identity *ecdsa.PrivateKey,
 	database *sql.DB,
+	messaging *messaging.API,
 	enc *encryption.Protocol,
-	transport *transport.Transport,
 	logger *zap.Logger,
 	features FeatureFlags,
 ) (*MessageSender, error) {
@@ -106,7 +105,7 @@ func NewMessageSender(
 		protocol:        enc,
 		database:        database,
 		persistence:     NewRawMessagesPersistence(database),
-		transport:       transport,
+		messaging:       messaging,
 		logger:          logger,
 		ephemeralKeys:   make(map[string]*ecdsa.PrivateKey),
 		featureFlags:    features,
@@ -128,6 +127,10 @@ func (s *MessageSender) Stop() {
 
 func (s *MessageSender) SetHandleSharedSecrets(handler func([]*sharedsecret.Secret) error) {
 	s.handleSharedSecrets = handler
+}
+
+func (s *MessageSender) SetMetricsHandler(handler wakuv2.IMetricsHandler) {
+	s.metricsHandler = handler
 }
 
 func (s *MessageSender) StartDatasync(statusChangeEvent chan datasyncnode.PeerStatusChangeEvent, handler func(peer state.PeerID, payload *datasyncproto.Payload) error) error {
@@ -434,7 +437,8 @@ func (s *MessageSender) sendCommunity(
 		zap.String("messageType", "community"),
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
-	s.transport.Track(messageID, hashes, newMessages)
+	s.messaging.Track(messageID, hashes, newMessages)
+	s.sendBandwidthMetrics(rawMessage)
 
 	return messageID, nil
 }
@@ -529,7 +533,7 @@ func (s *MessageSender) sendPrivate(
 			zap.String("messageType", "private"),
 			zap.Any("contentType", rawMessage.MessageType),
 			zap.Strings("hashes", types.EncodeHexes(hashes)))
-		s.transport.Track(messageID, hashes, newMessages)
+		s.messaging.Track(messageID, hashes, newMessages)
 
 	} else {
 		messageSpec, err := s.protocol.BuildEncryptedMessage(rawMessage.Sender, recipient, wrappedMessage)
@@ -549,8 +553,10 @@ func (s *MessageSender) sendPrivate(
 			zap.Any("contentType", rawMessage.MessageType),
 			zap.String("messageType", "private"),
 			zap.Strings("hashes", types.EncodeHexes(hashes)))
-		s.transport.Track(messageID, hashes, newMessages)
+		s.messaging.Track(messageID, hashes, newMessages)
 	}
+
+	s.sendBandwidthMetrics(rawMessage)
 
 	return messageID, nil
 }
@@ -580,7 +586,8 @@ func (s *MessageSender) SendPairInstallation(
 		return nil, errors.Wrap(err, "failed to send a message spec")
 	}
 
-	s.transport.Track(messageID, hashes, newMessages)
+	s.messaging.Track(messageID, hashes, newMessages)
+	s.sendBandwidthMetrics(&rawMessage)
 
 	return messageID, nil
 }
@@ -662,10 +669,7 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 	}
 
 	newMessage := &wakutypes.NewMessage{
-		TTL:         whisperTTL,
 		Payload:     payload,
-		PowTarget:   calculatePoW(payload),
-		PowTime:     whisperPoWTime,
 		PubsubTopic: rawMessage.PubsubTopic,
 	}
 
@@ -685,7 +689,7 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 
 	hashes := make([][]byte, 0, len(newMessages))
 	for _, newMessage := range newMessages {
-		hash, err := s.transport.SendPublic(ctx, newMessage, rawMessage.ContentTopic)
+		hash, err := s.messaging.SendPublic(ctx, newMessage, rawMessage.ContentTopic)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -757,10 +761,7 @@ func (s *MessageSender) SendPublic(
 		}
 	} else {
 		newMessage = &wakutypes.NewMessage{
-			TTL:       whisperTTL,
-			Payload:   wrappedMessage,
-			PowTarget: calculatePoW(wrappedMessage),
-			PowTime:   whisperPoWTime,
+			Payload: wrappedMessage,
 		}
 	}
 
@@ -790,7 +791,7 @@ func (s *MessageSender) SendPublic(
 
 	hashes := make([][]byte, 0, len(newMessages))
 	for _, newMessage := range newMessages {
-		hash, err := s.transport.SendPublic(ctx, newMessage, chatName)
+		hash, err := s.messaging.SendPublic(ctx, newMessage, chatName)
 		if err != nil {
 			return nil, err
 		}
@@ -810,7 +811,8 @@ func (s *MessageSender) SendPublic(
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.String("messageType", "public"),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
-	s.transport.Track(messageID, hashes, newMessages)
+	s.messaging.Track(messageID, hashes, newMessages)
+	s.sendBandwidthMetrics(&rawMessage)
 
 	return messageID, nil
 }
@@ -853,16 +855,16 @@ func (s *MessageSender) unwrapDatasyncMessage(m *v1protocol.StatusMessage, respo
 // layer message, or in case of Raw methods, the processing stops at the layer
 // before.
 // It returns an error only if the processing of required steps failed.
-func (s *MessageSender) HandleMessages(wakuMessage *wakutypes.Message) (*HandleMessageResponse, error) {
+func (s *MessageSender) HandleMessages(msg *messagingtypes.ReceivedMessage) (*HandleMessageResponse, error) {
 	logger := s.logger.With(zap.String("site", "HandleMessages"))
-	hlogger := logger.With(zap.String("hash", types.HexBytes(wakuMessage.Hash).String()))
+	hlogger := logger.With(zap.String("hash", types.HexBytes(msg.Hash).String()))
 
-	response, err := s.handleMessage(wakuMessage)
+	response, err := s.handleMessage(msg)
 	if err != nil {
 		// Hash ratchet with a group id not found yet, save the message for future processing
 		if err == encryption.ErrHashRatchetGroupIDNotFound && len(response.Message.EncryptionLayer.HashRatchetInfo) == 1 {
 			info := response.Message.EncryptionLayer.HashRatchetInfo[0]
-			return nil, s.persistence.SaveHashRatchetMessage(info.GroupID, info.KeyID, wakuMessage)
+			return nil, s.persistence.SaveHashRatchetMessage(info.GroupID, info.KeyID, msg)
 		}
 
 		// The current message segment has been successfully retrieved.
@@ -947,26 +949,26 @@ func (h *handleMessageResponse) Messages() []*v1protocol.StatusMessage {
 	return []*v1protocol.StatusMessage{h.Message}
 }
 
-func (s *MessageSender) handleMessage(wakuMessage *wakutypes.Message) (*handleMessageResponse, error) {
+func (s *MessageSender) handleMessage(msg *messagingtypes.ReceivedMessage) (*handleMessageResponse, error) {
 	logger := s.logger.With(zap.String("site", "handleMessage"))
-	hlogger := logger.With(zap.String("hash", types.EncodeHex(wakuMessage.Hash)))
+	hlogger := logger.With(zap.String("hash", types.EncodeHex(msg.Hash)))
 
 	message := &v1protocol.StatusMessage{}
 
 	response := &handleMessageResponse{
-		Hash:             wakuMessage.Hash,
+		Hash:             msg.Hash,
 		Message:          message,
 		DatasyncMessages: []*v1protocol.StatusMessage{},
 		DatasyncAcks:     [][]byte{},
 	}
 
-	err := message.HandleTransportLayer(wakuMessage)
+	err := message.HandleTransportLayer(msg)
 	if err != nil {
 		hlogger.Error("failed to handle transport layer message", zap.Error(err))
 		return nil, err
 	}
 
-	err = s.handleSegmentationLayerV2(message)
+	err = s.handleSegmentationLayer(message)
 	if err != nil {
 		hlogger.Debug("failed to handle segmentation layer message", zap.Error(err))
 
@@ -1105,10 +1107,7 @@ func (s *MessageSender) addToDataSync(publicKey *ecdsa.PublicKey, message []byte
 // sendPrivateRawMessage sends a message not wrapped in an encryption layer
 func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *RawMessage, publicKey *ecdsa.PublicKey, payload []byte) ([][]byte, []*wakutypes.NewMessage, error) {
 	newMessage := &wakutypes.NewMessage{
-		TTL:         whisperTTL,
 		Payload:     payload,
-		PowTarget:   calculatePoW(payload),
-		PowTime:     whisperPoWTime,
 		PubsubTopic: rawMessage.PubsubTopic,
 	}
 
@@ -1121,9 +1120,9 @@ func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *R
 	var hash []byte
 	for _, newMessage := range newMessages {
 		if rawMessage.SendOnPersonalTopic {
-			hash, err = s.transport.SendPrivateOnPersonalTopic(ctx, newMessage, publicKey)
+			hash, err = s.messaging.SendPrivateOnPersonalTopic(ctx, newMessage, publicKey)
 		} else {
-			hash, err = s.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
+			hash, err = s.messaging.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
 		}
 		if err != nil {
 			return nil, nil, err
@@ -1167,10 +1166,7 @@ func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey 
 	}
 
 	newMessage := &wakutypes.NewMessage{
-		TTL:         whisperTTL,
 		Payload:     payload,
-		PowTarget:   calculatePoW(payload),
-		PowTime:     whisperPoWTime,
 		PubsubTopic: pubsubTopic,
 	}
 
@@ -1181,7 +1177,7 @@ func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey 
 
 	hashes := make([][]byte, 0, len(newMessages))
 	for _, newMessage := range newMessages {
-		hash, err := s.transport.SendCommunityMessage(ctx, newMessage, publicKey)
+		hash, err := s.messaging.SendCommunityMessage(ctx, newMessage, publicKey)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1224,10 +1220,10 @@ func (s *MessageSender) sendMessageSpec(ctx context.Context, publicKey *ecdsa.Pu
 		// process shared secret
 		if messageSpec.AgreedSecret {
 			logger.Debug("sending using shared secret")
-			hash, err = s.transport.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret.Key)
+			hash, err = s.messaging.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret.Key)
 		} else {
 			logger.Debug("sending partitioned topic")
-			hash, err = s.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
+			hash, err = s.messaging.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
 		}
 		if err != nil {
 			return nil, nil, err
@@ -1292,8 +1288,8 @@ func (s *MessageSender) notifyOnScheduledMessage(recipient *ecdsa.PublicKey, mes
 	}
 }
 
-func (s *MessageSender) JoinPublic(id string) (*transport.Filter, error) {
-	return s.transport.JoinPublic(id)
+func (s *MessageSender) JoinPublic(id string) (*messagingtypes.ChatFilter, error) {
+	return s.messaging.JoinPublicChat(id)
 }
 
 func (s *MessageSender) getRandomEphemeralKey() *ecdsa.PrivateKey {
@@ -1321,12 +1317,18 @@ func (s *MessageSender) GetEphemeralKey() (*ecdsa.PrivateKey, error) {
 
 	s.ephemeralKeys[types.EncodeHex(crypto.FromECDSAPub(&privateKey.PublicKey))] = privateKey
 	s.ephemeralKeysMutex.Unlock()
-	_, err = s.transport.LoadKeyFilters(privateKey)
+	_, err = s.messaging.LoadKeyFilters(privateKey)
 	if err != nil {
 		return nil, err
 	}
 
 	return privateKey, nil
+}
+
+func (s *MessageSender) sendBandwidthMetrics(rawMessage *RawMessage) {
+	if s.metricsHandler != nil {
+		s.metricsHandler.PushRawMessageByType(rawMessage.PubsubTopic, rawMessage.ContentTopic, rawMessage.MessageType.String(), uint32(len(rawMessage.Payload)))
+	}
 }
 
 func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*wakutypes.NewMessage, error) {
@@ -1338,23 +1340,9 @@ func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*wakutypes.NewM
 	}
 
 	newMessage = &wakutypes.NewMessage{
-		TTL:       whisperTTL,
-		Payload:   payload,
-		PowTarget: calculatePoW(payload),
-		PowTime:   whisperPoWTime,
+		Payload: payload,
 	}
 	return newMessage, nil
-}
-
-// calculatePoW returns the PoWTarget to be used.
-// We check the size and arbitrarily set it to a lower PoW if the packet is
-// greater than 50KB. We do this as the defaultPoW is too high for clients to send
-// large messages.
-func calculatePoW(payload []byte) float64 {
-	if len(payload) > largeSizeInBytes {
-		return whisperLargeSizePoW
-	}
-	return whisperDefaultPoW
 }
 
 func (s *MessageSender) StopDatasync() {

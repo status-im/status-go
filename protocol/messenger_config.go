@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/account"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -24,10 +25,10 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
+	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
@@ -74,8 +75,7 @@ type MessengerSignalsHandler interface {
 type config struct {
 	// systemMessagesTranslations holds translations for system-messages
 	systemMessagesTranslations *systemMessageTranslationsMap
-	// Config for the envelopes monitor
-	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
+	envelopeEventsConfig       *messagingtypes.EnvelopeEventsConfig
 
 	featureFlags     common.FeatureFlags
 	codeControlFlags common.CodeControlFlags
@@ -97,10 +97,10 @@ type config struct {
 	tokenManager           communities.TokenManager
 	collectiblesManager    communities.CollectiblesManager
 	accountsManager        account.Manager
+	signer                 communities.MessageSigner
 
-	verifyTransactionClient  EthClient
-	verifyENSURL             string
-	verifyENSContractAddress string
+	verifyTransactionClient EthClient
+	ensVerifier             *ens.Verifier
 
 	anonMetricsClientConfig *anonmetrics.ClientConfig
 	anonMetricsServerConfig *anonmetrics.ServerConfig
@@ -124,6 +124,8 @@ type config struct {
 	communityManagerOptions []communities.ManagerOption
 
 	accountsFeed *event.Feed
+
+	onlineChecker func() bool
 }
 
 func messengerDefaultConfig() config {
@@ -313,9 +315,9 @@ func WithAutoMessageDisabled() func(c *config) error {
 	}
 }
 
-func WithEnvelopesMonitorConfig(emc *transport.EnvelopesMonitorConfig) Option {
+func WithEnvelopeEventsConfig(emc *messagingtypes.EnvelopeEventsConfig) Option {
 	return func(c *config) error {
-		c.envelopesMonitorConfig = emc
+		c.envelopeEventsConfig = emc
 		return nil
 	}
 }
@@ -323,14 +325,6 @@ func WithEnvelopesMonitorConfig(emc *transport.EnvelopesMonitorConfig) Option {
 func WithSignalsHandler(h MessengerSignalsHandler) Option {
 	return func(c *config) error {
 		c.messengerSignalsHandler = h
-		return nil
-	}
-}
-
-func WithENSVerificationConfig(url, address string) Option {
-	return func(c *config) error {
-		c.verifyENSURL = url
-		c.verifyENSContractAddress = address
 		return nil
 	}
 }
@@ -419,9 +413,30 @@ func WithAccountManager(accountManager account.Manager) Option {
 	}
 }
 
+func WithMessageSigner(signer communities.MessageSigner) Option {
+	return func(c *config) error {
+		c.signer = signer
+		return nil
+	}
+}
+
 func WithAccountsFeed(feed *event.Feed) Option {
 	return func(c *config) error {
 		c.accountsFeed = feed
+		return nil
+	}
+}
+
+func WithNewsFeed() func(c *config) error {
+	return func(c *config) error {
+		c.featureFlags.EnableNewsFeed = true
+		return nil
+	}
+}
+
+func WithENSVerifier(ensVerifier *ens.Verifier) func(c *config) error {
+	return func(c *config) error {
+		c.ensVerifier = ensVerifier
 		return nil
 	}
 }

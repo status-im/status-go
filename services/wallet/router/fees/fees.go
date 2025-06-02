@@ -10,6 +10,12 @@ import (
 	"github.com/status-im/status-go/services/wallet/common"
 )
 
+const (
+	RewardPercentiles1 = 10
+	RewardPercentiles2 = 45
+	RewardPercentiles3 = 90
+)
+
 type GasFeeMode int
 
 const (
@@ -25,26 +31,43 @@ var (
 	ErrInvalidRewardData                        = &errors.ErrorResponse{Code: errors.ErrorCode("WRF-003"), Details: "invalid reward data"}
 )
 
+// NonEIP1559Fees represents the fees for non EIP-1559 compatible chains
+type NonEIP1559Fees struct {
+	GasPrice      *hexutil.Big `json:"gasPrice"`      // Gas price for the transaction used for non EIP-1559 compatible chains (in base unit of the chain eg. WEI for ETH or BNB)
+	EstimatedTime uint         `json:"estimatedTime"` // Estimated time for the transaction in seconds, used for non EIP-1559 compatible chains
+}
+
+// MaxFeesLevels represents the max fees levels for low, medium and high fee modes and should be used for EIP-1559 compatible chains
 type MaxFeesLevels struct {
-	Low    *hexutil.Big `json:"low"`
-	Medium *hexutil.Big `json:"medium"`
-	High   *hexutil.Big `json:"high"`
+	Low                 *hexutil.Big `json:"low"`                 // Low max fee per gas in WEI
+	LowPriority         *hexutil.Big `json:"lowPriority"`         // Low priority fee in WEI
+	LowEstimatedTime    uint         `json:"lowEstimatedTime"`    // Estimated time for low fees in seconds
+	Medium              *hexutil.Big `json:"medium"`              // Medium max fee per gas in WEI
+	MediumPriority      *hexutil.Big `json:"mediumPriority"`      // Medium priority fee in WEI
+	MediumEstimatedTime uint         `json:"mediumEstimatedTime"` // Estimated time for medium fees in seconds
+	High                *hexutil.Big `json:"high"`                // High max fee per gas in WEI
+	HighPriority        *hexutil.Big `json:"highPriority"`        // High priority fee in WEI
+	HighEstimatedTime   uint         `json:"highEstimatedTime"`   // Estimated time for high fees in seconds
 }
 
 type MaxPriorityFeesSuggestedBounds struct {
-	Lower *big.Int
-	Upper *big.Int
+	Lower *big.Int // Lower bound for priority fee per gas in WEI
+	Upper *big.Int // Upper bound for priority fee per gas in WEI
 }
 
 type SuggestedFees struct {
-	GasPrice                      *big.Int
-	BaseFee                       *big.Int
-	CurrentBaseFee                *big.Int // Current network base fee (in ETH WEI)
-	MaxFeesLevels                 *MaxFeesLevels
-	MaxPriorityFeePerGas          *big.Int
-	MaxPriorityFeeSuggestedBounds *MaxPriorityFeesSuggestedBounds
-	L1GasFee                      *big.Float
-	EIP1559Enabled                bool
+	// Fields that need to be removed once clients stop using them
+	GasPrice             *big.Int   // TODO: remove once clients stop using this field, used for EIP-1559 incompatible chains, not in use anymore
+	BaseFee              *big.Int   // TODO: remove once clients stop using this field, current network base fee (in ETH WEI), kept for backward compatibility
+	MaxPriorityFeePerGas *big.Int   // TODO: remove once clients stop using this field, kept for backward compatibility
+	L1GasFee             *big.Float // TODO: remove once clients stop using this field, not in use anymore
+
+	// Fields in use
+	NonEIP1559Fees                *NonEIP1559Fees                 // Fees for non EIP-1559 compatible chains
+	MaxFeesLevels                 *MaxFeesLevels                  // Max fees levels for low, medium and high fee modes, should be used for EIP-1559 compatible chains
+	MaxPriorityFeeSuggestedBounds *MaxPriorityFeesSuggestedBounds // Lower and upper bounds for priority fee per gas in WEI
+	CurrentBaseFee                *big.Int                        // Current network base fee (in ETH WEI)
+	EIP1559Enabled                bool                            // TODO: remove it since all chains we have support EIP-1559
 }
 
 // //////////////////////////////////////////////////////////////////////////////
@@ -62,23 +85,23 @@ type SuggestedFeesGwei struct {
 	EIP1559Enabled       bool       `json:"eip1559Enabled"`
 }
 
-func (m *MaxFeesLevels) FeeFor(mode GasFeeMode) (*big.Int, error) {
+func (m *MaxFeesLevels) FeeFor(mode GasFeeMode) (*big.Int, *big.Int, uint, error) {
 	if mode == GasFeeCustom {
-		return nil, ErrCustomFeeModeNotAvailableInSuggestedFees
+		return nil, nil, 0, ErrCustomFeeModeNotAvailableInSuggestedFees
 	}
 
 	if mode == GasFeeLow {
-		return m.Low.ToInt(), nil
+		return m.Low.ToInt(), m.LowPriority.ToInt(), m.LowEstimatedTime, nil
 	}
 
 	if mode == GasFeeHigh {
-		return m.High.ToInt(), nil
+		return m.High.ToInt(), m.HighPriority.ToInt(), m.MediumEstimatedTime, nil
 	}
 
-	return m.Medium.ToInt(), nil
+	return m.Medium.ToInt(), m.MediumPriority.ToInt(), m.HighEstimatedTime, nil
 }
 
-func (s *SuggestedFees) FeeFor(mode GasFeeMode) (*big.Int, error) {
+func (s *SuggestedFees) FeeFor(mode GasFeeMode) (*big.Int, *big.Int, uint, error) {
 	return s.MaxFeesLevels.FeeFor(mode)
 }
 
@@ -86,32 +109,82 @@ type FeeManager struct {
 	RPCClient rpc.ClientInterface
 }
 
+func (f *FeeManager) IsEIP1559Enabled(ctx context.Context, chainID uint64) (bool, error) {
+	if common.IsGaslessChainAndEIP1559Compatible(chainID) {
+		return true, nil
+	}
+
+	backend, err := f.RPCClient.EthClient(chainID)
+	if err != nil {
+		return false, err
+	}
+	block, err := backend.BlockByNumber(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	return block.BaseFee() != nil && block.BaseFee().Cmp(big.NewInt(0)) > 0, nil
+}
+
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
-	feeHistory, err := f.getFeeHistory(ctx, chainID, 300, "latest", []int{25, 50, 75})
+	feeHistory, err := f.getFeeHistory(ctx, chainID, "latest", []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3})
 	if err != nil {
 		return f.getNonEIP1559SuggestedFees(ctx, chainID)
 	}
 
-	maxPriorityFeePerGasLowerBound, maxPriorityFeePerGas, maxPriorityFeePerGasUpperBound, baseFee, err := getEIP1559SuggestedFees(feeHistory)
+	lowPriorityFeePerGasLowerBound, mediumPriorityFeePerGas, maxPriorityFeePerGasUpperBound, baseFee, err := getEIP1559SuggestedFees(chainID, feeHistory)
 	if err != nil {
 		return f.getNonEIP1559SuggestedFees(ctx, chainID)
 	}
 
-	return &SuggestedFees{
+	suggestedFees := &SuggestedFees{
+		GasPrice:             big.NewInt(0),
 		BaseFee:              baseFee,
 		CurrentBaseFee:       baseFee,
-		MaxPriorityFeePerGas: maxPriorityFeePerGas,
+		MaxPriorityFeePerGas: mediumPriorityFeePerGas,
 		MaxPriorityFeeSuggestedBounds: &MaxPriorityFeesSuggestedBounds{
-			Lower: maxPriorityFeePerGasLowerBound,
+			Lower: lowPriorityFeePerGasLowerBound,
 			Upper: maxPriorityFeePerGasUpperBound,
 		},
-		MaxFeesLevels: &MaxFeesLevels{
-			Low:    (*hexutil.Big)(new(big.Int).Add(baseFee, maxPriorityFeePerGas)),
-			Medium: (*hexutil.Big)(new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(2)), maxPriorityFeePerGas)),
-			High:   (*hexutil.Big)(new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(3)), maxPriorityFeePerGas)),
-		},
 		EIP1559Enabled: true,
-	}, nil
+	}
+
+	if chainID == common.EthereumMainnet || chainID == common.EthereumSepolia || chainID == common.AnvilMainnet {
+		networkCongestion := calculateNetworkCongestion(feeHistory)
+
+		baseFeeFloat := new(big.Float).SetUint64(baseFee.Uint64())
+		baseFeeFloat.Mul(baseFeeFloat, big.NewFloat(networkCongestion))
+		additionBasedOnCongestion := new(big.Int)
+		baseFeeFloat.Int(additionBasedOnCongestion)
+
+		mediumBaseFee := new(big.Int).Add(baseFee, additionBasedOnCongestion)
+
+		highBaseFee := new(big.Int).Mul(baseFee, big.NewInt(2))
+		highBaseFee.Add(highBaseFee, additionBasedOnCongestion)
+
+		suggestedFees.MaxFeesLevels = &MaxFeesLevels{
+			Low:            (*hexutil.Big)(new(big.Int).Add(baseFee, lowPriorityFeePerGasLowerBound)),
+			LowPriority:    (*hexutil.Big)(lowPriorityFeePerGasLowerBound),
+			Medium:         (*hexutil.Big)(new(big.Int).Add(mediumBaseFee, mediumPriorityFeePerGas)),
+			MediumPriority: (*hexutil.Big)(mediumPriorityFeePerGas),
+			High:           (*hexutil.Big)(new(big.Int).Add(highBaseFee, maxPriorityFeePerGasUpperBound)),
+			HighPriority:   (*hexutil.Big)(maxPriorityFeePerGasUpperBound),
+		}
+	} else {
+		suggestedFees.MaxFeesLevels = &MaxFeesLevels{
+			Low:            (*hexutil.Big)(new(big.Int).Add(baseFee, lowPriorityFeePerGasLowerBound)),
+			LowPriority:    (*hexutil.Big)(lowPriorityFeePerGasLowerBound),
+			Medium:         (*hexutil.Big)(new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(4)), mediumPriorityFeePerGas)),
+			MediumPriority: (*hexutil.Big)(mediumPriorityFeePerGas),
+			High:           (*hexutil.Big)(new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(10)), maxPriorityFeePerGasUpperBound)),
+			HighPriority:   (*hexutil.Big)(maxPriorityFeePerGasUpperBound),
+		}
+	}
+
+	suggestedFees.MaxFeesLevels.LowEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Low.ToInt(), suggestedFees.MaxFeesLevels.LowPriority.ToInt(), chainID, 1)
+	suggestedFees.MaxFeesLevels.MediumEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Medium.ToInt(), suggestedFees.MaxFeesLevels.MediumPriority.ToInt(), chainID, 1)
+	suggestedFees.MaxFeesLevels.HighEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.High.ToInt(), suggestedFees.MaxFeesLevels.HighPriority.ToInt(), chainID, 1)
+
+	return suggestedFees, nil
 }
 
 // //////////////////////////////////////////////////////////////////////////////

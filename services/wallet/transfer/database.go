@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/logutils"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -187,7 +188,7 @@ func (db *Database) GetTransfers(chainID uint64, start, end *big.Int) (rst []Tra
 	return query.TransferScan(rows)
 }
 
-func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []TransactionIdentity) (rst []Transfer, err error) {
+func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []ac.TransactionIdentity) (rst []Transfer, err error) {
 	query := newTransfersQuery()
 	for _, identity := range identities {
 		subQuery := newSubQuery()
@@ -226,32 +227,6 @@ func (db *Database) GetTransactionsToLoad(chainID uint64, address common.Address
 // statementCreator allows to pass transaction or database to use in consumer.
 type statementCreator interface {
 	Prepare(query string) (*sql.Stmt, error)
-}
-
-// Only used by status-mobile
-func (db *Database) InsertBlock(chainID uint64, account common.Address, blockNumber *big.Int, blockHash common.Hash) error {
-	var (
-		tx *sql.Tx
-	)
-	tx, err := db.client.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		_ = tx.Rollback()
-	}()
-
-	blockDB := blockDBFields{
-		chainID:     chainID,
-		account:     account,
-		blockNumber: blockNumber,
-		blockHash:   blockHash,
-	}
-	return insertBlockDBFields(tx, blockDB)
 }
 
 type blockDBFields struct {

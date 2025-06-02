@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -47,7 +48,10 @@ var (
 		WalletRootAddress:                   types.HexToAddress("0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6"),
 		DisplayAssetsBelowBalanceThreshold:  int64(100000000),
 		DisplayAssetsBelowBalance:           false,
-		ShowCommunityAssetWhenSendingTokens: true}
+		ShowCommunityAssetWhenSendingTokens: true,
+		NewsFeedEnabled:                     true,
+		NewsRSSEnabled:                      true,
+	}
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -129,6 +133,9 @@ func TestCreateSettings(t *testing.T) {
 
 	s, err := db.GetSettings()
 	require.NoError(t, err)
+	require.NotEqual(t, 0, s.NewsFeedLastFetchedTimestamp.UTC().Second())
+	// Reset the timestamp to 0 as it is set during CreateSettings as time.now and it's impossible to test reliably
+	s.NewsFeedLastFetchedTimestamp = time.Time{}
 	require.Equal(t, settings, s)
 }
 
@@ -194,4 +201,98 @@ func TestSyncColumnsSet(t *testing.T) {
 			require.NoError(t, err)
 		}
 	}
+}
+
+func TestDatabase_NewsNotificationsEnabled(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	enabled, err := db.NewsNotificationsEnabled()
+	require.NoError(t, err)
+	require.Equal(t, false, enabled)
+
+	err = db.SaveSetting(NewsNotificationsEnabled.GetReactName(), true)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, true, settings.NewsNotificationsEnabled)
+}
+
+func TestDatabase_MessengerNotificationsEnabled(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	settings, err := db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, false, settings.MessengerNotificationsEnabled)
+
+	err = db.SaveSetting(MessengerNotificationsEnabled.GetReactName(), true)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, true, settings.MessengerNotificationsEnabled)
+}
+
+func TestDatabase_NewsFeedEnabled(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	enabled, err := db.NewsFeedEnabled()
+	require.NoError(t, err)
+
+	require.Equal(t, true, enabled)
+
+	err = db.SaveSetting(NewsFeedEnabled.GetReactName(), false)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, false, settings.NewsFeedEnabled)
+}
+
+func TestDatabase_NewsFeedLastFetchedTimestamp(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	timestamp, err := db.NewsFeedLastFetchedTimestamp()
+	require.NoError(t, err)
+
+	// Using GreaterOrEqual because the timestamp is set during CreateSettings and there is a tiny chance that the second changes between
+	require.GreaterOrEqual(t, time.Now().UTC().Second(), timestamp.UTC().Second())
+
+	dateNow := time.Now()
+	err = db.SaveSetting(NewsFeedLastFetchedTimestamp.GetReactName(), dateNow)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, dateNow.UTC().Second(), settings.NewsFeedLastFetchedTimestamp.UTC().Second())
+}
+
+func TestDatabase_NewsRSSEnabled(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	enabled, err := db.NewsRSSEnabled()
+	require.NoError(t, err)
+	require.Equal(t, true, enabled)
+
+	err = db.SaveSetting(NewsRSSEnabled.GetReactName(), false)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, false, settings.NewsRSSEnabled)
 }

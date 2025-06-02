@@ -14,16 +14,26 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	wCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
-	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/services/wallet/transfer"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
 )
+
+type FilterDependencies struct {
+	db *sql.DB
+	// use token.TokenType, token.ChainID and token.Address to find the available symbol
+	tokenSymbol func(token ac.Token) string
+	// use the chainID and symbol to look up token.TokenType and token.Address. Return nil if not found
+	tokenFromSymbol func(chainID *wCommon.ChainID, symbol string) *ac.Token
+	// use to get current timestamp
+	currentTimestamp func() int64
+}
 
 // getActivityEntriesV2 queries the route_* and tracked_transactions based on filter parameters and arguments
 // it returns metadata for all entries ordered by timestamp column
@@ -41,23 +51,20 @@ func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresse
 		rpt.is_approval,
 		rp.path_json,
 		rip.route_input_params_json,
-		rbtp.route_build_tx_params_json,
 		tt.tx_status,
 		tt.timestamp
 		`).Distinct()
 	q = q.From("sent_transactions st").
-		LeftJoin(`route_path_transactions rpt ON 
-			st.chain_id = rpt.chain_id AND 
+		LeftJoin(`route_path_transactions rpt ON
+			st.chain_id = rpt.chain_id AND
 			st.tx_hash = rpt.tx_hash`).
-		LeftJoin(`tracked_transactions tt ON 
-			st.chain_id = tt.chain_id AND 
+		LeftJoin(`tracked_transactions tt ON
+			st.chain_id = tt.chain_id AND
 			st.tx_hash = tt.tx_hash`).
-		LeftJoin(`route_paths rp ON 
-			rpt.uuid = rp.uuid AND 
+		LeftJoin(`route_paths rp ON
+			rpt.uuid = rp.uuid AND
 			rpt.path_idx = rp.path_idx`).
-		LeftJoin(`route_build_tx_parameters rbtp ON 
-			rpt.uuid = rbtp.uuid`).
-		LeftJoin(`route_input_parameters rip ON 
+		LeftJoin(`route_input_parameters rip ON
 			rpt.uuid = rip.uuid`)
 	q = q.OrderBy("tt.timestamp DESC", "rpt.is_approval ASC")
 
@@ -68,7 +75,7 @@ func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresse
 
 	q = q.Where(qConditions)
 
-	if limit != NoLimit {
+	if limit != ac.NoLimit {
 		q = q.Limit(uint64(limit))
 		q = q.Offset(uint64(offset))
 	}
@@ -106,7 +113,6 @@ type entryDataV2 struct {
 	Timestamp        int64
 	Path             *routes.Path
 	RouteInputParams *requests.RouteInputParams
-	BuildInputParams *requests.RouterBuildTransactionsParams
 }
 
 func newEntryDataV2() *entryDataV2 {
@@ -115,7 +121,6 @@ func newEntryDataV2() *entryDataV2 {
 		Tx:               new(ethTypes.Transaction),
 		Path:             new(routes.Path),
 		RouteInputParams: new(requests.RouteInputParams),
-		BuildInputParams: new(requests.RouterBuildTransactionsParams),
 	}
 }
 
@@ -129,7 +134,6 @@ func rowsToDataV2(rows *sql.Rows) ([]*entryDataV2, error) {
 		nullableIsApproval := sql.NullBool{}
 		nullablePath := sqlite.JSONBlob{Data: data.Path}
 		nullableRouteInputParams := sqlite.JSONBlob{Data: data.RouteInputParams}
-		nullableBuildInputParams := sqlite.JSONBlob{Data: data.BuildInputParams}
 		nullableStatus := sql.NullString{}
 		nullableTimestamp := sql.NullInt64{}
 
@@ -139,7 +143,6 @@ func rowsToDataV2(rows *sql.Rows) ([]*entryDataV2, error) {
 			&nullableIsApproval,
 			&nullablePath,
 			&nullableRouteInputParams,
-			&nullableBuildInputParams,
 			&nullableStatus,
 			&nullableTimestamp,
 		)
@@ -154,8 +157,7 @@ func rowsToDataV2(rows *sql.Rows) ([]*entryDataV2, error) {
 			!nullableStatus.Valid ||
 			!nullableTimestamp.Valid ||
 			!nullablePath.Valid ||
-			!nullableRouteInputParams.Valid ||
-			!nullableBuildInputParams.Valid {
+			!nullableRouteInputParams.Valid {
 			logutils.ZapLogger().Warn("some fields missing in entryData")
 			continue
 		}
@@ -179,9 +181,9 @@ func dataToEntriesV2(deps FilterDependencies, data []*entryDataV2) ([]Entry, err
 		chainID := wCommon.ChainID(d.Path.FromChain.ChainID)
 
 		entry := Entry{
-			payloadType: MultiTransactionPT, // Temporary, to keep compatibility with clients
+			payloadType: ac.MultiTransactionPT, // Temporary, to keep compatibility with clients
 			id:          d.TxArgs.MultiTransactionID,
-			transactions: []*transfer.TransactionIdentity{
+			transactions: []*ac.TransactionIdentity{
 				{
 					ChainID: chainID,
 					Hash:    d.Tx.Hash(),
@@ -213,12 +215,15 @@ func dataToEntriesV2(deps FilterDependencies, data []*entryDataV2) ([]Entry, err
 
 		entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
 
-		if entry.transferType == nil || TokenType(*entry.transferType) != Native {
-			interactedAddress := eth.BytesToAddress(d.Tx.To().Bytes())
+		if entry.transferType == nil || ac.TokenType(*entry.transferType) != ac.Native {
+			var interactedAddress eth.Address
+			if d.Tx.To() != nil {
+				interactedAddress = eth.BytesToAddress(d.Tx.To().Bytes())
+			}
 			entry.interactedContractAddress = &interactedAddress
 		}
 
-		if entry.activityType == ApproveAT {
+		if entry.activityType == ac.ApproveAT {
 			entry.approvalSpender = d.Path.ApprovalContractAddress
 		}
 
@@ -228,62 +233,64 @@ func dataToEntriesV2(deps FilterDependencies, data []*entryDataV2) ([]Entry, err
 	return ret, nil
 }
 
-func getActivityTypeV2(processorName string, isApproval bool) Type {
+func getActivityTypeV2(processorName string, isApproval bool) ac.Type {
 	if isApproval {
-		return ApproveAT
+		return ac.ApproveAT
 	}
 
 	switch processorName {
 	case pathProcessorCommon.ProcessorTransferName, pathProcessorCommon.ProcessorERC721Name, pathProcessorCommon.ProcessorERC1155Name:
-		return SendAT
+		return ac.SendAT
 	case pathProcessorCommon.ProcessorBridgeHopName, pathProcessorCommon.ProcessorBridgeCelerName:
-		return BridgeAT
+		return ac.BridgeAT
 	case pathProcessorCommon.ProcessorSwapParaswapName:
-		return SwapAT
+		return ac.SwapAT
 	}
-	return UnknownAT
+	return ac.UnknownAT
 }
 
-func getActivityStatusV2(status transactions.TxStatus, timestamp int64, now int64, finalizationDuration int64) Status {
+func getActivityStatusV2(status transactions.TxStatus, timestamp int64, now int64, finalizationDuration int64) ac.Status {
 	switch status {
 	case transactions.Pending:
-		return PendingAS
+		return ac.PendingAS
 	case transactions.Success:
 		if timestamp+finalizationDuration > now {
-			return FinalizedAS
+			return ac.FinalizedAS
 		}
-		return CompleteAS
+		return ac.CompleteAS
 	case transactions.Failed:
-		return FailedAS
+		return ac.FailedAS
 	}
 
 	logutils.ZapLogger().Error("unhandled transaction status value")
-	return FailedAS
+	return ac.FailedAS
 }
 
 func getFinalizationPeriod(chainID wCommon.ChainID) int64 {
 	switch uint64(chainID) {
 	case wCommon.EthereumMainnet, wCommon.EthereumSepolia:
-		return L1FinalizationDuration
+		return ac.L1FinalizationDuration
+	case wCommon.BSCMainnet, wCommon.BSCTestnet:
+		return ac.BSCFinalizationDuration
 	}
 
-	return L2FinalizationDuration
+	return ac.L2FinalizationDuration
 }
 
-func getTransferType(fromToken *token.Token, processorName string) *TransferType {
-	ret := new(TransferType)
+func getTransferType(fromToken *tokenTypes.Token, processorName string) *ac.TransferType {
+	ret := new(ac.TransferType)
 
 	switch processorName {
 	case pathProcessorCommon.ProcessorTransferName:
 		if fromToken.IsNative() {
-			*ret = TransferTypeEth
+			*ret = ac.TransferTypeEth
 			break
 		}
-		*ret = TransferTypeErc20
+		*ret = ac.TransferTypeErc20
 	case pathProcessorCommon.ProcessorERC721Name:
-		*ret = TransferTypeErc721
+		*ret = ac.TransferTypeErc721
 	case pathProcessorCommon.ProcessorERC1155Name:
-		*ret = TransferTypeErc1155
+		*ret = ac.TransferTypeErc1155
 	default:
 		ret = nil
 	}
@@ -291,15 +298,15 @@ func getTransferType(fromToken *token.Token, processorName string) *TransferType
 	return ret
 }
 
-func getToken(token *token.Token, processorName string) *Token {
+func getToken(token *tokenTypes.Token, processorName string) *ac.Token {
 	if token == nil {
 		return nil
 	}
 
-	ret := new(Token)
+	ret := new(ac.Token)
 	ret.ChainID = wCommon.ChainID(token.ChainID)
 	if token.IsNative() {
-		ret.TokenType = Native
+		ret.TokenType = ac.Native
 	} else {
 		ret.Address = token.Address
 		switch processorName {
@@ -311,13 +318,30 @@ func getToken(token *token.Token, processorName string) *Token {
 			}
 			ret.TokenID = (*hexutil.Big)(id)
 			if processorName == pathProcessorCommon.ProcessorERC721Name {
-				ret.TokenType = Erc721
+				ret.TokenType = ac.Erc721
 			} else {
-				ret.TokenType = Erc1155
+				ret.TokenType = ac.Erc1155
 			}
 		default:
-			ret.TokenType = Erc20
+			ret.TokenType = ac.Erc20
 		}
 	}
 	return ret
+}
+
+// lookupAndFillInTokens ignores NFTs
+func lookupAndFillInTokens(deps FilterDependencies, tokenOut *ac.Token, tokenIn *ac.Token) (symbolOut *string, symbolIn *string) {
+	if tokenOut != nil && tokenOut.TokenID == nil {
+		symbol := deps.tokenSymbol(*tokenOut)
+		if len(symbol) > 0 {
+			symbolOut = wCommon.NewAndSet(symbol)
+		}
+	}
+	if tokenIn != nil && tokenIn.TokenID == nil {
+		symbol := deps.tokenSymbol(*tokenIn)
+		if len(symbol) > 0 {
+			symbolIn = wCommon.NewAndSet(symbol)
+		}
+	}
+	return symbolOut, symbolIn
 }

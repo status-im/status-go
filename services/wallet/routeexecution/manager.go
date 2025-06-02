@@ -9,16 +9,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-
-	"github.com/status-im/status-go/logutils"
 
 	status_common "github.com/status-im/status-go/common"
 	statusErrors "github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/services/wallet/router"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
@@ -38,9 +37,6 @@ type Manager struct {
 	transferController *transfer.Controller
 	db                 *storage.DB
 	eventFeed          *event.Feed
-
-	// Local data used for storage purposes
-	buildInputParams *requests.RouterBuildTransactionsParams
 }
 
 func NewManager(walletDB *sql.DB, eventFeed *event.Feed, router *router.Router, transactionManager *transfer.TransactionManager, transferController *transfer.Controller) *Manager {
@@ -54,11 +50,14 @@ func NewManager(walletDB *sql.DB, eventFeed *event.Feed, router *router.Router, 
 }
 
 func (m *Manager) ClearLocalRouteData() {
-	m.buildInputParams = nil
 	m.transactionManager.ClearLocalRouterTransactionsData()
 }
 
-func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputParams *requests.RouterBuildTransactionsParams) {
+func (m *Manager) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *requests.PathTxIdentity) error {
+	return m.router.ReevaluateRouterPath(ctx, pathTxIdentity)
+}
+
+func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 	go func() {
 		defer status_common.LogOnPanic()
 
@@ -67,7 +66,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 		var err error
 		response := &responses.RouterTransactionsForSigning{
 			SendDetails: &responses.SendDetails{
-				Uuid: buildInputParams.Uuid,
+				Uuid: uuid,
 			},
 		}
 
@@ -81,13 +80,18 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 		}()
 
 		route, routeInputParams := m.router.GetBestRouteAndAssociatedInputParams()
-		if routeInputParams.Uuid != buildInputParams.Uuid {
+		if routeInputParams.Uuid != uuid {
 			// should never be here
 			err = ErrCannotResolveRouteId
 			return
 		}
 
-		m.buildInputParams = buildInputParams
+		// re-use path processor input params structure to pass extra params to transaction manager
+		var extraParams pathprocessor.ProcessorInputParams
+		extraParams, err = m.router.CreateProcessorInputParams(&routeInputParams, nil, nil, nil, nil, 0)
+		if err != nil {
+			return
+		}
 
 		fromChainID, toChainID := route.GetFirstPathChains()
 
@@ -99,14 +103,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 		response.SigningDetails, fromChainID, toChainID, err = m.transactionManager.BuildTransactionsFromRoute(
 			route,
 			m.router.GetPathProcessors(),
-			transfer.BuildRouteExtraParams{
-				AddressFrom:        routeInputParams.AddrFrom,
-				AddressTo:          routeInputParams.AddrTo,
-				Username:           routeInputParams.Username,
-				PublicKey:          routeInputParams.PublicKey,
-				PackID:             routeInputParams.PackID.ToInt(),
-				SlippagePercentage: buildInputParams.SlippagePercentage,
-			},
+			&extraParams,
 		)
 		if err != nil {
 			response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
@@ -207,7 +204,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 		response.SentTransactions, fromChainID, toChainID, err = m.transactionManager.SendRouterTransactions(ctx, multiTx)
 		if err != nil {
 			response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
-			log.Error("Error sending router transactions", "error", err)
+			logutils.ZapLogger().Error("Error sending router transactions", zap.Error(err))
 			// TODO #16556: Handle partially successful Tx sends?
 			// Don't return, store whichever transactions were successfully sent
 		}
@@ -215,31 +212,10 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 		// don't overwrite err since we want to process it in the deferred function
 		var tmpErr error
 		routerTransactions := m.transactionManager.GetRouterTransactions()
-		routeData := wallettypes.NewRouteData(&routeInputParams, m.buildInputParams, routerTransactions)
+		routeData := wallettypes.NewRouteData(&routeInputParams, routerTransactions)
 		tmpErr = m.db.PutRouteData(routeData)
 		if tmpErr != nil {
-			log.Error("Error storing route data", "error", tmpErr)
-		}
-
-		var (
-			chainIDs  []uint64
-			addresses []common.Address
-		)
-		for _, tx := range response.SentTransactions {
-			chainIDs = append(chainIDs, tx.FromChain)
-			addresses = append(addresses, common.Address(tx.FromAddress))
-			go func(chainId uint64, txHash common.Hash) {
-				defer status_common.LogOnPanic()
-				tmpErr = m.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
-				if tmpErr != nil {
-					logutils.ZapLogger().Error("Error watching transaction", zap.Error(tmpErr))
-					return
-				}
-			}(tx.FromChain, common.Hash(tx.Hash))
-		}
-		tmpErr = m.transferController.CheckRecentHistory(chainIDs, addresses)
-		if tmpErr != nil {
-			logutils.ZapLogger().Error("Error checking recent history", zap.Error(tmpErr))
+			logutils.ZapLogger().Error("Error storing route data", zap.Error(tmpErr))
 		}
 	}()
 }

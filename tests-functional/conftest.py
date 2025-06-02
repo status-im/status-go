@@ -1,14 +1,13 @@
 import os
-import docker
-
 from dataclasses import dataclass, field
 from typing import List
+import pytest
 
 
 def pytest_addoption(parser):
     parser.addoption(
         "--status_backend_url",
-        action="store",
+        action="append",
         help="",
         default=None,
     )
@@ -37,10 +36,22 @@ def pytest_addoption(parser):
         default=None,
     )
     parser.addoption(
-        "--user_dir",
+        "--logout",
+        action="store_true",
+        help="When set, will automatically call Logout() before InitializeApplication()",
+        default=False,
+    )
+    parser.addoption(
+        "--waku-fleets-config",
         action="store",
-        help="",
-        default=None,
+        help="Path to a local JSON file with Waku fleets configuration. Default value is a path to config in Docker to run 2 local waku nodes",
+        default="/static/configs/wakufleetconfig.json",
+    )
+    parser.addoption(
+        "--waku-fleet",
+        action="store",
+        help="Waku fleet to be used. Default: --waku-fleet=status-go.test",
+        default="status-go.test",
     )
 
 
@@ -54,6 +65,17 @@ class Option:
 option = Option()
 
 
+def status_backend_url_generator(config):
+    if hasattr(option, "status_backend_url") and config.option.status_backend_url is not None:
+        urls = config.option.status_backend_url
+    else:
+        print("status_backend_url option not found or is None")
+        return
+
+    for url in urls:
+        yield url
+
+
 def pytest_configure(config):
     global option
     option = config.option
@@ -61,21 +83,36 @@ def pytest_configure(config):
     executor_number = int(os.getenv("EXECUTOR_NUMBER", 5))
     base_port = 7000
     range_size = 100
+    max_port = 65535
+    min_port = 1024
 
     start_port = base_port + (executor_number * range_size)
+    end_port = start_port + 20000
 
-    option.status_backend_port_range = list(range(start_port, start_port + range_size - 1))
+    # Ensure generated ports are within the valid range
+    if start_port < min_port or end_port > max_port:
+        raise ValueError(f"Generated port range ({start_port}-{end_port}) is outside the allowed range ({min_port}-{max_port}).")
+
+    option.status_backend_port_range = list(range(start_port, end_port))
     option.status_backend_containers = []
 
-    option.base_dir = os.path.dirname(os.path.abspath(__file__))
+    option.base_dir = os.path.dirname(os.path.abspath(__file__))  # schemas directory
+    option.status_backend_urls = status_backend_url_generator(config)
 
 
-def pytest_unconfigure():
-    docker_client = docker.from_env()
-    for container_id in option.status_backend_containers:
-        try:
-            container = docker_client.containers.get(container_id)
-            container.stop(timeout=30)
-            container.remove()
-        except Exception as e:
-            print(e)
+def pytest_report_header(config):
+    return [
+        f"waku fleets config file: {config.option.waku_fleets_config}",
+        f"waku fleet: {config.option.waku_fleet}",
+    ]
+
+
+@pytest.fixture(scope="function", autouse=True)
+def close_status_backend_containers(request):
+    yield
+    if hasattr(request.node.instance, "reuse_container"):
+        return
+    for status_backend in option.status_backend_containers:
+        status_backend.container.stop(timeout=10)  # pyright: ignore[reportAttributeAccessIssue]
+        status_backend.container.remove()  # pyright: ignore[reportAttributeAccessIssue]
+    option.status_backend_containers = []

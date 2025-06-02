@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/protocol/common/shard"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/t/helpers"
 	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -26,10 +26,10 @@ func TestAddGetDeleteMailserver(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
 	api := &API{db: db}
-	testMailserver := Mailserver{
+	testMailserver := wakutypes.Mailserver{
 		ID:     "mailserver001",
 		Name:   "My Mailserver",
-		Addr:   MustDecodeMultiaddress("/dns4/node-01.do-ams3.waku.test.status.im/tcp/30303/p2p/16Uiu2HAkykgaECHswi3YKJ5dMLbq2kPVCo89fcyTd38UcQD6ej5W"),
+		Addr:   wakutypes.MustDecodeMultiaddress("/dns4/node-01.do-ams3.waku.test.status.im/tcp/30303/p2p/16Uiu2HAkykgaECHswi3YKJ5dMLbq2kPVCo89fcyTd38UcQD6ej5W"),
 		Custom: true,
 		Fleet:  "prod",
 	}
@@ -44,14 +44,14 @@ func TestAddGetDeleteMailserver(t *testing.T) {
 
 	mailservers, err := api.GetMailservers(context.Background())
 	require.NoError(t, err)
-	require.EqualValues(t, []Mailserver{testMailserver, testMailserverWithPassword}, mailservers)
+	require.EqualValues(t, []wakutypes.Mailserver{testMailserver, testMailserverWithPassword}, mailservers)
 
 	err = api.DeleteMailserver(context.Background(), testMailserver.ID)
 	require.NoError(t, err)
 	// Verify they was deleted.
 	mailservers, err = api.GetMailservers(context.Background())
 	require.NoError(t, err)
-	require.EqualValues(t, []Mailserver{testMailserverWithPassword}, mailservers)
+	require.EqualValues(t, []wakutypes.Mailserver{testMailserverWithPassword}, mailservers)
 	// Delete non-existing mailserver.
 	err = api.DeleteMailserver(context.Background(), "other-id")
 	require.NoError(t, err)
@@ -62,9 +62,9 @@ func TestTopic(t *testing.T) {
 	defer close()
 	topicA := "0x61000000"
 	topicD := "0x64000000"
-	topic1 := MailserverTopic{PubsubTopic: shard.DefaultShardPubsubTopic(), ContentTopic: topicA, LastRequest: 1}
-	topic2 := MailserverTopic{PubsubTopic: shard.DefaultShardPubsubTopic(), ContentTopic: "0x6200000", LastRequest: 2}
-	topic3 := MailserverTopic{PubsubTopic: shard.DefaultShardPubsubTopic(), ContentTopic: "0x6300000", LastRequest: 3}
+	topic1 := MailserverTopic{PubsubTopic: wakuv2.DefaultShardPubsubTopic(), ContentTopic: topicA, LastRequest: 1}
+	topic2 := MailserverTopic{PubsubTopic: wakuv2.DefaultShardPubsubTopic(), ContentTopic: "0x6200000", LastRequest: 2}
+	topic3 := MailserverTopic{PubsubTopic: wakuv2.DefaultShardPubsubTopic(), ContentTopic: "0x6300000", LastRequest: 3}
 
 	require.NoError(t, db.AddTopic(topic1))
 	require.NoError(t, db.AddTopic(topic2))
@@ -74,18 +74,18 @@ func TestTopic(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, topics, 3)
 
-	filters := []*transport.Filter{
+	filters := messagingtypes.ChatFilters{
 		// Existing topic, is not updated
 		{
-			PubsubTopic:  shard.DefaultShardPubsubTopic(),
-			ContentTopic: wakutypes.BytesToTopic([]byte{0x61}),
+			PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
+			ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x61}),
 		},
 		// Non existing topic is not inserted
 		{
 			Discovery:    true,
 			Negotiated:   true,
-			PubsubTopic:  shard.DefaultShardPubsubTopic(),
-			ContentTopic: wakutypes.BytesToTopic([]byte{0x64}),
+			PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
+			ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x64}),
 		},
 	}
 
@@ -160,7 +160,7 @@ func TestAddGetDeleteMailserverTopics(t *testing.T) {
 	defer close()
 	api := &API{db: db}
 	testTopic := MailserverTopic{
-		PubsubTopic:  shard.DefaultShardPubsubTopic(),
+		PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
 		ContentTopic: "topic-001",
 		ChatIDs:      []string{"chatID01", "chatID02"},
 		LastRequest:  10,
@@ -173,14 +173,14 @@ func TestAddGetDeleteMailserverTopics(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, []MailserverTopic{testTopic}, topics)
 
-	err = api.DeleteMailserverTopic(context.Background(), shard.DefaultShardPubsubTopic(), testTopic.ContentTopic)
+	err = api.DeleteMailserverTopic(context.Background(), wakuv2.DefaultShardPubsubTopic(), testTopic.ContentTopic)
 	require.NoError(t, err)
 	topics, err = api.GetMailserverTopics(context.Background())
 	require.NoError(t, err)
 	require.EqualValues(t, ([]MailserverTopic)(nil), topics)
 
 	// Delete non-existing topic.
-	err = api.DeleteMailserverTopic(context.Background(), shard.DefaultShardPubsubTopic(), "non-existing-topic")
+	err = api.DeleteMailserverTopic(context.Background(), wakuv2.DefaultShardPubsubTopic(), "non-existing-topic")
 	require.NoError(t, err)
 }
 
