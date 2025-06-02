@@ -488,6 +488,7 @@ func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, su
 }
 */
 
+// TODO-nwaku maybe eventually remove as nwaku should do it
 func (w *Waku) discoverAndConnectPeers() {
 	var addrsToConnect []multiaddr.Multiaddr
 	nameserver := w.cfg.Nameserver
@@ -589,57 +590,6 @@ func (w *Waku) GetStats() types.StatsSummary {
 		DownloadRate: uint64(stats.RateIn),
 	} */
 }
-
-/* TODO-nwaku* (this logic should be directly in nwaku?)
-func (w *Waku) runPeerExchangeLoop() {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
-
-	if !w.cfg.EnablePeerExchangeClient {
-		// Currently peer exchange client is only used for light nodes
-		return
-	}
-
-	ticker := time.NewTicker(time.Second * 5)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-w.ctx.Done():
-			w.logger.Debug("Peer exchange loop stopped")
-			return
-		case <-ticker.C:
-			w.logger.Info("Running peer exchange loop")
-
-			// We select only the nodes discovered via DNS Discovery that support peer exchange
-			// We assume that those peers are running peer exchange according to infra config,
-			// If not, the peer selection process in go-waku will filter them out anyway
-			w.dnsAddressCacheLock.RLock()
-			var peers peer.IDSlice
-			for _, record := range w.dnsAddressCache {
-				for _, discoveredNode := range record {
-					if len(discoveredNode.PeerInfo.Addrs) == 0 {
-						continue
-					}
-					// Attempt to connect to the peers.
-					// Peers will be added to the libp2p peer store thanks to identify
-					go w.connect(discoveredNode.PeerInfo, discoveredNode.ENR, wps.DNSDiscovery)
-					peers = append(peers, discoveredNode.PeerID)
-				}
-			}
-			w.dnsAddressCacheLock.RUnlock()
-
-			if len(peers) != 0 {
-				err := w.node.PeerExchange().Request(w.ctx, w.cfg.DiscoveryLimit, peer_exchange.WithAutomaticPeerSelection(peers...),
-					peer_exchange.FilterByShard(int(w.defaultShardInfo.ClusterID), int(w.defaultShardInfo.ShardIDs[0])))
-				if err != nil {
-					w.logger.Error("couldnt request peers via peer exchange", zap.Error(err))
-				}
-			}
-		}
-	}
-}
-*/
 
 func (w *Waku) GetPubsubTopic(topic string) string {
 	if topic == "" {
@@ -1075,9 +1025,8 @@ func (w *Waku) Start() error {
 		w.ctx, w.cancel = context.WithCancel(context.Background())
 	}
 
-	/* TODO-nwaku
 	w.goingOnline = make(chan struct{})
-	*/
+
 	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, newPinger(w.node))
 	w.HistoryRetriever = history.NewHistoryRetriever(newStorenodeRequestor(w.node, w.logger), NewHistoryProcessorWrapper(w), w.logger)
 	w.StorenodeCycle.Start(w.ctx)
@@ -1461,8 +1410,7 @@ func (w *Waku) Stop() error {
 		}
 	}
 
-	/* TODO-nwaku
-	close(w.goingOnline)*/
+	close(w.goingOnline)
 
 	w.wg.Wait()
 
@@ -1666,16 +1614,27 @@ func (w *Waku) Peers() types.PeerStats {
 }
 
 func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
-	/* TODO-nwaku
+	if w.cfg.LightClient {
 		return nil, errors.New("only available in relay mode")
 	}
 
+	allPeers, err := w.node.GetConnectedRelayPeers(topic)
+
+	if err != nil {
+		return nil, err
+	}
+
+	fullMeshPeers, err := w.node.GetPeersInMesh(topic)
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &types.PeerList{
-		FullMeshPeers: w.node.Relay().PubSub().MeshPeers(topic),
-		AllPeers:      w.node.Relay().PubSub().ListPeers(topic),
+		FullMeshPeers: allPeers,
+		AllPeers:      fullMeshPeers,
 	}, nil
-	*/
-	return &types.PeerList{}, nil
+
 }
 
 func (w *Waku) ENR() (*enode.Node, error) {
@@ -1756,7 +1715,6 @@ func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
 	*/
 }
 
-/* TODO-nwaku
 func (w *Waku) isGoingOnline(state connection.State) bool {
 	return !state.Offline && !w.onlineChecker.IsOnline()
 }
@@ -1764,7 +1722,6 @@ func (w *Waku) isGoingOnline(state connection.State) bool {
 func (w *Waku) isGoingOffline(state connection.State) bool {
 	return state.Offline && w.onlineChecker.IsOnline()
 }
-*/
 
 func (w *Waku) ConnectionChanged(state connection.State) {
 	/* TODO-nwaku
