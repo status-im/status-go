@@ -52,7 +52,6 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
@@ -1253,14 +1252,23 @@ func (w *Waku) Start() error {
 
 func (w *Waku) checkForConnectionChanges() {
 
-	/* TODO-nwaku
-	isOnline := len(w.node.Host().Network().Peers()) > 0
+	isOnline, err := w.node.IsOnline()
+
+	if err != nil {
+		panic(err)
+	}
 
 	w.connStatusMu.Lock()
 
+	peerStats, err := FormatPeerStats(w.node)
+
+	if err != nil {
+		panic(err)
+	}
+
 	latestConnStatus := types.ConnStatus{
 		IsOnline: isOnline,
-		Peers:    FormatPeerStats(w.node),
+		Peers:    peerStats,
 	}
 
 	w.logger.Debug("peer stats",
@@ -1281,7 +1289,7 @@ func (w *Waku) checkForConnectionChanges() {
 	w.ConnectionChanged(connection.State{
 		Type:    w.state.Type, //setting state type as previous one since there won't be a change here
 		Offline: !latestConnStatus.IsOnline,
-	}) */
+	})
 }
 
 /* TODO-nwaku - implement when metrics are supported
@@ -1647,10 +1655,14 @@ func (w *Waku) PeerCount() int {
 	return numPeers
 }
 
-// TODO-nwaku
 func (w *Waku) Peers() types.PeerStats {
-	return nil
-	// return FormatPeerStats(w.node)
+	peerStats, err := FormatPeerStats(w.node)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return peerStats
 }
 
 func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
@@ -2014,18 +2026,26 @@ func toDeterministicID(id string, expectedLen int) (string, error) {
 	return id, nil
 }
 
-func FormatPeerStats(wakuNode *node.WakuNode) types.PeerStats {
-	p := make(types.PeerStats)
-	for k, v := range wakuNode.PeerStats() {
-		p[k] = types.WakuV2Peer{
-			Addresses: utils.EncapsulatePeerID(k, wakuNode.Host().Peerstore().PeerInfo(k).Addrs...),
-			Protocols: v,
-		}
+func convertPeersDataToPeerStats(peersData bindingscommon.PeersData) types.PeerStats {
+	result := make(types.PeerStats)
+	for peerID, peerInfo := range peersData {
+		result[peerID] = types.WakuV2Peer(peerInfo)
 	}
-	return p
+	return result
 }
 
-func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
+func FormatPeerStats(wakuNode *waku.WakuNode) (types.PeerStats, error) {
+
+	peersData, err := wakuNode.GetConnectedPeersInfo()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return convertPeersDataToPeerStats(peersData), nil
+}
+
+/* func FormatPeerConnFailures(wakuNode *waku.WakuNode) map[string]int {
 	p := make(map[string]int)
 	for _, peerID := range wakuNode.Host().Network().Peers() {
 		peerInfo := wakuNode.Host().Peerstore().PeerInfo(peerID)
@@ -2035,7 +2055,7 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 		}
 	}
 	return p
-}
+} */
 
 // GetCurrentTime returns current time.
 // Implements protocol/common.TimeSource
