@@ -78,7 +78,6 @@ type StatusNode struct {
 	logger *zap.Logger
 
 	gethAccountManager *account.GethManager
-	accountsManager    *accounts.Manager
 	transactor         *transactions.Transactor
 
 	publicMethods map[string]bool
@@ -116,11 +115,11 @@ type StatusNode struct {
 }
 
 // New makes new instance of StatusNode.
-func New(transactor *transactions.Transactor, logger *zap.Logger) *StatusNode {
+func New(transactor *transactions.Transactor, gethAccountManager *account.GethManager, logger *zap.Logger) *StatusNode {
 	logger = logger.Named("StatusNode")
 	return &StatusNode{
-		gethAccountManager: account.NewGethManager(logger),
 		transactor:         transactor,
+		gethAccountManager: gethAccountManager,
 		logger:             logger,
 		publicMethods:      make(map[string]bool),
 	}
@@ -147,19 +146,6 @@ func (n *StatusNode) HTTPServer() *server.MediaServer {
 	defer n.mu.RUnlock()
 
 	return n.httpServer
-}
-
-// Start starts current StatusNode, failing if it's already started.
-// It accepts a list of services that should be added to the node.
-func (n *StatusNode) Start(config *params.NodeConfig, accs *accounts.Manager) error {
-	return n.StartWithOptions(config, StartOptions{
-		AccountsManager: accs,
-	})
-}
-
-// StartOptions allows to control some parameters of Start() method.
-type StartOptions struct {
-	AccountsManager *accounts.Manager
 }
 
 // StartMediaServerWithoutDB starts media server without starting the node
@@ -196,7 +182,7 @@ func (n *StatusNode) StartMediaServerWithoutDB() error {
 
 // StartWithOptions starts current StatusNode, failing if it's already started.
 // It takes some options that allows to further configure starting process.
-func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOptions) error {
+func (n *StatusNode) Start(config *params.NodeConfig) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -205,19 +191,19 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 		return ErrNodeRunning
 	}
 
-	n.accountsManager = options.AccountsManager
-
 	n.logger.Debug("starting with options", zap.Stringer("ClusterConfig", &config.ClusterConfig))
 
-	return n.startWithDB(config, options.AccountsManager)
+	return n.startWithDB(config)
 }
 
 func (n *StatusNode) SetMediaServerEnableTLS(enableTLS *bool) {
 	n.mediaServerEnableTLS = enableTLS
 }
 
-func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manager) error {
-	if err := n.createNode(config, accs); err != nil {
+func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
+	var err error
+	n.gethNode, err = MakeNode(config)
+	if err != nil {
 		return err
 	}
 	n.config = config
@@ -254,11 +240,6 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 		return err
 	}
 	return n.startGethNode()
-}
-
-func (n *StatusNode) createNode(config *params.NodeConfig, accs *accounts.Manager) (err error) {
-	n.gethNode, err = MakeNode(config, accs)
-	return err
 }
 
 // startGethNode starts current StatusNode, will fail if it's already started.

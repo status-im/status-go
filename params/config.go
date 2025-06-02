@@ -785,10 +785,11 @@ func (c *NodeConfig) updatePeerLimits() {
 // NewNodeConfig creates new node configuration object with bare-minimum defaults.
 // Important: the returned config is not validated.
 func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
-	var keyStoreDir, keycardPairingDataFile, wakuV2Dir string
+	var keycardPairingDataFile, wakuV2Dir string
+
+	keyStoreDir := "keystore"
 
 	if dataDir != "" {
-		keyStoreDir = filepath.Join(dataDir, "keystore")
 		keycardPairingDataFile = filepath.Join(dataDir, "keycard", "pairings.json")
 
 		wakuV2Dir = filepath.Join(dataDir, "wakuv2")

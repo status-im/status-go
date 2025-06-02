@@ -137,13 +137,13 @@ func (b *GethStatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
 func (b *GethStatusBackend) initialize() {
 	accountManager := account.NewGethManager(b.logger)
 	transactor := transactions.NewTransactor()
-	personalAPI := personal.NewAPI()
-	statusNode := node.New(transactor, b.logger)
+	personalService := personal.New()
+	statusNode := node.New(transactor, accountManager, b.logger)
 
 	b.statusNode = statusNode
 	b.accountManager = accountManager
 	b.transactor = transactor
-	b.signer = personalAPI
+	b.signer = personalService
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
 	b.LocalPairingStateManager = new(statecontrol.ProcessStateManager)
 	b.LocalPairingStateManager.SetPairing(false)
@@ -368,29 +368,6 @@ func (b *GethStatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string
 	}
 
 	return os.RemoveAll(keyStoreDir)
-}
-
-func (b *GethStatusBackend) DeleteImportedKey(address, password, keyStoreDir string) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	err := filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if strings.Contains(fileInfo.Name(), address) {
-			_, err := b.accountManager.VerifyAccountPassword(keyStoreDir, "0x"+address, password)
-			if err != nil {
-				b.logger.Error("failed to verify account", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
-				return err
-			}
-
-			return os.Remove(path)
-		}
-		return nil
-	})
-
-	return err
 }
 
 func (b *GethStatusBackend) runDBFileMigrations(account multiaccounts.Account, password string) (string, error) {
@@ -2270,14 +2247,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		}
 	}
 
-	manager := b.accountManager.GetManager()
-	if manager == nil {
-		return errors.New("ethereum accounts.Manager is nil")
-	}
-
-	if err = b.statusNode.StartWithOptions(config, node.StartOptions{
-		AccountsManager: manager,
-	}); err != nil {
+	if err = b.statusNode.Start(config); err != nil {
 		return
 	}
 
@@ -2496,7 +2466,9 @@ func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (
 		return nil, wallettypes.ErrAccountDoesntExist
 	}
 
-	key, err := b.accountManager.VerifyAccountPassword(config.KeyStoreDir, address, password)
+	keystoreDirPath := filepath.Join(config.DataDir, config.KeyStoreDir)
+
+	key, err := b.accountManager.VerifyAccountPassword(keystoreDirPath, address, password)
 	if _, ok := err.(*account.ErrCannotLocateKeyFile); ok {
 		key, err = b.generatePartialAccountKey(db, address, password)
 		if err != nil {
