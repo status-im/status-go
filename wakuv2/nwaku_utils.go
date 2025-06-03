@@ -7,9 +7,10 @@ package wakuv2
 import (
 	bindings "github.com/waku-org/waku-go-bindings/waku/common"
 
-	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
+
+	"github.com/status-im/status-go/wakuv2/common"
 )
 
 func HexToPbHash(hexHash bindings.MessageHash) (pb.MessageHash, error) {

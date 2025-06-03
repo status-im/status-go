@@ -3,8 +3,9 @@ package common
 import (
 	"encoding/json"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 // Envelope contains information about the pubsub topic of a WakuMessage
