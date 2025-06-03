@@ -2,7 +2,13 @@ from typing import TypedDict
 from clients.rpc import RpcClient
 from clients.services.service import Service
 from resources.enums import MessageContentType
+from enum import Enum
 
+
+class PushNotificationRegistrationTokenType(Enum):
+    UNKNOWN = 0
+    APN_TOKEN = 1
+    FIREBASE_TOKEN = 2
 
 class SendPinMessagePayload(TypedDict):
     chat_id: str
@@ -164,7 +170,7 @@ class WakuextService(Service):
         return response.json()
 
     def all_messages_from_chats_and_communities_which_match_term(
-        self, community_ids: list[str], chat_ids: list[str], searchTerm: str, caseSensitive: bool
+            self, community_ids: list[str], chat_ids: list[str], searchTerm: str, caseSensitive: bool
     ):
         params = [community_ids, chat_ids, searchTerm, caseSensitive]
         response = self.rpc_request("allMessagesFromChatsAndCommunitiesWhichMatchTerm", params)
@@ -318,4 +324,9 @@ class WakuextService(Service):
     def create_one_to_one_chat(self, chat_id: str, ens_name: str):
         params = [{"id": chat_id, "ensName": ens_name}]
         response = self.rpc_request("createOneToOneChat", params)
+        return response.json()
+
+    def register_for_push_notifications(self, device_token: str, apnTopic: str, tokenType: PushNotificationRegistrationTokenType):
+        params = [device_token, apnTopic, tokenType.value]
+        response = self.rpc_request("registerForPushNotifications", params)
         return response.json()
