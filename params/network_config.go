@@ -2,9 +2,10 @@ package params
 
 import (
 	"net/url"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/status-im/status-go/pkg/security"
 )
 
 // RpcProviderAuthType defines the different types of authentication for RPC providers
@@ -28,31 +29,31 @@ const (
 
 // RpcProvider represents an RPC provider configuration with various options
 type RpcProvider struct {
-	ID               int64           `json:"id" validate:"omitempty"`          // Auto-increment ID (for sorting order)
-	ChainID          uint64          `json:"chainId" validate:"required,gt=0"` // Chain ID of the network
-	Name             string          `json:"name" validate:"required,min=1"`   // Provider name for identification
-	URL              string          `json:"url" validate:"required,url"`      // Current Provider URL
-	EnableRPSLimiter bool            `json:"enableRpsLimiter"`                 // Enable RPC rate limiting for this provider
-	Type             RpcProviderType `json:"type" validate:"required,oneof=embedded-proxy embedded-direct user"`
-	Enabled          bool            `json:"enabled"` // Whether the provider is enabled
+	ID               int64                    `json:"id" validate:"omitempty"`          // Auto-increment ID (for sorting order)
+	ChainID          uint64                   `json:"chainId" validate:"required,gt=0"` // Chain ID of the network
+	Name             string                   `json:"name" validate:"required,min=1"`   // Provider name for identification
+	URL              security.SensitiveString `json:"url" validate:"required,url"`      // Current Provider URL
+	EnableRPSLimiter bool                     `json:"enableRpsLimiter"`                 // Enable RPC rate limiting for this provider
+	Type             RpcProviderType          `json:"type" validate:"required,oneof=embedded-proxy embedded-direct user"`
+	Enabled          bool                     `json:"enabled"` // Whether the provider is enabled
 	// Authentication
-	AuthType     RpcProviderAuthType `json:"authType" validate:"required,oneof=no-auth basic-auth token-auth"` // Type of authentication
-	AuthLogin    string              `json:"authLogin" validate:"omitempty,min=1"`                             // Login for BasicAuth (empty string if not used)
-	AuthPassword string              `json:"authPassword" validate:"omitempty,min=1"`                          // Password for BasicAuth (empty string if not used)
-	AuthToken    string              `json:"authToken" validate:"omitempty,min=1"`                             // Token for TokenAuth (empty string if not used)
+	AuthType     RpcProviderAuthType      `json:"authType" validate:"required,oneof=no-auth basic-auth token-auth"` // Type of authentication
+	AuthLogin    security.SensitiveString `json:"authLogin" validate:"omitempty,min=1"`                             // Login for BasicAuth (empty string if not used)
+	AuthPassword security.SensitiveString `json:"authPassword" validate:"omitempty,min=1"`                          // Password for BasicAuth (empty string if not used)
+	AuthToken    security.SensitiveString `json:"authToken" validate:"omitempty,min=1"`                             // Token for TokenAuth (empty string if not used)
 }
 
 // GetFullURL returns the URL with auth token if TokenAuth is used
-func (p RpcProvider) GetFullURL() string {
-	if p.AuthType == TokenAuth && p.AuthToken != "" {
-		return strings.TrimRight(p.URL, "/") + "/" + p.AuthToken
+func (p RpcProvider) GetFullURL() security.SensitiveString {
+	if p.AuthType == TokenAuth && !p.AuthToken.Empty() {
+		return p.URL.TrimRight("/").Append("/", p.AuthToken)
 	}
 	return p.URL
 }
 
 // GetHost returns the host from the provider's URL
 func (p RpcProvider) GetHost() string {
-	u, err := url.Parse(p.URL)
+	u, err := url.Parse(p.URL.Reveal())
 	if err != nil {
 		return ""
 	}
@@ -93,6 +94,9 @@ type Network struct {
 	RelatedChainID         uint64          `json:"relatedChainId" validate:"omitempty"`
 	IsActive               bool            `json:"isActive"`
 	IsDeactivatable        bool            `json:"isDeactivatable"`
+	EIP1559Enabled         bool            `json:"eip1559Enabled"`
+	NoBaseFee              bool            `json:"noBaseFee"`
+	NoPriorityFee          bool            `json:"noPriorityFee"`
 }
 
 func (n *Network) DeepCopy() Network {
@@ -104,7 +108,7 @@ func (n *Network) DeepCopy() Network {
 	return updatedNetwork
 }
 
-func newRpcProvider(chainID uint64, name, url string, enableRpsLimiter bool, providerType RpcProviderType) *RpcProvider {
+func newRpcProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool, providerType RpcProviderType) *RpcProvider {
 	return &RpcProvider{
 		ChainID:          chainID,
 		Name:             name,
@@ -116,18 +120,18 @@ func newRpcProvider(chainID uint64, name, url string, enableRpsLimiter bool, pro
 	}
 }
 
-func NewUserProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
+func NewUserProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, UserProviderType)
 }
 
-func NewProxyProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
+func NewProxyProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedProxyProviderType)
 }
 
-func NewEthRpcProxyProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
+func NewEthRpcProxyProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedEthRpcProxyProviderType)
 }
 
-func NewDirectProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
+func NewDirectProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedDirectProviderType)
 }

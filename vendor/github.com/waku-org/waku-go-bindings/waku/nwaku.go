@@ -223,6 +223,10 @@ package waku
 		waku_ping_peer(ctx, peerAddr, timeoutMs, (WakuCallBack) GoCallback, resp);
 	}
 
+	static void cGoWakuGetPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
+		waku_relay_get_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp);
+	}
+
 	static void cGoWakuGetNumPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
 		waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp);
 	}
@@ -231,12 +235,20 @@ package waku
 		waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp);
 	}
 
+	static void cGoWakuGetConnectedRelayPeers(void* ctx, char* pubSubTopic, void* resp) {
+		waku_relay_get_connected_peers(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp);
+	}
+
 	static void cGoWakuGetConnectedPeers(void* wakuCtx, void* resp) {
 		waku_get_connected_peers(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuGetPeerIdsFromPeerStore(void* wakuCtx, void* resp) {
 		waku_get_peerids_from_peerstore(wakuCtx, (WakuCallBack) GoCallback, resp);
+	}
+
+	static void cGoWakuGetConnectedPeersInfo(void* wakuCtx, void* resp) {
+		waku_get_connected_peers_info(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuLightpushPublish(void* wakuCtx,
@@ -468,11 +480,17 @@ func (n *WakuNode) OnEvent(eventStr string) {
 }
 
 func (n *WakuNode) parseMessageEvent(eventStr string) {
-	envelope, err := common.NewEnvelope(eventStr)
+	var envelope common.Envelope
+	err := json.Unmarshal([]byte(eventStr), &envelope)
 	if err != nil {
 		Error("could not parse message %v", err)
+		return
 	}
-	n.MsgChan <- envelope
+	select {
+	case n.MsgChan <- envelope:
+	default:
+		Warn("Can't deliver message to subscription, MsgChan is full")
+	}
 }
 
 func (n *WakuNode) parseTopicHealthChangeEvent(eventStr string) {
@@ -482,7 +500,12 @@ func (n *WakuNode) parseTopicHealthChangeEvent(eventStr string) {
 	if err != nil {
 		Error("could not parse topic health change %v", err)
 	}
-	n.TopicHealthChan <- topicHealth
+
+	select {
+	case n.TopicHealthChan <- topicHealth:
+	default:
+		Warn("Can't deliver topic health event, TopicHealthChan is full")
+	}
 }
 
 func (n *WakuNode) parseConnectionChangeEvent(eventStr string) {
@@ -492,7 +515,12 @@ func (n *WakuNode) parseConnectionChangeEvent(eventStr string) {
 	if err != nil {
 		Error("could not parse connection change %v", err)
 	}
-	n.ConnectionChangeChan <- connectionChange
+
+	select {
+	case n.ConnectionChangeChan <- connectionChange:
+	default:
+		Warn("Can't deliver connection change event, ConnectionChangeChan is full")
+	}
 }
 
 func (n *WakuNode) GetNumConnectedRelayPeers(optPubsubTopic ...string) (int, error) {
@@ -529,6 +557,60 @@ func (n *WakuNode) GetNumConnectedRelayPeers(optPubsubTopic ...string) (int, err
 	Error("Failed to get number of connected relay peers for %s: %s", n.nodeName, errMsg)
 
 	return 0, errors.New(errMsg)
+}
+
+func (n *WakuNode) GetConnectedRelayPeers(optPubsubTopic ...string) (peer.IDSlice, error) {
+
+	pubsubTopic := ""
+	if len(optPubsubTopic) > 0 {
+		pubsubTopic = optPubsubTopic[0]
+	}
+
+	if n == nil {
+		err := errors.New("waku node is nil")
+		Error("Failed to get connected relay peers: %v", err)
+		return nil, err
+	}
+
+	Debug("Fetching connected relay peers for pubsubTopic: %v, node: %v", pubsubTopic, n.nodeName)
+
+	wg := sync.WaitGroup{}
+	var resp = C.allocResp(unsafe.Pointer(&wg))
+	defer C.freeResp(resp)
+
+	var cPubsubTopic = C.CString(pubsubTopic)
+	defer C.free(unsafe.Pointer(cPubsubTopic))
+
+	wg.Add(1)
+	C.cGoWakuGetConnectedRelayPeers(n.wakuCtx, cPubsubTopic, resp)
+	wg.Wait()
+
+	if C.getRet(resp) == C.RET_OK {
+		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		if peersStr == "" {
+			Debug("No connected relay peers found for pubsubTopic: %v, node: %v", pubsubTopic, n.nodeName)
+			return nil, nil
+		}
+
+		peerIDs := strings.Split(peersStr, ",")
+		var peers peer.IDSlice
+		for _, peerID := range peerIDs {
+			id, err := peer.Decode(peerID)
+			if err != nil {
+				Error("Failed to decode peer ID for %v: %v", n.nodeName, err)
+				return nil, err
+			}
+			peers = append(peers, id)
+		}
+
+		Debug("Successfully fetched connected relay peers for pubsubTopic: %v, node: %v count: %v", pubsubTopic, n.nodeName, len(peers))
+		return peers, nil
+	}
+
+	errMsg := "error GetConnectedRelayPeers: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to get connected relay peers for pubsubTopic: %v:, node: %v. %v", pubsubTopic, n.nodeName, errMsg)
+
+	return nil, errors.New(errMsg)
 }
 
 func (n *WakuNode) DisconnectPeerByID(peerID peer.ID) error {
@@ -591,6 +673,54 @@ func (n *WakuNode) GetConnectedPeers() (peer.IDSlice, error) {
 
 	errMsg := "error GetConnectedPeers: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	Error("Failed to get connected peers for %v: %v", n.nodeName, errMsg)
+
+	return nil, errors.New(errMsg)
+}
+
+func (n *WakuNode) GetPeersInMesh(pubsubTopic string) (peer.IDSlice, error) {
+	if n == nil {
+		err := errors.New("waku node is nil")
+		Error("Failed to get peers in mesh: %v", err)
+		return nil, err
+	}
+
+	Debug("Fetching peers in mesh peers for pubsubTopic: %v, node: %v", pubsubTopic, n.nodeName)
+
+	wg := sync.WaitGroup{}
+	var resp = C.allocResp(unsafe.Pointer(&wg))
+	defer C.freeResp(resp)
+
+	var cPubsubTopic = C.CString(pubsubTopic)
+	defer C.free(unsafe.Pointer(cPubsubTopic))
+
+	wg.Add(1)
+	C.cGoWakuGetPeersInMesh(n.wakuCtx, cPubsubTopic, resp)
+	wg.Wait()
+
+	if C.getRet(resp) == C.RET_OK {
+		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		if peersStr == "" {
+			Debug("No peers in mesh found for pubsubTopic: %v, node: %v", pubsubTopic, n.nodeName)
+			return nil, nil
+		}
+
+		peerIDs := strings.Split(peersStr, ",")
+		var peers peer.IDSlice
+		for _, peerID := range peerIDs {
+			id, err := peer.Decode(peerID)
+			if err != nil {
+				Error("Failed to decode peer ID for %v: %v", n.nodeName, err)
+				return nil, err
+			}
+			peers = append(peers, id)
+		}
+
+		Debug("Successfully fetched mesh peers for pubsubTopic: %v, node: %v count: %v", pubsubTopic, n.nodeName, len(peers))
+		return peers, nil
+	}
+
+	errMsg := "error GetPeersInMesh: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to get peers in mesh for pubsubTopic: %v:, node: %v. %v", pubsubTopic, n.nodeName, errMsg)
 
 	return nil, errors.New(errMsg)
 }
@@ -1176,6 +1306,33 @@ func (n *WakuNode) GetPeerIDsFromPeerStore() (peer.IDSlice, error) {
 	return nil, fmt.Errorf("GetPeerIdsFromPeerStore: %s", errMsg)
 }
 
+func (n *WakuNode) GetConnectedPeersInfo() (common.PeersData, error) {
+	wg := sync.WaitGroup{}
+
+	var resp = C.allocResp(unsafe.Pointer(&wg))
+	defer C.freeResp(resp)
+
+	wg.Add(1)
+	C.cGoWakuGetConnectedPeersInfo(n.wakuCtx, resp)
+	wg.Wait()
+	if C.getRet(resp) == C.RET_OK {
+		jsonStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		if jsonStr == "" {
+			return nil, nil
+		}
+
+		peerData, err := common.ParsePeerInfoFromJSON(jsonStr)
+
+		if err != nil {
+			return nil, fmt.Errorf("GetConnectedPeersInfo - failed parsing JSON: %w", err)
+		}
+
+		return peerData, nil
+	}
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, fmt.Errorf("GetConnectedPeersInfo: %s", errMsg)
+}
+
 func (n *WakuNode) GetPeerIDsByProtocol(protocol libp2pproto.ID) (peer.IDSlice, error) {
 	wg := sync.WaitGroup{}
 
@@ -1242,7 +1399,7 @@ func (n *WakuNode) GetNumConnectedPeers() (int, error) {
 
 	peers, err := n.GetConnectedPeers()
 	if err != nil {
-		Error("Failed to fetch connected peers for %v %v ", n.nodeName, err)
+		Error("Failed to fetch connected peers for %v: %v ", n.nodeName, err)
 		return 0, err
 	}
 

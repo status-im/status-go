@@ -14,6 +14,8 @@ import (
 	"github.com/status-im/status-go/wakuv2"
 	waku2 "github.com/status-im/status-go/wakuv2"
 
+	"github.com/waku-org/waku-go-bindings/waku/common"
+
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -31,6 +33,15 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 		EnablePeerExchangeServer: true,
 		EnablePeerExchangeClient: false,
 		EnableDiscV5:             false,
+	}
+
+	wakuConfig.NwakuConfig = &common.WakuConfig{
+		Relay:         true,
+		LogLevel:      "DEBUG",
+		ClusterID:     cfg.clusterID,
+		Shards:        []uint16{wakuv2.DefaultShardIndex},
+		Discv5UdpPort: 0,
+		TcpPort:       0,
 	}
 
 	var nodeKey *ecdsa.PrivateKey

@@ -32,7 +32,7 @@ const (
 )
 
 var hopBridgeContractAddresses = map[string]map[uint64]map[string]common.Address{
-	"USDC": {
+	"USDC (EVM)": {
 		walletCommon.EthereumMainnet: {
 			L1CanonicalToken:       common.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"),
 			CctpL1Bridge:           common.HexToAddress("0x7e77461CA2a9d82d26FD5e0Da2243BF72eA45747"),
@@ -124,7 +124,7 @@ var hopBridgeContractAddresses = map[string]map[uint64]map[string]common.Address
 			L2CanonicalToken: common.HexToAddress("0xB15312eA17d95375E64317C363A0e6304330D82e"),
 		},
 	},
-	"USDT": {
+	"USDT (EVM)": {
 		walletCommon.EthereumMainnet: {
 			L1CanonicalToken: common.HexToAddress("0xdAC17F958D2ee523a2206206994597C13D831ec7"),
 			L1Bridge:         common.HexToAddress("0x3E4a3a4796d16c0Cd582C382691998f7c06420B6"),
@@ -351,7 +351,7 @@ func isHTokenSend() bool {
 }
 
 func shouldUseCctpBridge(symbol string) bool {
-	if symbol == "USDC" {
+	if symbol == "USDC (EVM)" {
 		return true
 	}
 	return symbol == "USDC.e" && isHTokenSend()

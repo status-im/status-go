@@ -154,78 +154,10 @@ func segmentMessage(newMessage *wakutypes.NewMessage, segmentSize int) ([]*wakut
 	return segmentMessages, nil
 }
 
-// SegmentationLayerV1 reconstructs the message only when all segments have been successfully retrieved.
-// It lacks the capability to perform forward error correction.
-// Kept to test forward compatibility.
-func (s *MessageSender) handleSegmentationLayerV1(message *v1protocol.StatusMessage) error {
-	logger := s.logger.With(zap.String("site", "handleSegmentationLayerV1")).With(zap.String("hash", types.HexBytes(message.TransportLayer.Hash).String()))
-
-	segmentMessage := &SegmentMessage{
-		SegmentMessage: &protobuf.SegmentMessage{},
-	}
-	err := proto.Unmarshal(message.TransportLayer.Payload, segmentMessage.SegmentMessage)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal SegmentMessage")
-	}
-
-	logger.Debug("handling message segment", zap.String("EntireMessageHash", types.HexBytes(segmentMessage.EntireMessageHash).String()),
-		zap.Uint32("Index", segmentMessage.Index), zap.Uint32("SegmentsCount", segmentMessage.SegmentsCount))
-
-	alreadyCompleted, err := s.persistence.IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash)
-	if err != nil {
-		return err
-	}
-	if alreadyCompleted {
-		return ErrMessageSegmentsAlreadyCompleted
-	}
-
-	if segmentMessage.SegmentsCount < 2 {
-		return ErrMessageSegmentsInvalidCount
-	}
-
-	err = s.persistence.SaveMessageSegment(segmentMessage, message.TransportLayer.SigPubKey, time.Now().Unix())
-	if err != nil {
-		return err
-	}
-
-	segments, err := s.persistence.GetMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey)
-	if err != nil {
-		return err
-	}
-
-	if len(segments) != int(segmentMessage.SegmentsCount) {
-		return ErrMessageSegmentsIncomplete
-	}
-
-	// Combine payload
-	var entirePayload bytes.Buffer
-	for _, segment := range segments {
-		_, err := entirePayload.Write(segment.Payload)
-		if err != nil {
-			return errors.Wrap(err, "failed to write segment payload")
-		}
-	}
-
-	// Sanity check
-	entirePayloadHash := crypto.Keccak256(entirePayload.Bytes())
-	if !bytes.Equal(entirePayloadHash, segmentMessage.EntireMessageHash) {
-		return ErrMessageSegmentsHashMismatch
-	}
-
-	err = s.persistence.CompleteMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey, time.Now().Unix())
-	if err != nil {
-		return err
-	}
-
-	message.TransportLayer.Payload = entirePayload.Bytes()
-
-	return nil
-}
-
-// SegmentationLayerV2 is capable of reconstructing the message from both complete and partial sets of data segments.
+// handleSegmentationLayer is capable of reconstructing the message from both complete and partial sets of data segments.
 // It has capability to perform forward error correction.
-func (s *MessageSender) handleSegmentationLayerV2(message *v1protocol.StatusMessage) error {
-	logger := s.logger.With(zap.String("site", "handleSegmentationLayerV2")).With(zap.String("hash", types.HexBytes(message.TransportLayer.Hash).String()))
+func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessage) error {
+	logger := s.logger.Named("handleSegmentationLayer").With(zap.String("hash", types.HexBytes(message.TransportLayer.Hash).String()))
 
 	segmentMessage := &SegmentMessage{
 		SegmentMessage: &protobuf.SegmentMessage{},

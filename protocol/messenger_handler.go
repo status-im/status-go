@@ -12,7 +12,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/signal"
@@ -39,7 +38,7 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
 
 const (
@@ -1454,15 +1453,15 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 
 func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage) (*MessengerResponse, error) {
 
-	messagesToHandle := make(map[messaging.ChatFilter][]*wakutypes.Message)
+	messagesToHandle := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage)
 
 	for _, message := range archiveMessages {
 		filter := m.messaging.ChatFilterByTopic(message.Topic)
 		if filter != nil {
-			shhMessage := &wakutypes.Message{
+			shhMessage := &messagingtypes.ReceivedMessage{
 				Sig:          message.Sig,
 				Timestamp:    uint32(message.Timestamp),
-				Topic:        wakutypes.BytesToTopic(message.Topic),
+				Topic:        messagingtypes.BytesToContentTopic(message.Topic),
 				Payload:      message.Payload,
 				Padding:      message.Padding,
 				Hash:         message.Hash,
@@ -1472,8 +1471,8 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 		}
 	}
 
-	importedMessages := make(map[messaging.ChatFilter][]*wakutypes.Message, 0)
-	otherMessages := make(map[messaging.ChatFilter][]*wakutypes.Message, 0)
+	importedMessages := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, 0)
+	otherMessages := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, 0)
 
 	for filter, messages := range messagesToHandle {
 		for _, message := range messages {
@@ -2198,7 +2197,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			return err
 		}
 
-		community, err := m.GetCommunityByID(communityID)
+		community, err := m.communitiesManager.GetByIDReadonly(communityID)
 		if err != nil {
 			return err
 		}

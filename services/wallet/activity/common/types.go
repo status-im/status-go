@@ -29,8 +29,9 @@ const (
 )
 
 const (
-	L1FinalizationDuration = 960    // A block on layer 1 is every 12s, finalization require 64 blocks. A buffer of 16 blocks is added to not create false positives.
-	L2FinalizationDuration = 648000 // 7.5 days in seconds for layer 2 finalization. 0.5 day is buffer to not create false positive.
+	L1FinalizationDuration  = 960    // A block on layer 1 is every 12s, finalization require 64 blocks. A buffer of 16 blocks is added to not create false positives.
+	BSCFinalizationDuration = 9      // BSC uses Fast Finality, finalization time is 7.5 seconds approx. A buffer of 1.5 seconds is added to not create false positives.
+	L2FinalizationDuration  = 648000 // 7.5 days in seconds for layer 2 finalization. 0.5 day is buffer to not create false positive.
 )
 
 const (

@@ -14,8 +14,8 @@ var StatusTokenList = fetcher.FetchedTokenList{
 	Fetched: time.Unix(1742471186, 0),
 	JsonData: `
 	{
-  "name": "Status Token List",
-  "timestamp": "2023-10-18T07:10:03.000Z",
+  "name": "Status Local Token List",
+  "timestamp": "2025-05-21T07:10:03.000Z",
   "version": {
     "major": 1,
     "minor": 0,

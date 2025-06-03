@@ -8,12 +8,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	validator "gopkg.in/go-playground/validator.v9"
+	"gopkg.in/go-playground/validator.v9"
+
+	"github.com/brianvoe/gofakeit/v6"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/t/utils"
 )
 
@@ -27,7 +30,7 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Equal(t, "/some/data/path", c.DataDir)
-	assert.Equal(t, "/some/data/path/keystore", c.KeyStoreDir)
+	assert.Equal(t, "keystore", c.KeyStoreDir)
 	// assert Whisper
 	assert.Equal(t, true, c.WakuV2Config.Enabled)
 	assert.Equal(t, "/some/data/path/wakuv2", c.WakuV2Config.DataDir)
@@ -309,8 +312,8 @@ func TestNodeConfigValidate(t *testing.T) {
 
 func TestMarshalWalletConfigJSON(t *testing.T) {
 	walletConfig := params.WalletConfig{
-		OpenseaAPIKey:        "some-key",
-		RaribleMainnetAPIKey: "some-key2",
+		OpenseaAPIKey:        security.NewSensitiveString(gofakeit.LetterN(10)),
+		RaribleMainnetAPIKey: security.NewSensitiveString(gofakeit.LetterN(10)),
 	}
 	bytes, err := json.Marshal(walletConfig)
 	require.NoError(t, err)
@@ -321,5 +324,5 @@ func TestMarshalWalletConfigJSON(t *testing.T) {
 	walletConfig = params.WalletConfig{}
 	err = json.Unmarshal([]byte(`{"OpenseaAPIKey":"some-key"}`), &walletConfig)
 	require.NoError(t, err)
-	require.Equal(t, "some-key", walletConfig.OpenseaAPIKey)
+	require.Equal(t, "some-key", walletConfig.OpenseaAPIKey.Reveal())
 }

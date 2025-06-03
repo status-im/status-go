@@ -261,14 +261,13 @@ func main() {
 			protocol.WithTorrentConfig(&config.TorrentConfig),
 			protocol.WithWalletConfig(&config.WalletConfig),
 			protocol.WithAccountManager(backend.AccountManager()),
+			protocol.WithMessageSigner(backend.MessageSigner()),
 		}
 
 		messenger, err := protocol.NewMessenger(
-			config.Name,
 			identity,
 			backend.StatusNode().WakuV2Service(),
 			installationID.String(),
-			config.Version,
 			options...,
 		)
 
@@ -333,14 +332,13 @@ func main() {
 				protocol.WithTorrentConfig(&config.TorrentConfig),
 				protocol.WithWalletConfig(&config.WalletConfig),
 				protocol.WithAccountManager(backend.AccountManager()),
+				protocol.WithMessageSigner(backend.MessageSigner()),
 			}
 
 			messenger, err := protocol.NewMessenger(
-				config.Name,
 				identity,
 				backend.StatusNode().WakuV2Service(),
 				installationID.String(),
-				config.Version,
 				options...,
 			)
 			if err != nil {

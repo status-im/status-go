@@ -5,12 +5,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/services/wallet/community"
+
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
 )
 
 type Token struct {
 	Address common.Address `json:"address"`
 	Name    string         `json:"name"`
 	Symbol  string         `json:"symbol"`
+	// DONT USE THE FIELD BELOW
+	TmpSymbol string `json:"-"` // TODO: this is just a temporary solution to solve the collision, remove this when switching to CoinGecko tokens list
 	// Decimals defines how divisible the token is. For example, 0 would be
 	// indivisible, whereas 18 would allow very small amounts of the token
 	// to be traded.
@@ -36,5 +40,9 @@ type StorageToken struct {
 }
 
 func (t *Token) IsNative() bool {
+	if t.ChainID == wallet_common.BSCMainnet ||
+		t.ChainID == wallet_common.BSCTestnet {
+		return strings.EqualFold(t.Symbol, "BNB")
+	}
 	return strings.EqualFold(t.Symbol, "ETH")
 }

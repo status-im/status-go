@@ -16,11 +16,11 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestTableUserMessagesAllFieldsCount(t *testing.T) {
@@ -1815,25 +1815,22 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 	groupID2 := []byte("group-id-2")
 	keyID := []byte("key-id")
 
-	message1 := &wakutypes.Message{
+	message1 := &messagingtypes.ReceivedMessage{
 		Hash:      []byte{1},
 		Sig:       []byte{2},
-		TTL:       1,
 		Timestamp: 2,
 		Payload:   []byte{3},
 	}
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID1, keyID, message1))
 
-	message2 := &wakutypes.Message{
+	message2 := &messagingtypes.ReceivedMessage{
 		Hash:      []byte{2},
 		Sig:       []byte{2},
-		TTL:       1,
-		Topic:     wakutypes.BytesToTopic([]byte{5}),
+		Topic:     messagingtypes.BytesToContentTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
-		P2P:       true,
 	}
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID2, keyID, message2))
@@ -1909,38 +1906,33 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 	groupID := []byte("group-id")
 	keyID := []byte("key-id")
 
-	message1 := &wakutypes.Message{
+	message1 := &messagingtypes.ReceivedMessage{
 		Hash:      []byte{1},
 		Sig:       []byte{2},
-		TTL:       1,
 		Timestamp: 2,
 		Payload:   []byte{3},
 	}
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message1))
 
-	message2 := &wakutypes.Message{
+	message2 := &messagingtypes.ReceivedMessage{
 		Hash:      []byte{2},
 		Sig:       []byte{2},
-		TTL:       1,
-		Topic:     wakutypes.BytesToTopic([]byte{5}),
+		Topic:     messagingtypes.BytesToContentTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
-		P2P:       true,
 	}
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message2))
 
-	message3 := &wakutypes.Message{
+	message3 := &messagingtypes.ReceivedMessage{
 		Hash:      []byte{3},
 		Sig:       []byte{2},
-		TTL:       1,
-		Topic:     wakutypes.BytesToTopic([]byte{5}),
+		Topic:     messagingtypes.BytesToContentTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
-		P2P:       true,
 	}
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message3))

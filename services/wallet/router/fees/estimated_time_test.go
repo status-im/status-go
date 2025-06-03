@@ -229,12 +229,12 @@ func TestEstimatedTimeCalculation(t *testing.T) {
 		{
 			maxFee:       big.NewInt(32760456719),
 			priorityFee:  big.NewInt(1000000001),
-			expectedTime: 25,
+			expectedTime: 15,
 		},
 		{
 			maxFee:       big.NewInt(32067456719),
 			priorityFee:  big.NewInt(1000000001),
-			expectedTime: 50,
+			expectedTime: 25,
 		},
 	}
 
@@ -247,7 +247,7 @@ func TestEstimatedTimeCalculation(t *testing.T) {
 	for i, test := range tests {
 
 		t.Run(fmt.Sprintf("test-%d", i), func(t *testing.T) {
-			estimatedTime := estimatedTimeV2(feeHistory, test.maxFee, test.priorityFee, 1)
+			estimatedTime := estimatedTimeV2(feeHistory, test.maxFee, test.priorityFee, 1, 0)
 			assert.Equal(t, test.expectedTime, estimatedTime)
 		})
 	}

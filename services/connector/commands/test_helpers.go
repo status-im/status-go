@@ -9,10 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
+
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network"
 	network_testutil "github.com/status-im/status-go/rpc/network/testutil"
 	persistence "github.com/status-im/status-go/services/connector/database"
@@ -72,10 +74,10 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 
 	initNetworks := []params.Network{
 		*network_testutil.CreateNetwork(walletCommon.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
-			network_testutil.CreateProvider(walletCommon.EthereumMainnet, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
+			network_testutil.CreateProvider(walletCommon.EthereumMainnet, "Infura Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
 		}),
 		*network_testutil.CreateNetwork(walletCommon.OptimismMainnet, "Optimism Mainnet", []params.RpcProvider{
-			network_testutil.CreateProvider(walletCommon.OptimismMainnet, "Optimism Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.optimism.io"),
+			network_testutil.CreateProvider(walletCommon.OptimismMainnet, "Optimism Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.optimism.io")),
 		}),
 	}
 	err := networkManager.InitEmbeddedNetworks(initNetworks)

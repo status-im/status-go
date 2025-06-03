@@ -17,6 +17,7 @@ var (
 	newBlockCheckIntervalOptimism      = 1 * time.Second
 	newBlockCheckIntervalArbitrum      = 200 * time.Millisecond
 	newBlockCheckIntervalBase          = 1 * time.Second
+	newBlockCheckIntervalBSC           = 3 * time.Second
 	newBlockCheckIntervalStatusNetwork = 1 * time.Second
 	newBlockCheckIntervalAnvilMainnet  = 2 * time.Second
 
@@ -70,6 +71,9 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 		ticker = time.NewTicker(newBlockCheckIntervalBase)
 	case walletCommon.StatusNetworkSepolia:
 		ticker = time.NewTicker(newBlockCheckIntervalStatusNetwork)
+	case walletCommon.BSCMainnet,
+		walletCommon.BSCTestnet:
+		ticker = time.NewTicker(newBlockCheckIntervalBSC)
 	case walletCommon.AnvilMainnet:
 		ticker = time.NewTicker(newBlockCheckIntervalAnvilMainnet)
 	}

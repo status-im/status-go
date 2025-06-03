@@ -323,7 +323,7 @@ func (tc *TestClient) GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.
 }
 
 func (tc *TestClient) NetworkID() uint64 {
-	return 777333
+	return walletcommon.TestnetChainID
 }
 
 func (tc *TestClient) ToBigInt() *big.Int {
@@ -1143,7 +1143,7 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 	tokenManager = token.NewTokenManager(walletDb, client, community.NewManager(appDb, nil, nil), network.NewManager(appDb, nil, nil, nil), appDb, mediaServer, nil, nil, nil, token.NewPersistence(walletDb))
 
 	tokenListsFetcher := fetcher.NewTokenListsFetcher(walletDb)
-	err = tokenListsFetcher.StoreTokenList("sequential-commands-tests-list", "abcd", sequentialCommandsTestsListJsonData)
+	err = tokenListsFetcher.StoreTokenList("sequential-commands-tests-list", "", "abcd", sequentialCommandsTestsListJsonData)
 	require.NoError(t, err)
 
 	tokenManager.Start(context.Background(), time.Hour, time.Hour)
@@ -1407,7 +1407,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	defer ctrl.Finish()
 	rpcClient := mock_rpcclient.NewMockClientInterface(ctrl)
 	rpcClient.EXPECT().AbstractEthClient(tc.NetworkID()).Return(chainClient, nil).AnyTimes()
-	tracker := transactions.NewPendingTxTracker(db, rpcClient, nil, &event.Feed{}, transactions.PendingCheckInterval)
+	tracker := transactions.NewPendingTxTracker(db, rpcClient, &event.Feed{}, transactions.PendingCheckInterval)
 	accDB, err := accounts.NewDB(appdb)
 	require.NoError(t, err)
 

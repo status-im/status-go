@@ -52,7 +52,7 @@ func (m *Messenger) HandleFeedItem(feedItem *gofeed.Item) (*MessengerResponse, e
 	}
 
 	// Update the lastFetch time to the current time
-	err = m.settings.SaveSetting(settings.NewsFeedLastFetchedTimestamp.GetReactName(), time.Now())
+	err = m.settings.SaveSetting(settings.NewsFeedLastFetchedTimestamp.GetReactName(), time.Now().UTC())
 	if err != nil {
 		m.logger.Error("HandleFeedItem: failed to save last fetch time", zap.Error(err))
 		return nil, err
@@ -122,6 +122,14 @@ func (m *Messenger) changeNewsFeedManagerAfterUpdate() error {
 	}
 
 	if isNewsFeedEnabled {
+		// Reset the fetchFrom time to now since we don't want to fetch items that were posted while the feed was disabled
+		now := time.Now().UTC()
+		m.newsFeedManager.SetFetchFrom(now)
+		err = m.settings.SaveSetting(settings.NewsFeedLastFetchedTimestamp.GetReactName(), now)
+		if err != nil {
+			m.logger.Error("changeNewsFeedManagerAfterUpdate: failed to save last fetch time", zap.Error(err))
+			return err
+		}
 		m.newsFeedManager.StartPolling(m.ctx)
 	} else {
 		m.newsFeedManager.StopPolling()

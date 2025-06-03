@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network/testutil"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -18,15 +19,16 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
+
+	mock_reader "github.com/status-im/status-go/services/wallet/mock/reader"
+	mock_onramp "github.com/status-im/status-go/services/wallet/onramp/mock"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	mock_reader "github.com/status-im/status-go/services/wallet/mock/reader"
 	"github.com/status-im/status-go/services/wallet/onramp"
-	mock_onramp "github.com/status-im/status-go/services/wallet/onramp/mock"
 	"github.com/status-im/status-go/services/wallet/requests"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
@@ -138,12 +140,12 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 
 	networks := []params.Network{
 		*testutil.CreateNetwork(chainID, "Ethereum Mainnet", []params.RpcProvider{
-			*params.NewProxyProvider(chainID, "Test Provider", serverWith1SecDelay.URL+"/nodefleet/", false),
+			*params.NewProxyProvider(chainID, "Test Provider", security.NewSensitiveString(serverWith1SecDelay.URL+"/nodefleet/"), false),
 		},
 		),
 	}
 
-	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, gofakeit.Username(), gofakeit.LetterN(5))
+	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, security.NewSensitiveString(gofakeit.Username()), security.NewSensitiveString(gofakeit.LetterN(5)))
 	require.NotEmpty(t, networks)
 
 	config := rpc.ClientConfig{
@@ -230,12 +232,12 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 				{
 					ChainID:      chainID,
 					Name:         "Test Provider",
-					URL:          server.URL + "/nodefleet/",
+					URL:          security.NewSensitiveString(server.URL + "/nodefleet/"),
 					Type:         params.EmbeddedProxyProviderType,
 					Enabled:      true,
 					AuthType:     params.BasicAuth,
-					AuthLogin:    "user1",
-					AuthPassword: "pass1",
+					AuthLogin:    security.NewSensitiveString("user1"),
+					AuthPassword: security.NewSensitiveString("pass1"),
 				},
 			},
 		},

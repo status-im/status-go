@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,6 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
+	bindings "github.com/waku-org/waku-go-bindings/waku/common"
 
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/common"
@@ -45,7 +48,6 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
@@ -54,7 +56,6 @@ import (
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
@@ -76,7 +77,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	setSettingsNotifier(accDB, &b.settingsFeed)
 
 	services := []common.StatusService{}
-	services = append(services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
 	services = append(services, b.rpcStatsService())
 	services = append(services, b.appmetricsService())
@@ -92,7 +92,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
-	services = appendIf(config.Web3ProviderConfig.Enabled, services, b.providerService(accDB))
 	services = appendIf(config.ConnectorConfig.Enabled, services, b.connectorService())
 	services = append(services, b.gifService(accDB))
 	services = append(services, b.ChatService(accDB))
@@ -273,6 +272,15 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			}
 		}
 
+		cfg.NwakuConfig = &bindings.WakuConfig{
+			Nodekey:   hex.EncodeToString(crypto.FromECDSA(nodeKey)),
+			Host:      nodeConfig.WakuV2Config.Host,
+			TcpPort:   nodeConfig.WakuV2Config.Port,
+			LogLevel:  "DEBUG", // TODO-nwaku ?
+			ClusterID: nodeConfig.ClusterConfig.ClusterID,
+			Shards:    []uint16{wakuv2.DefaultShardIndex, wakuv2.NonProtectedShardIndex},
+		}
+
 		w, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
 
 		if err != nil {
@@ -299,13 +307,6 @@ func (b *StatusNode) connectorService() *connector.Service {
 		b.connectorSrvc = connector.NewService(b.walletDB, b.rpcClient, b.rpcClient.NetworkManager)
 	}
 	return b.connectorSrvc
-}
-
-func (b *StatusNode) rpcFiltersService() *rpcfilters.Service {
-	if b.rpcFiltersSrvc == nil {
-		b.rpcFiltersSrvc = rpcfilters.New(b)
-	}
-	return b.rpcFiltersSrvc
 }
 
 func (b *StatusNode) subscriptionService() *subscriptions.Service {
@@ -355,7 +356,7 @@ func (b *StatusNode) ensService(timesource func() time.Time) *ens.Service {
 
 func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *transactions.PendingTxTracker {
 	if b.pendingTracker == nil {
-		b.pendingTracker = transactions.NewPendingTxTracker(b.walletDB, b.rpcClient, b.rpcFiltersSrvc, walletFeed, transactions.PendingCheckInterval)
+		b.pendingTracker = transactions.NewPendingTxTracker(b.walletDB, b.rpcClient, walletFeed, transactions.PendingCheckInterval)
 		if b.transactor != nil {
 			b.transactor.SetPendingTracker(b.pendingTracker)
 		}
@@ -412,14 +413,6 @@ func (b *StatusNode) mailserversService() *mailservers.Service {
 		b.mailserversSrvc = mailservers.NewService(mailservers.NewDB(b.appDB))
 	}
 	return b.mailserversSrvc
-}
-
-func (b *StatusNode) providerService(accountsDB *accounts.Database) *web3provider.Service {
-	web3S := web3provider.NewService(b.appDB, accountsDB, b.rpcClient, b.config, b.gethAccountManager, b.rpcFiltersSrvc, b.transactor)
-	if b.providerSrvc == nil {
-		b.providerSrvc = web3S
-	}
-	return b.providerSrvc
 }
 
 func (b *StatusNode) appmetricsService() common.StatusService {
@@ -489,10 +482,6 @@ func appendIf(condition bool, services []common.StatusService, service common.St
 	return append(services, service)
 }
 
-func (b *StatusNode) RPCFiltersService() *rpcfilters.Service {
-	return b.rpcFiltersSrvc
-}
-
 func (b *StatusNode) PendingTracker() *transactions.PendingTxTracker {
 	return b.pendingTracker
 }
@@ -534,15 +523,9 @@ func (b *StatusNode) StartLocalNotifications() error {
 	return nil
 }
 
-// `personal_sign` and `personal_ecRecover` methods are important to
-// keep DApps working.
-// Usually, they are provided by an ETH or a LES service, but when using
-// upstream, we don't start any of these, so we need to start our own
-// implementation.
-
 func (b *StatusNode) personalService() *personal.Service {
 	if b.personalSrvc == nil {
-		b.personalSrvc = personal.New(b.accountsManager)
+		b.personalSrvc = personal.New()
 	}
 	return b.personalSrvc
 }

@@ -53,7 +53,7 @@ pipeline {
             passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
     ),
         ]) {
-          nix.shell('make test-functional', pure: false)
+          nix.develop('make test-functional', pure: false)
         }
       } }
     }

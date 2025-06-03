@@ -37,15 +37,13 @@ stdenv.mkDerivation {
     mkdir -p $out/bin
     cd $out/bin
     ${
-      if versions == [ ] then
-        ''
-          ln -s "${xcodebuildPath}"
-        ''
-      else
+      if versions != [ ] then
         ''
           ln -s "${xcodebuildWrapper}/bin/xcode-select"
         ''
+      else ""
     }
+    ln -s "${xcodebuildPath}"
     ln -s /usr/bin/security
     ln -s /usr/bin/codesign
     ln -s /usr/bin/xcrun

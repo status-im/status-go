@@ -59,13 +59,13 @@ pipeline {
 
     stage('Generate') {
       steps { script {
-        nix.shell('make generate', pure: false)
+        nix.develop('make generate', pure: false)
       } }
     }
 
     stage('Compile') {
       steps { script {
-        nix.shell('make statusgo-android', pure: false)
+        nix.develop('make statusgo-android', pure: false)
         sh "mv build/bin/statusgo.aar ${ARTIFACT}"
       } }
     }

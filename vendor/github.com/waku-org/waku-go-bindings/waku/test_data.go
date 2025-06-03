@@ -10,7 +10,7 @@ import (
 
 var DefaultWakuConfig common.WakuConfig
 var DefaultStoreQueryRequest common.StoreQueryRequest
-var DEFAULT_CLUSTER_ID = 16
+var DEFAULT_CLUSTER_ID = uint16(16)
 
 func init() {
 

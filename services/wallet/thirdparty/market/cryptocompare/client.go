@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
 )
@@ -42,8 +43,8 @@ type MarketValuesContainer struct {
 type Params struct {
 	ID       string
 	URL      string
-	User     string
-	Password string
+	User     security.SensitiveString
+	Password security.SensitiveString
 }
 
 type Client struct {
@@ -62,7 +63,7 @@ func NewClient() *Client {
 
 func NewClientWithParams(params Params) *Client {
 	var creds *thirdparty.BasicCreds
-	if params.User != "" {
+	if !params.User.Empty() {
 		creds = &thirdparty.BasicCreds{
 			User:     params.User,
 			Password: params.Password,

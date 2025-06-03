@@ -20,7 +20,6 @@ import (
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
@@ -89,21 +88,19 @@ type PendingTxTracker struct {
 	trackedTxDB           *DB
 	rpcClient             rpc.ClientInterface
 
-	rpcFilter *rpcfilters.Service
 	eventFeed *event.Feed
 
 	taskRunner *ConditionalRepeater
 	logger     *zap.Logger
 }
 
-func NewPendingTxTracker(db *sql.DB, rpcClient rpc.ClientInterface, rpcFilter *rpcfilters.Service, eventFeed *event.Feed, checkInterval time.Duration) *PendingTxTracker {
+func NewPendingTxTracker(db *sql.DB, rpcClient rpc.ClientInterface, eventFeed *event.Feed, checkInterval time.Duration) *PendingTxTracker {
 	tm := &PendingTxTracker{
 		db:                    db,
 		routeExecutionStorage: storage.NewDB(db),
 		trackedTxDB:           NewDB(db),
 		rpcClient:             rpcClient,
 		eventFeed:             eventFeed,
-		rpcFilter:             rpcFilter,
 		logger:                logutils.ZapLogger().Named("PendingTxTracker"),
 	}
 	tm.taskRunner = NewConditionalRepeater(checkInterval, func(ctx context.Context) bool {
@@ -702,14 +699,6 @@ func (tm *PendingTxTracker) addPendingAndNotify(transaction *PendingTransaction)
 			},
 			Deleted: false,
 		}, []eth.Address{transaction.From, transaction.To}, transaction.Timestamp)
-	}
-	if tm.rpcFilter != nil {
-		tm.rpcFilter.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-			Hash:    transaction.Hash,
-			Type:    string(transaction.Type),
-			From:    transaction.From,
-			ChainID: uint64(transaction.ChainID),
-		})
 	}
 	return err
 }

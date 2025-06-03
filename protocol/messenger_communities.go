@@ -25,9 +25,8 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 
-	"github.com/status-im/status-go/account"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -44,11 +43,10 @@ import (
 	"github.com/status-im/status-go/protocol/storenodes"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/wakuv2"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // 7 days interval
@@ -955,17 +953,6 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 	chats := CreateCommunityChats(community, m.getTimesource())
 
 	publicChatsToInit := m.DefaultFilters(community)
-	for _, chat := range chats {
-		publicChatsToInit = append(publicChatsToInit, &messaging.ChatToInitialize{ChatID: chat.ID, PubsubTopic: community.PubsubTopic()})
-		if community.PubsubTopic() == "" {
-			// add the new content pubsubtopic as well
-			publicChatsToInit = append(publicChatsToInit, &messaging.ChatToInitialize{ChatID: chat.ID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()})
-		}
-	}
-
-	for _, chat := range publicChatsToInit {
-		fmt.Printf(">>> publicChatsToInit: %s %s\n", chat.ChatID, chat.PubsubTopic)
-	}
 	filters, err := m.messaging.InitPublicChats(publicChatsToInit)
 	if err != nil {
 		logger.Debug("InitPublicChats error", zap.Error(err))
@@ -979,7 +966,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 	if community.IsControlNode() {
 		// Init the community filter so we can receive messages on the community
 
-		communityFilters, err := m.InitCommunityFilters(messaging.CommunitiesToInitialize{{
+		communityFilters, err := m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
 			Shard:   community.Shard(),
 			PrivKey: community.PrivateKey(),
 		}})
@@ -1311,7 +1298,7 @@ func (m *Messenger) SetMutePropertyOnChatsByCategory(request *requests.MuteCateg
 // Generates a single hash for each address that needs to be revealed to a community.
 // Each hash needs to be signed.
 // The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
-func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string, isEdit bool) ([]account.SignParams, error) {
+func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string, isEdit bool) ([]personal.SignParams, error) {
 	walletAccounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
 		return nil, err
@@ -1326,7 +1313,7 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 		return false
 	}
 
-	msgsToSign := make([]account.SignParams, 0)
+	msgsToSign := make([]personal.SignParams, 0)
 	for _, walletAccount := range walletAccounts {
 		if walletAccount.Chat || walletAccount.Type == accounts.AccountTypeWatch {
 			continue
@@ -1340,7 +1327,7 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 		if !isEdit {
 			requestID = communities.CalculateRequestID(memberPubKey, communityID)
 		}
-		msgsToSign = append(msgsToSign, account.SignParams{
+		msgsToSign = append(msgsToSign, personal.SignParams{
 			Data:    types.EncodeHex(crypto.Keccak256(m.IdentityPublicKeyCompressed(), communityID, requestID)),
 			Address: walletAccount.Address.Hex(),
 		})
@@ -1349,21 +1336,21 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 	return msgsToSign, nil
 }
 
-func (m *Messenger) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+func (m *Messenger) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	if len(communityID) == 0 {
 		return nil, errors.New(ErrMissingCommunityID)
 	}
 	return m.generateCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal, false)
 }
 
-func (m *Messenger) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+func (m *Messenger) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	return m.generateCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal, true)
 }
 
 // Signs the provided messages with the provided accounts and password.
 // Provided accounts must not belong to a keypair that is migrated to a keycard.
 // Otherwise, the signing will fail, cause such accounts should be signed with a keycard.
-func (m *Messenger) SignData(signParams []account.SignParams) ([]string, error) {
+func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error) {
 	signatures := make([]string, len(signParams))
 	for i, param := range signParams {
 		if err := param.Validate(true); err != nil {
@@ -1393,7 +1380,7 @@ func (m *Messenger) SignData(signParams []account.SignParams) ([]string, error) 
 			return nil, err
 		}
 
-		signature, err := m.accountsManager.Sign(param, verifiedAccount)
+		signature, err := m.signer.Sign(param, verifiedAccount)
 		if err != nil {
 			return nil, err
 		}
@@ -2393,24 +2380,10 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	var chats []*Chat
-	var publicFiltersToInit messaging.ChatsToInitialize
 	for chatID, chat := range changes.ChatsAdded {
 		c := CreateCommunityChat(changes.Community.IDString(), chatID, chat, m.getTimesource())
 		chats = append(chats, c)
-		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: changes.Community.PubsubTopic()})
-		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()})
-
 		response.AddChat(c)
-	}
-
-	// Load filters
-	filters, err := m.messaging.InitPublicChats(publicFiltersToInit)
-	if err != nil {
-		return nil, err
-	}
-	_, err = m.scheduleSyncFilters(filters)
-	if err != nil {
-		return nil, err
 	}
 
 	err = m.saveChats(chats)
@@ -2436,23 +2409,10 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	var chats []*Chat
-	var publicFiltersToInit messaging.ChatsToInitialize
 	for chatID, change := range changes.ChatsModified {
 		c := CreateCommunityChat(community.IDString(), chatID, change.ChatModified, m.getTimesource())
 		chats = append(chats, c)
-		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: community.PubsubTopic()})
-		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()})
 		response.AddChat(c)
-	}
-
-	// Load filters
-	filters, err := m.messaging.InitPublicChats(publicFiltersToInit)
-	if err != nil {
-		return nil, err
-	}
-	_, err = m.scheduleSyncFilters(filters)
-	if err != nil {
-		return nil, err
 	}
 
 	return &response, m.saveChats(chats)
@@ -2480,34 +2440,27 @@ func (m *Messenger) DeleteCommunityChat(communityID types.HexBytes, chatID strin
 	return response, nil
 }
 
-func (m *Messenger) InitCommunityFilters(c messaging.CommunitiesToInitialize) (messaging.ChatFilters, error) {
+func (m *Messenger) InitCommunityFilters(c messagingtypes.CommunitiesToInitialize) (messagingtypes.ChatFilters, error) {
 	return m.messaging.InitCommunities(c)
 }
 
-func (m *Messenger) DefaultFilters(o *communities.Community) messaging.ChatsToInitialize {
+func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.ChatsToInitialize {
 	cID := o.IDString()
 	uncompressedPubKey := common.PubkeyToHex(o.PublicKey())[2:]
-	updatesChannelID := o.StatusUpdatesChannelID()
-	mlChannelID := o.MagnetlinkMessageChannelID()
 	memberUpdateChannelID := o.MemberUpdateChannelID()
 
 	communityPubsubTopic := o.PubsubTopic()
 
-	chats := messaging.ChatsToInitialize{
+	chats := messagingtypes.ChatsToInitialize{
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
-		{ChatID: updatesChannelID, PubsubTopic: communityPubsubTopic},
-		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: uncompressedPubKey, PubsubTopic: wakuv2.DefaultNonProtectedPubsubTopic()},
-
-		// While we migrate to 128 and 256 shards, we listen to community messages in the new shards as well as in the old ones. After migration we should remove the old ones
-		{ChatID: cID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()},
-		{ChatID: updatesChannelID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()},
-		{ChatID: mlChannelID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()},
-		{ChatID: memberUpdateChannelID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()}, // Making content since chat messages are sent in this contenttopic
 		{ChatID: uncompressedPubKey, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()},
 	}
-
+	if communityPubsubTopic == "" {
+		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: cID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()})
+		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: memberUpdateChannelID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()})
+	}
 	return chats
 }
 
@@ -2537,7 +2490,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	}
 
 	// Init the community filter so we can receive messages on the community
-	_, err = m.InitCommunityFilters(messaging.CommunitiesToInitialize{{
+	_, err = m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
 		Shard:   community.Shard(),
 		PrivKey: community.PrivateKey(),
 	}})
@@ -2714,7 +2667,7 @@ func (m *Messenger) GetCommunityStorenodes(communityID types.HexBytes) (*Messeng
 
 func (m *Messenger) UpdateCommunityFilters(community *communities.Community) error {
 	defaultFilters := m.DefaultFilters(community)
-	publicFiltersToInit := make(messaging.ChatsToInitialize, 0, len(defaultFilters)+len(community.Chats()))
+	publicFiltersToInit := make(messagingtypes.ChatsToInitialize, 0, len(defaultFilters)+len(community.Chats()))
 
 	publicFiltersToInit = append(publicFiltersToInit, defaultFilters...)
 	for _, filter := range defaultFilters {
@@ -2723,23 +2676,13 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 			return err
 		}
 	}
-	for chatID := range community.Chats() {
-		communityChatID := community.IDString() + chatID
-		_, err := m.messaging.RemoveFilterByChatID(communityChatID)
-		if err != nil {
-			return err
-		}
-		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: communityChatID, PubsubTopic: community.PubsubTopic()})
-		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: communityChatID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()})
-	}
-
 	_, err := m.messaging.InitPublicChats(publicFiltersToInit)
 	if err != nil {
 		return err
 	}
 
 	// Init the community filter so we can receive messages on the community
-	_, err = m.InitCommunityFilters(messaging.CommunitiesToInitialize{{
+	_, err = m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
 		Shard:   community.Shard(),
 		PrivKey: community.PrivateKey(),
 	}})
@@ -3375,12 +3318,10 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 		return nil
 	}
 
-	removedChatIDs := make([]string, 0)
 	for id := range communityResponse.Changes.ChatsRemoved {
 		chatID := community.ChatID(id)
 		_, ok := state.AllChats.Load(chatID)
 		if ok {
-			removedChatIDs = append(removedChatIDs, chatID)
 			state.AllChats.Delete(chatID)
 			err := m.DeleteChat(chatID)
 			if err != nil {
@@ -3410,7 +3351,6 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	// Update relevant chats names and add new ones
 	// Currently removal is not supported
 	chats := CreateCommunityChats(community, state.Timesource)
-	var publicFiltersToInit messaging.ChatsToInitialize
 	for i, chat := range chats {
 
 		oldChat, ok := state.AllChats.Load(chat.ID)
@@ -3419,14 +3359,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 			state.AllChats.Store(chat.ID, chats[i])
 
 			state.Response.AddChat(chat)
-			publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{
-				ChatID:      chat.ID,
-				PubsubTopic: community.PubsubTopic(),
-			})
-			publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{
-				ChatID:      chat.ID,
-				PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic(),
-			})
+
 			// Update name, currently is the only field is mutable
 		} else if oldChat.Name != chat.Name ||
 			oldChat.Description != chat.Description ||
@@ -3443,23 +3376,6 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 			state.AllChats.Store(chat.ID, oldChat)
 			state.Response.AddChat(chat)
 		}
-	}
-
-	for _, chatID := range removedChatIDs {
-		_, err := m.messaging.RemoveFilterByChatID(chatID)
-		if err != nil {
-			m.logger.Error("couldn't remove filter", zap.Error(err))
-		}
-	}
-
-	// Load transport filters
-	filters, err := m.messaging.InitPublicChats(publicFiltersToInit)
-	if err != nil {
-		return err
-	}
-	_, err = m.scheduleSyncFilters(filters)
-	if err != nil {
-		return err
 	}
 
 	for _, requestToJoin := range communityResponse.RequestsToJoin {
@@ -3954,7 +3870,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				continue
 			}
 
-			topics := []wakutypes.TopicType{}
+			topics := []messagingtypes.ContentTopic{}
 
 			for _, filter := range filters {
 				topics = append(topics, filter.ContentTopic)
@@ -4397,8 +4313,8 @@ func (m *Messenger) generateSystemPinnedMessage(pinMessage *common.PinMessage, c
 	return systemMessage, nil
 }
 
-func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, c *communities.Community) ([]*wakutypes.Message, error) {
-	wakuMessages := make([]*wakutypes.Message, 0)
+func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, c *communities.Community) ([]*messagingtypes.ReceivedMessage, error) {
+	wakuMessages := make([]*messagingtypes.ReceivedMessage, 0)
 	for _, msg := range pinMessages {
 
 		filter := m.messaging.ChatFilterByChatID(msg.LocalChatID)
@@ -4412,7 +4328,7 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 		}
 
 		hash := crypto.Keccak256Hash(append([]byte(c.IDString()), wrappedPayload...))
-		wakuMessage := &wakutypes.Message{
+		wakuMessage := &messagingtypes.ReceivedMessage{
 			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
 			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
 			Topic:        filter.ContentTopic,
@@ -4427,8 +4343,8 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 	return wakuMessages, nil
 }
 
-func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c *communities.Community) ([]*wakutypes.Message, error) {
-	wakuMessages := make([]*wakutypes.Message, 0)
+func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c *communities.Community) ([]*messagingtypes.ReceivedMessage, error) {
+	wakuMessages := make([]*messagingtypes.ReceivedMessage, 0)
 	for _, msg := range chatMessages {
 
 		filter := m.messaging.ChatFilterByChatID(msg.LocalChatID)
@@ -4443,7 +4359,7 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 		}
 
 		hash := crypto.Keccak256Hash([]byte(msg.ID))
-		wakuMessage := &wakutypes.Message{
+		wakuMessage := &messagingtypes.ReceivedMessage{
 			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
 			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
 			Topic:        filter.ContentTopic,

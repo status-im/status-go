@@ -32,6 +32,7 @@ import (
 	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
+	"github.com/status-im/status-go/services/wallet/leaderboard"
 	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router"
@@ -420,8 +421,15 @@ func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64,
 	return api.s.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, gweiToWei(maxFeePerGas)), nil
 }
 
-func (api *API) GetTransactionEstimatedTimeV2(ctx context.Context, chainID uint64, maxFeePerGas *hexutil.Big, maxPriorityFeePerGas *hexutil.Big) (uint, error) {
+func (api *API) GetTransactionEstimatedTimeV2(ctx context.Context, chainID uint64, gasPrice *hexutil.Big, maxFeePerGas *hexutil.Big, maxPriorityFeePerGas *hexutil.Big) (uint, error) {
 	logutils.ZapLogger().Debug("call to getTransactionEstimatedTimeV2")
+	isEIP1559Enabled, err := api.s.router.GetFeesManager().IsEIP1559Enabled(ctx, chainID)
+	if err != nil {
+		return 0, err
+	}
+	if !isEIP1559Enabled {
+		return api.s.router.GetFeesManager().TransactionEstimatedTimeV2Legacy(ctx, chainID, gasPrice.ToInt()), nil
+	}
 	return api.s.router.GetFeesManager().TransactionEstimatedTimeV2(ctx, chainID, maxFeePerGas.ToInt(), maxPriorityFeePerGas.ToInt()), nil
 }
 
@@ -707,6 +715,12 @@ func (api *API) SendRouterTransactionsWithSignatures(ctx context.Context, sendIn
 	api.s.routeExecutionManager.SendRouterTransactionsWithSignatures(ctx, sendInputParams)
 }
 
+// ReevaluateRouterPath reevaluates the tx-fields from the router path that matches the provided pathTxIdentity and sends signal.SuggestedRoutes.
+func (api *API) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *requests.PathTxIdentity) error {
+	logutils.ZapLogger().Debug("wallet.api.ReevaluateRouterPath")
+	return api.s.routeExecutionManager.ReevaluateRouterPath(ctx, pathTxIdentity)
+}
+
 func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []wcommon.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {
 	logutils.ZapLogger().Debug("wallet.api.GetMultiTransactions", zap.Int("IDs.len", len(transactionIDs)))
 	return api.s.transactionManager.GetMultiTransactions(ctx, transactionIDs)
@@ -927,4 +941,24 @@ func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
 func (api *API) IsChecksumValidForAddress(address string) (bool, error) {
 	logutils.ZapLogger().Debug("wallet.api.isChecksumValidForAddress", zap.String("address", address))
 	return abi_spec.CheckAddressChecksum(address)
+}
+
+// GetLeaderboardData returns cryptocurrency data with updated price information
+func (api *API) GetLeaderboardData(ctx context.Context) ([]leaderboard.Cryptocurrency, error) {
+	logutils.ZapLogger().Debug("call to GetLeaderboardData")
+	if api.s.leaderboardService == nil {
+		return nil, errors.New("leaderboard service not initialized")
+	}
+	return api.s.leaderboardService.GetCombinedData(), nil
+}
+
+func (api *API) FetchMarketTokenPageAsync(ctx context.Context, page, pageSize, sortOrder int, currency string) error {
+	logutils.ZapLogger().Debug("call to GetMarketTokenPageAsync", zap.Int("page", page), zap.Int("pageSize", pageSize), zap.Int("sortOrder", sortOrder), zap.String("currency", currency))
+	api.s.leaderboardService.FetchLeaderboardPageAsync(page, pageSize, sortOrder, currency)
+	return nil
+}
+
+func (api *API) UnsubscribeFromLeaderboard() error {
+	logutils.ZapLogger().Debug("call to UnsubscribeFromLeaderboard")
+	return api.s.leaderboardService.UnsubscribeFromLeaderboard()
 }

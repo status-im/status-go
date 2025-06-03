@@ -149,7 +149,7 @@ def shell(cmd) {
     if (env.PLATFORM == 'windows') {
         sh "${cmd} SHELL=/bin/sh"
     } else {
-        nix.shell(cmd, pure: false) // Use nix.shell for Linux/macOS
+        nix.develop(cmd, pure: false) // Use nix.develop for Linux/macOS
     }
 }
 

@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/newsfeed"
 	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/wakuv2"
@@ -95,7 +96,7 @@ const communityAdvertiseIntervalSecond int64 = 24 * 60 * 60
 // messageCacheIntervalMs is how long we should keep processed messages in the cache, in ms
 var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 
-// Messenger is a entity managing chats and messages.
+// Messenger is an entity managing chats and messages.
 // It acts as a bridge between the application and encryption
 // layers.
 // It needs to expose an interface to manage installations
@@ -103,9 +104,9 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
 type Messenger struct {
-	waku                      wakutypes.Waku
 	config                    *config
 	identity                  *ecdsa.PrivateKey
+	signer                    communities.MessageSigner
 	messaging                 *messaging.API
 	persistence               *sqlitePersistence
 	encryptor                 *encryption.Protocol
@@ -187,7 +188,7 @@ type Messenger struct {
 	unhandledMessagesTracker func(*v1protocol.StatusMessage, error)
 
 	// enables control over chat messages iteration
-	retrievedMessagesIteratorFactory func(map[messaging.ChatFilter][]*wakutypes.Message) MessagesIterator
+	retrievedMessagesIteratorFactory func(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) MessagesIterator
 
 	peersyncing         *peersyncing.PeerSyncing
 	peersyncingOffers   map[string]uint64
@@ -201,7 +202,7 @@ type Messenger struct {
 }
 
 type EnvelopeEventsInterceptor struct {
-	EnvelopeEventsHandler messaging.EnvelopeEventsHandler
+	EnvelopeEventsHandler messagingtypes.EnvelopeEventsHandler
 	Messenger             *Messenger
 }
 
@@ -285,11 +286,9 @@ func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash types
 }
 
 func NewMessenger(
-	nodeName string,
 	identity *ecdsa.PrivateKey,
 	waku wakutypes.Waku,
 	installationID string,
-	version string,
 	opts ...Option,
 ) (*Messenger, error) {
 	var messenger *Messenger
@@ -336,7 +335,7 @@ func NewMessenger(
 	messaging, err := messaging.NewCore(
 		waku,
 		identity,
-		database,
+		common.NewMessagingPersistence(database),
 		messaging.WithLogger(logger),
 		messaging.WithEnvelopeEventsConfig(c.envelopeEventsConfig),
 	)
@@ -415,10 +414,8 @@ func NewMessenger(
 
 	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, sender, sqlitePersistence)
 
-	ensVerifier := ens.New(logger, messaging.API(), database, c.verifyENSURL, c.verifyENSContractAddress)
-
 	managerOptions := []communities.ManagerOption{
-		communities.WithAccountManager(c.accountsManager),
+		communities.WithMessageSigner(c.signer),
 	}
 
 	var walletAPI *wallet.API
@@ -457,7 +454,7 @@ func NewMessenger(
 		database,
 		encryptionProtocol,
 		logger,
-		ensVerifier,
+		c.ensVerifier,
 		c.communityTokensService,
 		messaging.API(),
 		messaging.API(),
@@ -521,7 +518,6 @@ func NewMessenger(
 	ctx, cancel := context.WithCancel(context.Background())
 	messenger = &Messenger{
 		config:                     &c,
-		waku:                       waku,
 		identity:                   identity,
 		messaging:                  messaging.API(),
 		persistence:                sqlitePersistence,
@@ -537,7 +533,8 @@ func NewMessenger(
 		communitiesKeyDistributor:  communitiesKeyDistributor,
 		archiveManager:             archiveManager,
 		accountsManager:            c.accountsManager,
-		ensVerifier:                ensVerifier,
+		ensVerifier:                c.ensVerifier,
+		signer:                     c.signer,
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,
 		allChats:                   new(chatMap),
@@ -574,7 +571,7 @@ func NewMessenger(
 		browserDatabase: c.browserDatabase,
 		httpServer:      c.httpServer,
 		shutdownTasks: []func() error{
-			ensVerifier.Stop,
+			c.ensVerifier.Stop,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			archiveManager.Stop,
@@ -742,11 +739,14 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}
 	}
 
-	ensSubscription := m.ensVerifier.Subscribe()
+	var ensSubscription chan []*ens.VerificationRecord
+	if m.ensVerifier != nil {
+		ensSubscription = m.ensVerifier.Subscribe()
 
-	// Subscrbe
-	if err := m.ensVerifier.Start(); err != nil {
-		return nil, err
+		// Subscribe
+		if err := m.ensVerifier.Start(); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := m.communitiesManager.Start(); err != nil {
@@ -973,7 +973,7 @@ func (m *Messenger) cleanTopics() error {
 	if m.mailserversDatabase == nil {
 		return nil
 	}
-	var filters messaging.ChatFilters
+	var filters messagingtypes.ChatFilters
 	for _, f := range m.messaging.ChatFilters() {
 		if f.Listen && !f.Ephemeral {
 			filters = append(filters, f)
@@ -1015,7 +1015,9 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Update ENS verifier
-	m.ensVerifier.SetOnline(online)
+	if m.ensVerifier != nil {
+		m.ensVerifier.SetOnline(online)
+	}
 }
 
 func (m *Messenger) Online() bool {
@@ -1531,14 +1533,14 @@ func (m *Messenger) watchConnectionChange() {
 		m.handleConnectionChange(state)
 	}
 
-	subscribedConnectionStatus := func(subscription *wakutypes.ConnStatusSubscription) {
+	subscribedConnectionStatus := func(subscription messagingtypes.ConnectionStatusSubscription) {
 		defer gocommon.LogOnPanic()
 		defer subscription.Unsubscribe()
 		ticker := time.NewTicker(keepAlivePeriod)
 		defer ticker.Stop()
 		for {
 			select {
-			case status := <-subscription.C:
+			case status := <-subscription.C():
 				processNewState(status.IsOnline)
 			case <-ticker.C:
 				processNewState(m.Online())
@@ -1551,7 +1553,11 @@ func (m *Messenger) watchConnectionChange() {
 	m.logger.Debug("watching connection changes")
 	m.handleConnectionChange(state)
 
-	subscription, _ := m.waku.SubscribeToConnStatusChanges()
+	subscription, err := m.messaging.SubscribeToConnStatusChanges()
+	if err != nil {
+		m.logger.Error("failed to subscribe to connection status changes", zap.Error(err))
+		return
+	}
 	go subscribedConnectionStatus(subscription)
 }
 
@@ -2345,7 +2351,7 @@ func (m *Messenger) updateChatFirstMessageTimestamp(chat *Chat, timestamp uint32
 		return nil
 	}
 
-	community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+	community, err := m.communitiesManager.GetByIDStringReadonly(chat.CommunityID)
 	if err != nil {
 		return err
 	}
@@ -3144,7 +3150,7 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 	}
 }
 
-func (m *Messenger) outputToCSV(timestamp uint32, messageID types.HexBytes, from string, topic wakutypes.TopicType, chatID string, msgType protobuf.ApplicationMetadataMessage_Type, parsedMessage interface{}) {
+func (m *Messenger) outputToCSV(timestamp uint32, messageID types.HexBytes, from string, topic messagingtypes.ContentTopic, chatID string, msgType protobuf.ApplicationMetadataMessage_Type, parsedMessage interface{}) {
 	if !m.outputCSV {
 		return
 	}
@@ -3176,7 +3182,7 @@ func (m *Messenger) shouldSkipDuplicate(messageType protobuf.ApplicationMetadata
 	return true
 }
 
-func (m *Messenger) handleImportedMessages(messagesToHandle map[messaging.ChatFilter][]*wakutypes.Message) error {
+func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) error {
 
 	messageState := m.buildMessageState()
 
@@ -3317,7 +3323,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[messaging.ChatFi
 	return nil
 }
 
-func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messaging.ChatFilter][]*wakutypes.Message, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
+func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
 
 	m.handleMessagesMutex.Lock()
 	defer m.handleMessagesMutex.Unlock()

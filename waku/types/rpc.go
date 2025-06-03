@@ -21,16 +21,12 @@ type NewMessage struct {
 // Message is the RPC representation of a whisper message.
 type Message struct {
 	Sig          []byte    `json:"sig,omitempty"`
-	TTL          uint32    `json:"ttl"`
 	Timestamp    uint32    `json:"timestamp"`
-	PubsubTopic  string    `json:"pubsubTopic"`
 	Topic        TopicType `json:"topic"`
 	Payload      []byte    `json:"payload"`
 	Padding      []byte    `json:"padding"`
-	PoW          float64   `json:"pow"`
 	Hash         []byte    `json:"hash"`
 	Dst          []byte    `json:"recipientPublicKey,omitempty"`
-	P2P          bool      `json:"bool,omitempty"`
 	ThirdPartyID string    `json:"thirdPartyId,omitempty"`
 }
 

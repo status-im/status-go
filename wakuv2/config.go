@@ -25,6 +25,8 @@ import (
 
 	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 
+	bindingscommon "github.com/waku-org/waku-go-bindings/waku/common"
+
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
@@ -35,36 +37,37 @@ var (
 
 // Config represents the configuration state of a waku node.
 type Config struct {
-	MaxMessageSize                         uint32           `toml:",omitempty"` // Maximal message length allowed by the waku node
-	Host                                   string           `toml:",omitempty"`
-	Port                                   int              `toml:",omitempty"`
-	EnablePeerExchangeServer               bool             `toml:",omitempty"` // PeerExchange server makes sense only when discv5 is running locally as it will have a cache of peers that it can respond to in case a PeerExchange request comes from the PeerExchangeClient
-	EnablePeerExchangeClient               bool             `toml:",omitempty"`
-	MinPeersForRelay                       int              `toml:",omitempty"` // Indicates the minimum number of peers required for using Relay Protocol
-	MinPeersForFilter                      int              `toml:",omitempty"` // Indicates the minimum number of peers required for using Filter Protocol
-	LightClient                            bool             `toml:",omitempty"` // Indicates if the node is a light client
-	WakuNodes                              []string         `toml:",omitempty"`
-	DiscV5BootstrapNodes                   []string         `toml:",omitempty"`
-	Nameserver                             string           `toml:",omitempty"` // Optional nameserver to use for dns discovery
-	Resolver                               ethdisc.Resolver `toml:",omitempty"` // Optional resolver to use for dns discovery
-	EnableDiscV5                           bool             `toml:",omitempty"` // Indicates whether discv5 is enabled or not
-	DiscoveryLimit                         int              `toml:",omitempty"` // Indicates the number of nodes to discover with peer exchange client
-	AutoUpdate                             bool             `toml:",omitempty"`
-	UDPPort                                int              `toml:",omitempty"`
-	EnableStore                            bool             `toml:",omitempty"`
-	StoreCapacity                          int              `toml:",omitempty"`
-	StoreSeconds                           int              `toml:",omitempty"`
-	TelemetryServerURL                     string           `toml:",omitempty"`
-	TelemetrySendPeriodMs                  int              `toml:",omitempty"` // Number of milliseconds to wait between sending requests to telemetry service
-	TelemetryPeerCountSendPeriod           int              `toml:",omitempty"` // Number of milliseconds to wait between checking peer count
-	DefaultShardPubsubTopic                string           `toml:",omitempty"` // Pubsub topic to be used by default for messages that do not have a topic assigned (depending whether sharding is used or not)
-	DefaultShardedPubsubTopics             []string         `toml:", omitempty"`
-	ClusterID                              uint16           `toml:",omitempty"`
-	EnableConfirmations                    bool             `toml:",omitempty"` // Enable sending message confirmations
-	SkipPublishToTopic                     bool             `toml:",omitempty"` // Used in testing
-	EnableMissingMessageVerification       bool             `toml:",omitempty"`
-	EnableStoreConfirmationForMessagesSent bool             `toml:",omitempty"` //Flag that enables checking with store node for sent message confimration
-	UseThrottledPublish                    bool             `toml:",omitempty"` // Flag that indicates whether a rate limited priority queue will be used to send messages or not
+	MaxMessageSize                         uint32                     `toml:",omitempty"` // Maximal message length allowed by the waku node
+	Host                                   string                     `toml:",omitempty"`
+	Port                                   int                        `toml:",omitempty"`
+	EnablePeerExchangeServer               bool                       `toml:",omitempty"` // PeerExchange server makes sense only when discv5 is running locally as it will have a cache of peers that it can respond to in case a PeerExchange request comes from the PeerExchangeClient
+	EnablePeerExchangeClient               bool                       `toml:",omitempty"`
+	MinPeersForRelay                       int                        `toml:",omitempty"` // Indicates the minimum number of peers required for using Relay Protocol
+	MinPeersForFilter                      int                        `toml:",omitempty"` // Indicates the minimum number of peers required for using Filter Protocol
+	LightClient                            bool                       `toml:",omitempty"` // Indicates if the node is a light client
+	WakuNodes                              []string                   `toml:",omitempty"`
+	DiscV5BootstrapNodes                   []string                   `toml:",omitempty"`
+	Nameserver                             string                     `toml:",omitempty"` // Optional nameserver to use for dns discovery
+	Resolver                               ethdisc.Resolver           `toml:",omitempty"` // Optional resolver to use for dns discovery
+	EnableDiscV5                           bool                       `toml:",omitempty"` // Indicates whether discv5 is enabled or not
+	DiscoveryLimit                         int                        `toml:",omitempty"` // Indicates the number of nodes to discover with peer exchange client
+	AutoUpdate                             bool                       `toml:",omitempty"`
+	UDPPort                                int                        `toml:",omitempty"`
+	EnableStore                            bool                       `toml:",omitempty"`
+	StoreCapacity                          int                        `toml:",omitempty"`
+	StoreSeconds                           int                        `toml:",omitempty"`
+	TelemetryServerURL                     string                     `toml:",omitempty"`
+	TelemetrySendPeriodMs                  int                        `toml:",omitempty"` // Number of milliseconds to wait between sending requests to telemetry service
+	TelemetryPeerCountSendPeriod           int                        `toml:",omitempty"` // Number of milliseconds to wait between checking peer count
+	DefaultShardPubsubTopic                string                     `toml:",omitempty"` // Pubsub topic to be used by default for messages that do not have a topic assigned (depending whether sharding is used or not)
+	DefaultShardedPubsubTopics             []string                   `toml:", omitempty"`
+	ClusterID                              uint16                     `toml:",omitempty"`
+	EnableConfirmations                    bool                       `toml:",omitempty"` // Enable sending message confirmations
+	SkipPublishToTopic                     bool                       `toml:",omitempty"` // Used in testing
+	EnableMissingMessageVerification       bool                       `toml:",omitempty"`
+	EnableStoreConfirmationForMessagesSent bool                       `toml:",omitempty"` //Flag that enables checking with store node for sent message confimration
+	UseThrottledPublish                    bool                       `toml:",omitempty"` // Flag that indicates whether a rate limited priority queue will be used to send messages or not
+	NwakuConfig                            *bindingscommon.WakuConfig `toml:",omitempty"` // Config for nwaku node
 }
 
 func (c *Config) Validate(logger *zap.Logger) error {

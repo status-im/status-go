@@ -1,5 +1,6 @@
 .PHONY: statusgo all test clean help
 .PHONY: statusgo-android statusgo-ios
+.PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
 
 # Clear any GOROOT set outside of the Nix shell
 export GOROOT=
@@ -41,12 +42,15 @@ endif
 
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
+ LIBWAKU_EXT := so
  GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
+ LIBWAKU_EXT := dll
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
 else
  GOBIN_SHARED_LIB_EXT := so
+ LIBWAKU_EXT := so
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
 endif
 
@@ -59,6 +63,10 @@ GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
+
+ifeq ($(USE_NWAKU), true)
+BUILD_TAGS += use_nwaku
+endif
 
 BUILD_FLAGS ?= -ldflags="-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)"
 BUILD_FLAGS_MOBILE ?=
@@ -91,21 +99,21 @@ $(shell $(1))
 endef
 
 # TODO: Define more specific shells.
-TARGET := default
 ifneq ($(detected_OS),Windows)
- SHELL := ./nix/scripts/shell.sh
+# No need for shell.sh script anymore, we use nix develop directly
 endif
-shell: export TARGET ?= default
+
 shell: ##@prepare Enter into a pre-configured shell
 ifndef IN_NIX_SHELL
-	@ENTER_NIX_SHELL
+	@echo "Entering nix development environment..."
+	@nix develop
 else
 	@echo -e "$(YELLOW)Nix shell is already active$(RESET)"
 endif
 
 nix-repl: SHELL := /bin/sh
 nix-repl: ##@nix Start an interactive Nix REPL
-	nix repl shell.nix
+	nix repl --file flake.nix
 
 nix-gc-protected: SHELL := /bin/sh
 nix-gc-protected:
@@ -141,6 +149,13 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	echo "Compilation done." ;\
 	echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
+LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(LIBWAKU_EXT)
+$(LIBWAKU):
+ifeq ($(USE_NWAKU),true)
+	@echo "Building libwaku"
+	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
+endif
+
 statusgo: ##@build Build status-go as statusd server
 statusgo: build/bin/statusd
 statusd: statusgo
@@ -161,6 +176,8 @@ statusgo-cross: statusgo-android statusgo-ios
 	@ls -ld build/bin/statusgo-*
 
 status-go-deps:
+	go clean -cache
+	go clean -modcache
 	go install go.uber.org/mock/mockgen@v0.4.0
 	go install github.com/kevinburke/go-bindata/v4/...@v4.0.2
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
@@ -193,7 +210,7 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
 statusgo-library: generate
-statusgo-library: ##@cross-compile Build status-go as static library for current platform
+statusgo-library: $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
@@ -207,8 +224,10 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la build/bin/libstatus.*
 
+build-libwaku: $(LIBWAKU)
+
 statusgo-shared-library: generate
-statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library: $(LIBWAKU) ##@cross-compile Build status-go as shared library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
@@ -295,6 +314,15 @@ lint-fix:
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
+
+test-libwaku: | $(LIBWAKU)
+	go test -tags '$(BUILD_TAGS) use_nwaku' -run TestDial ./wakuv2/... -count 1 -v -json | jq -r '.Output'
+
+clean-libwaku:
+	@echo "Removing libwaku"
+	rm $(LIBWAKU)
+
+rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
 test: test-unit ##@tests Run basic, short tests during development
 

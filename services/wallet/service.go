@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
+	"github.com/status-im/status-go/services/wallet/leaderboard"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/routeexecution"
@@ -141,7 +142,7 @@ func NewService(
 		User:     config.WalletConfig.StatusProxyMarketUser,
 		Password: config.WalletConfig.StatusProxyMarketPassword,
 	})
-	marketManager := market.NewManager([]thirdparty.MarketDataProvider{cryptoCompare, coingecko, cryptoCompareProxy}, feed)
+	marketManager := market.NewManager([]thirdparty.MarketDataProvider{cryptoCompare, coingecko, cryptoCompareProxy}, tokenManager, feed)
 	reader := NewReader(tokenManager, marketManager, token.NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, accountFeed, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
@@ -208,6 +209,9 @@ func NewService(
 
 	routeExecutionManager := routeexecution.NewManager(db, feed, router, transactionManager, transferController)
 
+	leaderboardConfig := leaderboard.NewLeaderboardConfig(config.WalletConfig.MarketDataProxyConfig)
+	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, db, feed)
+
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -237,6 +241,8 @@ func NewService(
 		featureFlags:          featureFlags,
 		router:                router,
 		routeExecutionManager: routeExecutionManager,
+		leaderboardService:    leaderboardService,
+		started:               false,
 	}
 }
 
@@ -311,18 +317,17 @@ type Service struct {
 	db                    *sql.DB
 	accountsDB            *accounts.Database
 	rpcClient             *rpc.Client
-	savedAddressesManager *SavedAddressesManager
 	tokenManager          *token.Manager
 	communityManager      *community.Manager
+	savedAddressesManager *SavedAddressesManager
 	transactionManager    *transfer.TransactionManager
 	pendingTxManager      *transactions.PendingTxTracker
-	cryptoOnRampManager   *onramp.Manager
 	transferController    *transfer.Controller
-	marketManager         *market.Manager
-	started               bool
+	cryptoOnRampManager   *onramp.Manager
 	collectiblesManager   *collectibles.Manager
 	collectibles          *collectibles.Service
 	gethManager           *account.GethManager
+	marketManager         *market.Manager
 	transactor            *transactions.Transactor
 	feed                  *event.Feed
 	signals               *walletevent.SignalsTransmitter
@@ -337,6 +342,8 @@ type Service struct {
 	featureFlags          *protocolCommon.FeatureFlags
 	router                *router.Router
 	routeExecutionManager *routeexecution.Manager
+	leaderboardService    *leaderboard.MarketDataService
+	started               bool
 
 	cancelWalletServiceCtx context.CancelFunc
 }
@@ -361,6 +368,7 @@ func (s *Service) Start() error {
 	err := s.signals.Start(ctx)
 	s.history.Start(ctx)
 	s.collectibles.Start(ctx)
+	s.leaderboardService.Start(ctx)
 	s.started = true
 	return err
 }
@@ -381,6 +389,7 @@ func (s *Service) Stop() error {
 	s.activity.Stop()
 	s.collectibles.Stop()
 	s.tokenManager.Stop()
+	s.leaderboardService.Stop()
 	s.started = false
 	logutils.ZapLogger().Info("wallet stopped")
 

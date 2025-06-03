@@ -9,19 +9,13 @@ import (
 // Envelope contains information about the pubsub topic of a WakuMessage
 // and a hash used to identify a message based on the bytes of a WakuMessage
 // protobuffer
-type Envelope interface {
-	Message() *pb.WakuMessage
-	PubsubTopic() string
-	Hash() MessageHash
-}
-
-type envelopeImpl struct {
+type Envelope struct {
 	msg   *pb.WakuMessage
 	topic string
 	hash  MessageHash
 }
 
-type tmpWakuMessageJson struct {
+type wakuMessage struct {
 	Payload        []byte  `json:"payload,omitempty"`
 	ContentTopic   string  `json:"contentTopic,omitempty"`
 	Version        *uint32 `json:"version,omitempty"`
@@ -31,47 +25,43 @@ type tmpWakuMessageJson struct {
 	RateLimitProof []byte  `json:"proof,omitempty"`
 }
 
-type tmpEnvelopeStruct struct {
-	WakuMessage tmpWakuMessageJson `json:"wakuMessage"`
-	PubsubTopic string             `json:"pubsubTopic"`
-	MessageHash MessageHash        `json:"messageHash"`
+type wakuEnvelope struct {
+	WakuMessage wakuMessage `json:"wakuMessage"`
+	PubsubTopic string      `json:"pubsubTopic"`
+	MessageHash MessageHash `json:"messageHash"`
 }
 
-// NewEnvelope creates a new Envelope from a json string generated in nwaku
-func NewEnvelope(jsonEventStr string) (Envelope, error) {
-	tmpEnvelopeStruct := tmpEnvelopeStruct{}
-	err := json.Unmarshal([]byte(jsonEventStr), &tmpEnvelopeStruct)
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (e *Envelope) UnmarshalJSON(input []byte) error {
+	wakuEnvelope := wakuEnvelope{}
+	err := json.Unmarshal(input, &wakuEnvelope)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if err != nil {
-		return nil, err
+	e.msg = &pb.WakuMessage{
+		Payload:        wakuEnvelope.WakuMessage.Payload,
+		ContentTopic:   wakuEnvelope.WakuMessage.ContentTopic,
+		Version:        wakuEnvelope.WakuMessage.Version,
+		Timestamp:      wakuEnvelope.WakuMessage.Timestamp,
+		Meta:           wakuEnvelope.WakuMessage.Meta,
+		Ephemeral:      wakuEnvelope.WakuMessage.Ephemeral,
+		RateLimitProof: wakuEnvelope.WakuMessage.RateLimitProof,
 	}
+	e.topic = wakuEnvelope.PubsubTopic
+	e.hash = wakuEnvelope.MessageHash
 
-	return &envelopeImpl{
-		msg: &pb.WakuMessage{
-			Payload:        tmpEnvelopeStruct.WakuMessage.Payload,
-			ContentTopic:   tmpEnvelopeStruct.WakuMessage.ContentTopic,
-			Version:        tmpEnvelopeStruct.WakuMessage.Version,
-			Timestamp:      tmpEnvelopeStruct.WakuMessage.Timestamp,
-			Meta:           tmpEnvelopeStruct.WakuMessage.Meta,
-			Ephemeral:      tmpEnvelopeStruct.WakuMessage.Ephemeral,
-			RateLimitProof: tmpEnvelopeStruct.WakuMessage.RateLimitProof,
-		},
-		topic: tmpEnvelopeStruct.PubsubTopic,
-		hash:  tmpEnvelopeStruct.MessageHash,
-	}, nil
+	return nil
 }
 
-func (e *envelopeImpl) Message() *pb.WakuMessage {
+func (e *Envelope) Message() *pb.WakuMessage {
 	return e.msg
 }
 
-func (e *envelopeImpl) PubsubTopic() string {
+func (e *Envelope) PubsubTopic() string {
 	return e.topic
 }
 
-func (e *envelopeImpl) Hash() MessageHash {
+func (e *Envelope) Hash() MessageHash {
 	return e.hash
 }

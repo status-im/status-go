@@ -12,14 +12,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/status-im/status-go/params/networkhelper"
-
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -154,11 +154,11 @@ func TestGetClientsUsingCache(t *testing.T) {
 			providers = append(providers, params.RpcProvider{
 				Name:         fmt.Sprintf("Provider%d", i+1),
 				ChainID:      1,
-				URL:          baseURL + path,
+				URL:          security.NewSensitiveString(baseURL).Append(path),
 				Type:         params.EmbeddedProxyProviderType,
 				AuthType:     params.BasicAuth,
-				AuthLogin:    "incorrectUser",
-				AuthPassword: "incorrectPwd", // will be replaced by correct values by OverrideBasicAuth
+				AuthLogin:    security.NewSensitiveString("incorrectUser"),
+				AuthPassword: security.NewSensitiveString("incorrectPwd"), // will be replaced by correct values by OverrideBasicAuth
 				Enabled:      true,
 			})
 		}
@@ -173,7 +173,12 @@ func TestGetClientsUsingCache(t *testing.T) {
 		},
 	}
 
-	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, user, password)
+	networks = networkhelper.OverrideBasicAuth(
+		networks,
+		params.EmbeddedProxyProviderType,
+		true,
+		security.NewSensitiveString(user),
+		security.NewSensitiveString(password))
 
 	config := ClientConfig{
 		Client:          nil,

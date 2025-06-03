@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/status-im/status-go/messaging"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
+
 	"github.com/status-im/status-go/wakuv2"
 
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
@@ -16,8 +16,8 @@ import (
 )
 
 type ReceivedMessages struct {
-	Filter     messaging.ChatFilter
-	SHHMessage *wakutypes.Message
+	Filter     messagingtypes.ChatFilter
+	SHHMessage *messagingtypes.ReceivedMessage
 	Messages   []*v1protocol.StatusMessage
 }
 

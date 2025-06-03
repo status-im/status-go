@@ -57,6 +57,10 @@ func (tm *TransactionManager) TxPlacedForPath(pathProcessorName string) bool {
 func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *wallettypes.RouterTransactionDetails {
 	for _, desc := range tm.routerTransactions {
 		if desc.RouterPath.PathIdentity() == path.PathIdentity() {
+			if desc.RouterPath.ProcessorName == pathProcessorCommon.ProcessorSwapParaswapName {
+				// since the path is re-evaluated for swap after approval tx is placed we need to use the latest path
+				desc.RouterPath = path
+			}
 			return desc
 		}
 	}
@@ -81,19 +85,26 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 		Version: wallettypes.SendTxArgsVersion1,
 
 		// tx fields
-		From:                 types.Address(addressFrom),
-		To:                   &addrTo,
-		Value:                (*hexutil.Big)(big.NewInt(0)),
-		Data:                 path.ApprovalPackedData,
-		Nonce:                path.ApprovalTxNonce,
-		Gas:                  (*hexutil.Uint64)(&path.ApprovalGasAmount),
-		MaxFeePerGas:         path.ApprovalMaxFeesPerGas,
-		MaxPriorityFeePerGas: path.ApprovalPriorityFee,
-		ValueOut:             (*hexutil.Big)(big.NewInt(0)),
+		From:     types.Address(addressFrom),
+		To:       &addrTo,
+		Value:    (*hexutil.Big)(big.NewInt(0)),
+		Data:     path.ApprovalPackedData,
+		Nonce:    path.ApprovalTxNonce,
+		Gas:      (*hexutil.Uint64)(&path.ApprovalGasAmount),
+		ValueOut: (*hexutil.Big)(big.NewInt(0)),
 
 		// additional fields version 1
 		FromChainID: path.FromChain.ChainID,
 	}
+
+	// set appropriate fields based on EIP-1559 compatibility of the chain
+	if !path.FromChain.EIP1559Enabled {
+		approavalSendArgs.GasPrice = path.ApprovalGasPrice
+	} else {
+		approavalSendArgs.MaxFeePerGas = path.ApprovalMaxFeesPerGas
+		approavalSendArgs.MaxPriorityFeePerGas = path.ApprovalPriorityFee
+	}
+
 	if path.FromToken != nil {
 		approavalSendArgs.FromTokenID = path.FromToken.Symbol
 	}
@@ -123,13 +134,11 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 		Version: wallettypes.SendTxArgsVersion1,
 
 		// tx fields
-		From:                 types.Address(processorInputParams.FromAddr),
-		Value:                path.AmountIn,
-		Data:                 path.TxPackedData,
-		Nonce:                path.TxNonce,
-		Gas:                  (*hexutil.Uint64)(&path.TxGasAmount),
-		MaxFeePerGas:         path.TxMaxFeesPerGas,
-		MaxPriorityFeePerGas: path.TxPriorityFee,
+		From:  types.Address(processorInputParams.FromAddr),
+		Value: path.AmountIn,
+		Data:  path.TxPackedData,
+		Nonce: path.TxNonce,
+		Gas:   (*hexutil.Uint64)(&path.TxGasAmount),
 
 		// additional fields version 1
 		ValueIn:            path.AmountIn,
@@ -137,6 +146,13 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 		FromChainID:        path.FromChain.ChainID,
 		ToChainID:          path.ToChain.ChainID,
 		SlippagePercentage: processorInputParams.SlippagePercentage,
+	}
+
+	if !path.FromChain.EIP1559Enabled {
+		sendArgs.GasPrice = path.TxGasPrice
+	} else {
+		sendArgs.MaxFeePerGas = path.TxMaxFeesPerGas
+		sendArgs.MaxPriorityFeePerGas = path.TxPriorityFee
 	}
 
 	isContractDeployment := path.ProcessorName == pathProcessorCommon.ProcessorCommunityDeployCollectiblesName ||

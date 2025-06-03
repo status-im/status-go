@@ -73,6 +73,13 @@ type Community struct {
 	mediaServer server.MediaServerInterface
 }
 
+type ReadonlyCommunity interface {
+	ID() types.HexBytes
+	IsControlNode() bool
+	CanPost(pk *ecdsa.PublicKey, chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error)
+	IsBanned(pk *ecdsa.PublicKey) bool
+}
+
 func New(config Config, timesource common.TimeSource, encryptor DescriptionEncryptor, mediaServer server.MediaServerInterface) (*Community, error) {
 	if config.MemberIdentity == nil {
 		return nil, errors.New("no member identity")

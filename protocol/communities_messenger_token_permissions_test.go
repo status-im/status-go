@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -2153,9 +2154,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	messageDate := time.UnixMilli(int64(message1.Timestamp))
 	startDate := messageDate.Add(-time.Minute)
 	endDate := messageDate.Add(time.Minute)
-	topic := wakutypes.BytesToTopic(messaging.ToContentTopic(chat.ID))
-	communityCommonTopic := wakutypes.BytesToTopic(messaging.ToContentTopic(community.UniversalChatID()))
-	topics := []wakutypes.TopicType{topic, communityCommonTopic}
+	topic := messagingtypes.BytesToContentTopic(messaging.ToContentTopic(chat.ID))
+	communityCommonTopic := messagingtypes.BytesToContentTopic(messaging.ToContentTopic(community.UniversalChatID()))
+	topics := []messagingtypes.ContentTopic{topic, communityCommonTopic}
 
 	torrentConfig := params.TorrentConfig{
 		Enabled:    true,

@@ -10,6 +10,7 @@ import (
 	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network/db"
 	"github.com/status-im/status-go/rpc/network/testutil"
 	"github.com/status-im/status-go/t/helpers"
@@ -41,7 +42,7 @@ func TestRpcProviderPersistenceTestSuite(t *testing.T) {
 // Test cases
 
 func (s *RpcProviderPersistenceTestSuite) TestAddAndGetRpcProvider() {
-	provider := testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com")
+	provider := testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, security.NewSensitiveString("https://provider1.example.com"))
 
 	err := s.rpcPersistence.AddRpcProvider(provider)
 	s.Require().NoError(err)
@@ -54,10 +55,10 @@ func (s *RpcProviderPersistenceTestSuite) TestAddAndGetRpcProvider() {
 
 func (s *RpcProviderPersistenceTestSuite) TestGetRpcProvidersByType() {
 	providers := []params.RpcProvider{
-		testutil.CreateProvider(api_common.MainnetChainID, "UserProvider1", params.UserProviderType, true, "https://provider1.example.com"),
-		testutil.CreateProvider(api_common.MainnetChainID, "EmbeddedDirect1", params.EmbeddedDirectProviderType, false, "https://provider2.example.com"),
-		testutil.CreateProvider(api_common.MainnetChainID, "UserProvider2", params.UserProviderType, false, "https://provider3.example.com"),
-		testutil.CreateProvider(api_common.MainnetChainID, "EmbeddedProxy1", params.EmbeddedProxyProviderType, true, "https://provider4.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "UserProvider1", params.UserProviderType, true, security.NewSensitiveString("https://provider1.example.com")),
+		testutil.CreateProvider(api_common.MainnetChainID, "EmbeddedDirect1", params.EmbeddedDirectProviderType, false, security.NewSensitiveString("https://provider2.example.com")),
+		testutil.CreateProvider(api_common.MainnetChainID, "UserProvider2", params.UserProviderType, false, security.NewSensitiveString("https://provider3.example.com")),
+		testutil.CreateProvider(api_common.MainnetChainID, "EmbeddedProxy1", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://provider4.example.com")),
 	}
 
 	for _, provider := range providers {
@@ -80,7 +81,7 @@ func (s *RpcProviderPersistenceTestSuite) TestGetRpcProvidersByType() {
 }
 
 func (s *RpcProviderPersistenceTestSuite) TestDeleteRpcProviders() {
-	provider := testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com")
+	provider := testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, security.NewSensitiveString("https://provider1.example.com"))
 
 	err := s.rpcPersistence.AddRpcProvider(provider)
 	s.Require().NoError(err)
@@ -95,7 +96,7 @@ func (s *RpcProviderPersistenceTestSuite) TestDeleteRpcProviders() {
 }
 
 func (s *RpcProviderPersistenceTestSuite) TestUpdateRpcProvider() {
-	provider := testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com")
+	provider := testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, security.NewSensitiveString("https://provider1.example.com"))
 
 	err := s.rpcPersistence.AddRpcProvider(provider)
 	s.Require().NoError(err)
@@ -106,7 +107,7 @@ func (s *RpcProviderPersistenceTestSuite) TestUpdateRpcProvider() {
 	s.Require().Len(providers, 1)
 
 	provider.ID = providers[0].ID
-	provider.URL = "https://provider1-updated.example.com"
+	provider.URL = security.NewSensitiveString("https://provider1-updated.example.com")
 	provider.EnableRPSLimiter = false
 
 	err = s.rpcPersistence.UpdateRpcProvider(provider)
@@ -120,8 +121,8 @@ func (s *RpcProviderPersistenceTestSuite) TestUpdateRpcProvider() {
 
 func (s *RpcProviderPersistenceTestSuite) TestSetRpcProviders() {
 	initialProviders := []params.RpcProvider{
-		testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com"),
-		testutil.CreateProvider(api_common.MainnetChainID, "Provider2", params.EmbeddedDirectProviderType, false, "https://provider2.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, security.NewSensitiveString("https://provider1.example.com")),
+		testutil.CreateProvider(api_common.MainnetChainID, "Provider2", params.EmbeddedDirectProviderType, false, security.NewSensitiveString("https://provider2.example.com")),
 	}
 
 	for _, provider := range initialProviders {
@@ -130,8 +131,8 @@ func (s *RpcProviderPersistenceTestSuite) TestSetRpcProviders() {
 	}
 
 	newProviders := []params.RpcProvider{
-		testutil.CreateProvider(api_common.MainnetChainID, "NewProvider1", params.UserProviderType, true, "https://newprovider1.example.com"),
-		testutil.CreateProvider(api_common.MainnetChainID, "NewProvider2", params.EmbeddedProxyProviderType, true, "https://newprovider2.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "NewProvider1", params.UserProviderType, true, security.NewSensitiveString("https://newprovider1.example.com")),
+		testutil.CreateProvider(api_common.MainnetChainID, "NewProvider2", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://newprovider2.example.com")),
 	}
 
 	err := s.rpcPersistence.SetRpcProviders(api_common.MainnetChainID, newProviders)
@@ -145,10 +146,10 @@ func (s *RpcProviderPersistenceTestSuite) TestSetRpcProviders() {
 
 func (s *RpcProviderPersistenceTestSuite) TestAddRpcProviderValidation() {
 	invalidProvider := params.RpcProvider{
-		ChainID: 0,              // Invalid: must be greater than 0
-		Name:    "",             // Invalid: cannot be empty
-		URL:     "invalid-url",  // Invalid: not a valid URL
-		Type:    "invalid-type", // Invalid: not in allowed values
+		ChainID: 0,                                          // Invalid: must be greater than 0
+		Name:    "",                                         // Invalid: cannot be empty
+		URL:     security.NewSensitiveString("invalid-url"), // Invalid: not a valid URL
+		Type:    "invalid-type",                             // Invalid: not in allowed values
 	}
 
 	err := s.rpcPersistence.AddRpcProvider(invalidProvider)

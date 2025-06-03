@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/pkg/security"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 
@@ -35,7 +36,7 @@ func (s *RaribleClientIntegrationSuite) SetupTest() {
 		testnetKey = os.Getenv("STATUS_RUNTIME_RARIBLE_TESTNET_API_KEY")
 	}
 
-	s.client = NewClient(mainnetKey, testnetKey)
+	s.client = NewClient(security.NewSensitiveString(mainnetKey), security.NewSensitiveString(testnetKey))
 }
 
 func (s *RaribleClientIntegrationSuite) TestAPIKeysAvailable() {

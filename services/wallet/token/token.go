@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token/balancefetcher"
 	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
+	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -137,7 +138,7 @@ func (tm *Manager) Start(ctx context.Context, autoRefreshInterval time.Duration,
 
 	// For now we don't have the list of tokens lists remotely set so we're uisng the harcoded default lists. Once we have it
 	//we will just need to update the empty string with the correct URL.
-	tm.tokenLists.Start(ctx, "", autoRefreshInterval, autoRefreshCheckInterval)
+	tm.tokenLists.Start(ctx, fetcher.RemoteListOfTokenLists, autoRefreshInterval, autoRefreshCheckInterval)
 }
 
 func (tm *Manager) startAccountsWatcher() {
@@ -641,12 +642,13 @@ func (tm *Manager) ToToken(network *params.Network) *tokenTypes.Token {
 		// TODO: we need to change the address for the native token to the correct one, we cannot to that right now cause will affect other parts of the code
 		// The following line is the right fix for `{"error":"Validation failed: \"srcToken\" contains an invalid value"}` error for Swap
 		// Address:  common.HexToAddress("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"), // for all the chains we support this is the address of the native (ETH) token
-		Address:  common.HexToAddress("0x"),
-		Name:     network.NativeCurrencyName,
-		Symbol:   network.NativeCurrencySymbol,
-		Decimals: uint(network.NativeCurrencyDecimals),
-		ChainID:  network.ChainID,
-		Verified: true,
+		Address:   common.HexToAddress("0x"),
+		Name:      network.NativeCurrencyName,
+		Symbol:    network.NativeCurrencySymbol,
+		TmpSymbol: network.NativeCurrencySymbol,
+		Decimals:  uint(network.NativeCurrencyDecimals),
+		ChainID:   network.ChainID,
+		Verified:  true,
 	}
 }
 

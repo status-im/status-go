@@ -12,6 +12,8 @@ func NetworkToCommonChainID(network string) uint64 {
 		return walletCommon.ArbitrumMainnet
 	case "BASE":
 		return walletCommon.BaseMainnet
+	case "BINANCESMARTCHAIN":
+		return walletCommon.BSCMainnet
 	}
 	return walletCommon.UnknownChainID
 }
@@ -26,6 +28,8 @@ func CommonChainIDToNetwork(chainID uint64) string {
 		return "OPTIMISM"
 	case walletCommon.BaseMainnet:
 		return "BASE"
+	case walletCommon.BSCMainnet:
+		return "BINANCESMARTCHAIN"
 	default:
 		return ""
 	}

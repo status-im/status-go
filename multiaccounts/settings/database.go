@@ -148,10 +148,11 @@ INSERT INTO settings (
   test_networks_enabled,
   fleet,
   auto_refresh_tokens_enabled,
-  news_feed_last_fetched_timestamp
+  news_feed_last_fetched_timestamp,
+  backup_fetched
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -188,6 +189,7 @@ INSERT INTO settings (
 		s.AutoRefreshTokensEnabled,
 		// Default the news feed last fetched timestamp to now
 		time.Now().Unix(),
+		s.BackupFetched,
 	)
 	if err != nil {
 		return err

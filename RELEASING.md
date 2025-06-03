@@ -6,9 +6,7 @@ The process is automated and, even though it's possible to run manually, should 
 
 ## Versioning
 
-We use [semver](https://semver.org/) but as we do not have a stable version yet, it's a bit skewed.
-
-We use `0` as the MAJOR version and bump only MINOR when there are breaking changes and PATCH when there are no breaking changes.
+For details on status-go's versioning approach, including how we handle Go modules, generated files, and our release workflow, see [_docs/versioning.md](./_docs/versioning.md).
 
 ## Custom build
 
