@@ -351,143 +351,6 @@ func (w *Waku) GetNodeENRString() (string, error) {
 	return enr.String(), nil
 }
 
-/* TODO-nwaku* (this logic should be directly in nwaku?)
-func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, useOnlyDnsDiscCache bool) ([]*enode.Node, error) {
-	wg := sync.WaitGroup{}
-	mu := sync.Mutex{}
-	var result []*enode.Node
-
-	w.seededBootnodesForDiscV5 = true
-
-	retrieveENR := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
-		mu.Lock()
-		defer mu.Unlock()
-		defer wg.Done()
-		if d.ENR != nil {
-			result = append(result, d.ENR)
-		}
-	}
-
-	for _, addrString := range addresses {
-		if addrString == "" {
-			continue
-		}
-
-		if strings.HasPrefix(addrString, "enrtree://") {
-			// Use DNS Discovery
-			wg.Add(1)
-			go func(addr string) {
-				defer gocommon.LogOnPanic()
-				defer wg.Done()
-				if err := w.dnsDiscover(ctx, addr, retrieveENR, useOnlyDnsDiscCache); err != nil {
-					// prevent w.ctx in retryDnsDiscoveryWithBackoff from set to nil when w.Stop() is called
-					w.wg.Add(1)
-					go func() {
-						defer gocommon.LogOnPanic()
-						defer w.wg.Done()
-						w.retryDnsDiscoveryWithBackoff(ctx, addr, w.dnsDiscAsyncRetrievedSignal)
-					}()
-				}
-			}(addrString)
-		} else {
-			// It's a normal enr
-			bootnode, err := enode.Parse(enode.ValidSchemes, addrString)
-			if err != nil {
-				return nil, err
-			}
-			mu.Lock()
-			result = append(result, bootnode)
-			mu.Unlock()
-		}
-	}
-	wg.Wait()
-
-	if len(result) == 0 {
-		w.seededBootnodesForDiscV5 = false
-	}
-
-	return result, nil
-}
-
-type fnApplyToEachPeer func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup)
-
-func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnApplyToEachPeer, useOnlyCache bool) error {
-	w.logger.Info("retrieving nodes", zap.String("enr", enrtreeAddress))
-	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
-	defer cancel()
-
-	w.dnsAddressCacheLock.Lock()
-	defer w.dnsAddressCacheLock.Unlock()
-
-	discNodes, ok := w.dnsAddressCache[enrtreeAddress]
-	if !ok && !useOnlyCache {
-		nameserver := w.cfg.Nameserver
-		resolver := w.cfg.Resolver
-
-		var opts []dnsdisc.DNSDiscoveryOption
-		if nameserver != "" {
-			opts = append(opts, dnsdisc.WithNameserver(nameserver))
-		}
-		if resolver != nil {
-			opts = append(opts, dnsdisc.WithResolver(resolver))
-		}
-
-		discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrtreeAddress, opts...)
-		if err != nil {
-			w.logger.Warn("dns discovery error ", zap.Error(err))
-			return err
-		}
-
-		if len(discoveredNodes) != 0 {
-			w.dnsAddressCache[enrtreeAddress] = append(w.dnsAddressCache[enrtreeAddress], discoveredNodes...)
-			discNodes = w.dnsAddressCache[enrtreeAddress]
-		}
-	}
-
-	wg := &sync.WaitGroup{}
-	wg.Add(len(discNodes))
-	for _, d := range discNodes {
-		apply(d, wg)
-	}
-	wg.Wait()
-
-	return nil
-}
-
-func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, successChan chan<- struct{}) {
-	retries := 0
-	applyFn := func(_ dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
-		wg.Done()
-	}
-	for {
-		err := w.dnsDiscover(ctx, addr, applyFn, false)
-		if err == nil {
-			select {
-			case successChan <- struct{}{}:
-			default:
-			}
-
-			break
-		}
-
-		retries++
-		backoff := time.Second * time.Duration(math.Exp2(float64(retries)))
-		if backoff > time.Minute {
-			backoff = time.Minute
-		}
-
-		t := time.NewTimer(backoff)
-		select {
-		case <-w.ctx.Done():
-			t.Stop()
-			return
-		case <-t.C:
-			t.Stop()
-		}
-	}
-}
-*/
-
 // TODO-nwaku maybe eventually remove as nwaku should do it
 func (w *Waku) discoverAndConnectPeers() {
 	var addrsToConnect []multiaddr.Multiaddr
@@ -1037,7 +900,9 @@ func (w *Waku) Start() error {
 	}
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", peerID))
-	w.discoverAndConnectPeers()
+
+	w.discoverAndConnectPeers() // TODO-nwaku: maybe eventually remove? we can pass cfg.WakuNodes as static nodes to nwaku config
+	// but we need to support in nwaku enrtree resolution for staticnodes and not only multiaddresses
 
 	/* TODO-nwaku
 
@@ -1178,12 +1043,6 @@ func (w *Waku) Start() error {
 		return err
 	}
 
-	/* TODO-nwaku
-	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set w.ctx to nil within `w.Stop()`
-	w.wg.Add(1)
-	go w.seedBootnodesForDiscV5()
-	*/
-
 	return nil
 }
 
@@ -1284,7 +1143,7 @@ func (w *Waku) startMessageSender() error {
 		return err
 	}
 
-	/* TODO-nwaku - check what WithMessageSentEmitter does
+	/* TODO-nwaku
 	if w.cfg.TelemetryServerURL != "" {
 		sender.WithMessageSentEmitter(w.node.Host())
 	} */
@@ -2095,13 +1954,12 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 		}
 	}
 
-	// TODO-nwaku
-	// TODO: merge Config and WakuConfig
 	cfg = setDefaults(cfg)
 	if err = cfg.Validate(logger); err != nil {
 		return nil, err
 	}
 
+	// TODO: once we remove go-waku, get rid of the conversion
 	nwakuCfg := gowakuToNwakuConfig(cfg, logger)
 	nwakuCfg.Nodekey = hex.EncodeToString(crypto.FromECDSA(nodeKey))
 
