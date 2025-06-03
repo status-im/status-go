@@ -2148,6 +2148,68 @@ func printStackTrace() {
 	fmt.Printf("Current stack trace:\n%s\n", buf[:n])
 }
 
+func gowakuToNwakuConfig(cfg *Config, logger *zap.Logger) *bindingscommon.WakuConfig {
+
+	nwakuCfg := bindingscommon.WakuConfig{}
+	nwakuCfg.MaxMessageSize = fmt.Sprintf("%dB", cfg.MaxMessageSize)
+	nwakuCfg.TcpPort = cfg.Port
+	nwakuCfg.PeerExchange = cfg.EnablePeerExchangeServer || cfg.EnablePeerExchangeClient // no distinction between client and server in nwaku
+	nwakuCfg.Discv5BootstrapNodes = cfg.DiscV5BootstrapNodes
+	// nwakuCfg.DnsDiscoveryNameServers = cfg.Nameserver // TODO
+	nwakuCfg.Discv5Discovery = cfg.EnableDiscV5
+	// nwakuCfg.Discv5EnrAutoUpdate = cfg.AutoUpdate // TODO
+	nwakuCfg.Discv5UdpPort = cfg.UDPPort
+	nwakuCfg.Store = cfg.EnableStore
+
+	nwakuCfg.ClusterID = cfg.ClusterID
+	nwakuCfg.Shards = []uint16{DefaultShardIndex, NonProtectedShardIndex}
+
+	for _, topic := range cfg.DefaultShardedPubsubTopics {
+		wakuTopic, err := protocol.ToWakuPubsubTopic(topic)
+		if err != nil {
+			continue
+		}
+
+		sharded, err := protocol.ToShardPubsubTopic(wakuTopic)
+		if err != nil {
+			continue
+		}
+
+		if sharded.Cluster() != cfg.ClusterID {
+			logger.Warn("ClusterId in provided pubsub topic doesn't match configured cluster",
+				zap.Uint16("configured cluster", cfg.ClusterID),
+				zap.Uint16("topic's cluster", sharded.Cluster()))
+			continue
+		}
+
+		nwakuCfg.Shards = append(nwakuCfg.Shards, sharded.Shard())
+	}
+
+	if cfg.StoreCapacity > 0 {
+		nwakuCfg.StoreMessageRetentionPolicy = fmt.Sprintf("capacity:%d", cfg.StoreCapacity)
+	} else if cfg.StoreSeconds > 0 {
+		nwakuCfg.StoreMessageRetentionPolicy = fmt.Sprintf("time:%d", cfg.StoreSeconds)
+	}
+
+	if !cfg.LightClient {
+		nwakuCfg.Discv5Discovery = true
+		nwakuCfg.Relay = true
+		nwakuCfg.Filter = true
+		nwakuCfg.FilterMaxPeersToServe = 20
+		nwakuCfg.Lightpush = true
+		nwakuCfg.RateLimits.Filter = &bindingscommon.RateLimit{Volume: 100, Period: 1, TimeUnit: bindingscommon.Second}
+		nwakuCfg.RateLimits.Lightpush = &bindingscommon.RateLimit{Volume: 5, Period: 1, TimeUnit: bindingscommon.Second}
+	}
+
+	if cfg.EnablePeerExchangeServer {
+		nwakuCfg.PeerExchange = true
+		nwakuCfg.RateLimits.PeerExchange = &bindingscommon.RateLimit{Volume: 5, Period: 1, TimeUnit: bindingscommon.Second}
+	}
+
+	return &nwakuCfg
+
+}
+
 func wakuNew(nodeKey *ecdsa.PrivateKey,
 	cfg *Config,
 	logger *zap.Logger,
@@ -2174,7 +2236,14 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 		}
 	}
 
-	nwakuCfg := cfg.NwakuConfig
+	// TODO-nwaku
+	// TODO: merge Config and WakuConfig
+	cfg = setDefaults(cfg)
+	if err = cfg.Validate(logger); err != nil {
+		return nil, err
+	}
+
+	nwakuCfg := gowakuToNwakuConfig(cfg, logger)
 	nwakuCfg.Nodekey = hex.EncodeToString(crypto.FromECDSA(nodeKey))
 
 	nwakuCfg.TcpPort, nwakuCfg.Discv5UdpPort, err = getFreePortIfNeeded(nwakuCfg.TcpPort, nwakuCfg.Discv5UdpPort, logger)
@@ -2182,30 +2251,8 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 		return nil, err
 	}
 
-	// TODO-nwaku
-	// TODO: merge Config and WakuConfig
-	cfg = setDefaults(cfg)
-	if err = cfg.Validate(logger); err != nil {
-		return nil, err
-	}
 	logger.Info("starting wakuv2 with config", zap.Any("nwakuCfg", nwakuCfg), zap.Any("wakuCfg", cfg))
-
 	ctx, cancel := context.WithCancel(context.Background())
-
-	if !cfg.LightClient {
-		nwakuCfg.Discv5Discovery = true
-		nwakuCfg.Relay = true
-		nwakuCfg.Filter = true
-		nwakuCfg.FilterMaxPeersToServe = 20
-		nwakuCfg.Lightpush = true
-		nwakuCfg.RateLimits.Filter = &bindingscommon.RateLimit{Volume: 100, Period: 1, TimeUnit: bindingscommon.Second}
-		nwakuCfg.RateLimits.Lightpush = &bindingscommon.RateLimit{Volume: 5, Period: 1, TimeUnit: bindingscommon.Second}
-	}
-
-	if cfg.EnablePeerExchangeServer {
-		nwakuCfg.PeerExchange = true
-		nwakuCfg.RateLimits.PeerExchange = &bindingscommon.RateLimit{Volume: 5, Period: 1, TimeUnit: bindingscommon.Second}
-	}
 
 	wakunode, err := waku.NewWakuNode(nwakuCfg, "nwaku")
 	if err != nil {
