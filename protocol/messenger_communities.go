@@ -951,6 +951,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 
 	chats := CreateCommunityChats(community, m.getTimesource())
 
+	publicChatsToInit := m.DefaultFilters(community)
 	filters, err := m.messaging.InitPublicChats(publicChatsToInit)
 	if err != nil {
 		logger.Debug("InitPublicChats error", zap.Error(err))
@@ -2448,15 +2449,12 @@ func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.Chat
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: uncompressedPubKey, PubsubTopic: wakuv2.DefaultNonProtectedPubsubTopic()},
-
-		// While we migrate to 128 and 256 shards, we listen to community messages in the new shards as well as in the old ones. After migration we should remove the old ones
-		{ChatID: cID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()},
-		{ChatID: updatesChannelID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()},
-		{ChatID: mlChannelID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()},
-		{ChatID: memberUpdateChannelID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()}, // Making content since chat messages are sent in this contenttopic
 		{ChatID: uncompressedPubKey, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()},
 	}
-
+	if communityPubsubTopic == "" {
+		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: cID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()})
+		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: memberUpdateChannelID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()})
+	}
 	return chats
 }
 
