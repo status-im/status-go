@@ -11,7 +11,7 @@ import (
 
 	"github.com/multiformats/go-multiaddr"
 
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/waku/types"
 )
 
@@ -318,7 +318,7 @@ func (d *Database) DeleteTopic(pubsubTopic, contentTopic string) error {
 
 // SetTopics deletes all topics excepts the one set, or upsert those if
 // missing
-func (d *Database) SetTopics(filters messaging.ChatFilters) (err error) {
+func (d *Database) SetTopics(filters messagingtypes.ChatFilters) (err error) {
 	var tx *sql.Tx
 	tx, err = d.db.Begin()
 	if err != nil {

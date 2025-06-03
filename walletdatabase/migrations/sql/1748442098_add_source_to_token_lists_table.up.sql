@@ -1,0 +1,3 @@
+DELETE FROM token_lists;
+
+ALTER TABLE token_lists ADD COLUMN source VARCHAR DEFAULT NULL;

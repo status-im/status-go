@@ -52,6 +52,10 @@ in rec {
     };
   });
 
+  xcodeWrapper = callPackage ./pkgs/xcodeenv/compose-xcodewrapper.nix { } {
+    versions = ["16.0" "16.1" "16.2"];
+  };
+
   # Custom packages
   go-modvendor = callPackage ./pkgs/go-modvendor { };
   codecov-cli = callPackage ./pkgs/codecov-cli { };
@@ -60,5 +64,5 @@ in rec {
   # enabled CGO_ENABLED for status-mobile
   # swapped --replace plag with --replace-queit in substituteInPlace block because its deprecated in newer nix versions
   # swapped buildGoModule with buildGo122Module to ensure derivation is built with go 1.22
-  gomobile = callPackage ./pkgs/gomobile { };
+  gomobile = callPackage ./pkgs/gomobile {};
 }

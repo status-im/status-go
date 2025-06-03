@@ -24,10 +24,10 @@ func CreateEthClientFromProvider(provider params.RpcProvider, rpcUserAgentName s
 	// Set up authentication if needed
 	switch provider.AuthType {
 	case params.BasicAuth:
-		authEncoded := base64.StdEncoding.EncodeToString([]byte(provider.AuthLogin + ":" + provider.AuthPassword))
+		authEncoded := base64.StdEncoding.EncodeToString([]byte(provider.AuthLogin.Append(":", provider.AuthPassword).Reveal()))
 		headers.Set("Authorization", "Basic "+authEncoded)
 	case params.TokenAuth:
-		provider.URL = provider.URL + provider.AuthToken
+		provider.URL = provider.URL.Append(provider.AuthToken)
 	case params.NoAuth:
 		// no-op
 	default:
@@ -37,7 +37,7 @@ func CreateEthClientFromProvider(provider params.RpcProvider, rpcUserAgentName s
 	opts = append(opts, rpc.WithHeaders(headers))
 
 	// Dial the RPC client
-	rpcClient, err := rpc.DialOptions(context.Background(), provider.URL, opts...)
+	rpcClient, err := rpc.DialOptions(context.Background(), provider.URL.Reveal(), opts...)
 	if err != nil {
 		return nil, fmt.Errorf("dial server failed for provider %s: %w", provider.Name, err)
 	}

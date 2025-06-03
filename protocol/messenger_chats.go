@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/deprecation"
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -288,7 +288,7 @@ func (m *Messenger) CreateProfileChat(request *requests.CreateProfileChat) (*Mes
 		}
 	}
 
-	_, err = m.scheduleSyncFilters(messaging.ChatFilters{filter})
+	_, err = m.scheduleSyncFilters(messagingtypes.ChatFilters{filter})
 	if err != nil {
 		return nil, err
 	}
@@ -518,7 +518,7 @@ func (m *Messenger) saveChat(chat *Chat) error {
 	return nil
 }
 
-func (m *Messenger) Join(chat *Chat) (messaging.ChatFilters, error) {
+func (m *Messenger) Join(chat *Chat) (messagingtypes.ChatFilters, error) {
 	switch chat.ChatType {
 	case ChatTypeOneToOne:
 		pk, err := chat.PublicKey()
@@ -531,7 +531,7 @@ func (m *Messenger) Join(chat *Chat) (messaging.ChatFilters, error) {
 			return nil, err
 		}
 
-		return messaging.ChatFilters{f}, nil
+		return messagingtypes.ChatFilters{f}, nil
 	case ChatTypePrivateGroupChat:
 		members, err := chat.MembersAsPublicKeys()
 		if err != nil {
@@ -543,7 +543,7 @@ func (m *Messenger) Join(chat *Chat) (messaging.ChatFilters, error) {
 		if err != nil {
 			return nil, err
 		}
-		return messaging.ChatFilters{f}, nil
+		return messagingtypes.ChatFilters{f}, nil
 	default:
 		return nil, errors.New("chat is neither public nor private")
 	}

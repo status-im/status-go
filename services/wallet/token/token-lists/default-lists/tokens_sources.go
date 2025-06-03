@@ -3,6 +3,7 @@ package defaulttokenlists
 const (
 	UniswapTokenListID = "uniswap"
 	AaveTokenListID    = "aave"
+	StatusTokenListID  = "status"
 )
 
 type TokensSource struct {

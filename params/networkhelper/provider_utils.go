@@ -4,9 +4,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/status-im/status-go/rpc/network/db"
-
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/rpc/network/db"
 )
 
 // MergeProvidersPreservingUsersAndEnabledState merges new embedded providers with the current ones,
@@ -95,7 +95,7 @@ func ReplaceEmbeddedProviders(currentProviders, newEmbeddedProviders []params.Rp
 
 // OverrideBasicAuth updates providers of the specified type in the given networks.
 // It sets the `Enabled` flag and configures the `AuthLogin` and `AuthPassword` for each matching provider.
-func OverrideBasicAuth(networks []params.Network, providerType params.RpcProviderType, enabled bool, user, password string) []params.Network {
+func OverrideBasicAuth(networks []params.Network, providerType params.RpcProviderType, enabled bool, user, password security.SensitiveString) []params.Network {
 	updatedNetworks := DeepCopyNetworks(networks)
 
 	for i := range updatedNetworks {
@@ -122,7 +122,7 @@ func DeepCopyNetworks(networks []params.Network) []params.Network {
 	return updatedNetworks
 }
 
-func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[string]string) []params.Network {
+func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[string]security.SensitiveString) []params.Network {
 	updatedNetworks := DeepCopyNetworks(networks)
 
 	for i := range updatedNetworks {
@@ -135,13 +135,13 @@ func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[strin
 				continue
 			}
 
-			host, err := extractHost(provider.URL)
+			host, err := extractHost(provider.URL.Reveal())
 			if err != nil {
 				continue
 			}
 
 			for suffix, token := range authTokens {
-				if strings.HasSuffix(host, suffix) && token != "" {
+				if strings.HasSuffix(host, suffix) && !token.Empty() {
 					provider.AuthType = params.TokenAuth
 					provider.AuthToken = token
 					break

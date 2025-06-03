@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/storenodes"
 
 	"github.com/status-im/status-go/protocol/communities"
@@ -28,7 +29,6 @@ import (
 
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	waku2 "github.com/status-im/status-go/wakuv2"
-	wakuV2common "github.com/status-im/status-go/wakuv2/common"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -206,7 +206,7 @@ func (s *MessengerStoreNodeCommunitySuite) fetchCommunity(m *Messenger, communit
 	return stats
 }
 
-func (s *MessengerStoreNodeCommunitySuite) setupEnvelopesWatcher(wakuNode wakutypes.Waku, topic *wakutypes.TopicType, cb func(envelope *wakuV2common.ReceivedMessage)) {
+func (s *MessengerStoreNodeCommunitySuite) setupEnvelopesWatcher(wakuNode wakutypes.Waku, topic *wakutypes.TopicType, cb func(hash types.Hash)) {
 	envelopesWatcher := make(chan wakutypes.EnvelopeEvent, 100)
 	envelopesSub := wakuNode.SubscribeEnvelopeEvents(envelopesWatcher)
 
@@ -224,12 +224,14 @@ func (s *MessengerStoreNodeCommunitySuite) setupEnvelopesWatcher(wakuNode wakuty
 				if topic != nil && *topic != envelopeEvent.Topic {
 					continue
 				}
-				envelope := wakuNode.(*waku2.Waku).GetEnvelope(envelopeEvent.Hash)
-				cb(envelope)
-				s.logger.Debug("envelope available event for fetched content topic",
-					zap.Any("envelopeEvent", envelopeEvent),
-					zap.Any("envelope", envelope),
-				)
+				hasEnvelope := wakuNode.(*waku2.Waku).HasEnvelope(envelopeEvent.Hash)
+				if hasEnvelope {
+					cb(envelopeEvent.Hash)
+					s.logger.Debug("envelope available event for fetched content topic",
+						zap.Any("envelopeEvent", envelopeEvent),
+						zap.Any("hasEnvelope", hasEnvelope),
+					)
+				}
 			}
 
 		}
@@ -238,8 +240,8 @@ func (s *MessengerStoreNodeCommunitySuite) setupEnvelopesWatcher(wakuNode wakuty
 
 func (s *MessengerStoreNodeCommunitySuite) setupStoreNodeEnvelopesWatcher(topic *wakutypes.TopicType) <-chan string {
 	storeNodeSubscription := make(chan string, 100)
-	s.setupEnvelopesWatcher(s.storeNode, topic, func(envelope *wakuV2common.ReceivedMessage) {
-		storeNodeSubscription <- envelope.Hash().String()
+	s.setupEnvelopesWatcher(s.storeNode, topic, func(hash types.Hash) {
+		storeNodeSubscription <- hash.String()
 	})
 	return storeNodeSubscription
 }

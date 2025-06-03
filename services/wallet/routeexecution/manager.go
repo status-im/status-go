@@ -53,6 +53,10 @@ func (m *Manager) ClearLocalRouteData() {
 	m.transactionManager.ClearLocalRouterTransactionsData()
 }
 
+func (m *Manager) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *requests.PathTxIdentity) error {
+	return m.router.ReevaluateRouterPath(ctx, pathTxIdentity)
+}
+
 func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 	go func() {
 		defer status_common.LogOnPanic()

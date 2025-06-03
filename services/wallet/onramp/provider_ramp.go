@@ -8,7 +8,7 @@ import (
 )
 
 const rampID = "ramp"
-const rampSiteURL = "https://app.ramp.network/?hostApiKey=zrtf9u2uqebeyzcs37fu5857tktr3eg9w5tffove&hostAppName=Status&swapAsset=ETH_*,ARBITRUM_*,OPTIMISM_*,BASE_*"
+const rampSiteURL = "https://app.ramp.network/?hostApiKey=zrtf9u2uqebeyzcs37fu5857tktr3eg9w5tffove&hostAppName=Status&swapAsset=ETH_*,ARBITRUM_*,OPTIMISM_*,BASE_*,BSC_*"
 
 type RampProvider struct{}
 
@@ -34,7 +34,7 @@ func (p *RampProvider) GetCryptoOnRamp(ctx context.Context) (CryptoOnRamp, error
 		Hostname:                  "ramp.network",
 		SupportsSinglePurchase:    true,
 		SupportsRecurrentPurchase: false,
-		SupportedChainIDs:         []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet},
+		SupportedChainIDs:         []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
 		URLsNeedParameters:        false,
 		SiteURL:                   rampSiteURL,
 	}

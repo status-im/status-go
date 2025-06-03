@@ -1,26 +1,47 @@
 package main
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
+	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/token-lists/default-lists"
+	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 func main() {
-	tokensLists, err := tokenlists.NewTokenLists(nil, nil)
-	if err != nil {
-		fmt.Printf("Error creating token lists: %v\n", err)
+	fmt.Println("Analyzing token lists")
+	fetchedTokensLists := []fetcher.FetchedTokenList{
+		defaulttokenlists.StatusTokenList,
+		defaulttokenlists.AaveTokenList,
+		defaulttokenlists.UniswapTokenList,
+	}
+
+	fmt.Println("Analyzing token lists")
+	fmt.Println("=====================================")
+	fmt.Println("Total number of token lists: ", len(fetchedTokensLists))
+	if len(fetchedTokensLists) != len(defaulttokenlists.TokensSources)+1 { // +1 for the Status token list
+		fmt.Println("Warning: The number of token lists does not match the number of sources")
 		return
 	}
-	tokensLists.Start(context.Background(), "", time.Hour, time.Hour)
-	allTokensLists := tokensLists.GetTokensLists()
+	fmt.Println("=====================================")
+
+	tokensLists, err := rebuildTokensMap(fetchedTokensLists)
+	if err != nil {
+		fmt.Println("Error rebuilding tokens map: ", err)
+		return
+	}
 
 	fmt.Println("")
 	tokensPerList := make(map[string]map[string]*tokenTypes.Token) // map[store][tokenID]*tokenTypes.Token
-	for _, tList := range allTokensLists {
+	tokensByIdMap := make(map[string][]*tokenTypes.Token)          // map[tokenID][]*tokenTypes.Token
+	tokensBySymbolMap := make(map[string][]*tokenTypes.Token)      // map[tokenSymbol][]*tokenTypes.Token
+	for _, tList := range tokensLists {
 		fmt.Printf("Analizying token list: %s\n", tList.Name)
 		fmt.Printf("Total number of tokens: %d\n", len(tList.Tokens))
 
@@ -38,6 +59,16 @@ func main() {
 			} else {
 				fmt.Printf("Duplicate token for id: %s\n", id)
 			}
+
+			if _, ok := tokensByIdMap[id]; !ok {
+				tokensByIdMap[id] = make([]*tokenTypes.Token, 0)
+			}
+			tokensByIdMap[id] = append(tokensByIdMap[id], chainToken)
+
+			if _, ok := tokensBySymbolMap[chainToken.Symbol]; !ok {
+				tokensBySymbolMap[chainToken.Symbol] = make([]*tokenTypes.Token, 0)
+			}
+			tokensBySymbolMap[chainToken.Symbol] = append(tokensBySymbolMap[chainToken.Symbol], chainToken)
 		}
 
 		for chainID, chainTokens := range tokensPerChainID {
@@ -46,24 +77,84 @@ func main() {
 		fmt.Println("")
 	}
 
-	fmt.Println("Cross-analyzing stores")
-	statusStoreName := "Status Token List"
-	dupesFound := false
-	for tokenID, token := range tokensPerList[statusStoreName] {
-		for otherStoreName, otherTokensPerChain := range tokensPerList {
-			if otherStoreName == statusStoreName {
-				continue
+	fmt.Println("=====================================")
+	fmt.Println("Cross-analyzing tokens")
+	fmt.Println("=====================================")
+	fmt.Println("")
+	fmt.Println("Cross-analyzing tokens by id (finds different symbols for the same chainId+address pairs)")
+	for tokenID, tokens := range tokensByIdMap {
+		symbolMap := make(map[string]struct{}) // map[symbol]struct{}
+		for _, token := range tokens {
+			if _, ok := symbolMap[token.Symbol]; !ok {
+				symbolMap[token.Symbol] = struct{}{}
 			}
-			if _, ok := otherTokensPerChain[tokenID]; ok {
-				dupesFound = true
-				fmt.Printf("Token with id '%s' and symbol '%s' found in stores %s and %s\n", tokenID, token.Symbol, statusStoreName, otherStoreName)
+		}
+		if len(symbolMap) > 1 {
+			fmt.Printf("Token with id '%s' has multiple symbols: %+v\n", tokenID, maps.Keys(symbolMap))
+		}
+	}
+
+	fmt.Println("")
+	fmt.Println("Cross-analyzing tokens by symbol (finds different addresses for the same symbol on the same chain)")
+	for tokenSymbol, tokens := range tokensBySymbolMap {
+		chainIDAddressesMap := make(map[uint64]map[string]struct{}) // map[chainID]map[address]
+		for _, token := range tokens {
+			if _, ok := chainIDAddressesMap[token.ChainID]; !ok {
+				chainIDAddressesMap[token.ChainID] = make(map[string]struct{})
+			}
+			chainIDAddressesMap[token.ChainID][token.Address.Hex()] = struct{}{}
+		}
+		for chainID, addresses := range chainIDAddressesMap {
+			if len(addresses) > 1 {
+				fmt.Printf("Token with symbol '%s' has multiple addresses for chain %d: %+v\n", tokenSymbol, chainID, maps.Keys(addresses))
+			}
+			if len(addresses) == 0 {
+				fmt.Printf("Token with symbol '%s' has no address for chain %d\n", tokenSymbol, chainID)
 			}
 		}
 	}
 
-	if !dupesFound {
-		fmt.Println("No duplicates found")
+	fmt.Println("")
+	fmt.Println("Cross-analyzing tokens by symbol (finds different decimals for the same symbol across chains)")
+	for _, tokens := range tokensBySymbolMap {
+		decimalsChainIdMapBySymbol := make(map[string]map[uint]map[uint64]struct{}) // map[symbol]map[decimals]map[chainID]
+		for _, token := range tokens {
+			if _, ok := decimalsChainIdMapBySymbol[token.Symbol]; !ok {
+				decimalsChainIdMapBySymbol[token.Symbol] = make(map[uint]map[uint64]struct{})
+			}
+			if _, ok := decimalsChainIdMapBySymbol[token.Symbol][token.Decimals]; !ok {
+				decimalsChainIdMapBySymbol[token.Symbol][token.Decimals] = make(map[uint64]struct{})
+			}
+			decimalsChainIdMapBySymbol[token.Symbol][token.Decimals][token.ChainID] = struct{}{}
+		}
+		for symbol, chainsByDecimalsMap := range decimalsChainIdMapBySymbol {
+			if len(chainsByDecimalsMap) > 1 {
+				fmt.Printf("Token with symbol '%s' has different decimals across chains\n", symbol)
+				for decimal, chainsMap := range chainsByDecimalsMap {
+					fmt.Printf("Token with symbol '%s' has decimals %d for chains %+v\n", symbol, decimal, maps.Keys(chainsMap))
+				}
+			}
+		}
 	}
+	fmt.Println("=====================================")
+}
+
+func rebuildTokensMap(fetchedLists []fetcher.FetchedTokenList) (map[string]*tokenlists.TokensList, error) {
+	tokensLists := make(map[string]*tokenlists.TokensList)
+	for _, fetchedTokenList := range fetchedLists {
+		var list tokenlists.TokensList
+		decoder := json.NewDecoder(strings.NewReader(fetchedTokenList.JsonData))
+		if err := decoder.Decode(&list); err != nil {
+			return nil, err
+		}
+
+		list.Source = fetchedTokenList.SourceURL
+		list.FetchedTimestamp = fetchedTokenList.Fetched.Format(time.RFC3339)
+
+		tokensLists[fetchedTokenList.ID] = &list
+	}
+
+	return tokensLists, nil
 }
 
 func getTokenID(token *tokenTypes.Token) string {

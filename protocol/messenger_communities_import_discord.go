@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -1794,7 +1794,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		}
 
 		// Init the community filter so we can receive messages on the community
-		_, err = m.InitCommunityFilters(messaging.CommunitiesToInitialize{{
+		_, err = m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
 			Shard:   discordCommunity.Shard(),
 			PrivKey: discordCommunity.PrivateKey(),
 		}})

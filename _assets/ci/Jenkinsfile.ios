@@ -61,13 +61,13 @@ pipeline {
 
     stage('Generate') {
       steps { script {
-        nix.shell('make generate', pure: false)
+        nix.develop('make generate', pure: false)
       } }
     }
 
     stage('Compile') {
       steps { script {
-        nix.shell('make statusgo-ios', pure: false, sandbox: false)
+        nix.develop('make statusgo-ios', pure: false, sandbox: false)
       } }
     }
 

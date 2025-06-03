@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/security"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -53,14 +54,14 @@ func getV2URL(chainID walletCommon.ChainID, path string) (string, error) {
 
 type ClientV2 struct {
 	client           *HTTPClient
-	apiKey           string
+	apiKey           security.SensitiveString
 	connectionStatus *connection.Status
 	urlGetter        urlGetter
 }
 
 // new opensea v2 client.
-func NewClientV2(apiKey string, httpClient *HTTPClient) *ClientV2 {
-	if apiKey == "" {
+func NewClientV2(apiKey security.SensitiveString, httpClient *HTTPClient) *ClientV2 {
+	if apiKey.Empty() {
 		logutils.ZapLogger().Warn("OpenseaV2 API key not available")
 	}
 

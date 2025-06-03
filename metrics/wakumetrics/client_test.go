@@ -14,9 +14,8 @@ import (
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
 )
 
@@ -37,11 +36,10 @@ func createTestClient(t *testing.T) *Client {
 	return client
 }
 
-func createTestMessage(pubsubTopic string, contentTopic wakutypes.TopicType, payload []byte) *wakutypes.Message {
-	return &wakutypes.Message{
-		PubsubTopic: pubsubTopic,
-		Topic:       contentTopic,
-		Payload:     payload,
+func createTestMessage(pubsubTopic string, contentTopic messagingtypes.ContentTopic, payload []byte) *messagingtypes.ReceivedMessage {
+	return &messagingtypes.ReceivedMessage{
+		Topic:   contentTopic,
+		Payload: payload,
 	}
 }
 
@@ -73,13 +71,13 @@ func TestClient_DoubleRegister(t *testing.T) {
 func TestClient_PushReceivedMessages(t *testing.T) {
 	client := createTestClient(t)
 
-	filter := messaging.ChatFilter{
+	filter := messagingtypes.ChatFilter{
 		PubsubTopic:  "test-pubsub",
-		ContentTopic: wakutypes.StringToTopic("test-content"),
+		ContentTopic: messagingtypes.StringToContentTopic("test-content"),
 		ChatID:       "test-chat",
 	}
 
-	shhMessage := createTestMessage("test-pubsub", wakutypes.StringToTopic("test-content"), []byte("test-payload"))
+	shhMessage := createTestMessage("test-pubsub", messagingtypes.StringToContentTopic("test-content"), []byte("test-payload"))
 
 	receivedMessages := ReceivedMessages{
 		Filter:     filter,

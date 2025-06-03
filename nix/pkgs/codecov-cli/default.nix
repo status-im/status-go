@@ -1,7 +1,7 @@
-{ lib, stdenv, fetchurl }:
+{ lib, stdenv, fetchurl, system }:
 
 let
-  platform = lib.getAttr builtins.currentSystem {
+  platform = lib.getAttr system {
     aarch64-linux = "linux-arm64";
     x86_64-linux = "linux";
     aarch64-darwin = "macos"; # There's no arm64 build for macOS, amd64 works on both
@@ -14,7 +14,7 @@ in stdenv.mkDerivation rec {
 
   src = fetchurl {
     url = "https://cli.codecov.io/v${version}/${platform}/codecov";
-    hash = lib.getAttr builtins.currentSystem {
+    hash = lib.getAttr system {
       aarch64-darwin = "sha256-CB1D8/zYF23Jes9sd6rJiadDg7nwwee9xWSYqSByAlU=";
       x86_64-darwin = "sha256-CB1D8/zYF23Jes9sd6rJiadDg7nwwee9xWSYqSByAlU=";
       x86_64-linux = "sha256-65AgCcuAD977zikcE1eVP4Dik4L0PHqYzOO1fStNjOw=";

@@ -22,7 +22,12 @@ cd status-go
 
 ### 3. Set up build environment
 
-status-go uses nix in the Makefile to provide every tools required.
+status-go uses nix in the Makefile to provide every tools required. It is advised but not required to use Nix shell prior to executing other make targets.
+You can enter the development shell by using either of two:
+```bash
+make shell
+nix develop
+```
 
 ### 4. Build the status-backend
 
@@ -46,6 +51,24 @@ Checkout [`status-backend docs`](../cmd/status-backend/README.md) for more detai
 make install-gomobile
 make statusgo-cross # statusgo-android or statusgo-ios to build for specific platform
 ```
+
+## Build status-go with nix
+
+The `flake.nix` file exposes multiple `status-go` packages that can be built using Nix. To view the available packages for different architectures, run:
+```bash
+nix flake show
+```
+To build a specific package, use:
+```bash
+nix build '#name-of-the-package'
+```
+For example:
+```bash
+nix build '#status-go-library'
+```
+This flake includes a dependency on `nwaku`, which is pinned to a specific commit to ensure reproducibility and control over its version.
+Maintainers are responsible for tracking updates to `nwaku` and updating the pinned commit accordingly when new versions are released.
+Continuous Integration (CI) will validate whether the `status-go` packages build successfully with Nix, and report the result on pull requests.
 
 ## Debugging
 

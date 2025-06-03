@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/security"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -60,33 +61,34 @@ func (o *Client) IsConnected() bool {
 	return o.connectionStatus.IsConnected()
 }
 
-func getAPIKeySubpath(apiKey string) string {
-	if apiKey == "" {
-		return "demo"
+func getAPIKeySubpath(apiKey security.SensitiveString) security.SensitiveString {
+	if apiKey.Empty() {
+		return security.NewSensitiveString("demo")
 	}
 	return apiKey
 }
 
-func getNFTBaseURL(chainID walletCommon.ChainID, apiKey string) (string, error) {
+func getNFTBaseURL(chainID walletCommon.ChainID, apiKey security.SensitiveString) (string, error) {
 	baseURL, err := getBaseURL(chainID)
 
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/nft/v3/%s", baseURL, getAPIKeySubpath(apiKey)), nil
+	return fmt.Sprintf("%s/nft/v3/%s", baseURL, getAPIKeySubpath(apiKey).Reveal()), nil
 }
 
 type Client struct {
 	thirdparty.CollectibleContractOwnershipProvider
 	client           *http.Client
-	apiKeys          map[uint64]string
+	apiKeys          map[uint64]security.SensitiveString
 	connectionStatus *connection.Status
 }
 
-func NewClient(apiKeys map[uint64]string) *Client {
+func NewClient(apiKeys map[uint64]security.SensitiveString) *Client {
 	for _, chainID := range walletCommon.AllChainIDs() {
-		if apiKeys[uint64(chainID)] == "" {
+		key := apiKeys[uint64(chainID)]
+		if key.Empty() {
 			logutils.ZapLogger().Warn("Alchemy API key not available for", zap.Stringer("chainID", chainID))
 		}
 	}

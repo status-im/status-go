@@ -15,7 +15,12 @@ type FeeHistory struct {
 	Reward        [][]string `json:"reward,omitempty"`
 }
 
-func (fh *FeeHistory) isEIP1559Compatible() bool {
+func (fh *FeeHistory) isEIP1559Compatible(chainID uint64) bool {
+	// Since the Status Network is gasless chain, but EIP-1559 compatible, we should not rely on checking the BaseFeePerGas, that's why we have this special case.
+	if common.IsGaslessChainAndEIP1559Compatible(chainID) {
+		return true
+	}
+
 	if len(fh.BaseFeePerGas) == 0 {
 		return false
 	}

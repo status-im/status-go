@@ -68,6 +68,8 @@ func (s *MessengerNewsFeedSuite) TestToggleSettings() {
 	s.Require().NoError(err)
 	s.Require().True(s.m.newsFeedManager.IsPolling())
 
+	oldFetchFrom := s.m.newsFeedManager.GetFetchFrom()
+
 	// Polling is off as soon as one setting is off
 	err = s.m.ToggleNewsFeedEnabled(false)
 	s.Require().NoError(err)
@@ -86,6 +88,10 @@ func (s *MessengerNewsFeedSuite) TestToggleSettings() {
 	err = s.m.ToggleNewsFeedEnabled(true)
 	s.Require().NoError(err)
 	s.Require().True(s.m.newsFeedManager.IsPolling())
+
+	// Check that the fetchFrom timestamp is updated
+	newFetchFrom := s.m.newsFeedManager.GetFetchFrom()
+	s.Require().Greater(newFetchFrom, oldFetchFrom)
 
 	s.m.newsFeedManager.StopPolling()
 	s.Require().False(s.m.newsFeedManager.IsPolling())

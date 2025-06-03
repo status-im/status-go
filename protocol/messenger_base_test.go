@@ -5,7 +5,6 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/suite"
-
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -62,6 +61,7 @@ func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logge
 			ProfilePicturesVisibility: 1,
 			URLUnfurlingMode:          settings.URLUnfurlingAlwaysAsk,
 		}, params.NodeConfig{}),
+		WithMessageSigner(NewSignerStub()),
 	}
 	options = append(options, extraOptions...)
 

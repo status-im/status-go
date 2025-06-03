@@ -363,12 +363,11 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types.Criteria) (*r
 // ToWakuMessage converts an internal message into an API version.
 func ToWakuMessage(message *common.ReceivedMessage) *types.Message {
 	msg := types.Message{
-		Payload:     message.Data,
-		Padding:     message.Padding,
-		Timestamp:   message.Sent,
-		Hash:        message.Hash().Bytes(),
-		PubsubTopic: message.PubsubTopic,
-		Topic:       types.TopicType(message.ContentTopic),
+		Payload:   message.Data,
+		Padding:   message.Padding,
+		Timestamp: message.Sent,
+		Hash:      message.Hash().Bytes(),
+		Topic:     types.TopicType(message.ContentTopic),
 	}
 
 	if message.Dst != nil {

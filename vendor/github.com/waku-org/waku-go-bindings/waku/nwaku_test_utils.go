@@ -2,18 +2,22 @@ package waku
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/waku-go-bindings/utils"
 	"github.com/waku-org/waku-go-bindings/waku/common"
 	"google.golang.org/protobuf/proto"
 )
@@ -153,10 +157,6 @@ func (n *WakuNode) VerifyMessageReceived(expectedMessage *pb.WakuMessage, expect
 
 	select {
 	case envelope := <-n.MsgChan:
-		if envelope == nil {
-			Error("Received envelope is nil on node %s", n.nodeName)
-			return errors.New("received envelope is nil")
-		}
 		if string(expectedMessage.Payload) != string(envelope.Message().Payload) {
 			Error("Payload does not match on node %s", n.nodeName)
 			return errors.New("payload does not match")
@@ -254,4 +254,51 @@ func (n *WakuNode) GetStoredMessages(storeNode *WakuNode, storeRequest *common.S
 
 	Debug("Store query successful, retrieved %d messages", len(*res.Messages))
 	return res, nil
+}
+
+func recordMemoryMetricsPX(testName, phase string, heapAllocKB, rssKB uint64) error {
+	staticMu := sync.Mutex{}
+	staticMu.Lock()
+	defer staticMu.Unlock()
+
+	file, err := os.OpenFile("px_load_metrics.csv", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	stat, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	if stat.Size() == 0 {
+		header := []string{"TestName", "Phase", "HeapAlloc(KB)", "RSS(KB)", "Timestamp"}
+		if err := writer.Write(header); err != nil {
+			return err
+		}
+	}
+
+	row := []string{
+		testName,
+		phase,
+		strconv.FormatUint(heapAllocKB, 10),
+		strconv.FormatUint(rssKB, 10),
+		time.Now().Format(time.RFC3339),
+	}
+	return writer.Write(row)
+}
+
+func captureMemory(testName, phase string) {
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+
+	heapKB := ms.HeapAlloc / 1024
+	rssKB, _ := utils.GetRSSKB() 
+
+	Debug("[%s] Memory usage  (%s): %d KB (RSS %d KB)", testName, phase, heapKB, rssKB)
+
+	_ = recordMemoryMetricsPX(testName, phase, heapKB, rssKB)
 }

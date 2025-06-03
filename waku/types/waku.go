@@ -3,10 +3,7 @@ package types
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -19,6 +16,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/connection"
 )
 
@@ -158,7 +156,7 @@ type Waku interface {
 	BloomFilter() []byte
 
 	// GetCurrentTime returns current time.
-	GetCurrentTime() time.Time
+	GetCurrentTime() uint64
 
 	// GetPrivateKey retrieves the private key of the specified identity.
 	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)
@@ -237,14 +235,7 @@ type Waku interface {
 type MailserverBatch struct {
 	From        time.Time
 	To          time.Time
-	Cursor      string
 	PubsubTopic string
 	Topics      []TopicType
 	ChatIDs     []string
-}
-
-func (mb *MailserverBatch) Hash() string {
-	data := fmt.Sprintf("%d%d%s%s%v%v", mb.From.UnixNano(), mb.To.UnixNano(), mb.Cursor, mb.PubsubTopic, mb.Topics, mb.ChatIDs)
-	hash := sha256.Sum256([]byte(data))
-	return hex.EncodeToString(hash[:4])
 }

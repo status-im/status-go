@@ -50,8 +50,8 @@ class TestWalletActivitySession(WalletSteps):
             "tokenID": "ETH",
             "tokenIDIsOwnerToken": False,
             "toTokenID": "",
-            "disabledFromChainIDs": [10, 42161],
-            "disabledToChainIDs": [10, 42161],
+            "disabledFromChainIDs": [1, 10, 42161, 8453, 56],
+            "disabledToChainIDs": [1, 10, 42161, 8453, 56],
             "gasFeeMode": 1,
             # params for building tx from route
             "slippagePercentage": 0,

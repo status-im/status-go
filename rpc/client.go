@@ -17,11 +17,12 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/ethereum/go-ethereum/event"
+
 	appCommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"
-	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"

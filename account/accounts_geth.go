@@ -1,14 +1,11 @@
 package account
 
 import (
-	"time"
-
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts"
 
 	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/rpc"
 )
 
 // GethManager represents account manager interface.
@@ -26,11 +23,6 @@ func NewGethManager(logger *zap.Logger) *GethManager {
 		logger:            logger,
 	}
 	return m
-}
-
-func (m *GethManager) SetRPCClient(rpcClient *rpc.Client, rpcTimeout time.Duration) {
-	m.DefaultManager.rpcClient = rpcClient
-	m.DefaultManager.rpcTimeout = rpcTimeout
 }
 
 // InitKeystore sets key manager and key store.

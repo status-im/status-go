@@ -12,11 +12,11 @@ import (
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
-func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter messaging.ChatFilter, fromArchive bool) error {
+func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter messagingtypes.ChatFilter, fromArchive bool) error {
 	switch msg.ApplicationLayer.Type {
 	{{ range .}}
            case protobuf.ApplicationMetadataMessage_{{.EnumValue}}:
@@ -28,7 +28,7 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
 }
 
 {{ range . }}
-func (m *Messenger) {{.MethodName}}(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter messaging.ChatFilter{{ if .FromArchiveArg }}, fromArchive bool{{ end }}) error {
+func (m *Messenger) {{.MethodName}}(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter messagingtypes.ChatFilter{{ if .FromArchiveArg }}, fromArchive bool{{ end }}) error {
 	m.logger.Info("handling {{ .ProtobufName}}")
 	{{ if .SyncMessage }}
 	if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {

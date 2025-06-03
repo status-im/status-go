@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/security"
 )
 
 const requestTimeout = 5 * time.Second
@@ -30,7 +31,7 @@ func NewHTTPClient() *HTTPClient {
 	}
 }
 
-func (o *HTTPClient) doGetRequest(ctx context.Context, url string, apiKey string) ([]byte, error) {
+func (o *HTTPClient) doGetRequest(ctx context.Context, url string, apiKey security.SensitiveString) ([]byte, error) {
 	// Ensure only one thread makes a request at a time
 	o.getRequestLock.Lock()
 	defer o.getRequestLock.Unlock()
@@ -39,7 +40,7 @@ func (o *HTTPClient) doGetRequest(ctx context.Context, url string, apiKey string
 	statusCode := http.StatusOK
 
 	// Try to do the request without an apiKey first
-	tmpAPIKey := ""
+	var tmpAPIKey security.SensitiveString
 
 	for {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -49,8 +50,8 @@ func (o *HTTPClient) doGetRequest(ctx context.Context, url string, apiKey string
 
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0")
-		if len(tmpAPIKey) > 0 {
-			req.Header.Set("X-API-KEY", tmpAPIKey)
+		if !tmpAPIKey.Empty() {
+			req.Header.Set("X-API-KEY", tmpAPIKey.Reveal())
 		}
 
 		resp, err := o.client.Do(req)
@@ -82,7 +83,7 @@ func (o *HTTPClient) doGetRequest(ctx context.Context, url string, apiKey string
 			// break and error
 		case http.StatusForbidden:
 			// Request requires an apiKey, set it and retry
-			if tmpAPIKey == "" && apiKey != "" {
+			if tmpAPIKey.Empty() && !apiKey.Empty() {
 				tmpAPIKey = apiKey
 				// sleep and retry
 				time.Sleep(getRequestWaitTime)

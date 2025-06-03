@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -74,18 +74,18 @@ func TestTopic(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, topics, 3)
 
-	filters := messaging.ChatFilters{
+	filters := messagingtypes.ChatFilters{
 		// Existing topic, is not updated
 		{
 			PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
-			ContentTopic: wakutypes.BytesToTopic([]byte{0x61}),
+			ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x61}),
 		},
 		// Non existing topic is not inserted
 		{
 			Discovery:    true,
 			Negotiated:   true,
 			PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
-			ContentTopic: wakutypes.BytesToTopic([]byte{0x64}),
+			ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x64}),
 		},
 	}
 

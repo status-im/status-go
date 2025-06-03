@@ -54,7 +54,7 @@ pip install --upgrade pip
 pip install -r "${root_path}/requirements.txt"
 
 # Run functional tests
-pytest --reruns 2 -m rpc -n 12 --dist loadgroup --docker_project_name=${project_name} --codecov_dir=${binary_coverage_reports_path} --junitxml=${test_results_path}/report.xml
+pytest --reruns 2 -m rpc -c "${root_path}/pytest.ini" -n 12 --dist loadgroup --docker_project_name=${project_name} --codecov_dir=${binary_coverage_reports_path} --junitxml=${test_results_path}/report.xml
 exit_code=$?
 
 # Stop containers

@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -75,6 +76,14 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		return nil, err
 	}
 
+	ensVerifier := ens.New(
+		config.logger,
+		waku, // timesource
+		appDb,
+		"",
+		"",
+	)
+
 	options := []Option{
 		WithCustomLogger(config.logger),
 		WithDatabase(appDb),
@@ -86,15 +95,15 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		WithBrowserDatabase(nil),
 		WithCuratedCommunitiesUpdateLoop(false),
 		WithStubOnlineChecker(),
+		WithENSVerifier(ensVerifier),
+		WithMessageSigner(NewSignerStub()),
 	}
 	options = append(options, config.extraOptions...)
 
 	m, err := NewMessenger(
-		config.name,
 		config.privateKey,
 		waku,
 		uuid.New().String(),
-		"testVersion",
 		options...,
 	)
 	if err != nil {

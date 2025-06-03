@@ -207,6 +207,80 @@ func (r *Router) SetCustomTxDetails(ctx context.Context, pathTxIdentity *request
 	return r.setCustomTxDetails(ctx, pathTxIdentity, pathTxCustomParams)
 }
 
+// ReevaluateRouterPath reevaluates the tx-fields from the router path that matches the provided pathTxIdentity and sends signal.SuggestedRoutes.
+func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *requests.PathTxIdentity) error {
+	if pathTxIdentity == nil {
+		return ErrTxIdentityNotProvided
+	}
+	err := pathTxIdentity.Validate()
+	if err != nil {
+		return err
+	}
+
+	r.activeRoutesMutex.Lock()
+	defer r.activeRoutesMutex.Unlock()
+	if r.activeRoutes == nil || len(r.activeRoutes.Best) == 0 {
+		return ErrNoBestRouteFound
+	}
+
+	fetchedFees, err := r.feesManager.SuggestedFees(ctx, pathTxIdentity.ChainID)
+	if err != nil {
+		return err
+	}
+
+	for _, path := range r.activeRoutes.Best {
+		if path.PathIdentity() != pathTxIdentity.PathIdentity() {
+			continue
+		}
+
+		for _, pProcessor := range r.pathProcessors {
+			if pProcessor.Name() != path.ProcessorName {
+				continue
+			}
+
+			processorInputParams, err := r.CreateProcessorInputParams(r.lastInputParams, path.FromChain, path.ToChain, path.FromToken, path.ToToken, 0)
+			if err != nil {
+				return err
+			}
+
+			txPackedData, err := pProcessor.PackTxInputData(processorInputParams)
+			if err != nil {
+				return err
+			}
+
+			gasLimit, err := pProcessor.EstimateGas(processorInputParams, txPackedData)
+			if err != nil {
+				return err
+			}
+
+			path.SuggestedTxGasAmount = gasLimit
+			path.TxGasAmount = gasLimit
+			path.TxPackedData = txPackedData
+
+			// update the path details
+			usedNonces := make(map[uint64]uint64)
+			if path.ApprovalRequired {
+				usedNonces[path.FromChain.ChainID] = uint64(*path.ApprovalTxNonce) - 1
+			} else {
+				usedNonces[path.FromChain.ChainID] = uint64(*path.TxNonce - 1)
+			}
+			err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, false, 0)
+			if err != nil {
+				return err
+			}
+
+			// inform the client about the changes
+			sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, err)
+
+			return nil
+		}
+
+		return ErrCannotFindPathProcessorForProvidedIdentity
+	}
+
+	return ErrCannotFindPathForProvidedIdentity
+}
+
 func newSuggestedRoutes(
 	input *requests.RouteInputParams,
 	candidates routes.Route,
@@ -934,7 +1008,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputPa
 	suggestedRoutes, allRoutes = newSuggestedRoutes(input, candidates, prices)
 
 	defer func() {
-		if suggestedRoutes.Best != nil && len(suggestedRoutes.Best) > 0 {
+		if len(suggestedRoutes.Best) > 0 {
 			sort.Slice(suggestedRoutes.Best, func(i, j int) bool {
 				iChain := getChainPriority(suggestedRoutes.Best[i].FromChain.ChainID)
 				jChain := getChainPriority(suggestedRoutes.Best[j].FromChain.ChainID)

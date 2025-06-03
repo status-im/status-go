@@ -68,6 +68,7 @@ func (p *RpcProvidersPersistence) GetRpcProviders(chainID uint64) ([]params.RpcP
 	var providers []params.RpcProvider
 	for rows.Next() {
 		var provider params.RpcProvider
+
 		err := rows.Scan(
 			&provider.ID,
 			&provider.ChainID,
@@ -84,6 +85,7 @@ func (p *RpcProvidersPersistence) GetRpcProviders(chainID uint64) ([]params.RpcP
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
+
 		providers = append(providers, provider)
 	}
 

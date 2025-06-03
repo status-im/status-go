@@ -65,6 +65,13 @@ type BonderFee struct {
 }
 
 func (bf *BonderFee) UnmarshalJSON(data []byte) error {
+	var errorResponse struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(data, &errorResponse); err == nil && errorResponse.Error != "" {
+		return createBridgeHopErrorResponse(fmt.Errorf(errorResponse.Error))
+	}
+
 	type Alias BonderFee
 	aux := &struct {
 		AmountIn                string  `json:"amountIn"`
@@ -475,9 +482,13 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 
 	hopChainsMap := map[uint64]string{
 		walletCommon.EthereumMainnet: "ethereum",
+		walletCommon.EthereumSepolia: "ethereum",
 		walletCommon.OptimismMainnet: "optimism",
+		walletCommon.OptimismSepolia: "optimism",
 		walletCommon.ArbitrumMainnet: "arbitrum",
+		walletCommon.ArbitrumSepolia: "arbitrum",
 		walletCommon.BaseMainnet:     "base",
+		walletCommon.BaseSepolia:     "base",
 	}
 
 	fromChainName, ok := hopChainsMap[params.FromChain.ChainID]
@@ -492,7 +503,7 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 
 	reqParams := netUrl.Values{}
 	reqParams.Add("amount", params.AmountIn.String())
-	reqParams.Add("token", params.FromToken.Symbol)
+	reqParams.Add("token", params.FromToken.TmpSymbol)
 	reqParams.Add("fromChain", fromChainName)
 	reqParams.Add("toChain", toChainName)
 	reqParams.Add("slippage", "0.5") // menas 0.5%

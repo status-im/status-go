@@ -13,7 +13,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/signal"
 
@@ -124,7 +124,7 @@ func (s *MessengerMessagesTrackingSuite) newMessenger(waku wakutypes.Waku, logge
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	envelopeEventsConfig := &messaging.EnvelopeEventsConfig{
+	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
 		EnvelopeEventsHandler:      EnvelopeSignalHandlerMock{},
 		MaxMessageDeliveryAttempts: 1,
 		MailServerConfirmations:    false,

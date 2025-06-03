@@ -16,6 +16,8 @@ const (
 
 	priorityWeight = 0.7
 	gasUsedWeight  = 0.3
+
+	blocksToCheck = 5 // Number of blocks to check for estimating time in case of non-EIP1559 chains
 )
 
 func hexStringToBigInt(value string) (*big.Int, error) {
@@ -51,18 +53,14 @@ func (f *FeeManager) getNonEIP1559SuggestedFees(ctx context.Context, chainID uin
 	if err != nil {
 		return nil, err
 	}
+
+	estimatedTime := f.TransactionEstimatedTimeV2Legacy(ctx, chainID, gasPrice)
+
 	return &SuggestedFees{
-		GasPrice:             gasPrice,
-		BaseFee:              big.NewInt(0),
-		MaxPriorityFeePerGas: big.NewInt(0),
-		MaxPriorityFeeSuggestedBounds: &MaxPriorityFeesSuggestedBounds{
-			Lower: big.NewInt(0),
-			Upper: big.NewInt(0),
-		},
-		MaxFeesLevels: &MaxFeesLevels{
-			Low:    (*hexutil.Big)(gasPrice),
-			Medium: (*hexutil.Big)(gasPrice),
-			High:   (*hexutil.Big)(gasPrice),
+		GasPrice: gasPrice,
+		NonEIP1559Fees: &NonEIP1559Fees{
+			GasPrice:      (*hexutil.Big)(gasPrice),
+			EstimatedTime: estimatedTime,
 		},
 		EIP1559Enabled: false,
 	}, nil
@@ -70,8 +68,8 @@ func (f *FeeManager) getNonEIP1559SuggestedFees(ctx context.Context, chainID uin
 
 // getEIP1559SuggestedFees returns suggested fees for EIP-1559 compatible chains
 // source https://github.com/brave/brave-core/blob/master/components/brave_wallet/browser/eth_gas_utils.cc
-func getEIP1559SuggestedFees(feeHistory *FeeHistory) (lowPriorityFee, avgPriorityFee, highPriorityFee, suggestedBaseFee *big.Int, err error) {
-	if feeHistory == nil || !feeHistory.isEIP1559Compatible() {
+func getEIP1559SuggestedFees(chainID uint64, feeHistory *FeeHistory) (lowPriorityFee, avgPriorityFee, highPriorityFee, suggestedBaseFee *big.Int, err error) {
+	if feeHistory == nil || !feeHistory.isEIP1559Compatible(chainID) {
 		return nil, nil, nil, nil, ErrEIP1559IncompaibleChain
 	}
 

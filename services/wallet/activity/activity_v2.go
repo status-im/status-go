@@ -270,6 +270,8 @@ func getFinalizationPeriod(chainID wCommon.ChainID) int64 {
 	switch uint64(chainID) {
 	case wCommon.EthereumMainnet, wCommon.EthereumSepolia:
 		return ac.L1FinalizationDuration
+	case wCommon.BSCMainnet, wCommon.BSCTestnet:
+		return ac.BSCFinalizationDuration
 	}
 
 	return ac.L2FinalizationDuration

@@ -21,6 +21,7 @@ type PathTxCustomParams struct {
 	GasAmount     uint64          `json:"gasAmount"`
 	MaxFeesPerGas *hexutil.Big    `json:"maxFeesPerGas"`
 	PriorityFee   *hexutil.Big    `json:"priorityFee"`
+	GasPrice      *hexutil.Big    `json:"gasPrice"` // used for non-EIP1559 chains
 }
 
 func gasFeeModeValid(fl validator.FieldLevel) bool {
@@ -65,6 +66,9 @@ func (p *PathTxCustomParams) Validate() error {
 		return err
 	}
 	if p.GasFeeMode != fees.GasFeeCustom {
+		return nil
+	}
+	if p.GasPrice != nil { // used for non-EIP1559 chains
 		return nil
 	}
 	if p.MaxFeesPerGas == nil {

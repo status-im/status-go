@@ -10,6 +10,7 @@ import (
 	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network/db"
 	"github.com/status-im/status-go/rpc/network/testutil"
 	"github.com/status-im/status-go/t/helpers"
@@ -47,7 +48,7 @@ func DefaultProviders(chainID uint64) []params.RpcProvider {
 		{
 			Name:     "Provider1",
 			ChainID:  chainID,
-			URL:      "https://rpc.provider1.io",
+			URL:      security.NewSensitiveString("https://rpc.provider1.io"),
 			Type:     params.UserProviderType,
 			Enabled:  true,
 			AuthType: params.NoAuth,
@@ -55,12 +56,12 @@ func DefaultProviders(chainID uint64) []params.RpcProvider {
 		{
 			Name:         "Provider2",
 			ChainID:      chainID,
-			URL:          "https://rpc.provider2.io",
+			URL:          security.NewSensitiveString("https://rpc.provider2.io"),
 			Type:         params.EmbeddedProxyProviderType,
 			Enabled:      true,
 			AuthType:     params.BasicAuth,
-			AuthLogin:    "user1",
-			AuthPassword: "password1",
+			AuthLogin:    security.NewSensitiveString("user1"),
+			AuthPassword: security.NewSensitiveString("password1"),
 		},
 	}
 }
@@ -99,8 +100,8 @@ func (s *NetworksPersistenceTestSuite) verifyNetworkDeletion(chainID uint64) {
 
 func (s *NetworksPersistenceTestSuite) TestAddAndGetNetworkWithProviders() {
 	network := testutil.CreateNetwork(api_common.OptimismChainID, "Optimism Mainnet", []params.RpcProvider{
-		testutil.CreateProvider(api_common.OptimismChainID, "Provider1", params.UserProviderType, true, "https://rpc.optimism.io"),
-		testutil.CreateProvider(api_common.OptimismChainID, "Provider2", params.EmbeddedProxyProviderType, false, "https://backup.optimism.io"),
+		testutil.CreateProvider(api_common.OptimismChainID, "Provider1", params.UserProviderType, true, security.NewSensitiveString("https://rpc.optimism.io")),
+		testutil.CreateProvider(api_common.OptimismChainID, "Provider2", params.EmbeddedProxyProviderType, false, security.NewSensitiveString("https://backup.optimism.io")),
 	})
 	s.addAndVerifyNetworks([]*params.Network{network})
 }
@@ -122,7 +123,7 @@ func (s *NetworksPersistenceTestSuite) TestUpdateNetworkAndProviders() {
 	// Update fields
 	network.ChainName = "Updated Optimism Mainnet"
 	network.RpcProviders = []params.RpcProvider{
-		testutil.CreateProvider(api_common.OptimismChainID, "UpdatedProvider", params.UserProviderType, true, "https://rpc.optimism.updated.io"),
+		testutil.CreateProvider(api_common.OptimismChainID, "UpdatedProvider", params.UserProviderType, true, security.NewSensitiveString("https://rpc.optimism.updated.io")),
 	}
 
 	s.addAndVerifyNetworks([]*params.Network{network})
@@ -171,7 +172,7 @@ func (s *NetworksPersistenceTestSuite) TestValidationForNetworksAndProviders() {
 	invalidProvider := params.RpcProvider{
 		Name:    "InvalidProvider",
 		ChainID: api_common.MainnetChainID,
-		URL:     "", // Invalid
+		URL:     security.NewSensitiveString(""), // Invalid
 		Type:    params.UserProviderType,
 		Enabled: true,
 	}

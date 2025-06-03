@@ -36,7 +36,7 @@ const (
 )
 
 func belongsToMandatoryTokens(symbol string) bool {
-	var mandatoryTokens = []string{"ETH", "DAI", "SNT", "STT", "USDC"}
+	var mandatoryTokens = []string{"ETH", "DAI", "SNT", "STT", "USDC", "BNB"}
 	for _, t := range mandatoryTokens {
 		if t == symbol {
 			return true
@@ -415,7 +415,7 @@ func (r *Reader) balancesToTokensByAddress(connectedPerChain map[uint64]bool, ad
 						Name:          tokens[0].Name,
 						Symbol:        symbol,
 						Decimals:      tokens[0].Decimals,
-						PegSymbol:     token.GetTokenPegSymbol(symbol),
+						PegSymbol:     tokenTypes.GetTokenPegSymbol(symbol),
 						Verified:      tokens[0].Verified,
 						CommunityData: tokens[0].CommunityData,
 						Image:         tokens[0].Image,

@@ -1,0 +1,88 @@
+{
+  "nodes": {
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1727956061,
+        "narHash": "sha256-VvwJWij/D6Coc7hiHbW2/dvkeNS1GhB6nuqsfmaNey0=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "df27247e6f3e636c119e2610bf12d38b5e98cc79",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "df27247e6f3e636c119e2610bf12d38b5e98cc79",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1740603184,
+        "narHash": "sha256-t+VaahjQAWyA+Ctn2idyo1yxRIYpaDxMgHkgCNiMJa4=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "f44bd8ca21e026135061a0a57dcf3d0775b67a49",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "f44bd8ca21e026135061a0a57dcf3d0775b67a49",
+        "type": "github"
+      }
+    },
+    "nwaku": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_2",
+        "zerokit": "zerokit"
+      },
+      "locked": {
+        "lastModified": 1747983922,
+        "narHash": "sha256-zaS/kTsJ8Z7ugcsw0pob1wXmd9WfZ4ZPqpM8UB1R2Vk=",
+        "ref": "refs/heads/master",
+        "rev": "e755fd834f5f3d6fba216b09469316f0328b3b6f",
+        "revCount": 2040,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/waku-org/nwaku"
+      },
+      "original": {
+        "rev": "e755fd834f5f3d6fba216b09469316f0328b3b6f",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/waku-org/nwaku"
+      }
+    },
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "nwaku": "nwaku"
+      }
+    },
+    "zerokit": {
+      "inputs": {
+        "nixpkgs": [
+          "nwaku",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1743756626,
+        "narHash": "sha256-SvhfEl0bJcRsCd79jYvZbxQecGV2aT+TXjJ57WVv7Aw=",
+        "owner": "vacp2p",
+        "repo": "zerokit",
+        "rev": "c60e0c33fc6350a4b1c20e6b6727c44317129582",
+        "type": "github"
+      },
+      "original": {
+        "owner": "vacp2p",
+        "repo": "zerokit",
+        "rev": "c60e0c33fc6350a4b1c20e6b6727c44317129582",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

@@ -6,22 +6,23 @@ import (
 	"math/big"
 	"sort"
 
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/services/wallet/common"
 )
 
 const (
 	inclusionThreshold = 0.95
 
-	priorityFeePercentileHigh   = 0.6
-	priorityFeePercentileMedium = 0.5
-	priorityFeePercentileLow    = 0.4
+	priorityFeePercentileHigh   = 0.3
+	priorityFeePercentileMedium = 0.2
+	priorityFeePercentileLow    = 0.1
 
-	baseFeePercentileFirstBlock  = 0.8
-	baseFeePercentileSecondBlock = 0.7
-	baseFeePercentileThirdBlock  = 0.6
-	baseFeePercentileFourthBlock = 0.5
-	baseFeePercentileFifthBlock  = 0.4
-	baseFeePercentileSixthBlock  = 0.3
+	baseFeePercentileFirstBlock  = 0.55
+	baseFeePercentileSecondBlock = 0.45
+	baseFeePercentileThirdBlock  = 0.35
+	baseFeePercentileFourthBlock = 0.3
+	baseFeePercentileFifthBlock  = 0.2
+	baseFeePercentileSixthBlock  = 0.1
 )
 
 type TransactionEstimation int
@@ -167,15 +168,14 @@ func getBaseFeePercentileIndex(sortedBaseFees []*big.Int, percentile float64, ne
 // TransactionEstimatedTimeV2 returns the estimated time in seconds for a transaction to be included in a block
 func (f *FeeManager) TransactionEstimatedTimeV2(ctx context.Context, chainID uint64, maxFeePerGas *big.Int, priorityFee *big.Int) uint {
 	feeHistory, err := f.getFeeHistory(ctx, chainID, "latest", []int{RewardPercentiles2})
-
 	if err != nil {
 		return 0
 	}
 
-	return estimatedTimeV2(feeHistory, maxFeePerGas, priorityFee, chainID)
+	return estimatedTimeV2(feeHistory, maxFeePerGas, priorityFee, chainID, 0)
 }
 
-func estimatedTimeV2(feeHistory *FeeHistory, txMaxFeePerGas *big.Int, txPriorityFee *big.Int, chainID uint64) uint {
+func estimatedTimeV2(feeHistory *FeeHistory, txMaxFeePerGas *big.Int, txPriorityFee *big.Int, chainID uint64, rewardIndex int) uint {
 	sortedBaseFees := convertToBigIntAndSort(feeHistory.BaseFeePerGas)
 	if len(sortedBaseFees) == 0 {
 		return 0
@@ -184,7 +184,7 @@ func estimatedTimeV2(feeHistory *FeeHistory, txMaxFeePerGas *big.Int, txPriority
 
 	var mediumPriorityFees []string // based on 50th percentile in the last 100 blocks
 	for _, fee := range feeHistory.Reward {
-		mediumPriorityFees = append(mediumPriorityFees, fee[0])
+		mediumPriorityFees = append(mediumPriorityFees, fee[rewardIndex])
 	}
 	mediumPriorityFeesSorted := convertToBigIntAndSort(mediumPriorityFees)
 	if len(mediumPriorityFeesSorted) == 0 {
@@ -194,19 +194,62 @@ func estimatedTimeV2(feeHistory *FeeHistory, txMaxFeePerGas *big.Int, txPriority
 
 	txBaseFee := new(big.Int).Sub(txMaxFeePerGas, txPriorityFee)
 
+	return estimateV2(txBaseFee, txPriorityFee, uniqueBaseFees, uniqueMediumPriorityFees, chainID)
+}
+
+func (f *FeeManager) TransactionEstimatedTimeV2Legacy(ctx context.Context, chainID uint64, gasPrice *big.Int) uint {
+	backend, err := f.RPCClient.EthClient(chainID)
+	if err != nil {
+		return 0
+	}
+	latestBlockNum, err := backend.BlockNumber(ctx)
+	if err != nil {
+		return 0
+	}
+
+	gasPrices := []*big.Int{}
+	for i := uint64(0); i < uint64(blocksToCheck); i++ {
+		blockNum := big.NewInt(0).SetUint64(latestBlockNum - i)
+		block, err := backend.BlockByNumber(ctx, blockNum)
+		if err != nil {
+			return 0
+		}
+
+		for _, tx := range block.Transactions() {
+			if tx.Type() != gethtypes.LegacyTxType && tx.Type() != gethtypes.AccessListTxType {
+				continue
+			}
+			gasPrices = append(gasPrices, tx.GasPrice())
+		}
+	}
+
+	sort.Slice(gasPrices, func(i, j int) bool { return gasPrices[i].Cmp(gasPrices[j]) < 0 })
+
+	uniqueGasPrices := removeDuplicatesFromSortedArray(gasPrices)
+
+	return estimateV2(gasPrice, nil, uniqueGasPrices, nil, chainID)
+}
+
+func estimateV2(txBaseFee *big.Int, txPriorityFee *big.Int, uniqueBaseFees []*big.Int, uniqueMediumPriorityFees []*big.Int, chainID uint64) uint {
 	// results are not good if we include the network congestion, cause we reduced the number of blocks we are looking at
 	// and also removed duplicates from the arrays, thus for now we will ignore it and use `1.0` for the network congestion
 	networkCongestion := 1.0 // calculateNetworkCongestion(feeHistory)
 
-	// Priority fee for the first two blocks has to be higher than 60th percentile of the mediumPriorityFeesSorted
-	priorityFeePercentileIndex := int(float64(len(uniqueMediumPriorityFees)) * priorityFeePercentileHigh)
-	priorityFeeForFirstTwoBlock := uniqueMediumPriorityFees[priorityFeePercentileIndex]
-	// Priority fee for the second two blocks has to be higher than 50th percentile of the mediumPriorityFeesSorted
-	priorityFeePercentileIndex = int(float64(len(uniqueMediumPriorityFees)) * priorityFeePercentileMedium)
-	priorityFeeForSecondTwoBlocks := uniqueMediumPriorityFees[priorityFeePercentileIndex]
-	// Priority fee for the third two blocks has to be higher than 40th percentile of the mediumPriorityFeesSorted
-	priorityFeePercentileIndex = int(float64(len(uniqueMediumPriorityFees)) * priorityFeePercentileLow)
-	priorityFeeForThirdTwoBlocks := uniqueMediumPriorityFees[priorityFeePercentileIndex]
+	priorityFeeForFirstTwoBlock := new(big.Int)
+	priorityFeeForSecondTwoBlocks := new(big.Int)
+	priorityFeeForThirdTwoBlocks := new(big.Int)
+	if len(uniqueMediumPriorityFees) > 0 {
+		// Priority fee for the first two blocks has to be higher than 60th percentile of the mediumPriorityFeesSorted
+		priorityFeePercentileIndex := int(float64(len(uniqueMediumPriorityFees)) * priorityFeePercentileHigh)
+		priorityFeeForFirstTwoBlock = uniqueMediumPriorityFees[priorityFeePercentileIndex]
+
+		// Priority fee for the second two blocks has to be higher than 50th percentile of the mediumPriorityFeesSorted
+		priorityFeePercentileIndex = int(float64(len(uniqueMediumPriorityFees)) * priorityFeePercentileMedium)
+		priorityFeeForSecondTwoBlocks = uniqueMediumPriorityFees[priorityFeePercentileIndex]
+		// Priority fee for the third two blocks has to be higher than 40th percentile of the mediumPriorityFeesSorted
+		priorityFeePercentileIndex = int(float64(len(uniqueMediumPriorityFees)) * priorityFeePercentileLow)
+		priorityFeeForThirdTwoBlocks = uniqueMediumPriorityFees[priorityFeePercentileIndex]
+	}
 
 	// To include the transaction in the block `inclusionInBlock` its base fee has to be in a higher than `baseFeePercentile`
 	// and its priority fee has to be higher than the `priorityFee`
@@ -232,5 +275,5 @@ func estimatedTimeV2(feeHistory *FeeHistory, txMaxFeePerGas *big.Int, txPriority
 		}
 	}
 
-	return 0
+	return calculateTimeForInclusion(chainID, 10)
 }

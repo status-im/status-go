@@ -37,6 +37,9 @@ func getTokenSymbols(t *testing.T) []string {
 		{
 			ChainID: w_common.BaseMainnet,
 		},
+		{
+			ChainID: w_common.BSCMainnet,
+		},
 	}
 
 	ptrNetworkList := make([]*params.Network, 0, len(networksList))

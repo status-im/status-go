@@ -163,7 +163,6 @@
                                     "chatId",
                                     "clock",
                                     "compressedKey",
-                                    "contactRequestState",
                                     "contentType",
                                     "displayName",
                                     "emojiHash",

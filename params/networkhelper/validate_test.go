@@ -3,13 +3,13 @@ package networkhelper_test
 import (
 	"testing"
 
-	"github.com/status-im/status-go/params/networkhelper"
-
 	"github.com/stretchr/testify/require"
 
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/pkg/security"
 )
 
 func TestValidation(t *testing.T) {
@@ -26,7 +26,7 @@ func TestValidation(t *testing.T) {
 			provider: params.RpcProvider{
 				ChainID:          1,
 				Name:             "Mainnet Provider",
-				URL:              "https://provider.example.com",
+				URL:              security.NewSensitiveString("https://provider.example.com"),
 				Type:             params.UserProviderType,
 				Enabled:          true,
 				AuthType:         params.NoAuth,
@@ -38,7 +38,7 @@ func TestValidation(t *testing.T) {
 			name: "Missing Provider Name",
 			provider: params.RpcProvider{
 				ChainID: 1,
-				URL:     "https://provider.example.com",
+				URL:     security.NewSensitiveString("https://provider.example.com"),
 				Type:    params.UserProviderType,
 			},
 			expectErr: true,
@@ -48,7 +48,7 @@ func TestValidation(t *testing.T) {
 			provider: params.RpcProvider{
 				ChainID:  1,
 				Name:     "Invalid Auth Provider",
-				URL:      "https://provider.example.com",
+				URL:      security.NewSensitiveString("https://provider.example.com"),
 				Type:     params.UserProviderType,
 				AuthType: "invalid-auth-type",
 			},
@@ -59,7 +59,7 @@ func TestValidation(t *testing.T) {
 			provider: params.RpcProvider{
 				ChainID:  1,
 				Name:     "BasicAuth Provider",
-				URL:      "https://provider.example.com",
+				URL:      security.NewSensitiveString("https://provider.example.com"),
 				Type:     params.UserProviderType,
 				AuthType: params.BasicAuth,
 			},
@@ -70,7 +70,7 @@ func TestValidation(t *testing.T) {
 			provider: params.RpcProvider{
 				ChainID:  1,
 				Name:     "TokenAuth Provider",
-				URL:      "https://provider.example.com",
+				URL:      security.NewSensitiveString("https://provider.example.com"),
 				Type:     params.UserProviderType,
 				AuthType: params.TokenAuth,
 			},
@@ -81,10 +81,10 @@ func TestValidation(t *testing.T) {
 			provider: params.RpcProvider{
 				ChainID:   1,
 				Name:      "NoAuth Provider",
-				URL:       "https://provider.example.com",
+				URL:       security.NewSensitiveString("https://provider.example.com"),
 				Type:      params.UserProviderType,
 				AuthType:  params.NoAuth,
-				AuthLogin: "user",
+				AuthLogin: security.NewSensitiveString("user"),
 			},
 			expectErr: true,
 		},
@@ -129,7 +129,7 @@ func TestNetworkValidation(t *testing.T) {
 					{
 						ChainID:  1,
 						Name:     "Mainnet Provider",
-						URL:      "https://provider.example.com",
+						URL:      security.NewSensitiveString("https://provider.example.com"),
 						Type:     params.UserProviderType,
 						Enabled:  true,
 						AuthType: params.NoAuth,
@@ -146,7 +146,7 @@ func TestNetworkValidation(t *testing.T) {
 					{
 						ChainID: 1,
 						Name:    "Mainnet Provider",
-						URL:     "https://provider.example.com",
+						URL:     security.NewSensitiveString("https://provider.example.com"),
 						Type:    params.UserProviderType,
 						Enabled: true,
 					},
@@ -163,7 +163,7 @@ func TestNetworkValidation(t *testing.T) {
 					{
 						ChainID: 1,
 						Name:    "",
-						URL:     "https://provider.example.com",
+						URL:     security.NewSensitiveString("https://provider.example.com"),
 						Type:    params.UserProviderType,
 						Enabled: true,
 					},

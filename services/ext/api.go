@@ -5,17 +5,15 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
 
@@ -42,6 +40,7 @@ import (
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/wakuv2"
 
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -345,7 +344,7 @@ func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*protocol
 	return api.service.messenger.FetchContact(pubkey, true)
 }
 
-func (api *PublicAPI) RemoveFilters(parent context.Context, chats messaging.ChatFilters) error {
+func (api *PublicAPI) RemoveFilters(parent context.Context, chats messagingtypes.ChatFilters) error {
 	return api.service.messenger.RemoveFilters(chats)
 }
 
@@ -600,21 +599,21 @@ func (api *PublicAPI) AllNonApprovedCommunitiesRequestsToJoin() ([]*communities.
 // Generates a single hash for each address that needs to be revealed to a community.
 // Each hash needs to be signed.
 // The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
-func (api *PublicAPI) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+func (api *PublicAPI) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	return api.service.messenger.GenerateJoiningCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal)
 }
 
 // Generates a single hash for each address that needs to be revealed to a community.
 // Each hash needs to be signed.
 // The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
-func (api *PublicAPI) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+func (api *PublicAPI) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	return api.service.messenger.GenerateEditCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal)
 }
 
 // Signs the provided messages with the provided accounts and password.
 // Provided accounts must not belong to a keypair that is migrated to a keycard.
 // Otherwise, the signing will fail, cause such accounts should be signed with a keycard.
-func (api *PublicAPI) SignData(signParams []account.SignParams) ([]string, error) {
+func (api *PublicAPI) SignData(signParams []personal.SignParams) ([]string, error) {
 	return api.service.messenger.SignData(signParams)
 }
 
@@ -1829,34 +1828,4 @@ func (api *PublicAPI) GetCommunityMemberAllMessages(request *requests.CommunityM
 // Delete a specific community member messages or all community member messages (based on provided parameters)
 func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
-}
-
-// -----
-// HELPER
-// -----
-
-func createBloomFilter(r MessagesRequest) []byte {
-	if len(r.Topics) > 0 {
-		return topicsToBloom(r.Topics...)
-	}
-	return wakutypes.TopicToBloom(r.Topic)
-}
-
-func topicsToBloom(topics ...wakutypes.TopicType) []byte {
-	i := new(big.Int)
-	for _, topic := range topics {
-		bloom := wakutypes.TopicToBloom(topic)
-		i.Or(i, new(big.Int).SetBytes(bloom[:]))
-	}
-
-	combined := make([]byte, wakutypes.BloomFilterSize)
-	data := i.Bytes()
-	copy(combined[wakutypes.BloomFilterSize-len(data):], data[:])
-
-	return combined
-}
-
-// TopicsToBloom squashes all topics into a single bloom filter.
-func TopicsToBloom(topics ...wakutypes.TopicType) []byte {
-	return topicsToBloom(topics...)
 }

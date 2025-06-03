@@ -716,37 +716,6 @@ func deleteMultiaccountV2(requestJSON string) string {
 	return makeJSONResponse(err)
 }
 
-func DeleteImportedKeyV2(requestJSON string) string {
-	return callWithResponse(deleteImportedKeyV2, requestJSON)
-}
-
-func deleteImportedKeyV2(requestJSON string) string {
-	var request requests.DeleteImportedKey
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = request.Validate()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = statusBackend.DeleteImportedKey(request.Address, request.Password, request.KeyStoreDir)
-	return makeJSONResponse(err)
-}
-
-// Deprecated: Use DeleteImportedKeyV2 instead
-func DeleteImportedKey(address, password, keyStoreDir string) string {
-	return deleteImportedKey(address, password, keyStoreDir)
-}
-
-// deleteImportedKey
-func deleteImportedKey(address, password, keyStoreDir string) string {
-	err := statusBackend.DeleteImportedKey(address, password, keyStoreDir)
-	return makeJSONResponse(err)
-}
-
 func InitKeystore(keydir string) string {
 	return callWithResponse(initKeystore, keydir)
 }

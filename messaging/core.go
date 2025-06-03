@@ -2,25 +2,28 @@ package messaging
 
 import (
 	"crypto/ecdsa"
-	"database/sql"
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging/transport"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/messaging/adapters"
+	"github.com/status-im/status-go/messaging/layers/transport"
+	"github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type Core struct {
+	waku                   wakutypes.Waku
 	transport              *transport.Transport
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
 	logger                 *zap.Logger
 }
 
-func NewCore(waku wakutypes.Waku, identity *ecdsa.PrivateKey, db *sql.DB, options ...Options) (*Core, error) {
+func NewCore(waku wakutypes.Waku, identity *ecdsa.PrivateKey, persistence types.Persistence, options ...Options) (*Core, error) {
 	core := &Core{
+		waku: waku,
 		envelopesMonitorConfig: &transport.EnvelopesMonitorConfig{
-			IsMailserver: func(types.EnodeID) bool { return false },
+			IsMailserver: func(ethtypes.EnodeID) bool { return false },
 		},
 	}
 
@@ -37,9 +40,8 @@ func NewCore(waku wakutypes.Waku, identity *ecdsa.PrivateKey, db *sql.DB, option
 	core.transport, err = transport.NewTransport(
 		waku,
 		identity,
-		db,
-		"wakuv2_keys",
-		nil,
+		&adapters.KeysPersistence{P: persistence},
+		&adapters.ProcessedMessageIDsCache{P: persistence},
 		core.envelopesMonitorConfig,
 		core.logger,
 	)
@@ -51,7 +53,7 @@ func NewCore(waku wakutypes.Waku, identity *ecdsa.PrivateKey, db *sql.DB, option
 }
 
 func (m *Core) API() *API {
-	return NewAPI(m.transport)
+	return NewAPI(m.waku, m.transport)
 }
 
 type Options func(*Core)
@@ -62,7 +64,7 @@ func WithLogger(logger *zap.Logger) Options {
 	}
 }
 
-func WithEnvelopeEventsConfig(config *EnvelopeEventsConfig) Options {
+func WithEnvelopeEventsConfig(config *types.EnvelopeEventsConfig) Options {
 	return func(c *Core) {
 		if config != nil {
 			c.envelopesMonitorConfig.EnvelopeEventsHandler = config.EnvelopeEventsHandler

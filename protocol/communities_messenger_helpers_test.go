@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -42,18 +42,6 @@ func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, add
 	return &account.SelectedExtKey{
 		Address: types.HexToAddress(address),
 	}, nil
-}
-
-func (m *AccountManagerMock) CanRecover(rpcParams account.RecoverParams, revealedAddress types.Address) (bool, error) {
-	return true, nil
-}
-
-func (m *AccountManagerMock) Sign(rpcParams account.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
-	// mock signature
-	bytesArray := []byte(rpcParams.Address)
-	bytesArray = append(bytesArray, []byte(rpcParams.Password)...)
-	bytesArray = common.Shake256(bytesArray)
-	return append([]byte{0}, bytesArray...), nil
 }
 
 func (m *AccountManagerMock) DeleteAccount(address types.Address) error {
@@ -343,6 +331,7 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config tes
 	options := []Option{
 		WithAccountManager(accountsManagerMock),
 		WithTokenManager(tokenManagerMock),
+		WithMessageSigner(NewSignerStub()),
 		WithCollectiblesManager(config.collectiblesManager),
 		WithCommunityTokensService(config.collectiblesService),
 		WithAppSettings(*config.appSettings, *config.nodeConfig),

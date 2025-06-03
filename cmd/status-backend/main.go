@@ -12,10 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/cmd/status-backend/server"
-	"github.com/status-im/status-go/internal/sentry"
-	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
 	statusgo "github.com/status-im/status-go/mobile"
+	"github.com/status-im/status-go/pkg/sentry"
+	"github.com/status-im/status-go/pkg/version"
 )
 
 var (

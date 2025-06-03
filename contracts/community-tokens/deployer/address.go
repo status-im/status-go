@@ -20,6 +20,8 @@ var contractAddressByChainID = map[uint64]common.Address{
 	walletCommon.OptimismSepolia:      common.HexToAddress("0xcE2A896eEA2F585BC0C3753DC8116BbE2AbaE541"),
 	walletCommon.BaseSepolia:          common.HexToAddress("0x7Ff554af5b6624db2135E4364F416d1D397f43e6"),
 	walletCommon.StatusNetworkSepolia: common.HexToAddress("0x06716eCfA9B5Ae0210F4c3279cA304A7F563c59e"),
+	walletCommon.BSCMainnet:           common.HexToAddress("0x76d0e484e7c3398922636960ab33bde6e9936d81"),
+	walletCommon.BSCTestnet:           common.HexToAddress("0x7Ff554af5b6624db2135E4364F416d1D397f43e6"),
 }
 
 func ContractAddress(chainID uint64) (common.Address, error) {
