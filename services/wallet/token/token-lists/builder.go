@@ -42,7 +42,19 @@ func (t *TokenLists) rebuildTokensMap(fetchedLists []fetcher.FetchedTokenList) e
 	// temporary soltion to avoid token collisions
 	t.solveCollision()
 
+	t.ensureEmptyTokenListsAreNotNil()
+
 	return nil
+}
+
+func (t *TokenLists) ensureEmptyTokenListsAreNotNil() {
+	t.tokensListsMu.RLock()
+	defer t.tokensListsMu.RUnlock()
+	for _, list := range t.tokensLists {
+		if len(list.Tokens) == 0 {
+			list.Tokens = make([]*tokenTypes.Token, 0)
+		}
+	}
 }
 
 func getDefaultTokensLists() []fetcher.FetchedTokenList {
