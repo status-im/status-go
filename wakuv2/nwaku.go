@@ -1037,16 +1037,9 @@ func (w *Waku) Start() error {
 	}
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", peerID))
-
-	/* TODO-nwaku
 	w.discoverAndConnectPeers()
 
-	if w.cfg.EnableDiscV5 {
-		err := w.node.DiscV5().Start(w.ctx)
-		if err != nil {
-			return err
-		}
-	}
+	/* TODO-nwaku
 
 	w.wg.Add(1)
 	go func() {
@@ -1118,11 +1111,6 @@ func (w *Waku) Start() error {
 
 	w.wg.Add(1)
 	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
-	//TODO: commenting for now so that only fleet nodes are used.
-	//Need to uncomment once filter peer scoring etc is implemented.
-
-	w.wg.Add(1)
-	go w.runPeerExchangeLoop()
 	*/
 
 	if w.cfg.EnableMissingMessageVerification {
@@ -1760,137 +1748,6 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 	*/
 }
 
-/* TODO-nwaku
-// seedBootnodesForDiscV5 tries to fetch bootnodes
-// from an ENR periodically.
-// It backs off exponentially until maxRetries, at which point it restarts from 0
-// It also restarts if there's a connection change signalled from the client
-func (w *Waku) seedBootnodesForDiscV5() {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
-
-	if !w.cfg.EnableDiscV5 || w.node.DiscV5() == nil {
-		return
-	}
-
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-	var retries = 0
-
-	now := func() int64 {
-		return time.Now().UnixNano() / int64(time.Millisecond)
-
-	}
-
-	var lastTry = now()
-
-	canQuery := func() bool {
-		backoff := bootnodesQueryBackoffMs * int64(math.Exp2(float64(retries)))
-
-		return lastTry+backoff < now()
-	}
-
-	for {
-		select {
-		case <-w.dnsDiscAsyncRetrievedSignal:
-			if !canQuery() {
-				continue
-			}
-
-			err := w.restartDiscV5(true)
-			if err != nil {
-				w.logger.Warn("failed to restart discv5", zap.Error(err))
-			}
-			retries = 0
-			lastTry = now()
-		case <-ticker.C:
-			if w.seededBootnodesForDiscV5 && len(w.node.Host().Network().Peers()) > 3 {
-				w.logger.Debug("not querying bootnodes", zap.Bool("seeded", w.seededBootnodesForDiscV5), zap.Int("peer-count", len(w.node.Host().Network().Peers())))
-				continue
-			}
-
-			if !canQuery() {
-				w.logger.Info("can't query bootnodes",
-					zap.Int("peer-count", len(w.node.Host().Network().Peers())),
-					zap.Int64("lastTry", lastTry), zap.Int64("now", now()),
-					zap.Int64("backoff", bootnodesQueryBackoffMs*int64(math.Exp2(float64(retries)))),
-					zap.Int("retries", retries),
-				)
-				continue
-			}
-
-			w.logger.Info("querying bootnodes to restore connectivity", zap.Int("peer-count", len(w.node.Host().Network().Peers())))
-			err := w.restartDiscV5(false)
-			if err != nil {
-				w.logger.Warn("failed to restart discv5", zap.Error(err))
-			}
-
-			lastTry = now()
-			retries++
-			// We reset the retries after a while and restart
-			if retries > bootnodesMaxRetries {
-				retries = 0
-			}
-
-		// If we go online, trigger immediately
-		case <-w.goingOnline:
-			if !canQuery() {
-				continue
-			}
-
-			err := w.restartDiscV5(false)
-			if err != nil {
-				w.logger.Warn("failed to restart discv5", zap.Error(err))
-			}
-			retries = 0
-			lastTry = now()
-
-		case <-w.ctx.Done():
-			w.logger.Debug("bootnode seeding stopped")
-			return
-		}
-	}
-}
-
-// Restart discv5, re-retrieving bootstrap nodes
-func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
-	ctx, cancel := context.WithTimeout(w.ctx, 30*time.Second)
-	defer cancel()
-	bootnodes, err := w.getDiscV5BootstrapNodes(ctx, w.discV5BootstrapNodes, useOnlyDNSDiscCache)
-	if err != nil {
-		return err
-	}
-	if len(bootnodes) == 0 {
-		return errors.New("failed to fetch bootnodes")
-	}
-
-	if w.node.DiscV5().ErrOnNotRunning() != nil {
-		w.logger.Info("is not started restarting")
-		err := w.node.DiscV5().Start(w.ctx)
-		if err != nil {
-			w.logger.Error("Could not start DiscV5", zap.Error(err))
-		}
-	} else {
-		w.node.DiscV5().Stop()
-		w.logger.Info("is started restarting")
-
-		select {
-		case <-w.ctx.Done(): // Don't start discv5 if we are stopping waku
-			return nil
-		default:
-		}
-
-		err := w.node.DiscV5().Start(w.ctx)
-		if err != nil {
-			w.logger.Error("Could not start DiscV5", zap.Error(err))
-		}
-	}
-
-	w.logger.Info("restarting discv5 with nodes", zap.Any("nodes", bootnodes))
-	return w.node.SetDiscV5Bootnodes(bootnodes)
-}
-*/
-
 func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
 }
@@ -2205,6 +2062,8 @@ func gowakuToNwakuConfig(cfg *Config, logger *zap.Logger) *bindingscommon.WakuCo
 		nwakuCfg.PeerExchange = true
 		nwakuCfg.RateLimits.PeerExchange = &bindingscommon.RateLimit{Volume: 5, Period: 1, TimeUnit: bindingscommon.Second}
 	}
+
+	nwakuCfg.LogLevel = "DEBUG" // TODO-nwaku
 
 	return &nwakuCfg
 
