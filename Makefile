@@ -82,8 +82,6 @@ GO_CMD_PATHS := $(filter-out library, $(wildcard cmd/*))
 GO_CMD_NAMES := $(notdir $(GO_CMD_PATHS))
 GO_CMD_BUILDS := $(addprefix build/bin/, $(GO_CMD_NAMES))
 
-# Our custom config is located in nix/nix.conf
-export NIX_USER_CONF_FILES = $(PWD)/nix/nix.conf
 # Location of symlinks to derivations that should not be garbage collected
 export _NIX_GCROOTS = ./.nix-gcroots
 

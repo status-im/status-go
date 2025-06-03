@@ -1,0 +1,29 @@
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.9.13'
+
+pipeline {
+  agent { label 'macos && nix-2.24' }
+
+  options {
+    disableConcurrentBuilds()
+    /* manage how many builds we keep */
+    buildDiscarder(logRotator(
+      numToKeepStr: '20',
+      daysToKeepStr: '30',
+    ))
+  }
+
+  stages {
+    stage('Build mobile iOS library') {
+      steps {
+        script {
+          nix.flake("status-go-mobile-ios")
+        }
+      }
+    }
+  }
+
+  post {
+    cleanup { cleanWs() }
+  }
+}
