@@ -3640,7 +3640,7 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	message.Sig = crypto.FromECDSAPub(&s.owner.identity.PublicKey)
 	message.Payload = wrappedPayload
 
-	filter := s.alice.messaging.ChatFilterByChatID(chat.ID)
+	filter := s.alice.messaging.ChatFilterByChatID(community.UniversalChatID())
 	importedMessages := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, 0)
 
 	importedMessages[*filter] = append(importedMessages[*filter], message)
