@@ -167,7 +167,7 @@ func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 	}
 	err = s.sendPushNotification(requestsAndRegistrations)
 	if err != nil {
-		s.config.Logger.Error("failed to send go rush notification", zap.Error(err))
+		s.config.Logger.Error("failed to send gorush notification", zap.Error(err))
 		return err
 	}
 	encodedMessage, err := proto.Marshal(response)
