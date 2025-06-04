@@ -1828,11 +1828,15 @@ func gowakuToNwakuConfig(cfg *Config, logger *zap.Logger) *bindingscommon.WakuCo
 	nwakuCfg.TcpPort = cfg.Port
 	nwakuCfg.PeerExchange = cfg.EnablePeerExchangeServer || cfg.EnablePeerExchangeClient // no distinction between client and server in nwaku
 	nwakuCfg.Discv5BootstrapNodes = cfg.DiscV5BootstrapNodes
-	// nwakuCfg.DnsDiscoveryNameServers = cfg.Nameserver // TODO
 	nwakuCfg.Discv5Discovery = cfg.EnableDiscV5
-	// nwakuCfg.Discv5EnrAutoUpdate = cfg.AutoUpdate // TODO
+	nwakuCfg.Discv5EnrAutoUpdate = cfg.AutoUpdate
 	nwakuCfg.Discv5UdpPort = cfg.UDPPort
 	nwakuCfg.Store = cfg.EnableStore
+
+	if cfg.Nameserver != "" {
+		nwakuCfg.DnsDiscoveryNameServers = []string{cfg.Nameserver}
+		nwakuCfg.DnsAddrsNameServers = []string{cfg.Nameserver}
+	}
 
 	nwakuCfg.ClusterID = cfg.ClusterID
 	nwakuCfg.Shards = []uint16{DefaultShardIndex, NonProtectedShardIndex}
@@ -1872,10 +1876,10 @@ func gowakuToNwakuConfig(cfg *Config, logger *zap.Logger) *bindingscommon.WakuCo
 		nwakuCfg.Lightpush = true
 		nwakuCfg.RateLimits.Filter = &bindingscommon.RateLimit{Volume: 100, Period: 1, TimeUnit: bindingscommon.Second}
 		nwakuCfg.RateLimits.Lightpush = &bindingscommon.RateLimit{Volume: 5, Period: 1, TimeUnit: bindingscommon.Second}
-		// TODO nwakuCfg.MaxConnections = maxRelayPeers * 1.5 // 60% will be allocated to relay, 40% to service peers
-		nwakuCfg.PeerExchange = true //Enabling this until discv5 issues are resolved. This will enable more peers to be connected for relay mesh.
+		nwakuCfg.MaxConnections = maxRelayPeers * 1.5 // 60% will be allocated to relay, 40% to service peers
+		nwakuCfg.PeerExchange = true                  //Enabling this until discv5 issues are resolved. This will enable more peers to be connected for relay mesh.
 	} else {
-		// TODO nwakuCfg.MaxConnections = cfg.DiscoveryLimit
+		nwakuCfg.MaxConnections = cfg.DiscoveryLimit
 	}
 
 	if cfg.EnablePeerExchangeServer {
