@@ -7,9 +7,12 @@
 package testenv
 
 import (
+	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"go/build"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,6 +24,7 @@ import (
 	"time"
 
 	"golang.org/x/mod/modfile"
+	"golang.org/x/tools/internal/gocommand"
 	"golang.org/x/tools/internal/goroot"
 )
 
@@ -323,12 +327,59 @@ func Go1Point() int {
 	panic("bad release tags")
 }
 
+// NeedsGoCommand1Point skips t if the ambient go command version in the PATH
+// of the current process is older than 1.x.
+//
+// NeedsGoCommand1Point memoizes the result of running the go command, so
+// should be called after all mutations of PATH.
+func NeedsGoCommand1Point(t testing.TB, x int) {
+	NeedsTool(t, "go")
+	go1point, err := goCommand1Point()
+	if err != nil {
+		panic(fmt.Sprintf("unable to determine go version: %v", err))
+	}
+	if go1point < x {
+		t.Helper()
+		t.Skipf("go command is version 1.%d, older than required 1.%d", go1point, x)
+	}
+}
+
+var (
+	goCommand1PointOnce sync.Once
+	goCommand1Point_    int
+	goCommand1PointErr  error
+)
+
+func goCommand1Point() (int, error) {
+	goCommand1PointOnce.Do(func() {
+		goCommand1Point_, goCommand1PointErr = gocommand.GoVersion(context.Background(), gocommand.Invocation{}, new(gocommand.Runner))
+	})
+	return goCommand1Point_, goCommand1PointErr
+}
+
 // NeedsGo1Point skips t if the Go version used to run the test is older than
 // 1.x.
 func NeedsGo1Point(t testing.TB, x int) {
 	if Go1Point() < x {
 		t.Helper()
 		t.Skipf("running Go version %q is version 1.%d, older than required 1.%d", runtime.Version(), Go1Point(), x)
+	}
+}
+
+// SkipAfterGoCommand1Point skips t if the ambient go command version in the PATH of
+// the current process is newer than 1.x.
+//
+// SkipAfterGoCommand1Point memoizes the result of running the go command, so
+// should be called after any mutation of PATH.
+func SkipAfterGoCommand1Point(t testing.TB, x int) {
+	NeedsTool(t, "go")
+	go1point, err := goCommand1Point()
+	if err != nil {
+		panic(fmt.Sprintf("unable to determine go version: %v", err))
+	}
+	if go1point > x {
+		t.Helper()
+		t.Skipf("go command is version 1.%d, newer than maximum 1.%d", go1point, x)
 	}
 }
 
@@ -489,4 +540,60 @@ func NeedsGoExperiment(t testing.TB, flag string) {
 	if !set {
 		t.Skipf("skipping test: flag %q is not set in GOEXPERIMENT=%q", flag, goexp)
 	}
+}
+
+// NeedsGOROOTDir skips the test if GOROOT/dir does not exist, and GOROOT is a
+// released version of Go (=has a VERSION file). Some GOROOT directories are
+// removed by cmd/distpack.
+//
+// See also golang/go#70081.
+func NeedsGOROOTDir(t *testing.T, dir string) {
+	gorootTest := filepath.Join(GOROOT(t), dir)
+	if _, err := os.Stat(gorootTest); os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(GOROOT(t), "VERSION")); err == nil {
+			t.Skipf("skipping: GOROOT/%s not present", dir)
+		}
+	}
+}
+
+// RedirectStderr causes os.Stderr (and the global logger) to be
+// temporarily replaced so that writes to it are sent to t.Log.
+// It is restored at test cleanup.
+func RedirectStderr(t testing.TB) {
+	t.Setenv("RedirectStderr", "") // side effect: assert t.Parallel wasn't called
+
+	// TODO(adonovan): if https://go.dev/issue/59928 is accepted,
+	// simply set w = t.Output() and dispense with the pipe.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	done := make(chan struct{})
+	go func() {
+		for sc := bufio.NewScanner(r); sc.Scan(); {
+			t.Log(sc.Text())
+		}
+		r.Close()
+		close(done)
+	}()
+
+	// Also do the same for the global logger.
+	savedWriter, savedPrefix, savedFlags := log.Writer(), log.Prefix(), log.Flags()
+	log.SetPrefix("log: ")
+	log.SetOutput(w)
+	log.SetFlags(0)
+
+	oldStderr := os.Stderr
+	os.Stderr = w
+	t.Cleanup(func() {
+		w.Close() // ignore error
+		os.Stderr = oldStderr
+
+		log.SetOutput(savedWriter)
+		log.SetPrefix(savedPrefix)
+		log.SetFlags(savedFlags)
+
+		// Don't let test finish before final t.Log.
+		<-done
+	})
 }
