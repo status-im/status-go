@@ -53,6 +53,12 @@ def pytest_addoption(parser):
         help="Waku fleet to be used. Default: --waku-fleet=status-go.test",
         default="status-go.test",
     )
+    parser.addoption(
+        "--push-fleets-config",
+        action="store",
+        help="Path to a local JSON file with Push Notifications fleets configuration. Default value is a path to config in Docker to run 1 pn-server",
+        default="",
+    )
 
 
 @dataclass

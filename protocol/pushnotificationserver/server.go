@@ -19,7 +19,7 @@ import (
 )
 
 const encryptedPayloadKeyLength = 16
-const defaultGorushURL = "https://gorush.infra.status.im/"
+const DefaultGorushURL = "https://gorush.infra.status.im/"
 
 var errUnhandledPushNotificationType = errors.New("unhandled push notification type")
 
@@ -43,7 +43,7 @@ type Server struct {
 
 func New(config *Config, persistence Persistence, messageSender *common.MessageSender) *Server {
 	if len(config.GorushURL) == 0 {
-		config.GorushURL = defaultGorushURL
+		config.GorushURL = DefaultGorushURL
 
 	}
 	return &Server{persistence: persistence, config: config, messageSender: messageSender}
@@ -167,7 +167,7 @@ func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 	}
 	err = s.sendPushNotification(requestsAndRegistrations)
 	if err != nil {
-		s.config.Logger.Error("failed to send go rush notification", zap.Error(err))
+		s.config.Logger.Error("failed to send gorush notification", zap.Error(err))
 		return err
 	}
 	encodedMessage, err := proto.Marshal(response)

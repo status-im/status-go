@@ -1569,7 +1569,7 @@ func (c *Client) registrationLoop() error {
 			return err
 		}
 		if len(servers) == 0 {
-			c.config.Logger.Debug("nothing to do, quitting registration loop")
+			c.config.Logger.Debug("no push notification servers found, quitting registration loop")
 			return nil
 		}
 

@@ -35,6 +35,10 @@ type InitializeApplication struct {
 	// File structure must be as params.FleetsMap.
 	// When successfully loaded, overrides all hard-coded fleets with file contents.
 	WakuFleetsConfigFilePath string `json:"wakuFleetsConfigFilePath"`
+
+	// PushNotificationsConfigFilePath specifies the file path for configuring push notifications servers.
+	// File structure must be as params.PushNotificationsFleet.
+	PushFleetsConfigFilePath string `json:"pushFleetsConfigFilePath"`
 }
 
 func (i *InitializeApplication) Validate() error {

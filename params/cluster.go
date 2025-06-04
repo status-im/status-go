@@ -28,7 +28,7 @@ type FleetInfo struct {
 type FleetsMap map[string]FleetInfo
 
 // DefaultWakuNodes is a list of "supported" fleets. This list is populated to clients UI settings.
-var supportedFleets = FleetsMap{
+var supportedWakuFleets = FleetsMap{
 	FleetStatusStaging: {
 		ClusterID: 16,
 		WakuNodes: []string{
@@ -193,8 +193,8 @@ var defaultPushNotificationServers = []string{
 	"5ffc34d5ffda180d94cd3974d9ed2bb082ede68f342babdbe801ceffb7da902087d43f9aa961c7b85029358874c08ef04ecad9f1d95a1f0e448cbdd5d04350c7",
 }
 
-func loadFleetsFromFile(filepath string) (FleetsMap, error) {
-	// Read the JSON file to populate the supportedFleets map
+func loadWakuFleetsFromFile(filepath string) (FleetsMap, error) {
+	// Read the JSON file to populate the supportedWakuFleets map
 	file, err := os.Open(filepath)
 	if err != nil {
 		err = pkgerrors.Wrap(err, "failed to open fleets json file")
@@ -215,39 +215,69 @@ func loadFleetsFromFile(filepath string) (FleetsMap, error) {
 	return overrideFleets, nil
 }
 
-func LoadFleetsFromFile(filepath string) error {
-	fleetsMap, err := loadFleetsFromFile(filepath)
+func LoadWakuFleetsFromFile(filepath string) error {
+	fleetsMap, err := loadWakuFleetsFromFile(filepath)
 	if err != nil {
 		return err
 	}
 
-	supportedFleets = fleetsMap
+	supportedWakuFleets = fleetsMap
+	return nil
+}
+
+func loadPushFleetsFromFile(filepath string) ([]string, error) {
+	file, err := os.Open(filepath)
+	if err != nil {
+		err = pkgerrors.Wrap(err, "failed to open push notifications json file")
+		return nil, err
+	}
+
+	defer file.Close()
+
+	var overridePushNotificationsServers []string
+	decoder := json.NewDecoder(file)
+
+	err = decoder.Decode(&overridePushNotificationsServers)
+	if err != nil {
+		err = pkgerrors.Wrap(err, "failed to decode push notifications json file")
+		return nil, err
+	}
+
+	return overridePushNotificationsServers, err
+}
+
+func LoadPushFleetsFromFile(filepath string) error {
+	pushNotifications, err := loadPushFleetsFromFile(filepath)
+	if err != nil {
+		return err
+	}
+	defaultPushNotificationServers = pushNotifications
 	return nil
 }
 
 func DefaultWakuNodes(fleet string) []string {
-	return supportedFleets[fleet].WakuNodes
+	return supportedWakuFleets[fleet].WakuNodes
 }
 
 func DefaultDiscV5Nodes(fleet string) []string {
-	return supportedFleets[fleet].DiscV5BootstrapNodes
+	return supportedWakuFleets[fleet].DiscV5BootstrapNodes
 }
 
 func DefaultClusterID(fleet string) uint16 {
-	return supportedFleets[fleet].ClusterID
+	return supportedWakuFleets[fleet].ClusterID
 }
 
 func IsFleetSupported(fleet string) bool {
-	_, ok := supportedFleets[fleet]
+	_, ok := supportedWakuFleets[fleet]
 	return ok
 }
 
 func GetSupportedFleets() FleetsMap {
-	return supportedFleets
+	return supportedWakuFleets
 }
 
 func DefaultStoreNodes(fleet string) []wakutypes.Mailserver {
-	return supportedFleets[fleet].StoreNodes
+	return supportedWakuFleets[fleet].StoreNodes
 }
 
 func DefaultPushNotificationServers() []string {
