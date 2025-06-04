@@ -22,9 +22,10 @@ import (
 )
 
 const (
-	fetchLimit                          = 50 // Limit number of collectibles we fetch per provider call
-	accountOwnershipUpdateInterval      = 60 * time.Minute
-	accountOwnershipUpdateDelayInterval = 30 * time.Second
+	fetchLimit                               = 50 // Limit number of collectibles we fetch per provider call
+	accountOwnershipUpdateInterval           = 60 * time.Minute
+	accountOwnershipUpdateShortDelayInterval = 10 * time.Second // Delay used to "debounce" fetches triggered by settings changes
+	accountOwnershipUpdateDelayInterval      = 30 * time.Second // Delay used to "debounce" fetches triggered by different detected transfers
 )
 
 type OwnershipState = int
@@ -132,15 +133,23 @@ func (c *periodicRefreshOwnedCollectiblesCommand) loadOwnedCollectibles(ctx cont
 
 	c.state.Store(OwnershipStateUpdating)
 	defer func() {
-		if command.err != nil {
+		if command.err != nil && !errors.Is(command.err, context.Canceled) {
 			c.state.Store(OwnershipStateError)
 		} else {
 			c.state.Store(OwnershipStateIdle)
 		}
 	}()
 
-	c.group.Add(command.Command())
+	delayTimer := time.NewTicker(accountOwnershipUpdateShortDelayInterval)
+	defer delayTimer.Stop()
+	select {
+	case <-delayTimer.C:
+		break
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
+	c.group.Add(command.Command())
 	select {
 	case ownedCollectiblesChange := <-ownedCollectiblesChangeCh:
 		if c.ownedCollectiblesChangeCb != nil {

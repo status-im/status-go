@@ -47,6 +47,36 @@ func (s *RaribleClientIntegrationSuite) TestAPIKeysAvailable() {
 	assert.NotEmpty(s.T(), s.client.testnetAPIKey)
 }
 
+func (s *RaribleClientIntegrationSuite) TestGetOwnedCollectibles() {
+	// TODO #13953: Enable for nightly runs
+	s.T().Skip("integration test")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collectibles, err := s.client.FetchAllAssetsByOwner(
+		ctx,
+		walletCommon.ChainID(walletCommon.EthereumMainnet),
+		common.HexToAddress("0x06012c8cf97BEaD5deAe237070F9587f8E7A266d"), // CryptoKitties contract address
+		thirdparty.FetchFromStartCursor,
+		10,
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(collectibles)
+	s.Require().NotEmpty(collectibles.Items)
+
+	collectibles, err = s.client.FetchAllAssetsByOwner(
+		ctx,
+		walletCommon.ChainID(walletCommon.EthereumMainnet),
+		common.HexToAddress("0x06012c8cf97BEaD5deAe237070F9587f8E7A266d"), // CryptoKitties contract address
+		collectibles.NextCursor,
+		10,
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(collectibles)
+	s.Require().NotEmpty(collectibles.Items)
+}
+
 func (s *RaribleClientIntegrationSuite) TestSearchCollections() {
 	// TODO #13953: Enable for nightly runs
 	s.T().Skip("integration test")

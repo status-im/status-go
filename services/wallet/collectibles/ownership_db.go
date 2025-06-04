@@ -58,31 +58,32 @@ func insertTmpOwnership(
 	chainID w_common.ChainID,
 	ownerAddress common.Address,
 	balancesPerContractAdddress thirdparty.TokenBalancesPerContractAddress,
+	uuid string,
 ) error {
 	// Put old/new ownership data into temp tables
 	// NOTE: Temp table CREATE doesn't work with prepared statements,
 	// so we have to use Exec directly
-	_, err := db.Exec(`
-		DROP TABLE IF EXISTS temp.old_collectibles_ownership_cache; 
-		CREATE TABLE temp.old_collectibles_ownership_cache(
+	_, err := db.Exec(fmt.Sprintf(`
+		DROP TABLE IF EXISTS temp.old_collectibles_ownership_cache_%[1]s; 
+		CREATE TABLE temp.old_collectibles_ownership_cache_%[1]s(
 			contract_address VARCHAR NOT NULL,
 			token_id BLOB NOT NULL,
 			balance BLOB NOT NULL
 		);
-		DROP TABLE IF EXISTS temp.new_collectibles_ownership_cache; 
-		CREATE TABLE temp.new_collectibles_ownership_cache(
+		DROP TABLE IF EXISTS temp.new_collectibles_ownership_cache_%[1]s; 
+		CREATE TABLE temp.new_collectibles_ownership_cache_%[1]s(
 			contract_address VARCHAR NOT NULL,
 			token_id BLOB NOT NULL,
 			balance BLOB NOT NULL
-		);`)
+		);`, uuid))
 	if err != nil {
 		return err
 	}
 
-	insertTmpOldOwnership, err := db.Prepare(`
-			INSERT INTO temp.old_collectibles_ownership_cache
+	insertTmpOldOwnership, err := db.Prepare(fmt.Sprintf(`
+			INSERT INTO temp.old_collectibles_ownership_cache_%[1]s
 			SELECT contract_address, token_id, balance FROM collectibles_ownership_cache
-			WHERE chain_id = ? AND owner_address = ?`)
+			WHERE chain_id = ? AND owner_address = ?`, uuid))
 	if err != nil {
 		return err
 	}
@@ -93,9 +94,9 @@ func insertTmpOwnership(
 		return err
 	}
 
-	insertTmpNewOwnership, err := db.Prepare(`
-			INSERT INTO temp.new_collectibles_ownership_cache (contract_address, token_id, balance) 
-			VALUES (?, ?, ?)`)
+	insertTmpNewOwnership, err := db.Prepare(fmt.Sprintf(`
+			INSERT INTO temp.new_collectibles_ownership_cache_%[1]s (contract_address, token_id, balance) 
+			VALUES (?, ?, ?)`, uuid))
 	if err != nil {
 		return err
 	}
@@ -121,16 +122,17 @@ func removeOldAddressOwnership(
 	creator sqlite.StatementCreator,
 	chainID w_common.ChainID,
 	ownerAddress common.Address,
+	uuid string,
 ) ([]thirdparty.CollectibleUniqueID, error) {
 	// Find collectibles in the DB that are not in the temp table
 	removedQuery, err := creator.Prepare(fmt.Sprintf(`
-	SELECT %d, tOld.contract_address, tOld.token_id 
-		FROM temp.old_collectibles_ownership_cache tOld
-		LEFT JOIN temp.new_collectibles_ownership_cache tNew ON
+	SELECT %[2]d, tOld.contract_address, tOld.token_id 
+		FROM temp.old_collectibles_ownership_cache_%[1]s tOld
+		LEFT JOIN temp.new_collectibles_ownership_cache_%[1]s tNew ON
 			tOld.contract_address = tNew.contract_address AND tOld.token_id = tNew.token_id
 		WHERE 
 			tNew.contract_address IS NULL
-	`, chainID))
+	`, uuid, chainID))
 	if err != nil {
 		return nil, err
 	}
@@ -172,16 +174,17 @@ func updateChangedAddressOwnership(
 	creator sqlite.StatementCreator,
 	chainID w_common.ChainID,
 	ownerAddress common.Address,
+	uuid string,
 ) ([]thirdparty.CollectibleUniqueID, error) {
 	// Find collectibles in the temp table that are in the DB and have a different balance
 	updatedQuery, err := creator.Prepare(fmt.Sprintf(`
-		SELECT %d, tNew.contract_address, tNew.token_id 
-		FROM temp.new_collectibles_ownership_cache tNew
-		LEFT JOIN temp.old_collectibles_ownership_cache tOld ON
+		SELECT %[2]d, tNew.contract_address, tNew.token_id 
+		FROM temp.new_collectibles_ownership_cache_%[1]s tNew
+		LEFT JOIN temp.old_collectibles_ownership_cache_%[1]s tOld ON
 			tOld.contract_address = tNew.contract_address AND tOld.token_id = tNew.token_id
 		WHERE 
 			tOld.contract_address IS NOT NULL AND tOld.balance != tNew.balance
-	`, chainID))
+	`, uuid, chainID))
 	if err != nil {
 		return nil, err
 	}
@@ -198,13 +201,13 @@ func updateChangedAddressOwnership(
 		return nil, err
 	}
 
-	updateOwnership, err := creator.Prepare(`
+	updateOwnership, err := creator.Prepare(fmt.Sprintf(`
 		UPDATE collectibles_ownership_cache
 		SET balance = (SELECT tNew.balance
-			FROM temp.new_collectibles_ownership_cache tNew
+			FROM temp.new_collectibles_ownership_cache_%[1]s tNew
 			WHERE tNew.contract_address = collectibles_ownership_cache.contract_address AND tNew.token_id = collectibles_ownership_cache.token_id)
 		WHERE chain_id = ? AND owner_address = ? AND contract_address = ? AND token_id = ?
-	`)
+	`, uuid))
 	if err != nil {
 		return nil, err
 	}
@@ -228,16 +231,17 @@ func insertNewAddressOwnership(
 	creator sqlite.StatementCreator,
 	chainID w_common.ChainID,
 	ownerAddress common.Address,
+	uuid string,
 ) ([]thirdparty.CollectibleUniqueID, error) {
 	// Find collectibles in the temp table that are not in the DB
 	insertedQuery, err := creator.Prepare(fmt.Sprintf(`
-		SELECT %d, tNew.contract_address, tNew.token_id 
-		FROM temp.new_collectibles_ownership_cache tNew
-		LEFT JOIN temp.old_collectibles_ownership_cache tOld ON
+		SELECT %[2]d, tNew.contract_address, tNew.token_id 
+		FROM temp.new_collectibles_ownership_cache_%[1]s tNew
+		LEFT JOIN temp.old_collectibles_ownership_cache_%[1]s tOld ON
 			tOld.contract_address = tNew.contract_address AND tOld.token_id = tNew.token_id
 		WHERE 
 			tOld.contract_address IS NULL
-	`, chainID))
+	`, uuid, chainID))
 	if err != nil {
 		return nil, err
 	}
@@ -257,11 +261,11 @@ func insertNewAddressOwnership(
 	insertOwnership, err := creator.Prepare(fmt.Sprintf(`
 		INSERT INTO collectibles_ownership_cache
 		SELECT
-			%d, tNew.contract_address, tNew.token_id, X'%s', tNew.balance, NULL
-		FROM temp.new_collectibles_ownership_cache tNew
+			%[2]d, tNew.contract_address, tNew.token_id, X'%[3]s', tNew.balance, NULL
+		FROM temp.new_collectibles_ownership_cache_%[1]s tNew
 		WHERE
 			tNew.contract_address = ? AND tNew.token_id = ?
-	`, chainID, ownerAddress.Hex()[2:]))
+	`, uuid, chainID, ownerAddress.Hex()[2:]))
 	if err != nil {
 		return nil, err
 	}
@@ -283,18 +287,19 @@ func updateAddressOwnership(
 	tx sqlite.StatementCreator,
 	chainID w_common.ChainID,
 	ownerAddress common.Address,
+	uuid string,
 ) (removedIDs, updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID, err error) {
-	removedIDs, err = removeOldAddressOwnership(tx, chainID, ownerAddress)
+	removedIDs, err = removeOldAddressOwnership(tx, chainID, ownerAddress, uuid)
 	if err != nil {
 		return
 	}
 
-	updatedIDs, err = updateChangedAddressOwnership(tx, chainID, ownerAddress)
+	updatedIDs, err = updateChangedAddressOwnership(tx, chainID, ownerAddress, uuid)
 	if err != nil {
 		return
 	}
 
-	insertedIDs, err = insertNewAddressOwnership(tx, chainID, ownerAddress)
+	insertedIDs, err = insertNewAddressOwnership(tx, chainID, ownerAddress, uuid)
 	if err != nil {
 		return
 	}
@@ -380,7 +385,9 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
-	err = insertTmpOwnership(o.db, chainID, ownerAddress, balances)
+	uuid := fmt.Sprintf("%d_%s", chainID, ownerAddress.Hex())
+
+	err = insertTmpOwnership(o.db, chainID, ownerAddress, balances, uuid)
 	if err != nil {
 		return
 	}
@@ -401,7 +408,7 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 	}()
 
 	// Compare tmp and current ownership tables and update the current one
-	removedIDs, updatedIDs, insertedIDs, err = updateAddressOwnership(tx, chainID, ownerAddress)
+	removedIDs, updatedIDs, insertedIDs, err = updateAddressOwnership(tx, chainID, ownerAddress, uuid)
 	if err != nil {
 		return
 	}
