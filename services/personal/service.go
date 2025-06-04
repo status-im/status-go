@@ -85,7 +85,10 @@ func (s *Service) Sign(rpcParams SignParams, verifiedAccount *accounttypes.Selec
 	var dBytes []byte
 	switch d := rpcParams.Data.(type) {
 	case string:
-		dBytes = []byte(d)
+		dBytes, err = hexutil.Decode(rpcParams.Data.(string))
+		if err != nil {
+			return types.HexBytes{}, err
+		}
 	case []byte:
 		dBytes = d
 	case byte:
