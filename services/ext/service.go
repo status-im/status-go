@@ -390,7 +390,6 @@ func buildMessengerOptions(
 		protocol.WithHTTPServer(httpServer),
 		protocol.WithRPCClient(rpcClient),
 		protocol.WithMessageCSV(config.OutputMessageCSVEnabled),
-		protocol.WithWalletConfig(&config.WalletConfig),
 		protocol.WithWalletService(walletService),
 		protocol.WithCommunityTokensService(communityTokensService),
 		protocol.WithWakuService(wakuService),

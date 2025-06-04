@@ -432,10 +432,6 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager, c.rpcClient.NetworkManager)))
 	}
 
-	if c.walletConfig != nil {
-		managerOptions = append(managerOptions, communities.WithWalletConfig(c.walletConfig))
-	}
-
 	if c.communityTokensService != nil {
 		managerOptions = append(managerOptions, communities.WithCommunityTokensService(c.communityTokensService))
 	}
