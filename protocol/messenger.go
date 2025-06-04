@@ -566,7 +566,6 @@ func NewMessenger(
 		browserDatabase: c.browserDatabase,
 		httpServer:      c.httpServer,
 		shutdownTasks: []func() error{
-			c.ensVerifier.Stop,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			archiveManager.Stop,
@@ -626,6 +625,9 @@ func NewMessenger(
 		messenger.shutdownTasks = append(messenger.shutdownTasks, csvFile.Close)
 	}
 
+	if c.ensVerifier != nil {
+		messenger.shutdownTasks = append(messenger.shutdownTasks, c.ensVerifier.Stop)
+	}
 	if anonMetricsClient != nil {
 		messenger.shutdownTasks = append(messenger.shutdownTasks, anonMetricsClient.Stop)
 	}
