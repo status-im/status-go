@@ -9,6 +9,7 @@ import threading
 import requests
 import os
 
+import hashlib
 from tenacity import retry, stop_after_delay, wait_fixed
 from clients.services.wallet import WalletService
 from clients.services.wakuext import WakuextService
@@ -281,6 +282,17 @@ class StatusBackend(RpcClient, SignalClient):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
         return self.container.exec(command)
+
+    def compressed_public_key(self):
+        if not self.public_key:
+            return ""
+        # Extract X coordinate (first 32 bytes after prefix)
+        x = self.public_key[4:68]
+        # Extract Y coordinate (last 32 bytes)
+        y = self.public_key[68:132]
+        # Add prefix 02 for even Y, 03 for odd Y
+        prefix = "03" if int(y, 16) % 2 else "02"
+        return "0x" + prefix + x
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.1), reraise=True)
     def change_container_ip(self, new_ipv4=None, new_ipv6=None):
