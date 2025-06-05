@@ -30,7 +30,7 @@ type Info struct {
 type SelectedExtKey struct {
 	Address     ethtypes.Address
 	AccountKey  *ethtypes.Key
-	SubAccounts []ethtypes.Account
+	SubAccounts []Account
 }
 
 // Hex dumps address of a given extended key as hex string.
