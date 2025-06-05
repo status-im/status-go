@@ -170,7 +170,7 @@ func (s *TransactorSuite) rlpEncodeTx(args wallettypes.SendTxArgs, config *param
 func (s *TransactorSuite) TestGasValues() {
 	key, _ := gethcrypto.GenerateKey()
 	selectedAccount := &accounttypes.SelectedExtKey{
-		Address:    types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
+		Address:    types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
 		AccountKey: &types.Key{PrivateKey: key},
 	}
 	testCases := []struct {
@@ -221,9 +221,9 @@ func (s *TransactorSuite) TestGasValues() {
 	for _, testCase := range testCases {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.SetupTest()
-			to := types.FromStringToAddress(utils.TestConfig.Account2.WalletAddress)
+			to := types.HexToAddress(utils.TestConfig.Account2.WalletAddress)
 			args := wallettypes.SendTxArgs{
-				From:                 types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
+				From:                 types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
 				To:                   &to,
 				Gas:                  testCase.gas,
 				GasPrice:             testCase.gasPrice,
@@ -254,13 +254,13 @@ func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs
 func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	key, _ := gethcrypto.GenerateKey()
 	selectedAccount := &accounttypes.SelectedExtKey{
-		Address:    types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
+		Address:    types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
 		AccountKey: &types.Key{PrivateKey: key},
 	}
 
 	chainID := s.nodeConfig.NetworkID
-	fromAddress := types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress)
-	toAddress := types.FromStringToAddress(utils.TestConfig.Account2.WalletAddress)
+	fromAddress := types.HexToAddress(utils.TestConfig.Account1.WalletAddress)
+	toAddress := types.HexToAddress(utils.TestConfig.Account2.WalletAddress)
 	value := (*hexutil.Big)(big.NewInt(10))
 
 	expectedGasPrice := (*big.Int)(testGasPrice)
@@ -348,25 +348,25 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 }
 
 func (s *TransactorSuite) TestArgsValidation() {
-	to := types.FromStringToAddress(utils.TestConfig.Account2.WalletAddress)
+	to := types.HexToAddress(utils.TestConfig.Account2.WalletAddress)
 	args := wallettypes.SendTxArgs{
-		From:  types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
+		From:  types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
 		To:    &to,
 		Data:  types.HexBytes([]byte{0x01, 0x02}),
 		Input: types.HexBytes([]byte{0x02, 0x01}),
 	}
 	s.False(args.Valid())
 	selectedAccount := &accounttypes.SelectedExtKey{
-		Address: types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
+		Address: types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
 	}
 	_, _, err := s.manager.SendTransaction(args, selectedAccount, -1)
 	s.EqualError(err, wallettypes.ErrInvalidSendTxArgs.Error())
 }
 
 func (s *TransactorSuite) TestAccountMismatch() {
-	to := types.FromStringToAddress(utils.TestConfig.Account2.WalletAddress)
+	to := types.HexToAddress(utils.TestConfig.Account2.WalletAddress)
 	args := wallettypes.SendTxArgs{
-		From: types.FromStringToAddress(utils.TestConfig.Account1.WalletAddress),
+		From: types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
 		To:   &to,
 	}
 
@@ -378,7 +378,7 @@ func (s *TransactorSuite) TestAccountMismatch() {
 
 	// mismatched accounts
 	selectedAccount := &accounttypes.SelectedExtKey{
-		Address: types.FromStringToAddress(utils.TestConfig.Account2.WalletAddress),
+		Address: types.HexToAddress(utils.TestConfig.Account2.WalletAddress),
 	}
 	_, _, err = s.manager.SendTransaction(args, selectedAccount, -1)
 	s.EqualError(err, wallettypes.ErrInvalidTxSender.Error())

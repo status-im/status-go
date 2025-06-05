@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/eth-node/crypto"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 var (
@@ -19,7 +19,7 @@ var (
 
 // ValidateExtendedKey validates the keystore keys, checking that
 // ExtendedKey is the extended key of PrivateKey
-func ValidateExtendedKey(key *ethtypes.Key) error {
+func ValidateExtendedKey(key *types.Key) error {
 	if key == nil || key.ExtendedKey == nil || key.ExtendedKey.IsZeroed() {
 		return nil
 	}
