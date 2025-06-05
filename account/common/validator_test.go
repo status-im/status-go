@@ -6,7 +6,7 @@ import (
 	"github.com/status-im/extkeys"
 	"github.com/stretchr/testify/assert"
 
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 func generateTestKey(t *testing.T) *extkeys.ExtendedKey {
@@ -24,26 +24,26 @@ func TestValidateExtendedKey(t *testing.T) {
 	extendedKey2 := generateTestKey(t)
 
 	// Create a valid key
-	validKey := &ethtypes.Key{
+	validKey := &types.Key{
 		PrivateKey:  extendedKey1.ToECDSA(),
 		ExtendedKey: extendedKey1,
 	}
 
 	// Create an invalid key with different private key
-	invalidKey := &ethtypes.Key{
+	invalidKey := &types.Key{
 		PrivateKey:  extendedKey1.ToECDSA(),
 		ExtendedKey: extendedKey2,
 	}
 
 	// Create a zeroed key
-	zeroedKey := &ethtypes.Key{
+	zeroedKey := &types.Key{
 		PrivateKey:  extendedKey1.ToECDSA(),
 		ExtendedKey: &extkeys.ExtendedKey{},
 	}
 
 	tests := []struct {
 		name        string
-		key         *ethtypes.Key
+		key         *types.Key
 		expectError bool
 	}{
 		{
