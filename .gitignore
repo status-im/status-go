@@ -94,6 +94,9 @@ vendor/github.com/waku-org/go-zerokit-rln-arm/
 # waku-go-bindings third_party directory
 vendor/**/waku-go-bindings/third_party/
 
+# sds-go-bindings third_party directory
+vendor/**/sds-go-bindings/third_party/
+
 # status-cli logs
 alice.log
 bob.log
