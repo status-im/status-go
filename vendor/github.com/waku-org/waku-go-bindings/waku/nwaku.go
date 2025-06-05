@@ -207,6 +207,12 @@ package waku
 						resp);
 	}
 
+	static void cGoWakuDisconnectAllPeers(void* wakuCtx, void* resp) {
+		waku_disconnect_all_peers(wakuCtx,
+						(WakuCallBack) GoCallback,
+						resp);
+	}
+
 	static void cGoWakuListenAddresses(void* wakuCtx, void* resp) {
 		waku_listen_addresses(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
@@ -633,6 +639,23 @@ func (n *WakuNode) DisconnectPeerByID(peerID peer.ID) error {
 		return nil
 	}
 	errMsg := "error DisconnectPeerById: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) DisconnectAllPeers() error {
+	wg := sync.WaitGroup{}
+
+	var resp = C.allocResp(unsafe.Pointer(&wg))
+	defer C.freeResp(resp)
+
+	wg.Add(1)
+	C.cGoWakuDisconnectAllPeers(n.wakuCtx, resp)
+	wg.Wait()
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error DisconnectAllPeers: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return errors.New(errMsg)
 }
 
