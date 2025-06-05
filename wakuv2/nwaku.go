@@ -275,6 +275,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
+	// TODO-nwaku
 	// waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
 	if cfg.LightClient {
@@ -354,11 +355,6 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	defer gocommon.LogOnPanic()
 	// Connection will be prunned eventually by the connection manager if needed
 	// The peer connector in go-waku uses Connect, so it will execute identify as part of its
-
-	// TODO-nwaku
-	// TODO: is enr and origin required?
-	// TODO: this function is meant to add a node to a peer store so it can be picked up by the peer manager
-	//       so probably we shouldn't connect directly but expose an AddPeer function in libwaku
 
 	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
 	defer cancel()
@@ -861,8 +857,6 @@ func (w *Waku) Start() error {
 	w.discoverAndConnectPeers() // TODO-nwaku: maybe eventually remove? we can pass cfg.WakuNodes as static nodes to nwaku config
 	// but we need to support in nwaku enrtree resolution for staticnodes and not only multiaddresses
 
-	/* TODO-nwaku
-
 	w.wg.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
@@ -875,15 +869,16 @@ func (w *Waku) Start() error {
 				return
 			case <-ticker.C:
 				w.checkForConnectionChanges()
-			case <-w.topicHealthStatusChan:
+			case <-w.node.TopicHealthChan:
 				// TODO: https://github.com/status-im/status-go/issues/4628
-			case <-w.connectionNotifChan:
+			case <-w.node.ConnectionChangeChan:
 				w.checkForConnectionChanges()
 			}
 		}
 	}()
 
-	if w.cfg.TelemetryServerURL != "" {
+	// TODO-nwaku
+	/* if w.cfg.TelemetryServerURL != "" {
 		w.wg.Add(1)
 		go func() {
 			defer gocommon.LogOnPanic()
@@ -932,8 +927,7 @@ func (w *Waku) Start() error {
 	}
 
 	w.wg.Add(1)
-	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
-	*/
+	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL) */
 
 	if w.cfg.EnableMissingMessageVerification {
 		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
@@ -1505,18 +1499,22 @@ func (w *Waku) StopDiscV5() error {
 }
 
 func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
-	// TODO-nwaku
-	/*
-		//If connection state is reported by something other than peerCount becoming 0 e.g from mobile app, disconnect all peers
-		if (state.Offline && len(w.node.Host().Network().Peers()) > 0) ||
-			(w.state.Type != state.Type && !w.state.Offline && !state.Offline) { // network switched between wifi and cellular
-			w.logger.Info("connection switched or offline detected via mobile, disconnecting all peers")
-			w.node.DisconnectAllPeers()
-			if w.cfg.LightClient {
-				w.filterManager.NetworkChange()
-			}
+
+	//If connection state is reported by something other than peerCount becoming 0 e.g from mobile app, disconnect all peers
+	if (state.Offline && w.PeerCount() > 0) ||
+		(w.state.Type != state.Type && !w.state.Offline && !state.Offline) { // network switched between wifi and cellular
+		w.logger.Info("connection switched or offline detected via mobile, disconnecting all peers")
+		err := w.node.DisconnectAllPeers()
+
+		if err != nil {
+			panic(err)
 		}
-	*/
+
+		if w.cfg.LightClient {
+			w.filterManager.NetworkChange()
+		}
+	}
+
 }
 
 func (w *Waku) isGoingOnline(state connection.State) bool {
@@ -1528,7 +1526,6 @@ func (w *Waku) isGoingOffline(state connection.State) bool {
 }
 
 func (w *Waku) ConnectionChanged(state connection.State) {
-	/* TODO-nwaku
 	if w.isGoingOnline(state) {
 		w.discoverAndConnectPeers()
 		if w.cfg.EnableMissingMessageVerification {
@@ -1561,7 +1558,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 	// update state
 	w.onlineChecker.SetOnline(isOnline)
 	w.state = state
-	*/
+
 }
 
 func (w *Waku) timestamp() int64 {
