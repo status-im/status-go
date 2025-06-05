@@ -17,7 +17,7 @@ func TestHex(t *testing.T) {
 		out string
 	}{
 		{&SelectedExtKey{
-			Address:    ethtypes.FromStringToAddress("0x742d35Cc6634C0532925a3b844Bc454e4438f44e"),
+			Address:    ethtypes.HexToAddress("0x742d35Cc6634C0532925a3b844Bc454e4438f44e"),
 			AccountKey: &ethtypes.Key{PrivateKey: cr},
 		}, "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"},
 		{addr, "0x0"},

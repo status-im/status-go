@@ -1,4 +1,4 @@
-package account
+package common
 
 import (
 	"testing"
