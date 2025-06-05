@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -2910,6 +2911,7 @@ func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan 
 }
 
 func (m *Messenger) ProcessAllMessages() {
+	m.logger.Debug("ProcessAllMessages")
 	response, err := m.RetrieveAll()
 	if err != nil {
 		m.logger.Error("failed to retrieve raw messages", zap.Error(err))
@@ -3320,14 +3322,22 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.C
 	return nil
 }
 
+var counter = atomic.Int32{}
+
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
+	c := counter.Add(1)
+	logger := m.logger.With(zap.String("site", "<<<"), zap.Int32("counter", c))
+	logger.Debug("handleRetrievedMessages started")
+	defer logger.Debug("handleRetrievedMessages finished")
 
 	m.handleMessagesMutex.Lock()
 	defer m.handleMessagesMutex.Unlock()
 
+	logger.Debug("handleRetrievedMessages mutex acquired")
+
 	messageState := m.buildMessageState()
 
-	logger := m.logger.With(zap.String("site", "RetrieveAll"))
+	logger = logger.With(zap.String("site", "RetrieveAll"))
 
 	controlledCommunitiesChatIDs, err := m.communitiesManager.GetOwnedCommunitiesChatIDs()
 	if err != nil {
@@ -3384,7 +3394,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 
 			err = m.handleDatasyncMetadata(handleMessagesResponse)
 			if err != nil {
-				m.logger.Warn("failed to handle datasync metadata", zap.Error(err))
+				logger.Warn("failed to handle datasync metadata", zap.Error(err))
 			}
 
 			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
