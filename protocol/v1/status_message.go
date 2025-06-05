@@ -50,6 +50,7 @@ type ApplicationLayer struct {
 	ID        types.HexBytes                           `json:"id"`
 	SigPubKey *ecdsa.PublicKey                         `json:"-"`
 	Type      protobuf.ApplicationMetadataMessage_Type `json:"-"`
+	ChannelId *string                                  `json:"channelId,omitempty"`
 }
 
 // StatusMessage encapsulates all layers of the protocol
@@ -176,6 +177,7 @@ func (m *StatusMessage) HandleApplicationLayer() error {
 
 	m.ApplicationLayer.Payload = message.Payload
 	m.ApplicationLayer.Type = message.Type
+	m.ApplicationLayer.ChannelId = message.ChannelId
 	return nil
 
 }
