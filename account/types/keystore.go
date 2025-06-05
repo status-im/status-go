@@ -4,10 +4,11 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/status-im/extkeys"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 )
 
 type KeyStore interface {
-	// ImportAccount imports the account specified with privateKey.
+	// ImportECDSA imports a private key into the keystore
 	ImportECDSA(priv *ecdsa.PrivateKey, passphrase string) (Account, error)
 	// ImportSingleExtendedKey imports an extended key setting it in both the PrivateKey and ExtendedKey fields
 	// of the Key struct.
@@ -19,8 +20,10 @@ type KeyStore interface {
 	// Deprecated: status-go is now using ImportSingleExtendedKey
 	ImportExtendedKeyForPurpose(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, passphrase string) (Account, error)
 	// AccountDecryptedKey returns decrypted key for account (provided that password is correct).
-	AccountDecryptedKey(a Account, auth string) (Account, *Key, error)
+	AccountDecryptedKey(a Account, auth string) (Account, *ethtypes.Key, error)
 	// Delete deletes the key matched by account if the passphrase is correct.
 	// If the account contains no filename, the address must match a unique key.
 	Delete(a Account) error
+	// Accounts returns all accounts in the keystore
+	Accounts() []Account
 }

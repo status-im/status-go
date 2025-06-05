@@ -1,4 +1,4 @@
-package account
+package common
 
 import (
 	"github.com/status-im/status-go/eth-node/crypto"

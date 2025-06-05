@@ -11,15 +11,16 @@ import (
 	"github.com/status-im/extkeys"
 
 	"github.com/status-im/status-go/account/common"
+	"github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
-	"github.com/status-im/status-go/eth-node/types"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 )
 
 type AccountManager interface {
-	AddressToDecryptedAccount(address, password string) (types.Account, *types.Key, error)
+	AddressToDecryptedAccount(address, password string) (types.Account, *ethtypes.Key, error)
 	ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error)
-	ImportAccount(privateKey *ecdsa.PrivateKey, password string) (types.Address, error)
+	ImportAccount(privateKey *ecdsa.PrivateKey, password string) (ethtypes.Address, error)
 }
 
 type Generator struct {

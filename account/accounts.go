@@ -46,7 +46,7 @@ type Manager interface {
 type DefaultManager struct {
 	mu       sync.RWMutex
 	Keydir   string
-	keystore ethtypes.KeyStore
+	keystore types.KeyStore
 
 	accountsGenerator *generator.Generator
 	onboarding        *Onboarding
@@ -56,13 +56,6 @@ type DefaultManager struct {
 	watchAddresses      []ethtypes.Address
 
 	logger *zap.Logger
-}
-
-// GetKeystore is only used in tests
-func (m *DefaultManager) GetKeystore() ethtypes.KeyStore {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.keystore
 }
 
 // AccountsGenerator returns accountsGenerator.
@@ -402,14 +395,14 @@ func (m *DefaultManager) ImportOnboardingAccount(id string, password string) (ty
 // AddressToDecryptedAccount tries to load decrypted key for a given account.
 // The running node, has a keystore directory which is loaded on start. Key file
 // for a given address is expected to be in that directory prior to node start.
-func (m *DefaultManager) AddressToDecryptedAccount(address, password string) (ethtypes.Account, *ethtypes.Key, error) {
+func (m *DefaultManager) AddressToDecryptedAccount(address, password string) (types.Account, *ethtypes.Key, error) {
 	if m.keystore == nil {
-		return ethtypes.Account{}, nil, ErrAccountKeyStoreMissing
+		return types.Account{}, nil, ErrAccountKeyStoreMissing
 	}
 
-	account, err := ethtypes.AddressToAccount(address)
+	account, err := types.AddressToAccount(address)
 	if err != nil {
-		return ethtypes.Account{}, nil, ErrAddressToAccountMappingFailure
+		return types.Account{}, nil, ErrAddressToAccountMappingFailure
 	}
 
 	account, key, err := m.keystore.AccountDecryptedKey(account, password)
@@ -605,7 +598,13 @@ func (m *DefaultManager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass strin
 }
 
 func (m *DefaultManager) DeleteAccount(address ethtypes.Address) error {
-	return m.keystore.Delete(ethtypes.Account{Address: address})
+	accounts := m.keystore.Accounts()
+	for _, acc := range accounts {
+		if acc.Address == address {
+			return m.keystore.Delete(acc)
+		}
+	}
+	return fmt.Errorf("account not found: %s", address.Hex())
 }
 
 func (m *DefaultManager) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*types.SelectedExtKey, error) {
