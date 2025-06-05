@@ -6,8 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/account/internal/keystore/geth"
+	"github.com/status-im/status-go/account/types"
 )
 
 // makeAccountManager creates ethereum accounts.Manager with single disk backend and lightweight kdf.
@@ -37,5 +37,5 @@ func makeKeyStore(manager *accounts.Manager) (types.KeyStore, error) {
 		return nil, ErrAccountKeyStoreMissing
 	}
 
-	return gethbridge.WrapKeyStore(keyStore), nil
+	return geth.NewAdapter(keyStore), nil
 }
