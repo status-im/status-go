@@ -1,6 +1,8 @@
 .PHONY: statusgo all test clean help
 .PHONY: statusgo-android statusgo-ios
-.PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku build-libsds
+.PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
+.PHONY: build-libsds clean-libsds rebuild-libsds
+
 
 # Clear any GOROOT set outside of the Nix shell
 export GOROOT=
@@ -43,14 +45,17 @@ endif
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
  LIBWAKU_EXT := so
+ LIBSDS_EXT := so
  GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
  LIBWAKU_EXT := dll
+ LIBSDS_EXT := dll
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
 else
  GOBIN_SHARED_LIB_EXT := so
  LIBWAKU_EXT := so
+ LIBSDS_EXT := so
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
 endif
 
@@ -154,6 +159,11 @@ ifeq ($(USE_NWAKU),true)
 	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
 endif
 
+LIBSDS := $(CURDIR)/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/libsds.$(LIBSDS_EXT)
+$(LIBSDS):
+	@echo "Building libsds"
+	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/sds-go-bindings/sds SHELL=/bin/bash
+
 statusgo: ##@build Build status-go as statusd server
 statusgo: build/bin/statusd
 statusd: statusgo
@@ -214,7 +224,7 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
 statusgo-library: generate
-statusgo-library: $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
+statusgo-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
@@ -230,15 +240,10 @@ statusgo-library: $(LIBWAKU) ##@cross-compile Build status-go as static library 
 
 build-libwaku: $(LIBWAKU)
 
-LIBSDS_DEP_PATH=$(shell go list -m -f '{{.Dir}}' github.com/waku-org/sds-go-bindings)
-build-libsds:
-	cd $(LIBSDS_DEP_PATH) && \
-	sudo mkdir -p third_party && \
-	sudo chown $(USER) third_party && \
-	make -C sds
+build-libsds: $(LIBSDS)
 
 statusgo-shared-library: generate
-statusgo-shared-library: $(LIBWAKU) ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
@@ -334,6 +339,12 @@ clean-libwaku:
 	rm $(LIBWAKU)
 
 rebuild-libwaku: | clean-libwaku $(LIBWAKU)
+
+clean-libsds:
+	@echo "Removing libsds"
+	rm $(LIBSDS)
+
+rebuild-libsds: | clean-libsds $(LIBSDS)
 
 test: test-unit ##@tests Run basic, short tests during development
 
