@@ -64,9 +64,6 @@ func (m *DefaultManager) AccountsGenerator() *generator.Generator {
 }
 
 // CreateAccount creates an internal geth account
-// BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
-// Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
-// sub-account derivations)
 func (m *DefaultManager) CreateAccount(password string) (generator.GeneratedAccountInfo, types.Info, string, error) {
 	var mkInfo generator.GeneratedAccountInfo
 	info := types.Info{}
@@ -87,7 +84,7 @@ func (m *DefaultManager) CreateAccount(password string) (generator.GeneratedAcco
 	mkInfo = acc.ToGeneratedAccountInfo("", mnemonic)
 
 	// import created key into account keystore
-	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extendedKey, password)
+	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extendedKey, password)
 	if err != nil {
 		return mkInfo, info, "", err
 	}
@@ -109,7 +106,7 @@ func (m *DefaultManager) RecoverAccount(password, mnemonic string) (types.Info, 
 	}
 
 	// import re-created key into account keystore
-	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extendedKey, password)
+	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extendedKey, password)
 	if err != nil {
 		return info, err
 	}
@@ -296,7 +293,7 @@ func (m *DefaultManager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, pa
 	address = account.Address.Hex()
 
 	// obtain public key to return
-	account, key, err := m.keystore.AccountDecryptedKey(account, password)
+	account, key, err := m.keystore.AccountDecryptedKey(account.Address, password)
 	if err != nil {
 		return address, "", err
 	}
@@ -308,20 +305,20 @@ func (m *DefaultManager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, pa
 
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
 // Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
-func (m *DefaultManager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
+func (m *DefaultManager) importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
 	if m.keystore == nil {
 		return "", "", ErrAccountKeyStoreMissing
 	}
 
 	// imports extended key, create key file (if necessary)
-	account, err := m.keystore.ImportExtendedKeyForPurpose(keyPurpose, extKey, password)
+	account, err := m.keystore.ImportExtendedKeyForWallet(extKey, password)
 	if err != nil {
 		return "", "", err
 	}
 	address = account.Address.Hex()
 
 	// obtain public key to return
-	account, key, err := m.keystore.AccountDecryptedKey(account, password)
+	account, key, err := m.keystore.AccountDecryptedKey(account.Address, password)
 	if err != nil {
 		return address, "", err
 	}
@@ -400,17 +397,7 @@ func (m *DefaultManager) AddressToDecryptedAccount(address, password string) (ty
 		return types.Account{}, nil, ErrAccountKeyStoreMissing
 	}
 
-	account, err := types.AddressToAccount(address)
-	if err != nil {
-		return types.Account{}, nil, ErrAddressToAccountMappingFailure
-	}
-
-	account, key, err := m.keystore.AccountDecryptedKey(account, password)
-	if err != nil {
-		err = fmt.Errorf("%s: %s", ErrAccountToKeyMappingFailure, err)
-	}
-
-	return account, key, err
+	return m.keystore.AccountDecryptedKey(ethtypes.HexToAddress(address), password)
 }
 
 func (m *DefaultManager) unlockExtendedKey(address, password string) (*types.SelectedExtKey, error) {
@@ -598,13 +585,7 @@ func (m *DefaultManager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass strin
 }
 
 func (m *DefaultManager) DeleteAccount(address ethtypes.Address) error {
-	accounts := m.keystore.Accounts()
-	for _, acc := range accounts {
-		if acc.Address == address {
-			return m.keystore.Delete(acc)
-		}
-	}
-	return fmt.Errorf("account not found: %s", address.Hex())
+	return m.keystore.Delete(address)
 }
 
 func (m *DefaultManager) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*types.SelectedExtKey, error) {
