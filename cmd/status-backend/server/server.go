@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -107,6 +108,7 @@ func (s *Server) Listen(address string, ) error {
 
 	// Register pprof handlers
 	if s.config.profilingEnabled {
+		runtime.SetMutexProfileFraction(1)
 		s.mux.HandleFunc("/debug/pprof/", pprof.Index)
 		s.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		s.mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
