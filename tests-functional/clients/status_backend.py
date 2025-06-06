@@ -297,7 +297,8 @@ class StatusBackend(RpcClient, SignalClient):
             "wakuV2LightClient": kwargs.get("wakuV2LightClient", False),
             "wakuV2Fleet": option.waku_fleet,
         }
-        self._set_networks(data, **kwargs)
+        if not option.disable_override_networks:
+            self._set_networks(data, **kwargs)
         data = self._set_proxy_credentials(data)
         return data
 

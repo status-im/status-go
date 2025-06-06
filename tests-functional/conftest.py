@@ -59,6 +59,12 @@ def pytest_addoption(parser):
         help="Path to a local JSON file with Push Notifications fleets configuration. Default value is a path to config in Docker to run 1 pn-server",
         default="",
     )
+    parser.addoption(
+        "--disable-override-networks",
+        action="store_true",
+        help="When set, will override the networks to use Anvil. Disable to use real networks.",
+        default=False,
+    )
 
 
 @dataclass
