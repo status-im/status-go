@@ -3945,7 +3945,10 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				topics = append(topics, filter.ContentTopic())
 			}
 
-			filters = append(filters, m.messaging.ChatFilterByChatID(c.UniversalChatID()))
+			filter := m.messaging.ChatFilterByChatID(c.UniversalChatID())
+			if filter != nil {
+				filters = append(filters, filter)
+			}
 
 			// First we need to know the timestamp of the latest waku message
 			// we've received for this community, so we can request messages we've
@@ -4387,6 +4390,9 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 	for _, msg := range pinMessages {
 
 		filter := m.messaging.ChatFilterByChatID(msg.LocalChatID)
+		if filter == nil {
+			return nil, ErrNoFiltersForChat
+		}
 		encodedPayload, err := proto.Marshal(msg.GetProtobuf())
 		if err != nil {
 			return nil, err
@@ -4417,6 +4423,9 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 	for _, msg := range chatMessages {
 
 		filter := m.messaging.ChatFilterByChatID(msg.LocalChatID)
+		if filter == nil {
+			return nil, ErrNoFiltersForChat
+		}
 		encodedPayload, err := proto.Marshal(msg.GetProtobuf())
 		if err != nil {
 			return nil, err
