@@ -188,7 +188,7 @@ status-go-deps:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
 statusgo-android: generate
-statusgo-android: $(LIBSDS) ##@cross-compile Build status-go for Android
+statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
 	mkdir -p build/bin \
 	export GO111MODULE=on; \
@@ -237,7 +237,7 @@ build-libwaku: $(LIBWAKU)
 build-libsds: $(LIBSDS)
 
 statusgo-shared-library: generate
-statusgo-shared-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library: $(LIBWAKU) ##@cross-compile Build status-go as shared library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
