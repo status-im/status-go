@@ -190,8 +190,13 @@ func (bf *DefaultBalanceFetcher) FetchTokenBalancesWithScanContract(ctx context.
 		if !res[idx].Success {
 			continue
 		}
+		balanceData := res[idx].Data
+		if len(balanceData) > 32 {
+			// balanceOf should ideally only return uint256 which is 32 bytes skip if any other value is returned
+			continue
+		}
 		balance := new(big.Int)
-		balance.SetBytes(res[idx].Data)
+		balance.SetBytes(balanceData)
 
 		if _, ok := accTokenBalance[account]; !ok {
 			accTokenBalance[account] = make(map[common.Address]*hexutil.Big)
