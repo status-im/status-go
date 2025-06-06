@@ -1,8 +1,6 @@
 module github.com/status-im/status-go
 
-go 1.22.0
-
-toolchain go1.22.6
+go 1.22.10
 
 replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.19
 
@@ -99,7 +97,7 @@ require (
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 	github.com/status-im/extkeys v1.1.0
 	github.com/waku-org/go-waku v0.8.1-0.20250411145637-900b98812a91
-	github.com/waku-org/sds-go-bindings v0.0.0-20250529115712-868e6f37cb36
+	github.com/waku-org/sds-go-bindings v0.0.0-20250606083716-4a7368fb5f31
 	github.com/waku-org/waku-go-bindings v0.0.0-20250528131356-4af668737057
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
