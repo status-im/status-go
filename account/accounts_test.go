@@ -216,11 +216,11 @@ func (s *ManagerTestSuite) TestSelectAccountSuccess() {
 }
 
 func (s *ManagerTestSuite) TestSelectAccountWrongAddress() {
-	s.testSelectAccount(ethtypes.HexToAddress("0x0000000000000000000000000000000000000001"), ethtypes.HexToAddress(s.testAccount.walletAddress), s.testAccount.password, errors.New("cannot retrieve a valid key for a given account: no key for given address or file"))
+	s.testSelectAccount(ethtypes.HexToAddress("0x0000000000000000000000000000000000000001"), ethtypes.HexToAddress(s.testAccount.walletAddress), s.testAccount.password, errors.New("no key for given address or file"))
 }
 
 func (s *ManagerTestSuite) TestSelectAccountWrongPassword() {
-	s.testSelectAccount(ethtypes.HexToAddress(s.testAccount.chatAddress), ethtypes.HexToAddress(s.testAccount.walletAddress), "wrong", errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password"))
+	s.testSelectAccount(ethtypes.HexToAddress(s.testAccount.chatAddress), ethtypes.HexToAddress(s.testAccount.walletAddress), "wrong", errors.New("could not decrypt key with given password"))
 }
 
 func (s *ManagerTestSuite) testSelectAccount(chat, wallet ethtypes.Address, password string, expErr error) {
@@ -304,11 +304,11 @@ func (s *ManagerTestSuite) TestAddressToDecryptedAccountSuccess() {
 }
 
 func (s *ManagerTestSuite) TestAddressToDecryptedAccountWrongAddress() {
-	s.testAddressToDecryptedAccount("0x0001", s.password, ErrAddressToAccountMappingFailure)
+	s.testAddressToDecryptedAccount("0x0001", s.password, errors.New("no key for given address or file"))
 }
 
 func (s *ManagerTestSuite) TestAddressToDecryptedAccountWrongPassword() {
-	s.testAddressToDecryptedAccount(s.walletAddress, "wrong", errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password"))
+	s.testAddressToDecryptedAccount(s.walletAddress, "wrong", errors.New("could not decrypt key with given password"))
 }
 
 func (s *ManagerTestSuite) testAddressToDecryptedAccount(wallet, password string, expErr error) {
