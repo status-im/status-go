@@ -188,7 +188,7 @@ status-go-deps:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
 statusgo-android: generate
-statusgo-android: ##@cross-compile Build status-go for Android
+statusgo-android: $(LIBSDS) ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
 	mkdir -p build/bin \
 	export GO111MODULE=on; \
@@ -204,7 +204,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
 statusgo-ios: generate
-statusgo-ios: ##@cross-compile Build status-go for iOS
+statusgo-ios: $(LIBSDS) ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
 	export GO111MODULE=on; \
 	export GOFLAGS="-mod=mod"; \
