@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"strconv"
 	"sync"
 	"time"
@@ -26,11 +27,17 @@ type Server struct {
 	lock        sync.Mutex
 	connections map[*websocket.Conn]struct{}
 	address     string
+	config      *Config
 }
 
-func NewServer() *Server {
+func NewServer(options ...Option) *Server {
+	config := defaultConfig()
+	for _, option := range options {
+		option(config)
+	}
 	return &Server{
 		connections: make(map[*websocket.Conn]struct{}, 1),
+		config:      config,
 	}
 }
 
@@ -78,7 +85,7 @@ func (s *Server) signalHandler(data []byte) {
 	}
 }
 
-func (s *Server) Listen(address string) error {
+func (s *Server) Listen(address string, ) error {
 	if s.server != nil {
 		return errors.New("server already started")
 	}
@@ -97,6 +104,15 @@ func (s *Server) Listen(address string) error {
 	s.mux.HandleFunc("/health", api.Health)
 	s.mux.HandleFunc("/signals", s.signals)
 	s.server.Handler = s.mux
+
+	// Register pprof handlers
+	if s.config.profilingEnabled {
+		s.mux.HandleFunc("/debug/pprof/", pprof.Index)
+		s.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		s.mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		s.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		s.mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	}
 
 	s.listener, err = net.Listen("tcp", address)
 	if err != nil {
