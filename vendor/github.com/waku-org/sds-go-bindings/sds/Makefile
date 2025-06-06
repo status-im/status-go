@@ -20,7 +20,7 @@ prepare:
 		cd $(THIRD_PARTY_DIR) && \
 		git clone $(NIM_SDS_REPO) && \
 		cd $(NIM_SDS_DIR) && \
-		git checkout master; \
+		git checkout fix-statusgo-build; \
 		make update; \
 	else \
 		echo "nim-sds repository already exists."; \
