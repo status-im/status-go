@@ -1,5 +1,10 @@
 package common
 
+import (
+	"github.com/status-im/status-go/account/internal/keystore/geth"
+	"github.com/status-im/status-go/eth-node/types"
+)
+
 // has0xPrefix validates str begins with '0x' or '0X'.
 func has0xPrefix(str string) bool {
 	return len(str) >= 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X')
@@ -28,4 +33,11 @@ func isHex(str string) bool {
 		}
 	}
 	return true
+}
+
+// TODO: this function is exposed from here just to be used by the tests that were using it before.
+// It will be removed in the future, once we update the tests.
+// The rest of the code should use the keystore package, via KeyStore interface.
+func DecryptKey(keyjson []byte, auth string) (*types.Key, error) {
+	return geth.DecryptKey(keyjson, auth)
 }

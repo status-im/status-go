@@ -16,14 +16,11 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/account/types"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/keystore"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 )
@@ -120,53 +117,16 @@ func (m *DefaultManager) RecoverAccount(password, mnemonic string) (types.Info, 
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
 // If no error is returned, then account is considered verified.
 func (m *DefaultManager) VerifyAccountPassword(keyStoreDir, address, password string) (*ethtypes.Key, error) {
-	var err error
-	var foundKeyFile []byte
+	if m.keystore == nil {
+		return nil, ErrAccountKeyStoreMissing
+	}
 
 	addressObj := ethtypes.BytesToAddress(ethtypes.FromHex(address))
-	checkAccountKey := func(path string, fileInfo os.FileInfo) error {
-		if len(foundKeyFile) > 0 || fileInfo.IsDir() {
-			return nil
-		}
-
-		rawKeyFile, e := ioutil.ReadFile(path)
-		if e != nil {
-			return fmt.Errorf("invalid account key file: %v", e)
-		}
-
-		var accountKey struct {
-			Address string `json:"address"`
-		}
-		if e := json.Unmarshal(rawKeyFile, &accountKey); e != nil {
-			return fmt.Errorf("failed to read key file: %s", e)
-		}
-		if ethtypes.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
-			foundKeyFile = rawKeyFile
-		}
-
-		return nil
-	}
-	// locate key within key store directory (address should be within the file)
-	err = filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		return checkAccountKey(path, fileInfo)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("cannot traverse key store folder: %v", err)
-	}
-
-	if len(foundKeyFile) == 0 {
-		return nil, &ErrCannotLocateKeyFile{fmt.Sprintf("cannot locate account for address: %s", addressObj.Hex())}
-	}
-
-	key, err := keystore.DecryptKey(foundKeyFile, password)
+	key, err := m.keystore.VerifyPassword(addressObj, password)
 	if err != nil {
 		return nil, err
 	}
 
-	// avoid swap attack
 	if key.Address != addressObj {
 		return nil, fmt.Errorf("account mismatch: have %s, want %s", gocommon.TruncateWithDot(key.Address.Hex()), gocommon.TruncateWithDot(addressObj.Hex()))
 	}
@@ -469,119 +429,8 @@ func (m *DefaultManager) MigrateKeyStoreDir(oldDir, newDir string, addresses []s
 	return nil
 }
 
-func (m *DefaultManager) ReEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []byte, e error) {
-	cryptoJSON, e := keystore.RawKeyToCryptoJSON(rawKey)
-	if e != nil {
-		return reEncryptedKey, fmt.Errorf("convert to crypto json error: %v", e)
-	}
-
-	decryptedKey, e := keystore.DecryptKey(rawKey, pass)
-	if e != nil {
-		return reEncryptedKey, fmt.Errorf("decryption error: %v", e)
-	}
-
-	if cryptoJSON.KDFParams["n"] == nil || cryptoJSON.KDFParams["p"] == nil {
-		return reEncryptedKey, fmt.Errorf("Unable to determine `n` or `p`: %v", e)
-	}
-	n := int(cryptoJSON.KDFParams["n"].(float64))
-	p := int(cryptoJSON.KDFParams["p"].(float64))
-
-	gethKey := gethkeystore.Key{
-		Id:              decryptedKey.ID,
-		Address:         gethcommon.Address(decryptedKey.Address),
-		PrivateKey:      decryptedKey.PrivateKey,
-		ExtendedKey:     decryptedKey.ExtendedKey,
-		SubAccountIndex: decryptedKey.SubAccountIndex,
-	}
-
-	return gethkeystore.EncryptKey(&gethKey, newPass, n, p)
-}
-
 func (m *DefaultManager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
-	rencryptFileAtPath := func(tempKeyDirPath, path string, fileInfo os.FileInfo) error {
-		if fileInfo.IsDir() {
-			return nil
-		}
-
-		rawKeyFile, e := ioutil.ReadFile(path)
-		if e != nil {
-			return fmt.Errorf("invalid account key file: %v", e)
-		}
-
-		reEncryptedKey, e := m.ReEncryptKey(rawKeyFile, oldPass, newPass)
-		if e != nil {
-			return fmt.Errorf("unable to re-encrypt key file: %v, path: %s, name: %s", e, path, fileInfo.Name())
-		}
-
-		tempWritePath := filepath.Join(tempKeyDirPath, fileInfo.Name())
-		e = ioutil.WriteFile(tempWritePath, reEncryptedKey, fileInfo.Mode().Perm())
-		if e != nil {
-			return fmt.Errorf("unable write key file: %v", e)
-		}
-
-		return nil
-	}
-
-	keyDirPath = strings.TrimSuffix(keyDirPath, "/")
-	keyDirPath = strings.TrimSuffix(keyDirPath, "\\")
-	keyParent, keyDirName := filepath.Split(keyDirPath)
-
-	// backupKeyDirName used to store existing keys before final write
-	backupKeyDirName := keyDirName + "-backup"
-	// tempKeyDirName used to put re-encrypted keys
-	tempKeyDirName := keyDirName + "-re-encrypted"
-	backupKeyDirPath := filepath.Join(keyParent, backupKeyDirName)
-	tempKeyDirPath := filepath.Join(keyParent, tempKeyDirName)
-
-	// create temp key dir
-	err := os.MkdirAll(tempKeyDirPath, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("mkdirall error: %v, tempKeyDirPath: %s", err, tempKeyDirPath)
-	}
-
-	err = filepath.Walk(keyDirPath, func(path string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			os.RemoveAll(tempKeyDirPath)
-			return fmt.Errorf("walk callback error: %v", err)
-		}
-
-		return rencryptFileAtPath(tempKeyDirPath, path, fileInfo)
-	})
-	if err != nil {
-		os.RemoveAll(tempKeyDirPath)
-		return fmt.Errorf("walk error: %v", err)
-	}
-
-	// move existing keys
-	err = os.Rename(keyDirPath, backupKeyDirPath)
-	if err != nil {
-		os.RemoveAll(tempKeyDirPath)
-		return fmt.Errorf("unable to rename keyDirPath to backupKeyDirPath: %v", err)
-	}
-
-	// move tempKeyDirPath to keyDirPath
-	err = os.Rename(tempKeyDirPath, keyDirPath)
-	if err != nil {
-		// if this happens, then the app is probably bricked, because the keystore won't exist anymore
-		// try to restore from backup
-		_ = os.Rename(backupKeyDirPath, keyDirPath)
-		return fmt.Errorf("unable to rename tempKeyDirPath to keyDirPath: %v", err)
-	}
-
-	// remove temp and backup folders and their contents
-	err = os.RemoveAll(tempKeyDirPath)
-	if err != nil {
-		// the re-encryption is complete so we don't throw
-		m.logger.Error("unable to delete tempKeyDirPath, manual cleanup required")
-	}
-
-	err = os.RemoveAll(backupKeyDirPath)
-	if err != nil {
-		// the re-encryption is complete so we don't throw
-		m.logger.Error("unable to delete backupKeyDirPath, manual cleanup required")
-	}
-
-	return nil
+	return m.keystore.ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass)
 }
 
 func (m *DefaultManager) DeleteAccount(address ethtypes.Address) error {

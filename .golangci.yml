@@ -12,7 +12,6 @@ run:
     - .*_mock.go
     - contracts/
     - eth-node/crypto/ecies/ # copied
-    - eth-node/keystore/ # copied
 
 output:
   format: colored-line-number
