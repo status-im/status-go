@@ -14,9 +14,8 @@ import (
 
 	"gopkg.in/go-playground/validator.v9"
 
-	accountcommon "github.com/status-im/status-go/account/common"
+	"github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/eth-node/keystore"
 )
 
 func newValidate() (*validator.Validate, error) {
@@ -45,12 +44,12 @@ func newValidate() (*validator.Validate, error) {
 
 func validateKeys(keys map[string][]byte, password string) error {
 	for _, key := range keys {
-		k, err := keystore.DecryptKey(key, password)
+		k, err := common.DecryptKey(key, password)
 		if err != nil {
 			return err
 		}
 
-		err = accountcommon.ValidateExtendedKey(k)
+		err = common.ValidateExtendedKey(k)
 		if err != nil {
 			return err
 		}

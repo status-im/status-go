@@ -1,6 +1,6 @@
 // Imported from github.com/ethereum/go-ethereum/accounts/keystore/keystore.go
 
-package keystore
+package geth
 
 import (
 	"errors"

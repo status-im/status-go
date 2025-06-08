@@ -1,16 +1,15 @@
 package account
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/keystore"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/utils"
@@ -32,8 +31,6 @@ func TestVerifyAccountPassword(t *testing.T) {
 	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount1PKFile()))
 	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount2PKFile()))
 
-	account1Address := ethtypes.BytesToAddress(ethtypes.FromHex(utils.TestConfig.Account1.WalletAddress))
-
 	testCases := []struct {
 		name          string
 		keyPath       string
@@ -53,21 +50,21 @@ func TestVerifyAccountPassword(t *testing.T) {
 			filepath.Join(keyStoreDir, "non-existent-folder"),
 			utils.TestConfig.Account1.WalletAddress,
 			utils.TestConfig.Account1.Password,
-			fmt.Errorf("cannot traverse key store folder: lstat %s/non-existent-folder: no such file or directory", keyStoreDir),
+			fmt.Errorf("no key for given address or file"),
 		},
 		{
 			"correct address, correct password, empty key store (pk is not there)",
 			emptyKeyStoreDir,
 			utils.TestConfig.Account1.WalletAddress,
 			utils.TestConfig.Account1.Password,
-			ErrCannotLocateKeyFile{fmt.Sprintf("cannot locate account for address: %s", account1Address.Hex())},
+			fmt.Errorf("no key for given address or file"),
 		},
 		{
 			"wrong address, correct password",
 			keyStoreDir,
 			"0x79791d3e8f2daa1f7fec29649d152c0ada3cc535",
 			utils.TestConfig.Account1.Password,
-			ErrCannotLocateKeyFile{fmt.Sprintf("cannot locate account for address: %s", "0x79791d3E8F2dAa1F7FeC29649d152c0aDA3cc535")},
+			fmt.Errorf("no key for given address or file"),
 		},
 		{
 			"correct address, wrong password",
@@ -78,6 +75,9 @@ func TestVerifyAccountPassword(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
+		err := accManager.InitKeystore(testCase.keyPath)
+		require.NoError(t, err)
+
 		accountKey, err := accManager.VerifyAccountPassword(testCase.keyPath, testCase.address, testCase.password)
 		if testCase.expectedError != nil && err != nil && testCase.expectedError.Error() != err.Error() ||
 			((testCase.expectedError == nil || err == nil) && testCase.expectedError != err) {
@@ -106,6 +106,9 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	require.NoError(t, err)
 
 	accManager := NewGethManager(tt.MustCreateTestLogger())
+
+	err = accManager.InitKeystore(keyStoreDir)
+	require.NoError(t, err)
 
 	address := ethtypes.HexToAddress(utils.TestConfig.Account3.WalletAddress)
 	_, err = accManager.VerifyAccountPassword(keyStoreDir, address.Hex(), utils.TestConfig.Account3.Password)
@@ -341,45 +344,6 @@ func (s *ManagerTestSuite) TestMigrateKeyStoreDir() {
 	s.Equal(1, len(files))
 }
 
-func (s *ManagerTestSuite) TestReEncryptKey() {
-	var firstKeyPath string
-	files, _ := os.ReadDir(s.keydir)
-
-	// there is only one file in this dir,
-	// is there a better way to reference it?
-	for _, f := range files {
-		firstKeyPath = filepath.Join(s.keydir, f.Name())
-	}
-
-	rawKey, _ := os.ReadFile(firstKeyPath)
-	reEncryptedKey, _ := s.accManager.ReEncryptKey(rawKey, testPassword, newTestPassword)
-
-	type Key struct {
-		Address string `json:"address"`
-	}
-
-	var unmarshaledRaw, unmarshaledReEncrypted Key
-	_ = json.Unmarshal(rawKey, &unmarshaledRaw)
-	_ = json.Unmarshal(reEncryptedKey, &unmarshaledReEncrypted)
-
-	oldCrypto, _ := keystore.RawKeyToCryptoJSON(rawKey)
-	newCrypto, _ := keystore.RawKeyToCryptoJSON(reEncryptedKey)
-
-	// Test address is same post re-encryption
-	s.Equal(unmarshaledRaw.Address, unmarshaledReEncrypted.Address)
-
-	// Test cipher changes after re-encryption
-	s.NotEqual(oldCrypto.CipherText, newCrypto.CipherText)
-
-	// Test re-encrypted key cannot be decrypted using old testPasswordword
-	_, decryptOldError := keystore.DecryptKey(reEncryptedKey, testPassword)
-	s.Require().Error(decryptOldError)
-
-	// Test re-encrypted key can be decrypted using new testPassword
-	_, decryptNewError := keystore.DecryptKey(reEncryptedKey, newTestPassword)
-	s.Require().NoError(decryptNewError)
-}
-
 func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
 
 	err := s.accManager.ReEncryptKeyStoreDir(s.keydir, testPassword, newTestPassword)
@@ -397,11 +361,11 @@ func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
 		s.Require().NoError(err)
 
 		// should not decrypt with old password
-		_, decryptError := keystore.DecryptKey(rawKeyFile, testPassword)
+		_, decryptError := common.DecryptKey(rawKeyFile, testPassword)
 		s.Require().Error(decryptError)
 
 		// should decrypt with new password
-		_, decryptError = keystore.DecryptKey(rawKeyFile, newTestPassword)
+		_, decryptError = common.DecryptKey(rawKeyFile, newTestPassword)
 		s.Require().NoError(decryptError)
 
 		return nil

@@ -30,20 +30,6 @@ var testAccount = struct {
 	bip44Address1:      "0x7AF7283bd1462C3b957e8FAc28Dc19cBbF2FAdfe",
 }
 
-const testAccountJSONFile = `{
-	"address":"9c32f71d4db8fb9e1a58b0a80df79935e7256fa6",
-	"crypto":
-		{
-			"cipher":"aes-128-ctr","ciphertext":"8055b65d5e41ef467c0cfe52ce6beda7f8dbe689221c6c43be9e9401bf173004",
-			"cipherparams":{"iv":"738f002e5e5343e0bb0e1050e098f721"},
-			"kdf":"scrypt",
-			"kdfparams":{"dklen":32,"n":4096,"p":6,"r":8,"salt":"9a54fbe1439ac567bd05039f76907b2c2846364a38b2f6813bcdac5ab0ec9d18"},
-			"mac":"79d817cd21afd4944e70d804d7871d10cbd15f25c6755416f780f81c1588677e"
-		},
-	"id":"6202ced9-f0cd-42e4-bf21-6029cca0ea91",
-	"version":3
-}`
-
 const (
 	path0 = "m/44'/60'/0'/0/0"
 	path1 = "m/44'/60'/0'/0/1"
@@ -110,25 +96,6 @@ func TestGenerator_ImportMnemonic(t *testing.T) {
 
 	key := g.accounts[info.ID]
 	assert.Equal(t, testAccount.extendedMasterKey, key.extendedKey.String())
-}
-
-func TestGenerator_ImportJSONKey(t *testing.T) {
-	g := New(nil)
-	assert.Equal(t, 0, len(g.accounts))
-
-	// wrong password
-	_, err := g.ImportJSONKey(testAccountJSONFile, "wrong-password")
-	assert.Error(t, err)
-
-	// right password
-	info, err := g.ImportJSONKey(testAccountJSONFile, testAccount.encriptionPassword)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(g.accounts))
-	assert.Equal(t, testAccount.bip44Address0, info.Address)
-
-	key := g.accounts[info.ID]
-	keyHex := fmt.Sprintf("0x%x", crypto.FromECDSA(key.privateKey))
-	assert.Equal(t, testAccount.bip44Key0, keyHex)
 }
 
 func TestGenerator_DeriveAddresses(t *testing.T) {
