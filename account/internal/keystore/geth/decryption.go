@@ -1,7 +1,7 @@
 // Imported from github.com/ethereum/go-ethereum/accounts/keystore/passphrase.go
 // and github.com/ethereum/go-ethereum/accounts/keystore/presale.go
 
-package keystore
+package geth
 
 import (
 	"bytes"
