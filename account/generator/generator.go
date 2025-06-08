@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/keystore"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 )
 
@@ -79,21 +78,6 @@ func (g *Generator) ImportPrivateKey(privateKeyHex string) (IdentifiedAccountInf
 
 	acc := &Account{
 		privateKey: privateKey,
-	}
-
-	id := g.addAccount(acc)
-
-	return acc.ToIdentifiedAccountInfo(id), nil
-}
-
-func (g *Generator) ImportJSONKey(json string, password string) (IdentifiedAccountInfo, error) {
-	key, err := keystore.DecryptKey([]byte(json), password)
-	if err != nil {
-		return IdentifiedAccountInfo{}, err
-	}
-
-	acc := &Account{
-		privateKey: key.PrivateKey,
 	}
 
 	id := g.addAccount(acc)

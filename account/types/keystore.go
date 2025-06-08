@@ -21,7 +21,7 @@ type KeyStore interface {
 	// Deprecated: status-go is now using ImportSingleExtendedKey
 	ImportExtendedKeyForWallet(extKey *extkeys.ExtendedKey, passphrase string) (Account, error)
 	// AccountDecryptedKey returns decrypted key for account (provided that password is correct).
-	AccountDecryptedKey(address ethtypes.Address, auth string) (Account, *ethtypes.Key, error)
+	AccountDecryptedKey(address ethtypes.Address, passphrase string) (Account, *ethtypes.Key, error)
 	// Delete deletes the key matched by account if the passphrase is correct.
 	// If the account contains no filename, the address must match a unique key.
 	Delete(address ethtypes.Address) error
@@ -29,4 +29,9 @@ type KeyStore interface {
 	Find(address ethtypes.Address) (Account, error)
 	// Accounts returns all accounts in the keystore
 	Accounts() []Account
+	// VerifyPassword tries to decrypt a given account key file, with a provided password.
+	// If no error is returned, then account is considered verified.
+	VerifyPassword(address ethtypes.Address, passphrase string) (*ethtypes.Key, error)
+	// ReEncryptKeyStoreDir re-encrypts all keys in the keystore directory.
+	ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error
 }

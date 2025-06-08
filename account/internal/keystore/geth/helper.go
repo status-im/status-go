@@ -80,18 +80,7 @@ func readKeystoreFileAndDecryptedKey(path string, auth string) (*ethtypes.Key, e
 		return nil, err
 	}
 
-	key, err := keystore.DecryptKey(keyjson, auth)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ethtypes.Key{
-		ID:              key.Id,
-		Address:         ethtypes.Address(key.Address),
-		PrivateKey:      key.PrivateKey,
-		ExtendedKey:     key.ExtendedKey,
-		SubAccountIndex: key.SubAccountIndex,
-	}, nil
+	return DecryptKey(keyjson, auth)
 }
 
 func encryptKeyAndStoreToKeystoreFile(ethKey *ethtypes.Key, path string, passphrase string) error {
