@@ -649,7 +649,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 
 		walletInfo, err := backend.AccountManager().AccountsGenerator().LoadAccount(walletRootAddress.String(), password)
 		require.NoError(t, err)
-		derivedInfos, err := backend.AccountManager().AccountsGenerator().DeriveAddresses(walletInfo.ID, []string{newPath})
+		derivedInfos, err := backend.AccountManager().AccountsGenerator().StoreDerivedAccounts(walletInfo.ID, password, []string{newPath})
 		require.NoError(t, err)
 		derivedInfo := derivedInfos[newPath]
 

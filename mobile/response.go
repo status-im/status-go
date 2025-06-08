@@ -2,9 +2,9 @@ package statusgo
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
@@ -20,9 +20,9 @@ const (
 )
 
 var errToCodeMap = map[error]int{
-	account.ErrNoAccountSelected:   codeErrNoAccountSelected,
-	wallettypes.ErrInvalidTxSender: codeErrInvalidTxSender,
-	keystore.ErrDecrypt:            codeErrDecrypt,
+	account.ErrNoAccountSelected:                            codeErrNoAccountSelected,
+	wallettypes.ErrInvalidTxSender:                          codeErrInvalidTxSender,
+	errors.New("could not decrypt key with given password"): codeErrDecrypt,
 }
 
 type jsonrpcSuccessfulResponse struct {

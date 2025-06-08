@@ -35,6 +35,7 @@ func (a *Adapter) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphras
 	if err == nil {
 		return account, nil
 	}
+
 	return a.updateKeystoreFile(privateKey, extKey, passphrase)
 }
 
@@ -55,13 +56,13 @@ func (a *Adapter) ImportExtendedKeyForWallet(extKey *extkeys.ExtendedKey, passph
 }
 
 // AccountDecryptedKey gets the decrypted key for an account using standard go-ethereum functions
-func (a *Adapter) AccountDecryptedKey(address ethtypes.Address, auth string) (types.Account, *ethtypes.Key, error) {
+func (a *Adapter) AccountDecryptedKey(address ethtypes.Address, passphrase string) (types.Account, *ethtypes.Key, error) {
 	gethAccount, err := a.find(address)
 	if err != nil {
 		return types.Account{}, nil, err
 	}
 
-	ethKey, err := readKeystoreFileAndDecryptedKey(gethAccount.URL.Path, auth)
+	ethKey, err := readKeystoreFileAndDecryptedKey(gethAccount.URL.Path, passphrase)
 	if err != nil {
 		return types.Account{}, nil, err
 	}
@@ -93,4 +94,17 @@ func (a *Adapter) Find(address ethtypes.Address) (types.Account, error) {
 		return types.Account{}, err
 	}
 	return accountFrom(gethAccount), nil
+}
+
+func (a *Adapter) VerifyPassword(address ethtypes.Address, passphrase string) (*ethtypes.Key, error) {
+	gethAccount, err := a.find(address)
+	if err != nil {
+		return nil, err
+	}
+
+	return readKeystoreFileAndDecryptedKey(gethAccount.URL.Path, passphrase)
+}
+
+func (a *Adapter) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
+	return ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass)
 }
