@@ -118,7 +118,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesWrapped() {
 	encodedPayload, err := proto.Marshal(&s.testMessage)
 	s.Require().NoError(err)
 
-	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
+	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey, nil)
 	s.Require().NoError(err)
 
 	message := &messagingtypes.ReceivedMessage{}
@@ -146,7 +146,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	encodedPayload, err := proto.Marshal(&s.testMessage)
 	s.Require().NoError(err)
 
-	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
+	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey, nil)
 	s.Require().NoError(err)
 
 	ds := datasync.New(nil, nil, false, s.sender.logger)
@@ -185,7 +185,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	encodedPayload, err := proto.Marshal(&s.testMessage)
 	s.Require().NoError(err)
 
-	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
+	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey, nil)
 	s.Require().NoError(err)
 
 	dataSyncMessage := datasyncproto.Payload{
@@ -269,7 +269,7 @@ func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
 	encryptedPayload1, err := proto.Marshal(hashRatchetKeyExchangeMessage.Message)
 	s.Require().NoError(err)
 
-	wrappedPayload2, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, senderKey)
+	wrappedPayload2, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, senderKey, nil)
 	s.Require().NoError(err)
 
 	messageSpec2, err := senderEncryptionProtocol.BuildHashRatchetMessage(
@@ -328,7 +328,7 @@ func (s *MessageSenderSuite) TestHandleSegmentMessages() {
 	encodedPayload, err := proto.Marshal(&s.testMessage)
 	s.Require().NoError(err)
 
-	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
+	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey, nil)
 	s.Require().NoError(err)
 
 	segmentedMessages, err := segmentMessage(&wakutypes.NewMessage{Payload: wrappedPayload}, int(math.Ceil(float64(len(wrappedPayload))/2)))
