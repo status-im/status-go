@@ -19,6 +19,7 @@ import (
 const DefaultProfileDisplayName = ""
 
 func (s *MessengerBaseTestSuite) SetupTest() {
+	s.tmpdir = s.T().TempDir()
 	s.logger = tt.MustCreateTestLogger()
 	shh, err := newTestWakuNode(s.logger)
 	s.Require().NoError(err)
@@ -51,6 +52,7 @@ type MessengerBaseTestSuite struct {
 	// a single waku service should be shared.
 	shh    wakutypes.Waku
 	logger *zap.Logger
+	tmpdir string
 }
 
 func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, extraOptions []Option) (*Messenger, error) {

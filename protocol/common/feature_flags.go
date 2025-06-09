@@ -35,4 +35,7 @@ type FeatureFlags struct {
 
 	// EnableNewsFeed indicates whether we should enable the News Feed polling (this is not the user setting)
 	EnableNewsFeed bool
+
+	// EnableLocalBackup indicates whether we should also back up user data locally
+	EnableLocalBackup bool
 }

@@ -416,6 +416,10 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		overrideApiConfig(nodeConfig, request.APIConfig)
 	}
 
+	nodeConfig.BackupConfig = params.BackupConfig{
+		DataDir: filepath.Join(nodeConfig.RootDataDir, params.BackupsRelativePath),
+	}
+
 	for _, opt := range opts {
 		if err := opt(nodeConfig); err != nil {
 			return nil, err

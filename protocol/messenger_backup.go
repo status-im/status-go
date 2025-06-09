@@ -2,6 +2,8 @@ package protocol
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -13,7 +15,9 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 const (
@@ -136,7 +140,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 			},
 			ProfileDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
-				TotalNumber: uint32(len(profileToBackup)),
+				TotalNumber: uint32(1), // Profile is always one
 			},
 			SettingsDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
@@ -153,11 +157,14 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		}
 	}
 
+	fullBackup := &protobuf.Backup{}
+
 	// Update contacts messages encode and dispatch
 	for i, d := range contactsToBackup {
 		pb := backupDetailsOnly()
 		pb.ContactsDetails.DataNumber = uint32(i + 1)
 		pb.Contacts = d.Contacts
+		fullBackup.Contacts = append(fullBackup.Contacts, d.Contacts...)
 		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
 		if err != nil {
 			return 0, err
@@ -169,6 +176,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		pb := backupDetailsOnly()
 		pb.CommunitiesDetails.DataNumber = uint32(i + 1)
 		pb.Communities = d.Communities
+		fullBackup.Communities = append(fullBackup.Communities, d.Communities...)
 		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
 		if err != nil {
 			return 0, err
@@ -176,14 +184,13 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 	}
 
 	// Update profile messages encode and dispatch
-	for i, d := range profileToBackup {
-		pb := backupDetailsOnly()
-		pb.ProfileDetails.DataNumber = uint32(i + 1)
-		pb.Profile = d.Profile
-		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
-		if err != nil {
-			return 0, err
-		}
+	pb := backupDetailsOnly()
+	pb.ProfileDetails.DataNumber = uint32(1)
+	pb.Profile = profileToBackup.Profile
+	fullBackup.Profile = profileToBackup.Profile
+	err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
+	if err != nil {
+		return 0, err
 	}
 
 	// Update chats encode and dispatch
@@ -191,6 +198,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		pb := backupDetailsOnly()
 		pb.ChatsDetails.DataNumber = uint32(i + 1)
 		pb.Chats = d.Chats
+		fullBackup.Chats = append(fullBackup.Chats, d.Chats...)
 		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
 		if err != nil {
 			return 0, err
@@ -202,6 +210,8 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		pb := backupDetailsOnly()
 		pb.SettingsDetails.DataNumber = uint32(i + 1)
 		pb.Setting = d
+		// TODO find a way to get all settings
+		// fullBackup.Setting = append(fullBackup.Setting, d)
 		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
 		if err != nil {
 			return 0, err
@@ -213,6 +223,8 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		pb := backupDetailsOnly()
 		pb.KeypairDetails.DataNumber = uint32(i + 1)
 		pb.Keypair = d.Keypair
+		// TODO find a way to get all settings
+		// fullBackup.Keypair = append(fullBackup.Keypair, d.Keypair)
 		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
 		if err != nil {
 			return 0, err
@@ -224,8 +236,45 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		pb := backupDetailsOnly()
 		pb.WatchOnlyAccountDetails.DataNumber = uint32(i + 1)
 		pb.WatchOnlyAccount = d.WatchOnlyAccount
+		// TODO find a way to get all settings
+		// fullBackup.WatchOnlyAccount = append(fullBackup.WatchOnlyAccount, d.Keypair)
 		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
 		if err != nil {
+			return 0, err
+		}
+	}
+
+	if m.config.featureFlags.EnableLocalBackup {
+		// TODO put file in a constant
+		path := filepath.Join(m.config.backupConfig.DataDir, "user_data.bkp")
+
+		if err := os.MkdirAll(m.config.backupConfig.DataDir, 0700); err != nil {
+			return 0, err
+		}
+
+		file, err := os.Create(path)
+		if err != nil {
+			return 0, err
+		}
+		defer file.Close()
+
+		mashalledMessage, err := proto.Marshal(fullBackup)
+		if err != nil {
+			return 0, err
+		}
+
+		messageSpec, err := m.encryptor.BuildDHMessage(m.identity, &m.identity.PublicKey, mashalledMessage)
+		if err != nil {
+			return 0, err
+		}
+
+		encryptedMessage, err := proto.Marshal(messageSpec.Message)
+		if err != nil {
+			return 0, err
+		}
+		err = os.WriteFile(path, encryptedMessage, 0600)
+		if err != nil {
+			m.logger.Error("failed to write backup message to file", zap.Error(err), zap.String("path", path))
 			return 0, err
 		}
 	}
@@ -246,6 +295,62 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 	}
 
 	return clockInSeconds, nil
+}
+
+func (m *Messenger) importLocalBackupFile(filePath string) (*MessengerResponse, error) {
+	if !m.config.featureFlags.EnableLocalBackup {
+		return nil, nil
+	}
+
+	// Make sure the backup file exists
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decrypt the backup file
+	// Unmarshal the content to get the message spec
+	var messageSpec encryption.ProtocolMessage
+	err = proto.Unmarshal(content, &messageSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decrypt the payload
+	var defaultMessageID = []byte("default")
+	decryptedPayload1, err := m.encryptor.HandleMessage(m.identity, &m.identity.PublicKey, &messageSpec, defaultMessageID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the decrypted payload to get the backup message
+	var backupMessage protobuf.Backup
+	err = proto.Unmarshal(decryptedPayload1.DecryptedMessage, &backupMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle the backup
+	state := ReceivedMessageState{
+		Response: &MessengerResponse{},
+		AllChats: &chatMap{},
+		AllContacts: &contactMap{
+			me: m.selfContact,
+		},
+		Timesource:            m.getTimesource(),
+		ModifiedContacts:      &stringBoolMap{},
+		ModifiedInstallations: &stringBoolMap{},
+	}
+	err = m.HandleBackup(
+		&state,
+		&backupMessage,
+		&v1protocol.StatusMessage{},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.saveDataAndPrepareResponse(&state)
 }
 
 func (m *Messenger) encodeAndDispatchBackupMessage(ctx context.Context, message *protobuf.Backup, chatID string) error {
@@ -447,7 +552,7 @@ func (m *Messenger) buildSyncContactMessage(contact *Contact) *protobuf.SyncInst
 	}
 }
 
-func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobuf.Backup, error) {
+func (m *Messenger) backupProfile(ctx context.Context, clock uint64) (*protobuf.Backup, error) {
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
 		return nil, err
@@ -515,9 +620,7 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 		},
 	}
 
-	backupMessages := []*protobuf.Backup{backupMessage}
-
-	return backupMessages, nil
+	return backupMessage, nil
 }
 
 func (m *Messenger) backupKeypairs() ([]*protobuf.Backup, error) {

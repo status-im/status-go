@@ -94,6 +94,7 @@ type config struct {
 	clusterConfig          params.ClusterConfig
 	browserDatabase        *browsers.Database
 	torrentConfig          *params.TorrentConfig
+	backupConfig           *params.BackupConfig
 	walletService          *wallet.Service
 	communityTokensService communities.CommunityTokensServiceInterface
 	httpServer             *server.MediaServer
@@ -427,6 +428,14 @@ func WithAccountsFeed(feed *event.Feed) Option {
 func WithNewsFeed() func(c *config) error {
 	return func(c *config) error {
 		c.featureFlags.EnableNewsFeed = true
+		return nil
+	}
+}
+
+func WithLocalBackup(bc *params.BackupConfig) func(c *config) error {
+	return func(c *config) error {
+		c.featureFlags.EnableLocalBackup = true
+		c.backupConfig = bc
 		return nil
 	}
 }

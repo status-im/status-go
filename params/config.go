@@ -395,6 +395,8 @@ type NodeConfig struct {
 
 	TorrentConfig TorrentConfig
 
+	BackupConfig BackupConfig
+
 	// RegisterTopics a list of specific topics where the peer wants to be
 	// discoverable.
 	RegisterTopics []discv5.Topic `json:"RegisterTopics"`
@@ -595,6 +597,12 @@ type TorrentConfig struct {
 	TorrentDir string
 }
 
+// BackupConfig provides configuration for the local backups
+type BackupConfig struct {
+	// DataDir is the file system folder Status should use for storing local backups.
+	DataDir string
+}
+
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
 func (c *ShhextConfig) Validate(validate *validator.Validate) error {
 	if err := validate.Struct(c); err != nil {
@@ -733,6 +741,10 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 		if c.TorrentConfig.TorrentDir == "" {
 			c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, TorrentTorrentsRelativePath)
 		}
+	}
+
+	c.BackupConfig = BackupConfig{
+		DataDir: filepath.Join(c.RootDataDir, BackupsRelativePath),
 	}
 
 	return c.setDefaultPushNotificationsServers()
