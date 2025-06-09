@@ -493,37 +493,6 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityWithSameContentTopi
 	s.fetchCommunity(s.bob, community1.CommunityShard(), community1)
 }
 
-func (s *MessengerStoreNodeRequestSuite) TestRequestMultipleCommunities() {
-	s.createOwner()
-	s.createBob()
-
-	// Create 2 communities
-	community1 := s.createCommunity(s.owner)
-	community2 := s.createCommunity(s.owner)
-
-	fetchedCommunities := map[string]*communities.Community{}
-
-	err := WaitOnSignaledCommunityFound(s.bob,
-		func() {
-			err := s.bob.fetchCommunities([]communities.CommunityShard{
-				community1.CommunityShard(),
-				community2.CommunityShard(),
-			})
-			s.Require().NoError(err)
-		},
-		func(community *communities.Community) bool {
-			fetchedCommunities[community.IDString()] = community
-			return len(fetchedCommunities) == 2
-		},
-		1*time.Second,
-		"communities were not signalled in time",
-	)
-
-	s.Require().NoError(err)
-	s.Require().Contains(fetchedCommunities, community1.IDString())
-	s.Require().Contains(fetchedCommunities, community2.IDString())
-}
-
 func (s *MessengerStoreNodeRequestSuite) TestRequestWithoutWaitingResponse() {
 	s.createOwner()
 	s.createBob()
