@@ -237,6 +237,8 @@ func (m *StoreNodeRequestManager) newStoreNodeRequest(ctx context.Context) *stor
 // getFilter checks if a filter for a given community is already created and creates one of not found.
 // Returns the found/created filter, a flag if the filter was created by the function and an error.
 func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, dataID string, shard *wakuv2.Shard) (*messagingtypes.ChatFilter, bool, error) {
+	m.logger.Debug("<<< getFilter", zap.Any("requestType", requestType), zap.Any("dataID", dataID), zap.Any("shard", shard))
+
 	// First check if such filter already exists.
 	filter := m.messenger.messaging.ChatFilterByChatID(dataID)
 	if filter != nil {
@@ -264,6 +266,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 		}
 
 		filter = filters[0]
+		m.logger.Debug("<<< installed filter", zap.Int("count", len(filters)), zap.Any("filter", filter))
 	case storeNodeContactRequest:
 		publicKeyBytes, err := types.DecodeHex(dataID)
 		if err != nil {
@@ -285,12 +288,14 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 	}
 
 	filter.Ephemeral = true
+	m.logger.Debug("<<< marked filter as ephemeral", zap.Any("filter", filter))
 
 	return filter, true, nil
 }
 
 // forgetFilter uninstalls the given filter
 func (m *StoreNodeRequestManager) forgetFilter(filter *messagingtypes.ChatFilter) {
+	m.logger.Debug("<<< forgetFilter", zap.Any("filter", filter))
 	err := m.messenger.messaging.RemoveFilters(messagingtypes.ChatFilters{filter})
 	if err != nil {
 		m.logger.Warn("failed to remove filter", zap.Error(err))

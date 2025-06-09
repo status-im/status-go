@@ -221,6 +221,7 @@ func (m *Messenger) syncChatWithFilters(peerInfo peer.AddrInfo, chatID string) (
 }
 
 func (m *Messenger) syncBackup() error {
+	m.logger.Debug("<<< syncBackup")
 
 	filter := m.messaging.PersonalTopicFilter()
 	if filter == nil {
@@ -399,6 +400,8 @@ func getPrioritizedBatches() []int {
 }
 
 func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtypes.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
+	m.logger.Debug("<<< syncFiltersFrom", zap.Any("filters", filters), zap.Uint32("lastRequest", lastRequest))
+
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return nil, err
@@ -676,6 +679,8 @@ func (m *Messenger) processMailserverBatchWithOptions(peerInfo peer.AddrInfo, ba
 }
 
 func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
+	m.logger.Debug("<<< syncing chat from synced from", zap.String("chatID", chatID))
+
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return 0, ErrChatNotFound
@@ -739,6 +744,8 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 }
 
 func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
+	m.logger.Debug("<<< filling gaps", zap.String("chatID", chatID), zap.Int("messageIDs", len(messageIDs)))
+
 	messages, err := m.persistence.MessagesByIDs(messageIDs)
 	if err != nil {
 		return err
