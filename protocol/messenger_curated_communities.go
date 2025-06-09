@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/communities"
@@ -143,8 +144,11 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 		})
 	}
 
+	m.shutdownWaitGroup.Add(1)
+
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		m.logger.Debug("fetching unknown curated communities")
 
 		for _, community := range unknownCommunities {
