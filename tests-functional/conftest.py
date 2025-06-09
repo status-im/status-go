@@ -116,6 +116,8 @@ def pytest_report_header(config):
     return [
         f"waku fleets config file: {config.option.waku_fleets_config}",
         f"waku fleet: {config.option.waku_fleet}",
+        f"push fleets config file: {config.option.push_fleets_config}",
+        f"disable override networks: {config.option.disable_override_networks}",
     ]
 
 
