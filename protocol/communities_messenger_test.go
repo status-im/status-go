@@ -3633,6 +3633,7 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 		encodedPayload,
 		protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		s.owner.identity,
+		nil,
 	)
 	s.Require().NoError(err)
 

@@ -4325,7 +4325,7 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 		if err != nil {
 			return nil, err
 		}
-		wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, c.PrivateKey())
+		wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, c.PrivateKey(), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -4359,7 +4359,7 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 			return nil, err
 		}
 
-		wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, c.PrivateKey())
+		wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, c.PrivateKey(), nil)
 		if err != nil {
 			return nil, err
 		}

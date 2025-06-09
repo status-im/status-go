@@ -2270,7 +2270,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			syncMessageType = peersyncing.SyncMessagePrivateGroup
 		}
 
-		wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender)
+		wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender, nil)
 		if err != nil {
 			return errors.Wrap(err, "failed to wrap message")
 		}
