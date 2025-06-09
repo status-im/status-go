@@ -46,7 +46,7 @@ func (m *Messenger) {{.MethodName}}(messageState *ReceivedMessageState, protoByt
 		return err
 	}
 
-	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.ApplicationLayer.Type, p)
+	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic(), filter.ChatID(), msg.ApplicationLayer.Type, p)
 
 	return m.Handle{{.ProtobufName}}(messageState, p, msg{{ if .FromArchiveArg }}, fromArchive {{ end }})
 	{{ end }}

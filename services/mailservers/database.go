@@ -338,12 +338,12 @@ func (d *Database) SetTopics(filters messagingtypes.ChatFilters) (err error) {
 
 	contentTopicsPerPubsubTopic := make(map[string]map[string]struct{})
 	for _, filter := range filters {
-		contentTopics, ok := contentTopicsPerPubsubTopic[filter.PubsubTopic]
+		contentTopics, ok := contentTopicsPerPubsubTopic[filter.PubsubTopic()]
 		if !ok {
 			contentTopics = make(map[string]struct{})
 		}
-		contentTopics[filter.ContentTopic.String()] = struct{}{}
-		contentTopicsPerPubsubTopic[filter.PubsubTopic] = contentTopics
+		contentTopics[filter.ContentTopic().String()] = struct{}{}
+		contentTopicsPerPubsubTopic[filter.PubsubTopic()] = contentTopics
 	}
 
 	for pubsubTopic, contentTopics := range contentTopicsPerPubsubTopic {
@@ -366,12 +366,12 @@ func (d *Database) SetTopics(filters messagingtypes.ChatFilters) (err error) {
 	for _, filter := range filters {
 		// fetch
 		var topic string
-		err = tx.QueryRow(`SELECT topic FROM mailserver_topics WHERE topic = ? AND pubsub_topic = ?`, filter.ContentTopic.String(), filter.PubsubTopic).Scan(&topic)
+		err = tx.QueryRow(`SELECT topic FROM mailserver_topics WHERE topic = ? AND pubsub_topic = ?`, filter.ContentTopic().String(), filter.PubsubTopic()).Scan(&topic)
 		if err != nil && err != sql.ErrNoRows {
 			return
 		} else if err == sql.ErrNoRows {
 			// we insert the topic
-			_, err = tx.Exec(`INSERT INTO mailserver_topics(topic,pubsub_topic,last_request,discovery,negotiated) VALUES (?,?,?,?,?)`, filter.ContentTopic.String(), filter.PubsubTopic, lastRequest, filter.Discovery, filter.Negotiated)
+			_, err = tx.Exec(`INSERT INTO mailserver_topics(topic,pubsub_topic,last_request,discovery,negotiated) VALUES (?,?,?,?,?)`, filter.ContentTopic().String(), filter.PubsubTopic(), lastRequest, filter.IsDiscovery(), filter.IsNegotiated())
 		}
 		if err != nil {
 			return

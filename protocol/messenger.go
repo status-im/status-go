@@ -972,7 +972,7 @@ func (m *Messenger) cleanTopics() error {
 	}
 	var filters messagingtypes.ChatFilters
 	for _, f := range m.messaging.ChatFilters() {
-		if f.Listen && !f.Ephemeral {
+		if f.IsListening() && !f.IsEphemeral() {
 			filters = append(filters, f)
 		}
 	}
@@ -3354,7 +3354,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
 
-			if controlledCommunitiesChatIDs[filter.ChatID] && storeWakuMessages {
+			if controlledCommunitiesChatIDs[filter.ChatID()] && storeWakuMessages {
 				logger.Debug("storing waku message")
 				err := m.communitiesManager.StoreWakuMessage(shhMessage)
 				if err != nil {
