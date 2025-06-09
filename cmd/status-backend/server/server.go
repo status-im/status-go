@@ -86,7 +86,7 @@ func (s *Server) signalHandler(data []byte) {
 	}
 }
 
-func (s *Server) Listen(address string, ) error {
+func (s *Server) Listen(address string) error {
 	if s.server != nil {
 		return errors.New("server already started")
 	}
