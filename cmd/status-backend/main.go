@@ -19,8 +19,9 @@ import (
 )
 
 var (
-	address = flag.String("address", "127.0.0.1:0", "host:port to listen")
-	logger  = log.New("package", "status-go/cmd/status-backend")
+	address      = flag.String("address", "127.0.0.1:0", "host:port to listen")
+	pprofEnabled = flag.Bool("pprof", false, "enable pprof")
+	logger       = log.New("package", "status-go/cmd/status-backend")
 )
 
 func init() {
@@ -44,7 +45,9 @@ func main() {
 	flag.Parse()
 	go handleInterrupts()
 
-	srv := server.NewServer()
+	srv := server.NewServer(
+		server.WithProfiling(*pprofEnabled),
+	)
 	srv.Setup()
 
 	err := srv.Listen(*address)
