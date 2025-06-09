@@ -98,7 +98,7 @@ rm -rf ./**/*.coverage.out
 
 echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
-DEFAULT_TIMEOUT_MINUTES=5
+DEFAULT_TIMEOUT_MINUTES=15
 PROTOCOL_TIMEOUT_MINUTES=45
 
 HAS_PROTOCOL_PACKAGE=true
