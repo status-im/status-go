@@ -45,6 +45,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 				// Immediate execution on first run, then set to regular interval
 				interval = curatedCommunitiesUpdateInterval
 
+				logger.Debug("updating curated communities")
 				curatedCommunities, err := m.getCuratedCommunitiesFromContract()
 				if err != nil {
 					interval = communitiesUpdateFailureInterval
@@ -144,7 +145,17 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 
 	go func() {
 		defer gocommon.LogOnPanic()
-		_ = m.fetchCommunities(unknownCommunities)
+		m.logger.Debug("fetching unknown curated communities")
+
+		for _, community := range unknownCommunities {
+			_, _, err := m.storeNodeRequestsManager.FetchCommunity(m.ctx, community, nil)
+			if err != nil {
+				m.logger.Error("failed to fetch curated community",
+					zap.String("communityID", community.CommunityID),
+					zap.Error(err),
+				)
+			}
+		}
 	}()
 
 	return response, nil
