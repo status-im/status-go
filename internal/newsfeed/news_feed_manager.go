@@ -11,7 +11,7 @@ import (
 )
 
 const STATUS_DESKTOP_FEED_URL = "https://status.app/desktop-news/rss"
-const STATUS_MOBILE_FEED_URL = "https://status.app/mobile-news/rss"
+const STATUS_MOBILE_FEED_URL = "https://vkjr.github.io/status-mobile-rss-feed-test/rss.xml"
 
 type FeedParser interface {
 	ParseURL(url string) (*gofeed.Feed, error)
