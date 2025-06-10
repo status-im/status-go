@@ -109,7 +109,6 @@ func NewService(
 	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountFeed, accountsDB, token.NewPersistence(db))
 
 	cryptoOnRampProviders := []onramp.Provider{
-		onramp.NewRampProvider(),
 		onramp.NewMoonPayProvider(),
 	}
 
