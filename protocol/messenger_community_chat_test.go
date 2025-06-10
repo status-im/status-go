@@ -61,7 +61,7 @@ func (s *MessengerCommunityChatsUnitSuite) TestCreateCommunityChat_GlobalCommuni
 	// Verify the global community content topic filter is still set after creating the chat
 	universalChatFilterAfter := s.m.messaging.ChatFilterByChatID(community.UniversalChatID())
 	s.Require().NotNil(universalChatFilterAfter, "Global community content topic filter should remain set after creating community chat")
-	s.Require().Equal(universalChatFilter.FilterID, universalChatFilterAfter.FilterID, "Global community content topic filter should remain the same")
+	s.Require().Equal(universalChatFilter.FilterID(), universalChatFilterAfter.FilterID(), "Global community content topic filter should remain the same")
 }
 
 func (s *MessengerCommunityChatsUnitSuite) TestEditCommunityChat_GlobalCommunityContentTopicFilterSet() {
@@ -121,7 +121,7 @@ func (s *MessengerCommunityChatsUnitSuite) TestEditCommunityChat_GlobalCommunity
 	// Verify the global community content topic filter is still set after editing the chat
 	universalChatFilterAfter := s.m.messaging.ChatFilterByChatID(community.UniversalChatID())
 	s.Require().NotNil(universalChatFilterAfter, "Global community content topic filter should remain set after editing community chat")
-	s.Require().Equal(universalChatFilter.FilterID, universalChatFilterAfter.FilterID, "Global community content topic filter should remain the same")
+	s.Require().Equal(universalChatFilter.FilterID(), universalChatFilterAfter.FilterID(), "Global community content topic filter should remain the same")
 }
 
 func (s *MessengerCommunityChatsUnitSuite) TestProcessCommunityChat_HandlesUnreadMessagesWithCacheMiss() {
