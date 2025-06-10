@@ -127,34 +127,6 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, community 
 	return requestCommunity(community.CommunityID, communityShard)
 }
 
-// FetchCommunities makes a FetchCommunity for each element in given `communities` list.
-// For each successfully fetched community, a `CommunityFound` event will be emitted. Ability to subscribe
-// to results is not provided, because it's not needed and would complicate the code. `FetchCommunity` can
-// be called directly if such functionality is needed.
-//
-// This function intentionally doesn't fetch multiple content topics in a single store node request. For now
-// FetchCommunities is only used for regular (once in 2 minutes) fetching of curated communities. If one of
-// those content topics is spammed with to many envelopes, then on each iteration we will have to fetch all
-// of this spam first to get the envelopes in other content topics. To avoid this we keep independent requests
-// for each content topic.
-func (m *StoreNodeRequestManager) FetchCommunities(ctx context.Context, communities []communities.CommunityShard, opts []StoreNodeRequestOption) error {
-	m.logger.Info("requesting communities from store node", zap.Any("communities", communities))
-
-	// when fetching multiple communities we don't wait for the response
-	opts = append(opts, WithWaitForResponseOption(false))
-
-	var outErr error
-
-	for _, community := range communities {
-		_, _, err := m.FetchCommunity(ctx, community, opts)
-		if err != nil {
-			outErr = fmt.Errorf("%sfailed to create a request for community %s: %w", outErr, gocommon.TruncateWithDot(community.CommunityID), err)
-		}
-	}
-
-	return outErr
-}
-
 // FetchContact - similar to FetchCommunity
 // If a `nil` contact and a `nil` error are returned, it means that the contact wasn't found at the store node.
 func (m *StoreNodeRequestManager) FetchContact(ctx context.Context, contactID string, opts []StoreNodeRequestOption) (*Contact, StoreNodeRequestStats, error) {

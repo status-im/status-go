@@ -3248,12 +3248,6 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 	return community, err
 }
 
-// fetchCommunities installs filter for community and requests its details from store node.
-// When response received it will be passed through signals handler.
-func (m *Messenger) fetchCommunities(communities []communities.CommunityShard) error {
-	return m.storeNodeRequestsManager.FetchCommunities(m.ctx, communities, []StoreNodeRequestOption{})
-}
-
 // passStoredCommunityInfoToSignalHandler calls signal handler with community info
 func (m *Messenger) passStoredCommunityInfoToSignalHandler(community *communities.Community) {
 	if m.config.messengerSignalsHandler == nil {
