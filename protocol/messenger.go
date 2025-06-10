@@ -898,7 +898,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	if m.config.featureFlags.EnableNewsFeed {
-		lastFetched, err := m.settings.NewsFeedLastFetchedTimestamp()
+		//lastFetched, err := m.settings.NewsFeedLastFetchedTimestamp()
 		if err != nil {
 			return nil, err
 		}
@@ -913,8 +913,8 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 			newsfeed.WithParser(gofeed.NewParser()),
 			newsfeed.WithHandler(m),
 			newsfeed.WithLogger(m.logger),
-			newsfeed.WithPollingInterval(30*time.Minute),
-			newsfeed.WithFetchFrom(lastFetched),
+			newsfeed.WithPollingInterval(10*time.Second),
+			newsfeed.WithFetchFrom(time.Now().Add(-5*time.Hour).UTC()),
 		)
 
 		newsFeedEnabled, err := m.IsNewsFeedEnabled()
