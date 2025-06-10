@@ -35,18 +35,21 @@ func FromTransportFilter(filter *transport.Filter) *types.ChatFilter {
 	if filter == nil {
 		return nil
 	}
-	return &types.ChatFilter{
-		ChatID:       filter.ChatID,
-		FilterID:     filter.FilterID,
-		Identity:     filter.Identity,
-		PubsubTopic:  filter.PubsubTopic,
-		ContentTopic: FromWakuTopic(filter.ContentTopic),
-		Discovery:    filter.Discovery,
-		Negotiated:   filter.Negotiated,
-		Listen:       filter.Listen,
-		Ephemeral:    filter.Ephemeral,
-		Priority:     filter.Priority,
-	}
+
+	return types.NewChatFilter(
+		&types.ChatFilterConfig{
+			ChatID:       filter.ChatID,
+			FilterID:     filter.FilterID,
+			Identity:     filter.Identity,
+			PubsubTopic:  filter.PubsubTopic,
+			ContentTopic: FromWakuTopic(filter.ContentTopic),
+			Discovery:    filter.Discovery,
+			Negotiated:   filter.Negotiated,
+			Listen:       filter.Listen,
+			Ephemeral:    filter.Ephemeral,
+			Priority:     filter.Priority,
+		},
+	)
 }
 
 func FromTransportFilters(filters []*transport.Filter) types.ChatFilters {
@@ -59,16 +62,16 @@ func FromTransportFilters(filters []*transport.Filter) types.ChatFilters {
 
 func ToTransportFilter(c *types.ChatFilter) *transport.Filter {
 	return &transport.Filter{
-		ChatID:       c.ChatID,
-		FilterID:     c.FilterID,
-		Identity:     c.Identity,
-		PubsubTopic:  c.PubsubTopic,
-		ContentTopic: ToWakuTopic(c.ContentTopic),
-		Discovery:    c.Discovery,
-		Negotiated:   c.Negotiated,
-		Listen:       c.Listen,
-		Ephemeral:    c.Ephemeral,
-		Priority:     c.Priority,
+		ChatID:       c.ChatID(),
+		FilterID:     c.FilterID(),
+		Identity:     c.Identity(),
+		PubsubTopic:  c.PubsubTopic(),
+		ContentTopic: ToWakuTopic(c.ContentTopic()),
+		Discovery:    c.IsDiscovery(),
+		Negotiated:   c.IsNegotiated(),
+		Listen:       c.IsListening(),
+		Ephemeral:    c.IsEphemeral(),
+		Priority:     c.Priority(),
 	}
 }
 

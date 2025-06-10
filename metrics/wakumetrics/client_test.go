@@ -71,11 +71,13 @@ func TestClient_DoubleRegister(t *testing.T) {
 func TestClient_PushReceivedMessages(t *testing.T) {
 	client := createTestClient(t)
 
-	filter := messagingtypes.ChatFilter{
-		PubsubTopic:  "test-pubsub",
-		ContentTopic: messagingtypes.StringToContentTopic("test-content"),
-		ChatID:       "test-chat",
-	}
+	filter := *messagingtypes.NewChatFilter(
+		&messagingtypes.ChatFilterConfig{
+			PubsubTopic:  "test-pubsub",
+			ContentTopic: messagingtypes.StringToContentTopic("test-content"),
+			ChatID:       "test-chat",
+		},
+	)
 
 	shhMessage := createTestMessage("test-pubsub", messagingtypes.StringToContentTopic("test-content"), []byte("test-payload"))
 
@@ -89,9 +91,9 @@ func TestClient_PushReceivedMessages(t *testing.T) {
 
 	// Verify MessagesReceivedTotal metric
 	value := getCounterValue(metrics.MessagesReceivedTotal,
-		filter.PubsubTopic,
-		filter.ContentTopic.String(),
-		filter.ChatID,
+		filter.PubsubTopic(),
+		filter.ContentTopic().String(),
+		filter.ChatID(),
 	)
 	require.Equal(t, float64(1), value)
 }

@@ -675,7 +675,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFiltersNotRemoved() {
 	filterAfter := s.owner.messaging.ChatFilterByChatID(community.IDString())
 	s.Require().NotNil(filterAfter)
 
-	s.Require().Equal(filterBefore.FilterID, filterAfter.FilterID)
+	s.Require().Equal(filterBefore.FilterID(), filterAfter.FilterID())
 }
 
 func (s *MessengerStoreNodeRequestSuite) TestFiltersRemoved() {

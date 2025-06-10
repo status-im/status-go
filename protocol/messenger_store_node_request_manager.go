@@ -183,9 +183,9 @@ func (m *StoreNodeRequestManager) subscribeToRequest(ctx context.Context, reques
 
 		request = m.newStoreNodeRequest(ctx)
 		request.config = cfg
-		request.pubsubTopic = filter.PubsubTopic
+		request.pubsubTopic = filter.PubsubTopic()
 		request.requestID = requestID
-		request.contentTopic = filter.ContentTopic
+		request.contentTopic = filter.ContentTopic()
 		if filterCreated {
 			request.filterToForget = filter
 		}
@@ -256,7 +256,10 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 		return nil, false, fmt.Errorf("invalid store node request type: %d", requestType)
 	}
 
-	filter.Ephemeral = true
+	err := m.messenger.messaging.UpdateFilterEphemerality(filter.ChatID(), true)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to update filter: %w", err)
+	}
 
 	return filter, true, nil
 }
