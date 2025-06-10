@@ -247,7 +247,7 @@ func (m *ArchiveManager) GetCommunityChatsTopics(communityID types.HexBytes) ([]
 
 	topics := []messagingtypes.ContentTopic{}
 	for _, filter := range filters {
-		topics = append(topics, filter.ContentTopic)
+		topics = append(topics, filter.ContentTopic())
 	}
 
 	return topics, nil
@@ -278,7 +278,7 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 	topics := []messagingtypes.ContentTopic{}
 
 	for _, filter := range filters {
-		topics = append(topics, filter.ContentTopic)
+		topics = append(topics, filter.ContentTopic())
 	}
 
 	lastArchiveEndDateTimestamp, err := m.getLastMessageArchiveEndDate(communityID)
@@ -358,7 +358,7 @@ func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, 
 			// adding the content-topic used for member updates.
 			// since member updates would not be too frequent i.e only addition/deletion would add a new message,
 			// this shouldn't cause too much increase in size of archive generated.
-			topics = append(topics, m.messaging.ChatFilterByChatID(community.UniversalChatID()).ContentTopic)
+			topics = append(topics, m.messaging.ChatFilterByChatID(community.UniversalChatID()).ContentTopic())
 
 			ts := time.Now().Unix()
 			to := time.Unix(ts, 0)

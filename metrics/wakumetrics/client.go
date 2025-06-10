@@ -75,9 +75,9 @@ func (c *Client) SetDeviceType(deviceType string) {
 
 func (c *Client) PushReceivedMessages(receivedMessages ReceivedMessages) {
 	metrics.MessagesReceivedTotal.WithLabelValues(
-		receivedMessages.Filter.PubsubTopic,
-		receivedMessages.Filter.ContentTopic.String(),
-		receivedMessages.Filter.ChatID,
+		receivedMessages.Filter.PubsubTopic(),
+		receivedMessages.Filter.ContentTopic().String(),
+		receivedMessages.Filter.ChatID(),
 	).Add(float64(len(receivedMessages.Messages)))
 }
 

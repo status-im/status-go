@@ -205,10 +205,10 @@ func (m *Messenger) topicsForChat(chatID string) (string, []messagingtypes.Conte
 	var contentTopics []messagingtypes.ContentTopic
 
 	for _, filter := range filters {
-		contentTopics = append(contentTopics, filter.ContentTopic)
+		contentTopics = append(contentTopics, filter.ContentTopic())
 	}
 
-	return filters[0].PubsubTopic, contentTopics, nil
+	return filters[0].PubsubTopic(), contentTopics, nil
 }
 
 func (m *Messenger) syncChatWithFilters(peerInfo peer.AddrInfo, chatID string) (*MessengerResponse, error) {
@@ -236,8 +236,8 @@ func (m *Messenger) syncBackup() error {
 
 	from, to := m.calculateMailserverTimeBounds(oneMonthDuration)
 
-	batch := messagingtypes.StoreNodeBatch{From: from, To: to, Topics: []messagingtypes.ContentTopic{filter.ContentTopic}}
-	ms := m.getCommunityStorenode(filter.ChatID)
+	batch := messagingtypes.StoreNodeBatch{From: from, To: to, Topics: []messagingtypes.ContentTopic{filter.ContentTopic()}}
+	ms := m.getCommunityStorenode(filter.ChatID())
 	err = m.processMailserverBatch(ms, batch)
 	if err != nil {
 		return err
@@ -265,20 +265,30 @@ func (m *Messenger) capToDefaultSyncPeriod(period uint32) (uint32, error) {
 	return period - tolerance, nil
 }
 
-func (m *Messenger) updateFiltersPriority(filters messagingtypes.ChatFilters) {
+func (m *Messenger) updateFiltersPriority(filters messagingtypes.ChatFilters) error {
 	for _, filter := range filters {
-		chatID := filter.ChatID
+		chatID := filter.ChatID()
 		chat := m.Chat(chatID)
 		if chat != nil {
-			filter.Priority = chat.ReadMessagesAtClockValue
+			err := m.messaging.UpdateFilterPriority(chatID, chat.ReadMessagesAtClockValue)
+			if err != nil {
+				return err
+			}
 		}
 	}
+
+	return nil
 }
 
-func (m *Messenger) resetFiltersPriority(filters messagingtypes.ChatFilters) {
+func (m *Messenger) resetFiltersPriority(filters messagingtypes.ChatFilters) error {
 	for _, filter := range filters {
-		filter.Priority = 0
+		err := m.messaging.UpdateFilterPriority(filter.ChatID(), 0)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func (m *Messenger) SplitFiltersByStoreNode(filters messagingtypes.ChatFilters) map[string]messagingtypes.ChatFilters {
@@ -286,7 +296,7 @@ func (m *Messenger) SplitFiltersByStoreNode(filters messagingtypes.ChatFilters) 
 	filtersByMs := make(map[string]messagingtypes.ChatFilters, len(filters))
 	for _, f := range filters {
 		communityID := "" // none by default
-		if chat, ok := m.allChats.Load(f.ChatID); ok && chat.CommunityChat() && m.communityStorenodes.HasStorenodeSetup(chat.CommunityID) {
+		if chat, ok := m.allChats.Load(f.ChatID()); ok && chat.CommunityChat() && m.communityStorenodes.HasStorenodeSetup(chat.CommunityID) {
 			communityID = chat.CommunityID
 		}
 		if _, exists := filtersByMs[communityID]; !exists {
@@ -328,8 +338,16 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 	}
 
 	filters := m.messaging.ChatFilters()
-	m.updateFiltersPriority(filters)
-	defer m.resetFiltersPriority(filters)
+	err = m.updateFiltersPriority(filters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update filters priority: %w", err)
+	}
+	defer func() {
+		err := m.resetFiltersPriority(filters)
+		if err != nil {
+			m.logger.Error("failed to reset filters priority", zap.Error(err))
+		}
+	}()
 
 	filtersByMs := m.SplitFiltersByStoreNode(filters)
 	for communityID, filtersForMs := range filtersByMs {
@@ -424,14 +442,14 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 	var syncedTopics []mailservers.MailserverTopic
 
 	sort.Slice(filters[:], func(i, j int) bool {
-		p1 := filters[i].Priority
-		p2 := filters[j].Priority
+		p1 := filters[i].Priority()
+		p2 := filters[j].Priority()
 		return p1 > p2
 	})
 	prioritizedBatches := getPrioritizedBatches()
 	currentBatch := 0
 
-	if len(filters) == 0 || filters[0].Priority == 0 {
+	if len(filters) == 0 || filters[0].Priority() == 0 {
 		currentBatch = len(prioritizedBatches)
 	}
 
@@ -442,16 +460,16 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 
 	contentTopicsPerPubsubTopic := make(map[string]map[string]*messagingtypes.ChatFilter)
 	for _, filter := range filters {
-		if !filter.Listen || filter.Ephemeral {
+		if !filter.IsListening() || filter.IsEphemeral() {
 			continue
 		}
 
-		contentTopics, ok := contentTopicsPerPubsubTopic[filter.PubsubTopic]
+		contentTopics, ok := contentTopicsPerPubsubTopic[filter.PubsubTopic()]
 		if !ok {
 			contentTopics = make(map[string]*messagingtypes.ChatFilter)
 		}
-		contentTopics[filter.ContentTopic.String()] = filter
-		contentTopicsPerPubsubTopic[filter.PubsubTopic] = contentTopics
+		contentTopics[filter.ContentTopic().String()] = filter
+		contentTopicsPerPubsubTopic[filter.PubsubTopic()] = contentTopics
 	}
 
 	for pubsubTopic, contentTopics := range contentTopicsPerPubsubTopic {
@@ -462,21 +480,21 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 		for _, filter := range contentTopics {
 			var chatID string
 			// If the filter has an identity, we use it as a chatID, otherwise is a public chat/community chat filter
-			if len(filter.Identity) != 0 {
-				chatID = filter.Identity
+			if len(filter.Identity()) != 0 {
+				chatID = filter.Identity()
 			} else {
-				chatID = filter.ChatID
+				chatID = filter.ChatID()
 			}
 
-			topicData, ok := topicsData[fmt.Sprintf("%s-%s", filter.PubsubTopic, filter.ContentTopic)]
+			topicData, ok := topicsData[fmt.Sprintf("%s-%s", filter.PubsubTopic(), filter.ContentTopic())]
 			var capToDefaultSyncPeriod = true
 			if !ok {
 				if lastRequest == 0 {
 					lastRequest = defaultPeriodFromNow
 				}
 				topicData = mailservers.MailserverTopic{
-					PubsubTopic:  filter.PubsubTopic,
-					ContentTopic: filter.ContentTopic.String(),
+					PubsubTopic:  filter.PubsubTopic(),
+					ContentTopic: filter.ContentTopic().String(),
 					LastRequest:  int(defaultPeriodFromNow),
 				}
 			} else if lastRequest != 0 {
@@ -520,7 +538,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 
 			batch.ChatIDs = append(batch.ChatIDs, chatID)
 			batch.PubsubTopic = pubsubTopic
-			batch.Topics = append(batch.Topics, filter.ContentTopic)
+			batch.Topics = append(batch.Topics, filter.ContentTopic())
 			batches[pubsubTopic][batchID] = batch
 
 			// Set last request to the new `to`

@@ -3942,7 +3942,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			topics := []messagingtypes.ContentTopic{}
 
 			for _, filter := range filters {
-				topics = append(topics, filter.ContentTopic)
+				topics = append(topics, filter.ContentTopic())
 			}
 
 			filters = append(filters, m.messaging.ChatFilterByChatID(c.UniversalChatID()))
@@ -4400,7 +4400,7 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 		wakuMessage := &messagingtypes.ReceivedMessage{
 			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
 			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
-			Topic:        filter.ContentTopic,
+			Topic:        filter.ContentTopic(),
 			Payload:      wrappedPayload,
 			Padding:      []byte{1},
 			Hash:         hash[:],
@@ -4431,7 +4431,7 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 		wakuMessage := &messagingtypes.ReceivedMessage{
 			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
 			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
-			Topic:        filter.ContentTopic,
+			Topic:        filter.ContentTopic(),
 			Payload:      wrappedPayload,
 			Padding:      []byte{1},
 			Hash:         hash[:],

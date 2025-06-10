@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -77,6 +78,28 @@ func (a *API) RemoveFilterByChatID(chatID string) (*types.ChatFilter, error) {
 
 func (a *API) ResetChatFilters(ctx context.Context) error {
 	return a.transport.ResetFilters(ctx)
+}
+
+func (a *API) UpdateFilterPriority(chatID string, priority uint64) error {
+	transportFilter := a.transport.FilterByChatID(chatID)
+	if transportFilter == nil {
+		return errors.New("filter not found")
+	}
+
+	transportFilter.Priority = priority
+
+	return nil
+}
+
+func (a *API) UpdateFilterEphemerality(chatID string, ephemeral bool) error {
+	transportFilter := a.transport.FilterByChatID(chatID)
+	if transportFilter == nil {
+		return errors.New("filter not found")
+	}
+
+	transportFilter.Ephemeral = ephemeral
+
+	return nil
 }
 
 func (a *API) ProcessNegotiatedSecret(secret ethtypes.NegotiatedSecret) (*types.ChatFilter, error) {

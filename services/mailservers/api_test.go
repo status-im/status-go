@@ -76,17 +76,21 @@ func TestTopic(t *testing.T) {
 
 	filters := messagingtypes.ChatFilters{
 		// Existing topic, is not updated
-		{
-			PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
-			ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x61}),
-		},
+		messagingtypes.NewChatFilter(
+			&messagingtypes.ChatFilterConfig{
+				PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
+				ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x61}),
+			},
+		),
 		// Non existing topic is not inserted
-		{
-			Discovery:    true,
-			Negotiated:   true,
-			PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
-			ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x64}),
-		},
+		messagingtypes.NewChatFilter(
+			&messagingtypes.ChatFilterConfig{
+				Discovery:    true,
+				Negotiated:   true,
+				PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
+				ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x64}),
+			},
+		),
 	}
 
 	require.NoError(t, db.SetTopics(filters))
