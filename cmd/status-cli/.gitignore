@@ -1,5 +1,0 @@
-log
-*.log
-*.log.gz
-test-*
-status-cli
