@@ -251,9 +251,6 @@ func (m *mockWakuAPI) Post(ctx context.Context, msg wakutypes.NewMessage) ([]byt
 func (m *mockWakuAPI) AddPrivateKey(ctx context.Context, privateKey types.HexBytes) (string, error) {
 	return "", nil
 }
-func (m *mockWakuAPI) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
-	return "", nil
-}
 func (m *mockWakuAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
 	return false, nil
 }

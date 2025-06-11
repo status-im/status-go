@@ -31,7 +31,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
-	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2/common"
@@ -97,46 +96,9 @@ func (api *PublicWakuAPI) NewKeyPair(ctx context.Context) (string, error) {
 	return api.w.NewKeyPair()
 }
 
-// AddPrivateKey imports the given private key.
-func (api *PublicWakuAPI) AddPrivateKey(ctx context.Context, privateKey ethtypes.HexBytes) (string, error) {
-	key, err := crypto.ToECDSA(privateKey)
-	if err != nil {
-		return "", err
-	}
-	return api.w.AddKeyPair(key)
-}
-
-// DeleteKeyPair removes the key with the given key if it exists.
-func (api *PublicWakuAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
-	if ok := api.w.DeleteKeyPair(key); ok {
-		return true, nil
-	}
-	return false, fmt.Errorf("key pair %s not found", key)
-}
-
 // HasKeyPair returns an indication if the node has a key pair that is associated with the given id.
 func (api *PublicWakuAPI) HasKeyPair(ctx context.Context, id string) bool {
 	return api.w.HasKeyPair(id)
-}
-
-// GetPublicKey returns the public key associated with the given key. The key is the hex
-// encoded representation of a key in the form specified in section 4.3.6 of ANSI X9.62.
-func (api *PublicWakuAPI) GetPublicKey(ctx context.Context, id string) (hexutil.Bytes, error) {
-	key, err := api.w.GetPrivateKey(id)
-	if err != nil {
-		return hexutil.Bytes{}, err
-	}
-	return crypto.FromECDSAPub(&key.PublicKey), nil
-}
-
-// GetPrivateKey returns the private key associated with the given key. The key is the hex
-// encoded representation of a key in the form specified in section 4.3.6 of ANSI X9.62.
-func (api *PublicWakuAPI) GetPrivateKey(ctx context.Context, id string) (hexutil.Bytes, error) {
-	key, err := api.w.GetPrivateKey(id)
-	if err != nil {
-		return hexutil.Bytes{}, err
-	}
-	return crypto.FromECDSA(key), nil
 }
 
 // NewSymKey generate a random symmetric key.
@@ -144,18 +106,6 @@ func (api *PublicWakuAPI) GetPrivateKey(ctx context.Context, id string) (hexutil
 // Can be used encrypting and decrypting messages where the key is known to both parties.
 func (api *PublicWakuAPI) NewSymKey(ctx context.Context) (string, error) {
 	return api.w.GenerateSymKey()
-}
-
-// AddSymKey import a symmetric key.
-// It returns an ID that can be used to refer to the key.
-// Can be used encrypting and decrypting messages where the key is known to both parties.
-func (api *PublicWakuAPI) AddSymKey(ctx context.Context, key hexutil.Bytes) (string, error) {
-	return api.w.AddSymKeyDirect([]byte(key))
-}
-
-// GenerateSymKeyFromPassword derive a key from the given password, stores it, and returns its ID.
-func (api *PublicWakuAPI) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
-	return api.w.AddSymKeyFromPassword(passwd)
 }
 
 // HasSymKey returns an indication if the node has a symmetric key associated with the given key.
@@ -166,11 +116,6 @@ func (api *PublicWakuAPI) HasSymKey(ctx context.Context, id string) bool {
 // GetSymKey returns the symmetric key associated with the given id.
 func (api *PublicWakuAPI) GetSymKey(ctx context.Context, id string) (hexutil.Bytes, error) {
 	return api.w.GetSymKey(id)
-}
-
-// DeleteSymKey deletes the symmetric key that is associated with the given id.
-func (api *PublicWakuAPI) DeleteSymKey(ctx context.Context, id string) bool {
-	return api.w.DeleteSymKey(id)
 }
 
 // Post posts a message on the Waku network.
