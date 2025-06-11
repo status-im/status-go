@@ -2,8 +2,6 @@ package types
 
 import (
 	"context"
-
-	"github.com/status-im/status-go/eth-node/types"
 )
 
 // NewMessage represents a new whisper message that is posted through the RPC.
@@ -44,13 +42,6 @@ type Criteria struct {
 // PublicWakuAPI provides the waku RPC service that can be
 // use publicly without security implications.
 type PublicWakuAPI interface {
-	// AddPrivateKey imports the given private key.
-	AddPrivateKey(ctx context.Context, privateKey types.HexBytes) (string, error)
-	// GenerateSymKeyFromPassword derives a key from the given password, stores it, and returns its ID.
-	GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error)
-	// DeleteKeyPair removes the key with the given key if it exists.
-	DeleteKeyPair(ctx context.Context, key string) (bool, error)
-
 	// Post posts a message on the Whisper network.
 	// returns the hash of the message in case of success.
 	Post(ctx context.Context, req NewMessage) ([]byte, error)
