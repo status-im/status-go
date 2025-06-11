@@ -351,9 +351,12 @@ func (s *MessageSender) sendCommunity(
 		rawMessage.Sender = s.identity
 	}
 
-	err := s.wrapPayloadForSDS(rawMessage)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to wrap payload for SDS")
+	var err error
+	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 {
+		err := s.wrapPayloadForSDS(rawMessage)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
+		}
 	}
 
 	messageID, err := s.getMessageID(rawMessage)
@@ -721,8 +724,16 @@ func (s *MessageSender) SendPublic(
 		rawMessage.Sender = s.identity
 	}
 
-	var wrappedMessage []byte
 	var err error
+	s.logger.Debug("SDS: communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)), zap.Any("communityID", rawMessage.CommunityID))
+	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 {
+		err := s.wrapPayloadForSDS(&rawMessage)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
+		}
+	}
+
+	var wrappedMessage []byte
 	if rawMessage.SkipApplicationWrap {
 		wrappedMessage = rawMessage.Payload
 	} else {
@@ -1395,10 +1406,12 @@ func (s *MessageSender) CleanupHashRatchetEncryptedMessages() error {
 
 func (s *MessageSender) wrapPayloadForSDS(rawMessage *RawMessage) error {
 	// Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
+	var err error
 	reliabilityManager, ok := s.reliabilityManagers[types.EncodeHex(rawMessage.CommunityID)]
+	s.logger.Debug("SDS: rmanager lookup", zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)), zap.Bool("exists", ok))
 	if !ok {
 		s.reliabilityManagersMutex.Lock()
-		reliabilityManager, err := sds.NewReliabilityManager(types.EncodeHex(rawMessage.CommunityID))
+		reliabilityManager, err = sds.NewReliabilityManager(types.EncodeHex(rawMessage.CommunityID))
 		if err != nil {
 			return errors.Wrap(err, "SDS: failed to create reliability manager")
 		}
@@ -1413,6 +1426,8 @@ func (s *MessageSender) wrapPayloadForSDS(rawMessage *RawMessage) error {
 		s.reliabilityManagers[types.EncodeHex(rawMessage.CommunityID)] = reliabilityManager
 		s.reliabilityManagersMutex.Unlock()
 	}
+
+	s.logger.Debug("SDS: wrap payload", zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)), zap.Any("communityID", rawMessage.CommunityID))
 
 	// TODO: need the message ID related to Waku or SDS for history retrieval
 	messageID, err := s.getMessageID(rawMessage)
