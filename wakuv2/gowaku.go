@@ -59,7 +59,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -768,18 +767,6 @@ func (w *Waku) CurrentTime() time.Time {
 	return w.timesource.Now()
 }
 
-// APIs returns the RPC descriptors the Waku implementation offers
-func (w *Waku) APIs() []rpc.API {
-	return []rpc.API{
-		{
-			Namespace: Name,
-			Version:   VersionStr,
-			Service:   NewPublicWakuAPI(w),
-			Public:    false,
-		},
-	}
-}
-
 func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
 	return w.envelopeFeed.Send(event)
 }
@@ -1106,8 +1093,7 @@ func (w *Waku) OnNewEnvelope(env *protocol.Envelope) error {
 	return w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 }
 
-// Start implements node.Service, starting the background data propagation thread
-// of the Waku protocol.
+// Starts the background data propagation thread of the Waku protocol.
 func (w *Waku) Start() error {
 	if w.ctx == nil {
 		w.ctx, w.cancel = context.WithCancel(context.Background())
@@ -1465,9 +1451,13 @@ func (w *Waku) setupRelaySubscriptions() error {
 	return nil
 }
 
-// Stop implements node.Service, stopping the background data propagation thread
-// of the Waku protocol.
+// Stops the background data propagation thread of the Waku protocol.
 func (w *Waku) Stop() error {
+	// Never started
+	if w.node == nil {
+		return nil
+	}
+
 	w.cancel()
 
 	w.envelopeCache.Stop()

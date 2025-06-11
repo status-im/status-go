@@ -59,7 +59,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server/pairing/statecontrol"
 	"github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
@@ -67,13 +66,10 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
-	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
 var (
-	// ErrWakuIdentityInjectionFailure injecting whisper identities has failed.
-	ErrWakuIdentityInjectionFailure = errors.New("failed to inject identity into waku")
 	// ErrUnsupportedRPCMethod is for methods not supported by the RPC interface
 	ErrUnsupportedRPCMethod = errors.New("method is unsupported by RPC interface")
 	// ErrRPCClientUnavailable is returned if an RPC client can't be retrieved.
@@ -109,7 +105,6 @@ type GethStatusBackend struct {
 	transactor               *transactions.Transactor
 	connectionState          connection.State
 	appState                 AppState
-	selectedAccountKeyID     string
 	allowAllRPC              bool // used only for tests, disables api method restrictions
 	LocalPairingStateManager *statecontrol.ProcessStateManager
 	centralizedMetrics       *centralizedmetrics.MetricService
@@ -185,11 +180,6 @@ func (b *GethStatusBackend) MessageSigner() communities.MessageSigner {
 	return b.signer
 }
 
-// SelectedAccountKeyID returns a Whisper key ID of the selected chat key pair.
-func (b *GethStatusBackend) SelectedAccountKeyID() string {
-	return b.selectedAccountKeyID
-}
-
 // IsNodeRunning confirm that node is running
 func (b *GethStatusBackend) IsNodeRunning() bool {
 	return b.statusNode.IsRunning()
@@ -203,6 +193,10 @@ func (b *GethStatusBackend) StartNode(config *params.NodeConfig) error {
 		signal.SendNodeCrashed(err)
 		return err
 	}
+
+	// Set initial connection state
+	b.statusNode.ConnectionChanged(b.connectionState)
+
 	return nil
 }
 
@@ -830,9 +824,9 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 			return errors.Wrap(err, "failed to get selected chat account")
 		}
 
-		err = b.injectAccountsIntoServices()
+		err = b.initProtocol()
 		if err != nil {
-			return errors.Wrap(err, "failed to inject accounts into services")
+			return errors.Wrap(err, "failed to init protocol")
 		}
 	}
 
@@ -943,7 +937,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 			return err
 		}
 
-		err = b.injectAccountsIntoServices()
+		err = b.initProtocol()
 		if err != nil {
 			return err
 		}
@@ -2251,7 +2245,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	// Handle a case when a node is stopped and resumed.
 	// If there is no account selected, an error is returned.
 	if _, err := b.accountsManager.SelectedChatAccount(); err == nil {
-		if err := b.injectAccountsIntoServices(); err != nil {
+		if err := b.initProtocol(); err != nil {
 			return err
 		}
 	} else if err != accsmanagement.ErrNoAccountSelected {
@@ -2608,7 +2602,6 @@ func (b *GethStatusBackend) switchToPreLoginLog() error {
 
 // cleanupServices stops parts of services that aren't managed by a node and removes injected data from services.
 func (b *GethStatusBackend) cleanupServices() error {
-	b.selectedAccountKeyID = ""
 	if b.statusNode == nil {
 		return nil
 	}
@@ -2662,7 +2655,7 @@ func (b *GethStatusBackend) SelectAccount(loginParams LoginParams) error {
 		b.account = loginParams.MultiAccount
 	}
 
-	if err := b.injectAccountsIntoServices(); err != nil {
+	if err := b.initProtocol(); err != nil {
 		return err
 	}
 
@@ -2690,7 +2683,12 @@ func (b *GethStatusBackend) LocalPairingStarted() error {
 	return accountDB.MnemonicWasShown()
 }
 
-func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyManager, st *ext.Service) error {
+func (b *GethStatusBackend) initProtocol() error {
+	st := b.statusNode.WakuV2ExtService()
+	if st == nil {
+		return nil
+	}
+
 	chatAccount, err := b.accountsManager.SelectedChatAccount()
 	if err != nil {
 		return err
@@ -2703,23 +2701,13 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyMan
 		return err
 	}
 
-	if err := w.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
-		return err
-	}
-	b.selectedAccountKeyID, err = w.AddKeyPair(identity)
-	if err != nil {
-		return ErrWakuIdentityInjectionFailure
-	}
-
 	if st != nil {
 		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.walletDB,
 			b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountsManager, b.statusNode.RPCClient(),
-			b.statusNode.WalletService(), b.statusNode.CommunityTokensService(), b.statusNode.WakuV2Service(),
-			logutils.ZapLogger(), b.statusNode.AccountsPublisher()); err != nil {
+			b.statusNode.WalletService(), b.statusNode.CommunityTokensService(),
+			logutils.ZapLogger(), b.statusNode.AccountsPublisher(), b.statusNode.TimeSource()); err != nil {
 			return err
 		}
-		// Set initial connection state
-		st.ConnectionChanged(b.connectionState)
 
 		messenger := st.Messenger()
 		// Init public status api
@@ -2752,19 +2740,6 @@ func (b *GethStatusBackend) KeyUID() string {
 		return m.KeyUID()
 	}
 	return ""
-}
-
-func (b *GethStatusBackend) injectAccountsIntoServices() error {
-	if b.statusNode.WakuV2Service() != nil {
-		return b.injectAccountsIntoWakuService(b.statusNode.WakuV2Service(), func() *ext.Service {
-			if b.statusNode.WakuV2ExtService() == nil {
-				return nil
-			}
-			return b.statusNode.WakuV2ExtService().Service
-		}())
-	}
-
-	return nil
 }
 
 // ExtractGroupMembershipSignatures extract signatures from tuples of content/signature

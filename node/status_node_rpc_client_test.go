@@ -189,7 +189,7 @@ func TestNodeRPCPrivateClientCallPrivateService(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	result, err := statusNode.CallPrivateRPC(`{"jsonrpc": "2.0", "id": 1, "method": "waku_info"}`)
+	result, err := statusNode.CallPrivateRPC(`{"jsonrpc": "2.0", "id": 1, "method": "wakuext_echo", "params": ["hello"]}`)
 	require.NoError(t, err)
 
 	// the call is successful
