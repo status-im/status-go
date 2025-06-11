@@ -2027,6 +2027,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, err
 		}
 
+		fmt.Println("------------ dispatchMessage 1")
 		rawMessage.CommunityID, err = types.DecodeHex(chat.CommunityID)
 		if err != nil {
 			return rawMessage, err
@@ -2038,6 +2039,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 				return rawMessage, err
 			}
 		} else {
+			fmt.Println("------------ dispatchMessage 2")
 			if isChannelEncrypted {
 				rawMessage.HashRatchetGroupID = []byte(chat.ID)
 			} else {

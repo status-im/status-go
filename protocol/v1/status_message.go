@@ -3,6 +3,7 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/jinzhu/copier"
@@ -130,12 +131,14 @@ func (m *StatusMessage) HandleEncryptionLayer(myKey *ecdsa.PrivateKey, senderKey
 		return errors.Wrap(err, "failed to unmarshal ProtocolMessage")
 	}
 
+	fmt.Println("-------- HandleEncryptionLayer1")
 	response, err := enc.HandleMessage(
 		myKey,
 		senderKey,
 		&protocolMessage,
 		m.TransportLayer.Hash,
 	)
+	fmt.Println("-------- HandleEncryptionLayer2")
 
 	if err == encryption.ErrHashRatchetGroupIDNotFound {
 
@@ -175,6 +178,7 @@ func (m *StatusMessage) HandleApplicationLayer() error {
 		zap.String("messageId", hexutil.Encode(m.ApplicationLayer.ID)),
 	)
 
+	fmt.Println("-------------------- HandleApplicationLayer 1")
 	m.ApplicationLayer.Payload = message.Payload
 	m.ApplicationLayer.Type = message.Type
 	m.ApplicationLayer.ChannelId = message.ChannelId

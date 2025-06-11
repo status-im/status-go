@@ -11,6 +11,7 @@ package communities
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"os"
 	"path"
 	"time"
@@ -460,7 +461,9 @@ func (m *ArchiveFileManager) ExtractMessagesFromHistoryArchive(communityID types
 			m.logger.Error("failed to decompress community pubkey", zap.Error(err))
 			return nil, err
 		}
+		fmt.Println("-------- ExtractMessagesFromHistoryArchive1")
 		decryptedBytes, err := m.encryptor.HandleMessage(m.identity, pk, &protocolMessage, make([]byte, 0))
+		fmt.Println("-------- ExtractMessagesFromHistoryArchive2")
 		if err != nil {
 			m.logger.Error("failed to decrypt message archive", zap.Error(err))
 			return nil, err

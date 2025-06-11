@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -41,11 +42,17 @@ func WrapMessageV1(payload []byte, messageType protobuf.ApplicationMetadataMessa
 		}
 	}
 
+	fmt.Println("----------------- WrapMessageV1 1")
 	message := &protobuf.ApplicationMetadataMessage{
 		Signature: signature,
 		Type:      messageType,
 		Payload:   payload,
 		ChannelId: channelId,
 	}
-	return proto.Marshal(message)
+	fmt.Println("----------------- WrapMessageV1 2")
+
+	msg, err := proto.Marshal(message)
+
+	fmt.Println("----------------- WrapMessageV1 3")
+	return msg, err
 }
