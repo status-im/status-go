@@ -46,9 +46,6 @@ type PublicWakuAPI interface {
 	// returns the hash of the message in case of success.
 	Post(ctx context.Context, req NewMessage) ([]byte, error)
 
-	// NewMessageFilter creates a new filter that can be used to poll for
-	// (new) messages that satisfy the given criteria.
-	NewMessageFilter(req Criteria) (string, error)
 	// GetFilterMessages returns the messages that match the filter criteria and
 	// are received between the last poll and now.
 	GetFilterMessages(id string) ([]*Message, error)

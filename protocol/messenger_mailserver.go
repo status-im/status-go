@@ -39,8 +39,9 @@ const (
 var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
 
 func (m *Messenger) shouldSync() (bool, error) {
-	// TODO (pablo) support community store node as well
-	if m.messaging.GetActiveStorenode().ID == "" || !m.Online() {
+	if !m.started ||
+		m.messaging.GetActiveStorenode().ID == "" ||
+		!m.Online() {
 		return false, nil
 	}
 

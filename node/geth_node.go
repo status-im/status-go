@@ -15,8 +15,6 @@ import (
 // Errors related to node and services creation.
 var (
 	ErrNodeMakeFailureFormat                      = "error creating p2p node: %s"
-	ErrWakuServiceRegistrationFailure             = errors.New("failed to register the Waku service")
-	ErrWakuV2ServiceRegistrationFailure           = errors.New("failed to register the WakuV2 service")
 	ErrLightEthRegistrationFailure                = errors.New("failed to register the LES service")
 	ErrLightEthRegistrationFailureUpstreamEnabled = errors.New("failed to register the LES service, upstream is also configured")
 	ErrPersonalServiceRegistrationFailure         = errors.New("failed to register the personal api service")

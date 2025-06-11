@@ -44,7 +44,6 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 // errors
@@ -94,7 +93,6 @@ type StatusNode struct {
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         *timesource.NTPTimeSource
-	wakuV2Srvc             *wakuv2.Waku
 	wakuV2ExtSrvc          *wakuv2ext.Service
 	ensSrvc                *ens.Service
 	communityTokensSrvc    *communitytokens.Service
@@ -314,7 +312,6 @@ func (n *StatusNode) stop() error {
 	n.localNotificationsSrvc = nil
 	n.personalSrvc = nil
 	n.timeSourceSrvc = nil
-	n.wakuV2Srvc = nil
 	n.wakuV2ExtSrvc = nil
 	n.ensSrvc = nil
 	n.communityTokensSrvc = nil

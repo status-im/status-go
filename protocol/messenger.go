@@ -1752,6 +1752,7 @@ func (m *Messenger) Shutdown() (err error) {
 			}
 		}
 	}
+	m.started = false
 	return
 }
 
