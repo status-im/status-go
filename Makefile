@@ -158,9 +158,6 @@ statusgo: ##@build Build status-go as statusd server
 statusgo: build/bin/statusd
 statusd: statusgo
 
-status-cli: ##@build Build status-cli to send messages
-status-cli: build/bin/status-cli
-
 status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend
 
