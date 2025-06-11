@@ -1449,9 +1449,10 @@ func (s *MessageSender) unwrapPayloadForSDS(msg *v1protocol.StatusMessage) error
 	if msg.ApplicationLayer.ChannelId != nil {
 		s.logger.Debug("SDS: unwrap payload", zap.String("channelId", *msg.ApplicationLayer.ChannelId))
 		reliabilityManager, ok := s.reliabilityManagers[*msg.ApplicationLayer.ChannelId]
+		var err error
 		if !ok {
 			s.reliabilityManagersMutex.Lock()
-			reliabilityManager, err := sds.NewReliabilityManager(*msg.ApplicationLayer.ChannelId)
+			reliabilityManager, err = sds.NewReliabilityManager(*msg.ApplicationLayer.ChannelId)
 			if err != nil {
 				return errors.Wrap(err, "sds: failed to create reliability manager")
 			}
