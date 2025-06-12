@@ -11,5 +11,6 @@ const (
 )
 
 var (
+	ErrNoMatch = errors.New("no key for given address or file")
 	ErrDecrypt = errors.New("could not decrypt key with given password")
 )
