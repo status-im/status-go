@@ -22,6 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	gethmetrics "github.com/ethereum/go-ethereum/metrics"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/status-im/status-go/account/keystore/geth"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/cmd/status-backend/server"
@@ -555,11 +557,12 @@ func createDirsFromConfig(config *params.NodeConfig) error {
 }
 
 func startNode(config *params.NodeConfig, backend *api.GethStatusBackend, installationID uuid.UUID) (*sql.DB, *sql.DB, error) {
-	err := backend.AccountManager().InitKeystore(config.KeyStoreDir)
+	gethKeystore := keystore.NewKeyStore(config.KeyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
+	adapter, err := geth.NewAdapter(config.KeyStoreDir, gethKeystore)
 	if err != nil {
-		logger.Error("Failed to init keystore", "error", err)
 		return nil, nil, err
 	}
+	backend.AccountManager().SetKeystore(adapter)
 
 	err = createDirsFromConfig(config)
 	if err != nil {

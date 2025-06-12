@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/status-im/status-go/account/keystore/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -25,32 +27,27 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 			f()
 		}
 	}
-	if err != nil {
-		return
-	}
 
 	backend = NewGethStatusBackend(tt.MustCreateTestLogger())
 	backend.UpdateRootDataDir(tmpdir)
 
-	err = backend.AccountManager().InitKeystore(filepath.Join(tmpdir, "keystore"))
+	keystoreDir := filepath.Join(tmpdir, "keystore")
+	gethKeystore := keystore.NewKeyStore(keystoreDir, keystore.LightScryptN, keystore.LightScryptP)
+	adapter, err := geth.NewAdapter(keystoreDir, gethKeystore)
+	if err != nil {
+		return
+	}
+	backend.AccountManager().SetKeystore(adapter)
 
+	genAccount, _, err := backend.AccountManager().CreateAndStoreAccount(password)
 	if err != nil {
 		return
 	}
 
-	// Create master account
+	masterAccInfo := genAccount.ToIdentifiedAccountInfo()
+
 	const pathWalletRoot = "m/44'/60'/0'/0"
-	accs, err := backend.AccountManager().
-		AccountsGenerator().
-		GenerateAndDeriveAddresses(12, 1, "", []string{pathWalletRoot})
-	if err != nil {
-		return
-	}
-
-	masterAccInfo := accs[0]
-
-	_, err = backend.AccountManager().AccountsGenerator().StoreDerivedAccounts(masterAccInfo.ID, password, []string{pathWalletRoot})
-
+	derivedAccountKey, err := backend.AccountManager().DeriveChildAccountForPathAndStore(types.HexToAddress(masterAccInfo.Address), pathWalletRoot, password)
 	if err != nil {
 		return
 	}
@@ -65,7 +62,7 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 	err = backend.ensureDBsOpened(account, password)
 	require.NoError(t, err)
 
-	walletRootAddress := masterAccInfo.Derived[pathWalletRoot].Address
+	walletRootAddress := derivedAccountKey.Address.Hex()
 
 	config, err := params.NewNodeConfig(tmpdir, 178733)
 	require.NoError(t, err)

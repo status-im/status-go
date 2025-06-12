@@ -25,7 +25,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appmetrics"
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
@@ -118,7 +117,7 @@ type Messenger struct {
 	communitiesManager        *communities.Manager
 	archiveManager            communities.ArchiveService
 	communitiesKeyDistributor communities.KeyDistributor
-	accountsManager           account.Manager
+	accountsManager           Manager
 	mentionsManager           *MentionManager
 	storeNodeRequestsManager  *StoreNodeRequestManager
 	logger                    *zap.Logger

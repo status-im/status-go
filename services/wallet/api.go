@@ -18,6 +18,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	abi_spec "github.com/status-im/status-go/abi-spec"
+	"github.com/status-im/status-go/account/generator"
 	accounttypes "github.com/status-im/status-go/account/types"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -489,44 +490,47 @@ func (api *API) SetCustomTxDetails(ctx context.Context, pathTxIdentity *requests
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
 func (api *API) GetDerivedAddresses(ctx context.Context, password string, derivedFrom string, paths []string) ([]*DerivedAddress, error) {
-	info, err := api.s.gethManager.AccountsGenerator().LoadAccount(derivedFrom, password)
+	key, err := api.s.gethManager.LoadAccount(types.HexToAddress(derivedFrom), password)
 	if err != nil {
 		return nil, err
 	}
 
-	return api.getDerivedAddresses(info.ID, paths)
+	account := generator.NewAccount(key.PrivateKey, key.ExtendedKey)
+
+	return api.getDerivedAddresses(account, paths)
 }
 
 // Generates addresses for the provided paths derived from the provided mnemonic, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
 func (api *API) GetDerivedAddressesForMnemonic(ctx context.Context, mnemonic string, paths []string) ([]*DerivedAddress, error) {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
 
-	info, err := api.s.gethManager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	acc, err := generator.CreateAccountFromMnemonic(mnemonicNoExtraSpaces, "")
 	if err != nil {
 		return nil, err
 	}
 
-	return api.getDerivedAddresses(info.ID, paths)
+	return api.getDerivedAddresses(acc, paths)
 }
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
-func (api *API) getDerivedAddresses(id string, paths []string) ([]*DerivedAddress, error) {
+func (api *API) getDerivedAddresses(account *generator.Account, paths []string) ([]*DerivedAddress, error) {
 	addedAccounts, err := api.s.accountsDB.GetActiveAccounts()
 	if err != nil {
 		return nil, err
 	}
 
-	info, err := api.s.gethManager.AccountsGenerator().DeriveAddresses(id, paths)
+	childrenAccounts, err := generator.DeriveChildrenFromAccount(account, paths)
 	if err != nil {
 		return nil, err
 	}
 
 	derivedAddresses := make([]*DerivedAddress, 0)
-	for accPath, acc := range info {
+	for accPath, childAccount := range childrenAccounts {
+		accountInfo := childAccount.ToAccountInfo()
 
 		derivedAddress := &DerivedAddress{
-			Address:   common.HexToAddress(acc.Address),
-			PublicKey: types.Hex2Bytes(acc.PublicKey),
+			Address:   common.HexToAddress(accountInfo.Address),
+			PublicKey: types.Hex2Bytes(accountInfo.PublicKey),
 			Path:      accPath,
 		}
 
@@ -635,7 +639,7 @@ func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address s
 func (api *API) SignMessage(ctx context.Context, message types.HexBytes, address common.Address, password string) (string, error) {
 	logutils.ZapLogger().Debug("[WalletAPI::SignMessage]", zap.Stringer("message", message), zap.Stringer("address", address))
 
-	selectedAccount, err := api.s.gethManager.VerifyAccountPassword(api.s.Config().KeyStoreDir, address.Hex(), password)
+	selectedAccount, err := api.s.gethManager.LoadAccount(types.Address(address), password)
 	if err != nil {
 		return "", err
 	}
@@ -834,8 +838,7 @@ func (api *API) getVerifiedWalletAccount(address, password string) (*accounttype
 		return nil, wallettypes.ErrAccountDoesntExist
 	}
 
-	keyStoreDir := api.s.Config().KeyStoreDir
-	key, err := api.s.gethManager.VerifyAccountPassword(keyStoreDir, address, password)
+	key, err := api.s.gethManager.LoadAccount(types.HexToAddress(address), password)
 	if err != nil {
 		logutils.ZapLogger().Error("failed to verify account", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
 		return nil, err

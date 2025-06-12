@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"time"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -61,7 +62,11 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 	}
 
 	acc := generator.NewAccount(config.privateKey, nil)
-	iai := acc.ToIdentifiedAccountInfo("")
+	iai := acc.ToIdentifiedAccountInfo()
+	multiAcc := &multiaccounts.Account{
+		Timestamp: time.Now().Unix(),
+		KeyUID:    iai.KeyUID,
+	}
 
 	madb, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
 	if err != nil {
@@ -89,7 +94,7 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		WithDatabase(appDb),
 		WithWalletDatabase(walletDb),
 		WithMultiAccounts(madb),
-		WithAccount(iai.ToMultiAccount()),
+		WithAccount(multiAcc),
 		WithDatasync(),
 		WithToplevelDatabaseMigrations(),
 		WithBrowserDatabase(nil),

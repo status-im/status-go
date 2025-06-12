@@ -19,6 +19,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/account/keystore/geth"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -103,6 +107,16 @@ func (s *SyncDeviceSuite) TearDownTest() {
 	s.Require().NoError(s.pxBootNode.Stop())
 }
 
+func setKeystore(accManager *account.DefaultManager, keyStoreDir string) error {
+	gethKeystore := keystore.NewKeyStore(keyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
+	adapter, err := geth.NewAdapter(keyStoreDir, gethKeystore)
+	if err != nil {
+		return err
+	}
+	accManager.SetKeystore(adapter)
+	return nil
+}
+
 func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *api.GethStatusBackend {
 	backend := s.prepareBackendWithoutAccount(tmpdir)
 
@@ -182,7 +196,7 @@ func (s *SyncDeviceSuite) pairAccounts(serverBackend *api.GethStatusBackend, ser
 
 	// Start receiving client
 
-	err = clientBackend.AccountManager().InitKeystore(filepath.Join(clientDir, api.DefaultKeystoreRelativePath))
+	err = setKeystore(clientBackend.AccountManager(), filepath.Join(clientDir, api.DefaultKeystoreRelativePath))
 	require.NoError(s.T(), err)
 
 	err = clientBackend.OpenAccounts()
@@ -278,8 +292,9 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	}()
 	ctx := context.TODO()
 
-	err := serverBackend.AccountManager().InitKeystore(filepath.Join(serverTmpDir, api.DefaultKeystoreRelativePath))
+	err := setKeystore(serverBackend.AccountManager(), filepath.Join(serverTmpDir, api.DefaultKeystoreRelativePath))
 	require.NoError(s.T(), err)
+
 	err = serverBackend.OpenAccounts()
 	require.NoError(s.T(), err)
 
@@ -454,8 +469,9 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	_, err = serverMessenger.DeleteMessageForMeAndSync(ctx, publicChatID, serverMessageID)
 	require.NoError(s.T(), err)
 
-	err = clientBackend.AccountManager().InitKeystore(filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath))
+	err = setKeystore(clientBackend.AccountManager(), filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath))
 	require.NoError(s.T(), err)
+
 	err = clientBackend.OpenAccounts()
 	require.NoError(s.T(), err)
 
@@ -777,27 +793,30 @@ func buildTestMessage(chat *protocol.Chat) *common.Message {
 }
 
 func (s *SyncDeviceSuite) getSeedPhraseKeypairForTest(backend *api.GethStatusBackend, mnemonic string, server bool) *accounts.Keypair {
-	generatedAccount, err := backend.AccountManager().AccountsGenerator().ImportMnemonic(mnemonic, "")
+	generatedAccount, err := generator.CreateAccountFromMnemonic(mnemonic, "")
 	require.NoError(s.T(), err)
-	generatedDerivedAccs, err := backend.AccountManager().AccountsGenerator().DeriveAddresses(generatedAccount.ID, []string{path0, path1})
+	generatedDerivedAccs, err := generator.DeriveChildrenFromAccount(generatedAccount, []string{path0, path1})
 	require.NoError(s.T(), err)
 
+	genAccInfo := generatedAccount.ToGeneratedAccountInfo("")
+
 	seedPhraseKp := &accounts.Keypair{
-		KeyUID:      generatedAccount.KeyUID,
+		KeyUID:      genAccInfo.KeyUID,
 		Name:        "SeedPhraseImported",
 		Type:        accounts.KeypairTypeSeed,
-		DerivedFrom: generatedAccount.Address,
+		DerivedFrom: genAccInfo.Address,
 	}
 	i := 0
 	for path, ga := range generatedDerivedAccs {
+		derivAccInfo := ga.ToAccountInfo()
 		acc := &accounts.Account{
-			Address:   types.HexToAddress(ga.Address),
-			KeyUID:    generatedAccount.KeyUID,
+			Address:   types.HexToAddress(derivAccInfo.Address),
+			KeyUID:    genAccInfo.KeyUID,
 			Wallet:    false,
 			Chat:      false,
 			Type:      accounts.AccountTypeSeed,
 			Path:      path,
-			PublicKey: types.HexBytes(ga.PublicKey),
+			PublicKey: types.HexBytes(derivAccInfo.PublicKey),
 			Name:      fmt.Sprintf("Acc_%d", i),
 			Operable:  accounts.AccountFullyOperable,
 			Emoji:     fmt.Sprintf("Emoji_%d", i),
@@ -911,23 +930,29 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 
 	// check client - client should contain keystore files for imported seed phrase
 	accountManager := clientBackend.AccountManager()
-	accGenerator := accountManager.AccountsGenerator()
 	require.True(s.T(), containsKeystoreFile(clientKeystorePath, clientSeedPhraseKp.DerivedFrom[2:]))
 	for _, acc := range clientSeedPhraseKp.Accounts {
 		require.True(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
 	}
 
 	// reinit keystore on client
-	require.NoError(s.T(), accountManager.InitKeystore(clientKeystorePath))
+	err = setKeystore(accountManager, clientKeystorePath)
+	require.NoError(s.T(), err)
 
 	// check keystore on client
-	genAccInfo, err := accGenerator.LoadAccount(clientSeedPhraseKp.DerivedFrom, s.password)
+	accKey, err := accountManager.LoadAccount(types.HexToAddress(clientSeedPhraseKp.DerivedFrom), s.password)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), clientSeedPhraseKp.KeyUID, genAccInfo.KeyUID)
+
+	genAcc := generator.NewAccount(accKey.PrivateKey, accKey.ExtendedKey)
+	accInfo := genAcc.ToIdentifiedAccountInfo()
+	require.Equal(s.T(), clientSeedPhraseKp.KeyUID, accInfo.KeyUID)
+
 	for _, acc := range clientSeedPhraseKp.Accounts {
-		genAccInfo, err := accGenerator.LoadAccount(acc.Address.String(), s.password)
+		accKey, err = accountManager.LoadAccount(acc.Address, s.password)
 		require.NoError(s.T(), err)
-		require.Equal(s.T(), acc.Address.String(), genAccInfo.Address)
+		genAcc := generator.NewAccount(accKey.PrivateKey, accKey.ExtendedKey)
+		accInfo := genAcc.ToIdentifiedAccountInfo()
+		require.Equal(s.T(), acc.Address.String(), accInfo.Address)
 	}
 }
 
