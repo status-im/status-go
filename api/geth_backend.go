@@ -25,8 +25,11 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/account"
+	accountcommon "github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/account/keystore/geth"
 	accounttypes "github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/centralizedmetrics"
@@ -99,7 +102,7 @@ type GethStatusBackend struct {
 	signer                   communities.MessageSigner
 	multiaccountsDB          *multiaccounts.Database
 	account                  *multiaccounts.Account
-	accountManager           *account.GethManager
+	accountManager           *account.DefaultManager
 	transactor               *transactions.Transactor
 	connectionState          connection.State
 	appState                 AppState
@@ -136,7 +139,7 @@ func (b *GethStatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
 }
 
 func (b *GethStatusBackend) initialize() {
-	accountManager := account.NewGethManager(b.logger)
+	accountManager := account.NewDefaultManager(b.logger)
 	transactor := transactions.NewTransactor()
 	personalService := personal.New()
 	statusNode := node.New(transactor, accountManager, b.logger)
@@ -156,7 +159,7 @@ func (b *GethStatusBackend) StatusNode() *node.StatusNode {
 }
 
 // AccountManager returns reference to account manager
-func (b *GethStatusBackend) AccountManager() *account.GethManager {
+func (b *GethStatusBackend) AccountManager() *account.DefaultManager {
 	return b.accountManager
 }
 
@@ -685,22 +688,22 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	}
 
 	if request.Mnemonic != "" {
-		info, err := b.generateAccountInfo(request.Mnemonic)
+		generatedAccount, generatedAccountInfo, err := b.generateAccount(request.Mnemonic)
 		if err != nil {
 			return errors.Wrap(err, "failed to generate account info")
 		}
 
-		if info.KeyUID != request.KeyUID {
+		if generatedAccountInfo.KeyUID != request.KeyUID {
 			return errors.New("mnemonic does not match this account")
 		}
 
-		derivedAddresses, err := b.getDerivedAddresses(info.ID)
+		_, generatedDerivedAccountsInfo, err := b.generateDerivedAddresses(generatedAccount, paths)
 		if err != nil {
-			return errors.Wrap(err, "failed to get derived addresses")
+			return errors.Wrap(err, "failed to derive children accounts")
 		}
 
-		request.Password = derivedAddresses[pathEncryption].PublicKey
-		request.KeycardWhisperPrivateKey = derivedAddresses[pathDefaultChat].PrivateKey
+		request.Password = generatedDerivedAccountsInfo[pathEncryption].PublicKey
+		request.KeycardWhisperPrivateKey = generatedDerivedAccountsInfo[pathDefaultChat].PrivateKey
 	}
 
 	acc := multiaccounts.Account{
@@ -783,10 +786,9 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		return errors.Wrap(err, "failed to get wallet addresses")
 	}
 	login := accounttypes.LoginParams{
-		Password:       request.Password,
-		ChatAddress:    chatAddr,
-		WatchAddresses: watchAddrs,
-		MainAccount:    walletAddr,
+		Password:    request.Password,
+		ChatAddress: chatAddr,
+		MainAccount: walletAddr,
 	}
 
 	err = b.StartNode(b.config)
@@ -901,10 +903,9 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		return err
 	}
 	login := accounttypes.LoginParams{
-		Password:       password,
-		ChatAddress:    chatAddr,
-		WatchAddresses: watchAddrs,
-		MainAccount:    walletAddr,
+		Password:    password,
+		ChatAddress: chatAddr,
+		MainAccount: walletAddr,
 	}
 
 	err = b.StartNode(b.config)
@@ -969,7 +970,7 @@ func (b *GethStatusBackend) GetEnsUsernames() ([]*ens.UsernameDetail, error) {
 	return db.GetEnsUsernames(&removed)
 }
 
-func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, password, oldDir, newDir string) error {
+func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, password, newDir string) error {
 	err := b.ensureDBsOpened(acc, password)
 	if err != nil {
 		return err
@@ -991,7 +992,7 @@ func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, passwo
 	for _, account := range accounts {
 		addresses = append(addresses, account.Address.Hex())
 	}
-	err = b.accountManager.MigrateKeyStoreDir(oldDir, newDir, addresses)
+	err = b.accountManager.MigrateKeyStoreDir(newDir, addresses)
 	if err != nil {
 		return err
 	}
@@ -1089,19 +1090,9 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 }
 
 func (b *GethStatusBackend) reEncryptKeyStoreDir(currentPassword string, newPassword string) error {
-	config := b.StatusNode().Config()
-	keyDir := ""
-	if config == nil {
-		keyDir = b.accountManager.Keydir
-	} else {
-		keyDir = config.KeyStoreDir
-	}
-
-	if keyDir != "" {
-		err := b.accountManager.ReEncryptKeyStoreDir(keyDir, currentPassword, newPassword)
-		if err != nil {
-			return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
-		}
+	err := b.accountManager.ReEncryptKeyStoreDir(currentPassword, newPassword)
+	if err != nil {
+		return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
 	}
 	return nil
 }
@@ -1488,7 +1479,6 @@ func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.Rest
 
 	input := &prepareAccountInput{
 		customizationColorClock: 0,
-		accountID:               "", // empty for keycard
 		keyUID:                  request.Keycard.KeyUID,
 		address:                 request.Keycard.Address,
 		mnemonic:                "",
@@ -1521,19 +1511,18 @@ func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.Rest
 }
 
 func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
-	accountGenerator := b.accountManager.AccountsGenerator()
-
-	info, err := accountGenerator.ImportMnemonic(mnemonic, "")
+	genAccount, err := generator.CreateAccountFromMnemonic(mnemonic, "")
 	if err != nil {
 		return "", err
 	}
 
-	return info.KeyUID, nil
+	accInfo := genAccount.ToIdentifiedAccountInfo()
+
+	return accInfo.KeyUID, nil
 }
 
 type prepareAccountInput struct {
 	customizationColorClock uint64
-	accountID               string
 	keyUID                  string
 	address                 string
 	mnemonic                string
@@ -1553,29 +1542,28 @@ type accountBundle struct {
 }
 
 func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount, opts ...params.Option) (*accountBundle, error) {
-	info, err := b.generateAccountInfo(mnemonic)
+	generatedAccount, generatedAccountInfo, err := b.generateAccount(mnemonic)
 	if err != nil {
 		return nil, err
 	}
 
-	keyStoreDir, err := b.InitKeyStoreDirWithAccount(request.RootDataDir, info.KeyUID)
+	keyStoreDir, err := b.InitKeyStoreDirWithAccount(request.RootDataDir, generatedAccountInfo.KeyUID)
 	if err != nil {
 		return nil, err
 	}
 
-	derivedAddresses, err := b.getDerivedAddresses(info.ID)
+	_, generatedDerivedAccountsInfo, err := b.generateDerivedAddresses(generatedAccount, paths)
 	if err != nil {
 		return nil, err
 	}
 
 	input := &prepareAccountInput{
 		customizationColorClock: customizationColorClock,
-		accountID:               info.ID,
-		keyUID:                  info.KeyUID,
-		address:                 info.Address,
-		mnemonic:                info.Mnemonic,
+		keyUID:                  generatedAccountInfo.KeyUID,
+		address:                 generatedAccountInfo.Address,
+		mnemonic:                generatedAccountInfo.Mnemonic,
 		restoringAccount:        mnemonic != "",
-		derivedAddresses:        derivedAddresses,
+		derivedAddresses:        generatedDerivedAccountsInfo,
 		fetchBackup:             fetchBackup,
 		keyStoreDir:             keyStoreDir,
 		opts:                    opts,
@@ -1597,7 +1585,7 @@ func (b *GethStatusBackend) prepareNodeAccount(request *requests.CreateAccount, 
 	// 		 - replace password when we're using keycard
 	// 		 - store account when we're not using keycard
 	if request.KeycardInstanceUID == "" {
-		err = b.storeAccount(input.accountID, request.Password, paths)
+		_, _, err = b.StoreAccount(input.mnemonic, request.Password, paths)
 		if err != nil {
 			return nil, err
 		}
@@ -1638,48 +1626,70 @@ func (b *GethStatusBackend) prepareNodeAccount(request *requests.CreateAccount, 
 func (b *GethStatusBackend) InitKeyStoreDirWithAccount(rootDataDir, keyUID string) (string, error) {
 	b.UpdateRootDataDir(rootDataDir)
 	keyStoreRelativePath, keystoreAbsolutePath := DefaultKeystorePath(rootDataDir, keyUID)
-	// Initialize keystore dir with account
-	return keyStoreRelativePath, b.accountManager.InitKeystore(keystoreAbsolutePath)
+
+	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keystoreAbsolutePath, keystore.LightScryptN, keystore.LightScryptP)
+	if err != nil {
+		return "", err
+	}
+	b.accountManager.SetKeystore(keystoreAdapter)
+
+	return keyStoreRelativePath, nil
 }
 
-func (b *GethStatusBackend) generateAccountInfo(mnemonic string) (*generator.GeneratedAccountInfo, error) {
-	accountGenerator := b.accountManager.AccountsGenerator()
-
-	var info generator.GeneratedAccountInfo
-	var err error
+func (b *GethStatusBackend) generateAccount(mnemonic string) (genAcc *generator.Account, accInfo generator.GeneratedAccountInfo, err error) {
+	finalMnemonic := mnemonic
 	if mnemonic == "" {
-		// generate 1(n) account with default mnemonic length and no passphrase
-		generatedAccountInfos, err := accountGenerator.Generate(defaultMnemonicLength, 1, "")
-		info = generatedAccountInfos[0]
-
+		finalMnemonic, err = accountcommon.CreateRandomMnemonicWithDefaultLength()
 		if err != nil {
-			return nil, err
-		}
-	} else {
-
-		info, err = accountGenerator.ImportMnemonic(mnemonic, "")
-		if err != nil {
-			return nil, err
+			return
 		}
 	}
 
-	return &info, nil
+	genAcc, err = generator.CreateAccountFromMnemonic(finalMnemonic, "")
+	if err != nil {
+		return
+	}
+
+	accInfo = genAcc.ToGeneratedAccountInfo(finalMnemonic)
+	return
 }
 
-func (b *GethStatusBackend) storeAccount(id string, password string, paths []string) error {
-	accountGenerator := b.accountManager.AccountsGenerator()
-
-	_, err := accountGenerator.StoreAccount(id, password)
+func (b *GethStatusBackend) generateDerivedAddresses(genAcc *generator.Account, paths []string) (genDerivedAccounts map[string]*generator.Account, genDerivedAccountsInfo map[string]generator.AccountInfo, err error) {
+	genDerivedAccounts, err = generator.DeriveChildrenFromAccount(genAcc, paths)
 	if err != nil {
-		return err
+		return
 	}
 
-	_, err = accountGenerator.StoreDerivedAccounts(id, password, paths)
-	if err != nil {
-		return err
+	genDerivedAccountsInfo = make(map[string]generator.AccountInfo, 0)
+	for path, acc := range genDerivedAccounts {
+		genDerivedAccountsInfo[path] = acc.ToAccountInfo()
 	}
 
-	return nil
+	return
+}
+
+func (b *GethStatusBackend) StoreAccount(mnemonic string, password string, paths []string) (accInfo generator.IdentifiedAccountInfo, derivedAccsInfo map[string]generator.AccountInfo, err error) {
+	var genAcc *generator.Account
+	genAcc, err = b.accountManager.CreateFromMnemonicAndStoreAccount(mnemonic, password)
+	if err != nil {
+		return
+	}
+
+	accInfo = genAcc.ToIdentifiedAccountInfo()
+
+	var genDerivedAccs map[string]*types.Key
+	genDerivedAccs, err = b.accountManager.DeriveChildrenAccountsForPathsAndStore(genAcc.Address(), paths, password)
+	if err != nil {
+		return
+	}
+
+	derivedAccsInfo = make(map[string]generator.AccountInfo, 0)
+	for path, acc := range genDerivedAccs {
+		genDerivedAcc := generator.NewAccount(acc.PrivateKey, acc.ExtendedKey)
+		derivedAccsInfo[path] = genDerivedAcc.ToAccountInfo()
+	}
+
+	return accInfo, derivedAccsInfo, nil
 }
 
 func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, input *prepareAccountInput) (*multiaccounts.Account, error) {
@@ -1850,11 +1860,6 @@ func (b *GethStatusBackend) prepareForKeycard(request *requests.CreateAccount, i
 	return response, nil
 }
 
-func (b *GethStatusBackend) getDerivedAddresses(id string) (map[string]generator.AccountInfo, error) {
-	accountGenerator := b.accountManager.AccountsGenerator()
-	return accountGenerator.DeriveAddresses(id, paths)
-}
-
 // CreateAccountAndLogin creates a new account and logs in with it.
 // NOTE: requests.CreateAccount is used for public, params.Option maybe used for internal usage.
 func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
@@ -1894,17 +1899,17 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 	}
 
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
-	accountInfo, err := b.accountManager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	_, generatedAccountInfo, err := b.generateAccount(mnemonicNoExtraSpaces)
 	if err != nil {
 		return err
 	}
 
-	kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(accountInfo.KeyUID)
+	kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(generatedAccountInfo.KeyUID)
 	if err != nil {
 		return err
 	}
 
-	err = b.ensureDBsOpened(multiaccounts.Account{KeyUID: accountInfo.KeyUID, KDFIterations: kdfIterations}, currPassword)
+	err = b.ensureDBsOpened(multiaccounts.Account{KeyUID: generatedAccountInfo.KeyUID, KDFIterations: kdfIterations}, currPassword)
 	if err != nil {
 		return err
 	}
@@ -1925,27 +1930,22 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 	var paths []string
 	paths = append(paths, pathWalletRoot, pathEIP1581)
 	for _, acc := range knownAccounts {
-		if accountInfo.KeyUID == acc.KeyUID {
+		if generatedAccountInfo.KeyUID == acc.KeyUID {
 			paths = append(paths, acc.Path)
 		}
 	}
 
-	_, err = b.accountManager.AccountsGenerator().StoreAccount(accountInfo.ID, currPassword)
+	_, _, err = b.StoreAccount(mnemonicNoExtraSpaces, currPassword, paths)
 	if err != nil {
 		return err
 	}
 
-	_, err = b.accountManager.AccountsGenerator().StoreDerivedAccounts(accountInfo.ID, currPassword, paths)
+	err = b.multiaccountsDB.UpdateAccountKeycardPairing(generatedAccountInfo.KeyUID, "")
 	if err != nil {
 		return err
 	}
 
-	err = b.multiaccountsDB.UpdateAccountKeycardPairing(accountInfo.KeyUID, "")
-	if err != nil {
-		return err
-	}
-
-	err = messenger.DeleteAllKeycardsWithKeyUID(context.Background(), accountInfo.KeyUID)
+	err = messenger.DeleteAllKeycardsWithKeyUID(context.Background(), generatedAccountInfo.KeyUID)
 	if err != nil {
 		return err
 	}
@@ -1975,7 +1975,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 		return err
 	}
 
-	return b.ChangeDatabasePassword(accountInfo.KeyUID, currPassword, newPassword)
+	return b.ChangeDatabasePassword(generatedAccountInfo.KeyUID, currPassword, newPassword)
 }
 
 func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
@@ -2237,11 +2237,12 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		return err
 	}
 
-	if b.accountManager.GetManager() == nil {
-		err = b.accountManager.InitKeystore(config.KeyStoreDir)
+	if b.accountManager == nil {
+		keystoreAdapter, err := geth.NewGethKeystoreAdapter(config.KeyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
 		if err != nil {
 			return err
 		}
+		b.accountManager.SetKeystore(keystoreAdapter)
 	}
 
 	if err = b.statusNode.Start(config); err != nil {
@@ -2446,73 +2447,13 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 }
 
 func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*accounttypes.SelectedExtKey, error) {
-	config := b.StatusNode().Config()
 	db, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		b.logger.Error("failed to create new *Database instance", zap.Error(err))
 		return nil, err
 	}
-	exists, err := db.AddressExists(types.HexToAddress(address))
-	if err != nil {
-		b.logger.Error("failed to query db for a given address", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
-		return nil, err
-	}
 
-	if !exists {
-		b.logger.Error("failed to get a selected account", zap.Error(wallettypes.ErrInvalidTxSender))
-		return nil, wallettypes.ErrAccountDoesntExist
-	}
-
-	keystoreDirPath := filepath.Join(config.DataDir, config.KeyStoreDir)
-
-	key, err := b.accountManager.VerifyAccountPassword(keystoreDirPath, address, password)
-	if _, ok := err.(*account.ErrCannotLocateKeyFile); ok {
-		key, err = b.generatePartialAccountKey(db, address, password)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if err != nil {
-		b.logger.Error("failed to verify account", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
-		return nil, err
-	}
-
-	return &accounttypes.SelectedExtKey{
-		Address:    key.Address,
-		AccountKey: key,
-	}, nil
-}
-
-func (b *GethStatusBackend) generatePartialAccountKey(db *accounts.Database, address string, password string) (*types.Key, error) {
-	dbPath, err := db.GetPath(types.HexToAddress(address))
-	path := "m/" + dbPath[strings.LastIndex(dbPath, "/")+1:]
-	if err != nil {
-		b.logger.Error("failed to get path for given account address", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
-		return nil, err
-	}
-
-	rootAddress, err := db.GetWalletRootAddress()
-	if err != nil {
-		return nil, err
-	}
-	info, err := b.accountManager.AccountsGenerator().LoadAccount(rootAddress.Hex(), password)
-	if err != nil {
-		return nil, err
-	}
-	masterID := info.ID
-
-	accInfosMap, err := b.accountManager.AccountsGenerator().StoreDerivedAccounts(masterID, password, []string{path})
-	if err != nil {
-		return nil, err
-	}
-
-	_, key, err := b.accountManager.AddressToDecryptedAccount(accInfosMap[path].Address, password)
-	if err != nil {
-		return nil, err
-	}
-
-	return key, nil
+	return b.accountManager.GetVerifiedWalletAccount(db, types.HexToAddress(address), password)
 }
 
 // registerHandlers attaches Status callback handlers to running node

@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/account"
 	accountcommon "github.com/status-im/status-go/account/common"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -19,13 +20,13 @@ import (
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 )
 
-func NewAccountsAPI(manager *account.GethManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed, messenger **protocol.Messenger) *API {
+func NewAccountsAPI(manager *account.DefaultManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed, messenger **protocol.Messenger) *API {
 	return &API{manager, config, db, feed, messenger}
 }
 
 // API is class with methods available over RPC.
 type API struct {
-	manager   *account.GethManager
+	manager   *account.DefaultManager
 	config    *params.NodeConfig
 	db        *accounts.Database
 	feed      *event.Feed
@@ -292,12 +293,7 @@ func (api *API) createKeystoreFileForAccount(masterAddress string, password stri
 		return errors.New("cannot create keystore file if password is empty")
 	}
 
-	info, err := api.manager.AccountsGenerator().LoadAccount(masterAddress, password)
-	if err != nil {
-		return err
-	}
-
-	_, err = api.manager.AccountsGenerator().StoreDerivedAccounts(info.ID, password, []string{account.Path})
+	_, err := api.manager.DeriveChildAccountForPathAndStore(types.HexToAddress(masterAddress), account.Path, password)
 	return err
 }
 
@@ -335,10 +331,12 @@ func (api *API) AddAccount(ctx context.Context, password string, account *accoun
 
 // Imports a new private key and creates local keystore file.
 func (api *API) ImportPrivateKey(ctx context.Context, privateKey string, password string) error {
-	info, err := api.manager.AccountsGenerator().ImportPrivateKey(privateKey)
+	acc, err := generator.CreateAccountFromPrivateKey(privateKey)
 	if err != nil {
 		return err
 	}
+
+	info := acc.ToGeneratedAccountInfo("")
 
 	kp, err := api.db.GetKeypairByKeyUID(info.KeyUID)
 	if err != nil && err != accounts.ErrDbKeypairNotFound {
@@ -349,16 +347,18 @@ func (api *API) ImportPrivateKey(ctx context.Context, privateKey string, passwor
 		return errors.New("provided private key was already imported")
 	}
 
-	_, err = api.manager.AccountsGenerator().StoreAccount(info.ID, password)
+	_, err = api.manager.CreateFromPrivateKeyAndStoreAccount(privateKey, password)
 	return err
 }
 
 // Creates all keystore files for a keypair and mark it in db as fully operable.
 func (api *API) MakePrivateKeyKeypairFullyOperable(ctx context.Context, privateKey string, password string) error {
-	info, err := api.manager.AccountsGenerator().ImportPrivateKey(privateKey)
+	acc, err := generator.CreateAccountFromPrivateKey(privateKey)
 	if err != nil {
 		return err
 	}
+
+	info := acc.ToGeneratedAccountInfo("")
 
 	kp, err := api.db.GetKeypairByKeyUID(info.KeyUID)
 	if err != nil {
@@ -369,7 +369,7 @@ func (api *API) MakePrivateKeyKeypairFullyOperable(ctx context.Context, privateK
 		return errors.New("keypair for the provided private key is not known")
 	}
 
-	_, err = api.manager.AccountsGenerator().StoreAccount(info.ID, password)
+	_, err = api.manager.CreateFromPrivateKeyAndStoreAccount(privateKey, password)
 	if err != nil {
 		return err
 	}
@@ -416,12 +416,14 @@ func (api *API) MakePartiallyOperableAccoutsFullyOperable(ctx context.Context, p
 func (api *API) ImportMnemonic(ctx context.Context, mnemonic string, password string) error {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
 
-	generatedAccountInfo, err := api.manager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	acc, err := generator.CreateAccountFromMnemonic(mnemonicNoExtraSpaces, "")
 	if err != nil {
 		return err
 	}
 
-	kp, err := api.db.GetKeypairByKeyUID(generatedAccountInfo.KeyUID)
+	info := acc.ToGeneratedAccountInfo("")
+
+	kp, err := api.db.GetKeypairByKeyUID(info.KeyUID)
 	if err != nil && err != accounts.ErrDbKeypairNotFound {
 		return err
 	}
@@ -430,7 +432,7 @@ func (api *API) ImportMnemonic(ctx context.Context, mnemonic string, password st
 		return errors.New("provided mnemonic was already imported, to add new account use `AddAccount` endpoint")
 	}
 
-	_, err = api.manager.AccountsGenerator().StoreAccount(generatedAccountInfo.ID, password)
+	_, err = api.manager.CreateFromMnemonicAndStoreAccount(mnemonic, password)
 	return err
 }
 
@@ -438,12 +440,14 @@ func (api *API) ImportMnemonic(ctx context.Context, mnemonic string, password st
 func (api *API) MakeSeedPhraseKeypairFullyOperable(ctx context.Context, mnemonic string, password string) error {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
 
-	generatedAccountInfo, err := api.manager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	acc, err := generator.CreateAccountFromMnemonic(mnemonicNoExtraSpaces, "")
 	if err != nil {
 		return err
 	}
 
-	kp, err := api.db.GetKeypairByKeyUID(generatedAccountInfo.KeyUID)
+	info := acc.ToGeneratedAccountInfo("")
+
+	kp, err := api.db.GetKeypairByKeyUID(info.KeyUID)
 	if err != nil {
 		return err
 	}
@@ -452,7 +456,7 @@ func (api *API) MakeSeedPhraseKeypairFullyOperable(ctx context.Context, mnemonic
 		return errors.New("keypair for the provided seed phrase is not known")
 	}
 
-	_, err = api.manager.AccountsGenerator().StoreAccount(generatedAccountInfo.ID, password)
+	_, err = api.manager.CreateFromMnemonicAndStoreAccount(mnemonicNoExtraSpaces, password)
 	if err != nil {
 		return err
 	}
@@ -462,12 +466,12 @@ func (api *API) MakeSeedPhraseKeypairFullyOperable(ctx context.Context, mnemonic
 		paths = append(paths, acc.Path)
 	}
 
-	_, err = api.manager.AccountsGenerator().StoreDerivedAccounts(generatedAccountInfo.ID, password, paths)
+	_, err = api.manager.DeriveChildrenAccountsForPathsAndStore(types.HexToAddress(info.Address), paths, password)
 	if err != nil {
 		return err
 	}
 
-	return (*api.messenger).MarkKeypairFullyOperable(generatedAccountInfo.KeyUID)
+	return (*api.messenger).MarkKeypairFullyOperable(info.KeyUID)
 }
 
 // Creates a random new mnemonic.
@@ -476,7 +480,7 @@ func (api *API) GetRandomMnemonic(ctx context.Context) (string, error) {
 }
 
 func (api *API) VerifyKeystoreFileForAccount(address types.Address, password string) bool {
-	_, err := api.manager.VerifyAccountPassword(api.config.KeyStoreDir, address.Hex(), password)
+	_, err := api.manager.LoadAccount(address, password)
 	return err == nil
 }
 
@@ -491,12 +495,14 @@ func (api *API) VerifyPassword(password string) bool {
 func (api *API) MigrateNonProfileKeycardKeypairToApp(ctx context.Context, mnemonic string, password string) error {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
 
-	generatedAccountInfo, err := api.manager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	acc, err := generator.CreateAccountFromMnemonic(mnemonicNoExtraSpaces, "")
 	if err != nil {
 		return err
 	}
 
-	kp, err := api.db.GetKeypairByKeyUID(generatedAccountInfo.KeyUID)
+	info := acc.ToGeneratedAccountInfo("")
+
+	kp, err := api.db.GetKeypairByKeyUID(info.KeyUID)
 	if err != nil {
 		return err
 	}
@@ -518,20 +524,23 @@ func (api *API) MigrateNonProfileKeycardKeypairToApp(ctx context.Context, mnemon
 		return errors.New("wrong password provided")
 	}
 
-	_, err = api.manager.AccountsGenerator().StoreAccount(generatedAccountInfo.ID, password)
+	_, err = api.manager.CreateFromMnemonicAndStoreAccount(mnemonicNoExtraSpaces, password)
 	if err != nil {
 		return err
 	}
 
+	var paths []string
 	for _, acc := range kp.Accounts {
-		err = api.createKeystoreFileForAccount(kp.DerivedFrom, password, acc)
-		if err != nil {
-			return err
-		}
+		paths = append(paths, acc.Path)
+	}
+
+	_, err = api.manager.DeriveChildrenAccountsForPathsAndStore(types.HexToAddress(info.Address), paths, password)
+	if err != nil {
+		return err
 	}
 
 	// this will emit SyncKeypair message
-	return (*api.messenger).DeleteAllKeycardsWithKeyUID(ctx, generatedAccountInfo.KeyUID)
+	return (*api.messenger).DeleteAllKeycardsWithKeyUID(ctx, info.KeyUID)
 }
 
 // If keypair is migrated from keycard to app, then `accountsComingFromKeycard` should be set to true, otherwise false.

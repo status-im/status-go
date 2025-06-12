@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/account/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/appdatabase/migrations"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -72,6 +73,11 @@ type MessengerSignalsHandler interface {
 	SendCuratedCommunitiesUpdate(response *communities.KnownCommunitiesResponse)
 }
 
+type Manager interface {
+	GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*types.SelectedExtKey, error)
+	DeleteAccount(address ethtypes.Address) error
+}
+
 type config struct {
 	// systemMessagesTranslations holds translations for system-messages
 	systemMessagesTranslations *systemMessageTranslationsMap
@@ -95,7 +101,7 @@ type config struct {
 	rpcClient              *rpc.Client
 	tokenManager           communities.TokenManager
 	collectiblesManager    communities.CollectiblesManager
-	accountsManager        account.Manager
+	accountsManager        Manager
 	signer                 communities.MessageSigner
 
 	verifyTransactionClient EthClient
@@ -398,7 +404,7 @@ func WithCollectiblesManager(collectiblesManager communities.CollectiblesManager
 	}
 }
 
-func WithAccountManager(accountManager account.Manager) Option {
+func WithAccountManager(accountManager Manager) Option {
 	return func(c *config) error {
 		c.accountsManager = accountManager
 		return nil
