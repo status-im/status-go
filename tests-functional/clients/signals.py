@@ -128,6 +128,9 @@ class SignalClient:
                     return event
             time.sleep(0.2)
 
+    def get_all_signals(self, signal_type):
+        return self.received_signals.get(signal_type, {}).get("received", [])
+
     def _on_error(self, ws, error):
         logging.error(f"Error: {error}")
 

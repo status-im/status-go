@@ -36,8 +36,14 @@ class TestLocalPairing(MessengerSteps):
         response = receiver_second_device.input_connection_string_for_bootstrapping(connection_string)
         response = json.loads(response)
         print(f"response = {response}")
+
+        events = receiver_second_device.get_all_signals(signal_type=SignalType.LOCAL_PAIRING.value)
+        print(f"events = {events}")
         
-        assert "keyUID" in response, "keyUID not found in response"
+        for event in events:
+            assert "error" not in event["event"] or not event["event"]["error"]
+
+        assert response["error"] == {}
         assert response["keyUID"] == self.receiver.key_uid
 
         # Login on second device
@@ -49,7 +55,7 @@ class TestLocalPairing(MessengerSteps):
         )
         receiver_second_device.init_status_backend()
         receiver_second_device.login(self.receiver.key_uid, user)
-        input("Press Enter to continue...")
+        # input("Press Enter to continue...")
         receiver_second_device.wait_for_login()
         receiver_second_device.find_public_key()
         receiver_second_device.find_key_uid()
