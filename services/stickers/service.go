@@ -14,7 +14,7 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, config *params.NodeConfig, downloader *ipfs.Downloader, httpServer *server.MediaServer, pendingTracker *transactions.PendingTxTracker) *Service {
+func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.DefaultManager, config *params.NodeConfig, downloader *ipfs.Downloader, httpServer *server.MediaServer, pendingTracker *transactions.PendingTxTracker) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Service{
@@ -34,7 +34,7 @@ func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *
 type Service struct {
 	accountsDB      *accounts.Database
 	rpcClient       *rpc.Client
-	accountsManager *account.GethManager
+	accountsManager *account.DefaultManager
 	downloader      *ipfs.Downloader
 	keyStoreDir     string
 	httpServer      *server.MediaServer
