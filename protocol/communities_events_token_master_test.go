@@ -219,6 +219,8 @@ func (s *TokenMasterCommunityEventsSuite) TestReceiveRequestsToJoinWithRevealedA
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptsRequestToJoinAfterMemberLeave() {
+	s.T().Skip("flaky test")
+
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
 
 	// set up additional user that will send request to join

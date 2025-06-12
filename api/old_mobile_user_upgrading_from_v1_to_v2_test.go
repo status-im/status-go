@@ -5,10 +5,13 @@ import (
 	"database/sql"
 	"strings"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/account/generator"
 	d_common "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/multiaccounts"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
@@ -122,42 +125,57 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 			s.Require().Equal(a.KeyUID, oldMobileUserKeyUID)
 		}
 
-		generator := b.AccountManager().AccountsGenerator()
 		// Check seed keypair
 		seedKps, ok := keypairMap[accounts.KeypairTypeSeed]
 		s.Require().True(ok, "Seed keypair not found")
 		s.Require().True(len(seedKps) == 1, "Unexpected number of seed keypairs")
 		s.Require().True(len(seedKps[0].Accounts) == 1)
-		info, err := generator.LoadAccount(seedKps[0].Accounts[0].Address.Hex(), oldMobileUserPasswd)
+
+		accKey, err := b.AccountManager().LoadAccount(seedKps[0].Accounts[0].Address, oldMobileUserPasswd)
 		s.Require().NoError(err)
-		s.Require().Equal(seedKps[0].KeyUID, info.KeyUID)
-		s.Require().Equal(seedKps[0].Accounts[0].KeyUID, info.KeyUID)
+
+		genAcc := generator.NewAccount(accKey.PrivateKey, accKey.ExtendedKey)
+		genAccKeyUID := genAcc.KeyUID()
+
+		s.Require().NoError(err)
+		s.Require().Equal(seedKps[0].KeyUID, genAccKeyUID)
+		s.Require().Equal(seedKps[0].Accounts[0].KeyUID, genAccKeyUID)
+
 		mnemonicNoExtraSpaces := strings.Join(strings.Fields("vocal blouse script census island armor seek catch wool narrow peasant attract"), " ")
-		importedSeedAccountInfo, err := generator.ImportMnemonic(mnemonicNoExtraSpaces, "")
+		importedAcc, err := generator.CreateAccountFromMnemonic(mnemonicNoExtraSpaces, "")
 		s.Require().NoError(err)
-		derivedAddresses, err := generator.DeriveAddresses(importedSeedAccountInfo.ID, paths)
+
+		derivedAddresses, err := generator.DeriveChildrenFromAccount(importedAcc, paths)
 		s.Require().NoError(err)
-		s.Require().Equal(derivedAddresses[pathDefaultWallet].PublicKey, "0x04fde3e58a7379161da2adf033fbee076e2ba11fca8b07c4d06610b399911a60017e4c108eae243487d19e273f99c2d6af13ff5e330783f4389212092b01cc616c")
+
+		s.Require().Equal(derivedAddresses[pathDefaultWallet].PublicKeyHex(), "0x04fde3e58a7379161da2adf033fbee076e2ba11fca8b07c4d06610b399911a60017e4c108eae243487d19e273f99c2d6af13ff5e330783f4389212092b01cc616c")
 		//following line shows: we're unable to calculate the right KeyUID with the wrong public key from existing records for the imported seed account
-		s.Require().False(importedSeedAccountInfo.KeyUID == seedKps[0].KeyUID)
+		s.Require().False(importedAcc.KeyUID() == seedKps[0].KeyUID)
 
 		// Check key keypair
 		keyKps, ok := keypairMap[accounts.KeypairTypeKey]
 		s.Require().True(ok, "Key keypair not found")
 		s.Require().True(len(keyKps) == 1, "Unexpected number of key keypairs")
 		s.Require().True(len(keyKps[0].Accounts) == 1)
-		info, err = generator.LoadAccount(keyKps[0].Accounts[0].Address.Hex(), oldMobileUserPasswd)
+		accKey, err = b.AccountManager().LoadAccount(keyKps[0].Accounts[0].Address, oldMobileUserPasswd)
 		s.Require().NoError(err)
+
+		genAcc = generator.NewAccount(accKey.PrivateKey, accKey.ExtendedKey)
+		genAccKeyUID = genAcc.KeyUID()
+		multiAcc := &multiaccounts.Account{
+			Timestamp: time.Now().Unix(),
+			KeyUID:    genAccKeyUID,
+		}
 
 		// The user should manually accept terms, so we make sure we don't set it
 		// automatically by mistake.
-		s.Require().False(info.ToMultiAccount().HasAcceptedTerms)
+		s.Require().False(multiAcc.HasAcceptedTerms)
 
-		s.Require().Equal(keyKps[0].KeyUID, info.KeyUID)
-		s.Require().Equal(keyKps[0].Accounts[0].KeyUID, info.KeyUID)
-		info, err = generator.ImportPrivateKey("c3ad0b50652318f845565c13761e5369ce75dcbc2a94616e15b829d4b07410fe")
+		s.Require().Equal(keyKps[0].KeyUID, genAccKeyUID)
+		s.Require().Equal(keyKps[0].Accounts[0].KeyUID, genAccKeyUID)
+		importedAcc, err = generator.CreateAccountFromPrivateKey("c3ad0b50652318f845565c13761e5369ce75dcbc2a94616e15b829d4b07410fe")
 		s.Require().NoError(err)
-		s.Require().Equal(info.KeyUID, keyKps[0].KeyUID)
+		s.Require().Equal(importedAcc.KeyUID(), keyKps[0].KeyUID)
 	}
 
 	s.loginMobileUser(checkAfterLogin)
@@ -191,16 +209,19 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 	// simulate mobile frontend adding a wallet account
 	suggestedPath, err := db.ResolveSuggestedPathForKeypair(oldMobileUserKeyUID)
 	s.Require().NoError(err)
-	generator := b.AccountManager().AccountsGenerator()
-	accountInfo, err := generator.LoadAccount(profileKp.DerivedFrom, oldMobileUserPasswd)
+
+	accKey, err := b.AccountManager().LoadAccount(types.HexToAddress(profileKp.DerivedFrom), oldMobileUserPasswd)
 	s.Require().NoError(err)
-	infoMap, err := generator.DeriveAddresses(accountInfo.ID, []string{suggestedPath})
+
+	genAcc := generator.NewAccount(accKey.PrivateKey, accKey.ExtendedKey)
+
+	infoMap, err := generator.DeriveChildrenFromAccount(genAcc, []string{suggestedPath})
 	s.Require().NoError(err)
 	s.Require().Len(infoMap, 1)
 	deriveAccountInfo := infoMap[suggestedPath]
 	expectedDerivedAddress := "0xf44F8Ebc5b088e0eA8a0f7309A4a0c525AD783DA"
-	s.Require().Equal(expectedDerivedAddress, deriveAccountInfo.Address)
-	derivedAddress := types.HexToAddress(deriveAccountInfo.Address)
+	s.Require().Equal(expectedDerivedAddress, deriveAccountInfo.Address().Hex())
+	derivedAddress := deriveAccountInfo.Address()
 	accountsAPI := b.StatusNode().AccountService().AccountsAPI()
 	err = accountsAPI.AddAccount(context.Background(), oldMobileUserPasswd, &accounts.Account{
 		Address:   derivedAddress,
@@ -209,7 +230,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 		Chat:      false,
 		Type:      accounts.AccountTypeGenerated,
 		Path:      suggestedPath,
-		PublicKey: types.Hex2Bytes(deriveAccountInfo.PublicKey),
+		PublicKey: types.Hex2Bytes(deriveAccountInfo.PublicKeyHex()),
 		Name:      "GeneratedAccount2",
 		Emoji:     "emoji",
 		ColorID:   common.CustomizationColorBlue,

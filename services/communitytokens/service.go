@@ -38,7 +38,7 @@ import (
 // Collectibles service
 type Service struct {
 	manager         *Manager
-	accountsManager *account.GethManager
+	accountsManager *account.DefaultManager
 	config          *params.NodeConfig
 	db              *communitytokensdatabase.Database
 	Messenger       *protocol.Messenger
@@ -49,7 +49,7 @@ type Service struct {
 }
 
 // Returns a new Collectibles Service.
-func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, config *params.NodeConfig, appDb *sql.DB,
+func NewService(rpcClient *rpc.Client, accountsManager *account.DefaultManager, config *params.NodeConfig, appDb *sql.DB,
 	walletFeed *event.Feed, transactor *transactions.Transactor) *Service {
 	return &Service{
 		manager:         NewManager(rpcClient),
