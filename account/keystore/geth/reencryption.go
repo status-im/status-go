@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func ReEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []byte, e error) {
+func reEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []byte, e error) {
 	cryptoJSON, e := RawKeyToCryptoJSON(rawKey)
 	if e != nil {
 		return reEncryptedKey, fmt.Errorf("convert to crypto json error: %v", e)
@@ -42,7 +42,7 @@ func ReEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []
 	return keystore.EncryptKey(&gethKey, newPass, n, p)
 }
 
-func ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
+func reEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
 	rencryptFileAtPath := func(tempKeyDirPath, path string, fileInfo os.FileInfo) error {
 		if fileInfo.IsDir() {
 			return nil
@@ -53,7 +53,7 @@ func ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
 			return fmt.Errorf("invalid account key file: %v", e)
 		}
 
-		reEncryptedKey, e := ReEncryptKey(rawKeyFile, oldPass, newPass)
+		reEncryptedKey, e := reEncryptKey(rawKeyFile, oldPass, newPass)
 		if e != nil {
 			return fmt.Errorf("unable to re-encrypt key file: %v, path: %s, name: %s", e, path, fileInfo.Name())
 		}

@@ -32,35 +32,33 @@ func accountFrom(account accounts.Account) types.Account {
 	}
 }
 
-func newKeyForPurposeFromExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey) (*ethtypes.Key, error) {
+func newKeyForPurposeFromExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey) (key *ethtypes.Key, err error) {
 	var (
 		extChild1 *extkeys.ExtendedKey // CKD#1 - main account (extChild2 removed in comparison to original code we have in go-ethereum fork)
-		err       error
-		id        uuid.UUID
 	)
+
+	key = &ethtypes.Key{}
 
 	if extKey.Depth == 0 { // we are dealing with master key
 		// CKD#1 - main account
 		extChild1, err = extKey.ChildForPurpose(keyPurpose, 0)
 		if err != nil {
-			return &ethtypes.Key{}, err
+			return
 		}
 	} else { // we are dealing with non-master key, so it is safe to persist and extend from it
 		extChild1 = extKey
 	}
 
-	privateKeyECDSA := extChild1.ToECDSA()
-	id, err = uuid.NewRandom()
+	key.ID, err = uuid.NewRandom()
 	if err != nil {
-		return nil, err
+		return
 	}
-	key := &ethtypes.Key{
-		ID:          id,
-		Address:     crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
-		PrivateKey:  privateKeyECDSA,
-		ExtendedKey: extChild1,
-	}
-	return key, nil
+
+	key.PrivateKey = extChild1.ToECDSA()
+	key.Address = crypto.PubkeyToAddress(key.PrivateKey.PublicKey)
+	key.ExtendedKey = extChild1
+
+	return
 }
 
 func zeroKey(k *ecdsa.PrivateKey) {

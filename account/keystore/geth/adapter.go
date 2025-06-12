@@ -2,6 +2,8 @@ package geth
 
 import (
 	"crypto/ecdsa"
+	"errors"
+	"os"
 
 	"github.com/status-im/extkeys"
 
@@ -12,13 +14,30 @@ import (
 )
 
 type Adapter struct {
-	keystore *keystore.KeyStore
+	keystoreDir string
+	keystore    *keystore.KeyStore
 }
 
-func NewAdapter(ks *keystore.KeyStore) *Adapter {
-	return &Adapter{
-		keystore: ks,
+func NewAdapter(keystoreDir string, ks *keystore.KeyStore) (*Adapter, error) {
+	var (
+		keydir = keystoreDir
+		err    error
+	)
+	if keydir == "" {
+		keydir, err = os.MkdirTemp("", "go-ethereum-keystore")
+		if err != nil {
+			return nil, err
+		}
 	}
+
+	if err = os.MkdirAll(keydir, 0700); err != nil {
+		return nil, err
+	}
+
+	return &Adapter{
+		keystoreDir: keydir,
+		keystore:    ks,
+	}, nil
 }
 
 // ImportECDSA imports an ECDSA private key
@@ -39,8 +58,14 @@ func (a *Adapter) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphras
 	return a.updateKeystoreFile(privateKey, extKey, passphrase)
 }
 
-// ImportExtendedKeyForWallet imports an extended key for a wallet purpose by deriving the appropriate child key
+// ImportExtendedKeyForWallet imports an extended key by converting it to ECDSA private key and then deriving
+// the appropriate child key (CKD#1) default wallet account for a wallet purpose
 func (a *Adapter) ImportExtendedKeyForWallet(extKey *extkeys.ExtendedKey, passphrase string) (types.Account, error) {
+	_, err := a.ImportSingleExtendedKey(extKey, passphrase) // create master account if it doesn't exist
+	if err != nil {
+		return types.Account{}, err
+	}
+
 	const keyPurpose = extkeys.KeyPurposeWallet
 	key, err := newKeyForPurposeFromExtendedKey(keyPurpose, extKey)
 	if err != nil {
@@ -52,6 +77,7 @@ func (a *Adapter) ImportExtendedKeyForWallet(extKey *extkeys.ExtendedKey, passph
 	if err == nil {
 		return account, nil
 	}
+
 	return a.updateKeystoreFile(key.PrivateKey, key.ExtendedKey, passphrase)
 }
 
@@ -76,6 +102,8 @@ func (a *Adapter) Delete(address ethtypes.Address) error {
 		return err
 	}
 
+	// TODO: think about how to use `Delete` method from `keystore` package, not from our fork
+	// this is the only that depends on our fork for the account management part of the app.
 	return a.keystore.Delete(gethAccount)
 }
 
@@ -91,20 +119,18 @@ func (a *Adapter) Accounts() []types.Account {
 func (a *Adapter) Find(address ethtypes.Address) (types.Account, error) {
 	gethAccount, err := a.find(address)
 	if err != nil {
+		if errors.Is(err, keystore.ErrNoMatch) {
+			return types.Account{}, ErrNoMatch
+		}
 		return types.Account{}, err
 	}
 	return accountFrom(gethAccount), nil
 }
 
-func (a *Adapter) VerifyPassword(address ethtypes.Address, passphrase string) (*ethtypes.Key, error) {
-	gethAccount, err := a.find(address)
-	if err != nil {
-		return nil, err
-	}
-
-	return readKeystoreFileAndDecryptedKey(gethAccount.URL.Path, passphrase)
+func (a *Adapter) ReEncryptKeyStoreDir(oldPass, newPass string) error {
+	return reEncryptKeyStoreDir(a.keystoreDir, oldPass, newPass)
 }
 
-func (a *Adapter) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
-	return ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass)
+func (a *Adapter) MigrateKeyStoreDir(newDir string, addresses []string) error {
+	return migrateKeyStoreDir(a.keystoreDir, newDir, addresses)
 }
