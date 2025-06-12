@@ -66,6 +66,9 @@ class StatusBackend(RpcClient, SignalClient):
         self.ws_url = f"{url}".replace("http", "ws")
         self.rpc_url = f"{url}/statusgo/CallRPC"
         self.public_key = ""
+        self.key_uid = ""
+        self.password = ""
+        self.display_name = ""
 
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
@@ -191,7 +194,7 @@ class StatusBackend(RpcClient, SignalClient):
             "dataDir": self.data_dir,
             "logEnabled": True,
             "logLevel": "DEBUG",
-            "apiLogging": True,
+            "apiLoggingEnabled": True,
             "wakuFleetsConfigFilePath": option.waku_fleets_config,
             "pushFleetsConfigFilePath": option.push_fleets_config,
         }
@@ -283,12 +286,13 @@ class StatusBackend(RpcClient, SignalClient):
         )
 
     def _create_account_request(self, user, **kwargs):
+        self.password = kwargs.get("password", user.password)
         data = {
             "rootDataDir": self.data_dir,
             "kdfIterations": 256000,
             # Profile config
             "displayName": self.display_name,
-            "password": kwargs.get("password", user.password),
+            "password": self.password,
             "customizationColor": kwargs.get("customizationColor", "primary"),
             # Logs config
             "logEnabled": True,
@@ -315,6 +319,7 @@ class StatusBackend(RpcClient, SignalClient):
         return self.api_valid_request(method, data)
 
     def login(self, keyUid, user=user_1):
+        self.password = user.password
         method = "LoginAccount"
         data = {
             "password": user.password,
@@ -355,7 +360,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
 
     def find_key_uid(self):
-        return self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
+        self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.1), reraise=True)
     def change_container_ip(self, new_ipv4=None, new_ipv6=None):

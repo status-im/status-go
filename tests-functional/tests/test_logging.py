@@ -39,7 +39,7 @@ class TestLogging:
             r"ERROR\s+test1\.test2\.test3\s+",
         ]
 
-        key_uid = str(backend_client.find_key_uid())
+        key_uid = str(backend_client.key_uid)
         formatted_key_uid = f"{key_uid[:4]}..{key_uid[-4:]}"
         profile_log_file_name = f"{formatted_key_uid}.log"
         log_path = os.path.join(backend_client.data_dir, profile_log_file_name)
