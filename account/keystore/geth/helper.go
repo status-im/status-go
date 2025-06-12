@@ -8,7 +8,6 @@ import (
 	"github.com/status-im/extkeys"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -32,35 +31,33 @@ func accountFrom(account accounts.Account) types.Account {
 	}
 }
 
-func newKeyForPurposeFromExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey) (*ethtypes.Key, error) {
+func newKeyForPurposeFromExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey) (key *ethtypes.Key, err error) {
 	var (
 		extChild1 *extkeys.ExtendedKey // CKD#1 - main account (extChild2 removed in comparison to original code we have in go-ethereum fork)
-		err       error
-		id        uuid.UUID
 	)
+
+	key = &ethtypes.Key{}
 
 	if extKey.Depth == 0 { // we are dealing with master key
 		// CKD#1 - main account
 		extChild1, err = extKey.ChildForPurpose(keyPurpose, 0)
 		if err != nil {
-			return &ethtypes.Key{}, err
+			return
 		}
 	} else { // we are dealing with non-master key, so it is safe to persist and extend from it
 		extChild1 = extKey
 	}
 
-	privateKeyECDSA := extChild1.ToECDSA()
-	id, err = uuid.NewRandom()
+	key.ID, err = uuid.NewRandom()
 	if err != nil {
-		return nil, err
+		return
 	}
-	key := &ethtypes.Key{
-		ID:          id,
-		Address:     crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
-		PrivateKey:  privateKeyECDSA,
-		ExtendedKey: extChild1,
-	}
-	return key, nil
+
+	key.PrivateKey = extChild1.ToECDSA()
+	key.Address = crypto.PubkeyToAddress(key.PrivateKey.PublicKey)
+	key.ExtendedKey = extChild1
+
+	return
 }
 
 func zeroKey(k *ecdsa.PrivateKey) {
@@ -83,16 +80,16 @@ func readKeystoreFileAndDecryptedKey(path string, auth string) (*ethtypes.Key, e
 	return DecryptKey(keyjson, auth)
 }
 
-func encryptKeyAndStoreToKeystoreFile(ethKey *ethtypes.Key, path string, passphrase string) error {
-	key := &keystore.Key{
-		Id:              ethKey.ID,
-		Address:         common.Address(ethKey.Address),
+func encryptKeyAndStoreToKeystoreFile(ethKey *ethtypes.Key, path string, scryptN int, scryptP int, passphrase string) error {
+	key := &ethtypes.Key{
+		ID:              ethKey.ID,
+		Address:         ethKey.Address,
 		PrivateKey:      ethKey.PrivateKey,
 		ExtendedKey:     ethKey.ExtendedKey,
 		SubAccountIndex: ethKey.SubAccountIndex,
 	}
 
-	keyjson, err := keystore.EncryptKey(key, passphrase, keystore.LightScryptN, keystore.LightScryptP)
+	keyjson, err := EncryptKey(key, passphrase, scryptN, scryptP)
 	if err != nil {
 		return err
 	}
@@ -100,7 +97,8 @@ func encryptKeyAndStoreToKeystoreFile(ethKey *ethtypes.Key, path string, passphr
 	return os.WriteFile(path, keyjson, 0600)
 }
 
-func (a *Adapter) updateKeystoreFile(privateKey *ecdsa.PrivateKey, extKey *extkeys.ExtendedKey, passphrase string) (types.Account, error) {
+func (a *Adapter) updateKeystoreFile(privateKey *ecdsa.PrivateKey, extKey *extkeys.ExtendedKey, scryptN int, scryptP int,
+	passphrase string) (types.Account, error) {
 	gethAccount, err := a.keystore.ImportECDSA(privateKey, passphrase)
 	if err != nil {
 		return types.Account{}, err
@@ -113,7 +111,7 @@ func (a *Adapter) updateKeystoreFile(privateKey *ecdsa.PrivateKey, extKey *extke
 
 	ethKey.ExtendedKey = extKey
 
-	err = encryptKeyAndStoreToKeystoreFile(ethKey, gethAccount.URL.Path, passphrase)
+	err = encryptKeyAndStoreToKeystoreFile(ethKey, gethAccount.URL.Path, scryptN, scryptP, passphrase)
 	if err != nil {
 		return types.Account{}, err
 	}
