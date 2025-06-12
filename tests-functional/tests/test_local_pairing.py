@@ -19,13 +19,11 @@ class TestLocalPairing(MessengerSteps):
     ]
 
     def test_pairing_server_as_sender(self):
-        # user 1
+        # Create users
         self.sender = self.initialize_backend(self.await_signals, False)
-
-        # User 2
         self.receiver = self.initialize_backend(self.await_signals, False)
 
-        # Make contacts
+        # Make contacts before local pairing
         self.make_contacts()
 
         # Local pairing
@@ -35,18 +33,15 @@ class TestLocalPairing(MessengerSteps):
         connection_string = self.receiver.get_connection_string_for_bootstrapping_another_device()
         response = receiver_second_device.input_connection_string_for_bootstrapping(connection_string)
         response = json.loads(response)
-        print(f"response = {response}")
 
         events = receiver_second_device.get_all_signals(signal_type=SignalType.LOCAL_PAIRING.value)
-        print(f"events = {events}")
-        
         for event in events:
             assert "error" not in event["event"] or not event["event"]["error"]
 
         assert response["error"] is None
         assert response["keyUID"] == self.receiver.key_uid
 
-        # Login on second device
+        # Login on the second device
         user = Account(
             password=self.receiver.password,
             address="",
@@ -60,7 +55,7 @@ class TestLocalPairing(MessengerSteps):
         receiver_second_device.find_key_uid()
         receiver_second_device.wakuext_service.start_messenger()
 
-        # Check contacts
+        # Check that contact is synced
         response = receiver_second_device.wakuext_service.get_contacts()
         assert "error" not in response
 
