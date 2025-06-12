@@ -43,7 +43,7 @@ class TestLocalPairing(MessengerSteps):
         for event in events:
             assert "error" not in event["event"] or not event["event"]["error"]
 
-        assert response["error"] == {}
+        assert response["error"] is None
         assert response["keyUID"] == self.receiver.key_uid
 
         # Login on second device
@@ -55,12 +55,17 @@ class TestLocalPairing(MessengerSteps):
         )
         receiver_second_device.init_status_backend()
         receiver_second_device.login(self.receiver.key_uid, user)
-        # input("Press Enter to continue...")
         receiver_second_device.wait_for_login()
         receiver_second_device.find_public_key()
         receiver_second_device.find_key_uid()
         receiver_second_device.wakuext_service.start_messenger()
 
         # Check contacts
-        contacts = receiver_second_device.wakuext_service.get_contacts()
+        response = receiver_second_device.wakuext_service.get_contacts()
+        assert "error" not in response
+
+        contacts = response["result"]
         print(f"contacts = {contacts}")
+
+        assert len(contacts) == 1
+        assert contacts[0]["id"] == self.sender.public_key

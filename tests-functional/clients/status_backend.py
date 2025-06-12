@@ -439,7 +439,7 @@ class StatusBackend(RpcClient, SignalClient):
                "deviceType": "macos",
                "keyUID": self.key_uid,
                "password": self.password,
-               "chatKey": self.public_key,
+               "chatKey": "",
            },
             "serverConfig": {
                 "timeout": 5 * 60 * 1000,
