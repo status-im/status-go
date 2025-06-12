@@ -3,6 +3,8 @@ package statusgo
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/status-im/status-go/account/generator"
 )
 
 // MultiAccountImportPrivateKeyParams are the params sent to MultiAccountImportPrivateKey.
@@ -25,12 +27,14 @@ func CreateAccountFromPrivateKey(paramsJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	resp, err := statusBackend.AccountManager().AccountsGenerator().CreateAccountFromPrivateKey(p.PrivateKey)
+	generatedAccount, err := generator.CreateAccountFromPrivateKey(p.PrivateKey)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	out, err := json.Marshal(resp)
+	generatedAccountInfo := generatedAccount.ToIdentifiedAccountInfo()
+
+	out, err := json.Marshal(generatedAccountInfo)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -50,12 +54,29 @@ func CreateAccountFromMnemonicAndDeriveAccountsForPaths(paramsJSON string) strin
 	// remove any duplicate whitespaces
 	mnemonicPhraseNoExtraSpaces := strings.Join(strings.Fields(p.MnemonicPhrase), " ")
 
-	resp, err := statusBackend.AccountManager().AccountsGenerator().CreateAccountFromMnemonicAndDeriveAccountsForPaths(mnemonicPhraseNoExtraSpaces, p.Bip39Passphrase, p.Paths)
+	generatedAccount, err := generator.CreateAccountFromMnemonic(mnemonicPhraseNoExtraSpaces, p.Bip39Passphrase)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	out, err := json.Marshal(resp)
+	derivedAccounts, err := generator.DeriveChildrenFromAccount(generatedAccount, p.Paths)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	generatedAccountInfo := generatedAccount.ToIdentifiedAccountInfo()
+
+	derivedAccountsInfo := make(map[string]generator.AccountInfo)
+	for path, derivedAccount := range derivedAccounts {
+		derivedAccountsInfo[path] = derivedAccount.ToAccountInfo()
+	}
+
+	generatedAndDerivedAccountsInfo := generator.GeneratedAndDerivedAccountInfo{
+		GeneratedAccountInfo: generatedAccountInfo.ToGeneratedAccountInfo(mnemonicPhraseNoExtraSpaces),
+		Derived:              derivedAccountsInfo,
+	}
+
+	out, err := json.Marshal(generatedAndDerivedAccountsInfo)
 	if err != nil {
 		return makeJSONResponse(err)
 	}

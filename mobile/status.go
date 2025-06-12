@@ -21,8 +21,10 @@ import (
 
 	"github.com/status-im/extkeys"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	accountcommon "github.com/status-im/status-go/account/common"
+	"github.com/status-im/status-go/account/keystore/geth"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/centralizedmetrics"
@@ -392,7 +394,7 @@ func VerifyAccountPassword(keyStoreDir, address, password string) string {
 
 // verifyAccountPassword verifies account password.
 func verifyAccountPassword(keyStoreDir, address, password string) string {
-	_, err := statusBackend.AccountManager().VerifyAccountPassword(keyStoreDir, address, password)
+	_, err := statusBackend.AccountManager().LoadAccount(types.HexToAddress(address), password)
 	return makeJSONResponse(err)
 }
 
@@ -412,7 +414,7 @@ func verifyAccountPasswordV2(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	_, err = statusBackend.AccountManager().VerifyAccountPassword(request.KeyStoreDir, request.Address, request.Password)
+	_, err = statusBackend.AccountManager().LoadAccount(types.HexToAddress(request.Address), request.Password)
 	return makeJSONResponse(err)
 }
 
@@ -462,24 +464,24 @@ func migrateKeyStoreDirV2(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.MigrateKeyStoreDir(request.Account, request.Password, request.OldDir, request.NewDir)
+	err = statusBackend.MigrateKeyStoreDir(request.Account, request.Password, request.NewDir)
 	return makeJSONResponse(err)
 }
 
 // Deprecated: Use MigrateKeyStoreDirV2 instead
 func MigrateKeyStoreDir(accountData, password, oldDir, newDir string) string {
-	return migrateKeyStoreDir(accountData, password, oldDir, newDir)
+	return migrateKeyStoreDir(accountData, password, newDir)
 }
 
 // migrateKeyStoreDir migrates key files to a new directory
-func migrateKeyStoreDir(accountData, password, oldDir, newDir string) string {
+func migrateKeyStoreDir(accountData, password, newDir string) string {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.MigrateKeyStoreDir(account, password, oldDir, newDir)
+	err = statusBackend.MigrateKeyStoreDir(account, password, newDir)
 	return makeJSONResponse(err)
 }
 
@@ -729,8 +731,12 @@ func InitKeystore(keydir string) string {
 
 // initKeystore initialize keystore before doing any operations with keys.
 func initKeystore(keydir string) string {
-	err := statusBackend.AccountManager().InitKeystore(keydir)
-	return makeJSONResponse(err)
+	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keydir, keystore.LightScryptN, keystore.LightScryptP)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	statusBackend.AccountManager().SetKeystore(keystoreAdapter)
+	return makeJSONResponse(nil)
 }
 
 // SaveAccountAndLoginWithKeycard saves account in status-go database.
