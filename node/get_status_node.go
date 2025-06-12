@@ -76,7 +76,7 @@ type StatusNode struct {
 
 	logger *zap.Logger
 
-	gethAccountManager *account.GethManager
+	gethAccountManager *account.DefaultManager
 	transactor         *transactions.Transactor
 
 	publicMethods map[string]bool
@@ -113,7 +113,7 @@ type StatusNode struct {
 }
 
 // New makes new instance of StatusNode.
-func New(transactor *transactions.Transactor, gethAccountManager *account.GethManager, logger *zap.Logger) *StatusNode {
+func New(transactor *transactions.Transactor, gethAccountManager *account.DefaultManager, logger *zap.Logger) *StatusNode {
 	logger = logger.Named("StatusNode")
 	return &StatusNode{
 		transactor:         transactor,

@@ -47,6 +47,13 @@ func NewDefaultManager(logger *zap.Logger) *DefaultManager {
 	}
 }
 
+func (m *DefaultManager) IsKeystoreSet() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return m.keystore != nil
+}
+
 func (m *DefaultManager) SetKeystore(keystore types.KeyStore) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

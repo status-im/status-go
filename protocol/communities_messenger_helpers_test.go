@@ -18,6 +18,7 @@ import (
 	accounttypes "github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -38,9 +39,9 @@ type AccountManagerMock struct {
 	AccountsMap map[string]string
 }
 
-func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*accounttypes.SelectedExtKey, error) {
+func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*accounttypes.SelectedExtKey, error) {
 	return &accounttypes.SelectedExtKey{
-		Address: types.HexToAddress(address),
+		Address: address,
 	}, nil
 }
 

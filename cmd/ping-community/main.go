@@ -17,7 +17,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/account/keystore/geth"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/types"
@@ -369,35 +371,29 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	backend.UpdateRootDataDir("./tmp")
 	manager := backend.AccountManager()
-	if err := manager.InitKeystore("./tmp"); err != nil {
+	keystoreDir := "./tmp"
+	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keystoreDir, keystore.LightScryptN, keystore.LightScryptP)
+	if err != nil {
 		return err
 	}
-	err := backend.OpenAccounts()
+	manager.SetKeystore(keystoreAdapter)
+
+	err = backend.OpenAccounts()
 	if err != nil {
 		logger.Error("failed open accounts", err)
 		return err
 	}
-	generator := manager.AccountsGenerator()
-	generatedAccountInfo, err := generator.ImportMnemonic(seedPhrase, "")
-	if err != nil {
-		return err
-	}
 
-	derivedAddresses, err := generator.DeriveAddresses(generatedAccountInfo.ID, paths)
-	if err != nil {
-		return err
-	}
-
-	_, err = generator.StoreDerivedAccounts(generatedAccountInfo.ID, "", paths)
+	accInfo, derivedAccsInfo, err := backend.StoreAccount(seedPhrase, "", paths)
 	if err != nil {
 		return err
 	}
 
 	account := multiaccounts.Account{
-		KeyUID:        generatedAccountInfo.KeyUID,
+		KeyUID:        accInfo.KeyUID,
 		KDFIterations: dbsetup.ReducedKDFIterationsNumber,
 	}
-	settings, err := defaultSettings(generatedAccountInfo, derivedAddresses, &seedPhrase)
+	settings, err := defaultSettings(accInfo.ToGeneratedAccountInfo(seedPhrase), derivedAccsInfo, &seedPhrase)
 	if err != nil {
 		return err
 	}
@@ -407,10 +403,10 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 		return err
 	}
 
-	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
+	walletDerivedAccount := derivedAccsInfo[pathDefaultWallet]
 	walletAccount := &accounts.Account{
 		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
-		KeyUID:    generatedAccountInfo.KeyUID,
+		KeyUID:    accInfo.KeyUID,
 		Address:   types.HexToAddress(walletDerivedAccount.Address),
 		ColorID:   "",
 		Wallet:    true,
@@ -418,10 +414,10 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 		Name:      "Ethereum account",
 	}
 
-	chatDerivedAccount := derivedAddresses[pathDefaultChat]
+	chatDerivedAccount := derivedAccsInfo[pathDefaultChat]
 	chatAccount := &accounts.Account{
 		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
-		KeyUID:    generatedAccountInfo.KeyUID,
+		KeyUID:    accInfo.KeyUID,
 		Address:   types.HexToAddress(chatDerivedAccount.Address),
 		Name:      settings.Name,
 		Chat:      true,
