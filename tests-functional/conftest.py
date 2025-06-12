@@ -30,6 +30,12 @@ def pytest_addoption(parser):
         default="tests-functional",
     )
     parser.addoption(
+        "--docker-image",
+        action="store",
+        help="status-go docker image name to use, defaults to current git commit",
+        default="",
+    )
+    parser.addoption(
         "--codecov_dir",
         action="store",
         help="",
@@ -119,6 +125,6 @@ def close_status_backend_containers(request):
     if hasattr(request.node.instance, "reuse_container"):
         return
     for container in option.statusgo_containers:
-        container.stop() # pyright: ignore[reportAttributeAccessIssue]
-        container.remove() # pyright: ignore[reportAttributeAccessIssue]
+        container.stop()  # pyright: ignore[reportAttributeAccessIssue]
+        container.remove()  # pyright: ignore[reportAttributeAccessIssue]
     option.statusgo_containers = []
