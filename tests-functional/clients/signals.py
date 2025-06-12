@@ -23,6 +23,7 @@ class SignalType(Enum):
     WALLET_ROUTER_SIGN_TRANSACTIONS = "wallet.router.sign-transactions"
     WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED = "wallet.router.sending-transactions-started"
     WALLET_ROUTER_TRANSACTIONS_SENT = "wallet.router.transactions-sent"
+    LOCAL_PAIRING = "localPairing"
 
 
 class WalletEventType(Enum):

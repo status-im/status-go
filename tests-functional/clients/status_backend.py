@@ -20,7 +20,7 @@ from clients.services.settings import SettingsService
 from clients.signals import SignalClient
 from clients.rpc import RpcClient
 from conftest import option
-from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID
+from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
 from docker.errors import APIError
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
@@ -430,3 +430,41 @@ class StatusBackend(RpcClient, SignalClient):
             logging.info(f"StatusBackend is online after {time.time() - start_time} seconds")
             return
         raise TimeoutError(f"StatusBackend was not online after {timeout} seconds")
+
+    def get_connection_string_for_bootstrapping_another_device(self):
+        method = "GetConnectionStringForBootstrappingAnotherDevice"
+        data = {
+           "senderConfig": {
+               "keystorePath": os.path.join(self.data_dir, "keystore", self.key_uid),
+               "deviceType": "macos",
+               "keyUID": self.key_uid,
+               "password": self.password,
+               "chatKey": self.public_key,
+           },
+            "serverConfig": {
+                "timeout": 5 * 60 * 1000,
+            },
+        }
+        response = self.api_request(method, data)
+        return response.content.decode()
+
+    def input_connection_string_for_bootstrapping(self, connection_string):
+        method = "InputConnectionStringForBootstrappingV2"
+        # Empty user
+        user = Account(
+            address="",
+            private_key="",
+            password="",
+            passphrase="",
+        )
+        data = {
+            "connectionString": connection_string,
+            "receiverClientConfig": {
+                "receiverConfig": {
+                    "createAccount": self._create_account_request(user)
+                },
+                "clientConfig": {},
+            },
+        }
+        response = self.api_request(method, data)
+        return response.content.decode()
