@@ -6,11 +6,10 @@ import (
 )
 
 type LoginParams struct {
-	ChatAddress    ethtypes.Address       `json:"chatAddress"`
-	Password       string                 `json:"password"`
-	MainAccount    ethtypes.Address       `json:"mainAccount"`
-	WatchAddresses []ethtypes.Address     `json:"watchAddresses"`
-	MultiAccount   *multiaccounts.Account `json:"multiAccount"`
+	ChatAddress  ethtypes.Address       `json:"chatAddress"`
+	Password     string                 `json:"password"`
+	MainAccount  ethtypes.Address       `json:"mainAccount"`
+	MultiAccount *multiaccounts.Account `json:"multiAccount"`
 }
 
 type PublicKeyData struct {

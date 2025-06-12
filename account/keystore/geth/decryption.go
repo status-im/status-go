@@ -24,6 +24,9 @@ import (
 
 const (
 	keyHeaderKDF = "scrypt"
+
+	scryptR     = 8
+	scryptDKLen = 32
 )
 
 type EncryptedKeyJSONV3 struct {
@@ -49,6 +52,15 @@ type CryptoJSON struct {
 	KDF          string                 `json:"kdf"`
 	KDFParams    map[string]interface{} `json:"kdfparams"`
 	MAC          string                 `json:"mac"`
+}
+
+type encryptedKeyJSONV3 struct {
+	Address         string     `json:"address"`
+	Crypto          CryptoJSON `json:"crypto"`
+	Id              string     `json:"id"`
+	Version         int        `json:"version"`
+	ExtendedKey     CryptoJSON `json:"extendedkey"`
+	SubAccountIndex uint32     `json:"subaccountindex"`
 }
 
 type cipherparamsJSON struct {

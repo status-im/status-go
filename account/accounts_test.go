@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/account/common"
+	"github.com/status-im/status-go/account/keystore/geth"
 	"github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
@@ -21,8 +23,17 @@ import (
 const testPassword = "test-password"
 const newTestPassword = "new-test-password"
 
+func setKeystore(accManager *DefaultManager, keyStoreDir string) error {
+	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
+	if err != nil {
+		return err
+	}
+	accManager.SetKeystore(keystoreAdapter)
+	return nil
+}
+
 func TestVerifyAccountPassword(t *testing.T) {
-	accManager := NewGethManager(tt.MustCreateTestLogger())
+	accManager := NewDefaultManager(tt.MustCreateTestLogger())
 	keyStoreDir := t.TempDir()
 	emptyKeyStoreDir := t.TempDir()
 
@@ -71,26 +82,22 @@ func TestVerifyAccountPassword(t *testing.T) {
 			keyStoreDir,
 			utils.TestConfig.Account1.WalletAddress,
 			"wrong password", // wrong password
-			errors.New("could not decrypt key with given password"),
+			geth.ErrDecrypt,
 		},
 	}
 	for _, testCase := range testCases {
-		err := accManager.InitKeystore(testCase.keyPath)
+		err := setKeystore(accManager, testCase.keyPath)
 		require.NoError(t, err)
 
-		accountKey, err := accManager.VerifyAccountPassword(testCase.keyPath, testCase.address, testCase.password)
+		ok, err := accManager.VerifyAccountPassword(ethtypes.HexToAddress(testCase.address), testCase.password)
 		if testCase.expectedError != nil && err != nil && testCase.expectedError.Error() != err.Error() ||
 			((testCase.expectedError == nil || err == nil) && testCase.expectedError != err) {
 			require.FailNow(t, fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
 		}
 		if err == nil {
-			if accountKey == nil { // nolint: staticcheck
-				require.Fail(t, "no error reported, but account key is missing")
-			}
-			accountAddress := ethtypes.BytesToAddress(ethtypes.FromHex(testCase.address))
-			if accountKey.Address != accountAddress { // nolint: staticcheck
-				require.Fail(t, "account mismatch: have %s, want %s", accountKey.Address.Hex(), accountAddress.Hex())
-			}
+			require.True(t, ok)
+		} else {
+			require.False(t, ok)
 		}
 	}
 }
@@ -105,14 +112,15 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	err := utils.ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
 	require.NoError(t, err)
 
-	accManager := NewGethManager(tt.MustCreateTestLogger())
+	accManager := NewDefaultManager(tt.MustCreateTestLogger())
 
-	err = accManager.InitKeystore(keyStoreDir)
+	err = setKeystore(accManager, keyStoreDir)
 	require.NoError(t, err)
 
 	address := ethtypes.HexToAddress(utils.TestConfig.Account3.WalletAddress)
-	_, err = accManager.VerifyAccountPassword(keyStoreDir, address.Hex(), utils.TestConfig.Account3.Password)
+	ok, err := accManager.VerifyAccountPassword(address, utils.TestConfig.Account3.Password)
 	require.NoError(t, err)
+	require.True(t, ok)
 }
 
 func TestManagerTestSuite(t *testing.T) {
@@ -122,7 +130,7 @@ func TestManagerTestSuite(t *testing.T) {
 type ManagerTestSuite struct {
 	suite.Suite
 	testAccount
-	accManager *GethManager
+	accManager *DefaultManager
 	keydir     string
 }
 
@@ -138,42 +146,40 @@ type testAccount struct {
 // SetupTest is used here for reinitializing the mock before every
 // test function to avoid faulty execution.
 func (s *ManagerTestSuite) SetupTest() {
-	s.accManager = NewGethManager(tt.MustCreateTestLogger())
+	s.accManager = NewDefaultManager(tt.MustCreateTestLogger())
 
 	keyStoreDir := s.T().TempDir()
-	s.Require().NoError(s.accManager.InitKeystore(keyStoreDir))
+	err := setKeystore(s.accManager, keyStoreDir)
+	s.Require().NoError(err)
 	s.keydir = keyStoreDir
 
 	// Initial test - create test account
-	_, accountInfo, mnemonic, err := s.accManager.CreateAccount(testPassword)
+	genAccount, mnemonic, err := s.accManager.CreateAndStoreAccount(testPassword)
 	s.Require().NoError(err)
-	s.Require().NotEmpty(accountInfo.WalletAddress)
-	s.Require().NotEmpty(accountInfo.WalletPubKey)
-	s.Require().NotEmpty(accountInfo.ChatAddress)
-	s.Require().NotEmpty(accountInfo.ChatPubKey)
 	s.Require().NotEmpty(mnemonic)
+	s.Require().NotNil(genAccount.PrivateKey())
+	s.Require().NotNil(genAccount.ExtendedKey())
 
-	// Before the complete decoupling of the keys, wallet and chat keys are the same
-	s.Equal(accountInfo.WalletAddress, accountInfo.ChatAddress)
-	s.Equal(accountInfo.WalletPubKey, accountInfo.ChatPubKey)
+	accountInfo := genAccount.ToAccountInfo()
 
 	s.testAccount = testAccount{
 		testPassword,
-		accountInfo.WalletAddress,
-		accountInfo.WalletPubKey,
-		accountInfo.ChatAddress,
-		accountInfo.ChatPubKey,
+		accountInfo.Address,
+		accountInfo.PublicKey,
+		accountInfo.Address,
+		accountInfo.PublicKey,
 		mnemonic,
 	}
 }
 
 func (s *ManagerTestSuite) TestRecoverAccount() {
-	accountInfo, err := s.accManager.RecoverAccount(s.password, s.mnemonic)
+	genAccount, err := s.accManager.CreateFromMnemonicAndStoreAccount(s.mnemonic, s.password)
 	s.NoError(err)
-	s.Equal(s.walletAddress, accountInfo.WalletAddress)
-	s.Equal(s.walletPubKey, accountInfo.WalletPubKey)
-	s.Equal(s.chatAddress, accountInfo.ChatAddress)
-	s.Equal(s.chatPubKey, accountInfo.ChatPubKey)
+	accountInfo := genAccount.ToAccountInfo()
+	s.Equal(s.walletAddress, accountInfo.Address)
+	s.Equal(s.walletPubKey, accountInfo.PublicKey)
+	s.Equal(s.chatAddress, accountInfo.Address)
+	s.Equal(s.chatPubKey, accountInfo.PublicKey)
 }
 
 func (s *ManagerTestSuite) TestOnboarding() {
@@ -201,9 +207,9 @@ func (s *ManagerTestSuite) TestOnboarding() {
 	s.Nil(s.accManager.onboarding)
 
 	// try to decrypt it with password to check if it's been imported correctly
-	decAccount, _, err := s.accManager.AddressToDecryptedAccount(info.WalletAddress, password)
+	key, err := s.accManager.LoadAccount(ethtypes.HexToAddress(info.WalletAddress), password)
 	s.Require().NoError(err)
-	s.Equal(info.WalletAddress, decAccount.Address.Hex())
+	s.Equal(info.WalletAddress, key.Address.Hex())
 
 	// try resetting onboarding
 	_, err = s.accManager.StartOnboarding(count, 24)
@@ -223,7 +229,7 @@ func (s *ManagerTestSuite) TestSelectAccountWrongAddress() {
 }
 
 func (s *ManagerTestSuite) TestSelectAccountWrongPassword() {
-	s.testSelectAccount(ethtypes.HexToAddress(s.testAccount.chatAddress), ethtypes.HexToAddress(s.testAccount.walletAddress), "wrong", errors.New("could not decrypt key with given password"))
+	s.testSelectAccount(ethtypes.HexToAddress(s.testAccount.chatAddress), ethtypes.HexToAddress(s.testAccount.walletAddress), "wrong", geth.ErrDecrypt)
 }
 
 func (s *ManagerTestSuite) testSelectAccount(chat, wallet ethtypes.Address, password string, expErr error) {
@@ -277,7 +283,6 @@ func (s *ManagerTestSuite) TestLogout() {
 	s.accManager.Logout()
 	s.Equal(ethtypes.Address{}, s.accManager.mainAccountAddress)
 	s.Nil(s.accManager.selectedChatAccount)
-	s.Len(s.accManager.watchAddresses, 0)
 }
 
 // TestAccounts tests cases for (*Manager).Accounts.
@@ -302,27 +307,26 @@ func (s *ManagerTestSuite) TestAccounts() {
 	s.NotNil(accs)
 }
 
-func (s *ManagerTestSuite) TestAddressToDecryptedAccountSuccess() {
-	s.testAddressToDecryptedAccount(s.walletAddress, s.password, nil)
+func (s *ManagerTestSuite) TestAddressToAccountSuccess() {
+	s.testAddressToAccount(s.walletAddress, s.password, nil)
 }
 
-func (s *ManagerTestSuite) TestAddressToDecryptedAccountWrongAddress() {
-	s.testAddressToDecryptedAccount("0x0001", s.password, errors.New("no key for given address or file"))
+func (s *ManagerTestSuite) TestAddressToAccountWrongAddress() {
+	s.testAddressToAccount("0x0001", s.password, errors.New("no key for given address or file"))
 }
 
-func (s *ManagerTestSuite) TestAddressToDecryptedAccountWrongPassword() {
-	s.testAddressToDecryptedAccount(s.walletAddress, "wrong", errors.New("could not decrypt key with given password"))
+func (s *ManagerTestSuite) TestAddressToAccountWrongPassword() {
+	s.testAddressToAccount(s.walletAddress, "wrong", geth.ErrDecrypt)
 }
 
-func (s *ManagerTestSuite) testAddressToDecryptedAccount(wallet, password string, expErr error) {
-	acc, key, err := s.accManager.AddressToDecryptedAccount(wallet, password)
+func (s *ManagerTestSuite) testAddressToAccount(wallet, password string, expErr error) {
+	key, err := s.accManager.LoadAccount(ethtypes.HexToAddress(wallet), password)
 	if expErr != nil {
 		s.Equal(expErr, err)
 	} else {
 		s.Require().NoError(err)
-		s.Require().NotNil(acc)
 		s.Require().NotNil(key)
-		s.Equal(acc.Address, key.Address)
+		s.Equal(wallet, key.Address.Hex())
 	}
 }
 
@@ -337,7 +341,7 @@ func (s *ManagerTestSuite) TestMigrateKeyStoreDir() {
 
 	address := ethtypes.HexToAddress(s.walletAddress).Hex()
 	addresses := []string{address}
-	err = s.accManager.MigrateKeyStoreDir(oldKeyDir, newKeyDir, addresses)
+	err = s.accManager.MigrateKeyStoreDir(newKeyDir, addresses)
 	s.Require().NoError(err)
 
 	files, _ = os.ReadDir(newKeyDir)
@@ -346,7 +350,7 @@ func (s *ManagerTestSuite) TestMigrateKeyStoreDir() {
 
 func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
 
-	err := s.accManager.ReEncryptKeyStoreDir(s.keydir, testPassword, newTestPassword)
+	err := s.accManager.ReEncryptKeyStoreDir(testPassword, newTestPassword)
 	s.Require().NoError(err)
 
 	err = filepath.Walk(s.keydir, func(path string, fileInfo os.FileInfo, err error) error {
