@@ -494,12 +494,8 @@ func (b *GethStatusBackend) ensureWalletDBOpened(account multiaccounts.Account, 
 }
 
 func (b *GethStatusBackend) SetupLogSettings() error {
-	// sync pre_login.log
-	if err := logutils.ZapLogger().Sync(); err != nil {
-		return errors.Wrap(err, "failed to sync logger")
-	}
-	logSettings := b.config.ProfileLogSettings()
-	return logutils.OverrideRootLoggerWithConfig(logSettings)
+	_ = logutils.ZapLogger().Sync()
+	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
 // Deprecated: Use StartNodeWithAccount instead.
@@ -2681,10 +2677,7 @@ func (b *GethStatusBackend) Logout() error {
 // including in release builds, to help diagnose login issues.
 // related issue: https://github.com/status-im/status-mobile/issues/21501
 func (b *GethStatusBackend) switchToPreLoginLog() error {
-	err := logutils.ZapLogger().Sync()
-	if err != nil {
-		return err
-	}
+	_ = logutils.ZapLogger().Sync()
 	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 

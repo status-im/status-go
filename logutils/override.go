@@ -1,7 +1,6 @@
 package logutils
 
 import (
-	"bufio"
 	"io"
 	"os"
 
@@ -59,10 +58,7 @@ func overrideCoreWithConfig(filteringCore *namespaceFilteringCore, settings LogS
 			Compress:   settings.CompressRotated,
 		}))
 	} else {
-		// run TestLoginWithKey will get error: sync /dev/stdout: bad file descriptor
-		// use bufio.NewWriter to wrap os.Stderr to fix it
-		writer := bufio.NewWriter(os.Stderr)
-		core.UpdateSyncer(zapcore.Lock(zapcore.AddSync(writer)))
+		core.UpdateSyncer(zapcore.Lock(zapcore.AddSync(os.Stderr)))
 	}
 
 	// FIXME: remove go-libp2p logging altogether
