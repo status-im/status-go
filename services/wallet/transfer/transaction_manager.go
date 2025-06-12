@@ -31,7 +31,7 @@ type TransactionDescription struct {
 
 type TransactionManager struct {
 	storage        MultiTransactionStorage
-	gethManager    *account.GethManager
+	gethManager    *account.DefaultManager
 	transactor     transactions.TransactorIface
 	config         *params.NodeConfig
 	accountsDB     accounts.AccountsStorage
@@ -56,7 +56,7 @@ type MultiTransactionStorage interface {
 
 func NewTransactionManager(
 	storage MultiTransactionStorage,
-	gethManager *account.GethManager,
+	gethManager *account.DefaultManager,
 	transactor transactions.TransactorIface,
 	config *params.NodeConfig,
 	accountsDB accounts.AccountsStorage,

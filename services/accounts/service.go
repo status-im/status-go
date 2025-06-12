@@ -1,8 +1,10 @@
 package accounts
 
 import (
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/account/keystore/geth"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/server"
 
@@ -14,7 +16,7 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *account.GethManager, config *params.NodeConfig, feed *event.Feed, mediaServer *server.MediaServer) *Service {
+func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *account.DefaultManager, config *params.NodeConfig, feed *event.Feed, mediaServer *server.MediaServer) *Service {
 	return &Service{db, mdb, manager, config, feed, nil, mediaServer}
 }
 
@@ -22,7 +24,7 @@ func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *acc
 type Service struct {
 	db          *accounts.Database
 	mdb         *multiaccounts.Database
-	manager     *account.GethManager
+	manager     *account.DefaultManager
 	config      *params.NodeConfig
 	feed        *event.Feed
 	messenger   *protocol.Messenger
@@ -35,7 +37,12 @@ func (s *Service) Init(messenger *protocol.Messenger) {
 
 // Start a service.
 func (s *Service) Start() error {
-	return s.manager.InitKeystore(s.config.KeyStoreDir)
+	keystoreAdapter, err := geth.NewGethKeystoreAdapter(s.config.KeyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
+	if err != nil {
+		return err
+	}
+	s.manager.SetKeystore(keystoreAdapter)
+	return nil
 }
 
 // Stop a service.
@@ -86,6 +93,6 @@ func (s *Service) VerifyPassword(password string) bool {
 	if err != nil {
 		return false
 	}
-	_, err = s.manager.VerifyAccountPassword(s.config.KeyStoreDir, address.Hex(), password)
-	return err == nil
+	ok, err := s.manager.VerifyAccountPassword(address, password)
+	return ok && err == nil
 }
