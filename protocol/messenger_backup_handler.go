@@ -90,6 +90,13 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 		errors = append(errors, err)
 	}
 
+	for _, setting := range message.Settings {
+		err = m.handleBackedUpSettings(setting)
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
 	err = m.handleKeypair(message.Keypair)
 	if err != nil {
 		errors = append(errors, err)
@@ -98,6 +105,13 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 	err = m.handleWatchOnlyAccount(message.WatchOnlyAccount)
 	if err != nil {
 		errors = append(errors, err)
+	}
+
+	for _, watchOnlyAccount := range message.WatchOnlyAccounts {
+		err = m.handleWatchOnlyAccount(watchOnlyAccount)
+		if err != nil {
+			errors = append(errors, err)
+		}
 	}
 
 	// Send signal about applied backup progress

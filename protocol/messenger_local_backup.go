@@ -74,15 +74,15 @@ func (m *Messenger) BackupDataLocally(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// _, settings, errors := m.prepareSyncSettingsMessages(clock, true)
-	// if len(errors) != 0 {
-	// 	// return just the first error, the others have been logged
-	// 	return errors[0]
-	// }
-	// woAccountsToBackup, err := m.backupWatchOnlyAccounts()
-	// if err != nil {
-	// 	return 0, err
-	// }
+	_, settings, errors := m.prepareSyncSettingsMessages(clock, true)
+	if len(errors) != 0 {
+		// return just the first error, the others have been logged
+		return errors[0]
+	}
+	woAccountsToBackup, err := m.backupWatchOnlyAccounts()
+	if err != nil {
+		return err
+	}
 
 	fullBackup := &protobuf.Backup{}
 
@@ -96,14 +96,10 @@ func (m *Messenger) BackupDataLocally(ctx context.Context) error {
 	for _, d := range chatsToBackup {
 		fullBackup.Chats = append(fullBackup.Chats, d.Chats...)
 	}
-	// for i, d := range settings {
-	// 	// TODO find a way to get all settings
-	// 	fullBackup.Setting = append(fullBackup.Setting, d)
-	// }
-	// for i, d := range woAccountsToBackup {
-	// 	// TODO find a way to get all watchonlyaccounts
-	// 	fullBackup.WatchOnlyAccount = append(fullBackup.WatchOnlyAccount, d.Keypair)
-	// }
+	fullBackup.Settings = append(fullBackup.Settings, settings...)
+	for _, d := range woAccountsToBackup {
+		fullBackup.WatchOnlyAccounts = append(fullBackup.WatchOnlyAccounts, d.WatchOnlyAccount)
+	}
 
 	// TODO put file in a constant
 	path := filepath.Join(m.config.backupConfig.DataDir, "user_data.bkp")

@@ -96,9 +96,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 	chatsToBackup := m.backupChats(ctx, clock)
-	if err != nil {
-		return 0, err
-	}
+
 	profileToBackup, err := m.backupProfile(ctx, clock)
 	if err != nil {
 		return 0, err
@@ -206,6 +204,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		}
 	}
 
+	// TODO get rid of keypairs
 	// Update keypairs messages encode and dispatch
 	for i, d := range keypairsToBackup {
 		pb := backupDetailsOnly()

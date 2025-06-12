@@ -35,6 +35,8 @@ message Backup {
   FetchingBackedUpDataDetails watchOnlyAccountDetails = 14;
   repeated SyncChat chats = 15;
   FetchingBackedUpDataDetails chatsDetails = 16;
+  repeated SyncSetting settings = 17;
+  repeated SyncAccount watchOnlyAccounts = 18;
 }
 
 message MultiAccount {
