@@ -64,7 +64,7 @@ def pytest_addoption(parser):
 @dataclass
 class Option:
     status_backend_port_range: List[int] = field(default_factory=list)
-    status_backend_containers: List[str] = field(default_factory=list)
+    statusgo_containers: List[str] = field(default_factory=list)
     base_dir: str = ""
 
 
@@ -100,7 +100,7 @@ def pytest_configure(config):
         raise ValueError(f"Generated port range ({start_port}-{end_port}) is outside the allowed range ({min_port}-{max_port}).")
 
     option.status_backend_port_range = list(range(start_port, end_port))
-    option.status_backend_containers = []
+    option.statusgo_containers = []
 
     option.base_dir = os.path.dirname(os.path.abspath(__file__))  # schemas directory
     option.status_backend_urls = status_backend_url_generator(config)
@@ -118,7 +118,7 @@ def close_status_backend_containers(request):
     yield
     if hasattr(request.node.instance, "reuse_container"):
         return
-    for status_backend in option.status_backend_containers:
-        status_backend.container.stop(timeout=10)  # pyright: ignore[reportAttributeAccessIssue]
-        status_backend.container.remove()  # pyright: ignore[reportAttributeAccessIssue]
-    option.status_backend_containers = []
+    for container in option.statusgo_containers:
+        container.stop() # pyright: ignore[reportAttributeAccessIssue]
+        container.remove() # pyright: ignore[reportAttributeAccessIssue]
+    option.statusgo_containers = []

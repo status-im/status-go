@@ -22,7 +22,7 @@ class StatusBackendSteps:
             cls.rpc_client.wait_for_login()
 
     def teardown_class(self):
-        for status_backend in option.status_backend_containers:
-            status_backend.container.stop(timeout=10)
-            option.status_backend_containers.remove(status_backend)
-            status_backend.container.remove()
+        for container in option.statusgo_containers:
+            container.stop()
+            option.statusgo_containers.remove(container)
+            container.remove()
