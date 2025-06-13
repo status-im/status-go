@@ -125,14 +125,6 @@ class SignalClient:
             return self.received_signals[signal_type]["received"][-1]
         return self.received_signals[signal_type]["received"][-delta_count:]
 
-    def wait_for_login(self):
-        signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
-        if "error" in signal["event"]:
-            error_details = signal["event"]["error"]
-            assert not error_details, f"Unexpected error during login: {error_details}"
-        self.node_login_event = signal
-        return signal
-
     def wait_for_logout(self):
         signal = self.wait_for_signal(SignalType.NODE_LOGOUT.value)
         return signal

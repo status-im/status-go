@@ -38,8 +38,6 @@ class MessengerSteps(NetworkConditionsSteps):
         backend.init_status_backend()
         backend.create_account_and_login(**kwargs)
         backend.wait_for_login()
-        backend.find_public_key()
-        backend.find_key_uid()
         backend.wakuext_service.start_messenger()
         return backend
 

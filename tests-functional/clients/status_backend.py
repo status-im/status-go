@@ -17,7 +17,7 @@ from clients.services.wallet import WalletService
 from clients.services.wakuext import WakuextService
 from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
-from clients.signals import SignalClient
+from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
 from conftest import option
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
@@ -69,6 +69,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.key_uid = ""
         self.password = ""
         self.display_name = ""
+        self.node_login_event = None
 
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
@@ -333,6 +334,16 @@ class StatusBackend(RpcClient, SignalClient):
         method = "Logout"
         return self.api_valid_request(method, {})
 
+    def wait_for_login(self):
+        signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
+        if "error" in signal["event"]:
+            error_details = signal["event"]["error"]
+            assert not error_details, f"Unexpected error during login: {error_details}"
+        self.node_login_event = signal
+        self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
+        self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
+        return signal
+
     def container_pause(self):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
@@ -355,12 +366,6 @@ class StatusBackend(RpcClient, SignalClient):
             return exec_result.output.decode().strip()
         except APIError as e:
             raise RuntimeError(f"API error during container execution: {str(e)}") from e
-
-    def find_public_key(self):
-        self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
-
-    def find_key_uid(self):
-        self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.1), reraise=True)
     def change_container_ip(self, new_ipv4=None, new_ipv6=None):
