@@ -351,7 +351,7 @@ func (s *MessengerBackupSuite) TestLocalBackup() {
 	s.Require().NoError(err)
 
 	// Import the backup file and process it
-	response, err = bob2.importLocalBackupFile(backupFile)
+	response, err = bob2.ImportLocalBackupFile(backupFile)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
@@ -447,5 +447,6 @@ func (s *MessengerBackupSuite) TestLocalBackup() {
 
 	chat, ok = bob2.allChats.Load(ourOneOneChat.ID)
 	s.Require().True(ok)
+	s.Require().True(chat.Active)
 	s.Require().Equal("", chat.Name)
 }

@@ -1474,7 +1474,16 @@ func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings.ProfilePicturesS
 }
 
 func (api *PublicAPI) BackupData() (uint64, error) {
+	err := api.service.messenger.BackupDataLocally(context.Background())
+	if err != nil {
+		return 0, err
+	}
+	// TODO remove the below call once the local backup is fully functional
 	return api.service.messenger.BackupData(context.Background())
+}
+
+func (api *PublicAPI) ImportLocalBackupFile(filePath string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ImportLocalBackupFile(filePath)
 }
 
 func (api *PublicAPI) ImageServerURL() string {

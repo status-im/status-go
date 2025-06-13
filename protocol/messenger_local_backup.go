@@ -67,9 +67,6 @@ func (m *Messenger) BackupDataLocally(ctx context.Context) error {
 		return err
 	}
 	chatsToBackup := m.backupChats(ctx, clock)
-	if err != nil {
-		return err
-	}
 	profileToBackup, err := m.backupProfile(ctx, clock)
 	if err != nil {
 		return err
@@ -142,10 +139,16 @@ func (m *Messenger) BackupDataLocally(ctx context.Context) error {
 	return nil
 }
 
-func (m *Messenger) importLocalBackupFile(filePath string) (*MessengerResponse, error) {
+func (m *Messenger) ImportLocalBackupFile(filePath string) (*MessengerResponse, error) {
 	if !m.config.featureFlags.EnableLocalBackup {
 		return nil, nil
 	}
+
+	defer func() {
+		m.processBackedupMessages = false
+	}()
+
+	m.processBackedupMessages = true
 
 	// Make sure the backup file exists
 	content, err := os.ReadFile(filePath)
