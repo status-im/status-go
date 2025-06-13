@@ -17,10 +17,10 @@ from clients.services.wallet import WalletService
 from clients.services.wakuext import WakuextService
 from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
-from clients.signals import SignalClient
+from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
 from conftest import option
-from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID
+from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
 from docker.errors import APIError
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
@@ -58,6 +58,10 @@ class StatusBackend(RpcClient, SignalClient):
         self.ws_url = f"{url}".replace("http", "ws")
         self.rpc_url = f"{url}/statusgo/CallRPC"
         self.public_key = ""
+        self.key_uid = ""
+        self.password = ""
+        self.display_name = ""
+        self.node_login_event = {}
 
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
@@ -183,7 +187,7 @@ class StatusBackend(RpcClient, SignalClient):
             "dataDir": self.data_dir,
             "logEnabled": True,
             "logLevel": "DEBUG",
-            "apiLogging": True,
+            "apiLoggingEnabled": True,
             "wakuFleetsConfigFilePath": option.waku_fleets_config,
             "pushFleetsConfigFilePath": option.push_fleets_config,
         }
@@ -275,12 +279,13 @@ class StatusBackend(RpcClient, SignalClient):
         )
 
     def _create_account_request(self, user, **kwargs):
+        self.password = kwargs.get("password", user.password)
         data = {
             "rootDataDir": self.data_dir,
             "kdfIterations": 256000,
             # Profile config
             "displayName": self.display_name,
-            "password": kwargs.get("password", user.password),
+            "password": self.password,
             "customizationColor": kwargs.get("customizationColor", "primary"),
             # Logs config
             "logEnabled": True,
@@ -307,6 +312,7 @@ class StatusBackend(RpcClient, SignalClient):
         return self.api_valid_request(method, data)
 
     def login(self, keyUid, user=user_1):
+        self.password = user.password
         method = "LoginAccount"
         data = {
             "password": user.password,
@@ -319,6 +325,16 @@ class StatusBackend(RpcClient, SignalClient):
     def logout(self):
         method = "Logout"
         return self.api_valid_request(method, {})
+
+    def wait_for_login(self):
+        signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
+        if "error" in signal["event"]:
+            error_details = signal["event"]["error"]
+            assert not error_details, f"Unexpected error during login: {error_details}"
+        self.node_login_event = signal
+        self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
+        self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
+        return signal
 
     def container_pause(self):
         if not self.container:
@@ -342,12 +358,6 @@ class StatusBackend(RpcClient, SignalClient):
             return exec_result.output.decode().strip()
         except APIError as e:
             raise RuntimeError(f"API error during container execution: {str(e)}") from e
-
-    def find_public_key(self):
-        self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
-
-    def find_key_uid(self):
-        return self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.1), reraise=True)
     def change_container_ip(self, new_ipv4=None, new_ipv6=None):
@@ -417,3 +427,39 @@ class StatusBackend(RpcClient, SignalClient):
             logging.info(f"StatusBackend is online after {time.time() - start_time} seconds")
             return
         raise TimeoutError(f"StatusBackend was not online after {timeout} seconds")
+
+    def get_connection_string_for_bootstrapping_another_device(self):
+        method = "GetConnectionStringForBootstrappingAnotherDevice"
+        data = {
+            "senderConfig": {
+                "keystorePath": os.path.join(self.data_dir, "keystore", self.key_uid),
+                "deviceType": "macos",
+                "keyUID": self.key_uid,
+                "password": self.password,
+                "chatKey": "",
+            },
+            "serverConfig": {
+                "timeout": 5 * 60 * 1000,
+            },
+        }
+        response = self.api_request(method, data)
+        return response.content.decode()
+
+    def input_connection_string_for_bootstrapping(self, connection_string):
+        method = "InputConnectionStringForBootstrappingV2"
+        # Empty user
+        user = Account(
+            address="",
+            private_key="",
+            password="",
+            passphrase="",
+        )
+        data = {
+            "connectionString": connection_string,
+            "receiverClientConfig": {
+                "receiverConfig": {"createAccount": self._create_account_request(user)},
+                "clientConfig": {},
+            },
+        }
+        response = self.api_valid_request(method, data)
+        return json.loads(response.content)

@@ -23,6 +23,7 @@ class SignalType(Enum):
     WALLET_ROUTER_SIGN_TRANSACTIONS = "wallet.router.sign-transactions"
     WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED = "wallet.router.sending-transactions-started"
     WALLET_ROUTER_TRANSACTIONS_SENT = "wallet.router.transactions-sent"
+    LOCAL_PAIRING = "localPairing"
 
 
 class WalletEventType(Enum):
@@ -31,6 +32,30 @@ class WalletEventType(Enum):
     WALLET_ACTIVITY_SESSION_UPDATED = "wallet-activity-session-updated"
     TRANSACTIONS_PENDING_TRANSACTION_UPDATE = "pending-transaction-update"
     TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED = "pending-transaction-status-changed"
+
+
+class LocalPairingEventType(Enum):
+    # Both Sender and Receiver
+    EVENT_PEER_DISCOVERED = "peer-discovered"
+    EVENT_CONNECTION_ERROR = "connection-error"
+    EVENT_CONNECTION_SUCCESS = "connection-success"
+    EVENT_TRANSFER_ERROR = "transfer-error"
+    EVENT_TRANSFER_SUCCESS = "transfer-success"
+    EVENT_RECEIVED_INSTALLATION = "received-installation"
+    # Only Receiver side
+    EVENT_RECEIVED_ACCOUNT = "received-account"
+    EVENT_PROCESS_SUCCESS = "process-success"
+    EVENT_PROCESS_ERROR = "process-error"
+    EVENT_RECEIVED_KEYSTORE_FILES = "received-keystore-files"
+
+
+class LocalPairingEventAction(Enum):
+    ACTION_CONNECT = 1
+    ACTION_PAIRING_ACCOUNT = 2
+    ACTION_SYNC_DEVICE = 3
+    ACTION_PAIRING_INSTALLATION = 4
+    ACTION_PEER_DISCOVERY = 5
+    ACTION_KEYSTORE_FILES_TRANSFER = 6
 
 
 class SignalClient:
@@ -101,14 +126,6 @@ class SignalClient:
             return self.received_signals[signal_type]["received"][-1]
         return self.received_signals[signal_type]["received"][-delta_count:]
 
-    def wait_for_login(self):
-        signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
-        if "error" in signal["event"]:
-            error_details = signal["event"]["error"]
-            assert not error_details, f"Unexpected error during login: {error_details}"
-        self.node_login_event = signal
-        return signal
-
     def wait_for_logout(self):
         signal = self.wait_for_signal(SignalType.NODE_LOGOUT.value)
         return signal
@@ -126,6 +143,10 @@ class SignalClient:
                     logging.info(f"Signal {signal_type} containing {event_pattern} is received in {round(time.time() - start_time)} seconds")
                     return event
             time.sleep(0.2)
+
+    def get_all_events(self, signal_type):
+        signals = self.received_signals.get(signal_type, {}).get("received", [])
+        return [signal.get("event") for signal in signals]
 
     def _on_error(self, ws, error):
         logging.error(f"Error: {error}")
