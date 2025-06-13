@@ -1,7 +1,7 @@
 import json
 import pytest
 
-from clients.signals import SignalType
+from clients.signals import SignalType, LocalPairingEventType, LocalPairingEventAction
 from clients.status_backend import StatusBackend
 from resources.constants import Account
 from steps.messenger import MessengerSteps
@@ -18,6 +18,53 @@ class TestLocalPairing(MessengerSteps):
         SignalType.LOCAL_PAIRING.value,
     ]
 
+    def check_sender_events(self, events):
+        assert len(events) == 8
+
+        assert events[0]["action"] == events[1]["action"] == LocalPairingEventAction.ACTION_PAIRING_ACCOUNT.value
+        assert events[0]["type"] ==  LocalPairingEventType.EVENT_CONNECTION_SUCCESS.value
+        assert events[1]["type"] == LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
+
+        assert events[2]["action"] == events[3]["action"] == LocalPairingEventAction.ACTION_SYNC_DEVICE.value
+        assert events[2]["type"] == LocalPairingEventType.EVENT_CONNECTION_SUCCESS.value
+        assert events[3]["type"] == LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
+
+        assert (events[4]["action"] == events[5]["action"] == events[6]["action"] == events[7]["action"] ==
+                LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value)
+        assert events[4]["type"] == LocalPairingEventType.EVENT_CONNECTION_SUCCESS.value
+        assert events[5]["type"] == LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
+        assert events[6]["type"] == LocalPairingEventType.EVENT_RECEIVED_INSTALLATION.value
+        assert events[7]["type"] == LocalPairingEventType.EVENT_PROCESS_SUCCESS.value
+
+        for event in events:
+            assert "error" not in event or not event["error"]
+
+    def check_receiver_events(self, events):
+        assert len(events) == 8
+
+        assert events[0]["action"] == LocalPairingEventAction.ACTION_CONNECT.value
+        assert events[0]["type"] ==  LocalPairingEventType.EVENT_CONNECTION_SUCCESS.value
+
+        assert (events[1]["action"] == events[2]["action"] == events[3]["action"] ==
+                LocalPairingEventAction.ACTION_PAIRING_ACCOUNT.value)
+        assert events[1]["type"] == LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
+        assert events[2]["type"] == LocalPairingEventType.EVENT_RECEIVED_ACCOUNT.value
+        assert events[3]["type"] == LocalPairingEventType.EVENT_PROCESS_SUCCESS.value
+
+        # NOTE: We check events 4 and 6, for some reason they are out of order (but always the same)
+        assert events[4]["action"] ==  events[6]["action"] == LocalPairingEventAction.ACTION_SYNC_DEVICE.value
+        assert events[4]["type"] == LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
+        assert events[6]["type"] == LocalPairingEventType.EVENT_PROCESS_SUCCESS.value
+
+        assert events[5]["action"] == LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value
+        assert events[5]["type"] == LocalPairingEventType.EVENT_RECEIVED_INSTALLATION.value
+
+        assert events[7]["action"] == LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value
+        assert events[7]["type"] == LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
+
+        for event in events:
+            assert "error" not in event or not event["error"]
+
     def test_pairing_server_as_sender(self):
         # Create users
         self.sender = self.initialize_backend(self.await_signals, False)
@@ -32,14 +79,16 @@ class TestLocalPairing(MessengerSteps):
 
         connection_string = self.receiver.get_connection_string_for_bootstrapping_another_device()
         response = receiver_second_device.input_connection_string_for_bootstrapping(connection_string)
-        response = json.loads(response)
-
-        events = receiver_second_device.get_all_signals(signal_type=SignalType.LOCAL_PAIRING.value)
-        for event in events:
-            assert "error" not in event["event"] or not event["event"]["error"]
-
         assert response["error"] is None
         assert response["keyUID"] == self.receiver.key_uid
+
+        # Check sender signals
+        events = self.receiver.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
+        self.check_sender_events(events)
+
+        # Check receiver signals
+        events = receiver_second_device.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
+        self.check_receiver_events(events)
 
         # Login on the second device
         user = Account(
@@ -60,7 +109,5 @@ class TestLocalPairing(MessengerSteps):
         assert "error" not in response
 
         contacts = response["result"]
-        print(f"contacts = {contacts}")
-
         assert len(contacts) == 1
         assert contacts[0]["id"] == self.sender.public_key

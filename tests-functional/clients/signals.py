@@ -34,6 +34,29 @@ class WalletEventType(Enum):
     TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED = "pending-transaction-status-changed"
 
 
+class LocalPairingEventType(Enum):
+    # Both Sender and Receiver
+    EVENT_PEER_DISCOVERED = "peer-discovered"
+    EVENT_CONNECTION_ERROR = "connection-error"
+    EVENT_CONNECTION_SUCCESS = "connection-success"
+    EVENT_TRANSFER_ERROR = "transfer-error"
+    EVENT_TRANSFER_SUCCESS = "transfer-success"
+    EVENT_RECEIVED_INSTALLATION = "received-installation"
+    # Only Receiver side
+    EVENT_RECEIVED_ACCOUNT = "received-account"
+    EVENT_PROCESS_SUCCESS = "process-success"
+    EVENT_PROCESS_ERROR = "process-error"
+    EVENT_RECEIVED_KEYSTORE_FILES = "received-keystore-files"
+
+
+class LocalPairingEventAction(Enum):
+    ACTION_CONNECT = 1
+    ACTION_PAIRING_ACCOUNT = 2
+    ACTION_SYNC_DEVICE = 3
+    ACTION_PAIRING_INSTALLATION = 4
+    ACTION_PEER_DISCOVERY = 5
+    ACTION_KEYSTORE_FILES_TRANSFER = 6
+
 class SignalClient:
     def __init__(self, ws_url, await_signals):
         self.url = f"{ws_url}/signals"
@@ -128,8 +151,9 @@ class SignalClient:
                     return event
             time.sleep(0.2)
 
-    def get_all_signals(self, signal_type):
-        return self.received_signals.get(signal_type, {}).get("received", [])
+    def get_all_events(self, signal_type):
+        signals = self.received_signals.get(signal_type, {}).get("received", [])
+        return [signal.get("event") for signal in signals]
 
     def _on_error(self, ws, error):
         logging.error(f"Error: {error}")
