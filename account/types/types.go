@@ -17,14 +17,6 @@ type PublicKeyData struct {
 	EmojiHash     []string `json:"emojiHash"`
 }
 
-// Info contains wallet and chat addresses and public keys of an account.
-type Info struct {
-	WalletAddress string
-	WalletPubKey  string
-	ChatAddress   string
-	ChatPubKey    string
-}
-
 // SelectedExtKey is a container for the selected (logged in) external account.
 type SelectedExtKey struct {
 	Address     ethtypes.Address

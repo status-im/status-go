@@ -2669,8 +2669,6 @@ func (b *GethStatusBackend) SelectAccount(loginParams accounttypes.LoginParams) 
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.AccountManager().RemoveOnboarding()
-
 	err := b.accountManager.SelectAccount(loginParams)
 	if err != nil {
 		return err
