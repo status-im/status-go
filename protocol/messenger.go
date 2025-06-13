@@ -775,6 +775,9 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if !m.config.featureFlags.DisableCheckingForBackup {
 		m.startBackupLoop()
 	}
+	if m.config.featureFlags.EnableLocalBackup {
+		m.startLocalBackupLoop()
+	}
 	if !m.config.featureFlags.DisableAutoMessageLoop {
 		err = m.startAutoMessageLoop()
 		if err != nil {

@@ -396,7 +396,7 @@ func buildMessengerOptions(
 		protocol.WithAccountsFeed(accountsFeed),
 		protocol.WithNewsFeed(),
 		protocol.WithMessageSigner(personalService),
-		protocol.WithLocalBackup(&config.BackupConfig),
+		// protocol.WithLocalBackup(&config.BackupConfig),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {
