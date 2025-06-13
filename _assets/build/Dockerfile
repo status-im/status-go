@@ -9,7 +9,7 @@ RUN apk add --no-cache git bash make llvm clang musl-dev linux-headers protobuf-
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
-ARG build_target='status-backend'
+ARG build_target='cmd'
 
 RUN mkdir -p /go/src/github.com/status-im/status-go
 WORKDIR /go/src/github.com/status-im/status-go
@@ -33,6 +33,7 @@ RUN mkdir -p /static/keys
 RUN mkdir -p /static/configs
 
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/status-backend /usr/local/bin/
+COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/push-notification-server /usr/local/bin/
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/config.json /static/configs/
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
