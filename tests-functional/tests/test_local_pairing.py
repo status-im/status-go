@@ -1,4 +1,3 @@
-import json
 import pytest
 
 from clients.signals import SignalType, LocalPairingEventType, LocalPairingEventAction
@@ -11,15 +10,20 @@ def check_sender_events(events):
     assert len(events) == 8
 
     assert events[0]["action"] == events[1]["action"] == LocalPairingEventAction.ACTION_PAIRING_ACCOUNT.value
-    assert events[0]["type"] ==  LocalPairingEventType.EVENT_CONNECTION_SUCCESS.value
+    assert events[0]["type"] == LocalPairingEventType.EVENT_CONNECTION_SUCCESS.value
     assert events[1]["type"] == LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
 
     assert events[2]["action"] == events[3]["action"] == LocalPairingEventAction.ACTION_SYNC_DEVICE.value
     assert events[2]["type"] == LocalPairingEventType.EVENT_CONNECTION_SUCCESS.value
     assert events[3]["type"] == LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
 
-    assert (events[4]["action"] == events[5]["action"] == events[6]["action"] == events[7]["action"] ==
-            LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value)
+    assert (
+        events[4]["action"]
+        == events[5]["action"]
+        == events[6]["action"]
+        == events[7]["action"]
+        == LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value
+    )
     assert events[4]["type"] == LocalPairingEventType.EVENT_CONNECTION_SUCCESS.value
     assert events[5]["type"] == LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
     assert events[6]["type"] == LocalPairingEventType.EVENT_RECEIVED_INSTALLATION.value
@@ -33,16 +37,15 @@ def check_receiver_events(events):
     assert len(events) == 8
 
     assert events[0]["action"] == LocalPairingEventAction.ACTION_CONNECT.value
-    assert events[0]["type"] ==  LocalPairingEventType.EVENT_CONNECTION_SUCCESS.value
+    assert events[0]["type"] == LocalPairingEventType.EVENT_CONNECTION_SUCCESS.value
 
-    assert (events[1]["action"] == events[2]["action"] == events[3]["action"] ==
-            LocalPairingEventAction.ACTION_PAIRING_ACCOUNT.value)
+    assert events[1]["action"] == events[2]["action"] == events[3]["action"] == LocalPairingEventAction.ACTION_PAIRING_ACCOUNT.value
     assert events[1]["type"] == LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
     assert events[2]["type"] == LocalPairingEventType.EVENT_RECEIVED_ACCOUNT.value
     assert events[3]["type"] == LocalPairingEventType.EVENT_PROCESS_SUCCESS.value
 
     # NOTE: We check events 4 and 6, for some reason they are out of order (but always the same)
-    assert events[4]["action"] ==  events[6]["action"] == LocalPairingEventAction.ACTION_SYNC_DEVICE.value
+    assert events[4]["action"] == events[6]["action"] == LocalPairingEventAction.ACTION_SYNC_DEVICE.value
     assert events[4]["type"] == LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
     assert events[6]["type"] == LocalPairingEventType.EVENT_PROCESS_SUCCESS.value
 

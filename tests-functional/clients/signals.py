@@ -57,6 +57,7 @@ class LocalPairingEventAction(Enum):
     ACTION_PEER_DISCOVERY = 5
     ACTION_KEYSTORE_FILES_TRANSFER = 6
 
+
 class SignalClient:
     def __init__(self, ws_url, await_signals):
         self.url = f"{ws_url}/signals"

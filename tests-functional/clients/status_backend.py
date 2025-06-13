@@ -69,7 +69,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.key_uid = ""
         self.password = ""
         self.display_name = ""
-        self.node_login_event = None
+        self.node_login_event = {}
 
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
@@ -439,13 +439,13 @@ class StatusBackend(RpcClient, SignalClient):
     def get_connection_string_for_bootstrapping_another_device(self):
         method = "GetConnectionStringForBootstrappingAnotherDevice"
         data = {
-           "senderConfig": {
-               "keystorePath": os.path.join(self.data_dir, "keystore", self.key_uid),
-               "deviceType": "macos",
-               "keyUID": self.key_uid,
-               "password": self.password,
-               "chatKey": "",
-           },
+            "senderConfig": {
+                "keystorePath": os.path.join(self.data_dir, "keystore", self.key_uid),
+                "deviceType": "macos",
+                "keyUID": self.key_uid,
+                "password": self.password,
+                "chatKey": "",
+            },
             "serverConfig": {
                 "timeout": 5 * 60 * 1000,
             },
@@ -465,9 +465,7 @@ class StatusBackend(RpcClient, SignalClient):
         data = {
             "connectionString": connection_string,
             "receiverClientConfig": {
-                "receiverConfig": {
-                    "createAccount": self._create_account_request(user)
-                },
+                "receiverConfig": {"createAccount": self._create_account_request(user)},
                 "clientConfig": {},
             },
         }
