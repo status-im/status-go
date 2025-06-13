@@ -33,8 +33,6 @@ type DefaultManager struct {
 	mu       sync.RWMutex
 	keystore types.KeyStore
 
-	onboarding *Onboarding // TODO: move out of the account package
-
 	selectedChatAccount *types.SelectedExtKey // account that was processed during the last call to SelectAccount()
 	mainAccountAddress  ethtypes.Address
 
@@ -240,69 +238,6 @@ func (m *DefaultManager) Accounts() ([]ethtypes.Address, error) {
 	}
 
 	return addresses, nil
-}
-
-// StartOnboarding starts the onboarding process generating accountsCount accounts and returns a slice of OnboardingAccount.
-func (m *DefaultManager) StartOnboarding(accountsCount, mnemonicPhraseLength int) ([]*OnboardingAccount, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	onboarding, err := NewOnboarding(accountsCount, mnemonicPhraseLength)
-	if err != nil {
-		return nil, err
-	}
-
-	m.onboarding = onboarding
-
-	return m.onboarding.Accounts(), nil
-}
-
-// RemoveOnboarding reset the current onboarding struct setting it to nil and deleting the accounts from memory.
-func (m *DefaultManager) RemoveOnboarding() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.onboarding = nil
-}
-
-// ImportOnboardingAccount imports the account specified by id and encrypts it with password.
-func (m *DefaultManager) ImportOnboardingAccount(id string, password string) (types.Info, string, error) {
-	var info types.Info
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.onboarding == nil {
-		return info, "", ErrOnboardingNotStarted
-	}
-
-	acc, err := m.onboarding.Account(id)
-	if err != nil {
-		return info, "", err
-	}
-
-	genAccount, err := m.CreateFromMnemonicAndStoreAccount(acc.mnemonic, password)
-	if err != nil {
-		return info, "", err
-	}
-
-	childAccount, err := generator.DeriveChildFromAccount(genAccount, "m/44'/60'/0'/0/0")
-	if err != nil {
-		return info, "", err
-	}
-
-	childAccountInfo := childAccount.ToAccountInfo()
-
-	info = types.Info{
-		WalletAddress: childAccountInfo.Address,
-		WalletPubKey:  childAccountInfo.PublicKey,
-		ChatAddress:   childAccountInfo.Address,
-		ChatPubKey:    childAccountInfo.PublicKey,
-	}
-
-	m.onboarding = nil
-
-	return info, acc.mnemonic, nil
 }
 
 func (m *DefaultManager) MigrateKeyStoreDir(newDir string, addresses []string) error {
