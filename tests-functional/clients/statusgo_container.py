@@ -208,7 +208,7 @@ class PushNotificationServerContainer(StatusGoContainer):
             "--waku-fleet",
             option.waku_fleet,
         ]
-        super().__init__(entrypoint, container_name_suffix="-push-notification-server")
+        super().__init__(entrypoint, container_name_suffix=f"-push-notification-server-{gorush_port}")
 
 
 class StatusBackendContainer(StatusGoContainer):
