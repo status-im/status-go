@@ -7,7 +7,6 @@ import threading
 import docker
 import docker.errors
 import random
-# import netifaces
 
 from conftest import option
 from docker.errors import APIError

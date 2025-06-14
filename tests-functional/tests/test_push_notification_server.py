@@ -9,7 +9,6 @@ import pytest
 from clients.gorush_stub import GorushStub
 from clients.push_notification_server import PushNotificationServer
 from clients.services.wakuext import PushNotificationRegistrationTokenType
-from clients.signals import SignalType
 from clients.statusgo_container import StatusGoContainer
 from resources.enums import MessageContentType
 from steps.messenger import MessengerSteps

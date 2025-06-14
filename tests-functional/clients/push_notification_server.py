@@ -1,11 +1,4 @@
-import logging
-import tempfile
-import threading
-import os
-import docker
-
-from clients.statusgo_container import StatusGoContainer, PushNotificationServerContainer, DATA_DIR
-from conftest import option
+from clients.statusgo_container import PushNotificationServerContainer
 
 class PushNotificationServer():
     container = None

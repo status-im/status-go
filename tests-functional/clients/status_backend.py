@@ -9,7 +9,6 @@ import threading
 import requests
 import os
 
-import hashlib
 from tenacity import retry, stop_after_delay, wait_fixed
 from clients.services.wallet import WalletService
 from clients.services.wakuext import WakuextService
