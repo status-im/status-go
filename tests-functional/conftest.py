@@ -42,6 +42,12 @@ def pytest_addoption(parser):
         default=None,
     )
     parser.addoption(
+        "--logs-dir",
+        action="store",
+        help="Path to a directory where containers logs will be saved",
+        default="",
+    )
+    parser.addoption(
         "--logout",
         action="store_true",
         help="When set, will automatically call Logout() before InitializeApplication()",
@@ -126,5 +132,7 @@ def close_status_backend_containers(request):
         return
     for container in option.statusgo_containers:
         container.stop()  # pyright: ignore[reportAttributeAccessIssue]
+        container.save_logs() # pyright: ignore[reportAttributeAccessIssue]
         container.remove()  # pyright: ignore[reportAttributeAccessIssue]
+        
     option.statusgo_containers = []
