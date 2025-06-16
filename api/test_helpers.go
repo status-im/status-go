@@ -46,7 +46,7 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 	masterAccInfo := genAccount.ToIdentifiedAccountInfo()
 
 	const pathWalletRoot = "m/44'/60'/0'/0"
-	derivedAccountKey, err := backend.AccountManager().DeriveChildAccountForPathAndStore(types.HexToAddress(masterAccInfo.Address), pathWalletRoot, password)
+	derivedAccount, err := backend.AccountManager().DeriveChildAccountForPathAndStore(types.HexToAddress(masterAccInfo.Address), pathWalletRoot, password)
 	if err != nil {
 		return
 	}
@@ -61,7 +61,7 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 	err = backend.ensureDBsOpened(account, password)
 	require.NoError(t, err)
 
-	walletRootAddress := derivedAccountKey.Address.Hex()
+	walletRootAddress := derivedAccount.Address().Hex()
 
 	config, err := params.NewNodeConfig(tmpdir, 178733)
 	require.NoError(t, err)

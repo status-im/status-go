@@ -65,18 +65,18 @@ func (a *Adapter) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphras
 }
 
 // AccountDecryptedKey gets the decrypted key for an account using standard go-ethereum functions
-func (a *Adapter) AccountDecryptedKey(address ethtypes.Address, passphrase string) (types.Account, *ethtypes.Key, error) {
+func (a *Adapter) AccountDecryptedKey(address ethtypes.Address, passphrase string) (types.Account, *ecdsa.PrivateKey, *extkeys.ExtendedKey, error) {
 	gethAccount, err := a.find(address)
 	if err != nil {
-		return types.Account{}, nil, err
+		return types.Account{}, nil, nil, err
 	}
 
 	ethKey, err := readKeystoreFileAndDecryptedKey(gethAccount.URL.Path, passphrase)
 	if err != nil {
-		return types.Account{}, nil, err
+		return types.Account{}, nil, nil, err
 	}
 
-	return accountFrom(gethAccount), ethKey, nil
+	return accountFrom(gethAccount), ethKey.PrivateKey, ethKey.ExtendedKey, nil
 }
 
 func (a *Adapter) Delete(address ethtypes.Address) error {

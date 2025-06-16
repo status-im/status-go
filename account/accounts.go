@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/account/common"
@@ -15,7 +14,6 @@ import (
 	"github.com/status-im/status-go/account/keystore/geth"
 	"github.com/status-im/status-go/account/types"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 )
@@ -34,7 +32,7 @@ type DefaultManager struct {
 	keystore   types.KeyStore
 
 	selectedChatAccountMutex sync.RWMutex
-	selectedChatAccount      *types.SelectedExtKey // account that was processed during the last call to SelectAccount()
+	selectedChatAccount      *generator.Account // account that was processed during the last call to SelectAccount()
 
 	logger *zap.Logger
 }
@@ -96,13 +94,13 @@ func (m *DefaultManager) CreateFromPrivateKeyAndStoreAccount(privateKey string, 
 
 // VerifyAccountPassword verifies if the account key for a given address and password is correct.
 func (m *DefaultManager) VerifyAccountPassword(address ethtypes.Address, password string) (bool, error) {
-	key, err := m.LoadAccount(address, password)
+	account, err := m.LoadAccount(address, password)
 	if err != nil {
 		return false, err
 	}
 
-	if key.Address != address {
-		return false, fmt.Errorf("account mismatch: have %s, want %s", gocommon.TruncateWithDot(key.Address.Hex()), gocommon.TruncateWithDot(address.Hex()))
+	if account.Address() != address {
+		return false, fmt.Errorf("account mismatch: have %s, want %s", gocommon.TruncateWithDot(account.Address().Hex()), gocommon.TruncateWithDot(address.Hex()))
 	}
 
 	return true, nil
@@ -110,7 +108,7 @@ func (m *DefaultManager) VerifyAccountPassword(address ethtypes.Address, passwor
 
 // LoadAccount loads an account key from the keystore for a given address and password.
 // If either address or password is incorrect, an error is returned.
-func (m *DefaultManager) LoadAccount(address ethtypes.Address, password string) (*ethtypes.Key, error) {
+func (m *DefaultManager) LoadAccount(address ethtypes.Address, password string) (*generator.Account, error) {
 	m.keystoreMu.RLock()
 	defer m.keystoreMu.RUnlock()
 
@@ -118,7 +116,7 @@ func (m *DefaultManager) LoadAccount(address ethtypes.Address, password string) 
 		return nil, ErrAccountKeyStoreMissing
 	}
 
-	_, accountKey, err := m.keystore.AccountDecryptedKey(address, password)
+	_, privateKey, extendedKey, err := m.keystore.AccountDecryptedKey(address, password)
 	if err != nil {
 		if errors.Is(err, geth.ErrNoMatch) {
 			return nil, &ErrCannotLocateKeyFile{fmt.Sprintf("cannot locate account for address: %s", address.Hex())}
@@ -126,11 +124,12 @@ func (m *DefaultManager) LoadAccount(address ethtypes.Address, password string) 
 		return nil, err
 	}
 
-	if err := common.ValidateExtendedKey(accountKey); err != nil {
+	account := generator.NewAccount(privateKey, extendedKey)
+	if err := account.ValidateExtendedKey(); err != nil {
 		return nil, err
 	}
 
-	return accountKey, nil
+	return account, nil
 }
 
 func (m *DefaultManager) storeToKeystore(acc *generator.Account, password string) (err error) {
@@ -150,19 +149,11 @@ func (m *DefaultManager) storeToKeystore(acc *generator.Account, password string
 	return
 }
 
-func (m *DefaultManager) setChatAccount(key *ethtypes.Key) {
+func (m *DefaultManager) setChatAccount(account *generator.Account) {
 	m.selectedChatAccountMutex.Lock()
 	defer m.selectedChatAccountMutex.Unlock()
 
-	if key == nil {
-		m.selectedChatAccount = nil
-		return
-	}
-
-	m.selectedChatAccount = &types.SelectedExtKey{
-		Address:    key.Address,
-		AccountKey: key,
-	}
+	m.selectedChatAccount = account
 }
 
 // SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
@@ -180,25 +171,15 @@ func (m *DefaultManager) SelectAccount(loginParams types.LoginParams) error {
 
 // SetChatAccount initializes selectedChatAccount with privKey
 func (m *DefaultManager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
-	address := crypto.PubkeyToAddress(privKey.PublicKey)
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return err
-	}
+	account := generator.NewAccount(privKey, nil)
 
-	key := &ethtypes.Key{
-		ID:         id,
-		Address:    address,
-		PrivateKey: privKey,
-	}
-
-	m.setChatAccount(key)
+	m.setChatAccount(account)
 
 	return nil
 }
 
 // SelectedChatAccount returns currently selected chat account
-func (m *DefaultManager) SelectedChatAccount() (*types.SelectedExtKey, error) {
+func (m *DefaultManager) SelectedChatAccount() (*generator.Account, error) {
 	m.selectedChatAccountMutex.RLock()
 	defer m.selectedChatAccountMutex.RUnlock()
 
@@ -208,7 +189,7 @@ func (m *DefaultManager) SelectedChatAccount() (*types.SelectedExtKey, error) {
 	return m.selectedChatAccount, nil
 }
 
-// Logout clears selected accounts.
+// Logout clears everything.
 func (m *DefaultManager) Logout() {
 	m.setChatAccount(nil)
 	m.SetKeystore(nil)
@@ -262,7 +243,7 @@ func (m *DefaultManager) DeleteAccount(address ethtypes.Address) error {
 	return m.keystore.Delete(address)
 }
 
-func (m *DefaultManager) GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*types.SelectedExtKey, error) {
+func (m *DefaultManager) GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*generator.Account, error) {
 	exists, err := db.AddressExists(address)
 	if err != nil {
 		return nil, err
@@ -272,9 +253,9 @@ func (m *DefaultManager) GetVerifiedWalletAccount(db *accounts.Database, address
 		return nil, errors.New("account doesn't exist")
 	}
 
-	key, err := m.LoadAccount(address, password)
+	account, err := m.LoadAccount(address, password)
 	if errors.Is(err, geth.ErrNoMatch) {
-		key, err = m.generatePartialAccountKey(db, address, password)
+		account, err = m.generatePartialAccountKey(db, address, password)
 		if err != nil {
 			return nil, err
 		}
@@ -284,13 +265,10 @@ func (m *DefaultManager) GetVerifiedWalletAccount(db *accounts.Database, address
 		return nil, err
 	}
 
-	return &types.SelectedExtKey{
-		Address:    key.Address,
-		AccountKey: key,
-	}, nil
+	return account, nil
 }
 
-func (m *DefaultManager) generatePartialAccountKey(db *accounts.Database, address ethtypes.Address, password string) (*ethtypes.Key, error) {
+func (m *DefaultManager) generatePartialAccountKey(db *accounts.Database, address ethtypes.Address, password string) (*generator.Account, error) {
 	rootAddress, err := db.GetWalletRootAddress()
 	if err != nil {
 		return nil, err
@@ -305,13 +283,11 @@ func (m *DefaultManager) generatePartialAccountKey(db *accounts.Database, addres
 	return m.DeriveChildAccountForPathAndStore(rootAddress, path, password)
 }
 
-func (m *DefaultManager) DeriveChildAccountForPathAndStore(deriveFrom ethtypes.Address, path string, password string) (*ethtypes.Key, error) {
-	accountExtendedKey, err := m.LoadAccount(deriveFrom, password)
+func (m *DefaultManager) DeriveChildAccountForPathAndStore(deriveFrom ethtypes.Address, path string, password string) (*generator.Account, error) {
+	account, err := m.LoadAccount(deriveFrom, password)
 	if err != nil {
 		return nil, err
 	}
-
-	account := generator.NewAccount(accountExtendedKey.PrivateKey, accountExtendedKey.ExtendedKey)
 
 	childAccount, err := generator.DeriveChildFromAccount(account, path)
 	if err != nil {
@@ -323,21 +299,14 @@ func (m *DefaultManager) DeriveChildAccountForPathAndStore(deriveFrom ethtypes.A
 		return nil, err
 	}
 
-	childAccountKey, err := m.LoadAccount(childAccount.Address(), password)
-	if err != nil {
-		return nil, err
-	}
-
-	return childAccountKey, nil
+	return childAccount, nil
 }
 
-func (m *DefaultManager) DeriveChildrenAccountsForPathsAndStore(deriveFrom ethtypes.Address, paths []string, password string) (map[string]*ethtypes.Key, error) {
-	accountExtendedKey, err := m.LoadAccount(deriveFrom, password)
+func (m *DefaultManager) DeriveChildrenAccountsForPathsAndStore(deriveFrom ethtypes.Address, paths []string, password string) (map[string]*generator.Account, error) {
+	account, err := m.LoadAccount(deriveFrom, password)
 	if err != nil {
 		return nil, err
 	}
-
-	account := generator.NewAccount(accountExtendedKey.PrivateKey, accountExtendedKey.ExtendedKey)
 
 	childAccounts, err := generator.DeriveChildrenFromAccount(account, paths)
 	if err != nil {
@@ -351,14 +320,5 @@ func (m *DefaultManager) DeriveChildrenAccountsForPathsAndStore(deriveFrom ethty
 		}
 	}
 
-	childKeys := make(map[string]*ethtypes.Key, 0)
-	for path, childAccount := range childAccounts {
-		childKey, err := m.LoadAccount(childAccount.Address(), password)
-		if err != nil {
-			return nil, err
-		}
-		childKeys[path] = childKey
-	}
-
-	return childKeys, nil
+	return childAccounts, nil
 }
