@@ -32,7 +32,8 @@ func CreateAccountFromPrivateKey(privateKeyHex string) (*Account, error) {
 
 // CreateAccountFromKey creates an account from a key.
 func CreateAccountFromKey(key *types.Key) (*Account, error) {
-	if err := common.ValidateExtendedKey(key); err != nil {
+	account := NewAccount(key.PrivateKey, key.ExtendedKey)
+	if err := account.ValidateExtendedKey(); err != nil {
 		return nil, fmt.Errorf("can not create account from key: %v", err)
 	}
 	return NewAccount(key.PrivateKey, key.ExtendedKey), nil

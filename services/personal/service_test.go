@@ -4,11 +4,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/account/types"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/crypto"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
-
-	"github.com/status-im/extkeys"
 
 	"github.com/stretchr/testify/require"
 )
@@ -29,24 +27,15 @@ func generateMessageToSign(t *testing.T) string {
 	return ethtypes.EncodeHex(crypto.Keccak256(identityPublicKeyCompressedBytes, communityIDBytes, requestIDBytes))
 }
 
-func generateAccountForSigning(t *testing.T) *types.SelectedExtKey {
+func generateAccountForSigning(t *testing.T) *generator.Account {
 	seedPhrase := "inch describe nothing prepare salon foster market fabric bottom type trial glooom"
-	mnemonic := extkeys.NewMnemonic()
-	seed := mnemonic.MnemonicSeed(seedPhrase, "")
-
-	masterKey, err := extkeys.NewMaster(seed)
+	account, err := generator.CreateAccountFromMnemonic(seedPhrase, "")
 	require.NoError(t, err)
 
-	extendedKey, err := masterKey.ChildForPurpose(extkeys.KeyPurposeWallet, 0)
+	derivedAccount, err := generator.DeriveChildFromAccount(account, "m/44'/60'/0'/0/0")
 	require.NoError(t, err)
 
-	privateKeyECDSA := extendedKey.ToECDSA()
-	address := crypto.PubkeyToAddress(privateKeyECDSA.PublicKey)
-
-	return &types.SelectedExtKey{
-		AccountKey: &ethtypes.Key{PrivateKey: privateKeyECDSA},
-		Address:    address,
-	}
+	return derivedAccount
 }
 
 func TestSignAndRecover(t *testing.T) {
@@ -72,7 +61,7 @@ func TestSignAndRecover(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Equal(t, accountForSigning.Address.Hex(), recoveredAddress.Hex())
+	require.Equal(t, accountForSigning.Address().Hex(), recoveredAddress.Hex())
 
 	// Sign the message as bytes
 	generatedMessageToSignBytes, err := hexutil.Decode(generatedMessageToSign)
@@ -90,5 +79,5 @@ func TestSignAndRecover(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Equal(t, accountForSigning.Address.Hex(), recoveredAddress.Hex())
+	require.Equal(t, accountForSigning.Address().Hex(), recoveredAddress.Hex())
 }

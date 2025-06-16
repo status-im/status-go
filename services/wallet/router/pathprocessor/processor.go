@@ -8,7 +8,7 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	accounttypes "github.com/status-im/status-go/account/types"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/requests"
@@ -30,7 +30,7 @@ type PathProcessor interface {
 	// CalculateAmountOut calculates the amount out
 	CalculateAmountOut(params ProcessorInputParams) (*big.Int, error)
 	// Send sends the tx, returns the hash and the used nonce (lastUsedNonce is -1 if it's the first tx)
-	Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *accounttypes.SelectedExtKey) (types.Hash, uint64, error)
+	Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (types.Hash, uint64, error)
 	// GetContractAddress returns the contract address
 	GetContractAddress(params ProcessorInputParams) (common.Address, error)
 	// BuildTransaction builds the transaction based on MultipathProcessorTxArgs, returns the transaction and the used nonce (lastUsedNonce is -1 if it's the first tx)

@@ -21,7 +21,7 @@ type KeyStore interface {
 	// Deprecated: status-go is now using ImportSingleExtendedKey
 	ImportExtendedKeyForWallet(extKey *extkeys.ExtendedKey, passphrase string) (Account, error)
 	// AccountDecryptedKey returns decrypted key for account (provided that password is correct).
-	AccountDecryptedKey(address ethtypes.Address, passphrase string) (Account, *ethtypes.Key, error)
+	AccountDecryptedKey(address ethtypes.Address, passphrase string) (Account, *ecdsa.PrivateKey, *extkeys.ExtendedKey, error)
 	// Delete deletes the key matched by account.
 	// If the account contains no filename, the address must match a unique key.
 	Delete(address ethtypes.Address) error

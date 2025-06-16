@@ -670,16 +670,14 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		walletRootAddress, err := db.GetWalletRootAddress()
 		require.NoError(t, err)
 
-		walletAcc, err := backend.AccountManager().LoadAccount(walletRootAddress, password)
+		genAcc, err := backend.AccountManager().LoadAccount(walletRootAddress, password)
 		require.NoError(t, err)
 
-		genAcc := generator.NewAccount(walletAcc.PrivateKey, walletAcc.ExtendedKey)
 		walletInfo := genAcc.ToIdentifiedAccountInfo()
 
-		derivedAccKey, err := backend.AccountManager().DeriveChildAccountForPathAndStore(walletRootAddress, newPath, password)
+		derivedAcc, err := backend.AccountManager().DeriveChildAccountForPathAndStore(walletRootAddress, newPath, password)
 		require.NoError(t, err)
 
-		derivedAcc := generator.NewAccount(derivedAccKey.PrivateKey, nil)
 		derivedInfo := derivedAcc.ToAccountInfo()
 
 		keypair := &accounts.Keypair{
@@ -701,9 +699,9 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, db.SaveOrUpdateKeypair(keypair))
 
 		// With partial account we need to dynamically generate private key
-		key, err := backend.getVerifiedWalletAccount(keypair.Accounts[0].Address.Hex(), password)
+		acc, err := backend.getVerifiedWalletAccount(keypair.Accounts[0].Address.Hex(), password)
 		require.NoError(t, err)
-		require.Equal(t, keypair.Accounts[0].Address, key.Address)
+		require.Equal(t, keypair.Accounts[0].Address, acc.Address())
 	})
 
 	t.Run("Success", func(t *testing.T) {
@@ -732,9 +730,9 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 				},
 			},
 		}))
-		key, err := backend.getVerifiedWalletAccount(address.String(), password)
+		acc, err := backend.getVerifiedWalletAccount(address.String(), password)
 		require.NoError(t, err)
-		require.Equal(t, address, key.Address)
+		require.Equal(t, address, acc.Address())
 	})
 }
 
@@ -857,9 +855,9 @@ func TestLoginWithKey(t *testing.T) {
 		assert.NoError(t, b.Logout())
 		assert.NoError(t, b.StopNode())
 	}()
-	extkey, err := b.accountManager.SelectedChatAccount()
+	acc, err := b.accountManager.SelectedChatAccount()
 	require.NoError(t, err)
-	require.Equal(t, crypto.PubkeyToAddress(chatKey.PublicKey), extkey.Address)
+	require.Equal(t, crypto.PubkeyToAddress(chatKey.PublicKey), acc.Address())
 
 	activeAccount, err := b.GetActiveAccount()
 	require.NoError(t, err)
@@ -998,13 +996,12 @@ func TestDeleteMultiaccount(t *testing.T) {
 	genAccInfo := genAccount.ToIdentifiedAccountInfo()
 
 	const pathWalletRoot = "m/44'/60'/0'/0"
-	derivedAccountKey, err := backend.AccountManager().DeriveChildAccountForPathAndStore(types.HexToAddress(genAccInfo.Address), pathWalletRoot, password)
+	derivedAcc, err := backend.AccountManager().DeriveChildAccountForPathAndStore(types.HexToAddress(genAccInfo.Address), pathWalletRoot, password)
 	if err != nil {
 		return
 	}
 
-	walletRootAddress := derivedAccountKey.Address
-	derivedAcc := generator.NewAccount(derivedAccountKey.PrivateKey, derivedAccountKey.ExtendedKey)
+	walletRootAddress := derivedAcc.Address()
 	derivedInfo := derivedAcc.ToAccountInfo()
 
 	account := multiaccounts.Account{
@@ -1137,16 +1134,14 @@ func TestConvertAccount(t *testing.T) {
 	derivedAccounts, err := backend.AccountManager().DeriveChildrenAccountsForPathsAndStore(types.HexToAddress(genAccInfo.Address), allGeneratedPaths, password)
 	assert.NoError(t, err)
 
-	chatAccKey := derivedAccounts[pathEIP1581Chat]
-	chatAcc := generator.NewAccount(chatAccKey.PrivateKey, nil)
+	chatAcc := derivedAccounts[pathEIP1581Chat]
 	chatInfo := chatAcc.ToAccountInfo()
 
 	found = keystoreContainsFileForAccount(keyStoreDirPath, chatInfo.Address)
 	require.True(t, found)
 
 	derivedAccountsInfo := make(map[string]generator.AccountInfo, 0)
-	for path, accKey := range derivedAccounts {
-		acc := generator.NewAccount(accKey.PrivateKey, nil)
+	for path, acc := range derivedAccounts {
 		derivedAccountsInfo[path] = acc.ToAccountInfo()
 	}
 
@@ -1452,11 +1447,8 @@ func TestChangeDatabasePassword(t *testing.T) {
 	walletDb.Close()
 
 	// Test that keystore can be decrypted with the new password
-	key, err := backend.accountManager.LoadAccount(genAccount.Address(), newPassword)
+	acc, err := backend.accountManager.LoadAccount(genAccount.Address(), newPassword)
 	require.NoError(t, err)
-	require.NotNil(t, key)
-
-	acc := generator.NewAccount(key.PrivateKey, key.ExtendedKey)
 	require.NotNil(t, acc)
 
 	accInfo := acc.ToAccountInfo()

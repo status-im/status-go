@@ -1667,7 +1667,7 @@ func (b *GethStatusBackend) StoreAccount(mnemonic string, password string, paths
 
 	accInfo = genAcc.ToIdentifiedAccountInfo()
 
-	var genDerivedAccs map[string]*types.Key
+	var genDerivedAccs map[string]*generator.Account
 	genDerivedAccs, err = b.accountManager.DeriveChildrenAccountsForPathsAndStore(genAcc.Address(), paths, password)
 	if err != nil {
 		return
@@ -1675,8 +1675,7 @@ func (b *GethStatusBackend) StoreAccount(mnemonic string, password string, paths
 
 	derivedAccsInfo = make(map[string]generator.AccountInfo, 0)
 	for path, acc := range genDerivedAccs {
-		genDerivedAcc := generator.NewAccount(acc.PrivateKey, acc.ExtendedKey)
-		derivedAccsInfo[path] = genDerivedAcc.ToAccountInfo()
+		derivedAccsInfo[path] = acc.ToAccountInfo()
 	}
 
 	return accInfo, derivedAccsInfo, nil
@@ -2395,7 +2394,7 @@ func (b *GethStatusBackend) SignTypedData(typed typeddata.TypedData, address str
 		return types.HexBytes{}, err
 	}
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
-	sig, err := typeddata.Sign(typed, account.AccountKey.PrivateKey, chain)
+	sig, err := typeddata.Sign(typed, account.PrivateKey(), chain)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
@@ -2409,7 +2408,7 @@ func (b *GethStatusBackend) SignTypedDataV4(typed signercore.TypedData, address 
 		return types.HexBytes{}, err
 	}
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
-	sig, err := typeddata.SignTypedDataV4(typed, account.AccountKey.PrivateKey, chain)
+	sig, err := typeddata.SignTypedDataV4(typed, account.PrivateKey(), chain)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
@@ -2436,7 +2435,7 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 	return types.Hash(hash), err
 }
 
-func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*accounttypes.SelectedExtKey, error) {
+func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*generator.Account, error) {
 	db, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		b.logger.Error("failed to create new *Database instance", zap.Error(err))
@@ -2702,7 +2701,7 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyMan
 		return err
 	}
 
-	identity := chatAccount.AccountKey.PrivateKey
+	identity := chatAccount.PrivateKey()
 
 	acc, err := b.GetActiveAccount()
 	if err != nil {
@@ -2785,7 +2784,7 @@ func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) 
 		return "", err
 	}
 
-	return crypto.SignStringAsHex(content, selectedChatAccount.AccountKey.PrivateKey)
+	return crypto.SignStringAsHex(content, selectedChatAccount.PrivateKey())
 }
 
 func (b *GethStatusBackend) Messenger() *protocol.Messenger {
@@ -2811,7 +2810,7 @@ func (b *GethStatusBackend) SignHash(hexEncodedHash string) (string, error) {
 		return "", fmt.Errorf("SignHash: could not select account: %v", err.Error())
 	}
 
-	signature, err := ethcrypto.Sign(hash, chatAccount.AccountKey.PrivateKey)
+	signature, err := ethcrypto.Sign(hash, chatAccount.PrivateKey())
 	if err != nil {
 		return "", fmt.Errorf("SignHash: could not sign the hash: %v", err)
 	}

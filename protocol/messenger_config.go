@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/account/types"
+	"github.com/status-im/status-go/account/generator"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
@@ -74,7 +74,7 @@ type MessengerSignalsHandler interface {
 }
 
 type Manager interface {
-	GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*types.SelectedExtKey, error)
+	GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*generator.Account, error)
 	DeleteAccount(address ethtypes.Address) error
 }
 

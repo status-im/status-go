@@ -939,17 +939,15 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 	require.NoError(s.T(), err)
 
 	// check keystore on client
-	accKey, err := accountManager.LoadAccount(types.HexToAddress(clientSeedPhraseKp.DerivedFrom), s.password)
+	genAcc, err := accountManager.LoadAccount(types.HexToAddress(clientSeedPhraseKp.DerivedFrom), s.password)
 	require.NoError(s.T(), err)
 
-	genAcc := generator.NewAccount(accKey.PrivateKey, accKey.ExtendedKey)
 	accInfo := genAcc.ToIdentifiedAccountInfo()
 	require.Equal(s.T(), clientSeedPhraseKp.KeyUID, accInfo.KeyUID)
 
 	for _, acc := range clientSeedPhraseKp.Accounts {
-		accKey, err = accountManager.LoadAccount(acc.Address, s.password)
+		genAcc, err = accountManager.LoadAccount(acc.Address, s.password)
 		require.NoError(s.T(), err)
-		genAcc := generator.NewAccount(accKey.PrivateKey, accKey.ExtendedKey)
 		accInfo := genAcc.ToIdentifiedAccountInfo()
 		require.Equal(s.T(), acc.Address.String(), accInfo.Address)
 	}
