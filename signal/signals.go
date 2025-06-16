@@ -10,6 +10,7 @@ extern void SetEventCallback(void *cb);
 import "C"
 import (
 	"encoding/json"
+	"fmt"
 	"unsafe"
 
 	"sync"
@@ -46,6 +47,7 @@ func NewEnvelope(typ string, event interface{}) *Envelope {
 
 // send sends application signal (in JSON) upwards to application (via default notification handler)
 func send(typ string, event interface{}) {
+	fmt.Println("-------------- send typ: ", typ)
 	signal := NewEnvelope(typ, event)
 	data, err := json.Marshal(&signal)
 	if err != nil {
@@ -60,6 +62,7 @@ func send(typ string, event interface{}) {
 	} else {
 		// ...and fallback to C implementation otherwise.
 		str := C.CString(string(data))
+		fmt.Println("-------------- send signal: ", str)
 		C.StatusServiceSignalEvent(str)
 		C.free(unsafe.Pointer(str))
 	}

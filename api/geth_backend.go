@@ -2768,10 +2768,14 @@ func (b *GethStatusBackend) LocalPairingStarted() error {
 }
 
 func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyManager, st *ext.Service) error {
+	fmt.Println("----------- injectAccountsIntoWakuService 1")
+
 	chatAccount, err := b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("----------- injectAccountsIntoWakuService 2")
 
 	identity := chatAccount.AccountKey.PrivateKey
 
@@ -2779,6 +2783,8 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyMan
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("----------- injectAccountsIntoWakuService 3")
 
 	if err := w.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
 		return err
@@ -2788,30 +2794,42 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyMan
 		return ErrWakuIdentityInjectionFailure
 	}
 
+	fmt.Println("----------- injectAccountsIntoWakuService 4")
+
 	if st != nil {
+		fmt.Println("----------- injectAccountsIntoWakuService 5")
 		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.walletDB,
 			b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, b.statusNode.RPCClient(),
 			b.statusNode.WalletService(), b.statusNode.CommunityTokensService(), b.statusNode.WakuV2Service(),
 			logutils.ZapLogger(), b.statusNode.AccountsFeed()); err != nil {
+			fmt.Println("----------- injectAccountsIntoWakuService 6")
 			return err
 		}
+		fmt.Println("----------- injectAccountsIntoWakuService 7")
 		// Set initial connection state
 		st.ConnectionChanged(b.connectionState)
 
+		fmt.Println("----------- injectAccountsIntoWakuService 8")
 		messenger := st.Messenger()
+		fmt.Println("----------- injectAccountsIntoWakuService 9")
 		// Init public status api
 		b.statusNode.StatusPublicService().Init(messenger)
+		fmt.Println("----------- injectAccountsIntoWakuService 10")
 		b.statusNode.AccountService().Init(messenger)
+		fmt.Println("----------- injectAccountsIntoWakuService 11")
 		// Init chat service
 		accDB, err := accounts.NewDB(b.appDB)
 		if err != nil {
+			fmt.Println("----------- injectAccountsIntoWakuService 12")
 			return err
 		}
+		fmt.Println("----------- injectAccountsIntoWakuService 13")
 		b.statusNode.ChatService(accDB).Init(messenger)
 		b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
 		b.statusNode.CommunityTokensService().Init(messenger)
 	}
 
+	fmt.Println("----------- injectAccountsIntoWakuService 14")
 	return nil
 }
 
@@ -2832,7 +2850,9 @@ func (b *GethStatusBackend) KeyUID() string {
 }
 
 func (b *GethStatusBackend) injectAccountsIntoServices() error {
+	fmt.Println("----------- injectAccountsIntoServices 1")
 	if b.statusNode.WakuV2Service() != nil {
+		fmt.Println("----------- injectAccountsIntoServices 2")
 		return b.injectAccountsIntoWakuService(b.statusNode.WakuV2Service(), func() *ext.Service {
 			if b.statusNode.WakuV2ExtService() == nil {
 				return nil
@@ -2841,6 +2861,7 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 		}())
 	}
 
+	fmt.Println("----------- injectAccountsIntoServices 3")
 	return nil
 }
 

@@ -221,6 +221,7 @@ func unregisterReliabilityManager(rm *ReliabilityManager) {
 
 //export globalEventCallback
 func globalEventCallback(callerRet C.int, msg *C.char, len C.size_t, userData unsafe.Pointer) {
+	return
 	if callerRet == C.RET_OK {
 		eventStr := C.GoStringN(msg, C.int(len))
 		rm, ok := rmRegistry[userData] // userData contains rm's ctx
@@ -256,6 +257,7 @@ func (rm *ReliabilityManager) RegisterCallbacks(callbacks EventCallbacks) {
 
 func (rm *ReliabilityManager) OnEvent(eventStr string) {
 
+	return
 	jsonEvent := jsonEvent{}
 	err := json.Unmarshal([]byte(eventStr), &jsonEvent)
 	if err != nil {
@@ -319,6 +321,7 @@ func (rm *ReliabilityManager) parseMissingDepsEvent(eventStr string) {
 }
 
 func (rm *ReliabilityManager) Cleanup() error {
+	return nil
 	if rm == nil {
 		err := errors.New("reliability manager is nil in Cleanup")
 		Error("Failed to cleanup %v", err)
@@ -348,6 +351,7 @@ func (rm *ReliabilityManager) Cleanup() error {
 }
 
 func (rm *ReliabilityManager) Reset() error {
+	return nil
 	if rm == nil {
 		err := errors.New("reliability manager is nil in Reset")
 		Error("Failed to reset %v", err)
@@ -376,6 +380,9 @@ func (rm *ReliabilityManager) Reset() error {
 }
 
 func (rm *ReliabilityManager) WrapOutgoingMessage(message []byte, messageId MessageID) ([]byte, error) {
+
+	return []byte{1, 2, 3, 4, 5, 6}, nil
+
 	if rm == nil {
 		err := errors.New("reliability manager is nil in WrapOutgoingMessage")
 		Error("Failed to wrap outgoing message %v", err)
@@ -433,6 +440,12 @@ func (rm *ReliabilityManager) WrapOutgoingMessage(message []byte, messageId Mess
 }
 
 func (rm *ReliabilityManager) UnwrapReceivedMessage(message []byte) (*UnwrappedMessage, error) {
+
+	newMessage := []byte{1, 2, 3}
+	missingDeps := []MessageID{}
+	unwrappedMessage := UnwrappedMessage{Message: &newMessage, MissingDeps: &missingDeps}
+	return &unwrappedMessage, nil
+
 	if rm == nil {
 		err := errors.New("reliability manager is nil in UnwrapReceivedMessage")
 		Error("Failed to unwrap received message %v", err)
@@ -482,6 +495,7 @@ func (rm *ReliabilityManager) UnwrapReceivedMessage(message []byte) (*UnwrappedM
 
 // MarkDependenciesMet informs the library that dependencies are met
 func (rm *ReliabilityManager) MarkDependenciesMet(messageIDs []MessageID) error {
+	return nil
 	if rm == nil {
 		err := errors.New("reliability manager is nil in MarkDependenciesMet")
 		Error("Failed to mark dependencies met %v", err)
@@ -528,6 +542,7 @@ func (rm *ReliabilityManager) MarkDependenciesMet(messageIDs []MessageID) error 
 }
 
 func (rm *ReliabilityManager) StartPeriodicTasks() error {
+	return nil
 	if rm == nil {
 		err := errors.New("reliability manager is nil in StartPeriodicTasks")
 		Error("Failed to start periodic tasks %v", err)

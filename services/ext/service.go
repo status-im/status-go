@@ -150,20 +150,25 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		return err
 	}
 
+	fmt.Println("-------------- InitProtocol 1")
 	messenger, err := protocol.NewMessenger(
 		identity,
 		s.waku,
 		s.config.ShhextConfig.InstallationID,
 		options...,
 	)
+	fmt.Println("-------------- InitProtocol 2")
 	if err != nil {
+		fmt.Println("-------------- InitProtocol 3")
 		return err
 	}
+	fmt.Println("-------------- InitProtocol 4")
 	s.messenger = messenger
 	if s.config.ProcessBackedupMessages {
 		s.messenger.EnableBackedupMessagesProcessing()
 	}
 
+	fmt.Println("-------------- InitProtocol 5")
 	// Be mindful of adding more initialization code, as it can easily
 	// impact login times for mobile users. For example, we avoid calling
 	// messenger.InitFilters here.

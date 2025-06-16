@@ -263,33 +263,40 @@ func main() {
 			protocol.WithMessageSigner(backend.MessageSigner()),
 		}
 
+		fmt.Println("-------------- main 1")
 		messenger, err := protocol.NewMessenger(
 			identity,
 			backend.StatusNode().WakuV2Service(),
 			installationID.String(),
 			options...,
 		)
+		fmt.Println("-------------- main 2")
 
 		if err != nil {
 			logger.Error("failed to create messenger", "error", err)
 			return
 		}
 
+		fmt.Println("-------------- main 3")
 		_, err = messenger.Start()
 		if err != nil {
 			logger.Error("failed to start messenger", "error", err)
 			return
 		}
 
+		fmt.Println("-------------- main 4")
 		interruptCh := haltOnInterruptSignal(backend.StatusNode())
+		fmt.Println("-------------- main 5")
 		go retrieveMessagesLoop(messenger, 300*time.Millisecond, interruptCh)
 
 	} else {
+		fmt.Println("-------------- main 6")
 		appDB, walletDB, err := startNode(config, backend, installationID)
 		if err != nil {
 			logger.Error("failed to start node", "error", err)
 			return
 		}
+		fmt.Println("-------------- main 7")
 
 		err = sdnotify.Ready()
 		if err == sdnotify.ErrSdNotifyNoSocket {
@@ -300,6 +307,7 @@ func main() {
 			// systemd aliveness notifications, affects only Linux
 			go startSystemDWatchdog()
 		}
+		fmt.Println("-------------- main 8")
 
 		// handle interrupt signals
 		interruptCh := haltOnInterruptSignal(backend.StatusNode())
@@ -318,6 +326,7 @@ func main() {
 			profiling.NewProfiler(fmt.Sprintf(":%d", *pprofPort)).Go()
 		}
 
+		fmt.Println("-------------- main 9")
 		if config.PushNotificationServerConfig.Enabled {
 			options := []protocol.Option{
 				protocol.WithPushNotifications(),
@@ -333,36 +342,45 @@ func main() {
 				protocol.WithMessageSigner(backend.MessageSigner()),
 			}
 
+			fmt.Println("-------------- main 10")
 			messenger, err := protocol.NewMessenger(
 				identity,
 				backend.StatusNode().WakuV2Service(),
 				installationID.String(),
 				options...,
 			)
+			fmt.Println("-------------- main 11")
 			if err != nil {
+				fmt.Println("-------------- main 12")
 				logger.Error("failed to create messenger", "error", err)
 				return
 			}
 
+			fmt.Println("-------------- main 13")
 			err = messenger.InitInstallations()
 			if err != nil {
 				logger.Error("failed to init messenger installations", "error", err)
 				return
 			}
 
+			fmt.Println("-------------- main 14")
 			err = messenger.InitFilters()
 			if err != nil {
 				logger.Error("failed to init messenger filters", "error", err)
 				return
 			}
 
+			fmt.Println("-------------- main 15")
 			// This will start the push notification server as well as
 			// the config is set to Enabled
 			_, err = messenger.Start()
+			fmt.Println("-------------- main 16")
 			if err != nil {
+				fmt.Println("-------------- main 17")
 				logger.Error("failed to start messenger", "error", err)
 				return
 			}
+			fmt.Println("-------------- main 18")
 			go retrieveMessagesLoop(messenger, 300*time.Millisecond, interruptCh)
 		}
 	}

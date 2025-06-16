@@ -349,6 +349,7 @@ func NewMessenger(
 		logger,
 	)
 
+	fmt.Println("--------- NewMessenger 1")
 	sender, err := common.NewMessageSender(
 		identity,
 		database,
@@ -358,9 +359,11 @@ func NewMessenger(
 		c.featureFlags,
 	)
 	if err != nil {
+		fmt.Println("--------- NewMessenger 2")
 		return nil, errors.Wrap(err, "failed to create messageSender")
 	}
 
+	fmt.Println("--------- NewMessenger 3")
 	// Initialise anon metrics client
 	var anonMetricsClient *anonmetrics.Client
 	if c.anonMetricsClientConfig != nil &&
@@ -374,6 +377,7 @@ func NewMessenger(
 		anonMetricsClient.Logger = logger
 	}
 
+	fmt.Println("--------- NewMessenger 4")
 	// Initialise anon metrics server
 	var anonMetricsServer *anonmetrics.Server
 	if c.anonMetricsServerConfig != nil &&
@@ -390,6 +394,7 @@ func NewMessenger(
 		anonMetricsServer.Logger = logger
 	}
 
+	fmt.Println("--------- NewMessenger 5")
 	// Initialize push notification server
 	var pushNotificationServer *pushnotificationserver.Server
 	if c.pushNotificationServerConfig != nil && c.pushNotificationServerConfig.Enabled {
@@ -405,6 +410,7 @@ func NewMessenger(
 		pushNotificationClientConfig = &pushnotificationclient.Config{}
 	}
 
+	fmt.Println("--------- NewMessenger 6")
 	sqlitePersistence := newSQLitePersistence(database)
 	// Overriding until we handle different identities
 	pushNotificationClientConfig.Identity = identity
@@ -417,6 +423,7 @@ func NewMessenger(
 		communities.WithMessageSigner(c.signer),
 	}
 
+	fmt.Println("--------- NewMessenger 7")
 	var walletAPI *wallet.API
 	if c.walletService != nil {
 		walletAPI = wallet.NewAPI(c.walletService)
@@ -443,6 +450,7 @@ func NewMessenger(
 		encryptor: encryptionProtocol,
 	}
 
+	fmt.Println("--------- NewMessenger 8")
 	communitiesManager, err := communities.NewManager(
 		identity,
 		installationID,
@@ -471,6 +479,7 @@ func NewMessenger(
 		Publisher:     communitiesManager,
 	}
 
+	fmt.Println("--------- NewMessenger 9")
 	// Depending on the OS go will choose whether to use the "communities/manager_archive_nop.go" or
 	// "communities/manager_archive.go" version of this function based on the build instructions for those files.
 	// See those file for more details.
@@ -491,6 +500,7 @@ func NewMessenger(
 		return nil, fmt.Errorf("failed to build contact of ourself: %w", err)
 	}
 
+	fmt.Println("--------- NewMessenger 10")
 	var wakuMetricsHandler *wakumetrics.Client
 	if c.telemetryServerURL != "" {
 		options := []wakumetrics.TelemetryClientOption{
@@ -510,6 +520,7 @@ func NewMessenger(
 		}
 	}
 
+	fmt.Println("--------- NewMessenger 11")
 	ctx, cancel := context.WithCancel(context.Background())
 	messenger = &Messenger{
 		config:                     &c,
