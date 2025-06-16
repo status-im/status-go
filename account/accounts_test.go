@@ -203,18 +203,13 @@ func (s *ManagerTestSuite) testSelectAccount(chat, wallet ethtypes.Address, pass
 	err := s.accManager.SelectAccount(loginParams)
 	s.Require().Equal(expErr, err)
 
-	selectedMainAccountAddress, walletErr := s.accManager.MainAccountAddress()
 	selectedChatAccount, chatErr := s.accManager.SelectedChatAccount()
 
 	if expErr == nil {
-		s.Require().NoError(walletErr)
 		s.Require().NoError(chatErr)
-		s.Equal(wallet, selectedMainAccountAddress)
 		s.Equal(chat, crypto.PubkeyToAddress(selectedChatAccount.AccountKey.PrivateKey.PublicKey))
 	} else {
-		s.Equal(ethtypes.Address{}, selectedMainAccountAddress)
 		s.Nil(selectedChatAccount)
-		s.Equal(walletErr, ErrNoAccountSelected)
 		s.Equal(chatErr, ErrNoAccountSelected)
 	}
 
@@ -235,16 +230,12 @@ func (s *ManagerTestSuite) TestSetChatAccount() {
 	s.Require().NotNil(selectedChatAccount)
 	s.Equal(privKey, selectedChatAccount.AccountKey.PrivateKey)
 	s.Equal(address, selectedChatAccount.Address)
-
-	selectedMainAccountAddress, err := s.accManager.MainAccountAddress()
-	s.Error(err)
-	s.Equal(ethtypes.Address{}, selectedMainAccountAddress)
 }
 
 func (s *ManagerTestSuite) TestLogout() {
 	s.accManager.Logout()
-	s.Equal(ethtypes.Address{}, s.accManager.mainAccountAddress)
 	s.Nil(s.accManager.selectedChatAccount)
+	s.Nil(s.accManager.keystore)
 }
 
 // TestAccounts tests cases for (*Manager).Accounts.
@@ -260,11 +251,6 @@ func (s *ManagerTestSuite) TestAccounts() {
 
 	// Success
 	accs, err := s.accManager.Accounts()
-	s.NoError(err)
-	s.NotNil(accs)
-	// Selected main account address is zero address but doesn't fail
-	s.accManager.mainAccountAddress = ethtypes.Address{}
-	accs, err = s.accManager.Accounts()
 	s.NoError(err)
 	s.NotNil(accs)
 }
