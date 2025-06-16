@@ -782,10 +782,6 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get wallet address")
 	}
-	watchAddrs, err := accountsDB.GetWalletAddresses()
-	if err != nil {
-		return errors.Wrap(err, "failed to get wallet addresses")
-	}
 	login := accounttypes.LoginParams{
 		Password:    request.Password,
 		ChatAddress: chatAddr,
@@ -813,7 +809,6 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 			return errors.Wrap(err, "failed to get selected chat account")
 		}
 
-		b.accountManager.SetAccountAddresses(walletAddr, watchAddrs...)
 		err = b.injectAccountsIntoServices()
 		if err != nil {
 			return errors.Wrap(err, "failed to inject accounts into services")
@@ -899,10 +894,6 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		return err
 	}
-	watchAddrs, err := accountsDB.GetWalletAddresses()
-	if err != nil {
-		return err
-	}
 	login := accounttypes.LoginParams{
 		Password:    password,
 		ChatAddress: chatAddr,
@@ -931,7 +922,6 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 			return err
 		}
 
-		b.accountManager.SetAccountAddresses(walletAddr, watchAddrs...)
 		err = b.injectAccountsIntoServices()
 		if err != nil {
 			return err
