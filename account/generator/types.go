@@ -1,9 +1,11 @@
 package generator
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 
 	"github.com/status-im/extkeys"
 
@@ -12,13 +14,17 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
+var (
+	ErrInvalidKeystoreExtendedKey = errors.New("PrivateKey and ExtendedKey are different")
+)
+
 type Account struct {
 	privateKey  *ecdsa.PrivateKey
 	extendedKey *extkeys.ExtendedKey
 }
 
 func NewAccount(privateKey *ecdsa.PrivateKey, extKey *extkeys.ExtendedKey) *Account {
-	if privateKey == nil {
+	if privateKey == nil && extKey != nil {
 		privateKey = extKey.ToECDSA()
 	}
 
@@ -45,10 +51,16 @@ func (a *Account) PublicKey() *ecdsa.PublicKey {
 }
 
 func (a *Account) PublicKeyHex() string {
+	if a.privateKey == nil {
+		return ""
+	}
 	return types.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 }
 
 func (a *Account) Address() types.Address {
+	if a.privateKey == nil {
+		return types.Address{}
+	}
 	return crypto.PubkeyToAddress(a.privateKey.PublicKey)
 }
 
@@ -57,11 +69,17 @@ func (a *Account) HasExtendedKey() bool {
 }
 
 func (a *Account) KeyUID() string {
+	if a.privateKey == nil {
+		return ""
+	}
 	keyUID := sha256.Sum256(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 	return types.EncodeHex(keyUID[:])
 }
 
 func (a *Account) ToAccountInfo() AccountInfo {
+	if a.privateKey == nil {
+		return AccountInfo{}
+	}
 	privateKeyHex := types.EncodeHex(crypto.FromECDSA(a.privateKey))
 	publicKeyHex := types.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 	addressHex := crypto.PubkeyToAddress(a.privateKey.PublicKey).Hex()
@@ -74,6 +92,9 @@ func (a *Account) ToAccountInfo() AccountInfo {
 }
 
 func (a *Account) ToIdentifiedAccountInfo() IdentifiedAccountInfo {
+	if a.privateKey == nil {
+		return IdentifiedAccountInfo{}
+	}
 	info := a.ToAccountInfo()
 	keyUID := sha256.Sum256(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 	keyUIDHex := types.EncodeHex(keyUID[:])
@@ -89,6 +110,21 @@ func (a *Account) ToGeneratedAccountInfo(mnemonic string) GeneratedAccountInfo {
 		IdentifiedAccountInfo: idInfo,
 		Mnemonic:              mnemonic,
 	}
+}
+
+// ValidateExtendedKey validates the keystore keys, checking that ExtendedKey is the extended key of PrivateKey
+func (a *Account) ValidateExtendedKey() error {
+	if a.extendedKey == nil || a.extendedKey.IsZeroed() {
+		return nil
+	}
+
+	privKey := crypto.FromECDSA(a.privateKey)
+	extKey := crypto.FromECDSA(a.extendedKey.ToECDSA())
+	if !bytes.Equal(privKey, extKey) {
+		return ErrInvalidKeystoreExtendedKey
+	}
+
+	return nil
 }
 
 type AccountInfo struct {

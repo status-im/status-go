@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	accounttypes "github.com/status-im/status-go/account/types"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/snt"
 	stickersContracts "github.com/status-im/status-go/contracts/stickers"
@@ -125,7 +125,7 @@ func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams, input []
 	return uint64(increasedEstimation), nil
 }
 
-func (s *StickersBuyProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *accounttypes.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
+func (s *StickersBuyProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, usedNonce uint64, err error) {
 	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce, verifiedAccount)
 }
 

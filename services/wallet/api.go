@@ -19,8 +19,6 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/account/generator"
-	accounttypes "github.com/status-im/status-go/account/types"
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/healthmanager"
@@ -490,14 +488,12 @@ func (api *API) SetCustomTxDetails(ctx context.Context, pathTxIdentity *requests
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
 func (api *API) GetDerivedAddresses(ctx context.Context, password string, derivedFrom string, paths []string) ([]*DerivedAddress, error) {
-	key, err := api.s.gethManager.LoadAccount(types.HexToAddress(derivedFrom), password)
+	acc, err := api.s.gethManager.LoadAccount(types.HexToAddress(derivedFrom), password)
 	if err != nil {
 		return nil, err
 	}
 
-	account := generator.NewAccount(key.PrivateKey, key.ExtendedKey)
-
-	return api.getDerivedAddresses(account, paths)
+	return api.getDerivedAddresses(acc, paths)
 }
 
 // Generates addresses for the provided paths derived from the provided mnemonic, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
@@ -644,7 +640,7 @@ func (api *API) SignMessage(ctx context.Context, message types.HexBytes, address
 		return "", err
 	}
 
-	return api.s.transactionManager.SignMessage(message, selectedAccount)
+	return api.s.transactionManager.SignMessage(message, selectedAccount.PrivateKey())
 }
 
 func (api *API) BuildTransaction(ctx context.Context, chainID uint64, sendTxArgsJSON string) (response *transfer.TxResponse, err error) {
@@ -826,30 +822,6 @@ func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int
 	return client.ChainID(ctx)
 }
 
-func (api *API) getVerifiedWalletAccount(address, password string) (*accounttypes.SelectedExtKey, error) {
-	exists, err := api.s.accountsDB.AddressExists(types.HexToAddress(address))
-	if err != nil {
-		logutils.ZapLogger().Error("failed to query db for a given address", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
-		return nil, err
-	}
-
-	if !exists {
-		logutils.ZapLogger().Error("failed to get a selected account", zap.Error(wallettypes.ErrInvalidTxSender))
-		return nil, wallettypes.ErrAccountDoesntExist
-	}
-
-	key, err := api.s.gethManager.LoadAccount(types.HexToAddress(address), password)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to verify account", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
-		return nil, err
-	}
-
-	return &accounttypes.SelectedExtKey{
-		Address:    key.Address,
-		AccountKey: key,
-	}, nil
-}
-
 // AddWalletConnectSession adds or updates a session wallet connect session
 func (api *API) AddWalletConnectSession(ctx context.Context, session_json string) error {
 	logutils.ZapLogger().Debug("wallet.api.AddWalletConnectSession", zap.Int("rpcURL", len(session_json)))
@@ -896,7 +868,7 @@ func (api *API) SignTypedDataV4(typedJson string, address string, password strin
 		zap.Int("len(password)", len(password)),
 	)
 
-	account, err := api.getVerifiedWalletAccount(address, password)
+	account, err := api.s.gethManager.GetVerifiedWalletAccount(api.s.accountsDB, types.HexToAddress(address), password)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
@@ -908,7 +880,7 @@ func (api *API) SignTypedDataV4(typedJson string, address string, password strin
 
 	// This is not used down the line but required by the typeddata.SignTypedDataV4 function call
 	chain := new(big.Int).SetUint64(api.s.config.NetworkID)
-	sig, err := typeddata.SignTypedDataV4(typed, account.AccountKey.PrivateKey, chain)
+	sig, err := typeddata.SignTypedDataV4(typed, account.PrivateKey(), chain)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
@@ -929,12 +901,12 @@ func (api *API) SafeSignTypedDataForDApps(typedJson string, address string, pass
 		zap.Bool("legacy", legacy),
 	)
 
-	account, err := api.getVerifiedWalletAccount(address, password)
+	account, err := api.s.gethManager.GetVerifiedWalletAccount(api.s.accountsDB, types.HexToAddress(address), password)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
 
-	return walletconnect.SafeSignTypedDataForDApps(typedJson, account.AccountKey.PrivateKey, chainID, legacy)
+	return walletconnect.SafeSignTypedDataForDApps(typedJson, account.PrivateKey(), chainID, legacy)
 }
 
 func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
