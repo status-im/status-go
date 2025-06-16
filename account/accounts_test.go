@@ -207,7 +207,7 @@ func (s *ManagerTestSuite) testSelectAccount(chat, wallet ethtypes.Address, pass
 
 	if expErr == nil {
 		s.Require().NoError(chatErr)
-		s.Equal(chat, crypto.PubkeyToAddress(selectedChatAccount.AccountKey.PrivateKey.PublicKey))
+		s.Equal(chat, crypto.PubkeyToAddress(selectedChatAccount.PrivateKey().PublicKey))
 	} else {
 		s.Nil(selectedChatAccount)
 		s.Equal(chatErr, ErrNoAccountSelected)
@@ -228,8 +228,8 @@ func (s *ManagerTestSuite) TestSetChatAccount() {
 	selectedChatAccount, err := s.accManager.SelectedChatAccount()
 	s.Require().NoError(err)
 	s.Require().NotNil(selectedChatAccount)
-	s.Equal(privKey, selectedChatAccount.AccountKey.PrivateKey)
-	s.Equal(address, selectedChatAccount.Address)
+	s.Equal(privKey, selectedChatAccount.PrivateKey())
+	s.Equal(address, selectedChatAccount.Address())
 }
 
 func (s *ManagerTestSuite) TestLogout() {
@@ -274,7 +274,7 @@ func (s *ManagerTestSuite) testAddressToAccount(wallet, password string, expErr 
 	} else {
 		s.Require().NoError(err)
 		s.Require().NotNil(key)
-		s.Equal(wallet, key.Address.Hex())
+		s.Equal(wallet, key.Address().Hex())
 	}
 }
 

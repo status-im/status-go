@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	accounttypes "github.com/status-im/status-go/account/types"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/hop"
 	hopL1CctpImplementation "github.com/status-im/status-go/contracts/hop/l1Contracts/l1CctpImplementation"
@@ -436,8 +436,8 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, sig
 	return tx, nil
 }
 
-func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *accounttypes.SelectedExtKey) (hash types.Hash, nonce uint64, err error) {
-	tx, err := h.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.HopTx.ChainID, sendArgs.HopTx.From, verifiedAccount.AccountKey.PrivateKey), lastUsedNonce)
+func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, nonce uint64, err error) {
+	tx, err := h.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.HopTx.ChainID, sendArgs.HopTx.From, verifiedAccount.PrivateKey()), lastUsedNonce)
 	if err != nil {
 		return types.Hash{}, 0, createBridgeHopErrorResponse(err)
 	}

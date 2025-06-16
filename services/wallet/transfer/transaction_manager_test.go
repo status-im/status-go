@@ -225,11 +225,8 @@ func TestSignMessage(t *testing.T) {
 	message := (types.HexBytes)(make([]byte, 32))
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	account := &types.Key{
-		PrivateKey: privateKey,
-	}
 
-	signature, err := tm.SignMessage(message, account)
+	signature, err := tm.SignMessage(message, privateKey)
 	require.NoError(t, err)
 	require.NotEmpty(t, signature)
 }
@@ -238,11 +235,8 @@ func TestSignMessage_InvalidAccount(t *testing.T) {
 	tm, _ := setupTestSuite(t)
 
 	message := (types.HexBytes)(make([]byte, 32))
-	account := &types.Key{
-		PrivateKey: nil,
-	}
 
-	signature, err := tm.SignMessage(message, account)
+	signature, err := tm.SignMessage(message, nil)
 	require.Error(t, err)
 	require.Empty(t, signature)
 }
@@ -253,11 +247,8 @@ func TestSignMessage_InvalidMessage(t *testing.T) {
 	message := types.HexBytes{}
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	account := &types.Key{
-		PrivateKey: privateKey,
-	}
 
-	signature, err := tm.SignMessage(message, account)
+	signature, err := tm.SignMessage(message, privateKey)
 	require.Error(t, err)
 	require.Equal(t, "0x", signature)
 }

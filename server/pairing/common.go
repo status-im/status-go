@@ -15,6 +15,7 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/account/common"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api"
 )
 
@@ -49,7 +50,7 @@ func validateKeys(keys map[string][]byte, password string) error {
 			return err
 		}
 
-		err = common.ValidateExtendedKey(k)
+		_, err = generator.CreateAccountFromKey(k)
 		if err != nil {
 			return err
 		}

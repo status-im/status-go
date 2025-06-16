@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"time"
@@ -155,12 +156,12 @@ func NewMultiTransaction(timestamp uint64, fromNetworkID, toNetworkID uint64, fr
 	}
 }
 
-func (tm *TransactionManager) SignMessage(message types.HexBytes, account *types.Key) (string, error) {
-	if account == nil || account.PrivateKey == nil {
+func (tm *TransactionManager) SignMessage(message types.HexBytes, privateKey *ecdsa.PrivateKey) (string, error) {
+	if privateKey == nil {
 		return "", fmt.Errorf("account or private key is nil")
 	}
 
-	signature, err := crypto.Sign(message[:], account.PrivateKey)
+	signature, err := crypto.Sign(message[:], privateKey)
 
 	return types.EncodeHex(signature), err
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	accounttypes "github.com/status-im/status-go/account/types"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/contracts/erc721"
 	"github.com/status-im/status-go/eth-node/types"
@@ -207,8 +207,8 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 	return tx, nil
 }
 
-func (s *ERC721Processor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *accounttypes.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
-	tx, err := s.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount.AccountKey.PrivateKey), lastUsedNonce)
+func (s *ERC721Processor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, usedNonce uint64, err error) {
+	tx, err := s.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount.PrivateKey()), lastUsedNonce)
 	if err != nil {
 		return hash, 0, createERC721ErrorResponse(err)
 	}

@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	accounttypes "github.com/status-im/status-go/account/types"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -35,7 +35,7 @@ func (s *SignerStub) CanRecover(rpcParams personal.RecoverParams, revealedAddres
 	return true, nil
 }
 
-func (s *SignerStub) Sign(rpcParams personal.SignParams, verifiedAccount *accounttypes.SelectedExtKey) (result types.HexBytes, err error) {
+func (s *SignerStub) Sign(rpcParams personal.SignParams, verifiedAccount *generator.Account) (result types.HexBytes, err error) {
 	bytesArray := []byte(rpcParams.Address)
 	bytesArray = append(bytesArray, []byte(rpcParams.Password)...)
 	bytesArray = common.Shake256(bytesArray)

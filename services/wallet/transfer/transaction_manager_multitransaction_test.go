@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	accounttypes "github.com/status-im/status-go/account/types"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
@@ -61,14 +61,6 @@ func setupTransactionManager(t *testing.T) (*TransactionManager, *mock_transacto
 	tm := NewTransactionManager(NewInMemMultiTransactionStorage(), nil, transactor, nil, nil, nil, nil)
 
 	return tm, transactor, ctrl
-}
-
-func setupAccount(_ *testing.T, address common.Address) *accounttypes.SelectedExtKey {
-	// Dummy account
-	return &accounttypes.SelectedExtKey{
-		Address:    types.Address(address),
-		AccountKey: &types.Key{},
-	}
 }
 
 func setupTransactionData(_ *testing.T, transactor transactions.TransactorIface) (*MultiTransaction, []*pathprocessor.MultipathProcessorTxArgs, map[string]pathprocessor.PathProcessor, []*pathprocessor.MultipathProcessorTxArgs) {
@@ -161,7 +153,7 @@ func setupApproveTransactionData(_ *testing.T, transactor transactions.Transacto
 
 func TestSendTransactionsETHSuccess(t *testing.T) {
 	tm, transactor, _ := setupTransactionManager(t)
-	account := setupAccount(t, common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678"))
+	account := generator.NewAccount(nil, nil)
 	multiTransaction, data, bridges, expectedData := setupTransactionData(t, transactor)
 
 	// Verify that the SendTransactionWithChainID method is called for each transaction with proper arguments
@@ -177,7 +169,7 @@ func TestSendTransactionsETHSuccess(t *testing.T) {
 
 func TestSendTransactionsApproveSuccess(t *testing.T) {
 	tm, transactor, _ := setupTransactionManager(t)
-	account := setupAccount(t, common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678"))
+	account := generator.NewAccount(nil, nil)
 	multiTransaction, data, bridges, expectedData := setupApproveTransactionData(t, transactor)
 
 	// Verify that the SendTransactionWithChainID method is called for each transaction with proper arguments
@@ -193,7 +185,7 @@ func TestSendTransactionsApproveSuccess(t *testing.T) {
 
 func TestSendTransactionsETHFailOnBridge(t *testing.T) {
 	tm, transactor, ctrl := setupTransactionManager(t)
-	account := setupAccount(t, common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678"))
+	account := generator.NewAccount(nil, nil)
 	multiTransaction, data, _, _ := setupTransactionData(t, transactor)
 
 	// Initialize the bridges
@@ -215,7 +207,7 @@ func TestSendTransactionsETHFailOnBridge(t *testing.T) {
 
 func TestSendTransactionsETHFailOnTransactor(t *testing.T) {
 	tm, transactor, _ := setupTransactionManager(t)
-	account := setupAccount(t, common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678"))
+	account := generator.NewAccount(nil, nil)
 	multiTransaction, data, bridges, expectedData := setupTransactionData(t, transactor)
 
 	// Verify that the SendTransactionWithChainID method is called for each transaction with proper arguments

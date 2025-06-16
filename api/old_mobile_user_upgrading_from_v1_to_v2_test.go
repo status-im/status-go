@@ -132,10 +132,9 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 		s.Require().True(len(seedKps) == 1, "Unexpected number of seed keypairs")
 		s.Require().True(len(seedKps[0].Accounts) == 1)
 
-		accKey, err := b.AccountManager().LoadAccount(seedKps[0].Accounts[0].Address, oldMobileUserPasswd)
+		genAcc, err := b.AccountManager().LoadAccount(seedKps[0].Accounts[0].Address, oldMobileUserPasswd)
 		s.Require().NoError(err)
 
-		genAcc := generator.NewAccount(accKey.PrivateKey, accKey.ExtendedKey)
 		genAccKeyUID := genAcc.KeyUID()
 
 		s.Require().NoError(err)
@@ -158,10 +157,9 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 		s.Require().True(ok, "Key keypair not found")
 		s.Require().True(len(keyKps) == 1, "Unexpected number of key keypairs")
 		s.Require().True(len(keyKps[0].Accounts) == 1)
-		accKey, err = b.AccountManager().LoadAccount(keyKps[0].Accounts[0].Address, oldMobileUserPasswd)
+		genAcc, err = b.AccountManager().LoadAccount(keyKps[0].Accounts[0].Address, oldMobileUserPasswd)
 		s.Require().NoError(err)
 
-		genAcc = generator.NewAccount(accKey.PrivateKey, accKey.ExtendedKey)
 		genAccKeyUID = genAcc.KeyUID()
 		multiAcc := &multiaccounts.Account{
 			Timestamp: time.Now().Unix(),
@@ -211,10 +209,8 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 	suggestedPath, err := db.ResolveSuggestedPathForKeypair(oldMobileUserKeyUID)
 	s.Require().NoError(err)
 
-	accKey, err := b.AccountManager().LoadAccount(types.HexToAddress(profileKp.DerivedFrom), oldMobileUserPasswd)
+	genAcc, err := b.AccountManager().LoadAccount(types.HexToAddress(profileKp.DerivedFrom), oldMobileUserPasswd)
 	s.Require().NoError(err)
-
-	genAcc := generator.NewAccount(accKey.PrivateKey, accKey.ExtendedKey)
 
 	infoMap, err := generator.DeriveChildrenFromAccount(genAcc, []string{suggestedPath})
 	s.Require().NoError(err)

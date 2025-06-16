@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/account/generator"
 	accounttypes "github.com/status-im/status-go/account/types"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
@@ -103,12 +104,12 @@ var (
 	testNonce    = hexutil.Uint64(10)
 )
 
-func (s *TransactorSuite) setupTransactionPoolAPI(args wallettypes.SendTxArgs, returnNonce, resultNonce hexutil.Uint64, account *accounttypes.SelectedExtKey, txErr error) {
+func (s *TransactorSuite) setupTransactionPoolAPI(args wallettypes.SendTxArgs, returnNonce, resultNonce hexutil.Uint64, account *generator.Account, txErr error) {
 	// Expect calls to gas functions only if there are no user defined values.
 	// And also set the expected gas and gas price for RLP encoding the expected tx.
 	var usedGas hexutil.Uint64
 	var usedGasPrice *big.Int
-	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(account.Address)), gethrpc.PendingBlockNumber).Return(&returnNonce, nil)
+	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(account.Address())), gethrpc.PendingBlockNumber).Return(&returnNonce, nil)
 	if !args.IsDynamicFeeTx() {
 		if args.GasPrice == nil {
 			usedGasPrice = (*big.Int)(testGasPrice)
@@ -130,7 +131,7 @@ func (s *TransactorSuite) setupTransactionPoolAPI(args wallettypes.SendTxArgs, r
 	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), data).Return(common.Hash{}, txErr)
 }
 
-func (s *TransactorSuite) rlpEncodeTx(args wallettypes.SendTxArgs, config *params.NodeConfig, account *accounttypes.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
+func (s *TransactorSuite) rlpEncodeTx(args wallettypes.SendTxArgs, config *params.NodeConfig, account *generator.Account, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
 	var txData gethtypes.TxData
 	to := common.Address(*args.To)
 	if args.IsDynamicFeeTx() {
@@ -160,7 +161,7 @@ func (s *TransactorSuite) rlpEncodeTx(args wallettypes.SendTxArgs, config *param
 	newTx := gethtypes.NewTx(txData)
 	chainID := big.NewInt(int64(s.nodeConfig.NetworkID))
 
-	signedTx, err := gethtypes.SignTx(newTx, gethtypes.NewLondonSigner(chainID), account.AccountKey.PrivateKey)
+	signedTx, err := gethtypes.SignTx(newTx, gethtypes.NewLondonSigner(chainID), account.PrivateKey())
 	s.NoError(err)
 	data, err := signedTx.MarshalBinary()
 	s.NoError(err)
@@ -169,10 +170,7 @@ func (s *TransactorSuite) rlpEncodeTx(args wallettypes.SendTxArgs, config *param
 
 func (s *TransactorSuite) TestGasValues() {
 	key, _ := gethcrypto.GenerateKey()
-	selectedAccount := &accounttypes.SelectedExtKey{
-		Address:    types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
-		AccountKey: &types.Key{PrivateKey: key},
-	}
+	selectedAccount := generator.NewAccount(key, nil)
 	testCases := []struct {
 		name                 string
 		gas                  *hexutil.Uint64
@@ -223,7 +221,7 @@ func (s *TransactorSuite) TestGasValues() {
 			s.SetupTest()
 			to := types.HexToAddress(utils.TestConfig.Account2.WalletAddress)
 			args := wallettypes.SendTxArgs{
-				From:                 types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
+				From:                 selectedAccount.Address(),
 				To:                   &to,
 				Gas:                  testCase.gas,
 				GasPrice:             testCase.gasPrice,
@@ -356,9 +354,7 @@ func (s *TransactorSuite) TestArgsValidation() {
 		Input: types.HexBytes([]byte{0x02, 0x01}),
 	}
 	s.False(args.Valid())
-	selectedAccount := &accounttypes.SelectedExtKey{
-		Address: types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
-	}
+	selectedAccount := generator.NewAccount(nil, nil)
 	_, _, err := s.manager.SendTransaction(args, selectedAccount, -1)
 	s.EqualError(err, wallettypes.ErrInvalidSendTxArgs.Error())
 }
@@ -377,9 +373,7 @@ func (s *TransactorSuite) TestAccountMismatch() {
 	s.EqualError(err, account.ErrNoAccountSelected.Error())
 
 	// mismatched accounts
-	selectedAccount := &accounttypes.SelectedExtKey{
-		Address: types.HexToAddress(utils.TestConfig.Account2.WalletAddress),
-	}
+	selectedAccount := generator.NewAccount(nil, nil)
 	_, _, err = s.manager.SendTransaction(args, selectedAccount, -1)
 	s.EqualError(err, wallettypes.ErrInvalidTxSender.Error())
 }
