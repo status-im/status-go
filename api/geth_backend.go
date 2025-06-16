@@ -930,18 +930,25 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		}
 
 		b.accountManager.SetAccountAddresses(walletAddr, watchAddrs...)
+		fmt.Println("-------- loginAccount 1")
 		err = b.injectAccountsIntoServices()
+		fmt.Println("-------- loginAccount 2")
 		if err != nil {
+			fmt.Println("-------- loginAccount 3")
 			return err
 		}
 	}
 
+	fmt.Println("-------- loginAccount 4")
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
+	fmt.Println("-------- loginAccount 5")
 	if err != nil {
+		fmt.Println("-------- loginAccount 6")
 		b.logger.Info("failed to update account")
 		return err
 	}
 
+	fmt.Println("-------- loginAccount 7")
 	return nil
 }
 
@@ -2262,18 +2269,25 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	// Handle a case when a node is stopped and resumed.
 	// If there is no account selected, an error is returned.
 	if _, err := b.accountManager.SelectedChatAccount(); err == nil {
+		fmt.Println("-------- startNode 1")
 		if err := b.injectAccountsIntoServices(); err != nil {
+			fmt.Println("-------- startNode 2")
 			return err
 		}
 	} else if err != account.ErrNoAccountSelected {
+		fmt.Println("-------- startNode 3")
 		return err
 	}
 
+	fmt.Println("-------- startNode 4")
 	if b.statusNode.WalletService() != nil {
+		fmt.Println("-------- startNode 5")
 		b.statusNode.WalletService().KeycardPairings().SetKeycardPairingsFile(config.KeycardPairingDataFile)
 	}
 
+	fmt.Println("-------- startNode 6")
 	signal.SendNodeReady()
+	fmt.Println("-------- startNode 7")
 	return nil
 }
 
@@ -2739,10 +2753,13 @@ func (b *GethStatusBackend) SelectAccount(loginParams accounttypes.LoginParams) 
 		b.account = loginParams.MultiAccount
 	}
 
+	fmt.Println("-------- SelectAccount 1")
 	if err := b.injectAccountsIntoServices(); err != nil {
+		fmt.Println("-------- SelectAccount 2")
 		return err
 	}
 
+	fmt.Println("-------- SelectAccount 3")
 	return nil
 }
 
