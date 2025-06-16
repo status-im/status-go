@@ -8,7 +8,7 @@ import (
 type LoginParams struct {
 	ChatAddress  ethtypes.Address       `json:"chatAddress"`
 	Password     string                 `json:"password"`
-	MainAccount  ethtypes.Address       `json:"mainAccount"`
+	MainAccount  ethtypes.Address       `json:"mainAccount"` // TODO: remove this field
 	MultiAccount *multiaccounts.Account `json:"multiAccount"`
 }
 
