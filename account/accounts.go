@@ -30,11 +30,11 @@ func (e ErrCannotLocateKeyFile) Error() string {
 
 // DefaultManager represents default account manager implementation
 type DefaultManager struct {
-	mu       sync.RWMutex
-	keystore types.KeyStore
+	keystoreMu sync.RWMutex
+	keystore   types.KeyStore
 
-	selectedChatAccount *types.SelectedExtKey // account that was processed during the last call to SelectAccount()
-	mainAccountAddress  ethtypes.Address
+	selectedChatAccountMutex sync.RWMutex
+	selectedChatAccount      *types.SelectedExtKey // account that was processed during the last call to SelectAccount()
 
 	logger *zap.Logger
 }
@@ -46,15 +46,15 @@ func NewDefaultManager(logger *zap.Logger) *DefaultManager {
 }
 
 func (m *DefaultManager) IsKeystoreSet() bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.keystoreMu.RLock()
+	defer m.keystoreMu.RUnlock()
 
 	return m.keystore != nil
 }
 
 func (m *DefaultManager) SetKeystore(keystore types.KeyStore) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.keystoreMu.Lock()
+	defer m.keystoreMu.Unlock()
 
 	m.keystore = keystore
 }
@@ -111,6 +111,9 @@ func (m *DefaultManager) VerifyAccountPassword(address ethtypes.Address, passwor
 // LoadAccount loads an account key from the keystore for a given address and password.
 // If either address or password is incorrect, an error is returned.
 func (m *DefaultManager) LoadAccount(address ethtypes.Address, password string) (*ethtypes.Key, error) {
+	m.keystoreMu.RLock()
+	defer m.keystoreMu.RUnlock()
+
 	if m.keystore == nil {
 		return nil, ErrAccountKeyStoreMissing
 	}
@@ -131,12 +134,14 @@ func (m *DefaultManager) LoadAccount(address ethtypes.Address, password string) 
 }
 
 func (m *DefaultManager) storeToKeystore(acc *generator.Account, password string) (err error) {
+	m.keystoreMu.Lock()
+	defer m.keystoreMu.Unlock()
+
 	if m.keystore == nil {
 		return ErrAccountKeyStoreMissing
 	}
 
 	if acc.HasExtendedKey() {
-
 		_, err = m.keystore.ImportSingleExtendedKey(acc.ExtendedKey(), password)
 		return
 	}
@@ -145,34 +150,36 @@ func (m *DefaultManager) storeToKeystore(acc *generator.Account, password string
 	return
 }
 
+func (m *DefaultManager) setChatAccount(key *ethtypes.Key) {
+	m.selectedChatAccountMutex.Lock()
+	defer m.selectedChatAccountMutex.Unlock()
+
+	if key == nil {
+		m.selectedChatAccount = nil
+		return
+	}
+
+	m.selectedChatAccount = &types.SelectedExtKey{
+		Address:    key.Address,
+		AccountKey: key,
+	}
+}
+
 // SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
 // using provided password. Once verification is done, all previous identities are removed).
 func (m *DefaultManager) SelectAccount(loginParams types.LoginParams) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	selectedChatAccount, err := m.LoadAccount(loginParams.ChatAddress, loginParams.Password)
 	if err != nil {
 		return err
 	}
-	m.mainAccountAddress = loginParams.MainAccount
-	m.selectedChatAccount = &types.SelectedExtKey{
-		Address:    selectedChatAccount.Address,
-		AccountKey: selectedChatAccount,
-	}
+
+	m.setChatAccount(selectedChatAccount)
 
 	return nil
 }
 
-func (m *DefaultManager) SetAccountAddresses(main ethtypes.Address, secondary ...ethtypes.Address) {
-	m.mainAccountAddress = main
-}
-
 // SetChatAccount initializes selectedChatAccount with privKey
 func (m *DefaultManager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	address := crypto.PubkeyToAddress(privKey.PublicKey)
 	id, err := uuid.NewRandom()
 	if err != nil {
@@ -185,29 +192,15 @@ func (m *DefaultManager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
 		PrivateKey: privKey,
 	}
 
-	m.selectedChatAccount = &types.SelectedExtKey{
-		Address:    address,
-		AccountKey: key,
-	}
+	m.setChatAccount(key)
+
 	return nil
-}
-
-// MainAccountAddress returns main account address set during login
-func (m *DefaultManager) MainAccountAddress() (ethtypes.Address, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.mainAccountAddress == ethtypes.ZeroAddress() {
-		return ethtypes.ZeroAddress(), ErrNoAccountSelected
-	}
-
-	return m.mainAccountAddress, nil
 }
 
 // SelectedChatAccount returns currently selected chat account
 func (m *DefaultManager) SelectedChatAccount() (*types.SelectedExtKey, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.selectedChatAccountMutex.RLock()
+	defer m.selectedChatAccountMutex.RUnlock()
 
 	if m.selectedChatAccount == nil {
 		return nil, ErrNoAccountSelected
@@ -217,26 +210,32 @@ func (m *DefaultManager) SelectedChatAccount() (*types.SelectedExtKey, error) {
 
 // Logout clears selected accounts.
 func (m *DefaultManager) Logout() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.mainAccountAddress = ethtypes.ZeroAddress()
-	m.selectedChatAccount = nil
+	m.setChatAccount(nil)
+	m.SetKeystore(nil)
 }
 
 // Accounts returns list of addresses for selected account, including subaccounts.
 func (m *DefaultManager) Accounts() ([]ethtypes.Address, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	addresses := make([]ethtypes.Address, 0)
-	if m.mainAccountAddress != ethtypes.ZeroAddress() {
-		addresses = append(addresses, m.mainAccountAddress)
+	m.keystoreMu.RLock()
+	defer m.keystoreMu.RUnlock()
+
+	if m.keystore == nil {
+		return nil, ErrAccountKeyStoreMissing
+	}
+
+	ksAccounts := m.keystore.Accounts()
+	addresses := make([]ethtypes.Address, 0, len(ksAccounts))
+	for _, account := range ksAccounts {
+		addresses = append(addresses, account.Address)
 	}
 
 	return addresses, nil
 }
 
 func (m *DefaultManager) MigrateKeyStoreDir(newDir string, addresses []string) error {
+	m.keystoreMu.RLock()
+	defer m.keystoreMu.RUnlock()
+
 	if m.keystore == nil {
 		return ErrAccountKeyStoreMissing
 	}
@@ -244,6 +243,9 @@ func (m *DefaultManager) MigrateKeyStoreDir(newDir string, addresses []string) e
 }
 
 func (m *DefaultManager) ReEncryptKeyStoreDir(oldPass, newPass string) error {
+	m.keystoreMu.RLock()
+	defer m.keystoreMu.RUnlock()
+
 	if m.keystore == nil {
 		return ErrAccountKeyStoreMissing
 	}
@@ -251,6 +253,9 @@ func (m *DefaultManager) ReEncryptKeyStoreDir(oldPass, newPass string) error {
 }
 
 func (m *DefaultManager) DeleteAccount(address ethtypes.Address) error {
+	m.keystoreMu.RLock()
+	defer m.keystoreMu.RUnlock()
+
 	if m.keystore == nil {
 		return ErrAccountKeyStoreMissing
 	}
