@@ -15,8 +15,8 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/rpc/network/networksevent"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/async"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -40,22 +40,22 @@ type Controller struct {
 	walletFeed   *event.Feed
 	accountsDB   *accounts.Database
 	accountsFeed *event.Feed
-	networksFeed *event.Feed
 
 	networkManager *network.Manager
 	cancelFn       context.CancelFunc
 
-	commands             commandPerAddressAndChainID
-	timers               timerPerAddressAndChainID
-	group                *async.Group
-	accountsWatcher      *accountsevent.Watcher
-	walletEventsWatcher  *walletevent.Watcher
-	networkEventsWatcher *networksevent.Watcher
+	commands            commandPerAddressAndChainID
+	timers              timerPerAddressAndChainID
+	group               *async.Group
+	accountsWatcher     *accountsevent.Watcher
+	walletEventsWatcher *walletevent.Watcher
 
 	ownedCollectiblesChangeCb OwnedCollectiblesChangeCb
 	collectiblesTransferCb    TransferCb
 
 	commandsLock sync.RWMutex
+
+	stopCh chan struct{}
 }
 
 func NewController(
@@ -63,7 +63,6 @@ func NewController(
 	walletFeed *event.Feed,
 	accountsDB *accounts.Database,
 	accountsFeed *event.Feed,
-	networksFeed *event.Feed,
 	networkManager *network.Manager,
 	manager *Manager) *Controller {
 	return &Controller{
@@ -72,7 +71,6 @@ func NewController(
 		walletFeed:     walletFeed,
 		accountsDB:     accountsDB,
 		accountsFeed:   accountsFeed,
-		networksFeed:   networksFeed,
 		networkManager: networkManager,
 		commands:       make(commandPerAddressAndChainID),
 		timers:         make(timerPerAddressAndChainID),
@@ -88,6 +86,8 @@ func (c *Controller) SetCollectiblesTransferCb(cb TransferCb) {
 }
 
 func (c *Controller) Start() {
+	c.stopCh = make(chan struct{})
+
 	// Setup periodical collectibles refresh
 	_ = c.startPeriodicalOwnershipFetch()
 
@@ -102,7 +102,10 @@ func (c *Controller) Start() {
 }
 
 func (c *Controller) Stop() {
-	c.stopNetworkEventsWatcher()
+	if c.stopCh != nil {
+		close(c.stopCh)
+		c.stopCh = nil
+	}
 
 	c.stopWalletEventsWatcher()
 
@@ -366,34 +369,30 @@ func (c *Controller) stopWalletEventsWatcher() {
 }
 
 func (c *Controller) startNetworkEventsWatcher() {
-	if c.networkEventsWatcher != nil {
+	if c.networkManager != nil {
 		return
 	}
 
-	activeNetworksChangeCb := func() {
-		// Lazy logic for now, just restart everything if there's any network change.
-		// TODO #17183: Per-network logic
-		c.stopPeriodicalOwnershipFetch()
-		err := c.startPeriodicalOwnershipFetch()
-		if err != nil {
-			logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Error(err))
+	ch, unsub := pubsub.Subscribe[network.EventActiveNetworksChanged](c.networkManager.GetPublisher(), 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsub()
+		select {
+		case <-c.stopCh:
+			return
+		case _, ok := <-ch:
+			if !ok {
+				return
+			}
+			// Lazy logic for now, just restart everything if there's any network change.
+			// TODO #17183: Per-network logic
+			c.stopPeriodicalOwnershipFetch()
+			err := c.startPeriodicalOwnershipFetch()
+			if err != nil {
+				logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Error(err))
+			}
 		}
-	}
-
-	networkEventsWatcherCallbacks := networksevent.EventCallbacks{
-		ActiveNetworksChangeCb: activeNetworksChangeCb,
-	}
-
-	c.networkEventsWatcher = networksevent.NewWatcher(c.networksFeed, networkEventsWatcherCallbacks)
-
-	c.networkEventsWatcher.Start()
-}
-
-func (c *Controller) stopNetworkEventsWatcher() {
-	if c.networkEventsWatcher != nil {
-		c.networkEventsWatcher.Stop()
-		c.networkEventsWatcher = nil
-	}
+	}()
 }
 
 func (c *Controller) refetchOwnershipIfRecentTransfer(account common.Address, chainID walletCommon.ChainID, latestTxTimestamp int64) {

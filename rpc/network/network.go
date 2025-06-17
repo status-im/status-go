@@ -18,7 +18,6 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 
 	persistence "github.com/status-im/status-go/rpc/network/db"
-	"github.com/status-im/status-go/rpc/network/networksevent"
 )
 
 //go:generate mockgen -package=mock -source=network.go -destination=mock/network.go
@@ -57,7 +56,7 @@ type Manager struct {
 
 	accountFeed       *event.Feed
 	accountsPublisher *pubsub.Publisher
-	networksFeed      *event.Feed
+	networksPublisher *pubsub.Publisher
 
 	stopCh chan struct{}
 
@@ -65,7 +64,7 @@ type Manager struct {
 }
 
 // NewManager creates a new instance of Manager.
-func NewManager(db *sql.DB, accountFeed *event.Feed, accountsPublisher *pubsub.Publisher, networksFeed *event.Feed) *Manager {
+func NewManager(db *sql.DB, accountFeed *event.Feed, accountsPublisher *pubsub.Publisher) *Manager {
 	accountsDB, err := accounts.NewDB(db)
 	if err != nil {
 		return nil
@@ -79,7 +78,7 @@ func NewManager(db *sql.DB, accountFeed *event.Feed, accountsPublisher *pubsub.P
 		networkPersistence: persistence.NewNetworksPersistence(db),
 		accountFeed:        accountFeed,
 		accountsPublisher:  accountsPublisher,
-		networksFeed:       networksFeed,
+		networksPublisher:  pubsub.NewPublisher(),
 		logger:             logger,
 	}
 }
@@ -94,6 +93,7 @@ func (nm *Manager) Stop() {
 		close(nm.stopCh)
 		nm.stopCh = nil
 	}
+	nm.networksPublisher.Close()
 }
 
 func (nm *Manager) startSettingsChangeSubscription() {
@@ -125,13 +125,11 @@ func (nm *Manager) onTestNetworksEnabledChanged() {
 }
 
 func (nm *Manager) notifyActiveNetworksChange() {
-	if nm.networksFeed == nil {
+	if nm.networksPublisher == nil {
 		return
 	}
 
-	nm.networksFeed.Send(networksevent.Event{
-		Type: networksevent.EventTypeActiveNetworksChanged,
-	})
+	pubsub.Publish(nm.networksPublisher, EventActiveNetworksChanged{})
 }
 
 // Init initializes the nets, merges them with existing ones, and wraps the operation in a transaction.
@@ -383,4 +381,8 @@ func (nm *Manager) GetCombinedNetworks() ([]*CombinedNetwork, error) {
 	}
 
 	return combinedNetworksSlice, nil
+}
+
+func (nm *Manager) GetPublisher() *pubsub.Publisher {
+	return nm.networksPublisher
 }

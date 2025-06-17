@@ -107,7 +107,6 @@ type Client struct {
 	accountsFeed       *event.Feed
 	accountsPublisher  *pubsub.Publisher
 	walletFeed         *event.Feed
-	networksFeed       *event.Feed
 
 	handlersMx sync.RWMutex       // mx guards handlers
 	handlers   map[string]Handler // locally registered handlers
@@ -128,7 +127,6 @@ type ClientConfig struct {
 	AccountsFeed      *event.Feed
 	AccountsPublisher *pubsub.Publisher
 	WalletFeed        *event.Feed
-	NetworksFeed      *event.Feed
 }
 
 // NewClient initializes Client
@@ -137,7 +135,7 @@ type ClientConfig struct {
 // reconnect to the server if connection is lost.
 func NewClient(config ClientConfig) (*Client, error) {
 	logger := logutils.ZapLogger().Named("rpcClient")
-	networkManager := network.NewManager(config.DB, config.AccountsFeed, config.AccountsPublisher, config.NetworksFeed)
+	networkManager := network.NewManager(config.DB, config.AccountsFeed, config.AccountsPublisher)
 	if networkManager == nil {
 		return nil, errors.New("failed to create network manager")
 	}
@@ -159,7 +157,6 @@ func NewClient(config ClientConfig) (*Client, error) {
 		accountsFeed:       config.AccountsFeed,
 		accountsPublisher:  config.AccountsPublisher,
 		walletFeed:         config.WalletFeed,
-		networksFeed:       config.NetworksFeed,
 	}
 
 	c.UpstreamChainID = config.UpstreamChainID
