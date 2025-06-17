@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/markdown"
 	"github.com/status-im/markdown/ast"
 
-	accountcommon "github.com/status-im/status-go/account/common"
+	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/audio"
@@ -362,7 +362,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 	}
 
 	if item.From != "" {
-		ext, err := accountcommon.ExtendStructWithPubKeyData(item.From, item)
+		ext, err := common.ExtendStructWithPubKeyData(item.From, item)
 		if err != nil {
 			return nil, err
 		}

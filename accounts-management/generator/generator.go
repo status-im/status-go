@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/status-im/status-go/account/common"
+	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 )

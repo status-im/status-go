@@ -25,8 +25,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/account/generator"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
+	"github.com/status-im/status-go/accounts-management/generator"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -105,7 +105,7 @@ type Manager struct {
 	ownerVerifier            OwnerVerifier
 	identity                 *ecdsa.PrivateKey
 	installationID           string
-	accountsManager          *account.DefaultManager
+	accountsManager          *accsmanagement.DefaultManager
 	tokenManager             TokenManager
 	collectiblesManager      CollectiblesManager
 	logger                   *zap.Logger
@@ -247,7 +247,7 @@ type membersReevaluationTask struct {
 }
 
 type managerOptions struct {
-	accountsManager        *account.DefaultManager
+	accountsManager        *accsmanagement.DefaultManager
 	tokenManager           TokenManager
 	collectiblesManager    CollectiblesManager
 	communityTokensService CommunityTokensServiceInterface

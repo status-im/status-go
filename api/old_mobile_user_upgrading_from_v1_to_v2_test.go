@@ -9,8 +9,8 @@ import (
 
 	"go.uber.org/zap"
 
-	accscommon "github.com/status-im/status-go/account/common"
-	"github.com/status-im/status-go/account/generator"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/generator"
 	d_common "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts"
 

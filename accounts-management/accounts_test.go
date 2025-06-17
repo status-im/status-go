@@ -1,4 +1,4 @@
-package account
+package accountsmanagement
 
 import (
 	"errors"
@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/account/common"
-	"github.com/status-im/status-go/account/keystore/geth"
-	"github.com/status-im/status-go/account/types"
+	"github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/keystore/geth"
+	"github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/tt"

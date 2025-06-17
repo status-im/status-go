@@ -1,7 +1,7 @@
 package common
 
 import (
-	"github.com/status-im/status-go/account/keystore/geth"
+	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/eth-node/types"
 )
 

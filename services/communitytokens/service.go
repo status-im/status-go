@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -38,7 +38,7 @@ import (
 // Collectibles service
 type Service struct {
 	manager         *Manager
-	accountsManager *account.DefaultManager
+	accountsManager *accsmanagement.DefaultManager
 	config          *params.NodeConfig
 	db              *communitytokensdatabase.Database
 	Messenger       *protocol.Messenger
@@ -49,7 +49,7 @@ type Service struct {
 }
 
 // Returns a new Collectibles Service.
-func NewService(rpcClient *rpc.Client, accountsManager *account.DefaultManager, config *params.NodeConfig, appDb *sql.DB,
+func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.DefaultManager, config *params.NodeConfig, appDb *sql.DB,
 	walletFeed *event.Feed, transactor *transactions.Transactor) *Service {
 	return &Service{
 		manager:         NewManager(rpcClient),

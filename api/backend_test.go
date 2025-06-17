@@ -25,10 +25,10 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/account"
-	accscommon "github.com/status-im/status-go/account/common"
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/account/keystore/geth"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
@@ -126,7 +126,7 @@ func setupGethStatusBackend() (*GethStatusBackend, func() error, func() error, f
 	return backend, stop1, stop2, stop3, err
 }
 
-func setKeystore(accManager *account.DefaultManager, keyStoreDir string) error {
+func setKeystore(accManager *accsmanagement.DefaultManager, keyStoreDir string) error {
 	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
 	if err != nil {
 		return err
