@@ -105,7 +105,7 @@ type Manager struct {
 	ownerVerifier            OwnerVerifier
 	identity                 *ecdsa.PrivateKey
 	installationID           string
-	accountsManager          *accsmanagement.DefaultManager
+	accountsManager          *accsmanagement.AccountsManager
 	tokenManager             TokenManager
 	collectiblesManager      CollectiblesManager
 	logger                   *zap.Logger
@@ -247,7 +247,7 @@ type membersReevaluationTask struct {
 }
 
 type managerOptions struct {
-	accountsManager        *accsmanagement.DefaultManager
+	accountsManager        *accsmanagement.AccountsManager
 	tokenManager           TokenManager
 	collectiblesManager    CollectiblesManager
 	communityTokensService CommunityTokensServiceInterface

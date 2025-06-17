@@ -117,7 +117,7 @@ type Messenger struct {
 	communitiesManager        *communities.Manager
 	archiveManager            communities.ArchiveService
 	communitiesKeyDistributor communities.KeyDistributor
-	accountsManager           Manager
+	accountsManager           AccountsManager
 	mentionsManager           *MentionManager
 	storeNodeRequestsManager  *StoreNodeRequestManager
 	logger                    *zap.Logger

@@ -41,7 +41,7 @@ const (
 
 type API struct {
 	contractMaker   *contracts.ContractMaker
-	accountsManager *accsmanagement.DefaultManager
+	accountsManager *accsmanagement.AccountsManager
 	accountsDB      *accounts.Database
 	pendingTracker  *transactions.PendingTxTracker
 
@@ -88,7 +88,7 @@ type ednStickerPackInfo struct {
 	Meta ednStickerPack
 }
 
-func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.DefaultManager,
+func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager,
 	pendingTracker *transactions.PendingTxTracker, keyStoreDir string, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
 	result := &API{
 		contractMaker: &contracts.ContractMaker{

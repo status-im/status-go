@@ -24,7 +24,8 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-func NewAPI(rpcClient *rpc.Client, accountsManager *accsmanagement.DefaultManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
+func NewAPI(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, pendingTracker *transactions.PendingTxTracker,
+	config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
 	return &API{
 		ensResolver: ensresolver.NewEnsResolver(rpcClient),
 
@@ -49,7 +50,7 @@ type syncUsernameDetail func(context.Context, *UsernameDetail) error
 
 type API struct {
 	ensResolver     *ensresolver.EnsResolver
-	accountsManager *accsmanagement.DefaultManager
+	accountsManager *accsmanagement.AccountsManager
 	pendingTracker  *transactions.PendingTxTracker
 	config          *params.NodeConfig
 
