@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
@@ -104,8 +105,8 @@ type Client struct {
 	healthMgr          *healthmanager.BlockchainHealthManager
 	stopMonitoringFunc context.CancelFunc
 	accountsFeed       *event.Feed
+	accountsPublisher  *pubsub.Publisher
 	walletFeed         *event.Feed
-	settingsFeed       *event.Feed
 	networksFeed       *event.Feed
 
 	handlersMx sync.RWMutex       // mx guards handlers
@@ -120,14 +121,14 @@ var verifProxyInitFn func(c *Client)
 
 // ClientConfig holds the configuration for initializing a new Client.
 type ClientConfig struct {
-	Client          *gethrpc.Client
-	UpstreamChainID uint64
-	Networks        []params.Network
-	DB              *sql.DB
-	AccountsFeed    *event.Feed
-	WalletFeed      *event.Feed
-	SettingsFeed    *event.Feed
-	NetworksFeed    *event.Feed
+	Client            *gethrpc.Client
+	UpstreamChainID   uint64
+	Networks          []params.Network
+	DB                *sql.DB
+	AccountsFeed      *event.Feed
+	AccountsPublisher *pubsub.Publisher
+	WalletFeed        *event.Feed
+	NetworksFeed      *event.Feed
 }
 
 // NewClient initializes Client
@@ -136,7 +137,7 @@ type ClientConfig struct {
 // reconnect to the server if connection is lost.
 func NewClient(config ClientConfig) (*Client, error) {
 	logger := logutils.ZapLogger().Named("rpcClient")
-	networkManager := network.NewManager(config.DB, config.AccountsFeed, config.SettingsFeed, config.NetworksFeed)
+	networkManager := network.NewManager(config.DB, config.AccountsFeed, config.AccountsPublisher, config.NetworksFeed)
 	if networkManager == nil {
 		return nil, errors.New("failed to create network manager")
 	}
@@ -156,8 +157,8 @@ func NewClient(config ClientConfig) (*Client, error) {
 		logger:             logger,
 		healthMgr:          healthmanager.NewBlockchainHealthManager(),
 		accountsFeed:       config.AccountsFeed,
+		accountsPublisher:  config.AccountsPublisher,
 		walletFeed:         config.WalletFeed,
-		settingsFeed:       config.SettingsFeed,
 		networksFeed:       config.NetworksFeed,
 	}
 

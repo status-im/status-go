@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
@@ -17,8 +18,23 @@ import (
 
 // NewService initializes service instance.
 func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *accsmanagement.AccountsManager,
-	config *params.NodeConfig, feed *event.Feed, mediaServer *server.MediaServer) *Service {
-	return &Service{db, mdb, manager, config, feed, nil, mediaServer}
+	config *params.NodeConfig, feed *event.Feed, publisher *pubsub.Publisher, mediaServer *server.MediaServer) *Service {
+	s := &Service{
+		db:          db,
+		mdb:         mdb,
+		manager:     manager,
+		config:      config,
+		feed:        feed,
+		mediaServer: mediaServer,
+		publisher:   publisher,
+	}
+	db.SetSettingsNotifier(func(setting settings.SettingField, val interface{}) {
+		pubsub.Publish(s.publisher, settings.EventSettingChanged{
+			Setting: setting,
+			Value:   val,
+		})
+	})
+	return s
 }
 
 // Service is a browsers service.
@@ -30,6 +46,7 @@ type Service struct {
 	feed        *event.Feed
 	messenger   *protocol.Messenger
 	mediaServer *server.MediaServer
+	publisher   *pubsub.Publisher
 }
 
 func (s *Service) Init(messenger *protocol.Messenger) {

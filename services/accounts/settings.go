@@ -12,7 +12,11 @@ import (
 )
 
 func NewSettingsAPI(messenger **protocol.Messenger, db *accounts.Database, config *params.NodeConfig) *SettingsAPI {
-	return &SettingsAPI{messenger, db, config}
+	return &SettingsAPI{
+		messenger: messenger,
+		db:        db,
+		config:    config,
+	}
 }
 
 // SettingsAPI is class with methods available over RPC.

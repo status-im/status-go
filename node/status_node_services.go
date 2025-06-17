@@ -27,10 +27,8 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	accountssvc "github.com/status-im/status-go/services/accounts"
-	"github.com/status-im/status-go/services/accounts/settingsevent"
 	appgeneral "github.com/status-im/status-go/services/app-general"
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
@@ -68,8 +66,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	if err != nil {
 		return err
 	}
-
-	setSettingsNotifier(accDB, &b.settingsFeed)
 
 	services := []common.StatusService{}
 	services = append(services, b.rpcStatsService())
@@ -277,16 +273,6 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 	return b.wakuV2Srvc, nil
 }
 
-func setSettingsNotifier(db *accounts.Database, feed *event.Feed) {
-	db.SetSettingsNotifier(func(setting settings.SettingField, val interface{}) {
-		feed.Send(settingsevent.Event{
-			Type:    settingsevent.EventTypeChanged,
-			Setting: setting,
-			Value:   val,
-		})
-	})
-}
-
 func (b *StatusNode) connectorService() *connector.Service {
 	if b.connectorSrvc == nil {
 		b.connectorSrvc = connector.NewService(b.walletDB, b.rpcClient, b.rpcClient.NetworkManager)
@@ -310,6 +296,7 @@ func (b *StatusNode) accountsService(accountsFeed *event.Feed, accDB *accounts.D
 			b.gethAccountManager,
 			b.config,
 			accountsFeed,
+			b.accountsPublisher,
 			mediaServer,
 		)
 	}
