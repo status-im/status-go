@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/constants"
 	"github.com/status-im/status-go/eth-node/types"
@@ -212,7 +212,7 @@ func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 
 		if !kp.MigratedToKeycard() {
 			err = m.accountsManager.DeleteAccount(address)
-			var e *account.ErrCannotLocateKeyFile
+			var e *accsmanagement.ErrCannotLocateKeyFile
 			if err != nil && !errors.As(err, &e) {
 				return err
 			}
@@ -221,7 +221,7 @@ func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 				lastAcccountOfKeypairWithTheSameKey := len(kp.Accounts) == 1
 				if lastAcccountOfKeypairWithTheSameKey {
 					err = m.accountsManager.DeleteAccount(types.Address(ethcommon.HexToAddress(kp.DerivedFrom)))
-					var e *account.ErrCannotLocateKeyFile
+					var e *accsmanagement.ErrCannotLocateKeyFile
 					if err != nil && !errors.As(err, &e) {
 						return err
 					}
@@ -250,7 +250,7 @@ func (m *Messenger) deleteKeystoreFilesForKeypair(keypair *accounts.Keypair) (er
 			continue
 		}
 		err = m.accountsManager.DeleteAccount(acc.Address)
-		var e *account.ErrCannotLocateKeyFile
+		var e *accsmanagement.ErrCannotLocateKeyFile
 		if err != nil && !errors.As(err, &e) {
 			return err
 		}
@@ -258,7 +258,7 @@ func (m *Messenger) deleteKeystoreFilesForKeypair(keypair *accounts.Keypair) (er
 
 	if anyAccountFullyOrPartiallyOperable && keypair.Type != accounts.KeypairTypeKey {
 		err = m.accountsManager.DeleteAccount(types.Address(ethcommon.HexToAddress(keypair.DerivedFrom)))
-		var e *account.ErrCannotLocateKeyFile
+		var e *accsmanagement.ErrCannotLocateKeyFile
 		if err != nil && !errors.As(err, &e) {
 			return err
 		}

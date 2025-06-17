@@ -17,8 +17,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/account/generator"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
@@ -351,7 +351,7 @@ func (t *Transactor) HashTransaction(args wallettypes.SendTxArgs) (validatedArgs
 // make sure that only account which created the tx can complete it
 func (t *Transactor) validateAccount(args wallettypes.SendTxArgs, selectedAccount *generator.Account) error {
 	if selectedAccount == nil {
-		return account.ErrNoAccountSelected
+		return accsmanagement.ErrNoAccountSelected
 	}
 
 	if !args.Valid() {

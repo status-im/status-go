@@ -1,4 +1,4 @@
-package account
+package accountsmanagement
 
 import (
 	"crypto/ecdsa"
@@ -9,10 +9,10 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account/common"
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/account/keystore/geth"
-	"github.com/status-im/status-go/account/types"
+	"github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/accounts-management/keystore/geth"
+	"github.com/status-im/status-go/accounts-management/types"
 	gocommon "github.com/status-im/status-go/common"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"

@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/stickers"
@@ -41,7 +41,7 @@ const (
 
 type API struct {
 	contractMaker   *contracts.ContractMaker
-	accountsManager *account.DefaultManager
+	accountsManager *accsmanagement.DefaultManager
 	accountsDB      *accounts.Database
 	pendingTracker  *transactions.PendingTxTracker
 
@@ -88,7 +88,8 @@ type ednStickerPackInfo struct {
 	Meta ednStickerPack
 }
 
-func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.DefaultManager, pendingTracker *transactions.PendingTxTracker, keyStoreDir string, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
+func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.DefaultManager,
+	pendingTracker *transactions.PendingTxTracker, keyStoreDir string, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
 	result := &API{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/account/keystore/geth"
+	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"

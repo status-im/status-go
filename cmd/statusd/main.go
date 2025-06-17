@@ -23,7 +23,7 @@ import (
 	gethmetrics "github.com/ethereum/go-ethereum/metrics"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/account/keystore/geth"
+	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/cmd/status-backend/server"

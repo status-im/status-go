@@ -23,8 +23,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	abi_spec "github.com/status-im/status-go/abi-spec"
-	accountcommon "github.com/status-im/status-go/account/common"
-	"github.com/status-im/status-go/account/keystore/geth"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/centralizedmetrics"
@@ -2231,7 +2231,7 @@ func deserializeAndCompressKey(DesktopKey string) string {
 }
 
 func GetRandomMnemonic() string {
-	mnemonic, err := accountcommon.CreateRandomMnemonicWithDefaultLength()
+	mnemonic, err := accscommon.CreateRandomMnemonicWithDefaultLength()
 	if err != nil {
 		return makeJSONResponse(err)
 	}

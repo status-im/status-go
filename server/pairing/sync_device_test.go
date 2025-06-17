@@ -20,9 +20,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/account/keystore/geth"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -107,7 +107,7 @@ func (s *SyncDeviceSuite) TearDownTest() {
 	s.Require().NoError(s.pxBootNode.Stop())
 }
 
-func setKeystore(accManager *account.DefaultManager, keyStoreDir string) error {
+func setKeystore(accManager *accsmanagement.DefaultManager, keyStoreDir string) error {
 	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
 	if err != nil {
 		return err
