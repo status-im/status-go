@@ -8,17 +8,17 @@ package sds
 	#include <stdio.h>
 	#include <stdlib.h>
 
-	extern void globalEventCallback(int ret, char* msg, size_t len, void* userData);
+	extern void sdsGlobalEventCallback(int ret, char* msg, size_t len, void* userData);
 
 	typedef struct {
 		int ret;
 		char* msg;
 		size_t len;
 		void* ffiWg;
-	} Resp;
+	} SdsResp;
 
 	static void* allocResp(void* wg) {
-		Resp* r = calloc(1, sizeof(Resp));
+		SdsResp* r = calloc(1, sizeof(SdsResp));
 		r->ffiWg = wg;
 		return r;
 	}
@@ -33,7 +33,7 @@ package sds
 		if (resp == NULL) {
 			return NULL;
 		}
-		Resp* m = (Resp*) resp;
+		SdsResp* m = (SdsResp*) resp;
 		return m->msg;
 	}
 
@@ -41,7 +41,7 @@ package sds
 		if (resp == NULL) {
 			return 0;
 		}
-		Resp* m = (Resp*) resp;
+		SdsResp* m = (SdsResp*) resp;
 		return m->len;
 	}
 
@@ -49,79 +49,79 @@ package sds
 		if (resp == NULL) {
 			return 0;
 		}
-		Resp* m = (Resp*) resp;
+		SdsResp* m = (SdsResp*) resp;
 		return m->ret;
 	}
 
 	// resp must be set != NULL in case interest on retrieving data from the callback
-	void GoCallback(int ret, char* msg, size_t len, void* resp);
+	void SdsGoCallback(int ret, char* msg, size_t len, void* resp);
 
-	static void* cGoNewReliabilityManager(const char* channelId, void* resp) {
+	static void* cGoSdsNewReliabilityManager(const char* channelId, void* resp) {
 		// We pass NULL because we are not interested in retrieving data from this callback
-		void* ret = NewReliabilityManager(channelId, (SdsCallBack) GoCallback, resp);
+		void* ret = SdsNewReliabilityManager(channelId, (SdsCallBack) SdsGoCallback, resp);
 		return ret;
 	}
 
-	static void cGoSetEventCallback(void* rmCtx) {
-		// The 'globalEventCallback' Go function is shared amongst all possible Reliability Manager instances.
+	static void cGoSdsSetEventCallback(void* rmCtx) {
+		// The 'sdsGlobalEventCallback' Go function is shared amongst all possible Reliability Manager instances.
 
-		// Given that the 'globalEventCallback' is shared, we pass again the
+		// Given that the 'sdsGlobalEventCallback' is shared, we pass again the
 		// rmCtx instance but in this case is needed to pick up the correct method
 		// that will handle the event.
 
-		// In other words, for every call libsds makes to globalEventCallback,
+		// In other words, for every call libsds makes to sdsGlobalEventCallback,
 		// the 'userData' parameter will bring the context of the rm that registered
-		// that globalEventCallback.
+		// that sdsGlobalEventCallback.
 
 		// This technique is needed because cgo only allows to export Go functions and not methods.
 
-		SetEventCallback(rmCtx, (SdsCallBack) globalEventCallback, rmCtx);
+		SdsSetEventCallback(rmCtx, (SdsCallBack) sdsGlobalEventCallback, rmCtx);
 	}
 
-	static void cGoCleanupReliabilityManager(void* rmCtx, void* resp) {
-		CleanupReliabilityManager(rmCtx, (SdsCallBack) GoCallback, resp);
+	static void cGoSdsCleanupReliabilityManager(void* rmCtx, void* resp) {
+		SdsCleanupReliabilityManager(rmCtx, (SdsCallBack) SdsGoCallback, resp);
 	}
 
-	static void cGoResetReliabilityManager(void* rmCtx, void* resp) {
-		ResetReliabilityManager(rmCtx, (SdsCallBack) GoCallback, resp);
+	static void cGoSdsResetReliabilityManager(void* rmCtx, void* resp) {
+		SdsResetReliabilityManager(rmCtx, (SdsCallBack) SdsGoCallback, resp);
 	}
 
-	static void cGoWrapOutgoingMessage(void* rmCtx,
+	static void cGoSdsWrapOutgoingMessage(void* rmCtx,
 									void* message,
                     				size_t messageLen,
                     				const char* messageId,
 									void* resp) {
-		WrapOutgoingMessage(rmCtx,
+		SdsWrapOutgoingMessage(rmCtx,
 						message,
 						messageLen,
 						messageId,
-						(SdsCallBack) GoCallback,
+						(SdsCallBack) SdsGoCallback,
 						resp);
 	}
-	static void cGoUnwrapReceivedMessage(void* rmCtx,
+	static void cGoSdsUnwrapReceivedMessage(void* rmCtx,
 									void* message,
                     				size_t messageLen,
 									void* resp) {
-		UnwrapReceivedMessage(rmCtx,
+		SdsUnwrapReceivedMessage(rmCtx,
 						message,
 						messageLen,
-						(SdsCallBack) GoCallback,
+						(SdsCallBack) SdsGoCallback,
 						resp);
 	}
 
-	static void cGoMarkDependenciesMet(void* rmCtx,
+	static void cGoSdsMarkDependenciesMet(void* rmCtx,
 									char** messageIDs,
                     				size_t count,
 									void* resp) {
-		MarkDependenciesMet(rmCtx,
+		SdsMarkDependenciesMet(rmCtx,
 						messageIDs,
 						count,
-						(SdsCallBack) GoCallback,
+						(SdsCallBack) SdsGoCallback,
 						resp);
 	}
 
-	static void cGoStartPeriodicTasks(void* rmCtx, void* resp) {
-		StartPeriodicTasks(rmCtx, (SdsCallBack) GoCallback, resp);
+	static void cGoSdsStartPeriodicTasks(void* rmCtx, void* resp) {
+		SdsStartPeriodicTasks(rmCtx, (SdsCallBack) SdsGoCallback, resp);
 	}
 
 */
@@ -139,10 +139,10 @@ import (
 const requestTimeout = 30 * time.Second
 const EventChanBufferSize = 1024
 
-//export GoCallback
-func GoCallback(ret C.int, msg *C.char, len C.size_t, resp unsafe.Pointer) {
+//export SdsGoCallback
+func SdsGoCallback(ret C.int, msg *C.char, len C.size_t, resp unsafe.Pointer) {
 	if resp != nil {
-		m := (*C.Resp)(resp)
+		m := (*C.SdsResp)(resp)
 		m.ret = ret
 		m.msg = msg
 		m.len = len
@@ -186,10 +186,10 @@ func NewReliabilityManager(channelId string) (*ReliabilityManager, error) {
 	}
 
 	wg.Add(1)
-	rm.rmCtx = C.cGoNewReliabilityManager(cChannelId, resp)
+	rm.rmCtx = C.cGoSdsNewReliabilityManager(cChannelId, resp)
 	wg.Wait()
 
-	C.cGoSetEventCallback(rm.rmCtx)
+	C.cGoSdsSetEventCallback(rm.rmCtx)
 	registerReliabilityManager(rm)
 
 	Debug("Successfully created Reliability Manager")
@@ -219,8 +219,8 @@ func unregisterReliabilityManager(rm *ReliabilityManager) {
 	delete(rmRegistry, rm.rmCtx)
 }
 
-//export globalEventCallback
-func globalEventCallback(callerRet C.int, msg *C.char, len C.size_t, userData unsafe.Pointer) {
+//export sdsGlobalEventCallback
+func sdsGlobalEventCallback(callerRet C.int, msg *C.char, len C.size_t, userData unsafe.Pointer) {
 	if callerRet == C.RET_OK {
 		eventStr := C.GoStringN(msg, C.int(len))
 		rm, ok := rmRegistry[userData] // userData contains rm's ctx
@@ -230,9 +230,9 @@ func globalEventCallback(callerRet C.int, msg *C.char, len C.size_t, userData un
 	} else {
 		if len != 0 {
 			errMsg := C.GoStringN(msg, C.int(len))
-			Error("globalEventCallback retCode not ok, retCode: %v: %v", callerRet, errMsg)
+			Error("sdsGlobalEventCallback retCode not ok, retCode: %v: %v", callerRet, errMsg)
 		} else {
-			Error("globalEventCallback retCode not ok, retCode: %v", callerRet)
+			Error("sdsGlobalEventCallback retCode not ok, retCode: %v", callerRet)
 		}
 	}
 }
@@ -332,7 +332,7 @@ func (rm *ReliabilityManager) Cleanup() error {
 	defer C.freeResp(resp)
 
 	wg.Add(1)
-	C.cGoCleanupReliabilityManager(rm.rmCtx, resp)
+	C.cGoSdsCleanupReliabilityManager(rm.rmCtx, resp)
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
@@ -361,7 +361,7 @@ func (rm *ReliabilityManager) Reset() error {
 	defer C.freeResp(resp)
 
 	wg.Add(1)
-	C.cGoResetReliabilityManager(rm.rmCtx, resp)
+	C.cGoSdsResetReliabilityManager(rm.rmCtx, resp)
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
@@ -401,7 +401,7 @@ func (rm *ReliabilityManager) WrapOutgoingMessage(message []byte, messageId Mess
 	cMessageLen := C.size_t(len(message))
 
 	wg.Add(1)
-	C.cGoWrapOutgoingMessage(rm.rmCtx, cMessagePtr, cMessageLen, cMessageId, resp)
+	C.cGoSdsWrapOutgoingMessage(rm.rmCtx, cMessagePtr, cMessageLen, cMessageId, resp)
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
@@ -453,7 +453,7 @@ func (rm *ReliabilityManager) UnwrapReceivedMessage(message []byte) (*UnwrappedM
 	cMessageLen := C.size_t(len(message))
 
 	wg.Add(1)
-	C.cGoUnwrapReceivedMessage(rm.rmCtx, cMessagePtr, cMessageLen, resp)
+	C.cGoSdsUnwrapReceivedMessage(rm.rmCtx, cMessagePtr, cMessageLen, resp)
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
@@ -513,7 +513,7 @@ func (rm *ReliabilityManager) MarkDependenciesMet(messageIDs []MessageID) error 
 
 	wg.Add(1)
 	// Pass the pointer variable (cMessageIDsPtr) directly, which is of type **C.char
-	C.cGoMarkDependenciesMet(rm.rmCtx, cMessageIDsPtr, C.size_t(len(messageIDs)), resp)
+	C.cGoSdsMarkDependenciesMet(rm.rmCtx, cMessageIDsPtr, C.size_t(len(messageIDs)), resp)
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
@@ -541,7 +541,7 @@ func (rm *ReliabilityManager) StartPeriodicTasks() error {
 	defer C.freeResp(resp)
 
 	wg.Add(1)
-	C.cGoStartPeriodicTasks(rm.rmCtx, resp)
+	C.cGoSdsStartPeriodicTasks(rm.rmCtx, resp)
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {

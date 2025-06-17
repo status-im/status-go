@@ -2171,8 +2171,8 @@ github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065 h1:Sd7
 github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065/go.mod h1:7cSGUoGVIla1IpnChrLbkVjkYgdOcr7rcifEfh4ReR4=
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 h1:4HSdWMFMufpRo3ECTX6BrvA+VzKhXZf7mS0rTa5cCWU=
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1/go.mod h1:+LeEYoW5/uBUTVjtBGLEVCUe9mOYAlu5ZPkIxLOSr5Y=
-github.com/waku-org/sds-go-bindings v0.0.0-20250606090351-8c0eaa09857c h1:jRiNbTONLfJo19ElabcNUXK7eHFBPxp0oWQa7YAEXXc=
-github.com/waku-org/sds-go-bindings v0.0.0-20250606090351-8c0eaa09857c/go.mod h1:AoDF5mc186NsMQ4uaIdLrcAvp2aAEleAsQ7L6mUscBI=
+github.com/waku-org/sds-go-bindings v0.0.0-20250617080004-be7f61d8090f h1:4I5qrB3Lfxita8ON6KPULzx9EyRsuQbwrvVh8iKzH/o=
+github.com/waku-org/sds-go-bindings v0.0.0-20250617080004-be7f61d8090f/go.mod h1:V7gD6AH8+p+XjFW3F8x7f1DJy27wPf1elkunAECW0AI=
 github.com/waku-org/waku-go-bindings v0.0.0-20250528131356-4af668737057 h1:9ZsIVx4VQc75gIVTwB6TySQs/r/bcpMUNg/p85iI5js=
 github.com/waku-org/waku-go-bindings v0.0.0-20250528131356-4af668737057/go.mod h1:v6ogkMCyQRUTazRyQR5LIouukY4/2bkjjHpnBKBxcAY=
 github.com/wealdtech/go-ens/v3 v3.5.0 h1:Huc9GxBgiGweCOGTYomvsg07K2QggAqZpZ5SuiZdC8o=
