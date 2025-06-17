@@ -26,12 +26,11 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/account"
-	accountcommon "github.com/status-im/status-go/account/common"
-	accscommon "github.com/status-im/status-go/account/common"
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/account/keystore/geth"
-	accounttypes "github.com/status-im/status-go/account/types"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/accounts-management/keystore/geth"
+	accstypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/centralizedmetrics"
 	centralizedmetricscommon "github.com/status-im/status-go/centralizedmetrics/common"
@@ -103,7 +102,7 @@ type GethStatusBackend struct {
 	signer                   communities.MessageSigner
 	multiaccountsDB          *multiaccounts.Database
 	account                  *multiaccounts.Account
-	accountManager           *account.DefaultManager
+	accountManager           *accsmanagement.DefaultManager
 	transactor               *transactions.Transactor
 	connectionState          connection.State
 	appState                 AppState
@@ -140,7 +139,7 @@ func (b *GethStatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
 }
 
 func (b *GethStatusBackend) initialize() {
-	accountManager := account.NewDefaultManager(b.logger)
+	accountManager := accsmanagement.NewDefaultManager(b.logger)
 	transactor := transactions.NewTransactor()
 	personalService := personal.New()
 	statusNode := node.New(transactor, accountManager, b.logger)
@@ -160,7 +159,7 @@ func (b *GethStatusBackend) StatusNode() *node.StatusNode {
 }
 
 // AccountManager returns reference to account manager
-func (b *GethStatusBackend) AccountManager() *account.DefaultManager {
+func (b *GethStatusBackend) AccountManager() *accsmanagement.DefaultManager {
 	return b.accountManager
 }
 
@@ -782,7 +781,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get wallet address")
 	}
-	login := accounttypes.LoginParams{
+	login := accstypes.LoginParams{
 		Password:    request.Password,
 		ChatAddress: chatAddr,
 		MainAccount: walletAddr,
@@ -894,7 +893,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		return err
 	}
-	login := accounttypes.LoginParams{
+	login := accstypes.LoginParams{
 		Password:    password,
 		ChatAddress: chatAddr,
 		MainAccount: walletAddr,
@@ -1643,7 +1642,7 @@ func (b *GethStatusBackend) InitKeyStoreDirWithAccount(rootDataDir, keyUID strin
 func (b *GethStatusBackend) generateAccount(mnemonic string) (genAcc *generator.Account, accInfo generator.GeneratedAccountInfo, err error) {
 	finalMnemonic := mnemonic
 	if mnemonic == "" {
-		finalMnemonic, err = accountcommon.CreateRandomMnemonicWithDefaultLength()
+		finalMnemonic, err = accscommon.CreateRandomMnemonicWithDefaultLength()
 		if err != nil {
 			return
 		}
@@ -2263,7 +2262,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		if err := b.injectAccountsIntoServices(); err != nil {
 			return err
 		}
-	} else if err != account.ErrNoAccountSelected {
+	} else if err != accsmanagement.ErrNoAccountSelected {
 		return err
 	}
 
@@ -2662,7 +2661,7 @@ func (b *GethStatusBackend) closeWalletDB() error {
 // SelectAccount selects current wallet and chat accounts, by verifying that each address has corresponding account which can be decrypted
 // using provided password. Once verification is done, the decrypted chat key is injected into Whisper (as a single identity,
 // all previous identities are removed).
-func (b *GethStatusBackend) SelectAccount(loginParams accounttypes.LoginParams) error {
+func (b *GethStatusBackend) SelectAccount(loginParams accstypes.LoginParams) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

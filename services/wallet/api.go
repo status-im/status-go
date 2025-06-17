@@ -18,7 +18,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	abi_spec "github.com/status-im/status-go/abi-spec"
-	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/healthmanager"

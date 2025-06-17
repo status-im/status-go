@@ -8,7 +8,7 @@ import (
 	"github.com/status-im/extkeys"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/account/types"
+	"github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 )

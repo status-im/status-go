@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
 
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
@@ -76,7 +76,7 @@ type StatusNode struct {
 
 	logger *zap.Logger
 
-	gethAccountManager *account.DefaultManager
+	gethAccountManager *accsmanagement.DefaultManager
 	transactor         *transactions.Transactor
 
 	publicMethods map[string]bool
@@ -113,7 +113,7 @@ type StatusNode struct {
 }
 
 // New makes new instance of StatusNode.
-func New(transactor *transactions.Transactor, gethAccountManager *account.DefaultManager, logger *zap.Logger) *StatusNode {
+func New(transactor *transactions.Transactor, gethAccountManager *accsmanagement.DefaultManager, logger *zap.Logger) *StatusNode {
 	logger = logger.Named("StatusNode")
 	return &StatusNode{
 		transactor:         transactor,

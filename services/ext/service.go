@@ -22,7 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/api/multiformat"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
@@ -99,7 +99,7 @@ func New(
 
 func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB,
 	httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account,
-	accountManager *account.DefaultManager, rpcClient *rpc.Client, walletService *wallet.Service,
+	accountManager *accsmanagement.DefaultManager, rpcClient *rpc.Client, walletService *wallet.Service,
 	communityTokensService *communitytokens.Service, wakuService *wakuv2.Waku, logger *zap.Logger,
 	accountsFeed *event.Feed) error {
 	var err error
@@ -368,7 +368,7 @@ func buildMessengerOptions(
 	wakuService *wakuv2.Waku,
 	logger *zap.Logger,
 	messengerSignalsHandler protocol.MessengerSignalsHandler,
-	accountManager *account.DefaultManager,
+	accountManager *accsmanagement.DefaultManager,
 	accountsFeed *event.Feed,
 	ensVerifier *ens.Verifier,
 ) ([]protocol.Option, error) {

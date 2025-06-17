@@ -8,9 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/account"
-	accountcommon "github.com/status-im/status-go/account/common"
-	"github.com/status-im/status-go/account/generator"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -20,13 +20,13 @@ import (
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 )
 
-func NewAccountsAPI(manager *account.DefaultManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed, messenger **protocol.Messenger) *API {
+func NewAccountsAPI(manager *accsmanagement.DefaultManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed, messenger **protocol.Messenger) *API {
 	return &API{manager, config, db, feed, messenger}
 }
 
 // API is class with methods available over RPC.
 type API struct {
-	manager   *account.DefaultManager
+	manager   *accsmanagement.DefaultManager
 	config    *params.NodeConfig
 	db        *accounts.Database
 	feed      *event.Feed
@@ -476,7 +476,7 @@ func (api *API) MakeSeedPhraseKeypairFullyOperable(ctx context.Context, mnemonic
 
 // Creates a random new mnemonic.
 func (api *API) GetRandomMnemonic(ctx context.Context) (string, error) {
-	return accountcommon.CreateRandomMnemonicWithDefaultLength()
+	return accscommon.CreateRandomMnemonicWithDefaultLength()
 }
 
 func (api *API) VerifyKeystoreFileForAccount(address types.Address, password string) bool {

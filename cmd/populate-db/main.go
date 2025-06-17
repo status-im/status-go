@@ -19,8 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/account/keystore/geth"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/cmd/utils"
 	"github.com/status-im/status-go/common/dbsetup"

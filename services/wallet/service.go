@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -60,7 +60,7 @@ func NewService(
 	rpcClient *rpc.Client,
 	accountFeed *event.Feed,
 	networksFeed *event.Feed,
-	gethManager *account.DefaultManager,
+	gethManager *accsmanagement.DefaultManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
 	ensResolver *ensresolver.EnsResolver,
@@ -325,7 +325,7 @@ type Service struct {
 	cryptoOnRampManager   *onramp.Manager
 	collectiblesManager   *collectibles.Manager
 	collectibles          *collectibles.Service
-	gethManager           *account.DefaultManager
+	gethManager           *accsmanagement.DefaultManager
 	marketManager         *market.Manager
 	transactor            *transactions.Transactor
 	feed                  *event.Feed

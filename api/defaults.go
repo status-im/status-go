@@ -7,8 +7,8 @@ import (
 	"math/big"
 	"path/filepath"
 
-	accscommon "github.com/status-im/status-go/account/common"
-	"github.com/status-im/status-go/account/generator"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/api/common"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"

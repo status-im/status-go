@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"time"
 
-	accountcommon "github.com/status-im/status-go/account/common"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
@@ -238,7 +238,7 @@ func (s Settings) MarshalJSON() ([]byte, error) {
 	// when marshaling JSON
 	type Alias Settings
 
-	ext, err := accountcommon.ExtendStructWithPubKeyData(s.PublicKey, Alias(s))
+	ext, err := accscommon.ExtendStructWithPubKeyData(s.PublicKey, Alias(s))
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"

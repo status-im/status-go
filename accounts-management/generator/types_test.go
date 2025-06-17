@@ -6,7 +6,7 @@ import (
 	"github.com/status-im/extkeys"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/status-im/status-go/account/common"
+	"github.com/status-im/status-go/accounts-management/common"
 )
 
 func generateTestKey(t *testing.T) *Account {
