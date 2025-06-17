@@ -16,7 +16,8 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *accsmanagement.DefaultManager, config *params.NodeConfig, feed *event.Feed, mediaServer *server.MediaServer) *Service {
+func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *accsmanagement.AccountsManager,
+	config *params.NodeConfig, feed *event.Feed, mediaServer *server.MediaServer) *Service {
 	return &Service{db, mdb, manager, config, feed, nil, mediaServer}
 }
 
@@ -24,7 +25,7 @@ func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *acc
 type Service struct {
 	db          *accounts.Database
 	mdb         *multiaccounts.Database
-	manager     *accsmanagement.DefaultManager
+	manager     *accsmanagement.AccountsManager
 	config      *params.NodeConfig
 	feed        *event.Feed
 	messenger   *protocol.Messenger

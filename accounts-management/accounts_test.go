@@ -23,7 +23,7 @@ import (
 const testPassword = "test-password"
 const newTestPassword = "new-test-password"
 
-func setKeystore(accManager *DefaultManager, keyStoreDir string) error {
+func setKeystore(accManager *AccountsManager, keyStoreDir string) error {
 	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func setKeystore(accManager *DefaultManager, keyStoreDir string) error {
 }
 
 func TestVerifyAccountPassword(t *testing.T) {
-	accManager := NewDefaultManager(tt.MustCreateTestLogger())
+	accManager := NewAccountsManager(tt.MustCreateTestLogger())
 	keyStoreDir := t.TempDir()
 	emptyKeyStoreDir := t.TempDir()
 
@@ -112,7 +112,7 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	err := utils.ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
 	require.NoError(t, err)
 
-	accManager := NewDefaultManager(tt.MustCreateTestLogger())
+	accManager := NewAccountsManager(tt.MustCreateTestLogger())
 
 	err = setKeystore(accManager, keyStoreDir)
 	require.NoError(t, err)
@@ -130,7 +130,7 @@ func TestManagerTestSuite(t *testing.T) {
 type ManagerTestSuite struct {
 	suite.Suite
 	testAccount
-	accManager *DefaultManager
+	accManager *AccountsManager
 	keydir     string
 }
 
@@ -146,7 +146,7 @@ type testAccount struct {
 // SetupTest is used here for reinitializing the mock before every
 // test function to avoid faulty execution.
 func (s *ManagerTestSuite) SetupTest() {
-	s.accManager = NewDefaultManager(tt.MustCreateTestLogger())
+	s.accManager = NewAccountsManager(tt.MustCreateTestLogger())
 
 	keyStoreDir := s.T().TempDir()
 	err := setKeystore(s.accManager, keyStoreDir)

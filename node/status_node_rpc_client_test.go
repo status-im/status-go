@@ -69,7 +69,7 @@ func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
 }
 
 func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
-	accountManager := accsmanagement.NewDefaultManager(tt.MustCreateTestLogger())
+	accountManager := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
 	statusNode := New(nil, accountManager, tt.MustCreateTestLogger())
 
 	appDB, walletDB, stop, err := setupTestDBs()
@@ -110,7 +110,7 @@ func createStatusNode() (*StatusNode, func() error, func() error, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	accountManager := accsmanagement.NewDefaultManager(tt.MustCreateTestLogger())
+	accountManager := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
 	statusNode := New(nil, accountManager, tt.MustCreateTestLogger())
 	statusNode.SetAppDB(appDB)
 	statusNode.SetWalletDB(walletDB)

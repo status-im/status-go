@@ -20,13 +20,13 @@ import (
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 )
 
-func NewAccountsAPI(manager *accsmanagement.DefaultManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed, messenger **protocol.Messenger) *API {
+func NewAccountsAPI(manager *accsmanagement.AccountsManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed, messenger **protocol.Messenger) *API {
 	return &API{manager, config, db, feed, messenger}
 }
 
 // API is class with methods available over RPC.
 type API struct {
-	manager   *accsmanagement.DefaultManager
+	manager   *accsmanagement.AccountsManager
 	config    *params.NodeConfig
 	db        *accounts.Database
 	feed      *event.Feed

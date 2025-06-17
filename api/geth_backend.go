@@ -102,7 +102,7 @@ type GethStatusBackend struct {
 	signer                   communities.MessageSigner
 	multiaccountsDB          *multiaccounts.Database
 	account                  *multiaccounts.Account
-	accountManager           *accsmanagement.DefaultManager
+	accountManager           *accsmanagement.AccountsManager
 	transactor               *transactions.Transactor
 	connectionState          connection.State
 	appState                 AppState
@@ -139,7 +139,7 @@ func (b *GethStatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
 }
 
 func (b *GethStatusBackend) initialize() {
-	accountManager := accsmanagement.NewDefaultManager(b.logger)
+	accountManager := accsmanagement.NewAccountsManager(b.logger)
 	transactor := transactions.NewTransactor()
 	personalService := personal.New()
 	statusNode := node.New(transactor, accountManager, b.logger)
@@ -159,7 +159,7 @@ func (b *GethStatusBackend) StatusNode() *node.StatusNode {
 }
 
 // AccountManager returns reference to account manager
-func (b *GethStatusBackend) AccountManager() *accsmanagement.DefaultManager {
+func (b *GethStatusBackend) AccountManager() *accsmanagement.AccountsManager {
 	return b.accountManager
 }
 
