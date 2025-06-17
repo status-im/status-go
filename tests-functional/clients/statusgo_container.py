@@ -176,6 +176,22 @@ class StatusGoContainer:
         return temp_dir
 
 
+    def save_logs(self):
+        if not self.container:
+            raise RuntimeError("Container is not initialized.")
+        if option.logs_dir == "":
+            logging.warning("Save container logs skipped")
+            return
+
+        id_short = self.container.id[:12]
+        file_path = os.path.join(option.logs_dir, f"container_{id_short}.log")
+        logging.info(f"Saving logs to {file_path}")
+
+        with open(file_path, "wb") as f:
+            logs = self.container.logs()
+            f.write(logs)
+
+
 class PushNotificationServerContainer(StatusGoContainer):
     def __init__(self, identity, gorush_port):
         entrypoint = [

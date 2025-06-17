@@ -69,7 +69,7 @@ pipeline {
     always {
       script {
         archiveArtifacts(
-          artifacts: 'tests-functional/reports/*.xml, tests-functional/*.log, tests-functional/coverage/coverage.html',
+          artifacts: 'tests-functional/reports/*.xml, tests-functional/logs/*.log, tests-functional/coverage/coverage.html',
           allowEmptyArchive: true,
         )
         junit(

@@ -16,15 +16,18 @@ coverage_reports_path="${root_path}/coverage"
 binary_coverage_reports_path="${coverage_reports_path}/binary"
 merged_coverage_reports_path="${coverage_reports_path}/merged"
 test_results_path="${root_path}/reports"
+logs_path="${root_path}/logs"
 
 # Cleanup any previous coverage reports
 rm -rf "${coverage_reports_path}"
 rm -rf "${test_results_path}"
+rm -rf "${logs_path}"
 
 # Create directories
 mkdir -p "${binary_coverage_reports_path}"
 mkdir -p "${merged_coverage_reports_path}"
 mkdir -p "${test_results_path}"
+mkdir -p "${logs_path}"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.waku.yml"
 identifier=${BUILD_ID:-$(git rev-parse --short HEAD)}
@@ -71,6 +74,7 @@ pytest --reruns 2 -m rpc -c "${root_path}/pytest.ini" -n 12 \
   --docker_project_name="${project_name}" \
   --docker-image=${image_name} \
   --codecov_dir="${binary_coverage_reports_path}" \
+  --logs-dir="${logs_path}" \
   --junitxml="${test_results_path}/report.xml"
 exit_code=$?
 
