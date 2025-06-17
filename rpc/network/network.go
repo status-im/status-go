@@ -8,13 +8,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
-	"github.com/status-im/status-go/services/accounts/settingsevent"
+	"github.com/status-im/status-go/pkg/pubsub"
 
 	persistence "github.com/status-im/status-go/rpc/network/db"
 	"github.com/status-im/status-go/rpc/network/networksevent"
@@ -54,16 +55,17 @@ type Manager struct {
 	networkPersistence persistence.NetworksPersistenceInterface
 	embeddedNetworks   []params.Network
 
-	accountFeed     *event.Feed
-	settingsFeed    *event.Feed
-	networksFeed    *event.Feed
-	settingsWatcher *settingsevent.Watcher
+	accountFeed       *event.Feed
+	accountsPublisher *pubsub.Publisher
+	networksFeed      *event.Feed
+
+	stopCh chan struct{}
 
 	logger *zap.Logger
 }
 
 // NewManager creates a new instance of Manager.
-func NewManager(db *sql.DB, accountFeed *event.Feed, settingsFeed *event.Feed, networksFeed *event.Feed) *Manager {
+func NewManager(db *sql.DB, accountFeed *event.Feed, accountsPublisher *pubsub.Publisher, networksFeed *event.Feed) *Manager {
 	accountsDB, err := accounts.NewDB(db)
 	if err != nil {
 		return nil
@@ -76,29 +78,46 @@ func NewManager(db *sql.DB, accountFeed *event.Feed, settingsFeed *event.Feed, n
 		accountsDB:         accountsDB,
 		networkPersistence: persistence.NewNetworksPersistence(db),
 		accountFeed:        accountFeed,
-		settingsFeed:       settingsFeed,
+		accountsPublisher:  accountsPublisher,
 		networksFeed:       networksFeed,
 		logger:             logger,
 	}
 }
 
 func (nm *Manager) Start() {
-	if nm.settingsWatcher == nil {
-		settingChangeCb := func(setting settings.SettingField, value interface{}) {
-			if setting.Equals(settings.TestNetworksEnabled) {
-				nm.onTestNetworksEnabledChanged()
-			}
-		}
-		nm.settingsWatcher = settingsevent.NewWatcher(nm.settingsFeed, settingChangeCb)
-		nm.settingsWatcher.Start()
-	}
+	nm.stopCh = make(chan struct{})
+	nm.startSettingsChangeSubscription()
 }
 
 func (nm *Manager) Stop() {
-	if nm.settingsWatcher != nil {
-		nm.settingsWatcher.Stop()
-		nm.settingsWatcher = nil
+	if nm.stopCh != nil {
+		close(nm.stopCh)
+		nm.stopCh = nil
 	}
+}
+
+func (nm *Manager) startSettingsChangeSubscription() {
+	if nm.accountsPublisher == nil {
+		return
+	}
+	ch, unsub := pubsub.Subscribe[settings.EventSettingChanged](nm.accountsPublisher, 1)
+	go func() {
+		defer common.LogOnPanic()
+		defer unsub()
+		for {
+			select {
+			case <-nm.stopCh:
+				return
+			case ev, ok := <-ch:
+				if !ok {
+					return
+				}
+				if ev.Setting.Equals(settings.TestNetworksEnabled) {
+					nm.onTestNetworksEnabledChanged()
+				}
+			}
+		}
+	}()
 }
 
 func (nm *Manager) onTestNetworksEnabledChanged() {

@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
@@ -106,10 +107,10 @@ type StatusNode struct {
 	appGeneralSrvc         *appgeneral.Service
 	ethSrvc                *eth.Service
 
-	accountsFeed event.Feed
-	walletFeed   event.Feed
-	networksFeed event.Feed
-	settingsFeed event.Feed
+	accountsFeed      event.Feed
+	walletFeed        event.Feed
+	networksFeed      event.Feed
+	accountsPublisher *pubsub.Publisher
 }
 
 // New makes new instance of StatusNode.
@@ -120,6 +121,7 @@ func New(transactor *transactions.Transactor, gethAccountManager *accsmanagement
 		gethAccountManager: gethAccountManager,
 		logger:             logger,
 		publicMethods:      make(map[string]bool),
+		accountsPublisher:  pubsub.NewPublisher(),
 	}
 }
 
@@ -253,14 +255,14 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	}
 
 	config := rpc.ClientConfig{
-		Client:          gethNodeClient,
-		UpstreamChainID: n.config.NetworkID,
-		Networks:        n.config.Networks,
-		DB:              n.appDB,
-		AccountsFeed:    &n.accountsFeed,
-		WalletFeed:      &n.walletFeed,
-		SettingsFeed:    &n.settingsFeed,
-		NetworksFeed:    &n.networksFeed,
+		Client:            gethNodeClient,
+		UpstreamChainID:   n.config.NetworkID,
+		Networks:          n.config.Networks,
+		DB:                n.appDB,
+		AccountsFeed:      &n.accountsFeed,
+		AccountsPublisher: n.accountsPublisher,
+		WalletFeed:        &n.walletFeed,
+		NetworksFeed:      &n.networksFeed,
 	}
 	n.rpcClient, err = rpc.NewClient(config)
 	if err != nil {
@@ -287,6 +289,8 @@ func (n *StatusNode) stop() error {
 	if err := n.gethNode.Close(); err != nil {
 		return err
 	}
+
+	n.accountsPublisher.Close()
 
 	n.rpcClient.Stop()
 	n.rpcClient = nil
