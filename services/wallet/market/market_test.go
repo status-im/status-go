@@ -28,7 +28,7 @@ func setupTokenManager(t *testing.T) (*token.Manager, func()) {
 	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	nm := network.NewManager(appDb, nil, nil, nil)
+	nm := network.NewManager(appDb, nil, nil)
 
 	return token.NewTokenManager(walletDb, nil, nil, nm, appDb, nil, nil, nil, nil, token.NewPersistence(walletDb)),
 		func() {

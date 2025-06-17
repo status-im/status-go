@@ -107,13 +107,12 @@ func NewService(
 	walletFeed *event.Feed,
 	accountsDB *accounts.Database,
 	accountsFeed *event.Feed,
-	networksFeed *event.Feed,
 	communityManager *community.Manager,
 	networkManager *network.Manager,
 	manager *Manager) *Service {
 	s := &Service{
 		manager:          manager,
-		controller:       NewController(db, walletFeed, accountsDB, accountsFeed, networksFeed, networkManager, manager),
+		controller:       NewController(db, walletFeed, accountsDB, accountsFeed, networkManager, manager),
 		db:               db,
 		ownershipDB:      NewOwnershipDB(db),
 		transferDB:       transfer.NewDB(db),

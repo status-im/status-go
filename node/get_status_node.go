@@ -109,7 +109,6 @@ type StatusNode struct {
 
 	accountsFeed      event.Feed
 	walletFeed        event.Feed
-	networksFeed      event.Feed
 	accountsPublisher *pubsub.Publisher
 }
 
@@ -262,7 +261,6 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		AccountsFeed:      &n.accountsFeed,
 		AccountsPublisher: n.accountsPublisher,
 		WalletFeed:        &n.walletFeed,
-		NetworksFeed:      &n.networksFeed,
 	}
 	n.rpcClient, err = rpc.NewClient(config)
 	if err != nil {
