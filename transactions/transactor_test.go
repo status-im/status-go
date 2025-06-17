@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/account/generator"
-	accounttypes "github.com/status-im/status-go/account/types"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
+	"github.com/status-im/status-go/accounts-management/generator"
+	accstypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
@@ -237,7 +237,7 @@ func (s *TransactorSuite) TestGasValues() {
 	}
 }
 
-func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *accounttypes.SelectedExtKey) {
+func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *accstypes.SelectedExtKey) {
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(account.Address)), gethrpc.PendingBlockNumber).Return(&testNonce, nil)
 
 	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
@@ -251,7 +251,7 @@ func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs
 
 func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	key, _ := gethcrypto.GenerateKey()
-	selectedAccount := &accounttypes.SelectedExtKey{
+	selectedAccount := &accstypes.SelectedExtKey{
 		Address:    types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
 		AccountKey: &types.Key{PrivateKey: key},
 	}
@@ -370,7 +370,7 @@ func (s *TransactorSuite) TestAccountMismatch() {
 
 	// missing account
 	_, _, err = s.manager.SendTransaction(args, nil, -1)
-	s.EqualError(err, account.ErrNoAccountSelected.Error())
+	s.EqualError(err, accsmanagement.ErrNoAccountSelected.Error())
 
 	// mismatched accounts
 	selectedAccount := generator.NewAccount(nil, nil)

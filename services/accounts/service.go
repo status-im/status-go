@@ -4,11 +4,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/account/keystore/geth"
+	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/server"
 
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -16,7 +16,7 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *account.DefaultManager, config *params.NodeConfig, feed *event.Feed, mediaServer *server.MediaServer) *Service {
+func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *accsmanagement.DefaultManager, config *params.NodeConfig, feed *event.Feed, mediaServer *server.MediaServer) *Service {
 	return &Service{db, mdb, manager, config, feed, nil, mediaServer}
 }
 
@@ -24,7 +24,7 @@ func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *acc
 type Service struct {
 	db          *accounts.Database
 	mdb         *multiaccounts.Database
-	manager     *account.DefaultManager
+	manager     *accsmanagement.DefaultManager
 	config      *params.NodeConfig
 	feed        *event.Feed
 	messenger   *protocol.Messenger

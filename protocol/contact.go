@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	accountcommon "github.com/status-im/status-go/account/common"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -494,7 +494,7 @@ func (c *Contact) MarshalJSON() ([]byte, error) {
 	} else if c.hasAddedUs() {
 		item.ContactRequestState = ContactRequestStateReceived
 	}
-	ext, err := accountcommon.ExtendStructWithPubKeyData(item.ID, item)
+	ext, err := accscommon.ExtendStructWithPubKeyData(item.ID, item)
 	if err != nil {
 		return nil, err
 	}

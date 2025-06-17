@@ -17,14 +17,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	"github.com/status-im/status-go/transactions"
 )
 
-func NewAPI(rpcClient *rpc.Client, accountsManager *account.DefaultManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
+func NewAPI(rpcClient *rpc.Client, accountsManager *accsmanagement.DefaultManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
 	return &API{
 		ensResolver: ensresolver.NewEnsResolver(rpcClient),
 
@@ -49,7 +49,7 @@ type syncUsernameDetail func(context.Context, *UsernameDetail) error
 
 type API struct {
 	ensResolver     *ensresolver.EnsResolver
-	accountsManager *account.DefaultManager
+	accountsManager *accsmanagement.DefaultManager
 	pendingTracker  *transactions.PendingTxTracker
 	config          *params.NodeConfig
 

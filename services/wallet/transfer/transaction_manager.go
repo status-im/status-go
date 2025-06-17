@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -32,7 +32,7 @@ type TransactionDescription struct {
 
 type TransactionManager struct {
 	storage        MultiTransactionStorage
-	gethManager    *account.DefaultManager
+	gethManager    *accsmanagement.DefaultManager
 	transactor     transactions.TransactorIface
 	config         *params.NodeConfig
 	accountsDB     accounts.AccountsStorage
@@ -57,7 +57,7 @@ type MultiTransactionStorage interface {
 
 func NewTransactionManager(
 	storage MultiTransactionStorage,
-	gethManager *account.DefaultManager,
+	gethManager *accsmanagement.DefaultManager,
 	transactor transactions.TransactorIface,
 	config *params.NodeConfig,
 	accountsDB accounts.AccountsStorage,

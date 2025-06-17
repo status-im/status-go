@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/accounts-management/generator"
 )
 
 // MultiAccountImportPrivateKeyParams are the params sent to MultiAccountImportPrivateKey.

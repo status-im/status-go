@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/accounts-management/generator"
 	communitytokens "github.com/status-im/status-go/contracts/community-tokens"
 	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/errors"
