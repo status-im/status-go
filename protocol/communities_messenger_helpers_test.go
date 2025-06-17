@@ -35,15 +35,15 @@ import (
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
-type AccountManagerMock struct {
+type AccountsManagerMock struct {
 	AccountsMap map[string]string
 }
 
-func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*generator.Account, error) {
+func (m *AccountsManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*generator.Account, error) {
 	return generator.NewAccount(nil, nil), nil
 }
 
-func (m *AccountManagerMock) DeleteAccount(address types.Address) error {
+func (m *AccountsManagerMock) DeleteAccount(address types.Address) error {
 	return nil
 }
 
@@ -317,7 +317,7 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config tes
 	err := config.complete()
 	s.Require().NoError(err)
 
-	accountsManagerMock := &AccountManagerMock{}
+	accountsManagerMock := &AccountsManagerMock{}
 	accountsManagerMock.AccountsMap = make(map[string]string)
 	for _, walletAddress := range config.walletAddresses {
 		accountsManagerMock.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(config.password)))

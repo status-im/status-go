@@ -126,7 +126,7 @@ func setupGethStatusBackend() (*GethStatusBackend, func() error, func() error, f
 	return backend, stop1, stop2, stop3, err
 }
 
-func setKeystore(accManager *accsmanagement.DefaultManager, keyStoreDir string) error {
+func setKeystore(accManager *accsmanagement.AccountsManager, keyStoreDir string) error {
 	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
 	if err != nil {
 		return err
