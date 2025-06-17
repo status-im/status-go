@@ -73,7 +73,7 @@ type MessengerSignalsHandler interface {
 	SendCuratedCommunitiesUpdate(response *communities.KnownCommunitiesResponse)
 }
 
-type Manager interface {
+type AccountsManager interface {
 	GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*generator.Account, error)
 	DeleteAccount(address ethtypes.Address) error
 }
@@ -101,7 +101,7 @@ type config struct {
 	rpcClient              *rpc.Client
 	tokenManager           communities.TokenManager
 	collectiblesManager    communities.CollectiblesManager
-	accountsManager        Manager
+	accountsManager        AccountsManager
 	signer                 communities.MessageSigner
 
 	verifyTransactionClient EthClient
@@ -404,7 +404,7 @@ func WithCollectiblesManager(collectiblesManager communities.CollectiblesManager
 	}
 }
 
-func WithAccountManager(accountManager Manager) Option {
+func WithAccountManager(accountManager AccountsManager) Option {
 	return func(c *config) error {
 		c.accountsManager = accountManager
 		return nil

@@ -12,7 +12,8 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.DefaultManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time) *Service {
+func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, pendingTracker *transactions.PendingTxTracker,
+	config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time) *Service {
 	service := &Service{
 		rpcClient,
 		accountsManager,
@@ -28,7 +29,7 @@ func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.DefaultMa
 // Service is a browsers service.
 type Service struct {
 	rpcClient          *rpc.Client
-	accountsManager    *accsmanagement.DefaultManager
+	accountsManager    *accsmanagement.AccountsManager
 	pendingTracker     *transactions.PendingTxTracker
 	config             *params.NodeConfig
 	api                *API

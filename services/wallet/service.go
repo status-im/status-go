@@ -60,7 +60,7 @@ func NewService(
 	rpcClient *rpc.Client,
 	accountFeed *event.Feed,
 	networksFeed *event.Feed,
-	gethManager *accsmanagement.DefaultManager,
+	gethManager *accsmanagement.AccountsManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
 	ensResolver *ensresolver.EnsResolver,
@@ -325,7 +325,7 @@ type Service struct {
 	cryptoOnRampManager   *onramp.Manager
 	collectiblesManager   *collectibles.Manager
 	collectibles          *collectibles.Service
-	gethManager           *accsmanagement.DefaultManager
+	gethManager           *accsmanagement.AccountsManager
 	marketManager         *market.Manager
 	transactor            *transactions.Transactor
 	feed                  *event.Feed

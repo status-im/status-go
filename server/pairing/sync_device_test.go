@@ -107,7 +107,7 @@ func (s *SyncDeviceSuite) TearDownTest() {
 	s.Require().NoError(s.pxBootNode.Stop())
 }
 
-func setKeystore(accManager *accsmanagement.DefaultManager, keyStoreDir string) error {
+func setKeystore(accManager *accsmanagement.AccountsManager, keyStoreDir string) error {
 	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
 	if err != nil {
 		return err
