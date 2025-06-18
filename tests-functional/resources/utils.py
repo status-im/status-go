@@ -1,4 +1,4 @@
-def assert_account_attributes(actual, expected, keys=None):
+def assert_response_attributes(actual, expected, keys=None):
     """
     Assert that all keys in expected (or in keys) match in actual.
     Handles both list-of-dicts and dict.

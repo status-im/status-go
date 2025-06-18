@@ -4,7 +4,7 @@ from clients.signals import SignalType
 import logging
 
 from resources.constants import user_mnemonic_12, user_mnemonic_15, user_mnemonic_24
-from resources.utils import assert_account_attributes
+from resources.utils import assert_response_attributes
 
 
 @pytest.mark.create_account
@@ -30,8 +30,8 @@ class TestRecoverMnemonic:
 
         logging.info("Step: request getAccounts and check recovered accounts attributes.")
         response = backend_client.rpc_valid_request("accounts_getAccounts", [])
-        assert_account_attributes(response.json()["result"], user_mnemonic.accounts)
+        assert_response_attributes(response.json()["result"], user_mnemonic.accounts)
 
         logging.info("Step: request getSettings and check recovered profile data attributes.")
         response = backend_client.rpc_valid_request("settings_getSettings", [])
-        assert_account_attributes(response.json()["result"], user_mnemonic.profile_data)
+        assert_response_attributes(response.json()["result"], user_mnemonic.profile_data)
