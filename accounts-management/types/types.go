@@ -2,15 +2,7 @@ package types
 
 import (
 	ethtypes "github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts"
 )
-
-type LoginParams struct {
-	ChatAddress  ethtypes.Address       `json:"chatAddress"`
-	Password     string                 `json:"password"`
-	MainAccount  ethtypes.Address       `json:"mainAccount"` // TODO: remove this field
-	MultiAccount *multiaccounts.Account `json:"multiAccount"`
-}
 
 type PublicKeyData struct {
 	CompressedKey string   `json:"compressedKey"`
