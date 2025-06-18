@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/keystore/geth"
-	"github.com/status-im/status-go/accounts-management/types"
 	gocommon "github.com/status-im/status-go/common"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -29,7 +28,7 @@ func (e ErrCannotLocateKeyFile) Error() string {
 // AccountsManager represents the default account manager implementation
 type AccountsManager struct {
 	keystoreMu sync.RWMutex
-	keystore   types.KeyStore
+	keystore   KeyStore
 
 	selectedChatAccountMutex sync.RWMutex
 	selectedChatAccount      *generator.Account
@@ -43,7 +42,7 @@ func NewAccountsManager(logger *zap.Logger) *AccountsManager {
 	}
 }
 
-func (m *AccountsManager) SetKeystore(keystore types.KeyStore) {
+func (m *AccountsManager) SetKeystore(keystore KeyStore) {
 	m.keystoreMu.Lock()
 	defer m.keystoreMu.Unlock()
 
