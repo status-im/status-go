@@ -126,6 +126,18 @@ class SignalClient:
             return self.received_signals[signal_type]["received"][-1]
         return self.received_signals[signal_type]["received"][-delta_count:]
 
+    def wait_for_signal_predicate(self, signal_type, predicate=lambda signal: True, timeout=20):
+        start_time = time.time()
+        while True:
+            elapsed_time = time.time() - start_time
+            if elapsed_time >= timeout:
+                break
+            remaining_time = int(timeout - elapsed_time)
+            signal = self.wait_for_signal(signal_type, remaining_time)
+            if predicate(signal):
+                return signal
+        raise TimeoutError(f"Signal {signal_type} satisfying the predicate is not received in {timeout} seconds")
+
     def wait_for_logout(self):
         signal = self.wait_for_signal(SignalType.NODE_LOGOUT.value)
         return signal

@@ -1767,6 +1767,7 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 // and the device has no camera to read a QR code with
 //
 // Example: A desktop device (device without camera) receiving account data from mobile (device with camera)
+// Note: Once the bootstrapping is complete, the device will be in a logged-in state.
 func getConnectionStringForBeingBootstrapped(configJSON string) string {
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
@@ -1778,11 +1779,6 @@ func getConnectionStringForBeingBootstrapped(configJSON string) string {
 	}()
 
 	cs, err := pairing.StartUpReceiverServer(statusBackend, configJSON)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = statusBackend.Logout()
 	if err != nil {
 		return makeJSONResponse(err)
 	}

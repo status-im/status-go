@@ -341,3 +341,41 @@ class StatusBackend(RpcClient, SignalClient):
         }
         response = self.api_valid_request(method, data)
         return json.loads(response.content)
+
+    def get_connection_string_for_being_bootstrapped(self):
+        method = "GetConnectionStringForBeingBootstrapped"
+        user = Account(
+            address="",
+            private_key="",
+            password="",
+            passphrase="",
+        )
+        data = {
+            "receiverConfig": {
+                "createAccount": self._create_account_request(user),
+                "deviceType": "macos",
+            },
+            "serverConfig": {
+                "timeout": 5 * 60 * 1000,
+            },
+        }
+        response = self.api_request(method, data)
+        return response.content.decode()
+
+    def input_connection_string_for_bootstrapping_another_device(self, connection_string):
+        method = "InputConnectionStringForBootstrappingAnotherDeviceV2"
+        data = {
+            "connectionString": connection_string,
+            "senderClientConfig": {
+                "senderConfig": {
+                    "keystorePath": os.path.join(self.data_dir, "keystore", self.key_uid),
+                    "deviceType": "macos",
+                    "keyUID": self.key_uid,
+                    "password": self.password,
+                    "chatKey": "",
+                },
+                "clientConfig": {},
+            },
+        }
+        response = self.api_valid_request(method, data)
+        return json.loads(response.content)
