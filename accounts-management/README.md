@@ -58,10 +58,10 @@ account, err := manager.LoadAccount(address, password)
 // Verify account password
 valid, err := manager.VerifyAccountPassword(address, password)
 
-// Select an account for use
-err := manager.SelectAccount(loginParams)
+// Sets chat account for use
+err := manager.SetChatAccount(chatAddress, password)
 
-// Get currently selected account
+// Get currently selected chat account
 account, err := manager.SelectedChatAccount()
 ```
 
@@ -103,7 +103,6 @@ import (
     "log"
 
     "github.com/status-im/status-go/accounts-management"
-    "github.com/status-im/status-go/accounts-management/types"
     "go.uber.org/zap"
 )
 
@@ -127,12 +126,7 @@ func main() {
     log.Printf("Mnemonic: %s", mnemonic)
 
     // Select the account
-    loginParams := types.LoginParams{
-        ChatAddress: account.Address(),
-        Password:    "my-password",
-    }
-
-    err = manager.SelectAccount(loginParams)
+    err = manager.SetChatAccount(account.Address(), "my-password")
     if err != nil {
         log.Fatal(err)
     }

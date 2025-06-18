@@ -32,7 +32,7 @@ type AccountsManager struct {
 	keystore   types.KeyStore
 
 	selectedChatAccountMutex sync.RWMutex
-	selectedChatAccount      *generator.Account // account that was processed during the last call to SelectAccount()
+	selectedChatAccount      *generator.Account
 
 	logger *zap.Logger
 }
@@ -149,10 +149,9 @@ func (m *AccountsManager) setChatAccount(account *generator.Account) {
 	m.selectedChatAccount = account
 }
 
-// SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
-// using provided password. Once verification is done, all previous identities are removed).
-func (m *AccountsManager) SelectAccount(loginParams types.LoginParams) error {
-	selectedChatAccount, err := m.LoadAccount(loginParams.ChatAddress, loginParams.Password)
+// SetChatAccount sets the chat account with the given address and password
+func (m *AccountsManager) SetChatAccount(chatAddress ethtypes.Address, password string) error {
+	selectedChatAccount, err := m.LoadAccount(chatAddress, password)
 	if err != nil {
 		return err
 	}
@@ -162,8 +161,8 @@ func (m *AccountsManager) SelectAccount(loginParams types.LoginParams) error {
 	return nil
 }
 
-// SetChatAccount initializes selectedChatAccount with privKey
-func (m *AccountsManager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
+// SetChatAccountWithPrivateKey sets the chat account with the given private key
+func (m *AccountsManager) SetChatAccountWithPrivateKey(privKey *ecdsa.PrivateKey) error {
 	account := generator.NewAccount(privKey, nil)
 
 	m.setChatAccount(account)
