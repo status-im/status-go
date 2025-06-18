@@ -1,8 +1,6 @@
 package requests
 
 import (
-	"gopkg.in/go-playground/validator.v9"
-
 	"github.com/status-im/status-go/server/pairing"
 )
 
@@ -12,5 +10,5 @@ type InputConnectionStringForImportingKeypairsKeystores struct {
 }
 
 func (r *InputConnectionStringForImportingKeypairsKeystores) Validate() error {
-	return validator.New().Struct(r)
+	return pairing.ValidateStruct(r)
 }

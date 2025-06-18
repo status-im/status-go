@@ -31,11 +31,11 @@ Functional tests for status-go
 1. Functional tests will spawn `status-go` containers as needed, using the docker image name provided in `--docker-image`.
     Run this command to build a docker image for local runs:
     ```sh
-    # Note we tag the image with the commit hash. Functional tests will refer to the same when `--docker-image` is empty.   
-    docker build _assets/build/Dockerfile . --tag "statusgo-$(git rev-parse --short HEAD)"
+    # Note we tag the image with the commit hash. Functional tests will refer to the same when `--docker-image` is empty.
+    docker build --file _assets/build/Dockerfile . --tag "statusgo-$(git rev-parse --short HEAD)"
     ```
 2. Functional tests rely on local instances of Waku and Anvil.
-   Run this command to start all environment dependencies: 
+   Run this command to start all environment dependencies:
     ```sh
     docker compose -f tests-functional/docker-compose.anvil.yml -f tests-functional/docker-compose.waku.yml up --build --remove-orphans
     ```
@@ -68,7 +68,7 @@ NOTE:
 2. URLs are not reused
 3. URLs are not reusedURLs are selected in the provided order
 4. Most tests do not call `Logout` in the end of the test, so make sure to restart `status-backend` in between test runs.
-   You can also use `--logout` flag to automatically `Logout` before each `InitializeApplication` call, but it is 
+   You can also use `--logout` flag to automatically `Logout` before each `InitializeApplication` call, but it is
    recommended to restart `status-backend` for a full clean test.
 
 ### Options
@@ -80,7 +80,7 @@ NOTE:
 - Use `--waku-fleets-config` to override the hard-coded list of supported fleets. \
     The value will be passed to `InitializeApplication.wakuFleetsConfigFilePath` parameter. By default, it's set to JSON config for a local waku fleet. To run with a fleet from the hard-coded list use `--waku-fleets-config=""` and corresponding `--waku-fleet` value, e.g. `--waku-fleet=status.prod`
 - Use `--waku-fleet` to select a Waku fleet to be used by `status-go`. \
-    Default is `status-go.test` that will use local waku nodes for functional tests run. 
+    Default is `status-go.test` that will use local waku nodes for functional tests run.
     The value will be passed to all of these parameters:
     - `CreateAccount.wakuV2Fleet`
     - `RestoreAccount.wakuV2Fleet`
@@ -117,7 +117,7 @@ sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
 
 ## Import issues
 
-If you see some import issues, make sure that you have all requirements installed from `requirements.txt` 
+If you see some import issues, make sure that you have all requirements installed from `requirements.txt`
 
 ### For PyCharm users
 

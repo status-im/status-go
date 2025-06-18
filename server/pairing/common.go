@@ -87,7 +87,7 @@ func loadKeys(keys map[string][]byte, keyStorePath string) error {
 	return nil
 }
 
-func validate(s interface{}) error {
+func ValidateStruct(s interface{}) error {
 	v, err := newValidate()
 	if err != nil {
 		return err
@@ -97,7 +97,7 @@ func validate(s interface{}) error {
 }
 
 func validateAndVerifyPassword(s interface{}, senderConfig *SenderConfig) error {
-	err := validate(s)
+	err := ValidateStruct(s)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func validateAndVerifyPassword(s interface{}, senderConfig *SenderConfig) error 
 }
 
 func validateReceiverConfig(s interface{}, receiverConfig *ReceiverConfig) error {
-	err := validate(s)
+	err := ValidateStruct(s)
 	if err != nil {
 		return err
 	}

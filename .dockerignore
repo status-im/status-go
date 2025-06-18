@@ -1,6 +1,7 @@
 .git
 .ethereumtest
 .github
+**/*.vscode
 build/bin
 statusd-data
 wnode-data
