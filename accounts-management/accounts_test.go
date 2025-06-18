@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/keystore/geth"
-	"github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/tt"
@@ -182,25 +181,20 @@ func (s *ManagerTestSuite) TestRecoverAccount() {
 	s.Equal(s.chatPubKey, accountInfo.PublicKey)
 }
 
-func (s *ManagerTestSuite) TestSelectAccountSuccess() {
-	s.testSelectAccount(ethtypes.HexToAddress(s.testAccount.chatAddress), ethtypes.HexToAddress(s.testAccount.walletAddress), s.testAccount.password, nil)
+func (s *ManagerTestSuite) TestSetChatAccountSuccess() {
+	s.testSetChatAccount(ethtypes.HexToAddress(s.testAccount.chatAddress), ethtypes.HexToAddress(s.testAccount.walletAddress), s.testAccount.password, nil)
 }
 
-func (s *ManagerTestSuite) TestSelectAccountWrongAddress() {
-	s.testSelectAccount(ethtypes.HexToAddress("0x0000000000000000000000000000000000000001"), ethtypes.HexToAddress(s.testAccount.walletAddress), s.testAccount.password, errors.New("no key for given address or file"))
+func (s *ManagerTestSuite) TestSetChatAccountWrongAddress() {
+	s.testSetChatAccount(ethtypes.HexToAddress("0x0000000000000000000000000000000000000001"), ethtypes.HexToAddress(s.testAccount.walletAddress), s.testAccount.password, errors.New("no key for given address or file"))
 }
 
-func (s *ManagerTestSuite) TestSelectAccountWrongPassword() {
-	s.testSelectAccount(ethtypes.HexToAddress(s.testAccount.chatAddress), ethtypes.HexToAddress(s.testAccount.walletAddress), "wrong", geth.ErrDecrypt)
+func (s *ManagerTestSuite) TestSetChatAccountWrongPassword() {
+	s.testSetChatAccount(ethtypes.HexToAddress(s.testAccount.chatAddress), ethtypes.HexToAddress(s.testAccount.walletAddress), "wrong", geth.ErrDecrypt)
 }
 
-func (s *ManagerTestSuite) testSelectAccount(chat, wallet ethtypes.Address, password string, expErr error) {
-	loginParams := types.LoginParams{
-		ChatAddress: chat,
-		MainAccount: wallet,
-		Password:    password,
-	}
-	err := s.accManager.SelectAccount(loginParams)
+func (s *ManagerTestSuite) testSetChatAccount(chat, wallet ethtypes.Address, password string, expErr error) {
+	err := s.accManager.SetChatAccount(chat, password)
 	s.Require().Equal(expErr, err)
 
 	selectedChatAccount, chatErr := s.accManager.SelectedChatAccount()
@@ -224,7 +218,7 @@ func (s *ManagerTestSuite) TestSetChatAccount() {
 
 	address := crypto.PubkeyToAddress(privKey.PublicKey)
 
-	s.Require().NoError(s.accManager.SetChatAccount(privKey))
+	s.Require().NoError(s.accManager.SetChatAccountWithPrivateKey(privKey))
 	selectedChatAccount, err := s.accManager.SelectedChatAccount()
 	s.Require().NoError(err)
 	s.Require().NotNil(selectedChatAccount)
@@ -241,12 +235,7 @@ func (s *ManagerTestSuite) TestLogout() {
 // TestAccounts tests cases for (*Manager).Accounts.
 func (s *ManagerTestSuite) TestAccounts() {
 	// Select the test account
-	loginParams := types.LoginParams{
-		MainAccount: ethtypes.HexToAddress(s.walletAddress),
-		ChatAddress: ethtypes.HexToAddress(s.chatAddress),
-		Password:    s.password,
-	}
-	err := s.accManager.SelectAccount(loginParams)
+	err := s.accManager.SetChatAccount(ethtypes.HexToAddress(s.chatAddress), s.password)
 	s.NoError(err)
 
 	// Success
