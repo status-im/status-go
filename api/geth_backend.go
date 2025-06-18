@@ -30,7 +30,6 @@ import (
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/keystore/geth"
-	accstypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/centralizedmetrics"
 	centralizedmetricscommon "github.com/status-im/status-go/centralizedmetrics/common"
@@ -88,6 +87,13 @@ var (
 )
 
 var _ StatusBackend = (*GethStatusBackend)(nil)
+
+type LoginParams struct {
+	ChatAddress  types.Address          `json:"chatAddress"`
+	Password     string                 `json:"password"`
+	MainAccount  types.Address          `json:"mainAccount"` // TODO: remove this field
+	MultiAccount *multiaccounts.Account `json:"multiAccount"`
+}
 
 // GethStatusBackend implements the Status.im service over go-ethereum
 type GethStatusBackend struct {
@@ -781,7 +787,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get wallet address")
 	}
-	login := accstypes.LoginParams{
+	login := LoginParams{
 		Password:    request.Password,
 		ChatAddress: chatAddr,
 		MainAccount: walletAddr,
@@ -800,7 +806,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		}
 	} else {
 		// In case of keycard, we don't have a keystore, instead we have private key loaded from the keycard
-		if err := b.accountManager.SetChatAccount(chatKey); err != nil {
+		if err := b.accountManager.SetChatAccountWithPrivateKey(chatKey); err != nil {
 			return errors.Wrap(err, "failed to set chat account")
 		}
 		_, err = b.accountManager.SelectedChatAccount()
@@ -893,7 +899,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		return err
 	}
-	login := accstypes.LoginParams{
+	login := LoginParams{
 		Password:    password,
 		ChatAddress: chatAddr,
 		MainAccount: walletAddr,
@@ -913,7 +919,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		}
 	} else {
 		// In case of keycard, we don't have keystore, but we directly have the private key
-		if err := b.accountManager.SetChatAccount(chatKey); err != nil {
+		if err := b.accountManager.SetChatAccountWithPrivateKey(chatKey); err != nil {
 			return err
 		}
 		_, err = b.accountManager.SelectedChatAccount()
@@ -2661,11 +2667,11 @@ func (b *GethStatusBackend) closeWalletDB() error {
 // SelectAccount selects current wallet and chat accounts, by verifying that each address has corresponding account which can be decrypted
 // using provided password. Once verification is done, the decrypted chat key is injected into Whisper (as a single identity,
 // all previous identities are removed).
-func (b *GethStatusBackend) SelectAccount(loginParams accstypes.LoginParams) error {
+func (b *GethStatusBackend) SelectAccount(loginParams LoginParams) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	err := b.accountManager.SelectAccount(loginParams)
+	err := b.accountManager.SetChatAccount(loginParams.ChatAddress, loginParams.Password)
 	if err != nil {
 		return err
 	}
