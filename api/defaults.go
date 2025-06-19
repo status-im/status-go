@@ -417,7 +417,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	}
 
 	nodeConfig.BackupConfig = params.BackupConfig{
-		DataDir: filepath.Join(nodeConfig.RootDataDir, params.BackupsRelativePath),
+		DefaultDataDir: filepath.Join(nodeConfig.RootDataDir, params.BackupsRelativePath),
 	}
 
 	for _, opt := range opts {

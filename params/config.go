@@ -599,8 +599,9 @@ type TorrentConfig struct {
 
 // BackupConfig provides configuration for the local backups
 type BackupConfig struct {
-	// DataDir is the file system folder Status should use for storing local backups.
-	DataDir string
+	// DefaultDataDir is the default file system folder Status should use for storing local backups
+	// It is used when the user does not specify a custom backup directory.
+	DefaultDataDir string
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
@@ -744,7 +745,7 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 	}
 
 	c.BackupConfig = BackupConfig{
-		DataDir: filepath.Join(c.RootDataDir, BackupsRelativePath),
+		DefaultDataDir: filepath.Join(c.RootDataDir, BackupsRelativePath),
 	}
 
 	return c.setDefaultPushNotificationsServers()

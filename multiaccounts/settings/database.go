@@ -398,7 +398,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, wallet_token_preferences_group_by_community, url_unfurling_mode,
 		mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
 		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community,
-		peer_syncing_enabled, auto_refresh_tokens_enabled, last_tokens_update, news_feed_enabled, news_feed_last_fetched_timestamp, news_rss_enabled
+		peer_syncing_enabled, auto_refresh_tokens_enabled, last_tokens_update, news_feed_enabled, news_feed_last_fetched_timestamp, news_rss_enabled, backup_path
 	FROM
 		settings
 	WHERE
@@ -487,6 +487,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.NewsFeedEnabled,
 		&newsFeedLastFetchedTimestamp,
 		&s.NewsRSSEnabled,
+		&s.BackupPath,
 	)
 
 	if err != nil {
@@ -923,6 +924,14 @@ func (db *Database) NewsNotificationsEnabled() (result bool, err error) {
 
 func (db *Database) NewsRSSEnabled() (result bool, err error) {
 	err = db.makeSelectRow(NewsRSSEnabled).Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
+func (db *Database) BackupPath() (result string, err error) {
+	err = db.makeSelectRow(BackupPath).Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}

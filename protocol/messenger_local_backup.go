@@ -97,11 +97,21 @@ func (m *Messenger) BackupDataLocally(ctx context.Context) error {
 		fullBackup.WatchOnlyAccounts = append(fullBackup.WatchOnlyAccounts, d.WatchOnlyAccount)
 	}
 
-	// TODO put file in a constant
+	backupPath, err := m.settings.BackupPath()
+	if err != nil {
+		return err
+	}
+	var backupDir string
+	if backupPath != "" {
+		backupDir = backupPath
+	} else {
+		backupDir = m.config.backupConfig.DefaultDataDir
+	}
 	pubKeyHex := common.PubkeyToHex(&m.identity.PublicKey)
-	path := filepath.Join(m.config.backupConfig.DataDir, "user_data_"+pubKeyHex[:12]+".bkp")
+	// TODO put file in a constant
+	path := filepath.Join(backupDir, "user_data_"+pubKeyHex[:12]+".bkp")
 
-	if err := os.MkdirAll(m.config.backupConfig.DataDir, 0700); err != nil {
+	if err := os.MkdirAll(backupDir, 0700); err != nil {
 		return err
 	}
 
