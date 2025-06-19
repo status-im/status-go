@@ -132,7 +132,7 @@ def close_status_backend_containers(request):
         return
     for container in option.statusgo_containers:
         container.stop()  # pyright: ignore[reportAttributeAccessIssue]
-        container.save_logs() # pyright: ignore[reportAttributeAccessIssue]
+        container.save_logs()  # pyright: ignore[reportAttributeAccessIssue]
         container.remove()  # pyright: ignore[reportAttributeAccessIssue]
-        
+
     option.statusgo_containers = []

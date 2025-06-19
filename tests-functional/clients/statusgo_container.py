@@ -175,7 +175,6 @@ class StatusGoContainer:
 
         return temp_dir
 
-
     def save_logs(self):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
