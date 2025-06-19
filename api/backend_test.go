@@ -26,6 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/account"
+	accscommon "github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/account/keystore/geth"
 	"github.com/status-im/status-go/api/common"
@@ -997,8 +998,7 @@ func TestDeleteMultiaccount(t *testing.T) {
 
 	genAccInfo := genAccount.ToIdentifiedAccountInfo()
 
-	const pathWalletRoot = "m/44'/60'/0'/0"
-	derivedAccountKey, err := backend.AccountManager().DeriveChildAccountForPathAndStore(types.HexToAddress(genAccInfo.Address), pathWalletRoot, password)
+	derivedAccountKey, err := backend.AccountManager().DeriveChildAccountForPathAndStore(types.HexToAddress(genAccInfo.Address), accscommon.PathWalletRoot, password)
 	if err != nil {
 		return
 	}
@@ -1064,14 +1064,8 @@ func TestConvertAccount(t *testing.T) {
 	const password = "111111"        // represents password for a regular user
 	const keycardPassword = "222222" // represents password for a keycard user
 	const keycardUID = "1234"
-	const pathEIP1581Root = "m/43'/60'/1581'"
-	const pathEIP1581Chat = pathEIP1581Root + "/0'/0"
-	const pathWalletRoot = "m/44'/60'/0'/0"
-	const pathDefaultWalletAccount = pathWalletRoot + "/0"
-	const customWalletPath1 = pathWalletRoot + "/1"
-	const customWalletPath2 = pathWalletRoot + "/2"
 	var allGeneratedPaths []string
-	allGeneratedPaths = append(allGeneratedPaths, pathEIP1581Root, pathEIP1581Chat, pathWalletRoot, pathDefaultWalletAccount, customWalletPath1, customWalletPath2)
+	allGeneratedPaths = append(allGeneratedPaths, accscommon.PathEIP1581Root, accscommon.PathEIP1581Chat, accscommon.PathWalletRoot, accscommon.PathDefaultWalletAccount, accscommon.CustomWalletPath1, accscommon.CustomWalletPath2)
 
 	var err error
 
@@ -1137,7 +1131,7 @@ func TestConvertAccount(t *testing.T) {
 	derivedAccounts, err := backend.AccountManager().DeriveChildrenAccountsForPathsAndStore(types.HexToAddress(genAccInfo.Address), allGeneratedPaths, password)
 	assert.NoError(t, err)
 
-	chatAccKey := derivedAccounts[pathEIP1581Chat]
+	chatAccKey := derivedAccounts[accscommon.PathEIP1581Chat]
 	chatAcc := generator.NewAccount(chatAccKey.PrivateKey, nil)
 	chatInfo := chatAcc.ToAccountInfo()
 
@@ -1171,7 +1165,7 @@ func TestConvertAccount(t *testing.T) {
 		KeyUID:    profileKeypair.KeyUID,
 		Type:      accounts.AccountTypeGenerated,
 		PublicKey: types.Hex2Bytes(genAccInfo.PublicKey),
-		Path:      pathEIP1581Chat,
+		Path:      accscommon.PathEIP1581Chat,
 		Wallet:    false,
 		Chat:      true,
 		Name:      "GeneratedAccount",
@@ -1182,9 +1176,9 @@ func TestConvertAccount(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, found)
 
-		if p == pathDefaultWalletAccount ||
-			p == customWalletPath1 ||
-			p == customWalletPath2 {
+		if p == accscommon.PathDefaultWalletAccount ||
+			p == accscommon.CustomWalletPath1 ||
+			p == accscommon.CustomWalletPath2 {
 			wAcc := &accounts.Account{
 				Address: types.HexToAddress(dAccInfo.Address),
 				KeyUID:  genAccInfo.KeyUID,
@@ -1196,7 +1190,7 @@ func TestConvertAccount(t *testing.T) {
 				Hidden:  false,
 				Removed: false,
 			}
-			if p == pathDefaultWalletAccount {
+			if p == accscommon.PathDefaultWalletAccount {
 				wAcc.Wallet = true
 			}
 			profileKeypair.Accounts = append(profileKeypair.Accounts, wAcc)

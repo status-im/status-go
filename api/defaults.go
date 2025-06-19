@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"path/filepath"
 
+	accscommon "github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api/common"
 	gocommon "github.com/status-im/status-go/common"
@@ -22,11 +23,6 @@ import (
 )
 
 const (
-	pathWalletRoot           = "m/44'/60'/0'/0"
-	pathEIP1581              = "m/43'/60'/1581'"
-	pathDefaultChat          = pathEIP1581 + "/0'/0"
-	pathEncryption           = pathEIP1581 + "/1'/0"
-	pathDefaultWallet        = pathWalletRoot + "/0"
 	defaultMnemonicLength    = 12
 	walletAccountDefaultName = "Account 1"
 
@@ -46,7 +42,7 @@ const (
 )
 
 var (
-	paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet, pathEncryption}
+	paths = []string{accscommon.PathWalletRoot, accscommon.PathEIP1581Root, accscommon.PathEIP1581Chat, accscommon.PathDefaultWalletAccount, accscommon.PathEIP1581Encryption}
 
 	DefaultFleet = params.FleetStatusProd
 
@@ -54,7 +50,7 @@ var (
 )
 
 func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
-	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
+	chatKeyString := derivedAddresses[accscommon.PathEIP1581Chat].PublicKey
 
 	s := &settings.Settings{}
 	s.BackupEnabled = true
@@ -64,7 +60,7 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
 	s.KeyUID = keyUID
 	s.Address = types.HexToAddress(address)
-	s.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
+	s.WalletRootAddress = types.HexToAddress(derivedAddresses[accscommon.PathWalletRoot].Address)
 	s.URLUnfurlingMode = settings.URLUnfurlingAlwaysAsk
 
 	// Set chat key & name
@@ -75,8 +71,8 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.Name = name
 	s.PublicKey = chatKeyString
 
-	s.DappsAddress = types.HexToAddress(derivedAddresses[pathDefaultWallet].Address)
-	s.EIP1581Address = types.HexToAddress(derivedAddresses[pathEIP1581].Address)
+	s.DappsAddress = types.HexToAddress(derivedAddresses[accscommon.PathDefaultWalletAccount].Address)
+	s.EIP1581Address = types.HexToAddress(derivedAddresses[accscommon.PathEIP1581Root].Address)
 
 	signingPhrase, err := buildSigningPhrase()
 	if err != nil {

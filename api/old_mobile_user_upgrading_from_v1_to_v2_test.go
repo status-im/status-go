@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	accscommon "github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/account/generator"
 	d_common "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts"
@@ -148,7 +149,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 		derivedAddresses, err := generator.DeriveChildrenFromAccount(importedAcc, paths)
 		s.Require().NoError(err)
 
-		s.Require().Equal(derivedAddresses[pathDefaultWallet].PublicKeyHex(), "0x04fde3e58a7379161da2adf033fbee076e2ba11fca8b07c4d06610b399911a60017e4c108eae243487d19e273f99c2d6af13ff5e330783f4389212092b01cc616c")
+		s.Require().Equal(derivedAddresses[accscommon.PathDefaultWalletAccount].PublicKeyHex(), "0x04fde3e58a7379161da2adf033fbee076e2ba11fca8b07c4d06610b399911a60017e4c108eae243487d19e273f99c2d6af13ff5e330783f4389212092b01cc616c")
 		//following line shows: we're unable to calculate the right KeyUID with the wrong public key from existing records for the imported seed account
 		s.Require().False(importedAcc.KeyUID() == seedKps[0].KeyUID)
 
