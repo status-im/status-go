@@ -98,7 +98,8 @@ func (m *Messenger) BackupDataLocally(ctx context.Context) error {
 	}
 
 	// TODO put file in a constant
-	path := filepath.Join(m.config.backupConfig.DataDir, "user_data.bkp")
+	pubKeyHex := common.PubkeyToHex(&m.identity.PublicKey)
+	path := filepath.Join(m.config.backupConfig.DataDir, "user_data_"+pubKeyHex[:12]+".bkp")
 
 	if err := os.MkdirAll(m.config.backupConfig.DataDir, 0700); err != nil {
 		return err
