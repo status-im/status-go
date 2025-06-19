@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/account"
 	accountcommon "github.com/status-im/status-go/account/common"
+	accscommon "github.com/status-im/status-go/account/common"
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/account/keystore/geth"
 	accounttypes "github.com/status-im/status-go/account/types"
@@ -702,8 +703,8 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 			return errors.Wrap(err, "failed to derive children accounts")
 		}
 
-		request.Password = generatedDerivedAccountsInfo[pathEncryption].PublicKey
-		request.KeycardWhisperPrivateKey = generatedDerivedAccountsInfo[pathDefaultChat].PrivateKey
+		request.Password = generatedDerivedAccountsInfo[accscommon.PathEIP1581Encryption].PublicKey
+		request.KeycardWhisperPrivateKey = generatedDerivedAccountsInfo[accscommon.PathEIP1581Chat].PrivateKey
 	}
 
 	acc := multiaccounts.Account{
@@ -1457,22 +1458,22 @@ func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.Rest
 	}
 
 	derivedAddresses := map[string]generator.AccountInfo{
-		pathDefaultChat: {
+		accscommon.PathEIP1581Chat: {
 			Address:    request.Keycard.WhisperAddress,
 			PublicKey:  request.Keycard.WhisperPublicKey,
 			PrivateKey: request.Keycard.WhisperPrivateKey,
 		},
-		pathWalletRoot: {
+		accscommon.PathWalletRoot: {
 			Address: request.Keycard.WalletRootAddress,
 		},
-		pathDefaultWallet: {
+		accscommon.PathDefaultWalletAccount: {
 			Address:   request.Keycard.WalletAddress,
 			PublicKey: request.Keycard.WalletPublicKey,
 		},
-		pathEIP1581: {
+		accscommon.PathEIP1581Root: {
 			Address: request.Keycard.Eip1581Address,
 		},
-		pathEncryption: {
+		accscommon.PathEIP1581Encryption: {
 			PublicKey: request.Keycard.EncryptionPublicKey,
 		},
 	}
@@ -1577,7 +1578,7 @@ func (b *GethStatusBackend) prepareNodeAccount(request *requests.CreateAccount, 
 	response := &accountBundle{}
 
 	if request.KeycardInstanceUID != "" {
-		request.Password = input.derivedAddresses[pathEncryption].PublicKey
+		request.Password = input.derivedAddresses[accscommon.PathEIP1581Encryption].PublicKey
 	}
 
 	// NOTE: I intentionally left this condition separately and not an `else` branch. Technically it's an `else`,
@@ -1794,7 +1795,7 @@ func (b *GethStatusBackend) prepareSubAccounts(request *requests.CreateAccount, 
 		return nil, errors.Wrap(err, "failed to generate random emoji")
 	}
 
-	walletDerivedAccount := input.derivedAddresses[pathDefaultWallet]
+	walletDerivedAccount := input.derivedAddresses[accscommon.PathDefaultWalletAccount]
 	walletAccount := &accounts.Account{
 		PublicKey:          types.Hex2Bytes(walletDerivedAccount.PublicKey),
 		KeyUID:             input.keyUID,
@@ -1802,19 +1803,19 @@ func (b *GethStatusBackend) prepareSubAccounts(request *requests.CreateAccount, 
 		ColorID:            multiacccommon.CustomizationColor(request.CustomizationColor),
 		Emoji:              emoji,
 		Wallet:             true,
-		Path:               pathDefaultWallet,
+		Path:               accscommon.PathDefaultWalletAccount,
 		Name:               walletAccountDefaultName,
 		AddressWasNotShown: !input.restoringAccount,
 	}
 
-	chatDerivedAccount := input.derivedAddresses[pathDefaultChat]
+	chatDerivedAccount := input.derivedAddresses[accscommon.PathEIP1581Chat]
 	chatAccount := &accounts.Account{
 		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
 		KeyUID:    input.keyUID,
 		Address:   types.HexToAddress(chatDerivedAccount.Address),
 		Name:      request.DisplayName,
 		Chat:      true,
-		Path:      pathDefaultChat,
+		Path:      accscommon.PathEIP1581Chat,
 	}
 
 	return []*accounts.Account{walletAccount, chatAccount}, nil
@@ -1850,7 +1851,7 @@ func (b *GethStatusBackend) prepareForKeycard(request *requests.CreateAccount, i
 	response.settings.KeycardInstanceUID = request.KeycardInstanceUID
 	response.settings.KeycardPairedOn = time.Now().Unix()
 
-	privateKeyHex := strings.TrimPrefix(input.derivedAddresses[pathDefaultChat].PrivateKey, "0x")
+	privateKeyHex := strings.TrimPrefix(input.derivedAddresses[accscommon.PathEIP1581Chat].PrivateKey, "0x")
 	var err error
 	response.chatPrivateKey, err = crypto.HexToECDSA(privateKeyHex)
 	if err != nil {
@@ -1925,10 +1926,8 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 	}
 
 	// We add these two paths, cause others will be added via `StoreAccount` function call
-	const pathWalletRoot = "m/44'/60'/0'/0"
-	const pathEIP1581 = "m/43'/60'/1581'"
 	var paths []string
-	paths = append(paths, pathWalletRoot, pathEIP1581)
+	paths = append(paths, accscommon.PathWalletRoot, accscommon.PathEIP1581Root)
 	for _, acc := range knownAccounts {
 		if generatedAccountInfo.KeyUID == acc.KeyUID {
 			paths = append(paths, acc.Path)
