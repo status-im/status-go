@@ -125,7 +125,8 @@ func filterTokens(tokens []*tokenTypes.Token) []*tokenTypes.Token {
 				break
 			}
 		}
-		if !found {
+		// remove native token on respective chains as they are added via a different list
+		if !found || token.IsNative() {
 			continue
 		}
 		filteredTokens = append(filteredTokens, token)
