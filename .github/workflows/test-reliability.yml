@@ -46,7 +46,7 @@ jobs:
       run: pip install -r tests-functional/requirements.txt
 
     - name: Build status-backend
-      run: docker build _assets/build/Dockerfile . --tag "statusgo-local"
+      run: docker build --file _assets/build/Dockerfile . --tag "statusgo-local"
 
     - name: Run environment
       run: cd tests-functional; docker compose -f docker-compose.anvil.yml -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
