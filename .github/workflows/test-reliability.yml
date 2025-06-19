@@ -21,10 +21,10 @@ jobs:
       matrix:
         config:
           - name: ipv4
-            docker_compose_file: docker-compose.test.reliability.ipv4.yml
+            docker_compose_file: tests-functional/docker-compose.test.reliability.ipv4.yml
             use_ipv6: "No"
           - name: ipv6
-            docker_compose_file: docker-compose.test.reliability.ipv6.yml
+            docker_compose_file: tests-functional/docker-compose.test.reliability.ipv6.yml
             use_ipv6: "Yes"
     steps:
 
@@ -49,7 +49,7 @@ jobs:
       run: docker build --file _assets/build/Dockerfile . --tag "statusgo-local"
 
     - name: Run environment
-      run: cd tests-functional; docker compose -f docker-compose.anvil.yml -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
+      run: docker compose -f tests-functional/docker-compose.anvil.yml -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
 
     - name: Run tests
       env:
@@ -73,3 +73,8 @@ jobs:
         path: pytest_results.xml
         reporter: java-junit
         use-actions-summary: 'true'
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: status-backend-logs
+        path: tests-functional/logs
