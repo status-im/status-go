@@ -1098,16 +1098,6 @@ func (api *PublicAPI) RemainingCapacityForSavedAddresses(ctx context.Context, te
 	return api.service.messenger.RemainingCapacityForSavedAddresses(testnetMode)
 }
 
-// Deprecated: StartPushNotificationsServer is deprecated and does nothing.
-func (api *PublicAPI) StartPushNotificationsServer() error {
-	return errors.New("StartPushNotificationsServer endpoint is deprecated")
-}
-
-// Deprecated: StartPushNotificationsServer is deprecated and does nothing.
-func (api *PublicAPI) StopPushNotificationsServer() error {
-	return errors.New("StopPushNotificationsServer endpoint is deprecated")
-}
-
 // PushNotification client endpoints
 
 func (api *PublicAPI) RegisterForPushNotifications(ctx context.Context, deviceToken string, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType) error {

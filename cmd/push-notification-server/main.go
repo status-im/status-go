@@ -132,6 +132,13 @@ func main() {
 		logger.Error("failed to start waku", zap.Error(err))
 		os.Exit(exitCodeStartWakuFailed)
 	}
+	defer func() {
+		err := waku.Stop()
+		if err != nil {
+			logger.Error("failed to stop waku", zap.Error(err))
+		}
+	}()
+
 	// Set up the push notifications server
 	config := &pushnotificationserver.Config{
 		Enabled:   true,
@@ -171,6 +178,13 @@ func main() {
 		os.Exit(exitCodeStartMessengerFailed)
 	}
 
+	defer func() {
+		err := messenger.Shutdown()
+		if err != nil {
+			logger.Error("failed to shutdown messenger", zap.Error(err))
+		}
+	}()
+
 	cancelMessenger := make(chan struct{})
 	messenger.StartRetrieveMessagesLoop(300*time.Millisecond, cancelMessenger)
 
@@ -196,16 +210,6 @@ func main() {
 	signal.Notify(quit, os.Interrupt)
 	<-quit
 	close(cancelMessenger)
-
-	err = messenger.Shutdown()
-	if err != nil {
-		logger.Error("failed to shutdown messenger", zap.Error(err))
-	}
-
-	err = waku.Stop()
-	if err != nil {
-		logger.Error("failed to stop waku", zap.Error(err))
-	}
 
 	logger.Info("push-notification-server finished")
 	os.Exit(exitCodeOK)
@@ -248,9 +252,6 @@ func createWalletDatabase(path string) (*sql.DB, error) {
 }
 
 func buildWakuConfig() *wakuv2.Config {
-	// WARNING: copy configuration
-	//cfg := wakuv2.DefaultConfig
-
 	cfg := &wakuv2.Config{
 		MaxMessageSize:                         wakuv2common.DefaultMaxMessageSize,
 		Host:                                   "0.0.0.0",
