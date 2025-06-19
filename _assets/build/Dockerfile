@@ -13,12 +13,19 @@ ARG build_target='status-backend'
 
 RUN mkdir -p /go/src/github.com/status-im/status-go
 WORKDIR /go/src/github.com/status-im/status-go
-ADD . .
 
+ADD go.mod go.sum ./
+RUN go mod download -x
 RUN go install go.uber.org/mock/mockgen@v0.4.0
 RUN go install github.com/kevinburke/go-bindata/v4/...@v4.0.2
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
-RUN make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags"
+
+ADD . .
+RUN go env -w GOCACHE=/root/.cache/go-build
+RUN --mount=type=cache,target="/root/.cache/go-build" \
+    --mount=type=cache,target="/root/.cache/go-generate-fast" \
+    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" \
+      GO_GENERATE_FAST_RECACHE=false GO_GENERATE_FAST_DIR="/root/.cache/go-generate-fast"
 
 # Copy binaries to the second image
 FROM alpine:3.18
