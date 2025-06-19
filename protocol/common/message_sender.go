@@ -744,6 +744,9 @@ func (s *MessageSender) SendPublic(
 		return nil, errors.Wrap(err, "failed to wrap a public message in the encryption layer")
 	}
 
+	s.logger.Debug("raw message info", zap.Bool("skipEncryptionLayer", rawMessage.SkipEncryptionLayer),
+		zap.Int("hashRatchetGroupID", len(rawMessage.HashRatchetGroupID)),
+		zap.Bool("skipApplicationWrap", rawMessage.SkipApplicationWrap))
 	if len(rawMessage.HashRatchetGroupID) != 0 {
 
 		var ratchet *encryption.HashRatchetKeyCompatibility
@@ -810,6 +813,7 @@ func (s *MessageSender) SendPublic(
 		if err != nil {
 			return nil, err
 		}
+		s.logger.Debug("sending public message", zap.Int("messageSize", len(newMessage.Payload)), zap.String("hash", types.EncodeHex(hash)))
 		hashes = append(hashes, hash)
 	}
 
@@ -1428,10 +1432,15 @@ func (s *MessageSender) wrapPayloadForSDS(rawMessage *RawMessage, wrappedPayload
 		return nil, err
 	}
 
+	s.logger.Debug("SDS: original payload", zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)),
+		zap.Int("payload-length", len(wrappedPayload)), zap.String("messageId", types.EncodeHex(messageID)))
 	sdsWrappedPayload, err := reliabilityManager.WrapOutgoingMessage(wrappedPayload, sds.MessageID(types.EncodeHex(messageID)))
 	if err != nil {
 		return nil, errors.Wrap(err, "SDS: failed to wrap a community message")
 	}
+
+	s.logger.Debug("SDS: wrapped payload", zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)),
+		zap.Int("payload-length", len(sdsWrappedPayload)), zap.String("messageId", types.EncodeHex(messageID)))
 
 	return sdsWrappedPayload, nil
 }
@@ -1442,7 +1451,8 @@ func (s *MessageSender) unwrapPayloadForSDS(msg *v1protocol.StatusMessage) error
 	if err != nil {
 		return err
 	}
-	if message.ChannelId != nil {
+	s.logger.Debug("SDS: unwrap message", zap.Any("message", message.Payload), zap.Any("channelId", message.ChannelId))
+	if message.ChannelId != nil && len(message.Payload) > 0 {
 		s.logger.Debug("SDS: unwrap payload", zap.String("channelId", *message.ChannelId))
 		reliabilityManager, ok := s.reliabilityManagers[*message.ChannelId]
 		var err error

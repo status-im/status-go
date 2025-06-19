@@ -175,6 +175,10 @@ func (m *StatusMessage) HandleApplicationLayer() error {
 		if err != nil {
 			return err
 		}
+		logutils.ZapLogger().Debug("HandleApplicationLayer unmarshalled message",
+			zap.String("messageType", message.Type.String()),
+			zap.Any("messageChannelId", message.ChannelId),
+			zap.Int("messagePayloadLength", len(message.Payload)))
 	}
 
 	recoveredKey, err := utils.RecoverKey(message)

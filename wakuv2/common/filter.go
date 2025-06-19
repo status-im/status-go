@@ -253,8 +253,11 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 
 		if watcher.MatchMessage(decodedMsg) {
 			matched = true
-			logutils.ZapLogger().Debug("processing message: decrypted", zap.Stringer("envelopeHash", recvMessage.Hash()))
+			logutils.ZapLogger().Debug("processing message: decrypted", zap.Stringer("envelopeHash", recvMessage.Hash()),
+				zap.Any("watcher src", watcher.Src), zap.Any("decoded message src", decodedMsg.Src))
 			if watcher.Src == nil || IsPubKeyEqual(decodedMsg.Src, watcher.Src) {
+				logutils.ZapLogger().Debug("processing message: matched filter",
+					zap.Stringer("message", decodedMsg.Hash()))
 				watcher.Trigger(decodedMsg)
 			}
 		}
