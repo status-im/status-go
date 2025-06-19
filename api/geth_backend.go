@@ -1104,19 +1104,32 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 		return err
 	}
 
-	isCurrentAccount := appDBPath == internalDbPath
+	// In order to overcome Mac OS symlink issue, we check if the internalDbPath contains the appDBPath.
+	// Cause on macOS, `/var` is actually a symlink to `/private/var`.
+	isCurrentAccount := strings.Contains(internalDbPath, appDBPath)
 
 	restartNode := func() {
 		if isCurrentAccount {
+			pass := password
+			if err == nil {
+				pass = newPassword
+			}
+
+			err := b.StopNode()
 			if err != nil {
-				// TODO https://github.com/status-im/status-go/issues/3906
-				// Fix restarting node, as it always fails but the error is ignored
-				// because UI calls Logout and Quit afterwards. It should not be UI-dependent
-				// and should be handled gracefully here if it makes sense to run dummy node after
-				// logout
-				_ = b.startNodeWithAccount(*account, password, nil, nil)
-			} else {
-				_ = b.startNodeWithAccount(*account, newPassword, nil, nil)
+				b.logger.Error("failed to stop node", zap.Error(err))
+				return
+			}
+
+			// TODO https://github.com/status-im/status-go/issues/3906
+			// Fix restarting node, as it always fails but the error is ignored
+			// because UI calls Logout and Quit afterwards. It should not be UI-dependent
+			// and should be handled gracefully here if it makes sense to run dummy node after
+			// logout
+			err = b.startNodeWithAccount(*account, pass, b.config, nil)
+			if err != nil {
+				b.logger.Error("failed to start node", zap.Error(err))
+				return
 			}
 		}
 	}
@@ -1616,7 +1629,7 @@ func (b *GethStatusBackend) prepareNodeAccount(request *requests.CreateAccount, 
 
 func (b *GethStatusBackend) InitKeyStoreDirWithAccount(rootDataDir, keyUID string) (string, error) {
 	b.UpdateRootDataDir(rootDataDir)
-	keyStoreRelativePath, keystoreAbsolutePath := DefaultKeystorePath(rootDataDir, keyUID)
+	_, keystoreAbsolutePath := DefaultKeystorePath(rootDataDir, keyUID)
 
 	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keystoreAbsolutePath, keystore.LightScryptN, keystore.LightScryptP)
 	if err != nil {
@@ -1624,7 +1637,7 @@ func (b *GethStatusBackend) InitKeyStoreDirWithAccount(rootDataDir, keyUID strin
 	}
 	b.accountManager.SetKeystore(keystoreAdapter)
 
-	return keyStoreRelativePath, nil
+	return keystoreAbsolutePath, nil
 }
 
 func (b *GethStatusBackend) generateAccount(mnemonic string) (genAcc *generator.Account, accInfo generator.GeneratedAccountInfo, err error) {
@@ -2168,7 +2181,11 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	conf.Version = version.Version()
 	conf.RootDataDir = b.rootDataDir
 	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
-	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
+	if strings.Contains(conf.KeyStoreDir, "keystore") &&
+		(strings.HasPrefix(conf.KeyStoreDir, "keystore") ||
+			strings.HasPrefix(conf.KeyStoreDir, "/keystore")) {
+		conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
+	}
 
 	if _, err = os.Stat(conf.RootDataDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(conf.RootDataDir, os.ModePerm); err != nil {
@@ -2223,14 +2240,6 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	// Start by validating configuration
 	if err := config.Validate(); err != nil {
 		return err
-	}
-
-	if !b.accountManager.IsKeystoreSet() {
-		keystoreAdapter, err := geth.NewGethKeystoreAdapter(config.KeyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
-		if err != nil {
-			return err
-		}
-		b.accountManager.SetKeystore(keystoreAdapter)
 	}
 
 	if err = b.statusNode.Start(config); err != nil {

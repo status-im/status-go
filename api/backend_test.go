@@ -1083,8 +1083,7 @@ func TestConvertAccount(t *testing.T) {
 
 	rootDataDir := t.TempDir()
 
-	keyStoreDirName := "keystore"
-	keyStoreDirPath := filepath.Join(rootDataDir, keyStoreDirName)
+	keyStoreDirPath := filepath.Join(rootDataDir, "keystore")
 
 	utils.Init()
 
@@ -1131,8 +1130,10 @@ func TestConvertAccount(t *testing.T) {
 	chatAcc := derivedAccounts[accscommon.PathEIP1581Chat]
 	chatInfo := chatAcc.ToAccountInfo()
 
-	found = keystoreContainsFileForAccount(keyStoreDirPath, chatInfo.Address)
-	require.True(t, found)
+	for _, acc := range derivedAccounts {
+		found := keystoreContainsFileForAccount(keyStoreDirPath, acc.Address().Hex())
+		require.True(t, found)
+	}
 
 	derivedAccountsInfo := make(map[string]generator.AccountInfo, 0)
 	for path, acc := range derivedAccounts {
@@ -1146,7 +1147,7 @@ func TestConvertAccount(t *testing.T) {
 	})
 	require.NoError(t, err)
 	nodeConfig.DataDir = rootDataDir
-	nodeConfig.KeyStoreDir = keyStoreDirName
+	nodeConfig.KeyStoreDir = keyStoreDirPath
 
 	profileKeypair := &accounts.Keypair{
 		KeyUID:      genAccInfo.KeyUID,
@@ -1176,7 +1177,7 @@ func TestConvertAccount(t *testing.T) {
 			p == accscommon.CustomWalletPath2 {
 			wAcc := &accounts.Account{
 				Address: types.HexToAddress(dAccInfo.Address),
-				KeyUID:  genAccInfo.KeyUID,
+				KeyUID:  profileKeypair.KeyUID,
 				Wallet:  false,
 				Chat:    false,
 				Type:    accounts.AccountTypeGenerated,
@@ -1392,24 +1393,64 @@ func TestLoginAndMigrationsStillWorkWithExistingDesktopUser(t *testing.T) {
 }
 
 func TestChangeDatabasePassword(t *testing.T) {
+	utils.Init()
+
+	backend, stop1, stop2, stop3, err := setupGethStatusBackend()
+	defer func() {
+		err := stop1()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop3()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	require.NoError(t, err)
+
+	tempDir := t.TempDir()
+	backend.UpdateRootDataDir(tempDir)
+
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
+
+	config.RootDataDir = tempDir
+	config.KeyStoreDir = path.Join(tempDir, "keystore")
+
+	err = backend.StartNode(config)
+	require.NoError(t, err)
+
 	oldPassword := "password"
 	newPassword := "newPassword"
-
-	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
-	backend.UpdateRootDataDir(t.TempDir())
-
-	// Setup keystore to test decryption of it
-	keyStoreDir := t.TempDir()
-	err := setKeystore(backend.accountManager, keyStoreDir)
-	require.NoError(t, err)
 
 	genAccount, _, err := backend.accountManager.CreateAndStoreAccount(oldPassword)
 	require.NoError(t, err)
 
+	paths := []string{accscommon.PathEIP1581Chat, accscommon.PathDefaultWalletAccount}
+
+	genChatAccounts, err := backend.accountManager.DeriveChildrenAccountsForPathsAndStore(genAccount.Address(), paths, oldPassword)
+	require.NoError(t, err)
+
+	ok, err := backend.accountManager.VerifyAccountPassword(genChatAccounts[accscommon.PathEIP1581Chat].Address(), oldPassword)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	ok, err = backend.accountManager.VerifyAccountPassword(genChatAccounts[accscommon.PathDefaultWalletAccount].Address(), oldPassword)
+	require.NoError(t, err)
+	require.True(t, ok)
+
 	account := multiaccounts.Account{
 		Name:          "TestAccount",
 		Timestamp:     1,
-		KeyUID:        "0x7c46c8f6f059ab72d524f2a6d356904db30bb0392636172ab3929a6bd2220f84",
+		KeyUID:        genAccount.KeyUID(),
 		KDFIterations: 1,
 	}
 
@@ -1422,6 +1463,40 @@ func TestChangeDatabasePassword(t *testing.T) {
 	// Created DBs with old password
 	err = backend.ensureDBsOpened(account, oldPassword)
 	require.NoError(t, err)
+
+	db, err := accounts.NewDB(backend.appDB)
+	require.NoError(t, err)
+
+	err = db.SaveOrUpdateKeypair(&accounts.Keypair{
+		KeyUID: account.KeyUID,
+		Name:   "private key keypair",
+		Type:   accounts.KeypairTypeSeed,
+		Accounts: []*accounts.Account{
+			{
+				Chat:      true,
+				Wallet:    false,
+				Address:   genChatAccounts[accscommon.PathEIP1581Chat].Address(),
+				KeyUID:    account.KeyUID,
+				PublicKey: types.Hex2Bytes(genChatAccounts[accscommon.PathEIP1581Chat].PublicKeyHex()),
+			},
+			{
+				Chat:      false,
+				Wallet:    true,
+				Address:   genChatAccounts[accscommon.PathDefaultWalletAccount].Address(),
+				KeyUID:    account.KeyUID,
+				PublicKey: types.Hex2Bytes(genChatAccounts[accscommon.PathDefaultWalletAccount].PublicKeyHex()),
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	chatAcc, err := db.GetAccountByAddress(genChatAccounts[accscommon.PathEIP1581Chat].Address())
+	require.NoError(t, err)
+	require.Equal(t, genChatAccounts[accscommon.PathEIP1581Chat].Address(), chatAcc.Address)
+
+	walletAcc, err := db.GetAccountByAddress(genChatAccounts[accscommon.PathDefaultWalletAccount].Address())
+	require.NoError(t, err)
+	require.Equal(t, genChatAccounts[accscommon.PathDefaultWalletAccount].Address(), walletAcc.Address)
 
 	// Change password
 	err = backend.ChangeDatabasePassword(account.KeyUID, oldPassword, newPassword)
