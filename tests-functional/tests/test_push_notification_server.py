@@ -68,7 +68,8 @@ class TestPushNotificationServer(MessengerSteps):
         response = bob.wakuext_service.register_for_push_notifications(bob.device_id, APN_TOPIC, bob.device_platform)
         assert "error" not in response
 
-        time.sleep(5) # WARNING: Wait a few seconds for the devices to be registered
+        # There is currently no way to reliably check if the devices have been registered, so we just wait a few seconds
+        time.sleep(5)
 
         # Make contacts, this should force delivery of a push notification
         self.make_contacts()

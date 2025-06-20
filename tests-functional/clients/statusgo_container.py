@@ -70,6 +70,12 @@ class StatusGoContainer:
             container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
 
         self.docker_client = docker.from_env()
+
+        try:
+            self.docker_client.images.get(image_name)
+        except docker.errors.ImageNotFound:
+            raise RuntimeError(f"Docker image '{image_name}' not found")
+
         self.container = self.docker_client.containers.run(**container_args)
         option.statusgo_containers.append(self)
 
