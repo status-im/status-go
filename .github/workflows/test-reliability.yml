@@ -46,7 +46,7 @@ jobs:
       run: pip install -r tests-functional/requirements.txt
 
     - name: Build status-backend
-      run: docker build --file _assets/build/Dockerfile . --tag "statusgo-local"
+      run: docker build --file _assets/build/Dockerfile . --tag "statusgo-local" --build-arg "cache_id=${GITHUB_RUN_ID}"
 
     - name: Run environment
       run: docker compose -f tests-functional/docker-compose.anvil.yml -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
