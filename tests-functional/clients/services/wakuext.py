@@ -10,6 +10,7 @@ class PushNotificationRegistrationTokenType(Enum):
     APN_TOKEN = 1
     FIREBASE_TOKEN = 2
 
+
 class SendPinMessagePayload(TypedDict):
     chat_id: str
     message_id: str
@@ -170,7 +171,7 @@ class WakuextService(Service):
         return response.json()
 
     def all_messages_from_chats_and_communities_which_match_term(
-            self, community_ids: list[str], chat_ids: list[str], searchTerm: str, caseSensitive: bool
+        self, community_ids: list[str], chat_ids: list[str], searchTerm: str, caseSensitive: bool
     ):
         params = [community_ids, chat_ids, searchTerm, caseSensitive]
         response = self.rpc_request("allMessagesFromChatsAndCommunitiesWhichMatchTerm", params)

@@ -1,6 +1,7 @@
 from clients.statusgo_container import PushNotificationServerContainer
 
-class PushNotificationServer():
+
+class PushNotificationServer:
     container = None
 
     def __init__(self, gorush_port=8080):

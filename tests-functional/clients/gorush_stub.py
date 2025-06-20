@@ -9,31 +9,31 @@ import requests
 
 class GorushRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler for gorush stub"""
-    
+
     # Class-level variable to store requests for debugging
     push_requests = []
 
     def log_message(self, format, *args):
         logging.debug(f"gorush stub request: {format % args}")
 
-    def _set_response(self, status_code=200, content_type='application/json'):
+    def _set_response(self, status_code=200, content_type="application/json"):
         self.send_response(status_code)
-        self.send_header('Content-type', content_type)
+        self.send_header("Content-type", content_type)
         self.end_headers()
-    
+
     def do_GET(self):
-        if self.path == '/healthz':
+        if self.path == "/healthz":
             self._set_response()
-            self.wfile.write(json.dumps({"status": "ok"}).encode('utf-8'))
+            self.wfile.write(json.dumps({"status": "ok"}).encode("utf-8"))
         else:
             self._set_response(404)
-            self.wfile.write(json.dumps({"error": "Not found"}).encode('utf-8'))
-    
-    def do_POST(self):
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length).decode('utf-8')
+            self.wfile.write(json.dumps({"error": "Not found"}).encode("utf-8"))
 
-        if self.path == '/api/push':
+    def do_POST(self):
+        content_length = int(self.headers["Content-Length"])
+        post_data = self.rfile.read(content_length).decode("utf-8")
+
+        if self.path == "/api/push":
             # Store request for debugging
             self.__class__.push_requests.append(post_data)
 
@@ -42,7 +42,7 @@ class GorushRequestHandler(BaseHTTPRequestHandler):
                 request = json.loads(post_data)
             except json.JSONDecodeError:
                 self._set_response(400)
-                self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode('utf-8'))
+                self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode("utf-8"))
                 return
 
             # Return a successful response
@@ -51,12 +51,12 @@ class GorushRequestHandler(BaseHTTPRequestHandler):
                 "success": "ok",
                 "counts": {
                     "total": len(request["notifications"]),
-                }
+                },
             }
-            self.wfile.write(json.dumps(response).encode('utf-8'))
+            self.wfile.write(json.dumps(response).encode("utf-8"))
         else:
             self._set_response(404)
-            self.wfile.write(json.dumps({"error": "Not found"}).encode('utf-8'))
+            self.wfile.write(json.dumps({"error": "Not found"}).encode("utf-8"))
 
 
 class GorushStub:
@@ -64,13 +64,13 @@ class GorushStub:
 
     def __init__(self, address="localhost", port=8088):
         """Initialize GorushStub client
-        
+
         Args:
             port: Port to expose gorush-stub on the host
         """
         # Setup logging
         self.logger = logging.getLogger(__name__)
-        
+
         # Initialize the HTTP server
         self.base_url = ""
         self.server = None
@@ -94,11 +94,11 @@ class GorushStub:
 
     def _wait_for_service(self, timeout=30, interval=1):
         """Wait for gorush-stub service to be available
-        
+
         Args:
             timeout: Maximum time to wait in seconds
             interval: Interval between attempts in seconds
-            
+
         Returns:
             bool: True if service is available, False otherwise
         """
@@ -111,13 +111,13 @@ class GorushStub:
             except requests.RequestException:
                 pass
             time.sleep(interval)
-        
+
         self.logger.error(f"gorush-stub service not available after {timeout} seconds")
         return False
 
     def get_requests(self):
         """Get debug requests from gorush-stub
-        
+
         Returns:
             list: List of recorded requests
         """

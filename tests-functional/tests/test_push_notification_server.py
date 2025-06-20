@@ -1,6 +1,3 @@
-import json
-import logging
-import sys
 import time
 import uuid
 
@@ -14,6 +11,7 @@ from utils import keys
 
 APN_TOPIC = "im.status.ethereum"
 DEFAULT_PUSH_MESSAGE = "You have a new message"
+
 
 @pytest.fixture
 def gorush_stub():
