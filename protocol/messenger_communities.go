@@ -1383,7 +1383,7 @@ func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error)
 			return nil, errors.New(ErrSigningJoinRequestForKeycardAccounts)
 		}
 
-		verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, types.HexToAddress(param.Address), param.Password)
+		verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(types.HexToAddress(param.Address), param.Password)
 		if err != nil {
 			return nil, err
 		}

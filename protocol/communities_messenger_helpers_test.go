@@ -39,7 +39,7 @@ type AccountsManagerMock struct {
 	AccountsMap map[string]string
 }
 
-func (m *AccountsManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*generator.Account, error) {
+func (m *AccountsManagerMock) GetVerifiedWalletAccount(address ethtypes.Address, password string) (*generator.Account, error) {
 	return generator.NewAccount(nil, nil), nil
 }
 

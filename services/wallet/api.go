@@ -868,7 +868,7 @@ func (api *API) SignTypedDataV4(typedJson string, address string, password strin
 		zap.Int("len(password)", len(password)),
 	)
 
-	account, err := api.s.gethManager.GetVerifiedWalletAccount(api.s.accountsDB, types.HexToAddress(address), password)
+	account, err := api.s.gethManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
@@ -901,7 +901,7 @@ func (api *API) SafeSignTypedDataForDApps(typedJson string, address string, pass
 		zap.Bool("legacy", legacy),
 	)
 
-	account, err := api.s.gethManager.GetVerifiedWalletAccount(api.s.accountsDB, types.HexToAddress(address), password)
+	account, err := api.s.gethManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
