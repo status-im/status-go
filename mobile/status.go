@@ -464,24 +464,18 @@ func migrateKeyStoreDirV2(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.MigrateKeyStoreDir(request.Account, request.Password, request.NewDir)
+	err = statusBackend.AccountManager().MigrateKeyStoreDir(request.NewDir)
 	return makeJSONResponse(err)
 }
 
 // Deprecated: Use MigrateKeyStoreDirV2 instead
 func MigrateKeyStoreDir(accountData, password, oldDir, newDir string) string {
-	return migrateKeyStoreDir(accountData, password, newDir)
+	return migrateKeyStoreDir(newDir)
 }
 
 // migrateKeyStoreDir migrates key files to a new directory
-func migrateKeyStoreDir(accountData, password, newDir string) string {
-	var account multiaccounts.Account
-	err := json.Unmarshal([]byte(accountData), &account)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = statusBackend.MigrateKeyStoreDir(account, password, newDir)
+func migrateKeyStoreDir(newDir string) string {
+	err := statusBackend.AccountManager().MigrateKeyStoreDir(newDir)
 	return makeJSONResponse(err)
 }
 

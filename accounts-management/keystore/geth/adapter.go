@@ -114,8 +114,14 @@ func (a *Adapter) ReEncryptKeyStoreDir(oldPass, newPass string) error {
 	return reEncryptKeyStoreDir(a.keystoreDir, oldPass, newPass)
 }
 
-func (a *Adapter) MigrateKeyStoreDir(newDir string, addresses []string) error {
-	err := migrateKeyStoreDir(a.keystoreDir, newDir, addresses)
+func (a *Adapter) MigrateKeyStoreDir(newDir string) error {
+	addresses := a.Accounts()
+	addressesStr := make([]string, len(addresses))
+	for i, address := range addresses {
+		addressesStr[i] = address.Address.Hex()
+	}
+
+	err := migrateKeyStoreDir(a.keystoreDir, newDir, addressesStr)
 	if err != nil {
 		return err
 	}

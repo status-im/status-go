@@ -103,7 +103,7 @@ childAccounts, err := manager.DeriveChildrenAccountsForPathsAndStore(
 #### Keystore Operations
 ```go
 // Migrate keystore to new directory
-err := manager.MigrateKeyStoreDir(newDir, addresses)
+err := manager.MigrateKeyStoreDir(newDir)
 
 // Re-encrypt keystore with new password
 err := manager.ReEncryptKeyStoreDir(oldPassword, newPassword)

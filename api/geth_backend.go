@@ -985,36 +985,6 @@ func (b *GethStatusBackend) GetEnsUsernames() ([]*ens.UsernameDetail, error) {
 	return db.GetEnsUsernames(&removed)
 }
 
-func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, password, newDir string) error {
-	err := b.ensureDBsOpened(acc, password)
-	if err != nil {
-		return err
-	}
-
-	accountDB, err := accounts.NewDB(b.appDB)
-	if err != nil {
-		return err
-	}
-	accounts, err := accountDB.GetActiveAccounts()
-	if err != nil {
-		return err
-	}
-	settings, err := accountDB.GetSettings()
-	if err != nil {
-		return err
-	}
-	addresses := []string{settings.EIP1581Address.Hex(), settings.WalletRootAddress.Hex()}
-	for _, account := range accounts {
-		addresses = append(addresses, account.Address.Hex())
-	}
-	err = b.accountManager.MigrateKeyStoreDir(newDir, addresses)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (b *GethStatusBackend) Login(keyUID, password string) error {
 	return b.startNodeWithAccount(multiaccounts.Account{KeyUID: keyUID}, password, nil, nil)
 }
