@@ -17,12 +17,15 @@ import (
 )
 
 // localBackupInterval is the duration we should allow between backups
-var localBackupInterval = 1800 * time.Second // 30 minutes
+var localBackupInterval = 30 * time.Minute
 
 func (m *Messenger) startLocalBackupLoop() {
 	ticker := time.NewTicker(localBackupInterval)
+	defer ticker.Stop()
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case <-ticker.C:
@@ -38,7 +41,7 @@ func (m *Messenger) startLocalBackupLoop() {
 
 				m.logger.Debug("backing up data")
 
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				ctx, cancel := context.WithTimeout(m.ctx, 5*time.Minute)
 				defer cancel()
 				err = m.BackupDataLocally(ctx)
 				if err != nil {

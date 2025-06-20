@@ -24,6 +24,7 @@ type MessengerLocalBackupSuite struct {
 }
 
 func (s *MessengerBackupSuite) TestBackupContactsLocally() {
+	s.tmpdir = s.T().TempDir()
 	backupOptions := []Option{
 		WithLocalBackup(&params.BackupConfig{
 			DataDir: filepath.Join(s.tmpdir, params.BackupsRelativePath),

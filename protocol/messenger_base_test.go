@@ -19,7 +19,6 @@ import (
 const DefaultProfileDisplayName = ""
 
 func (s *MessengerBaseTestSuite) SetupTest() {
-	s.tmpdir = s.T().TempDir()
 	s.logger = tt.MustCreateTestLogger()
 	shh, err := newTestWakuNode(s.logger)
 	s.Require().NoError(err)
