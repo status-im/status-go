@@ -101,10 +101,10 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	_, settings, errors := m.prepareSyncSettingsMessages(clock, true)
-	if len(errors) != 0 {
+	_, settings, err := m.prepareSyncSettingsMessages(clock, true)
+	if err != nil {
 		// return just the first error, the others have been logged
-		return 0, errors[0]
+		return 0, err
 	}
 
 	keypairsToBackup, err := m.backupKeypairs()

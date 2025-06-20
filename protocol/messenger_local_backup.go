@@ -74,10 +74,9 @@ func (m *Messenger) BackupDataLocally(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	_, settings, errors := m.prepareSyncSettingsMessages(clock, true)
-	if len(errors) != 0 {
-		// return just the first error, the others have been logged
-		return errors[0]
+	_, settings, err := m.prepareSyncSettingsMessages(clock, true)
+	if err != nil {
+		return err
 	}
 	woAccountsToBackup, err := m.backupWatchOnlyAccounts()
 	if err != nil {
