@@ -74,7 +74,7 @@ type MessengerSignalsHandler interface {
 }
 
 type AccountsManager interface {
-	GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*generator.Account, error)
+	GetVerifiedWalletAccount(address ethtypes.Address, password string) (*generator.Account, error)
 	DeleteAccount(address ethtypes.Address) error
 }
 
