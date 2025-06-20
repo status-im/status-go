@@ -130,7 +130,10 @@ func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
 		logger:            logger,
 		preLoginLogConfig: logutils.NewPreLoginLogConfig(),
 	}
-	backend.initialize()
+	if err := backend.initialize(); err != nil {
+		logger.Error("failed to initialize backend", zap.Error(err))
+		panic(err)
+	}
 
 	logger.Info("Status backend initialized",
 		zap.String("backend geth version", version.Version()),
@@ -144,8 +147,13 @@ func (b *GethStatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
 	return b.preLoginLogConfig
 }
 
-func (b *GethStatusBackend) initialize() {
-	accountManager := accsmanagement.NewAccountsManager(b.logger)
+func (b *GethStatusBackend) initialize() (err error) {
+	accountManager, err := accsmanagement.NewAccountsManager(b.logger)
+	if err != nil {
+		b.logger.Error("failed to create new *AccountsManager instance", zap.Error(err))
+		return
+	}
+
 	transactor := transactions.NewTransactor()
 	personalService := personal.New()
 	statusNode := node.New(transactor, accountManager, b.logger)
@@ -157,6 +165,8 @@ func (b *GethStatusBackend) initialize() {
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
 	b.LocalPairingStateManager = new(statecontrol.ProcessStateManager)
 	b.LocalPairingStateManager.SetPairing(false)
+
+	return
 }
 
 // StatusNode returns reference to node manager
@@ -451,7 +461,16 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 		b.logger.Error("failed to initialize db", zap.Error(err))
 		return err
 	}
+
 	b.statusNode.SetAppDB(b.appDB)
+
+	accountsDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		b.logger.Error("failed to create new *Database instance", zap.Error(err))
+		return
+	}
+	b.accountManager.SetPersistence(accountsDB)
+
 	return nil
 }
 
@@ -2449,13 +2468,7 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 }
 
 func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*generator.Account, error) {
-	db, err := accounts.NewDB(b.appDB)
-	if err != nil {
-		b.logger.Error("failed to create new *Database instance", zap.Error(err))
-		return nil, err
-	}
-
-	return b.accountManager.GetVerifiedWalletAccount(db, types.HexToAddress(address), password)
+	return b.accountManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
 }
 
 // registerHandlers attaches Status callback handlers to running node
@@ -2605,7 +2618,9 @@ func (b *GethStatusBackend) Logout() error {
 	}
 
 	// re-initialize the node, at some point we should better manage the lifecycle
-	b.initialize()
+	if err = b.initialize(); err != nil {
+		return err
+	}
 
 	err = b.statusNode.StartMediaServerWithoutDB()
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/keystore/geth"
+	mock_persistence "github.com/status-im/status-go/accounts-management/mock"
 	"github.com/status-im/status-go/eth-node/crypto"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/tt"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	gomock "go.uber.org/mock/gomock"
 )
 
 const testPassword = "test-password"
@@ -32,7 +34,15 @@ func setKeystore(accManager *AccountsManager, keyStoreDir string) error {
 }
 
 func TestVerifyAccountPassword(t *testing.T) {
-	accManager := NewAccountsManager(tt.MustCreateTestLogger())
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	accManager, err := NewAccountsManager(tt.MustCreateTestLogger())
+	require.NoError(t, err)
+
+	persistence := mock_persistence.NewMockPersistence(ctrl)
+	accManager.SetPersistence(persistence)
+
 	keyStoreDir := t.TempDir()
 	emptyKeyStoreDir := t.TempDir()
 
@@ -111,7 +121,14 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	err := utils.ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
 	require.NoError(t, err)
 
-	accManager := NewAccountsManager(tt.MustCreateTestLogger())
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	accManager, err := NewAccountsManager(tt.MustCreateTestLogger())
+	require.NoError(t, err)
+
+	persistence := mock_persistence.NewMockPersistence(ctrl)
+	accManager.SetPersistence(persistence)
 
 	err = setKeystore(accManager, keyStoreDir)
 	require.NoError(t, err)
@@ -145,10 +162,18 @@ type testAccount struct {
 // SetupTest is used here for reinitializing the mock before every
 // test function to avoid faulty execution.
 func (s *ManagerTestSuite) SetupTest() {
-	s.accManager = NewAccountsManager(tt.MustCreateTestLogger())
+	ctrl := gomock.NewController(s.T())
+	defer ctrl.Finish()
+
+	var err error
+	s.accManager, err = NewAccountsManager(tt.MustCreateTestLogger())
+	s.Require().NoError(err)
+
+	persistence := mock_persistence.NewMockPersistence(ctrl)
+	s.accManager.SetPersistence(persistence)
 
 	keyStoreDir := s.T().TempDir()
-	err := setKeystore(s.accManager, keyStoreDir)
+	err = setKeystore(s.accManager, keyStoreDir)
 	s.Require().NoError(err)
 	s.keydir = keyStoreDir
 
