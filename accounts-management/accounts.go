@@ -237,15 +237,15 @@ func (m *AccountsManager) Accounts() ([]ethtypes.Address, error) {
 	return addresses, nil
 }
 
-func (m *AccountsManager) MigrateKeyStoreDir(newDir string, addresses []string) error {
+func (m *AccountsManager) MigrateKeyStoreDir(newDir string) error {
 	m.keystoreMu.RLock()
 	defer m.keystoreMu.RUnlock()
 
 	if m.keystore == nil {
 		return ErrAccountKeyStoreMissing
 	}
-	m.logger.Info("migrating keystore directory", zap.String("new location", newDir), zap.Strings("addresses", addresses))
-	return m.keystore.MigrateKeyStoreDir(newDir, addresses)
+	m.logger.Info("migrating keystore directory", zap.String("new location", newDir))
+	return m.keystore.MigrateKeyStoreDir(newDir)
 }
 
 func (m *AccountsManager) ReEncryptKeyStoreDir(oldPass, newPass string) error {
