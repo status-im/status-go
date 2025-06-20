@@ -1,15 +1,12 @@
-import io
 import json
 import logging
 import string
-import tarfile
 import tempfile
 import time
 import random
 import threading
+
 import requests
-import docker
-import docker.errors
 import os
 
 from tenacity import retry, stop_after_delay, wait_fixed
@@ -19,9 +16,9 @@ from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
 from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
+from clients.statusgo_container import StatusBackendContainer
 from conftest import option
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
-from docker.errors import APIError
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
@@ -42,15 +39,13 @@ class StatusBackend(RpcClient, SignalClient):
             self.temp_dir = tempfile.TemporaryDirectory()
             self.data_dir = self.temp_dir.name
         else:
-            self.temp_dir = None
-            self.data_dir = "/usr/status-user"
-            self.docker_client = docker.from_env()
-
             host_port = random.choice(option.status_backend_port_range)
             option.status_backend_port_range.remove(host_port)
 
-            self.container = self._start_container(host_port, privileged)
-            url = f"http://{'[::1]' if self.ipv6 else '127.0.0.1'}:{host_port}"
+            self.container = StatusBackendContainer(host_port, privileged, self.ipv6)
+            self.temp_dir = None
+            self.data_dir = self.container.data_dir()
+            url = self.container.url
 
         assert self.data_dir != ""
         self.base_url = url
@@ -80,55 +75,6 @@ class StatusBackend(RpcClient, SignalClient):
     def __del__(self):
         if self.temp_dir is not None:
             self.temp_dir.cleanup()
-
-    def _start_container(self, host_port, privileged):
-        identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else os.popen("git rev-parse --short HEAD").read().strip()
-        image_name = f"{self.docker_project_name}-status-backend:latest"
-        container_name = f"{self.docker_project_name}-{identifier}-status-backend-{host_port}"
-
-        coverage_path = option.codecov_dir if option.codecov_dir else os.path.abspath("./coverage/binary")
-
-        container_args = {
-            "image": image_name,
-            "detach": True,
-            "privileged": privileged,
-            "name": container_name,
-            "labels": {"com.docker.compose.project": self.docker_project_name},
-            "entrypoint": ["status-backend", "--address", "0.0.0.0:3333"],
-            "ports": {"3333/tcp": host_port},
-            "environment": {
-                "GOCOVERDIR": "/coverage/binary",
-            },
-            "volumes": {
-                coverage_path: {
-                    "bind": "/coverage/binary",
-                    "mode": "rw",
-                }
-            },
-        }
-
-        if self.ipv6:
-            container_args.update(
-                {
-                    "entrypoint": ["status-backend", "--address", f"[::]:{host_port}"],
-                    "ports": {
-                        f"{host_port}/tcp": [
-                            {"HostIp": "::", "HostPort": str(host_port)},
-                        ]
-                    },
-                }
-            )
-
-        if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
-            container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
-
-        container = self.docker_client.containers.run(**container_args)
-
-        network = self.docker_client.networks.get(self.network_name)
-        network.connect(container)
-
-        option.status_backend_containers.append(self)
-        return container
 
     def wait_for_healthy(self, timeout=10):
         start_time = time.time()
@@ -255,22 +201,7 @@ class StatusBackend(RpcClient, SignalClient):
                 return path
             return None
 
-        try:
-            stream, _ = self.container.get_archive(path)
-        except docker.errors.NotFound:
-            return None
-
-        temp_dir = tempfile.mkdtemp()
-        tar_bytes = io.BytesIO(b"".join(stream))
-
-        with tarfile.open(fileobj=tar_bytes) as tar:
-            tar.extractall(path=temp_dir)
-            # If the tar contains a single file, return the path to that file
-            # Otherwise it's a directory, just return temp_dir.
-            if len(tar.getmembers()) == 1:
-                return os.path.join(temp_dir, tar.getmembers()[0].name)
-
-        return temp_dir
+        return self.container.extract_data(path)
 
     def _set_display_name(self, **kwargs):
         self.display_name = kwargs.get(
@@ -340,82 +271,22 @@ class StatusBackend(RpcClient, SignalClient):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
         self.container.pause()
-        logging.info(f"Container {self.container.name} paused.")
 
     def container_unpause(self):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
         self.container.unpause()
-        logging.info(f"Container {self.container.name} unpaused.")
 
     def container_exec(self, command):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
-        try:
-            exec_result = self.container.exec_run(cmd=["sh", "-c", command], stdout=True, stderr=True, tty=False)
-            if exec_result.exit_code != 0:
-                raise RuntimeError(f"Failed to execute command in container {self.container.id}:\n" f"OUTPUT: {exec_result.output.decode().strip()}")
-            return exec_result.output.decode().strip()
-        except APIError as e:
-            raise RuntimeError(f"API error during container execution: {str(e)}") from e
+        return self.container.exec(command)
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.1), reraise=True)
     def change_container_ip(self, new_ipv4=None, new_ipv6=None):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
-
-        logging.info(f"Trying to change container {self.container.name} IPs (IPv6 Mode: {self.ipv6})")
-
-        try:
-            # Get the network details
-            network = self.docker_client.networks.get(self.network_name)
-
-            # Ensure network has explicitly configured subnets
-            ipam_config = network.attrs.get("IPAM", {}).get("Config", [])
-            if not ipam_config:
-                raise RuntimeError("Network does not have a user-defined subnet, cannot assign a custom IP.")
-
-            self.container.reload()
-            container_info = self.container.attrs["NetworkSettings"]["Networks"].get(self.network_name, {})
-            current_ipv4 = container_info.get("IPAddress", "Unknown")
-            current_ipv6 = container_info.get("GlobalIPv6Address", "Unknown")
-
-            logging.info(f"Current IPs for {self.container.name} - IPv4: {current_ipv4}, IPv6: {current_ipv6}")
-
-            # Generate new IPs based on mode
-            for config in ipam_config:
-                subnet = config.get("Subnet")
-
-                if self.ipv6 and ":" in subnet and not new_ipv6:  # IPv6 Subnet
-                    base_ipv6 = subnet.rstrip("::/64")
-                    new_ipv6 = f"{base_ipv6}::{random.randint(1, 9999):x}:{random.randint(1, 9999):x}"
-                    logging.info(f"Generated new IPv6: {new_ipv6}")
-
-                elif not self.ipv6 and "." in subnet and not new_ipv4:  # IPv4 Subnet
-                    new_ipv4 = subnet.rsplit(".", 1)[0] + f".{random.randint(2, 254)}"
-                    logging.info(f"Generated new IPv4: {new_ipv4}")
-
-            # Disconnect and reconnect with only the needed IP type
-            network.disconnect(self.container)
-            if self.ipv6:
-                network.connect(self.container, ipv6_address=new_ipv6)
-            else:
-                network.connect(self.container, ipv4_address=new_ipv4)
-
-            self.container.reload()
-            updated_info = self.container.attrs["NetworkSettings"]["Networks"].get(self.network_name, {})
-            updated_ipv4 = updated_info.get("IPAddress", "Unknown")
-            updated_ipv6 = updated_info.get("GlobalIPv6Address", "Unknown")
-
-            if self.ipv6 and current_ipv6 == updated_ipv6:
-                raise RuntimeError("IPV6 is the same after network reconnect")
-            if not self.ipv6 and current_ipv4 == updated_ipv4:
-                raise RuntimeError("IPV4 is the same after network reconnect")
-
-            logging.info(f"Changed container {self.container.name} IPs - New IPv4: {updated_ipv4}, New IPv6: {updated_ipv6}")
-
-        except Exception as e:
-            raise RuntimeError(f"Failed to change container IP: {e}")
+        self.container.change_ip(new_ipv4, new_ipv6)
 
     def wait_for_online(self, timeout=10):
         start_time = time.time()

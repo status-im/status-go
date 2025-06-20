@@ -10,11 +10,11 @@ Functional tests for status-go
   - [Running Tests](#running-tests)
 - [Implementation details](#implementation-details)
 
-## How to Install
+## Prerequisites
 
 1. Install [Docker](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/)
 2. Install [Python 3](https://www.python.org/downloads/) (tested with 3.10 and 3.12 and it works with both)
-3. **Set up a virtual environment (required for linting):**
+3. Set up a virtual environment (required for linting):
    - In `./tests-functional`, run:
      ```bash
      python3 -m venv .venv
@@ -27,19 +27,48 @@ Functional tests for status-go
 
 ## How to Run
 
-### Running dev RPC (anvil with contracts)
-- In `./tests-functional` run `docker compose -f docker-compose.anvil.yml up --remove-orphans --build`, as result:
-    * an [anvil](https://book.getfoundry.sh/reference/anvil/) container with ChainID 31337 exposed on `0.0.0.0:8545` will start running
-    * Status-im contracts will be deployed to the network
+1. Functional tests will spawn `status-go` containers as needed, using the docker image name provided in `--docker-image`.
+    Run this command to build a docker image for local runs:
+    ```sh
+    # Note we tag the image with the commit hash. Functional tests will refer to the same when `--docker-image` is empty.   
+    docker build _assets/build/Dockerfile . --tag "statusgo-$(git rev-parse --short HEAD)"
+    ```
+2. Functional tests rely on local instances of Waku and Anvil.
+   Run this command to start all environment dependencies: 
+    ```sh
+    docker compose -f tests-functional/docker-compose.anvil.yml -f tests-functional/docker-compose.waku.yml up --build --remove-orphans
+    ```
+   This will:
+    * Start a Waku fleet of 1 boot node + 1 store node
+    * Start Anvil with ChainID 31337 exposed on `0.0.0.0:8545`
+    * Deploy required Status contracts to Anvil
 
-### Run tests
-- In `./tests-functional` run `docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f docker-compose.status-go.local.yml -f docker-compose.waku.yml up --build --remove-orphans`, as result:
-    * a container with [status-backend](https://github.com/status-im/status-go/pull/5847) will be created with endpoint exposed on `0.0.0.0:3333`
-    * status-go will use [anvil](https://book.getfoundry.sh/reference/anvil/) as RPCURL with ChainID 31337 
-    * Status-im contracts will be deployed to the network
+3. In `./tests-functional/tests` directory run:
+   ```sh
+    pytest -m rpc
+   ```
 
-* In `./tests-functional/tests` directory run `pytest -m rpc`
-* To run tests against binary run `pytest -m <your mark> --status_backend_url=http://<binary_url>:<binary_port>`
+### Running against a `status-backend` binary
+
+By default, tests will spawn containers with `status-backend` when and as needed.
+This might be inconvenient when:
+- You make changes to the `status-go` code, so you have to rebuild it frequently
+- You need to run `status-go` code with a debugger
+
+For such cases, you can utilize `--status_backend_url` argument:
+```shell
+pytest --status_backend_url=http://<host>:<port> --status_backend_url=http://<host>:<port>
+```
+
+When provided, tests will connect to the given URL instead of spawning Docker containers.
+
+NOTE:
+1. You must provide as many URLs as you need in your test
+2. URLs are not reused
+3. URLs are not reusedURLs are selected in the provided order
+4. Most tests do not call `Logout` in the end of the test, so make sure to restart `status-backend` in between test runs.
+   You can also use `--logout` flag to automatically `Logout` before each `InitializeApplication` call, but it is 
+   recommended to restart `status-backend` for a full clean test.
 
 ### Options
 
@@ -58,6 +87,7 @@ Functional tests for status-go
 Please refer to the description of these parameters in `status-go` for details.
 
 ### Prerequisites for Mac OSx users
+
 If you see errors at attempt to run tests, try to run in terminal:
 ```shell
 sock.connect(self.unix_socket)
@@ -89,4 +119,5 @@ sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
 If you see some import issues, make sure that you have all requirements installed from `requirements.txt` 
 
 ### For PyCharm users
+
 Make sure that you made `test-functional` source folder (Right click > Mark directory as > Source folder)

@@ -1,7 +1,0 @@
-services:
-  anvil:
-    ports:
-      - 8545:8545
-  status-backend:
-    ports:
-      - 3314-3324:3333
