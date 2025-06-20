@@ -5,13 +5,14 @@ import tempfile
 import time
 import random
 import threading
+import uuid
 
 import requests
 import os
 
 from tenacity import retry, stop_after_delay, wait_fixed
 from clients.services.wallet import WalletService
-from clients.services.wakuext import WakuextService
+from clients.services.wakuext import WakuextService, PushNotificationRegistrationTokenType
 from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
 from clients.signals import SignalClient, SignalType
@@ -19,6 +20,7 @@ from clients.rpc import RpcClient
 from clients.statusgo_container import StatusBackendContainer
 from conftest import option
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
+from utils import keys
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
@@ -30,8 +32,6 @@ class StatusBackend(RpcClient, SignalClient):
         self.temp_dir = None
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
-        self.docker_project_name = option.docker_project_name
-        self.network_name = f"{self.docker_project_name}_default"
 
         if option.status_backend_url:
             url = next(option.status_backend_urls)
@@ -56,6 +56,8 @@ class StatusBackend(RpcClient, SignalClient):
         self.key_uid = ""
         self.password = ""
         self.display_name = ""
+        self.device_id = str(uuid.uuid4())  # In reality this is taken from the device, don't confuse with Status installation_id
+        self.device_platform = PushNotificationRegistrationTokenType.UNKNOWN
         self.node_login_event = {}
 
         RpcClient.__init__(self, self.rpc_url)
@@ -285,13 +287,7 @@ class StatusBackend(RpcClient, SignalClient):
     def compressed_public_key(self):
         if not self.public_key:
             return ""
-        # Extract X coordinate (first 32 bytes after prefix)
-        x = self.public_key[4:68]
-        # Extract Y coordinate (last 32 bytes)
-        y = self.public_key[68:132]
-        # Add prefix 02 for even Y, 03 for odd Y
-        prefix = "03" if int(y, 16) % 2 else "02"
-        return "0x" + prefix + x
+        return keys.compress_public_key(self.public_key)
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.1), reraise=True)
     def change_container_ip(self, new_ipv4=None, new_ipv6=None):

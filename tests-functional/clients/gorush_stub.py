@@ -33,8 +33,6 @@ class GorushRequestHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length).decode('utf-8')
 
-        logging.info(f"gorush stub received '{self.path}' request: " + str(post_data))
-
         if self.path == '/api/push':
             # Store request for debugging
             self.__class__.push_requests.append(post_data)
@@ -117,7 +115,7 @@ class GorushStub:
         self.logger.error(f"gorush-stub service not available after {timeout} seconds")
         return False
 
-    def get_debug_requests(self):
+    def get_requests(self):
         """Get debug requests from gorush-stub
         
         Returns:
@@ -129,6 +127,22 @@ class GorushStub:
         # Clear the original list
         GorushRequestHandler.push_requests = []
         return requests
+
+    def wait_for_requests(self, timeout=10):
+        start_time = time.time()
+        push_requests = []
+
+        while len(push_requests) == 0:
+            if time.time() - start_time > timeout:
+                assert False, "Timeout waiting for push notifications requests"
+
+            time.sleep(1)
+
+            for req in self.get_requests():
+                for notification in json.loads(req)["notifications"]:
+                    push_requests.append(notification)
+
+        return push_requests
 
     def close(self):
         """Stop the gorush-stub HTTP server"""
