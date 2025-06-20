@@ -53,16 +53,11 @@ type ApplicationLayer struct {
 	ChannelId *string                                  `json:"channelId,omitempty"`
 }
 
-type SdsLayer struct {
-	Message *protobuf.ApplicationMetadataMessage `json:"message"`
-}
-
 // StatusMessage encapsulates all layers of the protocol
 type StatusMessage struct {
 	TransportLayer   TransportLayer   `json:"transportLayer"`
 	EncryptionLayer  EncryptionLayer  `json:"encryptionLayer"`
 	ApplicationLayer ApplicationLayer `json:"applicationLayer"`
-	SdsLayer         SdsLayer         `json:"sdsLayer"`
 }
 
 // Temporary JSON marshaling for those messages that are not yet processed
@@ -162,23 +157,9 @@ func (m *StatusMessage) HandleEncryptionLayer(myKey *ecdsa.PrivateKey, senderKey
 }
 
 func (m *StatusMessage) HandleApplicationLayer() error {
-
-	var message *protobuf.ApplicationMetadataMessage
-
-	if m.SdsLayer.Message != nil {
-		logutils.ZapLogger().Debug("HandleApplicationLayer sds message is not nil")
-		message = m.SdsLayer.Message
-	} else {
-		logutils.ZapLogger().Debug("HandleApplicationLayer sds message is nil")
-		var err error
-		message, err = protobuf.Unmarshal(m.EncryptionLayer.Payload)
-		if err != nil {
-			return err
-		}
-		logutils.ZapLogger().Debug("HandleApplicationLayer unmarshalled message",
-			zap.String("messageType", message.Type.String()),
-			zap.Any("messageChannelId", message.ChannelId),
-			zap.Int("messagePayloadLength", len(message.Payload)))
+	message, err := protobuf.Unmarshal(m.EncryptionLayer.Payload)
+	if err != nil {
+		return err
 	}
 
 	recoveredKey, err := utils.RecoverKey(message)
