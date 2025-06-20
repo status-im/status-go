@@ -29,5 +29,5 @@ type KeyStore interface {
 	// ReEncryptKeyStoreDir re-encrypts all keys in the keystore directory.
 	ReEncryptKeyStoreDir(oldPass, newPass string) error
 	// MigrateKeyStoreDir migrates the keystore directory from one location to another.
-	MigrateKeyStoreDir(newDir string, addresses []string) error
+	MigrateKeyStoreDir(newDir string) error
 }
