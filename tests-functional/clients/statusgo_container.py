@@ -183,17 +183,6 @@ class StatusGoContainer:
 
         return temp_dir
 
-    @staticmethod
-    def get_bridge_ip():
-        client = docker.from_env()
-        network = client.networks.get("bridge")  # default bridge network
-        for config in network.attrs.get("IPAM", {}).get("Config", []):
-            gateway = config.get("Gateway")
-            if gateway:
-                return gateway  # typically 172.17.0.1
-
-        raise RuntimeError("No bridge gateway found")
-
     def save_logs(self):
         if not self.container:
             raise RuntimeError("Container is not initialized.")

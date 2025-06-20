@@ -29,9 +29,7 @@ class TestPushNotificationServer(MessengerSteps):
     def test_push_notification_delivery(self):
 
         # Initialize gorush stub
-        # NOTE: Host's `localhost` is not accessible from containers on Linux, so we use the bridge IP instead.
-        address = StatusGoContainer.get_bridge_ip() if sys.platform.startswith('linux') else '127.0.0.1'
-        gorush = GorushStub(address=address, port=0)
+        gorush = GorushStub(address="0.0.0.0", port=0)
 
         # Initialize push notification server
         server = PushNotificationServer(gorush_port=gorush.server.server_port)
