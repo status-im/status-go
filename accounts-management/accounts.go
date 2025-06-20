@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	gocommon "github.com/status-im/status-go/common"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 )
 
 type ErrCannotLocateKeyFile struct {
@@ -27,8 +26,9 @@ func (e ErrCannotLocateKeyFile) Error() string {
 
 // AccountsManager represents the default account manager implementation
 type AccountsManager struct {
-	keystoreMu sync.RWMutex
-	keystore   KeyStore
+	keystoreMu  sync.RWMutex
+	keystore    KeyStore
+	persistence Persistence
 
 	selectedChatAccountMutex sync.RWMutex
 	selectedChatAccount      *generator.Account
@@ -36,10 +36,19 @@ type AccountsManager struct {
 	logger *zap.Logger
 }
 
-func NewAccountsManager(logger *zap.Logger) *AccountsManager {
+func NewAccountsManager(logger *zap.Logger) (*AccountsManager, error) {
+	if logger == nil {
+		return nil, ErrLoggerIsMissing
+	}
+
+	logger.Info("accounts manager created")
 	return &AccountsManager{
 		logger: logger,
-	}
+	}, nil
+}
+
+func (m *AccountsManager) SetPersistence(persistence Persistence) {
+	m.persistence = persistence
 }
 
 func (m *AccountsManager) SetKeystore(keystore KeyStore) {
@@ -47,6 +56,7 @@ func (m *AccountsManager) SetKeystore(keystore KeyStore) {
 	defer m.keystoreMu.Unlock()
 
 	m.keystore = keystore
+	m.logger.Info("new keystore set")
 }
 
 // CreateAndStoreAccount creates an internal geth account and stores it in the keystore
@@ -69,6 +79,10 @@ func (m *AccountsManager) CreateFromMnemonicAndStoreAccount(mnemonic string, pas
 	}
 
 	err = m.storeToKeystore(genAccount, password)
+	if err != nil {
+		return
+	}
+	m.logger.Info("account created and stored (mnemonic)", zap.String("address", genAccount.Address().Hex()))
 
 	return
 }
@@ -80,6 +94,10 @@ func (m *AccountsManager) CreateFromPrivateKeyAndStoreAccount(privateKey string,
 	}
 
 	err = m.storeToKeystore(acc, password)
+	if err != nil {
+		return
+	}
+	m.logger.Info("account created and stored (private key)", zap.String("address", acc.Address().Hex()))
 
 	return
 }
@@ -110,6 +128,7 @@ func (m *AccountsManager) LoadAccount(address ethtypes.Address, password string)
 
 	_, privateKey, extendedKey, err := m.keystore.AccountDecryptedKey(address, password)
 	if err != nil {
+		m.logger.Error("error loading account", zap.String("address", address.Hex()), zap.Error(err))
 		if errors.Is(err, geth.ErrNoMatch) {
 			return nil, &ErrCannotLocateKeyFile{fmt.Sprintf("cannot locate account for address: %s", address.Hex())}
 		}
@@ -118,9 +137,11 @@ func (m *AccountsManager) LoadAccount(address ethtypes.Address, password string)
 
 	account := generator.NewAccount(privateKey, extendedKey)
 	if err := account.ValidateExtendedKey(); err != nil {
+		m.logger.Error("error validating account", zap.String("address", address.Hex()), zap.Error(err))
 		return nil, err
 	}
 
+	m.logger.Info("account loaded", zap.String("address", address.Hex()))
 	return account, nil
 }
 
@@ -131,6 +152,12 @@ func (m *AccountsManager) storeToKeystore(acc *generator.Account, password strin
 	if m.keystore == nil {
 		return ErrAccountKeyStoreMissing
 	}
+
+	if acc == nil {
+		return ErrAccountIsNil
+	}
+
+	m.logger.Info("storing account to keystore", zap.String("address", acc.Address().Hex()))
 
 	if acc.HasExtendedKey() {
 		_, err = m.keystore.ImportSingleExtendedKey(acc.ExtendedKey(), password)
@@ -146,6 +173,11 @@ func (m *AccountsManager) setChatAccount(account *generator.Account) {
 	defer m.selectedChatAccountMutex.Unlock()
 
 	m.selectedChatAccount = account
+	if account != nil {
+		m.logger.Info("chat account set", zap.String("address", account.Address().Hex()))
+	} else {
+		m.logger.Info("chat account cleared")
+	}
 }
 
 // SetChatAccount sets the chat account with the given address and password
@@ -184,6 +216,7 @@ func (m *AccountsManager) SelectedChatAccount() (*generator.Account, error) {
 func (m *AccountsManager) Logout() {
 	m.setChatAccount(nil)
 	m.SetKeystore(nil)
+	m.logger.Info("logout")
 }
 
 // Accounts returns list of addresses for selected account, including subaccounts.
@@ -211,6 +244,7 @@ func (m *AccountsManager) MigrateKeyStoreDir(newDir string, addresses []string) 
 	if m.keystore == nil {
 		return ErrAccountKeyStoreMissing
 	}
+	m.logger.Info("migrating keystore directory", zap.String("new location", newDir), zap.Strings("addresses", addresses))
 	return m.keystore.MigrateKeyStoreDir(newDir, addresses)
 }
 
@@ -221,6 +255,7 @@ func (m *AccountsManager) ReEncryptKeyStoreDir(oldPass, newPass string) error {
 	if m.keystore == nil {
 		return ErrAccountKeyStoreMissing
 	}
+	m.logger.Info("re-encrypting keystore directory")
 	return m.keystore.ReEncryptKeyStoreDir(oldPass, newPass)
 }
 
@@ -229,24 +264,30 @@ func (m *AccountsManager) DeleteAccount(address ethtypes.Address) error {
 	defer m.keystoreMu.RUnlock()
 
 	if m.keystore == nil {
+		m.logger.Error("cannot delete account, keystore is missing", zap.String("address", address.Hex()))
 		return ErrAccountKeyStoreMissing
 	}
+	m.logger.Info("deleting account", zap.String("address", address.Hex()))
 	return m.keystore.Delete(address)
 }
 
-func (m *AccountsManager) GetVerifiedWalletAccount(db *accounts.Database, address ethtypes.Address, password string) (*generator.Account, error) {
-	exists, err := db.AddressExists(address)
+func (m *AccountsManager) GetVerifiedWalletAccount(address ethtypes.Address, password string) (*generator.Account, error) {
+	if m.persistence == nil {
+		return nil, ErrPersistenceIsMissing
+	}
+
+	exists, err := m.persistence.AddressExists(address)
 	if err != nil {
 		return nil, err
 	}
 
 	if !exists {
-		return nil, errors.New("account doesn't exist")
+		return nil, ErrAccountDoesNotExist
 	}
 
 	account, err := m.LoadAccount(address, password)
 	if errors.Is(err, geth.ErrNoMatch) {
-		account, err = m.generatePartialAccountKey(db, address, password)
+		account, err = m.generatePartialAccountKey(address, password)
 		if err != nil {
 			return nil, err
 		}
@@ -259,17 +300,21 @@ func (m *AccountsManager) GetVerifiedWalletAccount(db *accounts.Database, addres
 	return account, nil
 }
 
-func (m *AccountsManager) generatePartialAccountKey(db *accounts.Database, address ethtypes.Address, password string) (*generator.Account, error) {
-	rootAddress, err := db.GetWalletRootAddress()
+func (m *AccountsManager) generatePartialAccountKey(address ethtypes.Address, password string) (*generator.Account, error) {
+	if m.persistence == nil {
+		return nil, ErrPersistenceIsMissing
+	}
+
+	rootAddress, err := m.persistence.GetWalletRootAddress()
 	if err != nil {
 		return nil, err
 	}
 
-	dbPath, err := db.GetPath(address)
-	path := "m/" + dbPath[strings.LastIndex(dbPath, "/")+1:]
+	dbPath, err := m.persistence.GetPath(address)
 	if err != nil {
 		return nil, err
 	}
+	path := "m/" + dbPath[strings.LastIndex(dbPath, "/")+1:]
 
 	return m.DeriveChildAccountForPathAndStore(rootAddress, path, password)
 }

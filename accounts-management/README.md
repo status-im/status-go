@@ -36,6 +36,24 @@ The main interface for account management operations. It provides methods for:
 - **Account Selection**: Select and manage the currently active account
 - **Account Derivation**: Derive child accounts from existing accounts
 
+#### Constructor
+```go
+// Create a new AccountsManager instance
+manager, err := NewAccountsManager(logger)
+```
+
+The constructor requires:
+- `logger`: A zap.Logger instance for logging operations
+
+After creation, you need to set up the persistence and keystore:
+```go
+// Set the persistence layer for account data storage
+manager.SetPersistence(persistence)
+
+// Set the keystore for secure key storage
+manager.SetKeystore(keystore)
+```
+
 ### Key Features
 
 #### Account Creation
@@ -110,11 +128,21 @@ func main() {
     // Initialize logger
     logger, _ := zap.NewDevelopment()
 
-    // Create account manager
-    manager := accountsmanagement.NewAccountsManager(logger)
+    // Create persistence instance aligning with `Persistence` interface
+    persistence := yourPersistenceImplementation()
 
-    // Set up keystore (implementation depends on your setup)
-    // manager.SetKeystore(keystore)
+    // Create account manager with persistence and logger
+    manager, err := accountsmanagement.NewAccountsManager(logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Set the persistence layer for account data storage
+    manager.SetPersistence(persistence)
+
+    // Set up keystore instance aligning with `KeyStore` interface
+    keystore := yourKeystoreImplementation()
+    manager.SetKeystore(keystore)
 
     // Create a new account
     account, mnemonic, err := manager.CreateAndStoreAccount("my-password")
@@ -161,6 +189,8 @@ The package defines several custom errors:
 - `go.uber.org/zap`: Logging
 - `github.com/status-im/status-go/eth-node/types`: Ethereum types
 - `github.com/status-im/status-go/multiaccounts`: Multi-account support
+- `Persistence` interface: Required for account data storage operations
+- `KeyStore` interface: Required for secure cryptographic key storage, encryption/decryption, and keystore management operations
 
 ## Testing
 

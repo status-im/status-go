@@ -15,6 +15,7 @@ import (
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
@@ -69,19 +70,27 @@ func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
 }
 
 func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
-	accountManager := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
-	statusNode := New(nil, accountManager, tt.MustCreateTestLogger())
-
 	appDB, walletDB, stop, err := setupTestDBs()
 	defer func() {
-		err := stop()
-		if err != nil {
-			statusNode.logger.Error("stopping db", zap.Error(err))
-		}
+		err = stop()
 	}()
 	if err != nil {
 		return nil, err
 	}
+
+	accsDB, err := accounts.NewDB(appDB)
+	if err != nil {
+		return nil, err
+	}
+
+	accountManager, err := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
+	if err != nil {
+		return nil, err
+	}
+	accountManager.SetPersistence(accsDB)
+
+	statusNode := New(nil, accountManager, tt.MustCreateTestLogger())
+
 	statusNode.appDB = appDB
 	statusNode.walletDB = walletDB
 
@@ -110,7 +119,18 @@ func createStatusNode() (*StatusNode, func() error, func() error, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	accountManager := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
+
+	accsDB, err := accounts.NewDB(appDB)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	accountManager, err := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	accountManager.SetPersistence(accsDB)
+
 	statusNode := New(nil, accountManager, tt.MustCreateTestLogger())
 	statusNode.SetAppDB(appDB)
 	statusNode.SetWalletDB(walletDB)
