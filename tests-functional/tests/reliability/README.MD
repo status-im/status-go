@@ -31,7 +31,7 @@ Example of running a test:
 pytest tests-functional/tests/reliability/ -k test_one_to_one_message_with_latency
 ```
 
-Note! To run locally you needs `tc` (ex: wasn't able to run it on `windows` or `wsl`) on your host.
+Note! To run locally you need [`tc`](https://man7.org/linux/man-pages/man8/tc.8.html) (ex: wasn't able to run it on `windows` or `wsl`) on your host.
 
 ## 🕒 CI Integration
 
