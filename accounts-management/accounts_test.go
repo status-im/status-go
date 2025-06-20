@@ -301,9 +301,7 @@ func (s *ManagerTestSuite) TestMigrateKeyStoreDir() {
 	files, _ := os.ReadDir(newKeyDir)
 	s.Equal(0, len(files))
 
-	address := ethtypes.HexToAddress(s.walletAddress).Hex()
-	addresses := []string{address}
-	err = s.accManager.MigrateKeyStoreDir(newKeyDir, addresses)
+	err = s.accManager.MigrateKeyStoreDir(newKeyDir)
 	s.Require().NoError(err)
 
 	files, _ = os.ReadDir(newKeyDir)
