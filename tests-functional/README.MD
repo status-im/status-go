@@ -126,4 +126,4 @@ Make sure that you made `test-functional` source folder (Right click > Mark dire
 
 ## Reliability tests
 
-This framework also hosts a suite of reliability tests. See more info [here](https://github.com/status-im/status-go/blob/develop/tests-functional/tests/reliability/README.MD)
+This framework also hosts a suite of reliability tests. See more info [here](./tests-functional/tests/reliability/README.md)

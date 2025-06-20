@@ -24,7 +24,7 @@ The suite includes tests that simulate:
 
 ## 🚀 How to Run
 
-Running the reliability tests is nearly identical to running functional tests see [how-to-run guide](https://github.com/status-im/status-go/blob/develop/tests-functional/README.MD#how-to-run).
+Running the reliability tests is nearly identical to running functional tests see [how-to-run guide](./tests-functional/README.MD#how-to-run).
 Example of running a test:
 
 ```bash
