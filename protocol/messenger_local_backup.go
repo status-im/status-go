@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	crand "crypto/rand"
+	"errors"
 	"os"
 	"path/filepath"
 	"time"
@@ -13,7 +14,6 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 // localBackupInterval is the duration we should allow between backups
@@ -144,12 +144,6 @@ func (m *Messenger) ImportLocalBackupFile(filePath string) (*MessengerResponse, 
 		return nil, nil
 	}
 
-	defer func() {
-		m.processBackedupMessages = false
-	}()
-
-	m.processBackedupMessages = true
-
 	// Make sure the backup file exists
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -184,13 +178,12 @@ func (m *Messenger) ImportLocalBackupFile(filePath string) (*MessengerResponse, 
 		ModifiedContacts:      &stringBoolMap{},
 		ModifiedInstallations: &stringBoolMap{},
 	}
-	err = m.HandleBackup(
+	errs := m.handleBackup(
 		&state,
 		&backupMessage,
-		&v1protocol.StatusMessage{},
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(errs...)
 	}
 
 	return m.saveDataAndPrepareResponse(&state)
