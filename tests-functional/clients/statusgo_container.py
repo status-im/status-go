@@ -64,6 +64,7 @@ class StatusGoContainer:
             },
             "entrypoint": entrypoint,
             "ports": ports,
+            "stop_signal": "SIGINT",
         }
 
         if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
