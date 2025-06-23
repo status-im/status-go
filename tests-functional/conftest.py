@@ -69,7 +69,7 @@ def pytest_addoption(parser):
         "--push-fleets-config",
         action="store",
         help="Path to a local JSON file with Push Notifications fleets configuration. Default value is a path to config in Docker to run 1 pn-server",
-        default="",
+        default="/static/configs/pushfleetconfig.json",
     )
 
 
