@@ -9,6 +9,7 @@ Functional tests for status-go
 - [How to Run](#how-to-run)
   - [Running Tests](#running-tests)
 - [Implementation details](#implementation-details)
+- [Reliability tests](#reliability-tests)
 
 ## Prerequisites
 
@@ -121,3 +122,8 @@ If you see some import issues, make sure that you have all requirements installe
 ### For PyCharm users
 
 Make sure that you made `test-functional` source folder (Right click > Mark directory as > Source folder)
+
+
+## Reliability tests
+
+This framework also hosts a suite of reliability tests. See more info [here](https://github.com/status-im/status-go/blob/develop/tests-functional/tests/reliability/README.MD)
