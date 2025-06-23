@@ -25,6 +25,10 @@ func (s *Service) PublicWakuAPI() wakutypes.PublicWakuAPI {
 	return s.w.PublicWakuAPI()
 }
 
+func (s *Service) API() *PublicAPI {
+	return NewPublicAPI(s)
+}
+
 // APIs returns a list of new APIs.
 func (s *Service) APIs() []gethrpc.API {
 	apis := []gethrpc.API{

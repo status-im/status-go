@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -16,8 +18,10 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/connection"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/node/backup"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
@@ -110,6 +114,8 @@ type StatusNode struct {
 	walletFeed   event.Feed
 	networksFeed event.Feed
 	settingsFeed event.Feed
+
+	localBackup *backup.Controller
 }
 
 // New makes new instance of StatusNode.
@@ -189,9 +195,59 @@ func (n *StatusNode) Start(config *params.NodeConfig) error {
 		return ErrNodeRunning
 	}
 
+	err := n.startLocalBackup()
+	if err != nil {
+		return err
+	}
+
 	n.logger.Debug("starting with options", zap.Stringer("ClusterConfig", &config.ClusterConfig))
 
 	return n.startWithDB(config)
+}
+
+func (n *StatusNode) startLocalBackup() error {
+	if n.localBackup != nil {
+		return errors.New("local backup already started")
+	}
+
+	chatAccount, err := n.gethAccountManager.SelectedChatAccount()
+	if err != nil {
+		return err
+	}
+
+	privateKey := chatAccount.AccountKey.PrivateKey
+	filenameGetter := func() string {
+		accountIdentifier := crypto.Keccak256(crypto.FromECDSAPub(&privateKey.PublicKey))[:4]
+		return filepath.Join(n.config.DataDir, fmt.Sprintf("%x_%d_backup.bak", accountIdentifier, time.Now().Unix()))
+	}
+
+	n.localBackup, err = backup.NewController(backup.BackupConfig{
+		PrivateKey:       crypto.Keccak256(crypto.FromECDSA(privateKey)),
+		FileNameGetter:   filenameGetter,
+		BackupAtInterval: true,
+		Interval:         time.Hour * 24, // TODO: check from database when last saved
+	})
+	if err != nil {
+		return err
+	}
+
+	// TODO: complete me
+	n.localBackup.Register("settings",
+		func() ([]byte, error) { return nil, nil },
+		func([]byte) error { return nil })
+
+	// TODO: complete me
+	n.localBackup.Register("wallet",
+		func() ([]byte, error) { return nil, nil },
+		func([]byte) error { return nil })
+
+	n.localBackup.Register("messenger",
+		func() ([]byte, error) { return n.wakuV2ExtSrvc.API().Messenger().ExportBackup() },
+		func(data []byte) error { return n.wakuV2ExtSrvc.API().Messenger().ImportBackup(data) })
+
+	n.localBackup.Start()
+
+	return nil
 }
 
 func (n *StatusNode) SetMediaServerEnableTLS(enableTLS *bool) {
@@ -278,6 +334,9 @@ func (n *StatusNode) Stop() error {
 	if !n.isRunning() {
 		return ErrNoRunningNode
 	}
+
+	n.localBackup.Stop()
+	n.localBackup = nil
 
 	return n.stop()
 }
