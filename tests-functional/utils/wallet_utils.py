@@ -169,7 +169,7 @@ def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
 
 def send_router_transaction(rpc_client, **kwargs):
     routes = get_suggested_routes(rpc_client, **kwargs)
-    assert "Best" in routes, f"No best route found: {routes}"
+    assert "Route" in routes, f"No route found: {routes}"
 
     build_tx = build_transactions_from_route(rpc_client, kwargs.get("uuid"))
 

@@ -119,9 +119,9 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 					}
 
 					r.activeRoutesMutex.Lock()
-					if r.activeRoutes != nil && r.activeRoutes.Best != nil && len(r.activeRoutes.Best) > 0 {
+					if r.activeRoutes != nil && r.activeRoutes.Route != nil && len(r.activeRoutes.Route) > 0 {
 						usedNonces := make(map[uint64]uint64)
-						for _, path := range r.activeRoutes.Best {
+						for _, path := range r.activeRoutes.Route {
 							err = r.evaluateAndUpdatePathDetails(ctx, path, fees, usedNonces, false, 0)
 							if err != nil {
 								break
@@ -134,7 +134,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 							continue
 						}
 
-						_, err = r.checkBalancesForTheBestRoute(ctx, r.activeRoutes.Best)
+						err = r.checkBalancesForTheBestRoute(r.activeRoutes.Route)
 						if err != nil {
 							logutils.ZapLogger().Error("Failed to check balances for the best route", zap.Error(err))
 							r.activeRoutesMutex.Unlock()
