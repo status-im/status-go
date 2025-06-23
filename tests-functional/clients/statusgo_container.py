@@ -1,26 +1,22 @@
 import io
 import logging
 import os
+import random
 import tarfile
 import tempfile
 import threading
+
 import docker
 import docker.errors
-import random
+from docker.errors import APIError
 
 from conftest import option
-from docker.errors import APIError
 
 DATA_DIR = "/usr/status-user"
 
 
 class StatusGoContainer:
     container = None
-
-    @staticmethod
-    def network_name():
-        docker_project_name = option.docker_project_name
-        return f"{docker_project_name}_default"
 
     def __init__(self, entrypoint, ports=None, privileged=False, container_name_suffix=""):
         if ports is None:
@@ -34,7 +30,7 @@ class StatusGoContainer:
         # NOTE: This part needs some love.
         #       There's magic with `docker_project_name`, `docker_image` and `identifier` variables.
         docker_project_name = option.docker_project_name
-        self.network_name = self.network_name()
+        self.network_name = f"{docker_project_name}_default"
         git_commit = os.popen("git rev-parse --short HEAD").read().strip()
         identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else git_commit
         image_name = option.docker_image or f"statusgo-{identifier}:latest"
