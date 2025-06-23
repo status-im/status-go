@@ -36,13 +36,13 @@ class TestRouter(StatusBackendSteps):
             "tokenID": "ETH",
             "tokenIDIsOwnerToken": False,
             "toTokenID": "",
-            "disabledFromChainIDs": [1, 10, 42161],
-            "disabledToChainIDs": [1, 10, 42161],
+            "fromChainID": 31337,
+            "toChainID": 31337,
             "gasFeeMode": 1,
         }
 
         routes = wallet_utils.get_suggested_routes(self.rpc_client, **params)
-        assert len(routes["Best"]) > 0
+        assert len(routes["Route"]) > 0
         wallet_router_sign_transactions = wallet_utils.build_transactions_from_route(self.rpc_client, uuid)
         if wallet_router_sign_transactions is None:
             raise ValueError("wallet_router_sign_transactions is None")
@@ -71,15 +71,15 @@ class TestRouter(StatusBackendSteps):
             "tokenID": "ETH",
             "tokenIDIsOwnerToken": False,
             "toTokenID": "",
-            "disabledFromChainIDs": [1, 10, 42161],
-            "disabledToChainIDs": [1, 10, 42161],
+            "fromChainID": 31337,
+            "toChainID": 31337,
             "gasFeeMode": gas_fee_mode,
         }
 
         # Step: getting the best route
         routes = wallet_utils.get_suggested_routes(self.rpc_client, **router_input_params)
-        assert len(routes["Best"]) > 0
-        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
+        assert len(routes["Route"]) > 0
+        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Route"][0]["ApprovalRequired"], routes["Route"])
 
         # Step: update gas fee mode without providing path tx identity params via wallet_setFeeMode endpoint
         method = "wallet_setFeeMode"
@@ -97,16 +97,16 @@ class TestRouter(StatusBackendSteps):
         gas_fee_mode = constants.gas_fee_mode_low
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
-            "pathName": routes["Best"][0]["ProcessorName"],
-            "chainID": routes["Best"][0]["FromChain"]["chainId"],
-            "isApprovalTx": routes["Best"][0]["ApprovalRequired"],
+            "pathName": routes["Route"][0]["ProcessorName"],
+            "chainID": routes["Route"][0]["FromChain"]["chainId"],
+            "isApprovalTx": routes["Route"][0]["ApprovalRequired"],
         }
         self.rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
         _ = self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
         response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
         routes = response["event"]
-        assert len(routes["Best"]) > 0
-        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
+        assert len(routes["Route"]) > 0
+        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Route"][0]["ApprovalRequired"], routes["Route"])
 
         # Step: update gas fee mode to high
         gas_fee_mode = constants.gas_fee_mode_high
@@ -114,8 +114,8 @@ class TestRouter(StatusBackendSteps):
         _ = self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
         response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
         routes = response["event"]
-        assert len(routes["Best"]) > 0
-        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
+        assert len(routes["Route"]) > 0
+        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Route"][0]["ApprovalRequired"], routes["Route"])
 
         # Step: try to set custom gas fee mode via wallet_setFeeMode endpoint
         gas_fee_mode = constants.gas_fee_mode_custom
@@ -138,15 +138,15 @@ class TestRouter(StatusBackendSteps):
             "tokenID": "ETH",
             "tokenIDIsOwnerToken": False,
             "toTokenID": "",
-            "disabledFromChainIDs": [1, 10, 42161],
-            "disabledToChainIDs": [1, 10, 42161],
+            "fromChainID": 31337,
+            "toChainID": 31337,
             "gasFeeMode": gas_fee_mode,
         }
 
         # Step: getting the best route
         routes = wallet_utils.get_suggested_routes(self.rpc_client, **router_input_params)
-        assert len(routes["Best"]) > 0
-        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
+        assert len(routes["Route"]) > 0
+        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Route"][0]["ApprovalRequired"], routes["Route"])
 
         # Step: try to set custom tx details with empty params via wallet_setCustomTxDetails endpoint
         method = "wallet_setCustomTxDetails"
@@ -163,9 +163,9 @@ class TestRouter(StatusBackendSteps):
         # Step: try to set custom tx details providing other than the custom gas fee mode via wallet_setCustomTxDetails endpoint
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
-            "pathName": routes["Best"][0]["ProcessorName"],
-            "chainID": routes["Best"][0]["FromChain"]["chainId"],
-            "isApprovalTx": routes["Best"][0]["ApprovalRequired"],
+            "pathName": routes["Route"][0]["ProcessorName"],
+            "chainID": routes["Route"][0]["FromChain"]["chainId"],
+            "isApprovalTx": routes["Route"][0]["ApprovalRequired"],
         }
         tx_custom_params = {
             "gasFeeMode": constants.gas_fee_mode_low,
@@ -196,9 +196,9 @@ class TestRouter(StatusBackendSteps):
         tx_priority_fee = "0x1DCD6500"
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
-            "pathName": routes["Best"][0]["ProcessorName"],
-            "chainID": routes["Best"][0]["FromChain"]["chainId"],
-            "isApprovalTx": routes["Best"][0]["ApprovalRequired"],
+            "pathName": routes["Route"][0]["ProcessorName"],
+            "chainID": routes["Route"][0]["FromChain"]["chainId"],
+            "isApprovalTx": routes["Route"][0]["ApprovalRequired"],
         }
         tx_custom_params = {
             "gasFeeMode": gas_fee_mode,
@@ -211,10 +211,10 @@ class TestRouter(StatusBackendSteps):
         _ = self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
         response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
         routes = response["event"]
-        assert len(routes["Best"]) > 0
-        tx_nonce_int = int(routes["Best"][0]["TxNonce"], 16)
+        assert len(routes["Route"]) > 0
+        tx_nonce_int = int(routes["Route"][0]["TxNonce"], 16)
         assert tx_nonce_int == tx_nonce
-        assert routes["Best"][0]["TxGasAmount"] == tx_gas_amount
-        assert routes["Best"][0]["TxMaxFeesPerGas"].upper() == tx_max_fees_per_gas.upper()
-        assert routes["Best"][0]["TxPriorityFee"].upper() == tx_priority_fee.upper()
-        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
+        assert routes["Route"][0]["TxGasAmount"] == tx_gas_amount
+        assert routes["Route"][0]["TxMaxFeesPerGas"].upper() == tx_max_fees_per_gas.upper()
+        assert routes["Route"][0]["TxPriorityFee"].upper() == tx_priority_fee.upper()
+        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Route"][0]["ApprovalRequired"], routes["Route"])

@@ -2,8 +2,6 @@ package requests
 
 import (
 	"math/big"
-	"reflect"
-	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -34,28 +32,28 @@ var (
 	ErrENSSetPubKeyInvalidUsername = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-017"), Details: "a valid username, ending in '.eth', is required for ENSSetPubKey"}
 	// ErrLockedAmountExcludesAllSupported = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-018"), Details: "all supported chains are excluded, routing impossible"}
 	// ErrCannotCheckLockedAmounts         = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-019"), Details: "cannot check locked amounts"}
-	ErrNoCommunityParametersProvided        = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-020"), Details: "no community parameters provided"}
-	ErrNoFromChainProvided                  = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-021"), Details: "from chain not provided"}
-	ErrNoToChainProvided                    = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-022"), Details: "to chain not provided"}
-	ErrFromAndToChainMustBeTheSame          = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-023"), Details: "from and to chain IDs must be the same"}
+	ErrNoCommunityParametersProvided = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-020"), Details: "no community parameters provided"}
+	ErrFromChainNotSupported         = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-021"), Details: "from chain not supported"}
+	ErrToChainNotSupported           = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-022"), Details: "to chain not supported"}
+	// ErrFromAndToChainMustBeTheSame          = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-023"), Details: "from and to chain IDs must be the same"}
 	ErrSwapSlippagePercentageMustBePositive = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-024"), Details: "slippage percentage must be positive"}
 )
 
 type RouteInputParams struct {
-	Uuid                 string            `json:"uuid"`
-	SendType             sendtype.SendType `json:"sendType" validate:"required"`
-	AddrFrom             common.Address    `json:"addrFrom" validate:"required"`
-	AddrTo               common.Address    `json:"addrTo" validate:"required"`
-	AmountIn             *hexutil.Big      `json:"amountIn" validate:"required"`
-	AmountOut            *hexutil.Big      `json:"amountOut"`
-	TokenID              string            `json:"tokenID" validate:"required"`
-	TokenIDIsOwnerToken  bool              `json:"tokenIDIsOwnerToken"`
-	ToTokenID            string            `json:"toTokenID"`
-	DisabledFromChainIDs []uint64          `json:"disabledFromChainIDs"`
-	DisabledToChainIDs   []uint64          `json:"disabledToChainIDs"`
-	GasFeeMode           fees.GasFeeMode   `json:"gasFeeMode" validate:"required"`
-	SlippagePercentage   float32           `json:"slippagePercentage"`
-	TestnetMode          bool
+	Uuid                string            `json:"uuid"`
+	SendType            sendtype.SendType `json:"sendType" validate:"required"`
+	AddrFrom            common.Address    `json:"addrFrom" validate:"required"`
+	AddrTo              common.Address    `json:"addrTo" validate:"required"`
+	AmountIn            *hexutil.Big      `json:"amountIn" validate:"required"`
+	AmountOut           *hexutil.Big      `json:"amountOut"`
+	TokenID             string            `json:"tokenID" validate:"required"`
+	TokenIDIsOwnerToken bool              `json:"tokenIDIsOwnerToken"`
+	ToTokenID           string            `json:"toTokenID"`
+	FromChainID         uint64            `json:"fromChainID"`
+	ToChainID           uint64            `json:"toChainID"`
+	GasFeeMode          fees.GasFeeMode   `json:"gasFeeMode" validate:"required"`
+	SlippagePercentage  float32           `json:"slippagePercentage"`
+	TestnetMode         bool
 
 	// For send types like EnsRegister, EnsRelease, EnsSetPubKey, StickersBuy
 	Username  string       `json:"username"`
@@ -91,22 +89,6 @@ type Estimation struct {
 	Err   error
 }
 
-func slicesEqual(a, b []uint64) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	aCopy := make([]uint64, len(a))
-	bCopy := make([]uint64, len(b))
-	copy(aCopy, a)
-	copy(bCopy, b)
-
-	sort.Slice(aCopy, func(i, j int) bool { return aCopy[i] < aCopy[j] })
-	sort.Slice(bCopy, func(i, j int) bool { return bCopy[i] < bCopy[j] })
-
-	return reflect.DeepEqual(aCopy, bCopy)
-}
-
 func (i *RouteInputParams) UseCommunityTransferDetails() bool {
 	if !i.SendType.IsCommunityRelatedTransfer() || i.CommunityRouteInputParams == nil {
 		return false
@@ -115,6 +97,14 @@ func (i *RouteInputParams) UseCommunityTransferDetails() bool {
 }
 
 func (i *RouteInputParams) Validate() error {
+	if !walletCommon.IsSupportedChainID(i.FromChainID) {
+		return ErrFromChainNotSupported
+	}
+
+	if !walletCommon.IsSupportedChainID(i.ToChainID) {
+		return ErrToChainNotSupported
+	}
+
 	if i.SendType == sendtype.ENSRegister {
 		if i.Username == "" || i.PublicKey == "" {
 			return ErrENSRegisterRequiresUsernameAndPubKey
@@ -182,16 +172,6 @@ func (i *RouteInputParams) Validate() error {
 	}
 
 	if i.SendType.IsCommunityRelatedTransfer() {
-		if i.DisabledFromChainIDs == nil || len(i.DisabledFromChainIDs) == 0 {
-			return ErrNoFromChainProvided
-		}
-		if i.DisabledToChainIDs == nil || len(i.DisabledToChainIDs) == 0 {
-			return ErrNoToChainProvided
-		}
-		if !slicesEqual(i.DisabledFromChainIDs, i.DisabledToChainIDs) {
-			return ErrFromAndToChainMustBeTheSame
-		}
-
 		if i.CommunityRouteInputParams == nil {
 			return ErrNoCommunityParametersProvided
 		}

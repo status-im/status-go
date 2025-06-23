@@ -33,8 +33,8 @@ class EthRpcSteps(StatusBackendSteps):
             "tokenID": "ETH",
             "tokenIDIsOwnerToken": False,
             "toTokenID": "",
-            "disabledFromChainIDs": [],
-            "disabledToChainIDs": [],
+            "fromChainID": 31337,
+            "toChainID": 31337,
             "gasFeeMode": 1,
             # params for building tx from route
             "slippagePercentage": 0,
