@@ -17,11 +17,6 @@ DATA_DIR = "/usr/status-user"
 class StatusGoContainer:
     container = None
 
-    @staticmethod
-    def network_name():
-        docker_project_name = option.docker_project_name
-        return f"{docker_project_name}_default"
-
     def __init__(self, entrypoint, ports=None, privileged=False, container_name_suffix=""):
         if ports is None:
             ports = {}
@@ -34,7 +29,7 @@ class StatusGoContainer:
         # NOTE: This part needs some love.
         #       There's magic with `docker_project_name`, `docker_image` and `identifier` variables.
         docker_project_name = option.docker_project_name
-        self.network_name = self.network_name()
+        self.network_name = f"{docker_project_name}_default"
         git_commit = os.popen("git rev-parse --short HEAD").read().strip()
         identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else git_commit
         image_name = option.docker_image or f"statusgo-{identifier}:latest"
@@ -59,9 +54,6 @@ class StatusGoContainer:
                     "mode": "rw",
                 }
             },
-            "extra_hosts": {
-                "host.docker.internal": "host-gateway",
-            },
             "entrypoint": entrypoint,
             "ports": ports,
         }
@@ -70,12 +62,6 @@ class StatusGoContainer:
             container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
 
         self.docker_client = docker.from_env()
-
-        try:
-            self.docker_client.images.get(image_name)
-        except docker.errors.ImageNotFound:
-            raise RuntimeError(f"Docker image '{image_name}' not found")
-
         self.container = self.docker_client.containers.run(**container_args)
         option.statusgo_containers.append(self)
 
@@ -222,7 +208,7 @@ class PushNotificationServerContainer(StatusGoContainer):
             "--waku-fleet",
             option.waku_fleet,
         ]
-        super().__init__(entrypoint, container_name_suffix=f"-push-notification-server-{gorush_port}")
+        super().__init__(entrypoint, container_name_suffix="-push-notification-server")
 
 
 class StatusBackendContainer(StatusGoContainer):
