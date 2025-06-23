@@ -455,5 +455,5 @@ codecov-validate:
 
 .PHONY: pytest-lint
 pytest-lint:
-	@echo "Running python linting on all files..."
-	pre-commit run --all-files --verbose --config tests-functional/.pre-commit-config.yaml
+	$(MAKE) -C tests-functional lint
+

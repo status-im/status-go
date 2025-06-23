@@ -31,4 +31,4 @@ jobs:
       run: pip install -r tests-functional/requirements.txt
 
     - name: Run pytest-lint
-      run: pre-commit run --all-files --verbose --config tests-functional/.pre-commit-config.yaml
+      run: make pytest-lint
