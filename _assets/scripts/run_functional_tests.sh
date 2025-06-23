@@ -43,7 +43,7 @@ echo -e "${GRN}Building status-go${RST}"
 docker build --file ./_assets/build/Dockerfile . \
   --build-arg "build_flags=-cover" \
   --build-arg "build_tags='gowaku_no_rln,enable_private_api'" \
-  --build-arg "cache_id=${BUILD_ID}" \
+  --build-arg "enable_go_cache=false" \
   --tag "${image_name}"
 
 # Run docker
