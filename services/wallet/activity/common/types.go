@@ -2,7 +2,6 @@ package common
 
 import (
 	"fmt"
-	"math"
 
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -49,9 +48,20 @@ const (
 	ContractDeploymentAT
 	MintAT
 	ApproveAT
-	UnknownAT = math.MaxUint64
+	ContractInteractionAT
+	UnknownAT
 )
 
+// Status of an individual transaction
+type TxStatus = string
+
+const (
+	Pending TxStatus = "Pending"
+	Success TxStatus = "Success"
+	Failed  TxStatus = "Failed"
+)
+
+// Status of an activity entry
 type Status int
 
 const (

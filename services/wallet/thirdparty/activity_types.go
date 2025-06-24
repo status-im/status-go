@@ -61,6 +61,7 @@ type ActivityEntry struct {
 	ContractAddress *common.Address `json:"contractAddress,omitempty"`
 	TxHash          common.Hash     `json:"txHash"`
 	BlockNumber     *hexutil.Big    `json:"blockNumber"`
+	TxStatus        ac.TxStatus     `json:"txStatus"`
 }
 
 type ActivityEntryContainer ItemsContainer[ActivityEntry]

@@ -25,22 +25,26 @@ import (
 const MaxActiveNetworks = 5
 
 type ManagerInterface interface {
+	GetterInterface
+
 	InitEmbeddedNetworks(networks []params.Network) error
 
 	Upsert(network *params.Network) error
 	Delete(chainID uint64) error
 	Find(chainID uint64) *params.Network
 
+	SetUserRpcProviders(chainID uint64, providers []params.RpcProvider) error
+	SetActive(chainID uint64, active bool) error
+	SetEnabled(chainID uint64, enabled bool) error
+}
+
+type GetterInterface interface {
 	Get(onlyEnabled bool) ([]*params.Network, error)
 	GetAll() ([]*params.Network, error)
 	GetActiveNetworks() ([]*params.Network, error)
 	GetCombinedNetworks() ([]*CombinedNetwork, error)
 	GetEmbeddedNetworks() []params.Network // Networks that are embedded in the app binary code
 	GetTestNetworksEnabled() (bool, error)
-
-	SetUserRpcProviders(chainID uint64, providers []params.RpcProvider) error
-	SetActive(chainID uint64, active bool) error
-	SetEnabled(chainID uint64, enabled bool) error
 }
 
 type CombinedNetwork struct {

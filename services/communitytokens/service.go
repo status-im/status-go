@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
@@ -91,7 +92,7 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 			logutils.ZapLogger().Error(errors.Wrap(err, fmt.Sprintf("can't parse transaction message %v\n", event.Message)).Error())
 			return
 		}
-		if p.Status == transactions.Pending {
+		if p.Status == ac.Pending {
 			return
 		}
 		if p.SendDetails == nil {
@@ -134,7 +135,7 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 			errorStr = tokenErr.Error()
 		}
 
-		signal.SendCommunityTokenTransactionStatusSignal(p.SendDetails.SendType, p.Status == transactions.Success, txHash,
+		signal.SendCommunityTokenTransactionStatusSignal(p.SendDetails.SendType, p.Status == ac.Success, txHash,
 			communityToken, ownerToken, masterToken, errorStr)
 	}
 }
@@ -168,7 +169,7 @@ func (s *Service) handleRemoteDestructCollectible(status string, toAddress commo
 }
 
 func (s *Service) handleBurnCommunityToken(status string, toAddress common.Address, chainID walletCommon.ChainID) (*token.CommunityToken, error) {
-	if status == transactions.Success {
+	if status == ac.Success {
 		// get new max supply and update database
 		newMaxSupply, err := s.maxSupply(context.Background(), uint64(chainID), toAddress.String())
 		if err != nil {
@@ -235,7 +236,7 @@ func (s *Service) updateStateAndAddTokenToCommunityDescription(status string, ch
 		return nil, fmt.Errorf("token does not exist in database: chainID=%v, address=%v", chainID, gocommon.TruncateWithDot(address))
 	}
 
-	if status == transactions.Success {
+	if status == ac.Success {
 		err := s.Messenger.UpdateCommunityTokenState(chainID, address, token.Deployed)
 		if err != nil {
 			return nil, err
@@ -267,7 +268,7 @@ func (s *Service) handleSetSignerPubKey(status string, toAddress common.Address,
 		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, gocommon.TruncateWithDot(toAddress.String()))
 	}
 
-	if status == transactions.Success {
+	if status == ac.Success {
 		_, err := s.Messenger.PromoteSelfToControlNode(types.FromHex(communityToken.CommunityID))
 		if err != nil {
 			return nil, err

@@ -16,13 +16,13 @@ type AccountsChangeCb func(changedAddresses []common.Address, eventType EventTyp
 
 // Watcher executes a given callback whenever an account gets added/removed
 type Watcher struct {
-	accountsDB  *accounts.Database
+	accountsDB  accounts.AccountsStorage
 	accountFeed *event.Feed
 	group       *async.Group
 	callback    AccountsChangeCb
 }
 
-func NewWatcher(accountsDB *accounts.Database, accountFeed *event.Feed, callback AccountsChangeCb) *Watcher {
+func NewWatcher(accountsDB accounts.AccountsStorage, accountFeed *event.Feed, callback AccountsChangeCb) *Watcher {
 	return &Watcher{
 		accountsDB:  accountsDB,
 		accountFeed: accountFeed,
@@ -54,7 +54,7 @@ func (w *Watcher) Stop() {
 	}
 }
 
-func onAccountsChange(accountsDB *accounts.Database, callback AccountsChangeCb, changedAddresses []common.Address, eventType EventType) {
+func onAccountsChange(accountsDB accounts.AccountsStorage, callback AccountsChangeCb, changedAddresses []common.Address, eventType EventType) {
 	currentEthAddresses, err := accountsDB.GetWalletAddresses()
 
 	if err != nil {
@@ -72,7 +72,7 @@ func onAccountsChange(accountsDB *accounts.Database, callback AccountsChangeCb, 
 	}
 }
 
-func watch(ctx context.Context, accountsDB *accounts.Database, accountFeed *event.Feed, callback AccountsChangeCb) error {
+func watch(ctx context.Context, accountsDB accounts.AccountsStorage, accountFeed *event.Feed, callback AccountsChangeCb) error {
 	ch := make(chan Event, 1)
 	sub := accountFeed.Subscribe(ch)
 	defer sub.Unsubscribe()

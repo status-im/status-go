@@ -289,6 +289,7 @@ type AccountsStorage interface {
 	GetKeypairByKeyUID(keyUID string) (*Keypair, error)
 	GetAccountByAddress(address types.Address) (*Account, error)
 	AddressExists(address types.Address) (bool, error)
+	GetWalletAddresses() ([]types.Address, error)
 }
 
 // Database sql wrapper for operations with browser objects.

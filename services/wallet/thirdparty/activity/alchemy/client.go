@@ -17,10 +17,6 @@ import (
 
 const AlchemyID = "alchemy"
 
-func areInternalTransfersSupported(chainID uint64) bool {
-	return chainID == wc.EthereumMainnet
-}
-
 type Client struct {
 	ethClientGetter  rpc.EthClientGetter
 	connectionStatus *connection.Status
@@ -85,10 +81,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 	// Defaults to "latest"
 	params.ToBlock = parameters.ToBlock
 
-	if areInternalTransfersSupported(chainID) {
-		params.Category = append(params.Category, TransferCategoryInternal)
-	}
-
+	responseTransfers := make([]Transfer, 0, 2*maxCount)
 	for {
 		outgoingCursor, outgoingDone, incomingCursor, incomingDone, err := decodeCursor(response.NextCursor)
 		if err != nil {
@@ -111,7 +104,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 			if err != nil {
 				return response, err
 			}
-			response.Items = append(response.Items, TransfersToCommon(tmpResponse.Transfers, false, chainID)...)
+			responseTransfers = append(responseTransfers, tmpResponse.Transfers...)
 			if tmpResponse.PageKey == "" {
 				outgoingCursor = ""
 				outgoingDone = true
@@ -129,7 +122,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 			if err != nil {
 				return response, err
 			}
-			response.Items = append(response.Items, TransfersToCommon(tmpResponse.Transfers, true, chainID)...)
+			responseTransfers = append(responseTransfers, tmpResponse.Transfers...)
 			if tmpResponse.PageKey == "" {
 				incomingCursor = ""
 				incomingDone = true
@@ -147,6 +140,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 			break
 		}
 	}
+	response.Items = TransfersToCommon(responseTransfers, chainID, parameters.Address)
 
 	return response, nil
 }

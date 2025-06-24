@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -158,7 +159,7 @@ func (tm *TransactionManager) WatchTransaction(ctx context.Context, chainID uint
 	defer sub.Unsubscribe()
 
 	status, err := tm.pendingTracker.Watch(ctx, wallet_common.ChainID(chainID), transactionHash)
-	if err == nil && *status != transactions.Pending {
+	if err == nil && *status != ac.Pending {
 		logutils.ZapLogger().Error("transaction is not pending", zap.String("status", *status))
 		return nil
 	}
