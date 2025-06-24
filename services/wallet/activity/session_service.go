@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -65,7 +66,12 @@ func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, of
 		return nil, errors.New("unsupported version")
 	}
 	allAddresses := s.areAllAddresses(f.addresses)
-	return getActivityEntriesV2(ctx, s.getDeps(), f.addresses, allAddresses, f.chainIDs, f.filter, offset, count)
+
+	entries, err := getActivityEntriesV2(ctx, s.getDeps(), f.addresses, allAddresses, f.chainIDs, f.filter, offset, count)
+	if err != nil {
+		fmt.Println("error getting activity entries", err)
+	}
+	return entries, nil
 }
 
 func (s *Service) internalFilter(f fullFilterParams, offset int, count int, processResults func(entries []Entry) (offsetOverride int)) {

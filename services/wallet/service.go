@@ -17,6 +17,7 @@ import (
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
@@ -29,6 +30,7 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	"github.com/status-im/status-go/services/wallet/activity"
+	"github.com/status-im/status-go/services/wallet/activityfetcher"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	"github.com/status-im/status-go/services/wallet/community"
@@ -40,6 +42,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	activityfetcher_alchemy "github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/rarible"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/coingecko"
@@ -210,36 +213,43 @@ func NewService(
 
 	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, db, feed)
 
+	alchemyEthClientGetter := rpc.NewProviderChainClientGetter(api_common.SmartProxyAlchemy, rpcClient)
+	activityFetcher := activityfetcher_alchemy.NewClient(alchemyEthClientGetter)
+	activityFetcherDb := activityfetcher.NewPersistence(db)
+	activityFetcherManager := activityfetcher.NewManager(activityFetcher, activityFetcherDb)
+	activityFetcherService := activityfetcher.NewService(activityFetcherManager, rpcClient.NetworkManager, networksFeed, accountsDB, accountFeed, activityFetcherDb, rpcClient)
+
 	return &Service{
-		db:                    db,
-		accountsDB:            accountsDB,
-		rpcClient:             rpcClient,
-		tokenManager:          tokenManager,
-		communityManager:      communityManager,
-		savedAddressesManager: savedAddressesManager,
-		transactionManager:    transactionManager,
-		pendingTxManager:      pendingTxManager,
-		transferController:    transferController,
-		cryptoOnRampManager:   cryptoOnRampManager,
-		collectiblesManager:   collectiblesManager,
-		collectibles:          collectibles,
-		gethManager:           gethManager,
-		marketManager:         marketManager,
-		transactor:            transactor,
-		feed:                  feed,
-		signals:               signals,
-		reader:                reader,
-		currency:              currency,
-		activity:              activity,
-		decoder:               NewDecoder(),
-		blockChainState:       blockChainState,
-		keycardPairings:       NewKeycardPairings(),
-		config:                config,
-		featureFlags:          featureFlags,
-		router:                router,
-		routeExecutionManager: routeExecutionManager,
-		leaderboardService:    leaderboardService,
-		started:               false,
+		db:                     db,
+		accountsDB:             accountsDB,
+		rpcClient:              rpcClient,
+		tokenManager:           tokenManager,
+		communityManager:       communityManager,
+		savedAddressesManager:  savedAddressesManager,
+		transactionManager:     transactionManager,
+		pendingTxManager:       pendingTxManager,
+		transferController:     transferController,
+		cryptoOnRampManager:    cryptoOnRampManager,
+		collectiblesManager:    collectiblesManager,
+		collectibles:           collectibles,
+		gethManager:            gethManager,
+		marketManager:          marketManager,
+		transactor:             transactor,
+		feed:                   feed,
+		signals:                signals,
+		reader:                 reader,
+		currency:               currency,
+		activity:               activity,
+		decoder:                NewDecoder(),
+		blockChainState:        blockChainState,
+		keycardPairings:        NewKeycardPairings(),
+		config:                 config,
+		featureFlags:           featureFlags,
+		router:                 router,
+		routeExecutionManager:  routeExecutionManager,
+		leaderboardService:     leaderboardService,
+		activityFetcherService: activityFetcherService,
+		started:                false,
 	}
 }
 
@@ -305,35 +315,36 @@ func buildPathProcessors(
 
 // Service is a wallet service.
 type Service struct {
-	db                    *sql.DB
-	accountsDB            *accounts.Database
-	rpcClient             *rpc.Client
-	tokenManager          *token.Manager
-	communityManager      *community.Manager
-	savedAddressesManager *SavedAddressesManager
-	transactionManager    *transfer.TransactionManager
-	pendingTxManager      *transactions.PendingTxTracker
-	transferController    *transfer.Controller
-	cryptoOnRampManager   *onramp.Manager
-	collectiblesManager   *collectibles.Manager
-	collectibles          *collectibles.Service
-	gethManager           *accsmanagement.AccountsManager
-	marketManager         *market.Manager
-	transactor            *transactions.Transactor
-	feed                  *event.Feed
-	signals               *walletevent.SignalsTransmitter
-	reader                *Reader
-	currency              *currency.Service
-	activity              *activity.Service
-	decoder               *Decoder
-	blockChainState       *blockchainstate.BlockChainState
-	keycardPairings       *KeycardPairings
-	config                *params.NodeConfig
-	featureFlags          *protocolCommon.FeatureFlags
-	router                *router.Router
-	routeExecutionManager *routeexecution.Manager
-	leaderboardService    *leaderboard.MarketDataService
-	started               bool
+	db                     *sql.DB
+	accountsDB             *accounts.Database
+	rpcClient              *rpc.Client
+	tokenManager           *token.Manager
+	communityManager       *community.Manager
+	savedAddressesManager  *SavedAddressesManager
+	transactionManager     *transfer.TransactionManager
+	pendingTxManager       *transactions.PendingTxTracker
+	transferController     *transfer.Controller
+	cryptoOnRampManager    *onramp.Manager
+	collectiblesManager    *collectibles.Manager
+	collectibles           *collectibles.Service
+	gethManager            *accsmanagement.AccountsManager
+	marketManager          *market.Manager
+	transactor             *transactions.Transactor
+	feed                   *event.Feed
+	signals                *walletevent.SignalsTransmitter
+	reader                 *Reader
+	currency               *currency.Service
+	activity               *activity.Service
+	decoder                *Decoder
+	blockChainState        *blockchainstate.BlockChainState
+	keycardPairings        *KeycardPairings
+	config                 *params.NodeConfig
+	featureFlags           *protocolCommon.FeatureFlags
+	router                 *router.Router
+	routeExecutionManager  *routeexecution.Manager
+	leaderboardService     *leaderboard.MarketDataService
+	activityFetcherService *activityfetcher.Service
+	started                bool
 
 	cancelWalletServiceCtx context.CancelFunc
 }
@@ -349,6 +360,7 @@ func (s *Service) Start() error {
 		err := s.signals.Start(ctx)
 		s.collectibles.Start(ctx)
 		s.leaderboardService.Start(ctx)
+		s.activityFetcherService.Start(ctx)
 		s.started = true
 		return err
 	}

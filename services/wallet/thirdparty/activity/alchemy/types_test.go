@@ -6,6 +6,8 @@ import (
 
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,12 +29,19 @@ func TestGetAssetTransfers(t *testing.T) {
 }
 
 func TestTransferToCommon(t *testing.T) {
-	data := []string{getAssetTransfersResponseData, getAssetTransfersResponseData2}
-	for _, d := range data {
+	data := []string{
+		getAssetTransfersResponseData,
+		getAssetTransfersResponseData2,
+	}
+	addresses := []common.Address{
+		common.HexToAddress("0xd8da6bf26964af9d7eed9e03e53415d37aa96045"),
+		common.HexToAddress("0xa1e277ea6b97effc5b61b3bf5de03f438981247e"),
+	}
+	for i := range data {
 		var response alchemy.GetAssetTranfersResponse
-		err := json.Unmarshal([]byte(d), &response)
+		err := json.Unmarshal([]byte(data[i]), &response)
 		require.NoError(t, err)
-		commonResponse := alchemy.TransfersToCommon(response.Transfers, false, 1)
+		commonResponse := alchemy.TransfersToCommon(response.Transfers, 1, addresses[i])
 		require.Equal(t, len(commonResponse), len(response.Transfers))
 	}
 }
