@@ -29,7 +29,6 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
-	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
@@ -110,8 +109,8 @@ type config struct {
 	anonMetricsClientConfig *anonmetrics.ClientConfig
 	anonMetricsServerConfig *anonmetrics.ServerConfig
 
-	pushNotificationServerConfig *pushnotificationserver.Config
 	pushNotificationClientConfig *pushnotificationclient.Config
+	pushNotificationServer       PushNotificationServer
 
 	logger *zap.Logger
 
@@ -278,13 +277,6 @@ func WithTelemetry(serverURL string, sendPeriod time.Duration) Option {
 	}
 }
 
-func WithPushNotificationServerConfig(pushNotificationServerConfig *pushnotificationserver.Config) Option {
-	return func(c *config) error {
-		c.pushNotificationServerConfig = pushNotificationServerConfig
-		return nil
-	}
-}
-
 func WithPushNotificationClientConfig(pushNotificationClientConfig *pushnotificationclient.Config) Option {
 	return func(c *config) error {
 		c.pushNotificationClientConfig = pushNotificationClientConfig
@@ -302,6 +294,13 @@ func WithDatasync() func(c *config) error {
 func WithPushNotifications() func(c *config) error {
 	return func(c *config) error {
 		c.featureFlags.PushNotifications = true
+		return nil
+	}
+}
+
+func WithPushNotificationServer(server PushNotificationServer) func(c *config) error {
+	return func(c *config) error {
+		c.pushNotificationServer = server
 		return nil
 	}
 }

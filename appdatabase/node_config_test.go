@@ -14,7 +14,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
@@ -116,8 +115,6 @@ func randomCustomNodes() map[string]string {
 }
 
 func randomNodeConfig() *params.NodeConfig {
-	privK, _ := crypto.GenerateKey()
-
 	return &params.NodeConfig{
 		NetworkID:                 uint64(int64(randomInt(math.MaxInt64))),
 		DataDir:                   randomString(),
@@ -174,11 +171,6 @@ func randomNodeConfig() *params.NodeConfig {
 		},
 		RegisterTopics: randomTopicSlice(),
 		RequireTopics:  randomTopicLimits(),
-		PushNotificationServerConfig: params.PushNotificationServerConfig{
-			Enabled:   randomBool(),
-			GorushURL: randomString(),
-			Identity:  privK,
-		},
 		ShhextConfig: params.ShhextConfig{
 			PFSEnabled:                   randomBool(),
 			InstallationID:               randomString(),

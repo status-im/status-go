@@ -176,8 +176,6 @@ type Settings struct {
 	PreferredName  *string `json:"preferred-name,omitempty"`
 	PreviewPrivacy bool    `json:"preview-privacy?"`
 	PublicKey      string  `json:"public-key"`
-	// PushNotificationsServerEnabled indicates whether we should be running a push notification server
-	PushNotificationsServerEnabled bool `json:"push-notifications-server-enabled?,omitempty"`
 	// PushNotificationsFromContactsOnly indicates whether we should only receive push notifications from contacts
 	PushNotificationsFromContactsOnly bool `json:"push-notifications-from-contacts-only?,omitempty"`
 	// PushNotificationsBlockMentions indicates whether we should receive notifications for mentions

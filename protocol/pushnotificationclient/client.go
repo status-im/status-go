@@ -587,7 +587,9 @@ func (c *Client) RemovePushNotificationServer(publicKey *ecdsa.PublicKey) error 
 }
 
 func (c *Client) AddPushNotificationsServer(publicKey *ecdsa.PublicKey, serverType ServerType) error {
-	c.config.Logger.Debug("adding push notifications server", zap.Any("public-key", publicKey))
+	c.config.Logger.Debug("adding push notifications server",
+		zap.String("publicKey", types.EncodeHex(crypto.CompressPubkey(publicKey))),
+	)
 	currentServers, err := c.persistence.GetServers()
 	if err != nil {
 		return err

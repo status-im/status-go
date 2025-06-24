@@ -58,7 +58,8 @@ func (s *ServerSuite) SetupTest() {
 		Logger:   tt.MustCreateTestLogger(),
 	}
 
-	s.server = New(config, s.persistence, nil)
+	s.server = New(config)
+	s.server.persistence = s.persistence // Set persistence without starting the server
 
 	sharedKey, err := s.server.generateSharedKey(&s.key.PublicKey)
 	s.Require().NoError(err)

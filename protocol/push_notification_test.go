@@ -19,7 +19,6 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -69,20 +68,23 @@ func (s *MessengerPushNotificationSuite) newMessenger(shh wakutypes.Waku) *Messe
 	return messenger
 }
 
-func (s *MessengerPushNotificationSuite) newPushNotificationServer(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-
+func (s *MessengerPushNotificationSuite) newPushNotificationServer(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey) (*Messenger, *pushnotificationserver.Server) {
 	serverConfig := &pushnotificationserver.Config{
 		Enabled:  true,
 		Logger:   s.logger,
 		Identity: privateKey,
 	}
 
-	options := []Option{
-		WithPushNotificationServerConfig(serverConfig),
-	}
-	messenger, err := newMessengerWithKey(shh, privateKey, s.logger, options)
+	server := pushnotificationserver.New(serverConfig)
+
+	messenger, err := newMessengerWithKey(shh, privateKey, s.logger, []Option{WithPushNotificationServer(server)})
 	s.Require().NoError(err)
-	return messenger
+
+	serverPersistence := pushnotificationserver.NewSQLitePersistence(messenger.database)
+	err = server.Start(serverPersistence, messenger.MessageSender())
+	s.Require().NoError(err)
+
+	return messenger, server
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
@@ -94,8 +96,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer TearDownMessenger(&s.Suite, server)
+	messenger, _ := s.newPushNotificationServer(s.shh, serverKey)
+	defer TearDownMessenger(&s.Suite, messenger)
 
 	alice := s.newMessenger(s.shh)
 	defer TearDownMessenger(&s.Suite, alice)
@@ -103,14 +105,14 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
 
 	// Register bob1
-	err = bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	err = bob1.AddPushNotificationsServer(context.Background(), &messenger.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -142,14 +144,14 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	s.Require().NoError(err)
 
 	// Register bob2
-	err = bob2.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	err = bob2.AddPushNotificationsServer(context.Background(), &messenger.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 	s.Require().NoError(err)
 
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -194,7 +196,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	infoMap := make(map[string]*pushnotificationclient.PushNotificationInfo)
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -245,7 +247,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	var sentNotification *pushnotificationclient.SentNotification
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -274,8 +276,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer TearDownMessenger(&s.Suite, server)
+	messenger, _ := s.newPushNotificationServer(s.shh, serverKey)
+	defer TearDownMessenger(&s.Suite, messenger)
 
 	alice := s.newMessenger(s.shh)
 	defer TearDownMessenger(&s.Suite, alice)
@@ -283,7 +285,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	bobInstallationIDs := []string{bob.installationID}
 
 	// Register bob
-	err = bob.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	err = bob.AddPushNotificationsServer(context.Background(), &messenger.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	// Add alice has a contact
@@ -305,7 +307,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -349,7 +351,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 
 	var info []*pushnotificationclient.PushNotificationInfo
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -383,7 +385,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 
 	var sentNotification *pushnotificationclient.SentNotification
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -413,8 +415,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer TearDownMessenger(&s.Suite, server)
+	messenger, _ := s.newPushNotificationServer(s.shh, serverKey)
+	defer TearDownMessenger(&s.Suite, messenger)
 
 	alice := s.newMessenger(s.shh)
 	// another contact to invalidate the token
@@ -426,7 +428,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	bobInstallationIDs := []string{bob.installationID}
 
 	// Register bob
-	err = bob.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	err = bob.AddPushNotificationsServer(context.Background(), &messenger.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	// Add alice has a contact
@@ -458,7 +460,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -497,10 +499,10 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	_, err = alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 
-	// We check that alice retrieves the info from the server
+	// We check that alice retrieves the info from the messenger
 	var info []*pushnotificationclient.PushNotificationInfo
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -535,10 +537,10 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	_, err = bob.RemoveContact(context.Background(), frankContact.ID)
 	s.Require().NoError(err)
 
-	// Re-registration should be triggered, pull from server and bob to check we are correctly registered
+	// Re-registration should be triggered, pull from messenger and bob to check we are correctly registered
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -570,7 +572,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	s.Require().NoError(err)
 
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -607,7 +609,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 
 	var sentNotification *pushnotificationclient.SentNotification
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -637,8 +639,8 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer TearDownMessenger(&s.Suite, server)
+	messenger, _ := s.newPushNotificationServer(s.shh, serverKey)
+	defer TearDownMessenger(&s.Suite, messenger)
 
 	alice := s.newMessenger(s.shh)
 	s.Require().NoError(err)
@@ -646,14 +648,14 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 
 	// Register bob1
-	err = bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	err = bob1.AddPushNotificationsServer(context.Background(), &messenger.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -696,8 +698,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer TearDownMessenger(&s.Suite, server)
+	messenger, _ := s.newPushNotificationServer(s.shh, serverKey)
+	defer TearDownMessenger(&s.Suite, messenger)
 
 	alice := s.newMessenger(s.shh)
 	s.Require().NoError(err)
@@ -720,14 +722,14 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 	s.Require().NoError(err)
 
 	// Register bob
-	err = bob.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	err = bob.AddPushNotificationsServer(context.Background(), &messenger.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -770,7 +772,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 
 	var bobInfo []*pushnotificationclient.PushNotificationInfo
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -806,7 +808,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 
 	var sentNotification *pushnotificationclient.SentNotification
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -835,8 +837,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer TearDownMessenger(&s.Suite, server)
+	messenger, server := s.newPushNotificationServer(s.shh, serverKey)
+	defer TearDownMessenger(&s.Suite, messenger)
 
 	alice := s.newMessenger(s.shh)
 	s.Require().NoError(err)
@@ -844,14 +846,14 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 
 	// Register bob
-	err = bob.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	err = bob.AddPushNotificationsServer(context.Background(), &messenger.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -939,7 +941,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -948,7 +950,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 			return err
 		}
 
-		if server.pushNotificationServer.SentRequests != 1 {
+		if server.SentRequests != 1 {
 			return errors.New("request not sent")
 		}
 
@@ -969,8 +971,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer TearDownMessenger(&s.Suite, server)
+	messenger, _ := s.newPushNotificationServer(s.shh, serverKey)
+	defer TearDownMessenger(&s.Suite, messenger)
 
 	alice := s.newMessenger(s.shh)
 	s.Require().NoError(err)
@@ -979,14 +981,14 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
 
 	// Register bob1
-	err = bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	err = bob1.AddPushNotificationsServer(context.Background(), &messenger.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -1018,14 +1020,14 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 	s.Require().NoError(err)
 
 	// Register bob2
-	err = bob2.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	err = bob2.AddPushNotificationsServer(context.Background(), &messenger.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 	s.Require().NoError(err)
 
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -1070,7 +1072,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 
 	infoMap := make(map[string]*pushnotificationclient.PushNotificationInfo)
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -1121,7 +1123,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 
 	var sentNotification *pushnotificationclient.SentNotification
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -1150,8 +1152,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationReply() {
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	server := s.newPushNotificationServer(s.shh, serverKey)
-	defer TearDownMessenger(&s.Suite, server)
+	messenger, _ := s.newPushNotificationServer(s.shh, serverKey)
+	defer TearDownMessenger(&s.Suite, messenger)
 
 	alice := s.newMessenger(s.shh)
 	s.Require().NoError(err)
@@ -1174,14 +1176,14 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationReply() {
 	s.Require().NoError(err)
 
 	// Register bob
-	err = bob.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	err = bob.AddPushNotificationsServer(context.Background(), &messenger.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -1244,7 +1246,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationReply() {
 
 	var bobInfo []*pushnotificationclient.PushNotificationInfo
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -1280,7 +1282,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationReply() {
 
 	var sentNotification *pushnotificationclient.SentNotification
 	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
+		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
 		}

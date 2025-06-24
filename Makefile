@@ -166,6 +166,12 @@ run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	go run ./cmd/status-backend --address localhost:${PORT}
 
+push-notification-server: ##@build Build push-notification-server
+push-notification-server: build/bin/push-notification-server
+
+cmd: ##@build Build all public apps in ./cmd
+cmd: status-backend push-notification-server
+
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld build/bin/statusgo-*

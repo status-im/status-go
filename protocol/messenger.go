@@ -54,7 +54,6 @@ import (
 	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
-	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/storenodes"
@@ -74,6 +73,12 @@ import (
 
 	_ "github.com/mmcdole/gofeed"
 )
+
+type PushNotificationServer interface {
+	HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, messageID []byte, query *protobuf.PushNotificationQuery) error
+	HandlePushNotificationRequest(publicKey *ecdsa.PublicKey, messageID []byte, request *protobuf.PushNotificationRequest) error
+	HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) error
+}
 
 const (
 	PubKeyStringLength = 132
@@ -113,7 +118,7 @@ type Messenger struct {
 	anonMetricsClient         *anonmetrics.Client
 	anonMetricsServer         *anonmetrics.Server
 	pushNotificationClient    *pushnotificationclient.Client
-	pushNotificationServer    *pushnotificationserver.Server
+	pushNotificationServer    PushNotificationServer
 	communitiesManager        *communities.Manager
 	archiveManager            communities.ArchiveService
 	communitiesKeyDistributor communities.KeyDistributor
@@ -389,14 +394,6 @@ func NewMessenger(
 		anonMetricsServer.Logger = logger
 	}
 
-	// Initialize push notification server
-	var pushNotificationServer *pushnotificationserver.Server
-	if c.pushNotificationServerConfig != nil && c.pushNotificationServerConfig.Enabled {
-		c.pushNotificationServerConfig.Identity = identity
-		pushNotificationServerPersistence := pushnotificationserver.NewSQLitePersistence(database)
-		pushNotificationServer = pushnotificationserver.New(c.pushNotificationServerConfig, pushNotificationServerPersistence, sender)
-	}
-
 	// Initialize push notification client
 	pushNotificationClientPersistence := pushnotificationclient.NewPersistence(database)
 	pushNotificationClientConfig := c.pushNotificationClientConfig
@@ -522,7 +519,7 @@ func NewMessenger(
 		wakuMetricsHandler:         wakuMetricsHandler,
 		communityTokensService:     c.communityTokensService,
 		pushNotificationClient:     pushNotificationClient,
-		pushNotificationServer:     pushNotificationServer,
+		pushNotificationServer:     c.pushNotificationServer,
 		communitiesManager:         communitiesManager,
 		communitiesKeyDistributor:  communitiesKeyDistributor,
 		archiveManager:             archiveManager,
@@ -712,12 +709,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	m.logger.Info("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
-	// Start push notification server
-	if m.pushNotificationServer != nil {
-		if err := m.pushNotificationServer.Start(); err != nil {
-			return nil, err
-		}
-	}
 
 	// Start push notification client
 	if m.pushNotificationClient != nil {
@@ -5331,27 +5322,6 @@ func (m *Messenger) GetPushNotificationsServers() ([]*pushnotificationclient.Pus
 	return m.pushNotificationClient.GetServers()
 }
 
-// StartPushNotificationsServer initialize and start a push notification server, using the current messenger identity key
-func (m *Messenger) StartPushNotificationsServer() error {
-	if m.pushNotificationServer == nil {
-		pushNotificationServerPersistence := pushnotificationserver.NewSQLitePersistence(m.database)
-		config := &pushnotificationserver.Config{
-			Enabled:  true,
-			Logger:   m.logger,
-			Identity: m.identity,
-		}
-		m.pushNotificationServer = pushnotificationserver.New(config, pushNotificationServerPersistence, m.sender)
-	}
-
-	return m.pushNotificationServer.Start()
-}
-
-// StopPushNotificationServer stops the push notification server if running
-func (m *Messenger) StopPushNotificationsServer() error {
-	m.pushNotificationServer = nil
-	return nil
-}
-
 func generateAliasAndIdenticon(pk string) (string, string, error) {
 	identicon, err := identicon.GenerateBase64(pk)
 	if err != nil {
@@ -5614,4 +5584,8 @@ func (m *Messenger) startHashRatchetEncryptedMessagesCleanupLoop() {
 
 func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string) (string, error) {
 	return m.persistence.FindStatusMessageIDForBridgeMessageID(bridgeMessageID)
+}
+
+func (m *Messenger) MessageSender() *common.MessageSender {
+	return m.sender
 }

@@ -1,15 +1,16 @@
 import io
 import logging
 import os
+import random
 import tarfile
 import tempfile
 import threading
+
 import docker
 import docker.errors
-import random
+from docker.errors import APIError
 
 from conftest import option
-from docker.errors import APIError
 
 DATA_DIR = "/usr/status-user"
 
@@ -54,14 +55,24 @@ class StatusGoContainer:
                     "mode": "rw",
                 }
             },
+            "extra_hosts": {
+                "host.docker.internal": "host-gateway",
+            },
             "entrypoint": entrypoint,
             "ports": ports,
+            "stop_signal": "SIGINT",
         }
 
         if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
             container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
 
         self.docker_client = docker.from_env()
+
+        try:
+            self.docker_client.images.get(image_name)
+        except docker.errors.ImageNotFound:
+            raise RuntimeError(f"Docker image '{image_name}' not found")
+
         self.container = self.docker_client.containers.run(**container_args)
         option.statusgo_containers.append(self)
 
@@ -208,7 +219,7 @@ class PushNotificationServerContainer(StatusGoContainer):
             "--waku-fleet",
             option.waku_fleet,
         ]
-        super().__init__(entrypoint, container_name_suffix="-push-notification-server")
+        super().__init__(entrypoint, container_name_suffix=f"-push-notification-server-{gorush_port}")
 
 
 class StatusBackendContainer(StatusGoContainer):

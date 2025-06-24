@@ -37,7 +37,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -287,7 +286,7 @@ func main() {
 		go retrieveMessagesLoop(messenger, 300*time.Millisecond, interruptCh)
 
 	} else {
-		appDB, walletDB, err := startNode(config, backend, installationID)
+		_, _, err := startNode(config, backend, installationID)
 		if err != nil {
 			logger.Error("failed to start node", "error", err)
 			return
@@ -318,54 +317,6 @@ func main() {
 		// Check if profiling shall be enabled.
 		if *pprofEnabled {
 			profiling.NewProfiler(fmt.Sprintf(":%d", *pprofPort)).Go()
-		}
-
-		if config.PushNotificationServerConfig.Enabled {
-			options := []protocol.Option{
-				protocol.WithPushNotifications(),
-				protocol.WithPushNotificationServerConfig(&pushnotificationserver.Config{
-					Enabled:   config.PushNotificationServerConfig.Enabled,
-					Identity:  config.PushNotificationServerConfig.Identity,
-					GorushURL: config.PushNotificationServerConfig.GorushURL,
-				}),
-				protocol.WithDatabase(appDB),
-				protocol.WithWalletDatabase(walletDB),
-				protocol.WithTorrentConfig(&config.TorrentConfig),
-				protocol.WithAccountManager(backend.AccountManager()),
-				protocol.WithMessageSigner(backend.MessageSigner()),
-			}
-
-			messenger, err := protocol.NewMessenger(
-				identity,
-				backend.StatusNode().WakuV2Service(),
-				installationID.String(),
-				options...,
-			)
-			if err != nil {
-				logger.Error("failed to create messenger", "error", err)
-				return
-			}
-
-			err = messenger.InitInstallations()
-			if err != nil {
-				logger.Error("failed to init messenger installations", "error", err)
-				return
-			}
-
-			err = messenger.InitFilters()
-			if err != nil {
-				logger.Error("failed to init messenger filters", "error", err)
-				return
-			}
-
-			// This will start the push notification server as well as
-			// the config is set to Enabled
-			_, err = messenger.Start()
-			if err != nil {
-				logger.Error("failed to start messenger", "error", err)
-				return
-			}
-			go retrieveMessagesLoop(messenger, 300*time.Millisecond, interruptCh)
 		}
 	}
 

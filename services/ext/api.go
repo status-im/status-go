@@ -1098,25 +1098,6 @@ func (api *PublicAPI) RemainingCapacityForSavedAddresses(ctx context.Context, te
 	return api.service.messenger.RemainingCapacityForSavedAddresses(testnetMode)
 }
 
-// PushNotifications server endpoints
-func (api *PublicAPI) StartPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, true)
-	if err != nil {
-		return err
-	}
-
-	return api.service.messenger.StartPushNotificationsServer()
-}
-
-func (api *PublicAPI) StopPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, false)
-	if err != nil {
-		return err
-	}
-
-	return api.service.messenger.StopPushNotificationsServer()
-}
-
 // PushNotification client endpoints
 
 func (api *PublicAPI) RegisterForPushNotifications(ctx context.Context, deviceToken string, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType) error {
