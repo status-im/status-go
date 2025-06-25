@@ -1,5 +1,6 @@
 import pytest
 
+from clients.services.wakuext import ActivityCenterNotificationType, ContactRequestState
 from clients.signals import SignalType, LocalPairingEventType, LocalPairingEventAction
 from clients.status_backend import StatusBackend
 from resources.constants import Account
@@ -116,6 +117,38 @@ def wait_for_action_of_type(backend: StatusBackend, action, type):
     )
 
 
+def pair_server_as_sender(sender, receiver):
+    connection_string = sender.get_connection_string_for_bootstrapping_another_device()
+    response = receiver.input_connection_string_for_bootstrapping(connection_string)
+    assert response["error"] is None
+    assert response["keyUID"] == sender.key_uid
+
+    wait_for_action_of_type(sender, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value)
+    wait_for_action_of_type(receiver, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value)
+
+
+def pair_server_as_receiver(sender, receiver):
+    connection_string = receiver.get_connection_string_for_being_bootstrapped()
+    response = sender.input_connection_string_for_bootstrapping_another_device(connection_string)
+    assert response.get("error") in (None, "")
+
+    wait_for_action_of_type(sender, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value)
+    wait_for_action_of_type(receiver, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value)
+
+
+def login_paired_device(backend: StatusBackend, key_uid, password):
+    user = Account(
+        password=password,
+        address="",
+        private_key="",
+        passphrase="",
+    )
+    backend.init_status_backend()
+    backend.login(key_uid, user)
+    backend.wait_for_login()
+    backend.wakuext_service.start_messenger()
+
+
 @pytest.mark.rpc
 class TestLocalPairing(MessengerSteps):
 
@@ -131,23 +164,14 @@ class TestLocalPairing(MessengerSteps):
         # Create users
         alice = self.initialize_backend(self.await_signals, False)
         bob = self.initialize_backend(self.await_signals, False)
+        bob_second_device = StatusBackend(self.await_signals)
+        bob_second_device.init_status_backend()
 
         # Make contacts before local pairing
         self.make_contacts(alice, bob)
 
         # Local pairing
-        bob_second_device = StatusBackend(self.await_signals)
-        bob_second_device.init_status_backend()
-
-        connection_string = bob.get_connection_string_for_bootstrapping_another_device()
-        response = bob_second_device.input_connection_string_for_bootstrapping(connection_string)
-        assert response["error"] is None
-        assert response["keyUID"] == bob.key_uid
-
-        wait_for_action_of_type(bob, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value)
-        wait_for_action_of_type(
-            bob_second_device, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
-        )
+        pair_server_as_sender(bob, bob_second_device)
 
         # Check sender signals
         events = bob.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
@@ -158,16 +182,7 @@ class TestLocalPairing(MessengerSteps):
         check_client_receiver_events(events)
 
         # Login on the second device
-        user = Account(
-            password=bob.password,
-            address="",
-            private_key="",
-            passphrase="",
-        )
-        bob_second_device.init_status_backend()
-        bob_second_device.login(bob.key_uid, user)
-        bob_second_device.wait_for_login()
-        bob_second_device.wakuext_service.start_messenger()
+        login_paired_device(bob_second_device, bob.key_uid, bob.password)
 
         # Check that contact is synced
         response = bob_second_device.wakuext_service.get_contacts()
@@ -181,22 +196,14 @@ class TestLocalPairing(MessengerSteps):
         # Create users
         alice = self.initialize_backend(self.await_signals, False)
         bob = self.initialize_backend(self.await_signals, False)
+        bob_second_device = StatusBackend(self.await_signals)
+        bob_second_device.init_status_backend()
 
         # Make contacts before local pairing
         self.make_contacts(alice, bob)
 
         # Local pairing
-        bob_second_device = StatusBackend(self.await_signals)
-        bob_second_device.init_status_backend()
-
-        connection_string = bob_second_device.get_connection_string_for_being_bootstrapped()
-        response = bob.input_connection_string_for_bootstrapping_another_device(connection_string)
-        assert response.get("error") in (None, "")
-
-        wait_for_action_of_type(bob, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value)
-        wait_for_action_of_type(
-            bob_second_device, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
-        )
+        pair_server_as_receiver(bob, bob_second_device)
 
         # Check sender signals
         events = bob.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
@@ -213,3 +220,61 @@ class TestLocalPairing(MessengerSteps):
         contacts = response["result"]
         assert len(contacts) == 1
         assert contacts[0]["id"] == alice.public_key
+
+    def test_pairing_three_devices(self):
+        # Create users
+        bob1 = self.initialize_backend(self.await_signals, False)
+        bob2 = StatusBackend(self.await_signals)
+        bob2.init_status_backend()
+        bob3 = StatusBackend(self.await_signals)
+        bob3.init_status_backend()
+        user_accepted = self.initialize_backend(self.await_signals, False)
+        user_pending = self.initialize_backend(self.await_signals, False)
+        user_declined = self.initialize_backend(self.await_signals, False)
+
+        # Setup contacts before local pairing
+        self.make_contacts(user_accepted, bob1)
+        self.send_contact_request_and_wait_for_signal_to_be_received(user_pending, bob1)
+        message_id = self.send_contact_request_and_wait_for_signal_to_be_received(user_declined, bob1)
+        bob1.wakuext_service.decline_contact_request(message_id)
+
+        # Pair second device
+        pair_server_as_sender(bob1, bob2)
+
+        # Login on the second device
+        login_paired_device(bob2, bob1.key_uid, bob1.password)
+
+        # Pair third device from second device
+        pair_server_as_sender(bob2, bob3)
+
+        # Login on the third device
+        login_paired_device(bob3, bob1.key_uid, bob1.password)
+
+        # Check that contacts and notifications are synced on all devices
+        for bob_another_device in [bob2, bob3]:
+            response = bob_another_device.wakuext_service.get_contacts()
+            assert "error" not in response
+            contacts = response["result"]
+            assert len(contacts) == 3
+            contacts_dict = {contact["id"]: contact for contact in contacts}
+            assert contacts_dict[user_accepted.public_key]["mutual"] is True
+            assert contacts_dict[user_accepted.public_key]["contactRequestState"] is ContactRequestState.MUTUAL.value
+            assert contacts_dict[user_pending.public_key]["mutual"] is False
+            assert contacts_dict[user_pending.public_key]["contactRequestState"] is ContactRequestState.RECEIVED.value
+            assert contacts_dict[user_declined.public_key]["mutual"] is False
+            assert contacts_dict[user_declined.public_key]["contactRequestState"] is ContactRequestState.DISMISSED.value
+
+            # Paired device will get notifications of requests that are not fulfilled (not mutual)
+            notifications = bob_another_device.wakuext_service.get_activity_center_notifications(
+                activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_CONTACT_REQUEST]
+            )["result"]["notifications"]
+            assert len(notifications) == 2
+            notifications_dict = {notification["chatId"]: notification for notification in notifications}
+            user_pending_notification = notifications_dict[user_pending.public_key]
+            assert user_pending_notification["read"] is False
+            assert user_pending_notification["accepted"] is False
+            assert user_pending_notification["dismissed"] is False
+            user_declined_notification = notifications_dict[user_declined.public_key]
+            assert user_declined_notification["read"] is True
+            assert user_declined_notification["accepted"] is False
+            assert user_declined_notification["dismissed"] is True
