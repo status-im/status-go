@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/services/wallet/common"
 )
 
 const (
@@ -71,6 +72,12 @@ func (f *FeeManager) getNonEIP1559SuggestedFees(ctx context.Context, chainID uin
 func getEIP1559SuggestedFees(chainID uint64, feeHistory *FeeHistory) (lowPriorityFee, avgPriorityFee, highPriorityFee, suggestedBaseFee *big.Int, err error) {
 	if feeHistory == nil || !feeHistory.isEIP1559Compatible(chainID) {
 		return nil, nil, nil, nil, ErrEIP1559IncompaibleChain
+	}
+
+	// This is something we can do just now (cause Lenea call has some issues), but should not be used later (after September 2025),
+	// instead `linea_estimateGas` call should be used for the Status Network.
+	if chainID == common.StatusNetworkSepolia {
+		return big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil
 	}
 
 	pendingBaseFee := feeHistory.BaseFeePerGas[len(feeHistory.BaseFeePerGas)-1]

@@ -390,20 +390,24 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 	}
 
 	err = r.prepareBalanceMapForTokenOnChain(ctx, input, fromChain)
+	if err != nil {
+		return nil, errors.CreateErrorResponseFromError(err)
+	}
+
 	// return only if there are no balances, otherwise try to resolve the candidates for chains we know the balances for
-	noBalanceOnAnyChain := true
-	r.activeBalanceMap.Range(func(key, value interface{}) bool {
-		if value.(*big.Int).Cmp(walletCommon.ZeroBigIntValue()) > 0 {
-			noBalanceOnAnyChain = false
-			return false
+	// an exception is Status chain, which is gasless
+	if input.FromChainID != walletCommon.StatusNetworkSepolia {
+		noBalanceOnAnyChain := true
+		r.activeBalanceMap.Range(func(key, value interface{}) bool {
+			if value.(*big.Int).Cmp(walletCommon.ZeroBigIntValue()) > 0 {
+				noBalanceOnAnyChain = false
+				return false
+			}
+			return true
+		})
+		if noBalanceOnAnyChain {
+			return nil, ErrNoPositiveBalance
 		}
-		return true
-	})
-	if noBalanceOnAnyChain {
-		if err != nil {
-			return nil, errors.CreateErrorResponseFromError(err)
-		}
-		return nil, ErrNoPositiveBalance
 	}
 
 	route, processorErrors, err := r.resolveRoute(ctx, input, fromChain, toChain)
