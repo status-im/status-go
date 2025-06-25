@@ -129,91 +129,87 @@ class TestLocalPairing(MessengerSteps):
 
     def test_pairing_server_as_sender(self):
         # Create users
-        self.sender = self.initialize_backend(self.await_signals, False)
-        self.receiver = self.initialize_backend(self.await_signals, False)
+        alice = self.initialize_backend(self.await_signals, False)
+        bob = self.initialize_backend(self.await_signals, False)
 
         # Make contacts before local pairing
-        self.make_contacts()
+        self.make_contacts(alice, bob)
 
         # Local pairing
-        receiver_second_device = StatusBackend(self.await_signals)
-        receiver_second_device.init_status_backend()
+        bob_second_device = StatusBackend(self.await_signals)
+        bob_second_device.init_status_backend()
 
-        connection_string = self.receiver.get_connection_string_for_bootstrapping_another_device()
-        response = receiver_second_device.input_connection_string_for_bootstrapping(connection_string)
+        connection_string = bob.get_connection_string_for_bootstrapping_another_device()
+        response = bob_second_device.input_connection_string_for_bootstrapping(connection_string)
         assert response["error"] is None
-        assert response["keyUID"] == self.receiver.key_uid
+        assert response["keyUID"] == bob.key_uid
 
+        wait_for_action_of_type(bob, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value)
         wait_for_action_of_type(
-            self.receiver, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value
-        )
-        wait_for_action_of_type(
-            receiver_second_device, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
+            bob_second_device, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
         )
 
         # Check sender signals
-        events = self.receiver.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
+        events = bob.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
         check_server_sender_events(events)
 
         # Check receiver signals
-        events = receiver_second_device.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
+        events = bob_second_device.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
         check_client_receiver_events(events)
 
         # Login on the second device
         user = Account(
-            password=self.receiver.password,
+            password=bob.password,
             address="",
             private_key="",
             passphrase="",
         )
-        receiver_second_device.init_status_backend()
-        receiver_second_device.login(self.receiver.key_uid, user)
-        receiver_second_device.wait_for_login()
-        receiver_second_device.wakuext_service.start_messenger()
+        bob_second_device.init_status_backend()
+        bob_second_device.login(bob.key_uid, user)
+        bob_second_device.wait_for_login()
+        bob_second_device.wakuext_service.start_messenger()
 
         # Check that contact is synced
-        response = receiver_second_device.wakuext_service.get_contacts()
+        response = bob_second_device.wakuext_service.get_contacts()
         assert "error" not in response
 
         contacts = response["result"]
         assert len(contacts) == 1
-        assert contacts[0]["id"] == self.sender.public_key
+        assert contacts[0]["id"] == alice.public_key
 
     def test_pairing_server_as_receiver(self):
         # Create users
-        self.sender = self.initialize_backend(self.await_signals, False)
-        self.receiver = self.initialize_backend(self.await_signals, False)
+        alice = self.initialize_backend(self.await_signals, False)
+        bob = self.initialize_backend(self.await_signals, False)
 
         # Make contacts before local pairing
-        self.make_contacts()
+        self.make_contacts(alice, bob)
 
         # Local pairing
-        receiver_second_device = StatusBackend(self.await_signals)
-        receiver_second_device.init_status_backend()
+        bob_second_device = StatusBackend(self.await_signals)
+        bob_second_device.init_status_backend()
 
-        connection_string = receiver_second_device.get_connection_string_for_being_bootstrapped()
-        response = self.receiver.input_connection_string_for_bootstrapping_another_device(connection_string)
+        connection_string = bob_second_device.get_connection_string_for_being_bootstrapped()
+        response = bob.input_connection_string_for_bootstrapping_another_device(connection_string)
         assert response.get("error") in (None, "")
 
+        wait_for_action_of_type(bob, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value)
         wait_for_action_of_type(
-            self.receiver, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value
-        )
-        wait_for_action_of_type(
-            receiver_second_device, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
+            bob_second_device, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value
         )
 
         # Check sender signals
-        events = self.receiver.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
+        events = bob.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
         check_client_sender_events(events)
 
         # Check receiver signals
-        events = receiver_second_device.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
+        events = bob_second_device.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
         check_server_receiver_events(events)
 
         # Check that contact is synced
-        response = receiver_second_device.wakuext_service.get_contacts()
+        response = bob_second_device.wakuext_service.get_contacts()
         assert "error" not in response
 
         contacts = response["result"]
         assert len(contacts) == 1
-        assert contacts[0]["id"] == self.sender.public_key
+        assert contacts[0]["id"] == alice.public_key
