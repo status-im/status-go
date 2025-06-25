@@ -402,7 +402,9 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	l1ApprovalFeeWei := big.NewInt(0)
 
 	needL1Fee := path.FromChain.ChainID == walletCommon.OptimismMainnet ||
-		path.FromChain.ChainID == walletCommon.OptimismSepolia
+		path.FromChain.ChainID == walletCommon.OptimismSepolia ||
+		path.FromChain.ChainID == walletCommon.BaseMainnet ||
+		path.FromChain.ChainID == walletCommon.BaseSepolia
 
 	if testsMode {
 		usedNonces[path.FromChain.ChainID] = usedNonces[path.FromChain.ChainID] + 1
