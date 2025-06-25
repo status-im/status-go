@@ -151,6 +151,11 @@ github.com/bradfitz/iter
 ## explicit; go 1.21
 github.com/brianvoe/gofakeit/v6
 github.com/brianvoe/gofakeit/v6/data
+# github.com/brianvoe/gofakeit/v7 v7.2.1
+## explicit; go 1.22
+github.com/brianvoe/gofakeit/v7
+github.com/brianvoe/gofakeit/v7/data
+github.com/brianvoe/gofakeit/v7/source
 # github.com/btcsuite/btcd v0.22.1
 ## explicit; go 1.17
 github.com/btcsuite/btcd/btcec
