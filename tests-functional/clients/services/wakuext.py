@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, Union
 from clients.rpc import RpcClient
 from clients.services.service import Service
 from resources.enums import MessageContentType
@@ -9,6 +9,63 @@ class PushNotificationRegistrationTokenType(Enum):
     UNKNOWN = 0
     APN_TOKEN = 1
     FIREBASE_TOKEN = 2
+
+
+class ActivityCenterNotificationType(Enum):
+    NOTIFICATION_NO_TYPE = 0
+    NOTIFICATION_TYPE_NEW_ONE_TO_ONE = 1
+    NOTIFICATION_TYPE_NEW_PRIVATE_GROUP_CHAT = 2
+    NOTIFICATION_TYPE_MENTION = 3
+    NOTIFICATION_TYPE_REPLY = 4
+    NOTIFICATION_TYPE_CONTACT_REQUEST = 5
+    NOTIFICATION_TYPE_COMMUNITY_INVITATION = 6
+    NOTIFICATION_TYPE_COMMUNITY_REQUEST = 7
+    NOTIFICATION_TYPE_COMMUNITY_MEMBERSHIP_REQUEST = 8
+    NOTIFICATION_TYPE_COMMUNITY_KICKED = 9
+    NOTIFICATION_TYPE_CONTACT_VERIFICATION = 10
+    NOTIFICATION_TYPE_CONTACT_REMOVED = 11
+    NOTIFICATION_TYPE_NEW_KEYPAIR_ADDED_TO_PAIRED_DEVICE = 12
+    NOTIFICATION_TYPE_OWNER_TOKEN_RECEIVED = 13
+    NOTIFICATION_TYPE_OWNERSHIP_RECEIVED = 14
+    NOTIFICATION_TYPE_OWNERSHIP_LOST = 15
+    NOTIFICATION_TYPE_SET_SIGNER_FAILED = 16
+    NOTIFICATION_TYPE_SET_SIGNER_DECLINED = 17
+    NOTIFICATION_TYPE_SHARE_ACCOUNTS = 18
+    NOTIFICATION_TYPE_COMMUNITY_TOKEN_RECEIVED = 19
+    NOTIFICATION_TYPE_FIRST_COMMUNITY_TOKEN_RECEIVED = 20
+    NOTIFICATION_TYPE_COMMUNITY_BANNED = 21
+    NOTIFICATION_TYPE_COMMUNITY_UNBANNED = 22
+    NOTIFICATION_TYPE_NEW_INSTALLATION_RECEIVED = 23
+    NOTIFICATION_TYPE_NEW_INSTALLATION_CREATED = 24
+    NOTIFICATION_TYPE_BACKUP_SYNCING_FETCHING = 25
+    NOTIFICATION_TYPE_BACKUP_SYNCING_SUCCESS = 26
+    NOTIFICATION_TYPE_BACKUP_SYNCING_PARTIAL_FAILURE = 27
+    NOTIFICATION_TYPE_BACKUP_SYNCING_FAILURE = 28
+    NOTIFICATION_TYPE_NEWS = 29
+
+
+class ActivityCenterMembershipStatus(Enum):
+    IDLE = 0
+    PENDING = 1
+    ACCEPTED = 2
+    DECLINED = 3
+    ACCEPTED_PENDING = 4
+    DECLINED_PENDING = 5
+    OWNERSHIP_CHANGED = 6
+
+
+class ActivityCenterQueryParamsRead(Enum):
+    READ = 1
+    UNREAD = 2
+    ALL = 3
+
+
+class ContactRequestState(Enum):
+    NONE = 0
+    MUTUAL = 1
+    SENT = 2
+    RECEIVED = 3
+    DISMISSED = 4
 
 
 class SendPinMessagePayload(TypedDict):
@@ -330,4 +387,22 @@ class WakuextService(Service):
     def register_for_push_notifications(self, device_token: str, apnTopic: str, tokenType: PushNotificationRegistrationTokenType):
         params = [device_token, apnTopic, tokenType.value]
         response = self.rpc_request("registerForPushNotifications", params)
+        return response.json()
+
+    def get_activity_center_notifications(
+        self,
+        activity_types: list = list(ActivityCenterNotificationType),
+        read_type: Union[ActivityCenterQueryParamsRead, None] = None,
+        cursor: str = "",
+        limit: int = 20,
+    ):
+        params = {
+            "activityTypes": [item.value for item in activity_types],
+            "cursor": cursor,
+            "limit": limit,
+        }
+        if read_type is not None:
+            params["readType"] = read_type.value
+
+        response = self.rpc_request(method="activityCenterNotifications", params=[params])
         return response.json()
