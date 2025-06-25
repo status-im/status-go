@@ -389,8 +389,15 @@ func (r *Router) applyCustomTxFeeMode(ctx context.Context, path *routes.Path, fe
 
 func (r *Router) updatePathFields(path *routes.Path, fetchedFees *fees.SuggestedFees) {
 	path.FromChain.EIP1559Enabled = fetchedFees.EIP1559Enabled
-	path.FromChain.NoBaseFee = walletCommon.HasNoBaseFee(path.FromChain.ChainID)
-	path.FromChain.NoPriorityFee = walletCommon.HasNoPriorityFee(path.FromChain.ChainID)
+	path.FromChain.NoBaseFee = false
+	path.FromChain.NoPriorityFee = false
+
+	if path.FromChain.ChainID == walletCommon.StatusNetworkSepolia {
+		// At this moment can be said that Status Network Sepolia is gasless chain, but for accurate settings of the following two fields
+		// a call to `linea_estimateGas` should be used for the Status Network.
+		path.FromChain.NoBaseFee = true
+		path.FromChain.NoPriorityFee = true
+	}
 }
 
 func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees,
