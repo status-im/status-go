@@ -970,8 +970,6 @@ func (s *MessageSender) handleMessage(msg *messagingtypes.ReceivedMessage) (*han
 
 	err = s.handleSegmentationLayer(message)
 	if err != nil {
-		hlogger.Debug("failed to handle segmentation layer message", zap.Error(err))
-
 		// Segments not completed yet, stop processing
 		if err == ErrMessageSegmentsIncomplete {
 			return nil, err
@@ -980,6 +978,8 @@ func (s *MessageSender) handleMessage(msg *messagingtypes.ReceivedMessage) (*han
 		if err == ErrMessageSegmentsAlreadyCompleted {
 			return nil, err
 		}
+
+		// Not a critical error; message wasn't segmented, proceed with next layers.
 	}
 
 	err = s.handleEncryptionLayer(context.Background(), message)

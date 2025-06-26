@@ -1,14 +1,17 @@
 package common
 
 import (
+	_ "embed"
 	"math"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/t/helpers"
@@ -172,4 +175,29 @@ func (s *MessageSegmentationSuite) TestHandleSegmentationLayer() {
 			s.Require().Equal(tc.shouldSucceed, messageRecreated)
 		})
 	}
+}
+
+//go:embed testdata/segmentationProtobufMissDecoding.bin
+var protobufMissDecodingPayload []byte // Represents a payload that is intentionally not encoded as protobuf.SegmentMessage to test unmarshalling behavior.
+
+func (s *MessageSegmentationSuite) TestProtobufMissDecoding() {
+	// This test demonstrates how protobuf unmarshalling behaves when given a payload
+	// that is not encoded as a protobuf.SegmentMessage. Protobuf attempts to decode
+	// any byte sequence, and if the structure coincidentally matches valid encoding
+	// patterns (e.g., varint or byte fields), it produces seemingly valid but incorrect results.
+
+	segmentedMessage := SegmentMessage{
+		SegmentMessage: &protobuf.SegmentMessage{},
+	}
+
+	// Attempt to unmarshal the invalid payload into a protobuf.SegmentMessage.
+	err := proto.Unmarshal(protobufMissDecodingPayload, segmentedMessage.SegmentMessage)
+	s.Require().NoError(err) // Surprisingly, no error is returned.
+
+	// Validate the unmarshalled data. The SegmentsCount field contains a value,
+	// but it is incorrect because the payload was not properly encoded.
+	s.Require().Equal(segmentedMessage.SegmentsCount, uint32(25)) // Incorrect but "valid" value.
+
+	// Ensure that the sanity check for the segmented message fails, as expected.
+	s.Require().False(segmentedMessage.IsValid())
 }
