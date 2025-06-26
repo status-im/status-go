@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 type testState struct {
@@ -213,9 +214,11 @@ func TestSuggestedFeesForNotEIP1559CompatibleChains(t *testing.T) {
 		mockedChainClient.EXPECT().BlockByNumber(state.ctx, blockNum).Times(1).Return(blockToReturn, nil)
 	}
 
-	suggestedFees, err := state.feeManager.SuggestedFees(context.Background(), chainID)
+	suggestedFees, noBaseFee, noPriorityFee, err := state.feeManager.SuggestedFees(context.Background(), chainID, walletCommon.ZeroAddress())
 	assert.NoError(t, err)
 	assert.NotNil(t, suggestedFees)
+	assert.False(t, noBaseFee)
+	assert.False(t, noPriorityFee)
 	assert.Equal(t, gasPrice, suggestedFees.GasPrice)
 	assert.False(t, suggestedFees.EIP1559Enabled)
 }
@@ -290,9 +293,11 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 			*feeHistory.(*FeeHistory) = *feeHistoryResponse
 		})
 
-	suggestedFees, err := state.feeManager.SuggestedFees(context.Background(), chainID)
+	suggestedFees, noBaseFee, noPriorityFee, err := state.feeManager.SuggestedFees(context.Background(), chainID, walletCommon.ZeroAddress())
 	assert.NoError(t, err)
 	assert.NotNil(t, suggestedFees)
+	assert.False(t, noBaseFee)
+	assert.False(t, noPriorityFee)
 
 	variadicFee1 := big.NewInt(0).Sub(suggestedFees.MaxFeesLevels.High.ToInt(), suggestedFees.MaxFeesLevels.HighPriority.ToInt())
 	variadicFee1.Sub(variadicFee1, big.NewInt(0).Mul(big.NewInt(2), suggestedFees.BaseFee))
