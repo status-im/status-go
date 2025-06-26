@@ -92,6 +92,7 @@ var remoteMethods = [...]string{
 	"eth_sendRawTransaction",
 	"eth_call",
 	"eth_estimateGas",
+	"linea_estimateGas", // Status chain specific gas estimation and tx gas amount calculation method
 	"eth_getBlockByHash",
 	"eth_getBlockByNumber",
 	"eth_getTransactionByHash",

@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -30,6 +31,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/rpc/chain/tagger"
 	"github.com/status-im/status-go/services/rpcstats"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 )
 
@@ -709,6 +711,10 @@ func (c *ClientWithFallback) FeeHistory(ctx context.Context, blockCount uint64, 
 }
 
 func (c *ClientWithFallback) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error) {
+	if c.ChainID == walletCommon.StatusNetworkSepolia {
+		return c.LineaEstimateGas(ctx, msg)
+	}
+
 	res, err := c.makeCallAndToggleConnectionState(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_EstimateGas",
@@ -721,6 +727,34 @@ func (c *ClientWithFallback) EstimateGas(ctx context.Context, msg ethereum.CallM
 		return 0, err
 	}
 
+	return res.(uint64), nil
+}
+
+func (c *ClientWithFallback) LineaEstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error) {
+	if c.ChainID != walletCommon.StatusNetworkSepolia {
+		return 0, errors.New("LineaEstimateGas should be used for Status network only")
+	}
+
+	const method = "linea_estimateGas"
+	res, err := c.makeCallAndToggleConnectionState(
+		ctx, MakeCallFunctor{
+			MethodName: method,
+			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+				var result struct {
+					GasLimit hexutil.Uint64 `json:"gasLimit"`
+				}
+				err := client.CallContext(ctx, &result, method, walletCommon.ToCallArg(msg))
+				if err != nil {
+					return nil, err
+				}
+
+				return uint64(result.GasLimit), nil
+			},
+		},
+	)
+	if err != nil {
+		return 0, err
+	}
 	return res.(uint64), nil
 }
 

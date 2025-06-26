@@ -387,23 +387,16 @@ func (r *Router) applyCustomTxFeeMode(ctx context.Context, path *routes.Path, fe
 	return nil
 }
 
-func (r *Router) updatePathFields(path *routes.Path, fetchedFees *fees.SuggestedFees) {
+func (r *Router) updatePathFields(path *routes.Path, fetchedFees *fees.SuggestedFees, noBaseFee bool, noPriorityFee bool) {
 	path.FromChain.EIP1559Enabled = fetchedFees.EIP1559Enabled
-	path.FromChain.NoBaseFee = false
-	path.FromChain.NoPriorityFee = false
-
-	if path.FromChain.ChainID == walletCommon.StatusNetworkSepolia {
-		// At this moment can be said that Status Network Sepolia is gasless chain, but for accurate settings of the following two fields
-		// a call to `linea_estimateGas` should be used for the Status Network.
-		path.FromChain.NoBaseFee = true
-		path.FromChain.NoPriorityFee = true
-	}
+	path.FromChain.NoBaseFee = noBaseFee
+	path.FromChain.NoPriorityFee = noPriorityFee
 }
 
 func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees,
-	usedNonces map[uint64]uint64, testsMode bool, testApprovalL1Fee uint64) (err error) {
+	usedNonces map[uint64]uint64, noBaseFee bool, noPriorityFee bool, testsMode bool, testApprovalL1Fee uint64) (err error) {
 
-	r.updatePathFields(path, fetchedFees)
+	r.updatePathFields(path, fetchedFees, noBaseFee, noPriorityFee)
 
 	l1TxFeeWei := big.NewInt(0)
 	l1ApprovalFeeWei := big.NewInt(0)

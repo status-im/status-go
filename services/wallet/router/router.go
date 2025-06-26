@@ -156,7 +156,12 @@ func (r *Router) setCustomTxDetails(ctx context.Context, pathTxIdentity *request
 		return ErrCannotCustomizeIfNoRoute
 	}
 
-	fetchedFees, err := r.feesManager.SuggestedFees(ctx, pathTxIdentity.ChainID)
+	var addrFrom common.Address
+	r.lastInputParamsMutex.Lock()
+	addrFrom = r.lastInputParams.AddrFrom
+	r.lastInputParamsMutex.Unlock()
+
+	fetchedFees, noBaseFee, noPriorityFee, err := r.feesManager.SuggestedFees(ctx, pathTxIdentity.ChainID, addrFrom)
 	if err != nil {
 		return err
 	}
@@ -176,7 +181,7 @@ func (r *Router) setCustomTxDetails(ctx context.Context, pathTxIdentity *request
 
 		// update the path details
 		usedNonces := make(map[uint64]uint64)
-		err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, false, 0)
+		err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, noBaseFee, noPriorityFee, false, 0)
 		if err != nil {
 			return err
 		}
@@ -221,7 +226,10 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 		return ErrNoBestRouteFound
 	}
 
-	fetchedFees, err := r.feesManager.SuggestedFees(ctx, pathTxIdentity.ChainID)
+	r.lastInputParamsMutex.Lock()
+	defer r.lastInputParamsMutex.Unlock()
+
+	fetchedFees, noBaseFee, noPriorityFee, err := r.feesManager.SuggestedFees(ctx, pathTxIdentity.ChainID, r.lastInputParams.AddrFrom)
 	if err != nil {
 		return err
 	}
@@ -262,7 +270,7 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 			} else {
 				usedNonces[path.FromChain.ChainID] = uint64(*path.TxNonce - 1)
 			}
-			err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, false, 0)
+			err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, noBaseFee, noPriorityFee, false, 0)
 			if err != nil {
 				return err
 			}
@@ -361,7 +369,7 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 		if suggestedRoutes != nil && err == nil && !r.routeCanceled {
 			// subscribe for updates
 			for _, path := range suggestedRoutes.Route {
-				err = r.subscribeForUdates(path.FromChain.ChainID)
+				err = r.subscribeForUdates(path.FromChain.ChainID, input.AddrFrom)
 			}
 		}
 		r.routeCanceledMutex.Unlock()
@@ -639,11 +647,15 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 		return
 	}
 
-	var fetchedFees *fees.SuggestedFees
+	var (
+		fetchedFees   *fees.SuggestedFees
+		noBaseFee     bool
+		noPriorityFee bool
+	)
 	if testsMode {
 		fetchedFees = input.TestParams.SuggestedFees
 	} else {
-		fetchedFees, err = r.feesManager.SuggestedFees(ctx, fromChain.ChainID)
+		fetchedFees, noBaseFee, noPriorityFee, err = r.feesManager.SuggestedFees(ctx, fromChain.ChainID, r.lastInputParams.AddrFrom)
 		if err != nil {
 			err = errors.CreateErrorResponseFromError(fmt.Errorf("failed to fetch fees for from chain %d", fromChain.ChainID))
 			return
@@ -668,7 +680,7 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 		if input.UseCommunityTransferDetails() {
 			for i := 0; i < len(input.CommunityRouteInputParams.TransferDetails); i++ {
 				usedNoncesMu.Lock()
-				path, err := r.buildPath(ctx, input, fromChain, toChain, fromToken, toToken, pProcessor, fetchedFees, usedNonces, i)
+				path, err := r.buildPath(ctx, input, fromChain, toChain, fromToken, toToken, pProcessor, fetchedFees, usedNonces, noBaseFee, noPriorityFee, i)
 				usedNoncesMu.Unlock()
 				if err != nil {
 					appendProcessorErrorFn(pProcessor.Name(), input.SendType, fromChain.ChainID, toChain.ChainID, input.AmountIn.ToInt(), err)
@@ -679,7 +691,7 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 			}
 		} else {
 			usedNoncesMu.Lock()
-			path, err := r.buildPath(ctx, input, fromChain, toChain, fromToken, toToken, pProcessor, fetchedFees, usedNonces, 0)
+			path, err := r.buildPath(ctx, input, fromChain, toChain, fromToken, toToken, pProcessor, fetchedFees, usedNonces, noBaseFee, noPriorityFee, 0)
 			usedNoncesMu.Unlock()
 			if err != nil {
 				appendProcessorErrorFn(pProcessor.Name(), input.SendType, fromChain.ChainID, toChain.ChainID, input.AmountIn.ToInt(), err)
@@ -696,7 +708,7 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams, fromNetwork *params.Network,
 	toNetwork *params.Network, fromToken *tokenTypes.Token, toToken *tokenTypes.Token,
 	pathProcessor pathprocessor.PathProcessor, fetchedFees *fees.SuggestedFees, usedNonces map[uint64]uint64,
-	useCommunityTokenTransferDetailsAtIndex int) (*routes.Path, error) {
+	noBaseFee bool, noPriorityFee bool, useCommunityTokenTransferDetailsAtIndex int) (*routes.Path, error) {
 	if !input.SendType.IsAvailableFor(fromNetwork) {
 		return nil, ErrPathNotSupportedForProvidedChain
 	}
@@ -822,7 +834,7 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		path.SetCommunityParams(communityParams)
 	}
 
-	err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, processorInputParams.TestsMode, processorInputParams.TestApprovalL1Fee)
+	err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, noBaseFee, noPriorityFee, processorInputParams.TestsMode, processorInputParams.TestApprovalL1Fee)
 	if err != nil {
 		return nil, err
 	}

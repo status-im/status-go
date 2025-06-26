@@ -10,6 +10,7 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/eth-node/types"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 
 	"github.com/status-im/status-go/rpc"
 )
@@ -48,7 +49,21 @@ func (w *rpcWrapper) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 // but it should provide a basis for setting a reasonable default.
 func (w *rpcWrapper) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error) {
 	var hex hexutil.Uint64
-	err := w.RPCClient.CallContext(ctx, &hex, w.chainID, "eth_estimateGas", toCallArg(msg))
+	method := "eth_estimateGas"
+	if w.chainID == walletCommon.StatusNetworkSepolia {
+		method = "linea_estimateGas"
+		var result struct {
+			GasLimit hexutil.Uint64 `json:"gasLimit"`
+		}
+
+		err := w.RPCClient.CallContext(ctx, &result, w.chainID, method, walletCommon.ToCallArg(msg))
+		if err != nil {
+			return 0, err
+		}
+		return uint64(result.GasLimit), nil
+	}
+
+	err := w.RPCClient.CallContext(ctx, &hex, w.chainID, method, walletCommon.ToCallArg(msg))
 	if err != nil {
 		return 0, err
 	}
@@ -70,24 +85,4 @@ func (w *rpcWrapper) SendTransaction(ctx context.Context, tx *gethtypes.Transact
 		return err
 	}
 	return w.SendRawTransaction(ctx, types.EncodeHex(data))
-}
-
-func toCallArg(msg ethereum.CallMsg) interface{} {
-	arg := map[string]interface{}{
-		"from": msg.From,
-		"to":   msg.To,
-	}
-	if len(msg.Data) > 0 {
-		arg["data"] = types.HexBytes(msg.Data)
-	}
-	if msg.Value != nil {
-		arg["value"] = (*hexutil.Big)(msg.Value)
-	}
-	if msg.Gas != 0 {
-		arg["gas"] = hexutil.Uint64(msg.Gas)
-	}
-	if msg.GasPrice != nil {
-		arg["gasPrice"] = (*hexutil.Big)(msg.GasPrice)
-	}
-	return arg
 }
