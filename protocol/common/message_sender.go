@@ -968,7 +968,7 @@ func (s *MessageSender) handleMessage(msg *messagingtypes.ReceivedMessage) (*han
 		return nil, err
 	}
 
-	err = s.handleSegmentationLayer(message)
+	err = s.handleSegmentationLayer(message, int(s.messaging.MaxMessageSize()/4*3))
 	if err != nil {
 		hlogger.Debug("failed to handle segmentation layer message", zap.Error(err))
 

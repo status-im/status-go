@@ -156,8 +156,12 @@ func segmentMessage(newMessage *wakutypes.NewMessage, segmentSize int) ([]*wakut
 
 // handleSegmentationLayer is capable of reconstructing the message from both complete and partial sets of data segments.
 // It has capability to perform forward error correction.
-func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessage) error {
+func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessage, segmentSize int) error {
 	logger := s.logger.Named("handleSegmentationLayer").With(zap.String("hash", types.HexBytes(message.TransportLayer.Hash).String()))
+
+	if len(message.TransportLayer.Payload) <= segmentSize {
+		return errors.New("short message, no segmentation required")
+	}
 
 	segmentMessage := &SegmentMessage{
 		SegmentMessage: &protobuf.SegmentMessage{},
