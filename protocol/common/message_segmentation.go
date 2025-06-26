@@ -21,7 +21,7 @@ import (
 
 var ErrMessageSegmentsIncomplete = errors.New("message segments incomplete")
 var ErrMessageSegmentsAlreadyCompleted = errors.New("message segments already completed")
-var ErrMessageSegmentsInvalidCount = errors.New("invalid segments count")
+var ErrMessageSegmentsInvalidPayload = errors.New("invalid segment payload")
 var ErrMessageSegmentsHashMismatch = errors.New("hash of entire payload does not match")
 var ErrMessageSegmentsInvalidParity = errors.New("invalid parity segments")
 
@@ -35,6 +35,21 @@ type SegmentMessage struct {
 }
 
 func (s *SegmentMessage) IsValid() bool {
+	// Check if the hash length is valid (32 bytes for Keccak256)
+	if len(s.EntireMessageHash) != 32 {
+		return false
+	}
+
+	// Check if the segment index is within the valid range
+	if s.SegmentsCount > 0 && s.Index >= s.SegmentsCount {
+		return false
+	}
+
+	// Check if the parity segment index is within the valid range
+	if s.ParitySegmentsCount > 0 && s.ParitySegmentIndex >= s.ParitySegmentsCount {
+		return false
+	}
+
 	return s.SegmentsCount >= 2 || s.ParitySegmentsCount > 0
 }
 
@@ -167,6 +182,10 @@ func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessag
 		return errors.Wrap(err, "failed to unmarshal SegmentMessage")
 	}
 
+	if !segmentMessage.IsValid() {
+		return ErrMessageSegmentsInvalidPayload
+	}
+
 	logger.Debug("handling message segment",
 		zap.String("EntireMessageHash", types.HexBytes(segmentMessage.EntireMessageHash).String()),
 		zap.Uint32("Index", segmentMessage.Index),
@@ -180,10 +199,6 @@ func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessag
 	}
 	if alreadyCompleted {
 		return ErrMessageSegmentsAlreadyCompleted
-	}
-
-	if !segmentMessage.IsValid() {
-		return ErrMessageSegmentsInvalidCount
 	}
 
 	err = s.persistence.SaveMessageSegment(segmentMessage, message.TransportLayer.SigPubKey, time.Now().Unix())
