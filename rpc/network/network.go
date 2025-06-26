@@ -6,8 +6,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/event"
-
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/logutils"
@@ -54,7 +52,6 @@ type Manager struct {
 	networkPersistence persistence.NetworksPersistenceInterface
 	embeddedNetworks   []params.Network
 
-	accountFeed       *event.Feed
 	accountsPublisher *pubsub.Publisher
 	networksPublisher *pubsub.Publisher
 
@@ -64,7 +61,7 @@ type Manager struct {
 }
 
 // NewManager creates a new instance of Manager.
-func NewManager(db *sql.DB, accountFeed *event.Feed, accountsPublisher *pubsub.Publisher) *Manager {
+func NewManager(db *sql.DB, accountsPublisher *pubsub.Publisher) *Manager {
 	accountsDB, err := accounts.NewDB(db)
 	if err != nil {
 		return nil
@@ -76,7 +73,6 @@ func NewManager(db *sql.DB, accountFeed *event.Feed, accountsPublisher *pubsub.P
 		db:                 db,
 		accountsDB:         accountsDB,
 		networkPersistence: persistence.NewNetworksPersistence(db),
-		accountFeed:        accountFeed,
 		accountsPublisher:  accountsPublisher,
 		networksPublisher:  pubsub.NewPublisher(),
 		logger:             logger,

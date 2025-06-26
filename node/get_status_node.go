@@ -107,7 +107,6 @@ type StatusNode struct {
 	appGeneralSrvc         *appgeneral.Service
 	ethSrvc                *eth.Service
 
-	accountsFeed      event.Feed
 	walletFeed        event.Feed
 	accountsPublisher *pubsub.Publisher
 }
@@ -258,7 +257,6 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		UpstreamChainID:   n.config.NetworkID,
 		Networks:          n.config.Networks,
 		DB:                n.appDB,
-		AccountsFeed:      &n.accountsFeed,
 		AccountsPublisher: n.accountsPublisher,
 		WalletFeed:        &n.walletFeed,
 	}

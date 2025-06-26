@@ -8,17 +8,15 @@ import (
 	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	statusaccounts "github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
+	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
-	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
-	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/transactions"
 )
 
 type Controller struct {
@@ -28,19 +26,14 @@ type Controller struct {
 	blockDAO           *BlockDAO
 	blockRangesSeqDAO  *BlockRangeSequentialDAO
 	reactor            *Reactor
-	accountFeed        *event.Feed
-	TransferFeed       *event.Feed
-	accWatcher         *accountsevent.Watcher
+	accountPublisher   *pubsub.Publisher
 	transactionManager *TransactionManager
-	pendingTxManager   *transactions.PendingTxTracker
-	tokenManager       *token.Manager
-	balanceCacher      balance.Cacher
 	blockChainState    *blockchainstate.BlockChainState
+	stopCh             chan struct{}
 }
 
-func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed,
-	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager,
-	balanceCacher balance.Cacher, blockChainState *blockchainstate.BlockChainState) *Controller {
+func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcClient *rpc.Client, accountPublisher *pubsub.Publisher,
+	transactionManager *TransactionManager, blockChainState *blockchainstate.BlockChainState) *Controller {
 
 	blockDAO := &BlockDAO{db}
 	return &Controller{
@@ -49,67 +42,138 @@ func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcC
 		blockDAO:           blockDAO,
 		blockRangesSeqDAO:  &BlockRangeSequentialDAO{db},
 		rpcClient:          rpcClient,
-		accountFeed:        accountFeed,
-		TransferFeed:       transferFeed,
+		accountPublisher:   accountPublisher,
 		transactionManager: transactionManager,
-		pendingTxManager:   pendingTxManager,
-		tokenManager:       tokenManager,
-		balanceCacher:      balanceCacher,
 		blockChainState:    blockChainState,
 	}
 }
 
 func (c *Controller) Start(ctx context.Context) {
+	c.stopCh = make(chan struct{})
 	go func() {
 		defer gocommon.LogOnPanic()
 		_ = c.cleanupAccountsLeftovers()
 	}()
+	c.startAccountWatcher()
+	c.startNetworksWatcher()
 }
 
 func (c *Controller) Stop() {
+	if c.stopCh != nil {
+		close(c.stopCh)
+		c.stopCh = nil
+	}
+
 	if c.reactor != nil {
 		c.reactor.stop()
 	}
-
-	if c.accWatcher != nil {
-		c.accWatcher.Stop()
-		c.accWatcher = nil
-	}
 }
 
-func (c *Controller) startAccountWatcher(chainIDs []uint64) {
-	if c.accWatcher == nil {
-		c.accWatcher = accountsevent.NewWatcher(c.accountsDB, c.accountFeed, func(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
-			c.onAccountsChanged(changedAddresses, eventType, currentAddresses, chainIDs)
-		})
+func (c *Controller) startAccountWatcher() {
+	if c.accountPublisher == nil {
+		return
 	}
-	c.accWatcher.Start()
-}
 
-func (c *Controller) onAccountsChanged(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address, chainIDs []uint64) {
-	if eventType == accountsevent.EventTypeRemoved {
-		for _, address := range changedAddresses {
-			c.cleanUpRemovedAccount(address)
+	chAdded, unsubAddedFn := pubsub.Subscribe[accountsevent.AccountsAddedEvent](c.accountPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubAddedFn()
+		for {
+			select {
+			case <-c.stopCh:
+				return
+			case _, ok := <-chAdded:
+				if !ok {
+					return
+				}
+				c.restartReactor()
+			}
 		}
-	}
+	}()
 
+	chRemoved, unsubRemovedFn := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](c.accountPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubRemovedFn()
+		for {
+			select {
+			case <-c.stopCh:
+				return
+			case _, ok := <-chRemoved:
+				if !ok {
+					return
+				}
+				c.restartReactor()
+			}
+		}
+	}()
+}
+
+func (c *Controller) startNetworksWatcher() {
+	if c.rpcClient != nil && c.rpcClient.NetworkManager != nil {
+		networksPublisher := c.rpcClient.NetworkManager.GetPublisher()
+		if networksPublisher == nil {
+			return
+		}
+
+		ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](networksPublisher, 10)
+		go func() {
+			defer gocommon.LogOnPanic()
+			defer unsubFn()
+			for {
+				select {
+				case <-c.stopCh:
+					return
+				case _, ok := <-ch:
+					if !ok {
+						return
+					}
+					c.restartReactor()
+				}
+			}
+		}()
+	}
+}
+
+func (c *Controller) restartReactor() {
 	if c.reactor == nil {
 		logutils.ZapLogger().Warn("reactor is not initialized")
 		return
 	}
 
-	if eventType == accountsevent.EventTypeAdded || eventType == accountsevent.EventTypeRemoved {
-		logutils.ZapLogger().Debug("list of accounts was changed from a previous version. reactor will be restarted", zap.Stringers("new", currentAddresses))
+	currentEthAddresses, err := c.accountsDB.GetWalletAddresses()
 
-		chainClients, err := c.rpcClient.EthClients(chainIDs)
-		if err != nil {
-			return
-		}
+	if err != nil {
+		logutils.ZapLogger().Error("failed getting wallet addresses", zap.Error(err))
+		return
+	}
 
-		err = c.reactor.restart(chainClients, currentAddresses)
-		if err != nil {
-			logutils.ZapLogger().Error("failed to restart reactor with new accounts", zap.Error(err))
-		}
+	currentAddresses := make([]common.Address, 0, len(currentEthAddresses))
+	for _, ethAddress := range currentEthAddresses {
+		currentAddresses = append(currentAddresses, common.Address(ethAddress))
+	}
+
+	logutils.ZapLogger().Debug("list of accounts was changed from a previous version. reactor will be restarted", zap.Stringers("new", currentAddresses))
+
+	currentNetworks, err := c.rpcClient.NetworkManager.Get(false)
+	if err != nil {
+		logutils.ZapLogger().Error("failed getting active networks", zap.Error(err))
+		return
+	}
+
+	chainIDs := make([]uint64, 0, len(currentNetworks))
+	for _, network := range currentNetworks {
+		chainIDs = append(chainIDs, network.ChainID)
+	}
+
+	chainClients, err := c.rpcClient.EthClients(chainIDs)
+	if err != nil {
+		return
+	}
+
+	err = c.reactor.restart(chainClients, currentAddresses)
+	if err != nil {
+		logutils.ZapLogger().Error("failed to restart reactor with new accounts", zap.Error(err))
 	}
 }
 

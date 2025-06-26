@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
 	protocolCommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
@@ -58,7 +59,7 @@ func NewService(
 	accountsDB *accounts.Database,
 	appDB *sql.DB,
 	rpcClient *rpc.Client,
-	accountFeed *event.Feed,
+	accountsPublisher *pubsub.Publisher,
 	gethManager *accsmanagement.AccountsManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
@@ -105,7 +106,7 @@ func NewService(
 
 	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
-	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountFeed, accountsDB, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountsPublisher, accountsDB, token.NewPersistence(db))
 
 	cryptoOnRampProviders := []onramp.Provider{
 		onramp.NewMoonPayProvider(),
@@ -129,8 +130,7 @@ func NewService(
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(transfer.NewMultiTransactionDB(db), gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	blockChainState := blockchainstate.NewBlockChainState()
-	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
-		tokenManager, balanceCacher, blockChainState)
+	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountsPublisher, transactionManager, blockChainState)
 
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
@@ -142,7 +142,7 @@ func NewService(
 	})
 	marketManager := market.NewManager([]thirdparty.MarketDataProvider{cryptoCompare, coingecko, cryptoCompareProxy}, tokenManager, feed)
 	reader := NewReader(tokenManager, marketManager, token.NewPersistence(db), feed)
-	history := history.NewService(db, accountsDB, accountFeed, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
+	history := history.NewService(db, accountsDB, accountsPublisher, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 
 	openseaHTTPClient := opensea.NewHTTPClient()
@@ -194,7 +194,7 @@ func NewService(
 		mediaServer,
 		feed,
 	)
-	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
+	collectibles := collectibles.NewService(db, feed, accountsDB, accountsPublisher, communityManager, rpcClient.NetworkManager, collectiblesManager)
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 

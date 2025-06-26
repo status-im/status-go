@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/ethereum/go-ethereum/event"
-
 	"github.com/status-im/status-go/accounts-management/generator"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -127,7 +126,7 @@ type config struct {
 
 	communityManagerOptions []communities.ManagerOption
 
-	accountsFeed *event.Feed
+	accountsPublisher *pubsub.Publisher
 
 	onlineChecker func() bool
 }
@@ -417,9 +416,9 @@ func WithMessageSigner(signer communities.MessageSigner) Option {
 	}
 }
 
-func WithAccountsFeed(feed *event.Feed) Option {
+func WithAccountsPublisher(publisher *pubsub.Publisher) Option {
 	return func(c *config) error {
-		c.accountsFeed = feed
+		c.accountsPublisher = publisher
 		return nil
 	}
 }
