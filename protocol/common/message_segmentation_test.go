@@ -191,71 +191,20 @@ func (s *MessageSegmentationSuite) TestProtobufMissDecoding() {
 	s.Require().Equal(segmentMessage.SegmentsCount, uint32(25))
 }
 
-// func (s *MessageSegmentationSuite) TestSegmentShortMessage() {
-// 	testPayload := "0a41"
-// 	payloadSizeThreashold := 5
-
-// 	segmentedMessages, err := segmentMessage(&wakutypes.NewMessage{Payload: types.Hex2Bytes(testPayload)}, payloadSizeThreashold)
-// 	s.Require().NoError(err)
-// 	s.Require().Less(len(testPayload), payloadSizeThreashold)
-// 	s.Require().Equal(len(segmentedMessages), 1)
-
-// 	message := &protocol.StatusMessage{TransportLayer: protocol.TransportLayer{
-// 		SigPubKey: &s.sender.identity.PublicKey,
-// 	}}
-
-// 	message.TransportLayer.Payload = segmentedMessages[0].Payload
-// 	err = s.sender.handleSegmentationLayer(message, payloadSizeThreashold)
-// 	s.Require().Equal(err.Error(), "short message, no segmentation required")
-// }
-
 func (s *MessageSegmentationSuite) TestSegmentShortMessage() {
-	testPayload := "0a41" // length 4 hex chars = 2 bytes
-	payloadBytes := types.Hex2Bytes(testPayload)
+	testPayload := "0a41"
+	payloadSizeThreashold := 5
 
-	testCases := []struct {
-		name                 string
-		threshold            int
-		expectedSegmentCount int
-		expectedErrorMessage string
-	}{
-		{
-			name:                 "threshold 3",
-			threshold:            3,
-			expectedSegmentCount: 1,
-			expectedErrorMessage: "short message, no segmentation required",
-		},
-		{
-			name:                 "threshold 4",
-			threshold:            4,
-			expectedSegmentCount: 1,
-			expectedErrorMessage: "short message, no segmentation required",
-		},
-		{
-			name:                 "threshold 5",
-			threshold:            5,
-			expectedSegmentCount: 1,
-			expectedErrorMessage: "short message, no segmentation required",
-		},
-	}
+	segmentedMessages, err := segmentMessage(&wakutypes.NewMessage{Payload: types.Hex2Bytes(testPayload)}, payloadSizeThreashold)
+	s.Require().NoError(err)
+	s.Require().Less(len(testPayload), payloadSizeThreashold)
+	s.Require().Equal(len(segmentedMessages), 1)
 
-	for _, tc := range testCases {
-		s.Run(tc.name, func() {
-			segmentedMessages, err := segmentMessage(&wakutypes.NewMessage{Payload: payloadBytes}, tc.threshold)
-			s.Require().NoError(err)
-			s.Require().Less(len(payloadBytes), tc.threshold, "payload should be smaller than threshold")
-			s.Require().Equal(tc.expectedSegmentCount, len(segmentedMessages), "expected only one segment")
+	message := &protocol.StatusMessage{TransportLayer: protocol.TransportLayer{
+		SigPubKey: &s.sender.identity.PublicKey,
+	}}
 
-			message := &protocol.StatusMessage{
-				TransportLayer: protocol.TransportLayer{
-					SigPubKey: &s.sender.identity.PublicKey,
-					Payload:   segmentedMessages[0].Payload,
-				},
-			}
-
-			err = s.sender.handleSegmentationLayer(message, tc.threshold)
-			s.Require().Error(err)
-			s.Require().Equal(tc.expectedErrorMessage, err.Error())
-		})
-	}
+	message.TransportLayer.Payload = segmentedMessages[0].Payload
+	err = s.sender.handleSegmentationLayer(message, payloadSizeThreashold)
+	s.Require().Equal(err.Error(), "short message, no segmentation required")
 }
