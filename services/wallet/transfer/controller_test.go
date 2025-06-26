@@ -11,10 +11,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
@@ -32,7 +32,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	accountFeed := &event.Feed{}
+	accountsPublisher := pubsub.NewPublisher()
 
 	bcstate := blockchainstate.NewBlockChainState()
 	SetMultiTransactionIDGenerator(StaticIDCounter()) // to have different multi-transaction IDs even with fast execution
@@ -41,12 +41,8 @@ func TestController_watchAccountsChanges(t *testing.T) {
 		walletDB,
 		accountsDB,
 		nil, // rpcClient
-		accountFeed,
-		nil,                // transferFeed
+		accountsPublisher,
 		transactionManager, // transactionManager
-		nil,                // pendingTxManager
-		nil,                // tokenManager
-		nil,                // balanceCacher
 		bcstate,
 	)
 
@@ -161,46 +157,48 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, mtxs, 3)
 
+	c.Start(context.Background())
+
 	// Start watching accounts
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	c.accWatcher = accountsevent.NewWatcher(c.accountsDB, c.accountFeed, func(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
-		c.onAccountsChanged(changedAddresses, eventType, currentAddresses, []uint64{chainID})
 
-		// Quit channel event handler before  destroying the channel
-		go func() {
-			defer wg.Done()
+	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](accountsPublisher, 10)
+	go func() {
+		_, ok := <-ch
+		if !ok {
+			return
+		}
+		defer wg.Done()
 
-			time.Sleep(1 * time.Millisecond)
-			// Wait for DB to be cleaned up
-			c.accWatcher.Stop()
+		time.Sleep(1 * time.Millisecond)
+		// Wait for DB to be cleaned up
 
-			// Check that transfers, blocks and block ranges were deleted
-			transfers, err := database.GetTransfersByAddress(chainID, address, big.NewInt(2), 1)
-			require.NoError(t, err)
-			require.Len(t, transfers, 0)
+		// Check that transfers, blocks and block ranges were deleted
+		transfers, err := database.GetTransfersByAddress(chainID, address, big.NewInt(2), 1)
+		require.NoError(t, err)
+		require.Len(t, transfers, 0)
 
-			blocksDAO := &BlockDAO{walletDB}
-			block, err := blocksDAO.GetLastBlockByAddress(chainID, address, 1)
-			require.NoError(t, err)
-			require.Nil(t, block)
+		blocksDAO := &BlockDAO{walletDB}
+		block, err := blocksDAO.GetLastBlockByAddress(chainID, address, 1)
+		require.NoError(t, err)
+		require.Nil(t, block)
 
-			ranges, _, err = blockRangesDAO.getBlockRange(chainID, address)
-			require.NoError(t, err)
-			require.Nil(t, ranges.eth.FirstKnown)
-			require.Nil(t, ranges.eth.LastKnown)
-			require.Nil(t, ranges.eth.Start)
-			require.Nil(t, ranges.tokens.FirstKnown)
-			require.Nil(t, ranges.tokens.LastKnown)
-			require.Nil(t, ranges.tokens.Start)
+		ranges, _, err = blockRangesDAO.getBlockRange(chainID, address)
+		require.NoError(t, err)
+		require.Nil(t, ranges.eth.FirstKnown)
+		require.Nil(t, ranges.eth.LastKnown)
+		require.Nil(t, ranges.eth.Start)
+		require.Nil(t, ranges.tokens.FirstKnown)
+		require.Nil(t, ranges.tokens.LastKnown)
+		require.Nil(t, ranges.tokens.Start)
 
-			mtxs, err := transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{mid, midSelf, midReverse})
-			require.NoError(t, err)
-			require.Len(t, mtxs, 1)
-			require.Equal(t, midReverse, mtxs[0].ID)
-		}()
-	})
-	c.startAccountWatcher([]uint64{chainID})
+		mtxs, err := transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{mid, midSelf, midReverse})
+		require.NoError(t, err)
+		require.Len(t, mtxs, 1)
+		require.Equal(t, midReverse, mtxs[0].ID)
+	}()
+	defer unsubFn()
 
 	// Watching accounts must start before sending event.
 	// To avoid running goroutine immediately and let the controller subscribe first,
@@ -208,8 +206,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	go func() {
 		time.Sleep(1 * time.Millisecond)
 
-		accountFeed.Send(accountsevent.Event{
-			Type:     accountsevent.EventTypeRemoved,
+		pubsub.Publish(accountsPublisher, accountsevent.AccountsRemovedEvent{
 			Accounts: []common.Address{address},
 		})
 	}()
@@ -244,13 +241,9 @@ func TestController_cleanupAccountLeftovers(t *testing.T) {
 	c := NewTransferController(
 		walletDB,
 		accountsDB,
-		nil,                // rpcClient
-		nil,                // accountFeed
-		nil,                // transferFeed
+		nil, // rpcClient
+		nil,
 		transactionManager, // transactionManager
-		nil,                // pendingTxManager
-		nil,                // tokenManager
-		nil,                // balanceCacher
 		bcstate,
 	)
 	chainID := uint64(777)

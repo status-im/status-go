@@ -1140,7 +1140,7 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 	require.NoError(t, err)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager = token.NewTokenManager(walletDb, client, community.NewManager(appDb, nil, nil), network.NewManager(appDb, nil, nil), appDb, mediaServer, nil, nil, nil, token.NewPersistence(walletDb))
+	tokenManager = token.NewTokenManager(walletDb, client, community.NewManager(appDb, nil, nil), network.NewManager(appDb, nil), appDb, mediaServer, nil, nil, nil, token.NewPersistence(walletDb))
 
 	tokenListsFetcher := fetcher.NewTokenListsFetcher(walletDb)
 	err = tokenListsFetcher.StoreTokenList("sequential-commands-tests-list", "", "abcd", sequentialCommandsTestsListJsonData)
@@ -1399,7 +1399,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	client, _ := statusRpc.NewClient(config)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 	address := common.HexToAddress("0x1234")
 	chainClient := newMockChainClient()
@@ -1511,7 +1511,7 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 		client, _ := statusRpc.NewClient(config)
 
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 		cmd := &findNewBlocksCommand{
 			findBlocksCommand: &findBlocksCommand{
@@ -1580,7 +1580,7 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 	client, _ := statusRpc.NewClient(config)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 	wdb := NewDB(db)
 	blockChannel := make(chan []*DBHeader, 10)
@@ -1703,7 +1703,7 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 
 	client.SetClient(tc.NetworkID(), tc)
 
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 	cmd := &findNewBlocksCommand{
 		findBlocksCommand: &findBlocksCommand{

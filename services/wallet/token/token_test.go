@@ -13,12 +13,12 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
 	mediaserver "github.com/status-im/status-go/server"
@@ -332,7 +332,7 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	require.NoError(t, err)
 
 	address := common.HexToAddress("0x1234")
-	accountFeed := event.Feed{}
+	accountsPublisher := pubsub.NewPublisher()
 	chainID := uint64(1)
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
@@ -348,11 +348,11 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	rpcClient, _ := rpc.NewClient(config)
 
 	rpcClient.UpstreamChainID = chainID
-	nm := network.NewManager(appDB, nil, nil)
+	nm := network.NewManager(appDB, nil)
 	mediaServer, err := mediaserver.NewMediaServer(appDB, nil, nil, walletDB)
 	require.NoError(t, err)
 
-	manager := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, mediaServer, nil, &accountFeed, accountsDB, NewPersistence(walletDB))
+	manager := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, mediaServer, nil, accountsPublisher, accountsDB, NewPersistence(walletDB))
 
 	// Insert balances for address
 	marked, err := manager.MarkAsPreviouslyOwnedToken(&tokenTypes.Token{
@@ -369,7 +369,7 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	require.Len(t, tokenByAddress, 1)
 
 	// Start service
-	manager.startAccountsWatcher()
+	manager.Start(context.Background(), 1*time.Hour, 1*time.Hour)
 
 	// Watching accounts must start before sending event.
 	// To avoid running goroutine immediately and let the controller subscribe first,
@@ -380,8 +380,7 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 		defer group.Done()
 		time.Sleep(1 * time.Millisecond)
 
-		accountFeed.Send(accountsevent.Event{
-			Type:     accountsevent.EventTypeRemoved,
+		pubsub.Publish(accountsPublisher, accountsevent.AccountsRemovedEvent{
 			Accounts: []common.Address{address},
 		})
 
@@ -399,7 +398,7 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	// Stop service
 	txServiceMockCtrl.Finish()
 	server.Stop()
-	manager.stopAccountsWatcher()
+	manager.Stop()
 }
 
 func Test_tokensListsValidity(t *testing.T) {
@@ -412,7 +411,7 @@ func Test_tokensListsValidity(t *testing.T) {
 	accountsDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 
-	nm := network.NewManager(appDB, nil, nil)
+	nm := network.NewManager(appDB, nil)
 
 	manager := NewTokenManager(walletDB, nil, nil, nm, appDB, nil, nil, nil, accountsDB, NewPersistence(walletDB))
 	require.NotNil(t, manager)

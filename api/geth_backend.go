@@ -2715,7 +2715,7 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyMan
 		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.walletDB,
 			b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, b.statusNode.RPCClient(),
 			b.statusNode.WalletService(), b.statusNode.CommunityTokensService(), b.statusNode.WakuV2Service(),
-			logutils.ZapLogger(), b.statusNode.AccountsFeed()); err != nil {
+			logutils.ZapLogger(), b.statusNode.AccountsPublisher()); err != nil {
 			return err
 		}
 		// Set initial connection state

@@ -18,7 +18,6 @@ import (
 	commongethtypes "github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
@@ -35,6 +34,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
@@ -100,7 +100,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account,
 	accountManager *accsmanagement.AccountsManager, rpcClient *rpc.Client, walletService *wallet.Service,
 	communityTokensService *communitytokens.Service, wakuService *wakuv2.Waku, logger *zap.Logger,
-	accountsFeed *event.Feed) error {
+	accountsPublisher *pubsub.Publisher) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
@@ -144,7 +144,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		s.config.ShhextConfig.VerifyENSContractAddress,
 	)
 
-	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsFeed, ensVerifier)
+	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsPublisher, ensVerifier)
 	if err != nil {
 		return err
 	}
@@ -368,7 +368,7 @@ func buildMessengerOptions(
 	logger *zap.Logger,
 	messengerSignalsHandler protocol.MessengerSignalsHandler,
 	accountManager *accsmanagement.AccountsManager,
-	accountsFeed *event.Feed,
+	accountsPublisher *pubsub.Publisher,
 	ensVerifier *ens.Verifier,
 ) ([]protocol.Option, error) {
 	personalService := personal.New()
@@ -393,7 +393,7 @@ func buildMessengerOptions(
 		protocol.WithCommunityTokensService(communityTokensService),
 		protocol.WithWakuService(wakuService),
 		protocol.WithAccountManager(accountManager),
-		protocol.WithAccountsFeed(accountsFeed),
+		protocol.WithAccountsPublisher(accountsPublisher),
 		protocol.WithNewsFeed(),
 		protocol.WithMessageSigner(personalService),
 	}

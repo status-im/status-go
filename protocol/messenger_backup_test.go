@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/status-im/status-go/pkg/pubsub"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
@@ -891,12 +891,12 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	s.Require().True(accounts.SameKeypairs(seedKp, dbSeedKp1))
 
 	// Create bob2
-	accountsFeed := &event.Feed{}
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, []Option{WithAccountsFeed(accountsFeed)})
+	accountsPublisher := pubsub.NewPublisher()
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, []Option{WithAccountsPublisher(accountsPublisher)})
 	s.Require().NoError(err)
-	s.Require().NotNil(bob2.config.accountsFeed)
-	ch := make(chan accountsevent.Event, 20)
-	sub := bob2.config.accountsFeed.Subscribe(ch)
+	s.Require().NotNil(bob2.config.accountsPublisher)
+	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsAddedEvent](accountsPublisher, 10)
+	defer unsubFn()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
@@ -948,18 +948,14 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 		case <-time.After(1 * time.Second):
 			s.Fail("Timed out waiting for accountsevent")
 		case event := <-ch:
-			switch event.Type {
-			case accountsevent.EventTypeAdded:
-				for _, address := range event.Accounts {
-					if _, exists := expectedAddresses[address]; !exists {
-						s.logger.Debug("missing address in the accounts event", zap.Any("address", address))
-						s.Fail("address not received in the event")
-					}
+			for _, address := range event.Accounts {
+				if _, exists := expectedAddresses[address]; !exists {
+					s.logger.Debug("missing address in the accounts event", zap.Any("address", address))
+					s.Fail("address not received in the event")
 				}
 			}
 		}
 	}
-	sub.Unsubscribe()
 }
 
 func (s *MessengerBackupSuite) TestBackupKeycards() {
@@ -1043,12 +1039,12 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	s.Require().True(haveSameElements(woAccounts, dbWoAccounts1, accounts.SameAccounts))
 
 	// Create bob2
-	accountsFeed := &event.Feed{}
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, []Option{WithAccountsFeed(accountsFeed)})
+	accountsPublisher := pubsub.NewPublisher()
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, []Option{WithAccountsPublisher(accountsPublisher)})
 	s.Require().NoError(err)
-	s.Require().NotNil(bob2.config.accountsFeed)
-	ch := make(chan accountsevent.Event, 20)
-	sub := bob2.config.accountsFeed.Subscribe(ch)
+	s.Require().NotNil(bob2.config.accountsPublisher)
+	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsAddedEvent](accountsPublisher, 10)
+	defer unsubFn()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
@@ -1080,13 +1076,9 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	case <-time.After(1 * time.Second):
 		s.Fail("Timed out waiting for accountsevent")
 	case event := <-ch:
-		switch event.Type {
-		case accountsevent.EventTypeAdded:
-			s.Require().Len(event.Accounts, 1)
-			s.Require().Equal(common.Address(dbWoAccounts2[0].Address), event.Accounts[0])
-		}
+		s.Require().Len(event.Accounts, 1)
+		s.Require().Equal(common.Address(dbWoAccounts2[0].Address), event.Accounts[0])
 	}
-	sub.Unsubscribe()
 }
 
 func (s *MessengerBackupSuite) TestBackupChats() {

@@ -2,8 +2,8 @@ package accounts
 
 import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -18,21 +18,22 @@ import (
 
 // NewService initializes service instance.
 func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *accsmanagement.AccountsManager,
-	config *params.NodeConfig, feed *event.Feed, publisher *pubsub.Publisher, mediaServer *server.MediaServer) *Service {
+	config *params.NodeConfig, publisher *pubsub.Publisher, mediaServer *server.MediaServer) *Service {
 	s := &Service{
 		db:          db,
 		mdb:         mdb,
 		manager:     manager,
 		config:      config,
-		feed:        feed,
 		mediaServer: mediaServer,
 		publisher:   publisher,
 	}
 	db.SetSettingsNotifier(func(setting settings.SettingField, val interface{}) {
-		pubsub.Publish(s.publisher, settings.EventSettingChanged{
-			Setting: setting,
-			Value:   val,
-		})
+		if s.publisher != nil {
+			pubsub.Publish(s.publisher, settings.EventSettingChanged{
+				Setting: setting,
+				Value:   val,
+			})
+		}
 	})
 	return s
 }
@@ -43,7 +44,6 @@ type Service struct {
 	mdb         *multiaccounts.Database
 	manager     *accsmanagement.AccountsManager
 	config      *params.NodeConfig
-	feed        *event.Feed
 	messenger   *protocol.Messenger
 	mediaServer *server.MediaServer
 	publisher   *pubsub.Publisher
@@ -90,7 +90,7 @@ func (s *Service) APIs() []rpc.API {
 }
 
 func (s *Service) AccountsAPI() *API {
-	return NewAccountsAPI(s.manager, s.config, s.db, s.feed, &s.messenger)
+	return NewAccountsAPI(s.manager, s.config, s.db, &s.messenger, s.publisher)
 }
 
 func (s *Service) GetKeypairByKeyUID(keyUID string) (*accounts.Keypair, error) {

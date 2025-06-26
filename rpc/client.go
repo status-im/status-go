@@ -104,7 +104,6 @@ type Client struct {
 
 	healthMgr          *healthmanager.BlockchainHealthManager
 	stopMonitoringFunc context.CancelFunc
-	accountsFeed       *event.Feed
 	accountsPublisher  *pubsub.Publisher
 	walletFeed         *event.Feed
 
@@ -124,7 +123,6 @@ type ClientConfig struct {
 	UpstreamChainID   uint64
 	Networks          []params.Network
 	DB                *sql.DB
-	AccountsFeed      *event.Feed
 	AccountsPublisher *pubsub.Publisher
 	WalletFeed        *event.Feed
 }
@@ -135,7 +133,7 @@ type ClientConfig struct {
 // reconnect to the server if connection is lost.
 func NewClient(config ClientConfig) (*Client, error) {
 	logger := logutils.ZapLogger().Named("rpcClient")
-	networkManager := network.NewManager(config.DB, config.AccountsFeed, config.AccountsPublisher)
+	networkManager := network.NewManager(config.DB, config.AccountsPublisher)
 	if networkManager == nil {
 		return nil, errors.New("failed to create network manager")
 	}
@@ -154,7 +152,6 @@ func NewClient(config ClientConfig) (*Client, error) {
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		logger:             logger,
 		healthMgr:          healthmanager.NewBlockchainHealthManager(),
-		accountsFeed:       config.AccountsFeed,
 		accountsPublisher:  config.AccountsPublisher,
 		walletFeed:         config.WalletFeed,
 	}

@@ -12,6 +12,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/signal"
@@ -3403,17 +3404,17 @@ func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount, fr
 		return nil, err
 	}
 
-	if m.config.accountsFeed != nil {
-		var eventType accountsevent.EventType
+	if m.config.accountsPublisher != nil {
+		payload := []gethcommon.Address{gethcommon.Address(acc.Address)}
 		if acc.Removed {
-			eventType = accountsevent.EventTypeRemoved
+			pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsRemovedEvent{
+				Accounts: payload,
+			})
 		} else {
-			eventType = accountsevent.EventTypeAdded
+			pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsAddedEvent{
+				Accounts: payload,
+			})
 		}
-		m.config.accountsFeed.Send(accountsevent.Event{
-			Type:     eventType,
-			Accounts: []gethcommon.Address{gethcommon.Address(acc.Address)},
-		})
 	}
 	return acc, nil
 }
@@ -3716,7 +3717,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		return nil, err
 	}
 
-	if m.config.accountsFeed != nil {
+	if m.config.accountsPublisher != nil {
 		addedAddresses := []gethcommon.Address{}
 		removedAddresses := []gethcommon.Address{}
 		if dbKeypair.Removed {
@@ -3735,17 +3736,17 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 				}
 			}
 		}
-		if len(addedAddresses) > 0 {
-			m.config.accountsFeed.Send(accountsevent.Event{
-				Type:     accountsevent.EventTypeAdded,
-				Accounts: addedAddresses,
-			})
-		}
-		if len(removedAddresses) > 0 {
-			m.config.accountsFeed.Send(accountsevent.Event{
-				Type:     accountsevent.EventTypeRemoved,
-				Accounts: removedAddresses,
-			})
+		if m.config.accountsPublisher != nil {
+			if len(addedAddresses) > 0 {
+				pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsAddedEvent{
+					Accounts: addedAddresses,
+				})
+			}
+			if len(removedAddresses) > 0 {
+				pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsRemovedEvent{
+					Accounts: removedAddresses,
+				})
+			}
 		}
 	}
 
