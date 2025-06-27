@@ -377,5 +377,5 @@ class StatusBackend(RpcClient, SignalClient):
                 "clientConfig": {},
             },
         }
-        response = self.api_valid_request(method, data)
+        response = self.api_request(method, data)
         return json.loads(response.content)

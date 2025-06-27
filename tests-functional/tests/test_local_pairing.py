@@ -278,3 +278,17 @@ class TestLocalPairing(MessengerSteps):
             assert user_declined_notification["read"] is True
             assert user_declined_notification["accepted"] is False
             assert user_declined_notification["dismissed"] is True
+
+    def test_pairing_receiver_must_be_logged_out(self):
+        sender = self.initialize_backend(self.await_signals, False)
+        receiver = self.initialize_backend(self.await_signals, False)
+
+        # Client receiver must be logged out
+        connection_string = sender.get_connection_string_for_bootstrapping_another_device()
+        response = receiver.input_connection_string_for_bootstrapping(connection_string)
+        assert response["error"] is not None
+
+        # Server receiver must be logged out
+        connection_string = receiver.get_connection_string_for_being_bootstrapped()
+        response = sender.input_connection_string_for_bootstrapping_another_device(connection_string)
+        assert response["error"] is not None
