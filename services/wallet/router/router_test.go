@@ -143,6 +143,21 @@ func TestRouter(t *testing.T) {
 				} else {
 					assertPathsEqual(t, tt.expectedCandidates, routes.Candidates)
 				}
+			} else if len(tt.expectedOneOfErrors) > 0 {
+				assert.Error(t, err)
+				found := false
+				for _, expectedError := range tt.expectedOneOfErrors {
+					if expectedError.Error() == err.Error() {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found)
+				if routes == nil {
+					assert.Empty(t, tt.expectedCandidates)
+				} else {
+					assertPathsEqual(t, tt.expectedCandidates, routes.Candidates)
+				}
 			} else {
 				assert.NoError(t, err)
 				assertPathsEqual(t, tt.expectedCandidates, routes.Candidates)
@@ -157,9 +172,21 @@ func TestRouter(t *testing.T) {
 		select {
 		case asyncRoutes := <-suggestedRoutesCh:
 			assert.Equal(t, tt.input.Uuid, asyncRoutes.Uuid)
-			assert.Equal(t, tt.expectedError, asyncRoutes.ErrorResponse)
+			if tt.expectedError != nil {
+				assert.Equal(t, tt.expectedError.Error(), asyncRoutes.ErrorResponse.Error())
+			} else if len(tt.expectedOneOfErrors) > 0 {
+				found := false
+				for _, expectedError := range tt.expectedOneOfErrors {
+					if expectedError.Error() == asyncRoutes.ErrorResponse.Error() {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found)
+			} else {
+				assert.Nil(t, asyncRoutes.ErrorResponse)
+			}
 			assertPathsEqual(t, tt.expectedCandidates, asyncRoutes.Candidates)
-			break
 		case <-time.After(10 * time.Second):
 			t.FailNow()
 		}

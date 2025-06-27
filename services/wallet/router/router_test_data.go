@@ -243,10 +243,11 @@ var defaultNetworks = []params.Network{
 }
 
 type normalTestParams struct {
-	name               string
-	input              *requests.RouteInputParams
-	expectedCandidates routes.Route
-	expectedError      *errors.ErrorResponse
+	name                string
+	input               *requests.RouteInputParams
+	expectedCandidates  routes.Route
+	expectedError       *errors.ErrorResponse
+	expectedOneOfErrors []*errors.ErrorResponse // one of the errors is expected to be returned
 }
 
 func getNormalTestParamsList() []normalTestParams {
@@ -1967,9 +1968,23 @@ func getNormalTestParamsList() []normalTestParams {
 					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedError: &errors.ErrorResponse{
-				Code:    ErrNotEnoughTokenBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, walletCommon.UsdcSymbolEVM, walletCommon.OptimismMainnet),
+			expectedOneOfErrors: []*errors.ErrorResponse{
+				{
+					Code:    ErrNotEnoughTokenBalance.Code,
+					Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, walletCommon.UsdcSymbolEVM, walletCommon.EthereumMainnet),
+				},
+				{
+					Code:    ErrNotEnoughTokenBalance.Code,
+					Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, walletCommon.UsdcSymbolEVM, walletCommon.OptimismMainnet),
+				},
+				{
+					Code:    ErrNotEnoughTokenBalance.Code,
+					Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, walletCommon.UsdcSymbolEVM, walletCommon.ArbitrumMainnet),
+				},
+				{
+					Code:    ErrNotEnoughTokenBalance.Code,
+					Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, walletCommon.UsdcSymbolEVM, walletCommon.BaseMainnet),
+				},
 			},
 			expectedCandidates: routes.Route{
 				{

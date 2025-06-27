@@ -427,20 +427,35 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 	}
 
 	err = r.prepareBalanceMapForTokenOnChains(ctx, input, selectedFromChains)
-	// return only if there are no balances, otherwise try to resolve the candidates for chains we know the balances for
-	noBalanceOnAnyChain := true
-	r.activeBalanceMap.Range(func(key, value interface{}) bool {
-		if value.(*big.Int).Cmp(walletCommon.ZeroBigIntValue()) > 0 {
-			noBalanceOnAnyChain = false
-			return false
+	if err != nil {
+		return nil, errors.CreateErrorResponseFromError(err)
+	}
+
+	statusChainAmongSelectedFromChains := false
+	for _, chain := range selectedFromChains {
+		if chain.ChainID == walletCommon.StatusNetworkSepolia {
+			statusChainAmongSelectedFromChains = true
+			break
 		}
-		return true
-	})
-	if noBalanceOnAnyChain {
-		if err != nil {
-			return nil, errors.CreateErrorResponseFromError(err)
+	}
+
+	// an exception is Status chain, which is gasless
+	if !statusChainAmongSelectedFromChains {
+		// return only if there are no balances, otherwise try to resolve the candidates for chains we know the balances for
+		noBalanceOnAnyChain := true
+		r.activeBalanceMap.Range(func(key, value interface{}) bool {
+			if value.(*big.Int).Cmp(walletCommon.ZeroBigIntValue()) > 0 {
+				noBalanceOnAnyChain = false
+				return false
+			}
+			return true
+		})
+		if noBalanceOnAnyChain {
+			if err != nil {
+				return nil, errors.CreateErrorResponseFromError(err)
+			}
+			return nil, ErrNoPositiveBalance
 		}
-		return nil, ErrNoPositiveBalance
 	}
 
 	candidates, processorErrors, err := r.resolveCandidates(ctx, input, selectedFromChains, selectedToChains)
