@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"runtime"
 	"strings"
@@ -1679,18 +1680,6 @@ func FormatPeerStats(wakuNode *waku.WakuNode) (types.PeerStats, error) {
 	return convertPeersDataToPeerStats(peersData), nil
 }
 
-/* func FormatPeerConnFailures(wakuNode *waku.WakuNode) map[string]int {
-	p := make(map[string]int)
-	for _, peerID := range wakuNode.Host().Network().Peers() {
-		peerInfo := wakuNode.Host().Peerstore().PeerInfo(peerID)
-		connFailures := wakuNode.Host().Peerstore().(wps.WakuPeerstore).ConnFailures(peerInfo.ID)
-		if connFailures > 0 {
-			p[peerID.String()] = connFailures
-		}
-	}
-	return p
-} */
-
 // GetCurrentTime returns current time.
 // Implements protocol/common.TimeSource
 func (w *Waku) GetCurrentTime() uint64 {
@@ -1879,8 +1868,8 @@ func gowakuToNwakuConfig(cfg *Config, logger *zap.Logger) *bindingscommon.WakuCo
 		nwakuCfg.Lightpush = true
 		nwakuCfg.RateLimits.Filter = &bindingscommon.RateLimit{Volume: 100, Period: 1, TimeUnit: bindingscommon.Second}
 		nwakuCfg.RateLimits.Lightpush = &bindingscommon.RateLimit{Volume: 5, Period: 1, TimeUnit: bindingscommon.Second}
-		nwakuCfg.MaxConnections = maxRelayPeers * 1.5 // 60% will be allocated to relay, 40% to service peers
-		nwakuCfg.PeerExchange = true                  //Enabling this until discv5 issues are resolved. This will enable more peers to be connected for relay mesh.
+		nwakuCfg.MaxConnections = int(math.Ceil(maxRelayPeers * 1.67)) // 60% will be allocated to relay, 40% to service peers. maxConnections = maxRelayPeers/0.6 = ~1.67*maxRelayPeers
+		nwakuCfg.PeerExchange = true                                   //Enabling this until discv5 issues are resolved. This will enable more peers to be connected for relay mesh.
 	} else {
 		nwakuCfg.MaxConnections = cfg.DiscoveryLimit
 	}
@@ -1890,7 +1879,7 @@ func gowakuToNwakuConfig(cfg *Config, logger *zap.Logger) *bindingscommon.WakuCo
 		nwakuCfg.RateLimits.PeerExchange = &bindingscommon.RateLimit{Volume: 1, Period: 1, TimeUnit: bindingscommon.Second}
 	}
 
-	nwakuCfg.LogLevel = "DEBUG" // TODO-nwaku
+	nwakuCfg.LogLevel = "DEBUG" // TODO-nwaku - allow dynamic log level configuration
 
 	return &nwakuCfg
 
