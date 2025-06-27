@@ -278,11 +278,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 	// TODO-nwaku
 	// waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
-	if cfg.LightClient {
-		cfg.EnableStoreConfirmationForMessagesSent = false
-	} else {
-		cfg.EnableStoreConfirmationForMessagesSent = true
-	}
+	cfg.EnableStoreConfirmationForMessagesSent = !cfg.LightClient
 
 	return waku, nil
 }
@@ -1500,10 +1496,21 @@ func (w *Waku) StopDiscV5() error {
 
 func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
 
+	networkChange := false
+
 	//If connection state is reported by something other than peerCount becoming 0 e.g from mobile app, disconnect all peers
-	if (state.Offline && w.PeerCount() > 0) ||
-		(w.state.Type != state.Type && !w.state.Offline && !state.Offline) { // network switched between wifi and cellular
-		w.logger.Info("connection switched or offline detected via mobile, disconnecting all peers")
+	if state.Offline && w.PeerCount() > 0 {
+		networkChange = true
+		w.logger.Info("offline detected via mobile, disconnecting all peers")
+	}
+
+	// network switched between wifi and cellular
+	if w.state.Type != state.Type && !w.state.Offline && !state.Offline {
+		networkChange = true
+		w.logger.Info("connection switched, disconnecting all peers")
+	}
+
+	if networkChange {
 		err := w.node.DisconnectAllPeers()
 
 		if err != nil {
@@ -1831,7 +1838,6 @@ func gowakuToNwakuConfig(cfg *Config, logger *zap.Logger) *bindingscommon.WakuCo
 	nwakuCfg.Store = cfg.EnableStore
 
 	if cfg.Nameserver != "" {
-		nwakuCfg.DnsDiscoveryNameServers = []string{cfg.Nameserver}
 		nwakuCfg.DnsAddrsNameServers = []string{cfg.Nameserver}
 	}
 
