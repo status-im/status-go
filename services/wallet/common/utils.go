@@ -91,13 +91,3 @@ func GetBlockCreationTimeForChain(chainID uint64) time.Duration {
 func IsGaslessChainAndEIP1559Compatible(chainID uint64) bool {
 	return chainID == StatusNetworkSepolia
 }
-
-// HasNoBaseFee returns true if the chain has no base fee (eg. Status Network is (will be fully) gasless chain, but EIP-1559 compatible, but at the moment its base fee is 0)
-func HasNoBaseFee(chainID uint64) bool {
-	return chainID == StatusNetworkSepolia
-}
-
-// HasNoPriorityFee returns true if the chain has no priority fee (eg. Status Network is (will be fully) gasless chain, but EIP-1559 compatible, but at the moment it has priority fee greater than 0)
-func HasNoPriorityFee(chainID uint64) bool {
-	return false // At this moment Status Network has priority fee, but it will be 0 after the upgrade
-}
