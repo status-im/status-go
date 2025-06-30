@@ -83,10 +83,10 @@ class StatusBackend(RpcClient, SignalClient):
         while time.time() - start_time <= timeout:
             try:
                 self.health(enable_logging=True)
-                logging.info(f"StatusBackend is healthy after {time.time() - start_time} seconds")
+                logging.debug(f"StatusBackend is healthy after {time.time() - start_time} seconds")
                 return
             except Exception as ex:
-                logging.error(ex)
+                logging.debug(f"StatusBackend error: {ex}")
                 time.sleep(0.1)
         raise TimeoutError(f"StatusBackend was not healthy after {timeout} seconds")
 

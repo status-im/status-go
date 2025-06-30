@@ -1,7 +1,6 @@
 import uuid as uuid_lib
 
 import pytest
-import logging
 import resources.constants as constants
 
 from steps.status_backend import StatusBackendSteps
@@ -77,24 +76,24 @@ class TestRouter(StatusBackendSteps):
             "gasFeeMode": gas_fee_mode,
         }
 
-        logging.info("Step: getting the best route")
+        # Step: getting the best route
         routes = wallet_utils.get_suggested_routes(self.rpc_client, **router_input_params)
         assert len(routes["Best"]) > 0
         wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
 
-        logging.info("Step: update gas fee mode without providing path tx identity params via wallet_setFeeMode endpoint")
+        # Step: update gas fee mode without providing path tx identity params via wallet_setFeeMode endpoint
         method = "wallet_setFeeMode"
         response = self.rpc_client.rpc_request(method, [None, gas_fee_mode])
         self.rpc_client.verify_is_json_rpc_error(response)
 
-        logging.info("Step: update gas fee mode with incomplete details for path tx identity params via wallet_setFeeMode endpoint")
+        # Step: update gas fee mode with incomplete details for path tx identity params via wallet_setFeeMode endpoint
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
         }
         response = self.rpc_client.rpc_request(method, [tx_identity_params, gas_fee_mode])
         self.rpc_client.verify_is_json_rpc_error(response)
 
-        logging.info("Step: update gas fee mode to low")
+        # Step: update gas fee mode to low
         gas_fee_mode = constants.gas_fee_mode_low
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
@@ -109,7 +108,7 @@ class TestRouter(StatusBackendSteps):
         assert len(routes["Best"]) > 0
         wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
 
-        logging.info("Step: update gas fee mode to high")
+        # Step: update gas fee mode to high
         gas_fee_mode = constants.gas_fee_mode_high
         self.rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
         _ = self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
@@ -118,7 +117,7 @@ class TestRouter(StatusBackendSteps):
         assert len(routes["Best"]) > 0
         wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
 
-        logging.info("Step: try to set custom gas fee mode via wallet_setFeeMode endpoint")
+        # Step: try to set custom gas fee mode via wallet_setFeeMode endpoint
         gas_fee_mode = constants.gas_fee_mode_custom
         response = self.rpc_client.rpc_request(method, [tx_identity_params, gas_fee_mode])
         self.rpc_client.verify_is_json_rpc_error(response)
@@ -144,24 +143,24 @@ class TestRouter(StatusBackendSteps):
             "gasFeeMode": gas_fee_mode,
         }
 
-        logging.info("Step: getting the best route")
+        # Step: getting the best route
         routes = wallet_utils.get_suggested_routes(self.rpc_client, **router_input_params)
         assert len(routes["Best"]) > 0
         wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
 
-        logging.info("Step: try to set custom tx details with empty params via wallet_setCustomTxDetails endpoint")
+        # Step: try to set custom tx details with empty params via wallet_setCustomTxDetails endpoint
         method = "wallet_setCustomTxDetails"
         response = self.rpc_client.rpc_request(method, [None, None])
         self.rpc_client.verify_is_json_rpc_error(response)
 
-        logging.info("Step: try to set custom tx details with incomplete details for path tx identity params via wallet_setCustomTxDetails endpoint")
+        # Step: try to set custom tx details with incomplete details for path tx identity params via wallet_setCustomTxDetails endpoint
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
         }
         response = self.rpc_client.rpc_request(method, [tx_identity_params, None])
         self.rpc_client.verify_is_json_rpc_error(response)
 
-        logging.info("Step: try to set custom tx details providing other than the custom gas fee mode via wallet_setCustomTxDetails endpoint")
+        # Step: try to set custom tx details providing other than the custom gas fee mode via wallet_setCustomTxDetails endpoint
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
             "pathName": routes["Best"][0]["ProcessorName"],
@@ -174,14 +173,14 @@ class TestRouter(StatusBackendSteps):
         response = self.rpc_client.rpc_request(method, [tx_identity_params, tx_custom_params])
         self.rpc_client.verify_is_json_rpc_error(response)
 
-        logging.info("Step: try to set custom tx details without providing maxFeesPerGas via wallet_setCustomTxDetails endpoint")
+        # Step: try to set custom tx details without providing maxFeesPerGas via wallet_setCustomTxDetails endpoint
         tx_custom_params = {
             "gasFeeMode": gas_fee_mode,
         }
         response = self.rpc_client.rpc_request(method, [tx_identity_params, tx_custom_params])
         self.rpc_client.verify_is_json_rpc_error(response)
 
-        logging.info("Step: try to set custom tx details without providing PriorityFee via wallet_setCustomTxDetails endpoint")
+        # Step: try to set custom tx details without providing PriorityFee via wallet_setCustomTxDetails endpoint
         tx_custom_params = {
             "gasFeeMode": gas_fee_mode,
             "maxFeesPerGas": "0x77359400",
@@ -189,7 +188,7 @@ class TestRouter(StatusBackendSteps):
         response = self.rpc_client.rpc_request(method, [tx_identity_params, tx_custom_params])
         self.rpc_client.verify_is_json_rpc_error(response)
 
-        logging.info("Step: try to set custom tx details via wallet_setCustomTxDetails endpoint")
+        # Step: try to set custom tx details via wallet_setCustomTxDetails endpoint
         gas_fee_mode = constants.gas_fee_mode_custom
         tx_nonce = 4
         tx_gas_amount = 30000

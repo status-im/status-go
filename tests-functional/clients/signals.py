@@ -164,10 +164,10 @@ class SignalClient:
         logging.error(f"Error: {error}")
 
     def _on_close(self, ws, close_status_code, close_msg):
-        logging.info(f"Connection closed: {close_status_code}, {close_msg}")
+        logging.debug(f"Connection closed: {close_status_code}, {close_msg}")
 
     def _on_open(self, ws):
-        logging.info("Connection opened")
+        logging.debug("Connection opened")
 
     def _connect(self):
         ws = websocket.WebSocketApp(
