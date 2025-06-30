@@ -167,7 +167,7 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	err = setKeystore(backend.AccountManager(), config.KeyStoreDir)
+	err = setKeystore(backend.AccountsManager(), config.KeyStoreDir)
 	require.NoError(t, err)
 
 	count := 2
@@ -225,7 +225,7 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	count := 3
-	err = setKeystore(backend.AccountManager(), config.KeyStoreDir)
+	err = setKeystore(backend.AccountsManager(), config.KeyStoreDir)
 	require.NoError(t, err)
 	require.NoError(t, backend.StartNode(config))
 	defer func() {
@@ -273,7 +273,7 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	err = setKeystore(backend.AccountManager(), config.KeyStoreDir)
+	err = setKeystore(backend.AccountsManager(), config.KeyStoreDir)
 	require.NoError(t, err)
 	err = backend.StartNode(config)
 	require.NoError(t, err)
@@ -291,7 +291,7 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		assert.NotNil(t, backend.AccountManager())
+		assert.NotNil(t, backend.AccountsManager())
 		wg.Done()
 	}()
 
@@ -381,7 +381,7 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	err = setKeystore(backend.AccountManager(), config.KeyStoreDir)
+	err = setKeystore(backend.AccountsManager(), config.KeyStoreDir)
 	require.NoError(t, err)
 	count := 3
 
@@ -478,7 +478,7 @@ func TestBlockedRPCMethods(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	err = setKeystore(backend.AccountManager(), config.KeyStoreDir)
+	err = setKeystore(backend.AccountsManager(), config.KeyStoreDir)
 	require.NoError(t, err)
 	err = backend.StartNode(config)
 	require.NoError(t, err)
@@ -539,7 +539,7 @@ func TestStartStopMultipleTimes(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	err = setKeystore(backend.AccountManager(), config.KeyStoreDir)
+	err = setKeystore(backend.AccountsManager(), config.KeyStoreDir)
 	require.NoError(t, err)
 	config.NoDiscovery = false
 	// doesn't have to be running. just any valid enode to bypass validation.
@@ -579,7 +579,7 @@ func TestHashTypedData(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	err = setKeystore(backend.AccountManager(), config.KeyStoreDir)
+	err = setKeystore(backend.AccountsManager(), config.KeyStoreDir)
 	require.NoError(t, err)
 	err = backend.StartNode(config)
 	require.NoError(t, err)
@@ -650,7 +650,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		db, err := accounts.NewDB(backend.appDB)
 		require.NoError(t, err)
 
-		_, err = backend.AccountManager().CreateFromPrivateKeyAndStoreAccount(privateKeyHex, password)
+		_, err = backend.AccountsManager().CreateFromPrivateKeyAndStoreAccount(privateKeyHex, password)
 		require.NoError(t, err)
 
 		require.NoError(t, db.SaveOrUpdateKeypair(&accounts.Keypair{
@@ -677,12 +677,12 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		walletRootAddress, err := db.GetWalletRootAddress()
 		require.NoError(t, err)
 
-		genAcc, err := backend.AccountManager().LoadAccount(walletRootAddress, password)
+		genAcc, err := backend.AccountsManager().LoadAccount(walletRootAddress, password)
 		require.NoError(t, err)
 
 		walletInfo := genAcc.ToIdentifiedAccountInfo()
 
-		derivedAcc, err := backend.AccountManager().DeriveChildAccountForPathAndStore(walletRootAddress, newPath, password)
+		derivedAcc, err := backend.AccountsManager().DeriveChildAccountForPathAndStore(walletRootAddress, newPath, password)
 		require.NoError(t, err)
 
 		derivedInfo := derivedAcc.ToAccountInfo()
@@ -725,7 +725,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 			handleError(t, db.Close())
 		}()
 
-		_, err = backend.AccountManager().CreateFromPrivateKeyAndStoreAccount(privateKeyHex, password)
+		_, err = backend.AccountsManager().CreateFromPrivateKeyAndStoreAccount(privateKeyHex, password)
 		require.NoError(t, err)
 
 		require.NoError(t, db.SaveOrUpdateKeypair(&accounts.Keypair{
@@ -783,7 +783,7 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 	require.Equal(t, "INFO", conf.RuntimeLogLevel)
 	keyhex := hex.EncodeToString(gethcrypto.FromECDSA(chatKey))
 
-	err = setKeystore(b.AccountManager(), conf.KeyStoreDir)
+	err = setKeystore(b.AccountsManager(), conf.KeyStoreDir)
 	require.NoError(t, err)
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
@@ -834,7 +834,7 @@ func TestLoginWithKey(t *testing.T) {
 	require.NoError(t, err)
 	keyhex := hex.EncodeToString(gethcrypto.FromECDSA(chatKey))
 
-	err = setKeystore(b.AccountManager(), conf.KeyStoreDir)
+	err = setKeystore(b.AccountsManager(), conf.KeyStoreDir)
 	require.NoError(t, err)
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
@@ -854,7 +854,7 @@ func TestLoginWithKey(t *testing.T) {
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
-	err = setKeystore(b.AccountManager(), conf.KeyStoreDir)
+	err = setKeystore(b.AccountsManager(), conf.KeyStoreDir)
 	require.NoError(t, err)
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
@@ -864,7 +864,7 @@ func TestLoginWithKey(t *testing.T) {
 		assert.NoError(t, b.Logout())
 		assert.NoError(t, b.StopNode())
 	}()
-	acc, err := b.accountManager.SelectedChatAccount()
+	acc, err := b.AccountsManager().SelectedChatAccount()
 	require.NoError(t, err)
 	require.Equal(t, crypto.PubkeyToAddress(chatKey.PublicKey), acc.Address())
 
@@ -961,7 +961,7 @@ func TestVerifyDatabasePassword(t *testing.T) {
 	require.NoError(t, err)
 	keyhex := hex.EncodeToString(gethcrypto.FromECDSA(chatKey))
 
-	err = setKeystore(b.AccountManager(), conf.KeyStoreDir)
+	err = setKeystore(b.AccountsManager(), conf.KeyStoreDir)
 	require.NoError(t, err)
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
@@ -993,18 +993,18 @@ func TestDeleteMultiaccount(t *testing.T) {
 
 	backend.rootDataDir = rootDataDir
 
-	err := setKeystore(backend.AccountManager(), keyStoreDir)
+	err := setKeystore(backend.AccountsManager(), keyStoreDir)
 	require.NoError(t, err)
 
 	const password = "123123"
-	genAccount, _, err := backend.AccountManager().CreateAndStoreAccount(password)
+	genAccount, _, err := backend.AccountsManager().CreateAndStoreAccount(password)
 	if err != nil {
 		return
 	}
 
 	genAccInfo := genAccount.ToIdentifiedAccountInfo()
 
-	derivedAcc, err := backend.AccountManager().DeriveChildAccountForPathAndStore(types.HexToAddress(genAccInfo.Address), accscommon.PathWalletRoot, password)
+	derivedAcc, err := backend.AccountsManager().DeriveChildAccountForPathAndStore(types.HexToAddress(genAccInfo.Address), accscommon.PathWalletRoot, password)
 	if err != nil {
 		return
 	}
@@ -1117,13 +1117,13 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	backend.rootDataDir = rootDataDir
-	err = setKeystore(backend.AccountManager(), keyStoreDirPath)
+	err = setKeystore(backend.AccountsManager(), keyStoreDirPath)
 	require.NoError(t, err)
 
 	err = backend.OpenAccounts()
 	require.NoError(t, err)
 
-	genAcc, err := backend.AccountManager().CreateFromMnemonicAndStoreAccount(mnemonic, password)
+	genAcc, err := backend.AccountsManager().CreateFromMnemonicAndStoreAccount(mnemonic, password)
 	assert.NoError(t, err)
 
 	genAccInfo := genAcc.ToIdentifiedAccountInfo()
@@ -1132,7 +1132,7 @@ func TestConvertAccount(t *testing.T) {
 	found := keystoreContainsFileForAccount(keyStoreDirPath, genAccInfo.Address)
 	require.True(t, found)
 
-	derivedAccounts, err := backend.AccountManager().DeriveChildrenAccountsForPathsAndStore(types.HexToAddress(genAccInfo.Address), allGeneratedPaths, password)
+	derivedAccounts, err := backend.AccountsManager().DeriveChildrenAccountsForPathsAndStore(types.HexToAddress(genAccInfo.Address), allGeneratedPaths, password)
 	assert.NoError(t, err)
 
 	chatAcc := derivedAccounts[accscommon.PathEIP1581Chat]
@@ -1261,7 +1261,7 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, backend.Logout())
 	require.NoError(t, backend.StopNode())
 
-	err = setKeystore(backend.AccountManager(), keyStoreDirPath)
+	err = setKeystore(backend.AccountsManager(), keyStoreDirPath)
 	require.NoError(t, err)
 
 	require.NoError(t, backend.OpenAccounts())
@@ -1355,7 +1355,7 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig) {
 
 	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 
-	err := setKeystore(b.AccountManager(), conf.KeyStoreDir)
+	err := setKeystore(b.AccountsManager(), conf.KeyStoreDir)
 	require.NoError(t, err)
 
 	b.UpdateRootDataDir(conf.DataDir)
@@ -1439,19 +1439,19 @@ func TestChangeDatabasePassword(t *testing.T) {
 	oldPassword := "password"
 	newPassword := "newPassword"
 
-	genAccount, _, err := backend.accountManager.CreateAndStoreAccount(oldPassword)
+	genAccount, _, err := backend.AccountsManager().CreateAndStoreAccount(oldPassword)
 	require.NoError(t, err)
 
 	paths := []string{accscommon.PathEIP1581Chat, accscommon.PathDefaultWalletAccount}
 
-	genChatAccounts, err := backend.accountManager.DeriveChildrenAccountsForPathsAndStore(genAccount.Address(), paths, oldPassword)
+	genChatAccounts, err := backend.AccountsManager().DeriveChildrenAccountsForPathsAndStore(genAccount.Address(), paths, oldPassword)
 	require.NoError(t, err)
 
-	ok, err := backend.accountManager.VerifyAccountPassword(genChatAccounts[accscommon.PathEIP1581Chat].Address(), oldPassword)
+	ok, err := backend.AccountsManager().VerifyAccountPassword(genChatAccounts[accscommon.PathEIP1581Chat].Address(), oldPassword)
 	require.NoError(t, err)
 	require.True(t, ok)
 
-	ok, err = backend.accountManager.VerifyAccountPassword(genChatAccounts[accscommon.PathDefaultWalletAccount].Address(), oldPassword)
+	ok, err = backend.AccountsManager().VerifyAccountPassword(genChatAccounts[accscommon.PathDefaultWalletAccount].Address(), oldPassword)
 	require.NoError(t, err)
 	require.True(t, ok)
 
@@ -1528,7 +1528,7 @@ func TestChangeDatabasePassword(t *testing.T) {
 	}()
 
 	// Test that keystore can be decrypted with the new password
-	acc, err := backend.accountManager.LoadAccount(genAccount.Address(), newPassword)
+	acc, err := backend.AccountsManager().LoadAccount(genAccount.Address(), newPassword)
 	require.NoError(t, err)
 	require.NotNil(t, acc)
 
@@ -1855,7 +1855,7 @@ func TestAcceptTerms(t *testing.T) {
 	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
-	err = setKeystore(b.AccountManager(), conf.KeyStoreDir)
+	err = setKeystore(b.AccountsManager(), conf.KeyStoreDir)
 	require.NoError(t, err)
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
@@ -2021,7 +2021,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 	require.NoError(t, err)
 
-	err = setKeystore(backend.AccountManager(), conf.KeyStoreDir)
+	err = setKeystore(backend.AccountsManager(), conf.KeyStoreDir)
 	require.NoError(t, err)
 	backend.UpdateRootDataDir(conf.DataDir)
 

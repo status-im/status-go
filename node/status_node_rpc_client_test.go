@@ -83,13 +83,13 @@ func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
 		return nil, err
 	}
 
-	accountManager, err := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
+	accountsManager, err := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
 	if err != nil {
 		return nil, err
 	}
-	accountManager.SetPersistence(accsDB)
+	accountsManager.SetPersistence(accsDB)
 
-	statusNode := New(nil, accountManager, tt.MustCreateTestLogger())
+	statusNode := New(nil, accountsManager, tt.MustCreateTestLogger())
 
 	statusNode.appDB = appDB
 	statusNode.walletDB = walletDB
@@ -125,13 +125,13 @@ func createStatusNode() (*StatusNode, func() error, func() error, error) {
 		return nil, nil, nil, err
 	}
 
-	accountManager, err := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
+	accountsManager, err := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	accountManager.SetPersistence(accsDB)
+	accountsManager.SetPersistence(accsDB)
 
-	statusNode := New(nil, accountManager, tt.MustCreateTestLogger())
+	statusNode := New(nil, accountsManager, tt.MustCreateTestLogger())
 	statusNode.SetAppDB(appDB)
 	statusNode.SetWalletDB(walletDB)
 

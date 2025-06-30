@@ -36,9 +36,9 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 	if err != nil {
 		return
 	}
-	backend.AccountManager().SetKeystore(keystoreAdapter)
+	backend.AccountsManager().SetKeystore(keystoreAdapter)
 
-	genAccount, _, err := backend.AccountManager().CreateAndStoreAccount(password)
+	genAccount, _, err := backend.AccountsManager().CreateAndStoreAccount(password)
 	if err != nil {
 		return
 	}
@@ -46,7 +46,7 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 	masterAccInfo := genAccount.ToIdentifiedAccountInfo()
 
 	const pathWalletRoot = "m/44'/60'/0'/0"
-	derivedAccount, err := backend.AccountManager().DeriveChildAccountForPathAndStore(types.HexToAddress(masterAccInfo.Address), pathWalletRoot, password)
+	derivedAccount, err := backend.AccountsManager().DeriveChildAccountForPathAndStore(types.HexToAddress(masterAccInfo.Address), pathWalletRoot, password)
 	if err != nil {
 		return
 	}

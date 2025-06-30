@@ -294,7 +294,7 @@ func (b *StatusNode) accountsService(accDB *accounts.Database, mediaServer *serv
 		b.accountsSrvc = accountssvc.NewService(
 			accDB,
 			b.multiaccountsDB,
-			b.gethAccountManager,
+			b.gethAccountsManager,
 			b.config,
 			b.accountsPublisher,
 			mediaServer,
@@ -313,7 +313,7 @@ func (b *StatusNode) browsersService() *browsers.Service {
 
 func (b *StatusNode) ensService(timesource func() time.Time) *ens.Service {
 	if b.ensSrvc == nil {
-		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountManager, b.pendingTracker, b.config, b.appDB, timesource)
+		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountsManager, b.pendingTracker, b.config, b.appDB, timesource)
 	}
 	return b.ensSrvc
 }
@@ -330,14 +330,14 @@ func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *transactions
 
 func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
 	if b.communityTokensSrvc == nil {
-		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountManager, b.config, b.appDB, &b.walletFeed, b.transactor)
+		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountsManager, b.config, b.appDB, &b.walletFeed, b.transactor)
 	}
 	return b.communityTokensSrvc
 }
 
 func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
 	if b.stickersSrvc == nil {
-		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountManager, b.config, b.downloader, b.httpServer, b.pendingTracker)
+		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountsManager, b.config, b.downloader, b.httpServer, b.pendingTracker)
 	}
 	return b.stickersSrvc
 }
@@ -410,7 +410,7 @@ func (b *StatusNode) SetWalletCommunityInfoProvider(provider thirdparty.Communit
 func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB, accountsPublisher *pubsub.Publisher, walletFeed *event.Feed, statusProxyStageName string) *wallet.Service {
 	if b.walletSrvc == nil {
 		b.walletSrvc = wallet.NewService(
-			b.walletDB, accountsDB, appDB, b.rpcClient, accountsPublisher, b.gethAccountManager, b.transactor, b.config,
+			b.walletDB, accountsDB, appDB, b.rpcClient, accountsPublisher, b.gethAccountsManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()).API().EnsResolver(),
 			b.pendingTracker,
 			walletFeed,

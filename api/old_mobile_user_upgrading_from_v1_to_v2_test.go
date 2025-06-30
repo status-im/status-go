@@ -132,7 +132,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 		s.Require().True(len(seedKps) == 1, "Unexpected number of seed keypairs")
 		s.Require().True(len(seedKps[0].Accounts) == 1)
 
-		genAcc, err := b.AccountManager().LoadAccount(seedKps[0].Accounts[0].Address, oldMobileUserPasswd)
+		genAcc, err := b.AccountsManager().LoadAccount(seedKps[0].Accounts[0].Address, oldMobileUserPasswd)
 		s.Require().NoError(err)
 
 		genAccKeyUID := genAcc.KeyUID()
@@ -157,7 +157,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 		s.Require().True(ok, "Key keypair not found")
 		s.Require().True(len(keyKps) == 1, "Unexpected number of key keypairs")
 		s.Require().True(len(keyKps[0].Accounts) == 1)
-		genAcc, err = b.AccountManager().LoadAccount(keyKps[0].Accounts[0].Address, oldMobileUserPasswd)
+		genAcc, err = b.AccountsManager().LoadAccount(keyKps[0].Accounts[0].Address, oldMobileUserPasswd)
 		s.Require().NoError(err)
 
 		genAccKeyUID = genAcc.KeyUID()
@@ -209,7 +209,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 	suggestedPath, err := db.ResolveSuggestedPathForKeypair(oldMobileUserKeyUID)
 	s.Require().NoError(err)
 
-	genAcc, err := b.AccountManager().LoadAccount(types.HexToAddress(profileKp.DerivedFrom), oldMobileUserPasswd)
+	genAcc, err := b.AccountsManager().LoadAccount(types.HexToAddress(profileKp.DerivedFrom), oldMobileUserPasswd)
 	s.Require().NoError(err)
 
 	infoMap, err := generator.DeriveChildrenFromAccount(genAcc, []string{suggestedPath})

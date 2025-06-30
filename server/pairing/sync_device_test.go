@@ -255,25 +255,25 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 	require.NoError(s.T(), err)
 
 	// check client - client should contain keystore files for imported seed phrase
-	accountManager := clientBackend.AccountManager()
+	accountsManager := clientBackend.AccountsManager()
 	require.True(s.T(), containsKeystoreFile(clientKeystorePath, clientSeedPhraseKp.DerivedFrom[2:]))
 	for _, acc := range clientSeedPhraseKp.Accounts {
 		require.True(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
 	}
 
 	// reinit keystore on client
-	err = setKeystore(accountManager, clientKeystorePath)
+	err = setKeystore(accountsManager, clientKeystorePath)
 	require.NoError(s.T(), err)
 
 	// check keystore on client
-	genAcc, err := accountManager.LoadAccount(types.HexToAddress(clientSeedPhraseKp.DerivedFrom), s.password)
+	genAcc, err := accountsManager.LoadAccount(types.HexToAddress(clientSeedPhraseKp.DerivedFrom), s.password)
 	require.NoError(s.T(), err)
 
 	accInfo := genAcc.ToIdentifiedAccountInfo()
 	require.Equal(s.T(), clientSeedPhraseKp.KeyUID, accInfo.KeyUID)
 
 	for _, acc := range clientSeedPhraseKp.Accounts {
-		genAcc, err = accountManager.LoadAccount(acc.Address, s.password)
+		genAcc, err = accountsManager.LoadAccount(acc.Address, s.password)
 		require.NoError(s.T(), err)
 		accInfo := genAcc.ToIdentifiedAccountInfo()
 		require.Equal(s.T(), acc.Address.String(), accInfo.Address)

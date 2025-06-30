@@ -260,7 +260,7 @@ func main() {
 			protocol.WithDatabase(backend.StatusNode().GetAppDB()),
 			protocol.WithWalletDatabase(backend.StatusNode().GetWalletDB()),
 			protocol.WithTorrentConfig(&config.TorrentConfig),
-			protocol.WithAccountManager(backend.AccountManager()),
+			protocol.WithAccountsManager(backend.AccountsManager()),
 			protocol.WithMessageSigner(backend.MessageSigner()),
 		}
 
@@ -512,7 +512,7 @@ func startNode(config *params.NodeConfig, backend *api.GethStatusBackend, instal
 	if err != nil {
 		return nil, nil, err
 	}
-	backend.AccountManager().SetKeystore(keystoreAdapter)
+	backend.AccountsManager().SetKeystore(keystoreAdapter)
 
 	err = createDirsFromConfig(config)
 	if err != nil {
