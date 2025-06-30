@@ -18,7 +18,8 @@ import (
 )
 
 type PersistenceInterface interface {
-	SaveActivity(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, activity thirdparty.ActivityEntryContainer) error
+	SaveActivityTransactions(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, activity thirdparty.ActivityTransactionContainer) error
+	SaveActivityEntries(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, activity thirdparty.ActivityEntryContainer) error
 	GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address common.Address) (*rpc.BlockNumber, *time.Time, error)
 }
 
@@ -30,7 +31,7 @@ func NewPersistence(db *sql.DB) *Persistence {
 	return &Persistence{db: db}
 }
 
-func (p *Persistence) SaveActivity(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, activity thirdparty.ActivityEntryContainer) (err error) {
+func (p *Persistence) SaveActivityTransactions(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, activity thirdparty.ActivityTransactionContainer) (err error) {
 	var tx *sql.Tx
 	tx, err = p.db.Begin()
 	if err != nil {
@@ -47,7 +48,23 @@ func (p *Persistence) SaveActivity(ctx context.Context, chainID uint64, paramete
 	return saveActivity(tx, chainID, parameters, activity)
 }
 
-func saveActivity(creator sqlite.StatementCreator, chainID uint64, parameters thirdparty.ActivityFetchParameters, activity thirdparty.ActivityEntryContainer) error {
+func saveActivity(creator sqlite.StatementCreator, chainID uint64, parameters thirdparty.ActivityFetchParameters, txs thirdparty.ActivityTransactionContainer) error {
+	id := uuid.New().String()
+
+	err := saveFetchParameters(creator, id, chainID, parameters, txs.NextCursor, txs.PreviousCursor, txs.Provider)
+	if err != nil {
+		return err
+	}
+
+	err = saveActivityEntries(creator, id, activity.Items)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func saveActivityEntries(creator sqlite.StatementCreator, chainID uint64, parameters thirdparty.ActivityFetchParameters, activity thirdparty.ActivityTransactionContainer) error {
 	id := uuid.New().String()
 
 	err := saveFetchParameters(creator, id, chainID, parameters, activity.NextCursor, activity.PreviousCursor, activity.Provider)
@@ -67,6 +84,34 @@ func saveFetchParameters(creator sqlite.StatementCreator, id string, chainID uin
 	q := sq.Insert("fetched_activity_fetch_parameters").
 		Columns("id", "chain_id", "parameters", "next_cursor", "previous_cursor", "provider").
 		Values(id, chainID, sqlite.ToJSONBlob(parameters), nextCursor, previousCursor, provider)
+
+	query, args, err := q.ToSql()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := creator.Prepare(query)
+	if err != nil {
+		return err
+	}
+
+	_, err = stmt.Exec(args...)
+	return err
+}
+
+func saveActivityTransactions(creator sqlite.StatementCreator, id string, transactions []thirdparty.ActivityTransaction) error {
+	for _, transaction := range transactions {
+		err := saveActivityTransaction(creator, id, transaction)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func saveActivityTransaction(creator sqlite.StatementCreator, id string, transaction thirdparty.ActivityTransaction) error {
+	q := sq.Insert("fetched_activity_transactions").
+		Columns("fetch_parameters_id", "tx_hash").
+		Values(id, transaction.TxHash)
 
 	query, args, err := q.ToSql()
 	if err != nil {

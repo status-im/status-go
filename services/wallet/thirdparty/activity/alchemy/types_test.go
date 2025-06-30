@@ -41,7 +41,7 @@ func TestTransferToCommon(t *testing.T) {
 		var response alchemy.GetAssetTranfersResponse
 		err := json.Unmarshal([]byte(data[i]), &response)
 		require.NoError(t, err)
-		commonResponse := alchemy.TransfersToCommon(response.Transfers, 1, addresses[i])
+		commonResponse := alchemy.TransfersToActivityTransactions(response.Transfers, 1, addresses[i])
 		require.Equal(t, len(commonResponse), len(response.Transfers))
 	}
 }

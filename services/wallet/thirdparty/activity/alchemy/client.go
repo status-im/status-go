@@ -42,8 +42,8 @@ func NewClient(ethClientGetter rpc.EthClientGetter) *Client {
 	}
 }
 
-func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, cursor string, limit int) (thirdparty.ActivityEntryContainer, error) {
-	response := thirdparty.ActivityEntryContainer{
+func (c *Client) FetchActivityTransactions(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, cursor string, limit int) (thirdparty.ActivityTransactionContainer, error) {
+	response := thirdparty.ActivityTransactionContainer{
 		Provider:       c.ID(),
 		PreviousCursor: cursor,
 		NextCursor:     cursor,
@@ -140,7 +140,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 			break
 		}
 	}
-	response.Items = TransfersToCommon(responseTransfers, chainID, parameters.Address)
+	response.Items = TransfersToActivityTransactions(responseTransfers, chainID, parameters.Address)
 
 	return response, nil
 }

@@ -47,6 +47,18 @@ type ActivityFetchParameters struct {
 	Direction Direction        `json:"direction" validate:"required,oneof=both incoming outgoing"`
 }
 
+type ActivityTransaction struct {
+	ChainID uint64      `json:"chainId"`
+	TxHash  common.Hash `json:"txHash"`
+}
+
+type ActivityTransactionContainer ItemsContainer[ActivityTransaction]
+
+type ActivityTransactionsFetcher interface {
+	ActivityProvider
+	FetchActivityTransactions(ctx context.Context, chainID uint64, parameters ActivityFetchParameters, cursor string, limit int) (ActivityTransactionContainer, error)
+}
+
 type ActivityEntry struct {
 	Timestamp       int64           `json:"timestamp"`
 	ActivityType    ac.Type         `json:"activityType"`
@@ -65,8 +77,3 @@ type ActivityEntry struct {
 }
 
 type ActivityEntryContainer ItemsContainer[ActivityEntry]
-
-type ActivityFetcher interface {
-	ActivityProvider
-	FetchActivity(ctx context.Context, chainID uint64, parameters ActivityFetchParameters, cursor string, limit int) (ActivityEntryContainer, error)
-}

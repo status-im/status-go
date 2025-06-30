@@ -11,6 +11,13 @@ CREATE TABLE IF NOT EXISTS fetched_activity_fetch_parameters (
 
 CREATE INDEX IF NOT EXISTS idx_fetched_activity_fetch_parameters_per_chain_id_address ON fetched_activity_fetch_parameters (chain_id, address);
 
+CREATE TABLE IF NOT EXISTS fetched_activity_transactions (
+    fetch_parameters_id TEXT NOT NULL,
+    tx_hash BLOB NOT NULL,
+    processed BOOLEAN NOT NULL DEFAULT FALSE,
+    FOREIGN KEY (fetch_parameters_id) REFERENCES fetched_activity_fetch_parameters(id)
+);
+
 CREATE TABLE IF NOT EXISTS fetched_activity_entries (
     fetch_parameters_id TEXT NOT NULL,
     entry JSON NOT NULL,
@@ -21,6 +28,7 @@ CREATE TABLE IF NOT EXISTS fetched_activity_entries (
     recipient BLOB AS (unhex(substr(json_extract(entry, '$.recipient'),3))),
     tx_hash BLOB AS (unhex(substr(json_extract(entry, '$.txHash'),3))),
     FOREIGN KEY (fetch_parameters_id) REFERENCES fetched_activity_fetch_parameters(id)
+    FOREIGN KEY (tx_hash) REFERENCES fetched_activity_transactions(tx_hash)
 );
 
 CREATE INDEX IF NOT EXISTS idx_fetched_activity_entries_per_sender ON fetched_activity_entries (sender);
