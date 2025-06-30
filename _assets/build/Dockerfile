@@ -1,11 +1,16 @@
 # Build status-go in a Go builder container
-FROM golang:1.22-alpine3.18 as builder
+FROM golang:1.22.12-bookworm AS builder
 
 # Set environment variables to use Clang
 ENV CC=clang
 ENV CXX=clang++
 
 RUN apk add --no-cache git bash make llvm clang musl-dev linux-headers protobuf-dev~3.21
+RUN apt-get update && apt-get install -y \
+    git bash make llvm clang protobuf-compiler \
+    build-essential pkg-config && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
@@ -33,13 +38,17 @@ RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_i
       GO_GENERATE_FAST_DIR="/root/.cache/go-generate-fast"
 
 # Copy binaries to the second image
-FROM alpine:3.18
+FROM debian:bookworm-slim
 
 LABEL maintainer="support@status.im"
 LABEL source="https://github.com/status-im/status-go"
 LABEL description="status-go is an underlying part of Status - a browser, messenger, and gateway to a decentralized world."
 
-RUN apk add --no-cache ca-certificates bash libgcc libstdc++ curl
+RUN apt-get update && apt-get install -y \
+    ca-certificates bash curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN mkdir -p /usr/status-user && chmod -R 777 /usr/status-user
 RUN mkdir -p /static/keys
 RUN mkdir -p /static/configs
