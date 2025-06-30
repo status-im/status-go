@@ -143,9 +143,9 @@ $(GO_CMD_BUILDS): generate
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
-		-o ./$@ ./cmd/$(notdir $@) ;\
-	echo "Compilation done." ;\
-	echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
+		-o ./$@ ./cmd/$(notdir $@)
+	@echo "Compilation done."
+	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
 LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(LIBWAKU_EXT)
 $(LIBWAKU):
