@@ -38,7 +38,7 @@ class StatusGoContainer:
         coverage_path = option.codecov_dir if option.codecov_dir else os.path.abspath("./coverage/binary")
 
         # Run the container
-        logging.info(f"Creating status-go container from image '{image_name}'")
+        logging.debug(f"Creating status-go container from image '{image_name}'")
 
         container_args = {
             "image": image_name,
@@ -76,7 +76,7 @@ class StatusGoContainer:
         self.container = self.docker_client.containers.run(**container_args)
         option.statusgo_containers.append(self)
 
-        logging.info(f"Container {self.container.name} created. ID = {self.container.id}")
+        logging.debug(f"Container {self.container.name} created. ID = {self.container.id}")
 
         network = self.docker_client.networks.get(self.network_name)
         network.connect(self.container)
@@ -131,7 +131,7 @@ class StatusGoContainer:
         if self.container:
             logging.debug(f"Stopping container {self.container.name}...")
             self.container.stop(timeout=10)
-            logging.info(f"Container {self.container.name} stopped.")
+            logging.debug(f"Container {self.container.name} stopped.")
 
     def remove(self):
         """Remove the container"""
@@ -140,7 +140,7 @@ class StatusGoContainer:
             logging.debug(f"Removing container {name}...")
             self.container.remove()
             self.container = None
-            logging.info(f"Container {name} removed.")
+            logging.debug(f"Container {name} removed.")
 
     def pause(self):
         if not self.container:
@@ -190,7 +190,7 @@ class StatusGoContainer:
         if not self.container:
             raise RuntimeError("Container is not initialized.")
         if option.logs_dir == "":
-            logging.warning("Save container logs skipped")
+            logging.debug("Save container logs skipped")
             return
 
         id_short = self.container.id[:12]

@@ -1,7 +1,6 @@
 from clients.status_backend import StatusBackend
 import pytest
 from clients.signals import SignalType
-import logging
 
 from resources.constants import user_mnemonic_12, user_mnemonic_15, user_mnemonic_24
 from resources.utils import assert_response_attributes
@@ -23,15 +22,15 @@ class TestRecoverMnemonic:
             SignalType.NODE_LOGIN.value,
         ]
 
-        logging.info("Step: Initialize backend client and restore account using user_mnemonic.")
+        # Initialize backend client and restore account using user_mnemonic.
         backend_client = StatusBackend(await_signals)
         backend_client.init_status_backend()
         backend_client.restore_account_and_login(user=user_mnemonic)
 
-        logging.info("Step: request getAccounts and check recovered accounts attributes.")
+        # Request getAccounts and check recovered accounts attributes.
         response = backend_client.rpc_valid_request("accounts_getAccounts", [])
         assert_response_attributes(response.json()["result"], user_mnemonic.accounts)
 
-        logging.info("Step: request getSettings and check recovered profile data attributes.")
+        # Request getSettings and check recovered profile data attributes.
         response = backend_client.rpc_valid_request("settings_getSettings", [])
         assert_response_attributes(response.json()["result"], user_mnemonic.profile_data)
