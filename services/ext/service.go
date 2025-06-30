@@ -98,7 +98,7 @@ func New(
 
 func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB,
 	httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account,
-	accountManager *accsmanagement.AccountsManager, rpcClient *rpc.Client, walletService *wallet.Service,
+	accountsManager *accsmanagement.AccountsManager, rpcClient *rpc.Client, walletService *wallet.Service,
 	communityTokensService *communitytokens.Service, wakuService *wakuv2.Waku, logger *zap.Logger,
 	accountsPublisher *pubsub.Publisher) error {
 	var err error
@@ -144,7 +144,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		s.config.ShhextConfig.VerifyENSContractAddress,
 	)
 
-	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsPublisher, ensVerifier)
+	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountsManager, accountsPublisher, ensVerifier)
 	if err != nil {
 		return err
 	}
@@ -367,7 +367,7 @@ func buildMessengerOptions(
 	wakuService *wakuv2.Waku,
 	logger *zap.Logger,
 	messengerSignalsHandler protocol.MessengerSignalsHandler,
-	accountManager *accsmanagement.AccountsManager,
+	accountsManager *accsmanagement.AccountsManager,
 	accountsPublisher *pubsub.Publisher,
 	ensVerifier *ens.Verifier,
 ) ([]protocol.Option, error) {
@@ -392,7 +392,7 @@ func buildMessengerOptions(
 		protocol.WithWalletService(walletService),
 		protocol.WithCommunityTokensService(communityTokensService),
 		protocol.WithWakuService(wakuService),
-		protocol.WithAccountManager(accountManager),
+		protocol.WithAccountsManager(accountsManager),
 		protocol.WithAccountsPublisher(accountsPublisher),
 		protocol.WithNewsFeed(),
 		protocol.WithMessageSigner(personalService),

@@ -328,7 +328,7 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config tes
 	}
 
 	options := []Option{
-		WithAccountManager(accountsManagerMock),
+		WithAccountsManager(accountsManagerMock),
 		WithTokenManager(tokenManagerMock),
 		WithMessageSigner(NewSignerStub()),
 		WithCollectiblesManager(config.collectiblesManager),

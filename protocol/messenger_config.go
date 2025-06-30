@@ -402,9 +402,9 @@ func WithCollectiblesManager(collectiblesManager communities.CollectiblesManager
 	}
 }
 
-func WithAccountManager(accountManager AccountsManager) Option {
+func WithAccountsManager(accountsManager AccountsManager) Option {
 	return func(c *config) error {
-		c.accountsManager = accountManager
+		c.accountsManager = accountsManager
 		return nil
 	}
 }

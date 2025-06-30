@@ -370,7 +370,7 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 
 func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 	backend.UpdateRootDataDir("./tmp")
-	manager := backend.AccountManager()
+	manager := backend.AccountsManager()
 	keystoreDir := "./tmp"
 	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keystoreDir, keystore.LightScryptN, keystore.LightScryptP)
 	if err != nil {

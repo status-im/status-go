@@ -77,8 +77,8 @@ type StatusNode struct {
 
 	logger *zap.Logger
 
-	gethAccountManager *accsmanagement.AccountsManager
-	transactor         *transactions.Transactor
+	gethAccountsManager *accsmanagement.AccountsManager
+	transactor          *transactions.Transactor
 
 	publicMethods map[string]bool
 	// we explicitly list every service, we could use interfaces
@@ -112,14 +112,14 @@ type StatusNode struct {
 }
 
 // New makes new instance of StatusNode.
-func New(transactor *transactions.Transactor, gethAccountManager *accsmanagement.AccountsManager, logger *zap.Logger) *StatusNode {
+func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagement.AccountsManager, logger *zap.Logger) *StatusNode {
 	logger = logger.Named("StatusNode")
 	return &StatusNode{
-		transactor:         transactor,
-		gethAccountManager: gethAccountManager,
-		logger:             logger,
-		publicMethods:      make(map[string]bool),
-		accountsPublisher:  pubsub.NewPublisher(),
+		transactor:          transactor,
+		gethAccountsManager: gethAccountsManager,
+		logger:              logger,
+		publicMethods:       make(map[string]bool),
+		accountsPublisher:   pubsub.NewPublisher(),
 	}
 }
 
@@ -365,8 +365,8 @@ func (n *StatusNode) ConnectionChanged(state connection.State) {
 	}
 }
 
-// AccountManager exposes reference to node's accounts manager
-func (n *StatusNode) AccountManager() (*accounts.Manager, error) {
+// AccountsManager exposes reference to node's accounts manager
+func (n *StatusNode) AccountsManager() (*accounts.Manager, error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 

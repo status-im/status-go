@@ -105,7 +105,7 @@ type GethStatusBackend struct {
 	signer                   communities.MessageSigner
 	multiaccountsDB          *multiaccounts.Database
 	account                  *multiaccounts.Account
-	accountManager           *accsmanagement.AccountsManager
+	accountsManager          *accsmanagement.AccountsManager
 	transactor               *transactions.Transactor
 	connectionState          connection.State
 	appState                 AppState
@@ -145,7 +145,7 @@ func (b *GethStatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
 }
 
 func (b *GethStatusBackend) initialize() (err error) {
-	accountManager, err := accsmanagement.NewAccountsManager(b.logger)
+	accountsManager, err := accsmanagement.NewAccountsManager(b.logger)
 	if err != nil {
 		b.logger.Error("failed to create new *AccountsManager instance", zap.Error(err))
 		return
@@ -153,10 +153,10 @@ func (b *GethStatusBackend) initialize() (err error) {
 
 	transactor := transactions.NewTransactor()
 	personalService := personal.New()
-	statusNode := node.New(transactor, accountManager, b.logger)
+	statusNode := node.New(transactor, accountsManager, b.logger)
 
 	b.statusNode = statusNode
-	b.accountManager = accountManager
+	b.accountsManager = accountsManager
 	b.transactor = transactor
 	b.signer = personalService
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
@@ -171,9 +171,9 @@ func (b *GethStatusBackend) StatusNode() *node.StatusNode {
 	return b.statusNode
 }
 
-// AccountManager returns reference to account manager
-func (b *GethStatusBackend) AccountManager() *accsmanagement.AccountsManager {
-	return b.accountManager
+// AccountsManager returns reference to accounts manager
+func (b *GethStatusBackend) AccountsManager() *accsmanagement.AccountsManager {
+	return b.accountsManager
 }
 
 // Transactor returns reference to a status transactor
@@ -466,7 +466,7 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 		b.logger.Error("failed to create new *Database instance", zap.Error(err))
 		return
 	}
-	b.accountManager.SetPersistence(accountsDB)
+	b.accountsManager.SetPersistence(accountsDB)
 
 	return nil
 }
@@ -822,10 +822,10 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		}
 	} else {
 		// In case of keycard, we don't have a keystore, instead we have private key loaded from the keycard
-		if err := b.accountManager.SetChatAccountWithPrivateKey(chatKey); err != nil {
+		if err := b.accountsManager.SetChatAccountWithPrivateKey(chatKey); err != nil {
 			return errors.Wrap(err, "failed to set chat account")
 		}
-		_, err = b.accountManager.SelectedChatAccount()
+		_, err = b.accountsManager.SelectedChatAccount()
 		if err != nil {
 			return errors.Wrap(err, "failed to get selected chat account")
 		}
@@ -935,10 +935,10 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		}
 	} else {
 		// In case of keycard, we don't have keystore, but we directly have the private key
-		if err := b.accountManager.SetChatAccountWithPrivateKey(chatKey); err != nil {
+		if err := b.accountsManager.SetChatAccountWithPrivateKey(chatKey); err != nil {
 			return err
 		}
-		_, err = b.accountManager.SelectedChatAccount()
+		_, err = b.accountsManager.SelectedChatAccount()
 		if err != nil {
 			return err
 		}
@@ -1072,7 +1072,7 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 }
 
 func (b *GethStatusBackend) reEncryptKeyStoreDir(currentPassword string, newPassword string) error {
-	err := b.accountManager.ReEncryptKeyStoreDir(currentPassword, newPassword)
+	err := b.accountsManager.ReEncryptKeyStoreDir(currentPassword, newPassword)
 	if err != nil {
 		return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
 	}
@@ -1389,23 +1389,23 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 
 	// We need to delete all accounts for the Keycard which is being added
 	for _, acc := range keypair.Accounts {
-		err = b.accountManager.DeleteAccount(acc.Address)
+		err = b.accountsManager.DeleteAccount(acc.Address)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = b.accountManager.DeleteAccount(masterAddress)
+	err = b.accountsManager.DeleteAccount(masterAddress)
 	if err != nil {
 		return err
 	}
 
-	err = b.accountManager.DeleteAccount(eip1581Address)
+	err = b.accountsManager.DeleteAccount(eip1581Address)
 	if err != nil {
 		return err
 	}
 
-	err = b.accountManager.DeleteAccount(walletRootAddress)
+	err = b.accountsManager.DeleteAccount(walletRootAddress)
 	if err != nil {
 		return err
 	}
@@ -1626,7 +1626,7 @@ func (b *GethStatusBackend) InitKeyStoreDirWithAccount(rootDataDir, keyUID strin
 	if err != nil {
 		return "", err
 	}
-	b.accountManager.SetKeystore(keystoreAdapter)
+	b.accountsManager.SetKeystore(keystoreAdapter)
 
 	return keystoreAbsolutePath, nil
 }
@@ -1665,7 +1665,7 @@ func (b *GethStatusBackend) generateDerivedAddresses(genAcc *generator.Account, 
 
 func (b *GethStatusBackend) StoreAccount(mnemonic string, password string, paths []string) (accInfo generator.IdentifiedAccountInfo, derivedAccsInfo map[string]generator.AccountInfo, err error) {
 	var genAcc *generator.Account
-	genAcc, err = b.accountManager.CreateFromMnemonicAndStoreAccount(mnemonic, password)
+	genAcc, err = b.accountsManager.CreateFromMnemonicAndStoreAccount(mnemonic, password)
 	if err != nil {
 		return
 	}
@@ -1673,7 +1673,7 @@ func (b *GethStatusBackend) StoreAccount(mnemonic string, password string, paths
 	accInfo = genAcc.ToIdentifiedAccountInfo()
 
 	var genDerivedAccs map[string]*generator.Account
-	genDerivedAccs, err = b.accountManager.DeriveChildrenAccountsForPathsAndStore(genAcc.Address(), paths, password)
+	genDerivedAccs, err = b.accountsManager.DeriveChildrenAccountsForPathsAndStore(genAcc.Address(), paths, password)
 	if err != nil {
 		return
 	}
@@ -2250,7 +2250,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 
 	// Handle a case when a node is stopped and resumed.
 	// If there is no account selected, an error is returned.
-	if _, err := b.accountManager.SelectedChatAccount(); err == nil {
+	if _, err := b.accountsManager.SelectedChatAccount(); err == nil {
 		if err := b.injectAccountsIntoServices(); err != nil {
 			return err
 		}
@@ -2435,7 +2435,7 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 }
 
 func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*generator.Account, error) {
-	return b.accountManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
+	return b.accountsManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
 }
 
 // registerHandlers attaches Status callback handlers to running node
@@ -2452,7 +2452,7 @@ func (b *GethStatusBackend) registerHandlers() error {
 		client.RegisterHandler(
 			params.AccountsMethodName,
 			func(context.Context, uint64, ...interface{}) (interface{}, error) {
-				return b.accountManager.Accounts()
+				return b.accountsManager.Accounts()
 			},
 		)
 
@@ -2566,7 +2566,7 @@ func (b *GethStatusBackend) Logout() error {
 		return err
 	}
 
-	b.AccountManager().Logout()
+	b.AccountsManager().Logout()
 	b.account = nil
 
 	if b.statusNode != nil {
@@ -2653,7 +2653,7 @@ func (b *GethStatusBackend) SelectAccount(loginParams LoginParams) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	err := b.accountManager.SetChatAccount(loginParams.ChatAddress, loginParams.Password)
+	err := b.accountsManager.SetChatAccount(loginParams.ChatAddress, loginParams.Password)
 	if err != nil {
 		return err
 	}
@@ -2691,7 +2691,7 @@ func (b *GethStatusBackend) LocalPairingStarted() error {
 }
 
 func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyManager, st *ext.Service) error {
-	chatAccount, err := b.accountManager.SelectedChatAccount()
+	chatAccount, err := b.accountsManager.SelectedChatAccount()
 	if err != nil {
 		return err
 	}
@@ -2713,7 +2713,7 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyMan
 
 	if st != nil {
 		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.walletDB,
-			b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, b.statusNode.RPCClient(),
+			b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountsManager, b.statusNode.RPCClient(),
 			b.statusNode.WalletService(), b.statusNode.CommunityTokensService(), b.statusNode.WakuV2Service(),
 			logutils.ZapLogger(), b.statusNode.AccountsPublisher()); err != nil {
 			return err
@@ -2774,7 +2774,7 @@ func (b *GethStatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2
 
 // SignGroupMembership signs a piece of data containing membership information
 func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) {
-	selectedChatAccount, err := b.accountManager.SelectedChatAccount()
+	selectedChatAccount, err := b.accountsManager.SelectedChatAccount()
 	if err != nil {
 		return "", err
 	}
@@ -2800,7 +2800,7 @@ func (b *GethStatusBackend) SignHash(hexEncodedHash string) (string, error) {
 		return "", fmt.Errorf("SignHash: could not unmarshal the input: %v", err)
 	}
 
-	chatAccount, err := b.accountManager.SelectedChatAccount()
+	chatAccount, err := b.accountsManager.SelectedChatAccount()
 	if err != nil {
 		return "", fmt.Errorf("SignHash: could not select account: %v", err.Error())
 	}
