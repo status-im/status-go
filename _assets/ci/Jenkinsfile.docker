@@ -46,6 +46,7 @@ pipeline {
     /* Makefile parameters */
     DOCKER_IMAGE_NAME = 'statusteam/status-go'
     DOCKER_IMAGE_CUSTOM_TAG = "ci-build-${git.commit()}"
+    SENTRY_PRODUCTION = '1'
   }
 
   stages {
