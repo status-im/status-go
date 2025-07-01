@@ -5,16 +5,10 @@ FROM golang:1.22.12-bookworm AS builder
 ENV CC=clang
 ENV CXX=clang++
 
-# Set version information environment variables
-ENV VERSION=unknown
-ENV GIT_COMMIT=unknown
-
-RUN apk add --no-cache git bash make llvm clang musl-dev linux-headers protobuf-dev~3.21
-RUN apt-get update && apt-get install -y \
-    git bash make llvm clang protobuf-compiler \
-    build-essential pkg-config && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y git bash make llvm clang protobuf-compiler build-essential pkg-config \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
@@ -33,22 +27,12 @@ ADD . .
 ARG cache_id='local'
 ARG enable_go_cache=true
 
-# Update version information from git if available
-# Usually the version is built-in using go:generate and go:embed in `pkg/version.go`,
-# but this approach does not work when there is no access to .git directory.
-# And we do not want to copy the whole .git directory to the image.
-RUN VERSION=$(git describe --tags --dirty='-dirty' 2>/dev/null || echo "unknown") && \
-    GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") && \
-    export VERSION GIT_COMMIT && \
-    echo "Building with VERSION=$VERSION GIT_COMMIT=$GIT_COMMIT"
-
 RUN if [ "$enable_go_cache" = "true" ]; then \
       go env -w GOCACHE=/root/.cache/go-build; \
     fi
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
     --mount=type=cache,target="/root/.cache/go-generate-fast",id=statusgo-build-$cache_id \
-    make $build_target BUILD_TAGS="$build_tags" \
-      BUILD_FLAGS="$build_flags -ldflags \"-X github.com/status-im/status-go/pkg/version.version=$VERSION -X github.com/status-im/status-go/pkg/version.gitCommit=$GIT_COMMIT\"" \
+    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" \
       GO_GENERATE_FAST_RECACHE=$([ "$enable_go_cache" = "true" ] && echo false || echo true) \
       GO_GENERATE_FAST_DIR="/root/.cache/go-generate-fast"
 
@@ -59,10 +43,10 @@ LABEL maintainer="support@status.im"
 LABEL source="https://github.com/status-im/status-go"
 LABEL description="status-go is an underlying part of Status - a browser, messenger, and gateway to a decentralized world."
 
-RUN apt-get update && apt-get install -y \
-    ca-certificates bash curl && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+ && apt-get install -y ca-certificates bash curl \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /usr/status-user && chmod -R 777 /usr/status-user
 RUN mkdir -p /static/keys
