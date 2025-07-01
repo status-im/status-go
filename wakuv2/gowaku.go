@@ -245,7 +245,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 		return nil, err
 	}
 
-	logger.Info("starting wakuv2 with config", zap.Any("config", cfg))
+	logger.Info("starting wakuv2")
 
 	ctx, cancel := context.WithCancel(context.Background())
 
