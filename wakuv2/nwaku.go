@@ -1511,16 +1511,18 @@ func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
 		w.logger.Info("connection switched, disconnecting all peers")
 	}
 
-	if networkChange {
-		err := w.node.DisconnectAllPeers()
+	if !networkChange {
+		return
+	}
 
-		if err != nil {
-			panic(err)
-		}
+	err := w.node.DisconnectAllPeers()
 
-		if w.cfg.LightClient {
-			w.filterManager.NetworkChange()
-		}
+	if err != nil {
+		panic(err)
+	}
+
+	if w.cfg.LightClient {
+		w.filterManager.NetworkChange()
 	}
 
 }
