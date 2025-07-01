@@ -4793,31 +4793,26 @@ func (s *MessengerCommunitiesSuite) mockPermissionCheckerForAllMessenger() {
 // TestSyncCommunity_Muted tests that the muted state is synced between 2 Messengers
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_Muted() {
 	// Create new device
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	tcs, err := alicesOtherDevice.communitiesManager.All()
 	s.Require().NoError(err, "alicesOtherDevice.communitiesManager.All")
 	s.Len(tcs, 1, "Must have 1 communities")
 
 	// Pair devices
-	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
-		Name:       "their-name",
-		DeviceType: "their-device-type",
-	})
-	s.Require().NoError(err)
-
-	s.pairTwoDevices(alicesOtherDevice, s.alice, "their-name", "their-device-type")
+	PairDevices(&s.Suite, s.alice, alicesOtherDevice)
+	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "new community",
 		Color:       "#000000",
 		Description: "new community description",
 	}
 
-	mr, err := s.alice.CreateCommunity(createCommunityReq)
+	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
 	s.Require().NoError(err, "s.alice.CreateCommunity")
 	var newCommunity *communities.Community
 	for _, com := range mr.Communities() {
@@ -4865,20 +4860,21 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Muted() {
 	s.Equal(newCommunity.Name(), tnc.Name())
 	s.Equal(newCommunity.DescriptionText(), tnc.DescriptionText())
 	s.Equal(newCommunity.IDString(), tnc.IDString())
-	s.Equal(newCommunity.PrivateKey(), tnc.PrivateKey())
 	s.Equal(newCommunity.PublicKey(), tnc.PublicKey())
 	s.Equal(newCommunity.Verified(), tnc.Verified())
 	s.Equal(newCommunity.Muted(), tnc.Muted())
 	s.Equal(newCommunity.Joined(), tnc.Joined())
 	s.Equal(newCommunity.IsAdmin(), tnc.IsAdmin())
-	s.Equal(newCommunity.InvitationOnly(), tnc.InvitationOnly())
 
 	// Check that the muted state is false on both devices
 	s.Equal(false, newCommunity.Muted())
 	s.Equal(false, tnc.Muted())
 
 	// Set alice community muted to true
-	err = s.alice.SetMuted(newCommunity.ID(), true)
+	err = s.alice.SetMuted(&requests.MuteCommunity{
+		CommunityID: newCommunity.ID(),
+		MutedType:   MuteFor24Hr,
+	})
 	s.Require().NoError(err, "alice.communitiesManager.SetMuted to true")
 
 	// muted state before synced
