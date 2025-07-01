@@ -113,6 +113,21 @@ sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
     - `jsonschema.validate()` is used to check that the response contains expected data, including required fields and types. Schemas are stored in `/schemas/wallet_MethodName`
     - New schemas can be generated using `./tests-functional/utils/schema_builder.py` by passing a response to the `CustomSchemaBuilder(schema_name).create_schema(response.json())` method, should be used only on test creation phase, please search `how to create schema:` to see an example in a test
 
+# Linting
+
+We use `pre-commit` setup for linting. To run linters:
+```shell
+cd tests-functional
+make lint
+```
+or run from the root of `status-go` repo:
+```shell
+make pytest-lint
+```
+
+Note that `pyright` uses `pyrightconfig.json` configuration from the repository root 
+and expects a Python virtual environment to be in `./tests-functional/.venv`. 
+
 # Known issues
 
 ## Import issues
