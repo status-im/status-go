@@ -33,4 +33,7 @@ type WakuConfig struct {
 	PeerExchangeNode            string           `json:"peerExchangeNode,omitempty"`
 	TcpPort                     int              `json:"tcpPort,omitempty"`
 	RateLimits                  RateLimitsConfig `json:"rateLimits,omitempty"`
+	DnsAddrsNameServers         []string         `json:"dnsAddrsNameServers,omitempty"`
+	Discv5EnrAutoUpdate         bool             `json:"discv5EnrAutoUpdate,omitempty"`
+	MaxConnections              int              `json:"maxConnections,omitempty"`
 }
