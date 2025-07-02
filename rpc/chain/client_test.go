@@ -278,58 +278,44 @@ func TestClientWithFallback_CloseStopsMultipleOperations(t *testing.T) {
 
 	allOperationsStarted := make(chan struct{})
 
-	// Set up the mock responses for operation 1
-	ethClients[0].EXPECT().CodeAt(ctx, addr1, nil).DoAndReturn(
-		func(ctx context.Context, addr common.Address, blockNumber *big.Int) ([]byte, error) {
-			close(operation1Started)
+	// Helper function to create operation handlers with common logic
+	createOperationHandler := func(operationStarted chan struct{}) func(context.Context) error {
+		return func(ctx context.Context) error {
+			close(operationStarted)
 
 			// Wait for all operations to start or context to be cancelled
 			select {
 			case <-allOperationsStarted:
 				// Continue with normal processing
 			case <-ctx.Done():
-				return nil, ctx.Err()
+				return ctx.Err()
 			}
 
 			// Now wait for context cancellation
 			<-ctx.Done()
-			return nil, ctx.Err()
+			return ctx.Err()
+		}
+	}
+
+	// Set up the mock responses for operation 1
+	ethClients[0].EXPECT().CodeAt(ctx, addr1, nil).DoAndReturn(
+		func(ctx context.Context, addr common.Address, blockNumber *big.Int) ([]byte, error) {
+			err := createOperationHandler(operation1Started)(ctx)
+			return nil, err
 		}).Times(1)
 
 	// Set up the mock responses for operation 2
 	ethClients[0].EXPECT().BalanceAt(ctx, addr2, blockNumber).DoAndReturn(
 		func(ctx context.Context, addr common.Address, blockNumber *big.Int) (*big.Int, error) {
-			close(operation2Started)
-
-			// Wait for all operations to start or context to be cancelled
-			select {
-			case <-allOperationsStarted:
-				// Continue with normal processing
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-
-			// Now wait for context cancellation
-			<-ctx.Done()
-			return nil, ctx.Err()
+			err := createOperationHandler(operation2Started)(ctx)
+			return nil, err
 		}).Times(1)
 
 	// Set up the mock responses for operation 3
 	ethClients[0].EXPECT().BlockByHash(ctx, hash).DoAndReturn(
 		func(ctx context.Context, hash common.Hash) (*types.Block, error) {
-			close(operation3Started)
-
-			// Wait for all operations to start or context to be cancelled
-			select {
-			case <-allOperationsStarted:
-				// Continue with normal processing
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-
-			// Now wait for context cancellation
-			<-ctx.Done()
-			return nil, ctx.Err()
+			err := createOperationHandler(operation3Started)(ctx)
+			return nil, err
 		}).Times(1)
 
 	// Set up expectations for Close on all clients
