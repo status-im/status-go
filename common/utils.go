@@ -3,6 +3,7 @@ package common
 import (
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
@@ -19,11 +20,18 @@ import (
 var ErrInvalidDisplayNameRegExp = errors.New("only letters, numbers, underscores and hyphens allowed")
 var ErrInvalidDisplayNameEthSuffix = errors.New(`usernames ending with "eth" are not allowed`)
 var ErrInvalidDisplayNameNotAllowed = errors.New("name is not allowed")
-var ErrInvalidDisplayNameLength = errors.New("length must be between 5 and 24 characters")
+var ErrInvalidDisplayNameLength = fmt.Errorf("length must be between %d and %d characters", MinDisplayNameLength, MaxDisplayNameLength)
 
 var DISPLAY_NAME_EXT = []string{"_eth", ".eth", "-eth"}
 
-const DefaultTruncateLength = 8
+const (
+	DefaultTruncateLength = 8
+	MinDisplayNameLength  = 5
+	MaxDisplayNameLength  = 24
+)
+
+// Compiled regex pattern for validating display names
+var displayNameRegex = regexp.MustCompile(fmt.Sprintf("^[\\w-\\s]{%d,%d}$", MinDisplayNameLength, MaxDisplayNameLength))
 
 func RecoverKey(m *protobuf.ApplicationMetadataMessage) (*ecdsa.PublicKey, error) {
 	if m.Signature == nil {
@@ -49,13 +57,12 @@ func ValidateDisplayName(displayName *string) error {
 		return nil
 	}
 
-	//keep in sync with he regex below!
-	if len(name) < 5 || len(name) > 24 {
+	if len(name) < MinDisplayNameLength || len(name) > MaxDisplayNameLength {
 		return ErrInvalidDisplayNameLength
 	}
 
-	// ^[\\w-\\s]{5,24}$ to allow spaces
-	if match, _ := regexp.MatchString("^[\\w-\\s]{5,24}$", name); !match {
+	// Use pre-compiled regex to validate name format
+	if !displayNameRegex.MatchString(name) {
 		return ErrInvalidDisplayNameRegExp
 	}
 
