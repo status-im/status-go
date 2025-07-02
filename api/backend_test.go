@@ -24,6 +24,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
@@ -924,8 +925,8 @@ func TestLoginAccount(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, accs, 1)
 
-	require.NotEmpty(t, accounts[0].KeyUID)
-	require.Equal(t, acc.KeyUID, accounts[0].KeyUID)
+	require.NotEmpty(t, accs[0].KeyUID)
+	require.Equal(t, acc.KeyUID, accs[0].KeyUID)
 
 	loginAccountRequest := &requests.Login{
 		KeyUID:           accs[0].KeyUID,
