@@ -190,6 +190,15 @@ class StatusBackend(RpcClient, SignalClient):
         data["StatusProxyStageName"] = "test"
         return data
 
+    def _set_wallet_secrets(self, data):
+        if "STATUS_BUILD_INFURA_TOKEN" in os.environ:
+            data["infuraToken"] = os.environ["STATUS_BUILD_INFURA_TOKEN"]
+        if "STATUS_BUILD_INFURA_SECRET" in os.environ:
+            data["infuraSecret"] = os.environ["STATUS_BUILD_INFURA_SECRET"]
+        if "STATUS_BUILD_POKT_TOKEN" in os.environ:
+            data["poktToken"] = os.environ["STATUS_BUILD_POKT_TOKEN"]
+        return data
+
     def _set_token_overrides(self, network, token_overrides):
         if not token_overrides:
             return network
@@ -227,8 +236,11 @@ class StatusBackend(RpcClient, SignalClient):
             "wakuV2LightClient": kwargs.get("wakuV2LightClient", False),
             "wakuV2Fleet": option.waku_fleet,
         }
-        self._set_networks(data, **kwargs)
+        if not option.disable_override_networks:
+            self._set_networks(data, **kwargs)
+
         data = self._set_proxy_credentials(data)
+        data = self._set_wallet_secrets(data)
         return data
 
     def create_account_and_login(self, user=user_1, **kwargs):
@@ -253,6 +265,7 @@ class StatusBackend(RpcClient, SignalClient):
             "kdfIterations": 256000,
         }
         data = self._set_proxy_credentials(data)
+        data = self._set_wallet_secrets(data)
         return self.api_valid_request(method, data)
 
     def logout(self):

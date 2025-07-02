@@ -71,6 +71,12 @@ def pytest_addoption(parser):
         help="Path to a local JSON file with Push Notifications fleets configuration. Default value is a path to config in Docker to run 1 pn-server",
         default="/static/configs/pushfleetconfig.json",
     )
+    parser.addoption(
+        "--disable-override-networks",
+        action="store_true",
+        help="When set, will disable overriding the networks to use Anvil and use default status-backend networks",
+        default=False,
+    )
 
 
 @dataclass
@@ -122,6 +128,8 @@ def pytest_report_header(config):
     return [
         f"waku fleets config file: {config.option.waku_fleets_config}",
         f"waku fleet: {config.option.waku_fleet}",
+        f"push fleets config file: {config.option.push_fleets_config}",
+        f"disable override networks: {config.option.disable_override_networks}",
     ]
 
 
