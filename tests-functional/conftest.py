@@ -62,7 +62,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--disable-override-networks",
         action="store_true",
-        help="When set, will override the networks to use Anvil. Disable to use real networks.",
+        help="When set, will disable overriding the networks to use Anvil and use default status-backend networks",
         default=False,
     )
 
