@@ -5,7 +5,6 @@ import (
 
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
-	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -27,7 +26,7 @@ type StatusBackend interface {
 	GetNodeConfig() (*params.NodeConfig, error)
 	UpdateRootDataDir(datadir string)
 
-	SelectAccount(loginParams account.LoginParams) error
+	SelectAccount(loginParams LoginParams) error
 	OpenAccounts() error
 	GetAccounts() ([]multiaccounts.Account, error)
 	LocalPairingStarted() error

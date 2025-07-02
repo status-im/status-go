@@ -26,6 +26,7 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
@@ -1742,29 +1743,29 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, inp
 		return nil, err
 	}
 
-	settings.DeviceName = request.DeviceName
-	settings.DisplayName = request.DisplayName
-	settings.PreviewPrivacy = request.PreviewPrivacy
-	settings.CurrentNetwork = request.CurrentNetwork
-	settings.TestNetworksEnabled = request.TestNetworksEnabled
-	settings.AutoRefreshTokensEnabled = request.AutoRefreshTokensEnabled
+	s.DeviceName = request.DeviceName
+	s.DisplayName = request.DisplayName
+	s.PreviewPrivacy = request.PreviewPrivacy
+	s.CurrentNetwork = request.CurrentNetwork
+	s.TestNetworksEnabled = request.TestNetworksEnabled
+	s.AutoRefreshTokensEnabled = request.AutoRefreshTokensEnabled
 	if !input.restoringAccount {
-		settings.Mnemonic = &input.mnemonic
+		s.Mnemonic = &input.mnemonic
 		// TODO(rasom): uncomment it as soon as address will be properly
 		// marked as shown on mobile client
 		//s.MnemonicWasNotShown = true
 	}
 
 	if !input.fetchBackup {
-		// This is a an account created from scratch, we can mark the BackupFetched as true
-		settings.BackupFetched = true
+		// This is an account created from scratch, we can mark the BackupFetched as true
+		s.BackupFetched = true
 	}
 
 	if request.WakuV2Fleet != "" {
-		settings.Fleet = &request.WakuV2Fleet
+		s.Fleet = &request.WakuV2Fleet
 	}
 
-	return settings, nil
+	return s, nil
 }
 
 func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, input *prepareAccountInput, installationID string) (*params.NodeConfig, error) {
