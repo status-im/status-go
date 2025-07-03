@@ -318,7 +318,7 @@ func (r *Reader) isBalanceUpdateNeededAnyway(clients map[uint64]chain.ClientInte
 	return updateAnyway
 }
 
-func tokensToBalancesPerChain(cachedTokens map[common.Address][]tokenTypes.StorageToken) map[uint64]map[common.Address]map[common.Address]*hexutil.Big {
+func tokensToBalancesPerChain(cachedTokens map[common.Address][]tokenTypes.StorageToken) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
 	cachedBalancesPerChain := map[uint64]map[common.Address]map[common.Address]*hexutil.Big{}
 	for address, tokens := range cachedTokens {
 		for _, token := range tokens {
@@ -330,13 +330,16 @@ func tokensToBalancesPerChain(cachedTokens map[common.Address][]tokenTypes.Stora
 					cachedBalancesPerChain[balance.ChainID][address] = map[common.Address]*hexutil.Big{}
 				}
 
-				bigBalance, _ := new(big.Int).SetString(balance.RawBalance, 10)
+				bigBalance, ok := new(big.Int).SetString(balance.RawBalance, 10)
+				if !ok {
+					return nil, gocommon.ErrBigIntSetFromString(balance.RawBalance)
+				}
 				cachedBalancesPerChain[balance.ChainID][address][balance.Address] = (*hexutil.Big)(bigBalance)
 			}
 		}
 	}
 
-	return cachedBalancesPerChain
+	return cachedBalancesPerChain, nil
 }
 
 func (r *Reader) fetchBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address, tokenAddresses []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
@@ -567,6 +570,10 @@ func (r *Reader) GetCachedBalances(clients map[uint64]chain.ClientInterface, add
 		connectedPerChain[chainID] = client.IsConnected()
 	}
 
-	balances := tokensToBalancesPerChain(cachedTokens)
+	balances, err := tokensToBalancesPerChain(cachedTokens)
+	if err != nil {
+		return nil, err
+	}
+
 	return r.balancesToTokensByAddress(connectedPerChain, addresses, allTokens, balances, cachedTokens), nil
 }
