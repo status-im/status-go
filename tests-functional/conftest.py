@@ -1,3 +1,4 @@
+import logging
 import os
 from dataclasses import dataclass, field
 from typing import List, Any
@@ -292,3 +293,50 @@ def backend_factory(request):
             teardown_container(backend.container, log_prefix=f"🧹 [TEARDOWN] Cleaning up backend {len(created_backends) - i} container...")
         else:
             logging.debug(f"ℹ️ [TEARDOWN] Backend {len(created_backends) - i} has no container to cleanup")
+
+
+class SecretRedactingFilter(logging.Filter):
+    secrets = []
+    placeholder = "***"
+
+    def __init__(self):
+        env_vars = [
+            "STATUS_BUILD_PROXY_USER",
+            "STATUS_BUILD_PROXY_PASSWORD",
+            "STATUS_BUILD_INFURA_TOKEN",
+            "STATUS_BUILD_INFURA_SECRET",
+            "STATUS_BUILD_POKT_TOKEN",
+        ]
+        for env_var in env_vars:
+            if env_var in os.environ:
+                self.secrets.append(os.environ[env_var])
+        super().__init__()
+
+    def redact(self, message):
+        for secret in self.secrets:
+            if secret:
+                message = message.replace(secret, self.placeholder)
+        return message
+
+    def filter(self, record):
+        # Redact secrets in the log message
+        if isinstance(record.msg, str):
+            message = record.getMessage()
+            record.msg = self.redact(message)
+
+        # Also redact secrets in args (if used with parameterized logging)
+        if record.args:
+            new_args = []
+            for arg in record.args:
+                redacted_arg = arg
+                if isinstance(arg, str):
+                    redacted_arg = self.redact(arg)
+                new_args.append(redacted_arg)
+            record.args = tuple(new_args)
+
+        return True
+
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger()
+logger.addFilter(SecretRedactingFilter())
