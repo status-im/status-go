@@ -58,11 +58,13 @@ func (s *MessengerPushNotificationSuite) SetupSuite() {
 	s.Require().NoError(shh.Start())
 	s.shh = shh
 
+	// Create a new HTTP server as a mock for gorush
 	s.gorushMock = &http.Server{
 		Addr: "127.0.0.1:0",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}),
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 	listener, err := net.Listen("tcp", s.gorushMock.Addr)
 	s.Require().NoError(err)
