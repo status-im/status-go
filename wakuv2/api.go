@@ -28,20 +28,20 @@ import (
 
 	"go.uber.org/zap"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/rpc"
+
+	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2/common"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rpc"
-
-	"google.golang.org/protobuf/proto"
-
-	gocommon "github.com/status-im/status-go/common"
 )
 
 // List of errors
@@ -261,7 +261,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types.Criteria) (*r
 			return nil, ErrInvalidSymmetricKey
 		}
 		filter.KeySym = key
-		filter.SymKeyHash = crypto.Keccak256Hash(filter.KeySym)
+		filter.SymKeyHash = ethcommon.Hash(crypto.Keccak256Hash(filter.KeySym))
 	}
 
 	// listen for messages that are encrypted with the given public key
