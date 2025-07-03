@@ -1,7 +1,8 @@
 import os
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Any
 import pytest
+import logging
 
 
 def pytest_addoption(parser):
@@ -82,7 +83,7 @@ def pytest_addoption(parser):
 @dataclass
 class Option:
     status_backend_port_range: List[int] = field(default_factory=list)
-    statusgo_containers: List[str] = field(default_factory=list)
+    statusgo_containers: List[Any] = field(default_factory=list)
     base_dir: str = ""
 
 
@@ -133,14 +134,161 @@ def pytest_report_header(config):
     ]
 
 
-@pytest.fixture(scope="function", autouse=True)
+def teardown_container(container, log_prefix=""):
+    """
+    Stops, saves logs, and removes a container with error handling.
+    Args:
+        container: The container object (should have stop, save_logs, remove methods)
+        log_prefix: Optional string for logging context
+    """
+    if not hasattr(container, "container") or not container.container:
+        logging.debug(f"{log_prefix}No container to cleanup.")
+        return
+    container.stop()  # pyright: ignore[reportAttributeAccessIssue]
+    try:
+        container.save_logs()  # pyright: ignore[reportAttributeAccessIssue]
+    except RuntimeError as e:
+        if "Container is not initialized" in str(e):
+            logging.warning(f"{log_prefix}Container already stopped, skipping log save: {e}")
+        else:
+            raise
+    container.remove()  # pyright: ignore[reportAttributeAccessIssue]
+    logging.debug(f"{log_prefix}Container stopped and removed.")
+
+
+@pytest.fixture(scope="function", autouse=False)
 def close_status_backend_containers(request):
+    """
+    Fixture to automatically cleanup Status backend containers after each test.
+    Should be used ONLY for tests that do not use backend_factory or class_backend fixtures.
+
+    This fixture ensures that all Status backend containers are properly stopped,
+    logs are saved, and containers are removed to prevent resource leaks and
+    conflicts between tests.
+
+    How it works:
+    1. Yields immediately (runs before test execution)
+    2. After test completes, checks if container reuse is enabled
+    3. If reuse is disabled, stops all containers in option.statusgo_containers
+    4. Saves logs from each container for debugging
+    5. Removes containers to free up system resources
+    6. Clears the containers list
+
+    Usage:
+    # Automatic cleanup for all tests in a class
+    @pytest.fixture(autouse=True)
+    def setup_cleanup(self, close_status_backend_containers):
+        yield
+
+    # Manual cleanup for specific test
+    def test_something(self, close_status_backend_containers):
+        # test code here
+        pass
+
+    # Skip cleanup for tests that reuse containers
+    class TestReuseContainers:
+        reuse_container = True  # This will skip cleanup
+
+    Parameters:
+        request: pytest request object containing test metadata
+
+    Dependencies:
+        - option.statusgo_containers: Global list of active containers
+        - Container objects with stop(), save_logs(), remove() methods
+
+    Scope: function (runs once per test function)
+    Autouse: False (must be explicitly requested)
+    """
     yield
     if hasattr(request.node.instance, "reuse_container"):
         return
     for container in option.statusgo_containers:
-        container.stop()  # pyright: ignore[reportAttributeAccessIssue]
-        container.save_logs()  # pyright: ignore[reportAttributeAccessIssue]
-        container.remove()  # pyright: ignore[reportAttributeAccessIssue]
-
+        try:
+            teardown_container(container, log_prefix="[close_status_backend_containers] ")
+        except Exception as e:
+            logging.error(f"Error cleaning up container: {e}")
     option.statusgo_containers = []
+
+
+@pytest.fixture(scope="function", autouse=False)
+def backend_factory(request):
+    """
+    Individual backend factory that creates backends one by one.
+    Each backend is created separately and all are cleaned up at the end.
+
+    Usage:
+    @pytest.fixture(autouse=True)
+    def setup_backends(self, backend_factory):
+        self.sender = backend_factory("sender")
+        self.receiver = backend_factory("receiver")
+
+    # Or with parameters:
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True, "wakuV2LightClient": True}], indirect=True)
+    def test_with_params(self, backend_factory):
+        self.sender = backend_factory("sender")
+        self.receiver = backend_factory("receiver")
+    """
+    from clients.status_backend import StatusBackend
+    from resources.constants import USE_IPV6
+
+    # Get class-level configuration
+    await_signals = getattr(request.cls, "await_signals", ["messages.new", "message.delivered", "node.login", "node.logout"])
+
+    # Get parameters from request.param if available
+    params = getattr(request, "param", {})
+
+    # Extract parameters with defaults
+    privileged = params.get("privileged", False)
+    ipv6 = params.get("ipv6", USE_IPV6)
+    wakuV2LightClient = params.get("wakuV2LightClient", False)
+    light_client_mode = params.get("light_client_mode", False)
+
+    # Use light_client_mode if specified, otherwise wakuV2LightClient
+    final_light_client = light_client_mode if "light_client_mode" in params else wakuV2LightClient
+
+    # Store created backends for cleanup
+    created_backends = []
+
+    def create_backend(self, name, *, start_messenger=True):
+        """
+        Create a single backend with the given name.
+
+        Args:
+            name (str): Name for the backend (e.g., "sender", "receiver")
+            start_messenger (bool): Whether to start messenger service
+
+        Returns:
+            StatusBackend: Created backend instance
+        """
+        logging.debug(f"🔧 [SETUP] Creating {name} backend for {request.cls.__name__}")
+        logging.debug(f"📋 [SETUP] Parameters: privileged={privileged}, ipv6={ipv6}, wakuV2LightClient={final_light_client}")
+
+        # Create backend
+        backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6)
+        backend.init_status_backend()
+        backend.create_account_and_login(wakuV2LightClient=final_light_client)
+        backend.wait_for_login()
+
+        if start_messenger:
+            backend.wakuext_service.start_messenger()
+
+        created_backends.append(backend)
+        logging.debug(f"✅ [SETUP] {name.capitalize()} backend created")
+
+        return backend
+
+    # Create factory object with create_backend method
+    factory = type("BackendFactory", (), {"__call__": create_backend})()
+
+    yield factory
+
+    # Cleanup all created backends
+    logging.debug(f"🧹 [TEARDOWN] Cleaning up {len(created_backends)} backends for {request.cls.__name__ if hasattr(request, 'cls') else 'test'}")
+
+    for i, backend in enumerate(reversed(created_backends)):
+        logging.debug(f"🧹 [TEARDOWN] Cleaning up backend {len(created_backends) - i}...")
+
+        if hasattr(backend, "container") and backend.container:
+            teardown_container(backend.container, log_prefix=f"🧹 [TEARDOWN] Cleaning up backend {len(created_backends) - i} container...")
+        else:
+            logging.debug(f"ℹ️ [TEARDOWN] Backend {len(created_backends) - i} has no container to cleanup")

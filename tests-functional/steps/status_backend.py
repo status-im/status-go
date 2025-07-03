@@ -6,6 +6,9 @@ from resources.constants import ANVIL_NETWORK_ID
 
 
 class StatusBackendSteps:
+    # TODO: we need to get rid of setup and teardown in this class and from this class in general and do it in fixtures
+    # like in other tests
+    # it is here because of wallet tests (test_router, test_wallet_rpc, test_wallet_signals, test_eth_api) require additional refactoring
     reuse_container = True  # Skip close_status_backend_containers cleanup
     await_signals = [SignalType.NODE_LOGIN.value]
 

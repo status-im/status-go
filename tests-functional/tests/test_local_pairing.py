@@ -160,10 +160,24 @@ class TestLocalPairing(MessengerSteps):
         SignalType.LOCAL_PAIRING.value,
     ]
 
+    @pytest.fixture(autouse=True)
+    def setup_cleanup(self, close_status_backend_containers):
+        """Automatically cleanup containers after each test"""
+        yield
+
+    def initialize_backend(self, await_signals, privileged=True, **kwargs):
+        backend = StatusBackend(await_signals, privileged=privileged)
+        backend.init_status_backend()
+        backend.create_account_and_login(**kwargs)
+        backend.wait_for_login()
+        backend.wakuext_service.start_messenger()
+        return backend
+
     def test_pairing_server_as_sender(self):
         # Create users
         alice = self.initialize_backend(self.await_signals, False)
         bob = self.initialize_backend(self.await_signals, False)
+
         bob_second_device = StatusBackend(self.await_signals)
         bob_second_device.init_status_backend()
 

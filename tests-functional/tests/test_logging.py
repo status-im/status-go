@@ -7,6 +7,11 @@ import os
 @pytest.mark.rpc
 class TestLogging:
 
+    @pytest.fixture(autouse=True)
+    def setup_cleanup(self, close_status_backend_containers):
+        """Automatically cleanup containers after each test"""
+        yield
+
     @pytest.mark.init
     def test_logging(self, tmp_path):
         await_signals = [

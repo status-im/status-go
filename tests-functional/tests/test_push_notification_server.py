@@ -50,9 +50,15 @@ def expect_push_notification(gorush, sender, receiver):
     assert push["data"]["chatId"] == keys.shake256(sender.public_key.encode("utf-8"))
 
 
-@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc
 class TestPushNotificationServer(MessengerSteps):
+
+    @pytest.fixture(autouse=True)
+    def setup_backends(self, backend_factory):
+        """Initialize two backends (alice and bob) for each test function"""
+        self.sender = backend_factory("alice")
+        self.receiver = backend_factory("bob")
+
     def test_push_notification_delivery(self, push_notification_server):
         server, gorush = push_notification_server
         alice = self.sender
@@ -71,7 +77,7 @@ class TestPushNotificationServer(MessengerSteps):
         time.sleep(5)
 
         # Make contacts, this should force delivery of a push notification
-        self.make_contacts()
+        self.make_contacts(alice, bob)
         expect_push_notification(gorush, alice, bob)
 
         # Send a message from Alice to Bob

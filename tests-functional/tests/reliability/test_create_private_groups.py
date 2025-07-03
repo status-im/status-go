@@ -6,19 +6,24 @@ from clients.signals import SignalType
 from resources.constants import USE_IPV6
 
 
-@pytest.mark.usefixtures("setup_two_privileged_nodes")
 @pytest.mark.reliability
 class TestCreatePrivateGroups(MessengerSteps):
 
+    @pytest.fixture(autouse=True)
+    def setup_backends(self, backend_factory):
+        """Initialize two unprivileged backends (sender and receiver) for each test function"""
+        self.sender = backend_factory("sender")
+        self.receiver = backend_factory("receiver")
+
     def test_create_private_group_baseline(self, private_groups_count=1):
-        self.make_contacts()
+        self.make_contacts(self.sender, self.receiver)
         self.create_private_group(private_groups_count)
 
     def test_multiple_create_private_groups(self):
         self.test_create_private_group_baseline(private_groups_count=50)
 
     def test_create_private_groups_with_node_pause_30_seconds(self):
-        self.make_contacts()
+        self.make_contacts(self.sender, self.receiver)
 
         with self.node_pause(self.receiver):
             private_group_name = f"private_group_{uuid4()}"
@@ -28,7 +33,7 @@ class TestCreatePrivateGroups(MessengerSteps):
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
     def test_create_private_groups_with_ip_change(self):
-        self.make_contacts()
+        self.make_contacts(self.sender, self.receiver)
         self.receiver.change_container_ip()
 
         private_group_name = f"private_group_{uuid4()}"

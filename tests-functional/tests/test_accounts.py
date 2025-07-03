@@ -10,6 +10,11 @@ from steps.status_backend import StatusBackendSteps
 @pytest.mark.rpc
 class TestAccounts(StatusBackendSteps):
 
+    @pytest.fixture(autouse=True)
+    def setup_backend(self, backend_factory):
+        """Initialize one backend for each test function"""
+        self.rpc_client = backend_factory("rpc_client")
+
     @pytest.mark.parametrize(
         "method, params",
         [

@@ -1,11 +1,14 @@
 import pytest
 
-from steps.status_backend import StatusBackendSteps
-
 
 @pytest.mark.rpc
 @pytest.mark.wallet
-class TestSavedAddresses(StatusBackendSteps):
+class TestSavedAddresses:
+
+    @pytest.fixture(autouse=True)
+    def setup(self, backend_factory):
+        """Initialize backend for each test function"""
+        self.rpc_client = backend_factory("rpc_client")
 
     @pytest.mark.parametrize(
         "method, params",

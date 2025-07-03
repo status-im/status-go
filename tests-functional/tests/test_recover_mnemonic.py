@@ -9,6 +9,12 @@ from resources.utils import assert_response_attributes
 @pytest.mark.create_account
 @pytest.mark.rpc
 class TestRecoverMnemonic:
+
+    @pytest.fixture(autouse=True)
+    def setup_cleanup(self, close_status_backend_containers):
+        """Automatically cleanup containers after each test"""
+        yield
+
     @pytest.mark.parametrize(
         "user_mnemonic",
         [user_mnemonic_24, user_mnemonic_15, user_mnemonic_12],

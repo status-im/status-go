@@ -1,3 +1,5 @@
+# pyright: reportOptionalMemberAccess=false
+# pyright: reportAttributeAccessIssue=false
 import logging
 import random
 import string
@@ -6,8 +8,6 @@ from uuid import uuid4
 import pytest
 from tenacity import retry, stop_after_delay, wait_fixed
 from clients.signals import SignalType
-from clients.status_backend import StatusBackend
-from resources.constants import USE_IPV6
 from resources.enums import MessageContentType
 from steps.network_conditions import NetworkConditionsSteps
 
@@ -21,30 +21,24 @@ class MessengerSteps(NetworkConditionsSteps):
         SignalType.NODE_LOGOUT.value,
     ]
 
-    @pytest.fixture(scope="function", autouse=False)
-    def setup_two_privileged_nodes(self, request):
-        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, True)
-        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, True)
+    def send_contact_request_and_wait_for_signal_to_be_received(self, sender=None, receiver=None) -> str:
+        """
+        Send a contact request from sender to receiver and wait for confirmation.
 
-    @pytest.fixture(scope="function", autouse=False)
-    def setup_two_unprivileged_nodes(self, request):
-        light_client_mode = request.param if hasattr(request, "param") else False
-        logging.info(f"Starting node with wakuV2LightClient: {light_client_mode}")
-        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False, wakuV2LightClient=light_client_mode)
-        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False, wakuV2LightClient=light_client_mode)
+        This function sends a contact request through the WakuExt service and waits
+        for the receiver to receive the MESSAGES_NEW signal containing the message ID.
+        This ensures the request has been delivered before proceeding with other operations.
 
-    def initialize_backend(self, await_signals, privileged=True, ipv6=USE_IPV6, **kwargs):
-        backend = StatusBackend(await_signals, privileged=privileged, ipv6=ipv6)
-        backend.init_status_backend()
-        backend.create_account_and_login(**kwargs)
-        backend.wait_for_login()
-        backend.wakuext_service.start_messenger()
-        return backend
+        Args:
+            sender: StatusBackend instance of the sender (defaults to self.sender)
+            receiver: StatusBackend instance of the receiver (defaults to self.receiver)
 
-    def send_contact_request_and_wait_for_signal_to_be_received(self, sender=None, receiver=None):
-        sender = sender or self.sender
-        receiver = receiver or self.receiver
+        Returns:
+            str: The message ID of the sent contact request
 
+        Raises:
+            AssertionError: If the message is not found or signal is not received
+        """
         response = sender.wakuext_service.send_contact_request(receiver.public_key, "contact_request")
         expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
         message_id = expected_message.get("id")
@@ -54,19 +48,28 @@ class MessengerSteps(NetworkConditionsSteps):
     def accept_contact_request_and_wait_for_signal_to_be_received(self, message_id, sender=None, receiver=None):
         sender = sender or self.sender
         receiver = receiver or self.receiver
-
         receiver.wakuext_service.accept_contact_request(message_id)
         accepted_signal = f"@{receiver.public_key} accepted your contact request"
         sender.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=accepted_signal)
 
-    def make_contacts(self, sender=None, receiver=None):
-        sender = sender or self.sender
-        receiver = receiver or self.receiver
+    def make_contacts(self, sender=None, receiver=None) -> str:
+        """
+        Create a contact between sender and receiver.
 
+        This function sends a contact request from sender to receiver and waits for confirmation.
+        It also checks if the contact request has been accepted by the receiver.
+
+        Args:
+            sender: StatusBackend instance of the sender (defaults to self.sender)
+            receiver: StatusBackend instance of the receiver (defaults to self.receiver)
+
+        Returns:
+            str: The message ID of the sent contact request
+        """
         existing_contacts = receiver.wakuext_service.get_contacts()
 
         if sender.public_key in str(existing_contacts):
-            return
+            return  # type: ignore
 
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(sender, receiver)
         self.accept_contact_request_and_wait_for_signal_to_be_received(message_id, sender, receiver)
@@ -125,16 +128,17 @@ class MessengerSteps(NetworkConditionsSteps):
             raise ValueError(f"Failed to find a message with message id '{message_id}' in response")
         return matched_message
 
-    def join_private_group(self):
+    def join_private_group(self, admin=None, member=None) -> str:
+
         private_group_name = f"private_group_{uuid4()}"
-        response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
-        expected_group_creation_msg = f"@{self.sender.public_key} created the group {private_group_name}"
+        response = admin.wakuext_service.create_group_chat_with_members([member.public_key], private_group_name)
+        expected_group_creation_msg = f"@{admin.public_key} created the group {private_group_name}"
         expected_message = self.get_message_by_content_type(
             response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
             message_pattern=expected_group_creation_msg,
         )[0]
-        self.receiver.find_signal_containing_pattern(
+        member.find_signal_containing_pattern(
             SignalType.MESSAGES_NEW.value,
             event_pattern=expected_message.get("id"),
             timeout=60,
@@ -152,9 +156,9 @@ class MessengerSteps(NetworkConditionsSteps):
             community_id = self.community_id
         return node.wakuext_service.fetch_community(community_id)
 
-    def join_community(self, node):
-        self.fetch_community(node)
-        response_to_join = node.wakuext_service.request_to_join_community(self.community_id)
+    def join_community(self, member=None, admin=None):
+        self.fetch_community(member)
+        response_to_join = member.wakuext_service.request_to_join_community(self.community_id)
         join_id = response_to_join.get("result", {}).get("requestsToJoinCommunity", [{}])[0].get("id")
 
         # I couldn't find any signal related to the requestToJoinCommunity request in the peer node.
@@ -163,7 +167,7 @@ class MessengerSteps(NetworkConditionsSteps):
         retry_interval = 0.5
         for attempt in range(max_retries):
             try:
-                response = self.sender.wakuext_service.accept_request_to_join_community(join_id)
+                response = admin.wakuext_service.accept_request_to_join_community(join_id)
                 if response.get("result"):
                     break
             except Exception as e:
@@ -193,17 +197,17 @@ class MessengerSteps(NetworkConditionsSteps):
         response = self.fetch_community(node, community_id)
         assert response.get("result", {}).get("joined") is joined
 
-    def community_messages(self, message_chat_id, message_count):
+    def community_messages(self, message_chat_id, message_count, sender=None, receiver=None):
         sent_messages = []
         for i in range(message_count):
             message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.send_chat_message(message_chat_id, message_text)
+            response = sender.wakuext_service.send_chat_message(message_chat_id, message_text)
             expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
             sent_messages.append(expected_message)
             time.sleep(0.01)
 
         for i, expected_message in enumerate(sent_messages):
-            messages_new_event = self.receiver.find_signal_containing_pattern(
+            messages_new_event = receiver.find_signal_containing_pattern(
                 SignalType.MESSAGES_NEW.value,
                 event_pattern=expected_message.get("id"),
                 timeout=60,
@@ -214,12 +218,12 @@ class MessengerSteps(NetworkConditionsSteps):
                 expected_message=expected_message,
             )
 
-    def one_to_one_message(self, message_count):
+    def one_to_one_message(self, message_count, receiver=None):
         _, responses = self.send_multiple_one_to_one_messages(message_count)
         messages = list(map(lambda r: r.get("result", {}).get("messages", [])[0], responses))
 
         for expected_message in messages:
-            messages_new_event = self.receiver.find_signal_containing_pattern(
+            messages_new_event = receiver.find_signal_containing_pattern(
                 SignalType.MESSAGES_NEW.value,
                 event_pattern=expected_message.get("id"),
                 timeout=60,
@@ -232,23 +236,20 @@ class MessengerSteps(NetworkConditionsSteps):
 
         return responses
 
-    def send_multiple_one_to_one_messages(self, message_count=1) -> tuple[list[str], list[dict]]:
+    def send_multiple_one_to_one_messages(self, message_count=1, sender=None, receiver=None) -> tuple[list[str], list[dict]]:
         sent_texts = []
         responses = []
 
         for i in range(message_count):
             message_text = f"test_message_{i}_{uuid4()}"
             sent_texts.append(message_text)
-            response = self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, message_text)
+            response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text)
             responses.append(response)
 
         return sent_texts, responses
 
-    def add_contact(self, execution_number, network_condition=None, privileged=True):
+    def add_contact(self, sender=None, receiver=None, execution_number=None, network_condition=None):
         message_text = f"test_contact_request_{execution_number}_{uuid4()}"
-        sender = self.initialize_backend(await_signals=self.await_signals, privileged=privileged)
-        receiver = self.initialize_backend(await_signals=self.await_signals, privileged=privileged)
-
         existing_contacts = receiver.wakuext_service.get_contacts()
 
         if sender.public_key in str(existing_contacts):
@@ -308,17 +309,17 @@ class MessengerSteps(NetworkConditionsSteps):
                 fields_to_validate={"text": "text"},
             )
 
-    def private_group_message(self, message_count, private_group_id):
+    def private_group_message(self, message_count, private_group_id, sender=None, receiver=None):
         sent_messages = []
         for i in range(message_count):
             message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.send_group_chat_message(private_group_id, message_text)
+            response = sender.wakuext_service.send_group_chat_message(private_group_id, message_text)
             expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
             sent_messages.append(expected_message)
             time.sleep(0.01)
 
         for _, expected_message in enumerate(sent_messages):
-            messages_new_event = self.receiver.find_signal_containing_pattern(
+            messages_new_event = receiver.find_signal_containing_pattern(
                 SignalType.MESSAGES_NEW.value,
                 event_pattern=expected_message.get("id"),
                 timeout=60,
