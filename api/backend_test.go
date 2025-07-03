@@ -721,7 +721,9 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 
 		db, err := accounts.NewDB(backend.appDB)
 		require.NoError(t, err)
-		defer handleError(t, db.Close())
+		defer func() {
+			handleError(t, db.Close())
+		}()
 
 		_, err = backend.AccountManager().CreateFromPrivateKeyAndStoreAccount(privateKeyHex, password)
 		require.NoError(t, err)
@@ -1513,13 +1515,17 @@ func TestChangeDatabasePassword(t *testing.T) {
 	require.NoError(t, err)
 	appDb, err := sqlite.OpenDB(appDbPath, newPassword, account.KDFIterations)
 	require.NoError(t, err)
-	defer handleError(t, appDb.Close())
+	defer func() {
+		handleError(t, appDb.Close())
+	}()
 
 	walletDbPath, err := backend.getWalletDBPath(account.KeyUID)
 	require.NoError(t, err)
 	walletDb, err := sqlite.OpenDB(walletDbPath, newPassword, account.KDFIterations)
 	require.NoError(t, err)
-	defer handleError(t, walletDb.Close())
+	defer func() {
+		handleError(t, walletDb.Close())
+	}()
 
 	// Test that keystore can be decrypted with the new password
 	acc, err := backend.accountManager.LoadAccount(genAccount.Address(), newPassword)
