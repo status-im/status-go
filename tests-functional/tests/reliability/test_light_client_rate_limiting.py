@@ -8,11 +8,16 @@ from resources.enums import MessageContentType
 
 
 @pytest.mark.reliability
+@pytest.mark.parametrize("backend_factory", [{"privileged": False, "wakuV2LightClient": True}], indirect=True, ids=["wakuV2LightClient_True"])
 class TestLightClientRateLimiting(MessengerSteps):
 
+    @pytest.fixture(autouse=True)
+    def setup_backends(self, backend_factory):
+        """Initialize two light client backends (sender and receiver) for each test function"""
+        self.sender = backend_factory("sender")
+        self.receiver = backend_factory("receiver")
+
     def test_light_client_rate_limiting(self):
-        self.sender = self.initialize_backend(await_signals=self.await_signals, wakuV2LightClient=True)
-        self.receiver = self.initialize_backend(await_signals=self.await_signals, wakuV2LightClient=True)
         sent_messages = []
 
         for i in range(200):

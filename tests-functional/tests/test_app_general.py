@@ -1,13 +1,15 @@
 import random
-
 import pytest
-
-from steps.status_backend import StatusBackendSteps
 
 
 @pytest.mark.accounts
 @pytest.mark.rpc
-class TestAppGeneral(StatusBackendSteps):
+class TestAppGeneral:
+
+    @pytest.fixture(autouse=True)
+    def setup_backend(self, backend_factory):
+        """Initialize one backend for each test function"""
+        self.rpc_client = backend_factory("rpc_client")
 
     @pytest.mark.parametrize(
         "method, params",

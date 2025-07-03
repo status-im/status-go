@@ -6,12 +6,17 @@ from clients.signals import SignalType
 from resources.constants import USE_IPV6
 
 
-@pytest.mark.usefixtures("setup_two_privileged_nodes")
 @pytest.mark.reliability
 class TestOneToOneMessages(MessengerSteps):
 
+    @pytest.fixture(autouse=True)
+    def setup_backends(self, backend_factory):
+        """Initialize two unprivileged backends (sender and receiver) for each test function"""
+        self.sender = backend_factory("sender")
+        self.receiver = backend_factory("receiver")
+
     def test_one_to_one_message_baseline(self, message_count=1):
-        self.one_to_one_message(message_count)
+        self.one_to_one_message(message_count, receiver=self.receiver)
 
     def test_multiple_one_to_one_messages(self):
         self.test_one_to_one_message_baseline(message_count=50)
