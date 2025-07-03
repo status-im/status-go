@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/circuitbreaker"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/logutils"
@@ -80,10 +82,20 @@ type ClientWithFallback struct {
 
 	tag      string // tag for the limiter
 	groupTag string // tag for the limiter group
+
+	done   chan struct{}  // channel to signal client closure
+	wg     sync.WaitGroup // wait group to track active operations
+	closed atomic.Bool    // flag to track if client is closed
 }
 
 func (c *ClientWithFallback) Copy() interface{} {
-	return &ClientWithFallback{
+	clientCopy := c.createCopy()
+	return clientCopy
+}
+
+func (c *ClientWithFallback) createCopy() *ClientWithFallback {
+	// Create a new ClientWithFallback with copied values
+	clientCopy := &ClientWithFallback{
 		ChainID:                c.ChainID,
 		ethClients:             c.ethClients,
 		commonLimiter:          c.commonLimiter,
@@ -94,7 +106,13 @@ func (c *ClientWithFallback) Copy() interface{} {
 		LastCheckedAt:          c.LastCheckedAt,
 		tag:                    c.tag,
 		groupTag:               c.groupTag,
+		done:                   make(chan struct{}),
 	}
+
+	// Copy the closed value
+	clientCopy.closed.Store(c.closed.Load())
+
+	return clientCopy
 }
 
 // Don't mark connection as failed if we get one of these errors
@@ -135,10 +153,21 @@ func NewClient(ethClients []ethclient.RPSLimitedEthClientInterface, chainID uint
 		LastCheckedAt:          time.Now().Unix(),
 		circuitbreaker:         circuitbreaker.NewCircuitBreaker(cbConfig),
 		providersHealthManager: providersHealthManager,
+		done:                   make(chan struct{}),
 	}
 }
 
 func (c *ClientWithFallback) Close() {
+	if !c.closed.CompareAndSwap(false, true) {
+		return // already closed
+	}
+
+	close(c.done) // signal all ongoing operations to stop
+
+	// Wait for all operations to complete
+	c.wg.Wait()
+
+	// Close all eth clients
 	for _, client := range c.ethClients {
 		client.Close()
 	}
@@ -188,6 +217,28 @@ func (c *ClientWithFallback) IsConnected() bool {
 }
 
 func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (interface{}, error) {
+	if c.closed.Load() {
+		return nil, errors.New("client is closed")
+	}
+
+	// Add the operation to the wait group
+	c.wg.Add(1)
+	defer c.wg.Done()
+
+	// Create a context that will be cancelled when either the parent context is done or the client is closed
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Start a goroutine to watch for client closure
+	go func() {
+		defer gocommon.LogOnPanic()
+		select {
+		case <-c.done:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
 	if c.commonLimiter != nil {
 		if allow, err := c.commonLimiter.Allow(c.tag); !allow {
 			return nil, fmt.Errorf("tag=%s, %w", c.tag, err)
@@ -206,6 +257,9 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (i
 	for _, ethProviderClient := range c.ethClients {
 		ethProviderClient := ethProviderClient
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			res, err := ethProviderClient.ExecuteWithRPSLimit(f.Func)
 			if err != nil && (isVMError(err) || errors.Is(err, context.Canceled)) {
 				cmd.Cancel()
@@ -768,8 +822,7 @@ func (c *ClientWithFallback) SetGroupTag(tag string) {
 }
 
 func (c *ClientWithFallback) DeepCopyTag() tagger.Tagger {
-	clientCopy := *c
-	return &clientCopy
+	return c.createCopy()
 }
 
 func (c *ClientWithFallback) GetLimiter() rpclimiter.RequestLimiter {
