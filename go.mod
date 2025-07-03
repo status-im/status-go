@@ -43,7 +43,6 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/multiformats/go-varint v0.0.7
 	github.com/nfnt/resize v0.0.0-00010101000000-000000000000
-	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/oliamb/cutter v0.2.2
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
