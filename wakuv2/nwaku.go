@@ -89,20 +89,21 @@ type ErrorSendingEnvelope struct {
 	SentEnvelope SentEnvelope
 }
 
+// Waku node metrics will be collected by the node and not by status-go
 type IMetricsHandler interface {
 	SetDeviceType(deviceType string)
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
-	PushPeerConnFailures(peerConnFailures map[string]int)
+	// PushPeerConnFailures(peerConnFailures map[string]int)
 	PushMessageCheckSuccess()
 	PushMessageCheckFailure()
-	PushPeerCountByShard(peerCountByShard map[uint16]uint)
-	PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
-	PushDialFailure(dialFailure common.DialError)
-	PushMissedMessage(envelope *protocol.Envelope)
+	// PushPeerCountByShard(peerCountByShard map[uint16]uint)
+	// PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
+	// PushDialFailure(dialFailure common.DialError)
+	PushMissedMessage(envelope common.Envelope)
 	PushMissedRelevantMessage(message *common.ReceivedMessage)
 	PushMessageDeliveryConfirmed()
-	PushSentMessageTotal(messageSize uint32, publishMethod string)
+	// PushSentMessageTotal(messageSize uint32, publishMethod string)
 	PushRawMessageByType(pubsubTopic string, contentTopic string, messageType string, messageSize uint32)
 }
 
@@ -276,8 +277,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
-	// TODO-nwaku
-	// waku.bandwidthCounter = metrics.NewBandwidthCounter()
+	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
 	cfg.EnableStoreConfirmationForMessagesSent = !cfg.LightClient
 
@@ -390,18 +390,12 @@ func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
 }
 */
 
-// TODO-nwaku - implement when metrics are supported
 func (w *Waku) GetStats() types.StatsSummary {
-	return types.StatsSummary{
-		UploadRate:   uint64(1),
-		DownloadRate: uint64(1),
-	}
-	/* TODO-nwaku
 	stats := w.bandwidthCounter.GetBandwidthTotals()
 	return types.StatsSummary{
 		UploadRate:   uint64(stats.RateOut),
 		DownloadRate: uint64(stats.RateIn),
-	} */
+	}
 }
 
 func (w *Waku) GetPubsubTopic(topic string) string {
@@ -1036,49 +1030,6 @@ func (w *Waku) checkForConnectionChanges() {
 	})
 }
 
-/* TODO-nwaku - implement when metrics are supported
-func (w *Waku) reportPeerMetrics() {
-	if w.metricsHandler != nil {
-		connFailures := FormatPeerConnFailures(w.node)
-		w.metricsHandler.PushPeerConnFailures(connFailures)
-
-		peerCountByOrigin := make(map[wps.Origin]uint)
-		peerCountByShard := make(map[uint16]uint)
-		wakuPeerStore := w.node.Host().Peerstore().(wps.WakuPeerstore)
-
-		for _, peerID := range w.node.Host().Network().Peers() {
-			origin, err := wakuPeerStore.Origin(peerID)
-			if err != nil {
-				origin = wps.Unknown
-			}
-
-			peerCountByOrigin[origin]++
-			pubsubTopics, err := wakuPeerStore.PubSubTopics(peerID)
-			if err != nil {
-				continue
-			}
-
-			keys := make([]string, 0, len(pubsubTopics))
-			for k := range pubsubTopics {
-				keys = append(keys, k)
-			}
-			relayShards, err := protocol.TopicsToRelayShards(keys...)
-			if err != nil {
-				continue
-			}
-
-			for _, shards := range relayShards {
-				for _, shard := range shards.ShardIDs {
-					peerCountByShard[shard]++
-				}
-			}
-		}
-		w.metricsHandler.PushPeerCountByShard(peerCountByShard)
-		w.metricsHandler.PushPeerCountByOrigin(peerCountByOrigin)
-	}
-}
-*/
-
 func (w *Waku) startMessageSender() error {
 	publishMethod := publish.Relay
 	if w.cfg.LightClient {
@@ -1225,13 +1176,11 @@ func (w *Waku) OnNewEnvelopes(envelope common.Envelope, msgType common.MessageTy
 		return nil
 	}
 
-	/* TODO-nwaku - implement when metrics are supported
 	if w.metricsHandler != nil {
 		if msgType == common.MissingMessageType {
 			w.metricsHandler.PushMissedMessage(envelope)
 		}
 	}
-	*/
 
 	logger := w.logger.With(
 		zap.String("messageType", msgType),
