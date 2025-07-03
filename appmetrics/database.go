@@ -139,6 +139,7 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric, sessionID string) (er
 	if err != nil {
 		return err
 	}
+	defer insert.Close()
 
 	for _, metric := range appMetrics {
 		_, err = insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS, sessionID, metric.Processed)
@@ -243,6 +244,7 @@ func (db *Database) SetToProcessedByIDs(ids []int) (err error) {
 	if err != nil {
 		return err
 	}
+	defer update.Close()
 
 	// Convert the ids into Stmt.Exec compatible variadic
 	args := make([]interface{}, 0, len(ids))
@@ -296,6 +298,7 @@ func (db *Database) DeleteOlderThan(date *time.Time) (err error) {
 	if err != nil {
 		return err
 	}
+	defer d.Close()
 
 	_, err = d.Exec(date)
 	if err != nil {

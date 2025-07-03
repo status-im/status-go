@@ -334,6 +334,7 @@ func (o *OwnershipDB) GetIDsNotInDB(
 	if err != nil {
 		return nil, err
 	}
+	defer exists.Close()
 
 	for _, id := range newIDs {
 		row := exists.QueryRow(
@@ -363,6 +364,7 @@ func (o *OwnershipDB) GetIsFirstOfCollection(onwerAddress common.Address, newIDs
 	if err != nil {
 		return nil, err
 	}
+	defer exists.Close()
 
 	for _, id := range newIDs {
 		row := exists.QueryRow(

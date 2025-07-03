@@ -1604,6 +1604,8 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 		return
 	}
 
+	defer stmt.Close()
+
 	for _, msg := range messages {
 		var allValues []interface{}
 		allValues, err = db.tableUserMessagesAllValues(msg)
@@ -1692,10 +1694,12 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 	defer func() {
 		if err == nil {
 			err = queries.transaction.Commit()
-			return
+		} else {
+			// don't shadow original error
+			_ = queries.transaction.Rollback()
 		}
-		// don't shadow original error
-		_ = queries.transaction.Rollback()
+		queries.updateStmt.Close()
+		queries.insertStmt.Close()
 	}()
 	for _, message := range messages {
 		_, err = db.savePinMessage(message, queries)
@@ -1759,10 +1763,12 @@ func (db sqlitePersistence) SavePinMessage(message *common.PinMessage) (inserted
 	defer func() {
 		if err == nil {
 			err = queries.transaction.Commit()
-			return
+		} else {
+			// don't shadow original error
+			_ = queries.transaction.Rollback()
 		}
-		// don't shadow original error
-		_ = queries.transaction.Rollback()
+		queries.updateStmt.Close()
+		queries.insertStmt.Close()
 	}()
 	return db.savePinMessage(message, queries)
 }
@@ -2281,6 +2287,7 @@ func (db sqlitePersistence) SaveDiscordMessageAuthor(author *protobuf.DiscordMes
 	if err != nil {
 		return
 	}
+	defer stmt.Close()
 	_, err = stmt.Exec(
 		author.GetId(),
 		author.GetName(),
@@ -2472,7 +2479,7 @@ func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err
 	if err != nil {
 		return
 	}
-
+	defer stmt.Close()
 	_, err = stmt.Exec(
 		emojiReaction.ID(),
 		emojiReaction.Clock,
@@ -2529,6 +2536,7 @@ func (db sqlitePersistence) SaveInvitation(invitation *GroupChatInvitation) (err
 	if err != nil {
 		return
 	}
+	defer stmt.Close()
 	_, err = stmt.Exec(
 		invitation.ID(),
 		invitation.From,

@@ -407,6 +407,7 @@ func migrateWalletJSONBlobs(sqlTx *sql.Tx) error {
 			if err != nil {
 				return err
 			}
+			defer stmt.Close()
 
 			for _, dataEntry := range batchEntries {
 				_, err = stmt.Exec(dataEntry...)
@@ -522,6 +523,7 @@ func migrateWalletTransferFromToAddresses(sqlTx *sql.Tx) error {
 			if err != nil {
 				return err
 			}
+			defer stmt.Close()
 
 			for _, dataEntry := range batchEntries {
 				_, err = stmt.Exec(dataEntry...)

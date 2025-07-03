@@ -89,6 +89,7 @@ ON CONFLICT (message_id) DO NOTHING;`
 	if err != nil {
 		return
 	}
+	defer insert.Close()
 
 	for _, metric := range appMetrics {
 		_, err = insert.Exec(
