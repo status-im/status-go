@@ -80,6 +80,7 @@ func (s *HandlersSuite) saveUserMessage(msg *common.Message) {
 	`)
 
 	s.Require().NoError(err)
+	defer stmt.Close()
 
 	links := []byte{}
 	statusLinks := []byte{}

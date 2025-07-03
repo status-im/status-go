@@ -381,6 +381,7 @@ func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *tokenTyp
 		logutils.ZapLogger().Error("Cannot prepare token update query", zap.Error(err))
 		return
 	}
+	defer update.Close()
 
 	if uri == "" {
 		// Update token community ID to prevent further checks
@@ -670,6 +671,7 @@ func (tm *Manager) UpsertCustom(token tokenTypes.Token) error {
 	if err != nil {
 		return err
 	}
+	defer insert.Close()
 	_, err = insert.Exec(token.ChainID, token.Address, token.Name, token.Symbol, token.Decimals)
 	return err
 }

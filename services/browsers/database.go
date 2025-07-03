@@ -70,6 +70,7 @@ func (db *Database) StoreBookmark(bookmark Bookmark) (Bookmark, error) {
 	if err != nil {
 		return bookmark, err
 	}
+	defer insert.Close()
 
 	// Get the right icon
 	finder := besticon.IconFinder{}
@@ -186,6 +187,7 @@ func (db *Database) UpdateBookmark(originalURL string, bookmark Bookmark) error 
 	if err != nil {
 		return err
 	}
+	defer insert.Close()
 	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock, bookmark.DeletedAt, originalURL)
 	return err
 }

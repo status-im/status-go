@@ -242,6 +242,7 @@ func (db *Database) saveSetting(setting SettingField, value interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer update.Close()
 
 	_, err = update.Exec(value)
 

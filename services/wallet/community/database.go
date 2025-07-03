@@ -47,6 +47,7 @@ func (o *DataDB) SetCommunityInfo(id string, c *thirdparty.CommunityInfo) (err e
 	if err != nil {
 		return err
 	}
+	defer setState.Close()
 
 	valid := c != nil
 	_, err = setState.Exec(
@@ -64,6 +65,7 @@ func (o *DataDB) SetCommunityInfo(id string, c *thirdparty.CommunityInfo) (err e
 		if err != nil {
 			return err
 		}
+		defer setInfo.Close()
 
 		_, err = setInfo.Exec(
 			id,
@@ -95,6 +97,7 @@ func (o *DataDB) GetCommunityInfo(id string) (*thirdparty.CommunityInfo, *InfoSt
 	if err != nil {
 		return nil, nil, err
 	}
+	defer getState.Close()
 	row = getState.QueryRow(id)
 
 	err = row.Scan(
@@ -114,6 +117,7 @@ func (o *DataDB) GetCommunityInfo(id string) (*thirdparty.CommunityInfo, *InfoSt
 	if err != nil {
 		return nil, nil, err
 	}
+	defer getInfo.Close()
 
 	row = getInfo.QueryRow(id)
 

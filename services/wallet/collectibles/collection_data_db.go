@@ -60,6 +60,7 @@ func getCollectionTraits(creator sqlite.StatementCreator, id thirdparty.Contract
 	if err != nil {
 		return nil, err
 	}
+	defer selectTraits.Close()
 
 	rows, err := selectTraits.Query(
 		id.ChainID,
@@ -68,6 +69,7 @@ func getCollectionTraits(creator sqlite.StatementCreator, id thirdparty.Contract
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	return rowsToCollectionTraits(rows)
 }
@@ -78,6 +80,7 @@ func upsertCollectionTraits(creator sqlite.StatementCreator, id thirdparty.Contr
 	if err != nil {
 		return err
 	}
+	defer deleteTraits.Close()
 
 	_, err = deleteTraits.Exec(
 		id.ChainID,
@@ -93,6 +96,7 @@ func upsertCollectionTraits(creator sqlite.StatementCreator, id thirdparty.Contr
 	if err != nil {
 		return err
 	}
+	defer insertTrait.Close()
 
 	for traitType, trait := range traits {
 		_, err = insertTrait.Exec(
@@ -116,6 +120,7 @@ func setCollectionsData(creator sqlite.StatementCreator, collections []thirdpart
 	if err != nil {
 		return err
 	}
+	defer insertCollection.Close()
 
 	for _, c := range collections {
 		_, err = insertCollection.Exec(
@@ -213,6 +218,7 @@ func (o *CollectionDataDB) GetIDsNotInDB(ids []thirdparty.ContractID) ([]thirdpa
 	if err != nil {
 		return nil, err
 	}
+	defer exists.Close()
 
 	for _, id := range idMap {
 		row := exists.QueryRow(
@@ -241,6 +247,7 @@ func (o *CollectionDataDB) GetData(ids []thirdparty.ContractID) (map[string]thir
 	if err != nil {
 		return nil, err
 	}
+	defer getData.Close()
 
 	for _, id := range ids {
 		row := getData.QueryRow(
@@ -336,6 +343,7 @@ func getCollectionSocials(creator sqlite.StatementCreator, id thirdparty.Contrac
 	if err != nil {
 		return nil, err
 	}
+	defer selectSocials.Close()
 
 	rows, err := selectSocials.Query(
 		id.ChainID,
@@ -344,6 +352,7 @@ func getCollectionSocials(creator sqlite.StatementCreator, id thirdparty.Contrac
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	return rowsToCollectionSocials(rows)
 }
@@ -355,6 +364,7 @@ func upsertCollectionSocials(creator sqlite.StatementCreator, id thirdparty.Cont
 	if err != nil {
 		return err
 	}
+	defer insertSocial.Close()
 
 	_, err = insertSocial.Exec(
 		id.ChainID,
