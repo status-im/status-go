@@ -5,7 +5,11 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"net"
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -40,16 +44,52 @@ type MessengerPushNotificationSuite struct {
 	// a single Waku service should be shared.
 	shh    wakutypes.Waku
 	logger *zap.Logger
+
+	gorushMock    *http.Server
+	gorushMockURL string
 }
 
-func (s *MessengerPushNotificationSuite) SetupTest() {
+func (s *MessengerPushNotificationSuite) SetupSuite() {
 	s.logger = tt.MustCreateTestLogger()
 
+	// Create a new Waku node
 	shh, err := newTestWakuNode(s.logger)
 	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
 	s.shh = shh
 
+	s.gorushMock = &http.Server{
+		Addr: "127.0.0.1:0",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	}
+	listener, err := net.Listen("tcp", s.gorushMock.Addr)
+	s.Require().NoError(err)
+
+	// Get the actual server URL after binding to a port
+	s.gorushMockURL = fmt.Sprintf("http://%s", listener.Addr().String())
+
+	// Start the server in a goroutine
+	go func() {
+		err := s.gorushMock.Serve(listener)
+		s.Require().ErrorIs(err, http.ErrServerClosed)
+	}()
+}
+
+func (s *MessengerPushNotificationSuite) TearDownSuite() {
+	// Create a context with a timeout for graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Shutdown the server
+	if err := s.gorushMock.Shutdown(ctx); err != nil {
+		s.T().Errorf("Server shutdown error: %v", err)
+	}
+	fmt.Println("HTTP server stopped")
+}
+
+func (s *MessengerPushNotificationSuite) SetupTest() {
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
 }
@@ -70,9 +110,10 @@ func (s *MessengerPushNotificationSuite) newMessenger(shh wakutypes.Waku) *Messe
 
 func (s *MessengerPushNotificationSuite) newPushNotificationServer(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey) (*Messenger, *pushnotificationserver.Server) {
 	serverConfig := &pushnotificationserver.Config{
-		Enabled:  true,
-		Logger:   s.logger,
-		Identity: privateKey,
+		Enabled:   true,
+		Logger:    s.logger,
+		Identity:  privateKey,
+		GorushURL: s.gorushMockURL,
 	}
 
 	server := pushnotificationserver.New(serverConfig)
