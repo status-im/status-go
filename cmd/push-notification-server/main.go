@@ -216,6 +216,16 @@ func main() {
 }
 
 func parseNodeKey(nodeKey string) (*ecdsa.PrivateKey, string, error) {
+	// Check for environment variable if CLI flag is empty
+	if nodeKey == "" {
+		nodeKey = os.Getenv("STATUS_GO_NODE_KEY")
+	}
+
+	// If still empty, return error
+	if nodeKey == "" {
+		return nil, "", errors.New("Nodekey must be provided via -identity flag or STATUS_GO_NODE_KEY environment variable")
+	}
+
 	// Parse private key
 	privateKey, err := crypto.HexToECDSA(nodeKey)
 	if err != nil {
