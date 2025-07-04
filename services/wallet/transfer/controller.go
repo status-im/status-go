@@ -3,9 +3,9 @@ package transfer
 import (
 	"context"
 	"database/sql"
+	"slices"
 
 	"go.uber.org/zap"
-	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
 
 	"github.com/ethereum/go-ethereum/common"
 	gocommon "github.com/status-im/status-go/common"

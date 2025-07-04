@@ -21,10 +21,10 @@ package common
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"maps"
 	"sync"
 
 	"go.uber.org/zap"
-	"golang.org/x/exp/maps"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

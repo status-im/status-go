@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
+	"slices"
 	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
-
-	maps "golang.org/x/exp/maps"
-	slices "golang.org/x/exp/slices"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"

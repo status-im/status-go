@@ -8,15 +8,14 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
-	slices "golang.org/x/exp/slices"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"github.com/status-im/status-go/api/multiformat"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
