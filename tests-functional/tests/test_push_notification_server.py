@@ -74,7 +74,7 @@ class TestPushNotificationServer(MessengerSteps):
         assert "error" not in response
 
         # There is currently no way to reliably check if the devices have been registered, so we just wait a few seconds
-        time.sleep(5)
+        time.sleep(10)
 
         # Make contacts, this should force delivery of a push notification
         self.make_contacts(alice, bob)
