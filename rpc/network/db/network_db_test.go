@@ -7,12 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network/db"
 	"github.com/status-im/status-go/rpc/network/testutil"
+	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -99,15 +99,15 @@ func (s *NetworksPersistenceTestSuite) verifyNetworkDeletion(chainID uint64) {
 // Tests
 
 func (s *NetworksPersistenceTestSuite) TestAddAndGetNetworkWithProviders() {
-	network := testutil.CreateNetwork(api_common.OptimismChainID, "Optimism Mainnet", []params.RpcProvider{
-		testutil.CreateProvider(api_common.OptimismChainID, "Provider1", params.UserProviderType, true, security.NewSensitiveString("https://rpc.optimism.io")),
-		testutil.CreateProvider(api_common.OptimismChainID, "Provider2", params.EmbeddedProxyProviderType, false, security.NewSensitiveString("https://backup.optimism.io")),
+	network := testutil.CreateNetwork(common.OptimismMainnet, "Optimism Mainnet", []params.RpcProvider{
+		testutil.CreateProvider(common.OptimismMainnet, "Provider1", params.UserProviderType, true, security.NewSensitiveString("https://rpc.optimism.io")),
+		testutil.CreateProvider(common.OptimismMainnet, "Provider2", params.EmbeddedProxyProviderType, false, security.NewSensitiveString("https://backup.optimism.io")),
 	})
 	s.addAndVerifyNetworks([]*params.Network{network})
 }
 
 func (s *NetworksPersistenceTestSuite) TestDeleteNetworkWithProviders() {
-	network := testutil.CreateNetwork(api_common.OptimismChainID, "Optimism Mainnet", DefaultProviders(api_common.OptimismChainID))
+	network := testutil.CreateNetwork(common.OptimismMainnet, "Optimism Mainnet", DefaultProviders(common.OptimismMainnet))
 	s.addAndVerifyNetworks([]*params.Network{network})
 
 	err := s.networksPersistence.DeleteNetwork(network.ChainID)
@@ -117,13 +117,13 @@ func (s *NetworksPersistenceTestSuite) TestDeleteNetworkWithProviders() {
 }
 
 func (s *NetworksPersistenceTestSuite) TestUpdateNetworkAndProviders() {
-	network := testutil.CreateNetwork(api_common.OptimismChainID, "Optimism Mainnet", DefaultProviders(api_common.OptimismChainID))
+	network := testutil.CreateNetwork(common.OptimismMainnet, "Optimism Mainnet", DefaultProviders(common.OptimismMainnet))
 	s.addAndVerifyNetworks([]*params.Network{network})
 
 	// Update fields
 	network.ChainName = "Updated Optimism Mainnet"
 	network.RpcProviders = []params.RpcProvider{
-		testutil.CreateProvider(api_common.OptimismChainID, "UpdatedProvider", params.UserProviderType, true, security.NewSensitiveString("https://rpc.optimism.updated.io")),
+		testutil.CreateProvider(common.OptimismMainnet, "UpdatedProvider", params.UserProviderType, true, security.NewSensitiveString("https://rpc.optimism.updated.io")),
 	}
 
 	s.addAndVerifyNetworks([]*params.Network{network})
@@ -131,8 +131,8 @@ func (s *NetworksPersistenceTestSuite) TestUpdateNetworkAndProviders() {
 
 func (s *NetworksPersistenceTestSuite) TestDeleteAllNetworks() {
 	networks := []*params.Network{
-		testutil.CreateNetwork(api_common.MainnetChainID, "Ethereum Mainnet", DefaultProviders(api_common.MainnetChainID)),
-		testutil.CreateNetwork(api_common.SepoliaChainID, "Sepolia Testnet", DefaultProviders(api_common.SepoliaChainID)),
+		testutil.CreateNetwork(common.EthereumMainnet, "Ethereum Mainnet", DefaultProviders(common.EthereumMainnet)),
+		testutil.CreateNetwork(common.EthereumSepolia, "Sepolia Testnet", DefaultProviders(common.EthereumSepolia)),
 	}
 	s.addAndVerifyNetworks(networks)
 
@@ -146,11 +146,11 @@ func (s *NetworksPersistenceTestSuite) TestDeleteAllNetworks() {
 
 func (s *NetworksPersistenceTestSuite) TestSetNetworks() {
 	initialNetworks := []*params.Network{
-		testutil.CreateNetwork(api_common.MainnetChainID, "Ethereum Mainnet", DefaultProviders(api_common.MainnetChainID)),
-		testutil.CreateNetwork(api_common.SepoliaChainID, "Sepolia Testnet", DefaultProviders(api_common.SepoliaChainID)),
+		testutil.CreateNetwork(common.EthereumMainnet, "Ethereum Mainnet", DefaultProviders(common.EthereumMainnet)),
+		testutil.CreateNetwork(common.EthereumSepolia, "Sepolia Testnet", DefaultProviders(common.EthereumSepolia)),
 	}
 	newNetworks := []*params.Network{
-		testutil.CreateNetwork(api_common.OptimismChainID, "Optimism Mainnet", DefaultProviders(api_common.OptimismChainID)),
+		testutil.CreateNetwork(common.OptimismMainnet, "Optimism Mainnet", DefaultProviders(common.OptimismMainnet)),
 	}
 
 	// Add initial networks
@@ -160,25 +160,25 @@ func (s *NetworksPersistenceTestSuite) TestSetNetworks() {
 	s.addAndVerifyNetworks(newNetworks)
 
 	// Verify old networks are removed
-	s.verifyNetworkDeletion(api_common.MainnetChainID)
-	s.verifyNetworkDeletion(api_common.SepoliaChainID)
+	s.verifyNetworkDeletion(common.EthereumMainnet)
+	s.verifyNetworkDeletion(common.EthereumSepolia)
 }
 
 func (s *NetworksPersistenceTestSuite) TestValidationForNetworksAndProviders() {
 	// Invalid Network: Missing required ChainName
-	invalidNetwork := testutil.CreateNetwork(api_common.MainnetChainID, "", DefaultProviders(api_common.MainnetChainID))
+	invalidNetwork := testutil.CreateNetwork(common.EthereumMainnet, "", DefaultProviders(common.EthereumMainnet))
 
 	// Invalid Provider: Missing URL
 	invalidProvider := params.RpcProvider{
 		Name:    "InvalidProvider",
-		ChainID: api_common.MainnetChainID,
+		ChainID: common.EthereumMainnet,
 		URL:     security.NewSensitiveString(""), // Invalid
 		Type:    params.UserProviderType,
 		Enabled: true,
 	}
 
 	// Add invalid provider to a valid network
-	validNetworkWithInvalidProvider := testutil.CreateNetwork(api_common.OptimismChainID, "Optimism Mainnet", []params.RpcProvider{invalidProvider})
+	validNetworkWithInvalidProvider := testutil.CreateNetwork(common.OptimismMainnet, "Optimism Mainnet", []params.RpcProvider{invalidProvider})
 
 	// Invalid networks and providers should fail validation
 	networksToValidate := []*params.Network{
@@ -198,7 +198,7 @@ func (s *NetworksPersistenceTestSuite) TestValidationForNetworksAndProviders() {
 }
 
 func (s *NetworksPersistenceTestSuite) TestSetActive() {
-	network := testutil.CreateNetwork(api_common.OptimismChainID, "Optimism Mainnet", DefaultProviders(api_common.OptimismChainID))
+	network := testutil.CreateNetwork(common.OptimismMainnet, "Optimism Mainnet", DefaultProviders(common.OptimismMainnet))
 	s.addAndVerifyNetworks([]*params.Network{network})
 
 	// Deactivate the network
@@ -223,7 +223,7 @@ func (s *NetworksPersistenceTestSuite) TestSetActive() {
 }
 
 func (s *NetworksPersistenceTestSuite) TestSetEnabled() {
-	network := testutil.CreateNetwork(api_common.OptimismChainID, "Optimism Mainnet", DefaultProviders(api_common.OptimismChainID))
+	network := testutil.CreateNetwork(common.OptimismMainnet, "Optimism Mainnet", DefaultProviders(common.OptimismMainnet))
 	s.addAndVerifyNetworks([]*params.Network{network})
 
 	// Disable the network
