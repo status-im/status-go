@@ -9,7 +9,6 @@ import (
 
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/api/common"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -20,6 +19,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 const (
@@ -191,28 +191,28 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	}
 
 	if !request.AlchemyEthereumMainnetToken.Empty() {
-		walletConfig.AlchemyAPIKeys[common.MainnetChainID] = request.AlchemyEthereumMainnetToken
+		walletConfig.AlchemyAPIKeys[walletcommon.EthereumMainnet] = request.AlchemyEthereumMainnetToken
 	}
 	if !request.AlchemyEthereumSepoliaToken.Empty() {
-		walletConfig.AlchemyAPIKeys[common.SepoliaChainID] = request.AlchemyEthereumSepoliaToken
+		walletConfig.AlchemyAPIKeys[walletcommon.EthereumSepolia] = request.AlchemyEthereumSepoliaToken
 	}
 	if !request.AlchemyArbitrumMainnetToken.Empty() {
-		walletConfig.AlchemyAPIKeys[common.ArbitrumChainID] = request.AlchemyArbitrumMainnetToken
+		walletConfig.AlchemyAPIKeys[walletcommon.ArbitrumMainnet] = request.AlchemyArbitrumMainnetToken
 	}
 	if !request.AlchemyArbitrumSepoliaToken.Empty() {
-		walletConfig.AlchemyAPIKeys[common.ArbitrumSepoliaChainID] = request.AlchemyArbitrumSepoliaToken
+		walletConfig.AlchemyAPIKeys[walletcommon.ArbitrumSepolia] = request.AlchemyArbitrumSepoliaToken
 	}
 	if !request.AlchemyOptimismMainnetToken.Empty() {
-		walletConfig.AlchemyAPIKeys[common.OptimismChainID] = request.AlchemyOptimismMainnetToken
+		walletConfig.AlchemyAPIKeys[walletcommon.OptimismMainnet] = request.AlchemyOptimismMainnetToken
 	}
 	if !request.AlchemyOptimismSepoliaToken.Empty() {
-		walletConfig.AlchemyAPIKeys[common.OptimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
+		walletConfig.AlchemyAPIKeys[walletcommon.OptimismSepolia] = request.AlchemyOptimismSepoliaToken
 	}
 	if !request.AlchemyBaseMainnetToken.Empty() {
-		walletConfig.AlchemyAPIKeys[common.BaseChainID] = request.AlchemyBaseMainnetToken
+		walletConfig.AlchemyAPIKeys[walletcommon.BaseMainnet] = request.AlchemyBaseMainnetToken
 	}
 	if !request.AlchemyBaseSepoliaToken.Empty() {
-		walletConfig.AlchemyAPIKeys[common.BaseSepoliaChainID] = request.AlchemyBaseSepoliaToken
+		walletConfig.AlchemyAPIKeys[walletcommon.BaseSepolia] = request.AlchemyBaseSepoliaToken
 	}
 	if !request.StatusProxyMarketUser.Empty() {
 		walletConfig.StatusProxyMarketUser = request.StatusProxyMarketUser
@@ -277,7 +277,7 @@ func overrideApiConfigProd(nodeConfig *params.NodeConfig, config *requests.APICo
 // getMainnetRPCURL retuevrns URL of the first provider with TokenAuth from mainnet network
 func getMainnetRPCURL(networks []params.Network) string {
 	for _, network := range networks {
-		if network.ChainID != common.MainnetChainID {
+		if network.ChainID != walletcommon.EthereumMainnet {
 			continue
 		}
 		for _, provider := range network.RpcProviders {
