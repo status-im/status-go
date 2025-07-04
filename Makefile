@@ -253,7 +253,7 @@ endif
 	@ls -la build/bin/libstatus.*
 
 docker-image: SHELL := /bin/sh
-docker-image: BUILD_TARGET ?= statusd
+docker-image: BUILD_TARGET ?= cmd
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
 	docker build --file _assets/build/Dockerfile . \
