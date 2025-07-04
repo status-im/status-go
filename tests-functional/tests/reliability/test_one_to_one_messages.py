@@ -21,14 +21,17 @@ class TestOneToOneMessages(MessengerSteps):
     def test_multiple_one_to_one_messages(self):
         self.test_one_to_one_message_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_one_to_one_message_with_latency(self):
         with self.add_latency(self.receiver):
             self.test_one_to_one_message_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_one_to_one_message_with_packet_loss(self):
         with self.add_packet_loss(self.receiver):
             self.test_one_to_one_message_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_one_to_one_message_with_low_bandwidth(self):
         with self.add_low_bandwith(self.receiver):
             self.test_one_to_one_message_baseline(message_count=50)

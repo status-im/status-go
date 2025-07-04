@@ -25,12 +25,15 @@ class TestCommunityMessages(MessengerSteps):
     def test_multiple_community_messages(self):
         self.test_community_messages_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_community_messages_with_latency(self):
         self.test_community_messages_baseline(network_condition=self.add_latency)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_community_messages_with_packet_loss(self):
         self.test_community_messages_baseline(network_condition=self.add_packet_loss)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_community_messages_with_low_bandwidth(self):
         self.test_community_messages_baseline(network_condition=self.add_low_bandwith)
 
