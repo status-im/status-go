@@ -218,8 +218,8 @@ class MessengerSteps(NetworkConditionsSteps):
                 expected_message=expected_message,
             )
 
-    def one_to_one_message(self, message_count, receiver=None):
-        _, responses = self.send_multiple_one_to_one_messages(message_count)
+    def one_to_one_message(self, message_count, sender=None, receiver=None):
+        _, responses = self.send_multiple_one_to_one_messages(message_count, sender=sender, receiver=receiver)
         messages = list(map(lambda r: r.get("result", {}).get("messages", [])[0], responses))
 
         for expected_message in messages:

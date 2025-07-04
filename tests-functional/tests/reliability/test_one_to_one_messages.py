@@ -16,7 +16,7 @@ class TestOneToOneMessages(MessengerSteps):
         self.receiver = backend_factory("receiver")
 
     def test_one_to_one_message_baseline(self, message_count=1):
-        self.one_to_one_message(message_count, receiver=self.receiver)
+        self.one_to_one_message(message_count, sender=self.sender, receiver=self.receiver)
 
     def test_multiple_one_to_one_messages(self):
         self.test_one_to_one_message_baseline(message_count=50)
