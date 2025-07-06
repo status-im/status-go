@@ -597,11 +597,11 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 	}
 
 	// Create alice second instance
-	alice2, err := newMessengerWithKey(
-		s.shh,
-		s.alice.identity,
-		s.logger.With(zap.String("name", "alice-2")),
-		[]Option{WithCommunityTokensService(s.collectiblesServiceMock)})
+	alice2, err := newRunningTestMessenger(s.shh, testMessengerConfig{
+		privateKey:   s.alice.identity,
+		logger:       s.logger.With(zap.String("name", "alice-2")),
+		extraOptions: []Option{WithCommunityTokensService(s.collectiblesServiceMock)},
+	})
 
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice2)

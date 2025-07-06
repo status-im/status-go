@@ -256,9 +256,6 @@ func (s *CollectiblesServiceMock) ProcessCommunityTokenAction(message *protobuf.
 type testCommunitiesMessengerConfig struct {
 	testMessengerConfig
 
-	nodeConfig  *params.NodeConfig
-	appSettings *settings.Settings
-
 	password            string
 	walletAddresses     []string
 	mockedBalances      *communities.BalancesByChain
@@ -267,16 +264,16 @@ type testCommunitiesMessengerConfig struct {
 }
 
 func (tcmc *testCommunitiesMessengerConfig) complete() error {
-	err := tcmc.testMessengerConfig.complete()
-	if err != nil {
-		return err
-	}
-
 	if tcmc.nodeConfig == nil {
 		tcmc.nodeConfig = defaultTestCommunitiesMessengerNodeConfig()
 	}
 	if tcmc.appSettings == nil {
 		tcmc.appSettings = defaultTestCommunitiesMessengerSettings()
+	}
+
+	err := tcmc.testMessengerConfig.complete()
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -333,7 +330,6 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config tes
 		WithMessageSigner(NewSignerStub()),
 		WithCollectiblesManager(config.collectiblesManager),
 		WithCommunityTokensService(config.collectiblesService),
-		WithAppSettings(*config.appSettings, *config.nodeConfig),
 	}
 
 	config.extraOptions = append(config.extraOptions, options...)

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/accounts-management/generator"
@@ -13,11 +14,13 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/wakuv2"
 	"github.com/status-im/status-go/walletdatabase"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -31,6 +34,8 @@ type testMessengerConfig struct {
 	unhandledMessagesTracker *unhandledMessagesTracker
 	messagesOrderController  *MessagesOrderController
 
+	appSettings  *settings.Settings
+	nodeConfig   *params.NodeConfig
 	extraOptions []Option
 }
 
@@ -50,6 +55,14 @@ func (tmc *testMessengerConfig) complete() error {
 	if tmc.logger == nil {
 		logger := tt.MustCreateTestLogger()
 		tmc.logger = logger.Named(tmc.name)
+	}
+
+	if tmc.appSettings == nil {
+		tmc.appSettings = newTestSettings()
+	}
+
+	if tmc.nodeConfig == nil {
+		tmc.nodeConfig = &params.NodeConfig{}
 	}
 
 	return nil
@@ -102,6 +115,7 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		WithStubOnlineChecker(),
 		WithENSVerifier(ensVerifier),
 		WithMessageSigner(NewSignerStub()),
+		WithAppSettings(*config.appSettings, *config.nodeConfig),
 	}
 	options = append(options, config.extraOptions...)
 
@@ -141,6 +155,34 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 	return m, nil
 }
 
+func newRunningTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messenger, error) {
+	m, err := newTestMessenger(waku, config)
+	if err != nil {
+		return nil, err
+	}
+
+	m.EnableBackedupMessagesProcessing()
+
+	_, err = m.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
+}
+
+func newTestWakuNode() (wakutypes.Waku, error) {
+	return wakuv2.New(
+		nil,
+		&wakuv2.DefaultConfig,
+		zap.NewNop(),
+		nil,
+		nil,
+		func([]byte, peer.AddrInfo, error) {},
+		nil,
+	)
+}
+
 type unhandedMessage struct {
 	*v1protocol.StatusMessage
 	err error
@@ -164,8 +206,8 @@ func (u *unhandledMessagesTracker) addMessage(msg *v1protocol.StatusMessage, err
 	u.messages[msgType] = append(u.messages[msgType], newMessage)
 }
 
-func newTestSettings() settings.Settings {
-	return settings.Settings{
+func newTestSettings() *settings.Settings {
+	return &settings.Settings{
 		DisplayName:               DefaultProfileDisplayName,
 		ProfilePicturesShowTo:     1,
 		ProfilePicturesVisibility: 1,

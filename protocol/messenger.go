@@ -1723,7 +1723,7 @@ func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 
 // Shutdown takes care of ensuring a clean shutdown of Messenger
 func (m *Messenger) Shutdown() (err error) {
-	if m == nil {
+	if m == nil || !m.started {
 		return nil
 	}
 
@@ -1753,6 +1753,7 @@ func (m *Messenger) Shutdown() (err error) {
 		}
 	}
 	m.started = false
+	_ = m.logger.Sync()
 	return
 }
 

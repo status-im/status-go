@@ -35,10 +35,10 @@ type MessengerInstallationSuite struct {
 }
 
 func (s *MessengerInstallationSuite) TestReceiveInstallation() {
-	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	theirMessenger := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -130,7 +130,6 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	actualChat := response.Chats()[0]
 	s.Require().Equal(statusChatID, actualChat.ID)
 	s.Require().True(actualChat.Active)
-	s.Require().NoError(theirMessenger.Shutdown())
 }
 
 func (s *MessengerInstallationSuite) TestSyncInstallation() {
@@ -232,8 +231,8 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	// pair
-	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	theirMessenger := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 	err = theirMessenger.SaveChat(chat2)
 	s.Require().NoError(err)
 
@@ -346,22 +345,19 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(bookmarks))
 
-	s.Require().NoError(theirMessenger.Shutdown())
-
 	s.Require().NotNil(removedChat)
 	s.Require().False(removedChat.Active)
 
 }
 
 func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
-
 	bob1 := s.m
-	// pair
-	bob2, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, bob2)
 	alice := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, alice)
 
-	err = bob2.SetInstallationMetadata(bob2.installationID, &multidevice.InstallationMetadata{
+	err := bob2.SetInstallationMetadata(bob2.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -402,13 +398,10 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 		"message not received",
 	)
 	s.Require().NoError(err)
-	s.Require().NoError(bob2.Shutdown())
-	s.Require().NoError(alice.Shutdown())
 }
 
 func (s *MessengerInstallationSuite) TestInitInstallations() {
-	m, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	m := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, m)
 
 	// m.InitInstallations is already called when we set-up the messenger for

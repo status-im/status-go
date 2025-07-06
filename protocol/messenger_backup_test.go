@@ -39,8 +39,7 @@ type MessengerBackupSuite struct {
 func (s *MessengerBackupSuite) TestBackupContacts() {
 	bob1 := s.m
 	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create 2 contacts
@@ -145,8 +144,7 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NoError(err)
 
 	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Check bob1
@@ -485,8 +483,7 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	s.Require().NoError(err)
 
 	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Check bob1
@@ -603,8 +600,7 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 	bob1 := s.m
 	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create contacts
@@ -621,7 +617,7 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 	}
 	// Backup
 
-	_, err = bob1.BackupData(context.Background())
+	_, err := bob1.BackupData(context.Background())
 	s.Require().NoError(err)
 
 	// Safety check
@@ -644,8 +640,7 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 func (s *MessengerBackupSuite) TestBackupRemovedContact() {
 	bob1 := s.m
 	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create 2 contacts on bob 1
@@ -715,14 +710,12 @@ func (s *MessengerBackupSuite) TestBackupRemovedContact() {
 
 func (s *MessengerBackupSuite) TestBackupLocalNickname() {
 	bob1 := s.m
-	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	nickname := "don van vliet"
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Set contact nickname
 
+	nickname := "don van vliet"
 	contact1Key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	contactID1 := types.EncodeHex(crypto.FromECDSAPub(&contact1Key.PublicKey))
@@ -765,9 +758,7 @@ func (s *MessengerBackupSuite) TestBackupLocalNickname() {
 
 func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 	bob1 := s.m
-	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create contact
@@ -820,9 +811,7 @@ func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 
 func (s *MessengerBackupSuite) TestBackupCommunities() {
 	bob1 := s.m
-	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create a communitie
@@ -892,7 +881,7 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 
 	// Create bob2
 	accountsPublisher := pubsub.NewPublisher()
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, []Option{WithAccountsPublisher(accountsPublisher)})
+	bob2, err := newRunningTestMessenger(s.shh, testMessengerConfig{privateKey: bob1.identity, extraOptions: []Option{WithAccountsPublisher(accountsPublisher)}})
 	s.Require().NoError(err)
 	s.Require().NotNil(bob2.config.accountsPublisher)
 	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsAddedEvent](accountsPublisher, 10)
@@ -950,7 +939,7 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 		case event := <-ch:
 			for _, address := range event.Accounts {
 				if _, exists := expectedAddresses[address]; !exists {
-					s.logger.Debug("missing address in the accounts event", zap.Any("address", address))
+					s.T().Log("missing address in the accounts event", zap.Any("address", address))
 					s.Fail("address not received in the event")
 				}
 			}
@@ -996,8 +985,7 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	s.Require().NoError(err)
 
 	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
@@ -1040,7 +1028,7 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 
 	// Create bob2
 	accountsPublisher := pubsub.NewPublisher()
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, []Option{WithAccountsPublisher(accountsPublisher)})
+	bob2, err := newRunningTestMessenger(s.shh, testMessengerConfig{privateKey: bob1.identity, extraOptions: []Option{WithAccountsPublisher(accountsPublisher)}})
 	s.Require().NoError(err)
 	s.Require().NotNil(bob2.config.accountsPublisher)
 	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsAddedEvent](accountsPublisher, 10)
@@ -1102,8 +1090,7 @@ func (s *MessengerBackupSuite) TestBackupChats() {
 	s.Require().NoError(err)
 
 	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
@@ -1144,8 +1131,7 @@ func (s *MessengerBackupSuite) TestBackupChats() {
 func (s *MessengerBackupSuite) TestLeftCommunitiesAreBackedUp() {
 	bob1 := s.m
 	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
-	s.Require().NoError(err)
+	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	description := &requests.CreateCommunity{

@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts"
 )
 
@@ -21,17 +20,15 @@ type MessengerReplySuite struct {
 func (s *MessengerReplySuite) TestReceiveReply() {
 	alice := s.m
 	alice.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
-	key, err := crypto.GenerateKey()
-	s.Require().NoError(err)
 
-	bob, err := newMessengerWithKey(s.shh, key, s.logger, nil)
-	s.Require().NoError(err)
+	bob := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, bob)
 
 	chatID := statusChatID
 
 	chat := CreatePublicChat(chatID, alice.getTimesource())
 
-	err = alice.SaveChat(chat)
+	err := alice.SaveChat(chat)
 	s.Require().NoError(err)
 
 	_, err = alice.Join(chat)
@@ -86,6 +83,4 @@ func (s *MessengerReplySuite) TestReceiveReply() {
 	s.Require().True(messageToCheck.ResponseTo == messageID)
 	// Verify that it's replied
 	s.Require().True(messageToCheck.Replied)
-
-	s.Require().NoError(bob.Shutdown())
 }

@@ -2,19 +2,14 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const publicChatName = "status"
@@ -24,54 +19,21 @@ func TestMessengerSyncChatSuite(t *testing.T) {
 }
 
 type MessengerSyncChatSuite struct {
-	suite.Suite
-	privateKey *ecdsa.PrivateKey
-	alice1     *Messenger
-	alice2     *Messenger
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh    wakutypes.Waku
-	logger *zap.Logger
-}
-
-func (s *MessengerSyncChatSuite) newMessenger() *Messenger {
-	if s.privateKey == nil {
-		privateKey, err := crypto.GenerateKey()
-		s.Require().NoError(err)
-
-		s.privateKey = privateKey
-	}
-
-	messenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
-}
-
-func (s *MessengerSyncChatSuite) otherNewMessenger() *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
+	MessengerBaseTestSuite
+	alice1 *Messenger
+	alice2 *Messenger
 }
 
 func (s *MessengerSyncChatSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.MessengerBaseTestSuite.SetupTest()
 
-	shh, err := newTestWakuNode(s.logger)
-	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
-	s.shh = shh
-
-	s.alice1 = s.newMessenger()
-	s.alice2 = s.newMessenger()
+	s.alice1 = s.m
+	s.alice2 = s.anotherMessenger()
 }
 
 func (s *MessengerSyncChatSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.alice1)
 	TearDownMessenger(&s.Suite, s.alice2)
-	_ = s.logger.Sync()
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func (s *MessengerSyncChatSuite) Pair() {
@@ -156,7 +118,9 @@ func (s *MessengerSyncChatSuite) TestMarkChatMessagesRead() {
 	_, err = s.alice2.createPublicChat(chatID, &MessengerResponse{})
 	s.Require().NoError(err)
 
-	otherMessenger := s.otherNewMessenger()
+	otherMessenger := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, otherMessenger)
+
 	_, err = otherMessenger.createPublicChat(chatID, &MessengerResponse{})
 	s.Require().NoError(err)
 

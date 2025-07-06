@@ -3,8 +3,6 @@ package protocol
 import (
 	"context"
 
-	"go.uber.org/zap"
-
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
 )
@@ -64,8 +62,8 @@ func (tp *testPublicWakuAPI) Post(ctx context.Context, req wakutypes.NewMessage)
 	return id, err
 }
 
-func newTestWakuWrapper(logger *zap.Logger) (*testWakuWrapper, error) {
-	w, err := newTestWakuNode(logger)
+func newTestWakuWrapper() (*testWakuWrapper, error) {
+	w, err := newTestWakuNode()
 	if err != nil {
 		return nil, err
 	}

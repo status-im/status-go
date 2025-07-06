@@ -19,8 +19,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -115,9 +113,6 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAd
 	}
 	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
 	mailserversSQLDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
 	err = sqlite.Migrate(mailserversSQLDb) // migrate default
@@ -143,9 +138,9 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAd
 		)
 	}
 
-	messenger, err := newMessengerWithKey(wakuV2, privateKey, logger, options)
-
+	messenger, err := newRunningTestMessenger(wakuV2, testMessengerConfig{logger: logger, extraOptions: options})
 	s.Require().NoError(err)
+
 	return messenger, wakuV2
 }
 

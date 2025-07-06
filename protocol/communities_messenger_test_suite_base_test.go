@@ -47,7 +47,7 @@ func (s *CommunitiesMessengerTestSuiteBase) SetupTest() {
 
 	s.mockedBalances = make(communities.BalancesByChain)
 
-	shh, err := newTestWakuNode(s.logger)
+	shh, err := newTestWakuNode()
 	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
 	s.shh = shh
@@ -55,6 +55,10 @@ func (s *CommunitiesMessengerTestSuiteBase) SetupTest() {
 
 func (s *CommunitiesMessengerTestSuiteBase) TearDownTest() {
 	_ = s.logger.Sync()
+
+	if s.shh != nil {
+		s.Require().NoError(s.shh.Stop())
+	}
 }
 
 func (s *CommunitiesMessengerTestSuiteBase) newMessenger(password string, walletAddresses []string) *Messenger {

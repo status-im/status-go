@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/eth-node/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerVerificationRequests(t *testing.T) { // nolint: deadcode,unused
@@ -131,7 +130,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 }
 
 func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
@@ -259,7 +258,7 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 }
 
 func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
@@ -370,7 +369,7 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 }
 
 func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
@@ -497,7 +496,7 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 
 func (s *MessengerVerificationRequests) TestRemoveTrustVerificationStatus() {
 	// GIVEN
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
@@ -555,7 +554,7 @@ func (s *MessengerVerificationRequests) TestRemoveTrustVerificationStatus() {
 }
 
 func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
@@ -669,7 +668,7 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 }
 
 func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
@@ -763,16 +762,8 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 	s.Require().Equal(resp.Messages()[0].ContactVerificationState, common.ContactVerificationStateCanceled)
 }
 
-func (s *MessengerVerificationRequests) newMessenger(shh wakutypes.Waku) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
-}
-
 func (s *MessengerVerificationRequests) TestTrustStatus() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)

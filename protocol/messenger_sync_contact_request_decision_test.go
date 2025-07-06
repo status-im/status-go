@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -25,12 +24,10 @@ func TestMessengerSyncContactRequestDecision(t *testing.T) {
 func (s *MessengerSyncContactRequestDecisionSuite) SetupTest() {
 	s.MessengerBaseTestSuite.SetupTest()
 
-	m2, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	s.m2 = m2
+	s.m2 = s.anotherMessenger()
 
-	PairDevices(&s.Suite, m2, s.m)
-	PairDevices(&s.Suite, s.m, m2)
+	PairDevices(&s.Suite, s.m2, s.m)
+	PairDevices(&s.Suite, s.m, s.m2)
 }
 
 func (s *MessengerSyncContactRequestDecisionSuite) TearDownTest() {
@@ -38,19 +35,9 @@ func (s *MessengerSyncContactRequestDecisionSuite) TearDownTest() {
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 
-func (s *MessengerSyncContactRequestDecisionSuite) createUserB() *Messenger {
-	key, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	userB, err := newMessengerWithKey(s.shh, key, s.logger, nil)
-	s.Require().NoError(err)
-	return userB
-}
-
 func (s *MessengerSyncContactRequestDecisionSuite) TestSyncAcceptContactRequest() {
-	userB := s.createUserB()
-	defer func() {
-		s.Require().NoError(userB.Shutdown())
-	}()
+	userB := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, userB)
 
 	numM1DispatchedAcceptContactRequest := 0
 	numM2DispatchedAcceptContactRequest := 0

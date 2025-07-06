@@ -41,7 +41,7 @@ func (s *MessengerPeersyncingSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 	peerSyncingLoopInterval = 500 * time.Millisecond
 
-	shh, err := newTestWakuNode(s.logger)
+	shh, err := newTestWakuNode()
 	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
 	s.shh = shh

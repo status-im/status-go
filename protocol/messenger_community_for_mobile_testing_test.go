@@ -20,14 +20,6 @@ func TestMessengerCommunityForMobileTesting(t *testing.T) {
 	suite.Run(t, new(MessengerCommunityForMobileTestingTestSuite))
 }
 
-func (s *MessengerCommunityForMobileTestingTestSuite) SetupTest() {
-	s.MessengerBaseTestSuite.SetupTest()
-}
-
-func (s *MessengerCommunityForMobileTestingTestSuite) TearDownTest() {
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func (s *MessengerCommunityForMobileTestingTestSuite) TestCreateClosedCommunity() {
 	var wg sync.WaitGroup
 	wg.Add(1)

@@ -29,7 +29,7 @@ func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
 	s.accountsPasswords = make(map[string]string)
 	s.mockedBalances = createMockedWalletBalance(&s.Suite)
 
-	wakuWrapper, err := newTestWakuWrapper(s.logger)
+	wakuWrapper, err := newTestWakuWrapper()
 	s.Require().NoError(err)
 	s.shh = wakuWrapper
 
