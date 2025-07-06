@@ -60,12 +60,12 @@ func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 	s.ownerWaku = wakuNodes[0]
 	s.owner = newTestCommunitiesMessenger(&s.Suite, s.ownerWaku, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
-			name:   "owner",
-			logger: s.logger,
+			name:       "owner",
+			logger:     s.logger,
+			nodeConfig: nodeConfig,
 		},
 		walletAddresses:     []string{},
 		password:            "",
-		nodeConfig:          nodeConfig,
 		mockedBalances:      &s.mockedBalances,
 		collectiblesManager: s.collectiblesManagerMock,
 	})
@@ -79,10 +79,10 @@ func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 			name:                     "alice",
 			logger:                   s.logger,
 			unhandledMessagesTracker: s.aliceUnhandledMessagesTracker,
+			nodeConfig:               nodeConfig,
 		},
 		walletAddresses: []string{aliceAddress1},
 		password:        alicePassword,
-		nodeConfig:      nodeConfig,
 		mockedBalances:  &s.mockedBalances,
 	})
 

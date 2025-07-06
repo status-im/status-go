@@ -1095,7 +1095,7 @@ func (w *Waku) OnNewEnvelope(env *protocol.Envelope) error {
 
 // Starts the background data propagation thread of the Waku protocol.
 func (w *Waku) Start() error {
-	if w.ctx == nil {
+	if w.cancel == nil {
 		w.ctx, w.cancel = context.WithCancel(context.Background())
 	}
 
@@ -1459,6 +1459,9 @@ func (w *Waku) Stop() error {
 	}
 
 	w.cancel()
+	defer func() {
+		w.cancel = nil
+	}()
 
 	w.envelopeCache.Stop()
 
@@ -1474,8 +1477,7 @@ func (w *Waku) Stop() error {
 	close(w.goingOnline)
 	w.wg.Wait()
 
-	w.ctx = nil
-	w.cancel = nil
+	_ = w.logger.Sync()
 
 	return nil
 }
@@ -1577,9 +1579,6 @@ func (w *Waku) postEvent(envelope *common.ReceivedMessage) {
 func (w *Waku) processQueueLoop() {
 	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
-	if w.ctx == nil {
-		return
-	}
 	for {
 		select {
 		case <-w.ctx.Done():

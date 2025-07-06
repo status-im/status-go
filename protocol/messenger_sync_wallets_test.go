@@ -81,8 +81,8 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().True(accounts.SameKeypairs(profileKp, dbProfileKp1))
 
 	// Create new device and add main account to
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	// Store only chat and default wallet account on other device
 	profileKpOtherDevice := accounts.GetProfileKeypairForTest(true, true, false)
@@ -302,8 +302,9 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 
 	// Create a main account on alice's other device
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
 	err = alicesOtherDevice.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err, "profile keypair alice.settings.SaveOrUpdateKeypair")
 	// Store watch only accounts on alice's other device
@@ -497,8 +498,9 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
 
 	// Create new device and add main account to
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
 	// Store only chat and default wallet account on other device
 	profileKpOtherDevice := accounts.GetProfileKeypairForTest(true, true, false)
 	err = alicesOtherDevice.settings.SaveOrUpdateKeypair(profileKpOtherDevice)

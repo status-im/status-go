@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/tt"
@@ -121,16 +120,13 @@ func (s *MessengerMessagesTrackingSuite) TearDownTest() {
 }
 
 func (s *MessengerMessagesTrackingSuite) newMessenger(waku wakutypes.Waku, logger *zap.Logger) (*Messenger, *EnvelopeEventsInterceptorMock) {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
 	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
 		EnvelopeEventsHandler:      EnvelopeSignalHandlerMock{},
 		MaxMessageDeliveryAttempts: 1,
 		MailServerConfirmations:    false,
 	}
 
-	messenger, err := newMessengerWithKey(waku, privateKey, s.logger, []Option{WithEnvelopeEventsConfig(envelopeEventsConfig)})
+	messenger, err := newRunningTestMessenger(waku, testMessengerConfig{logger: logger, extraOptions: []Option{WithEnvelopeEventsConfig(envelopeEventsConfig)}})
 	s.Require().NoError(err)
 
 	interceptor := &EnvelopeEventsInterceptorMock{

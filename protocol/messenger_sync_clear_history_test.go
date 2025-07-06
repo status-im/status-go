@@ -23,10 +23,9 @@ type MessengerSyncClearHistory struct {
 }
 
 func (s *MessengerSyncClearHistory) pair() *Messenger {
-	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	theirMessenger := s.anotherMessenger()
 
-	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -57,6 +56,7 @@ func (s *MessengerSyncClearHistory) pair() *Messenger {
 
 func (s *MessengerSyncClearHistory) TestSyncClearHistory() {
 	theirMessenger := s.pair()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	response, err := s.m.CreatePublicChat(&requests.CreatePublicChat{
 		ID: publicChatName,
@@ -118,7 +118,4 @@ func (s *MessengerSyncClearHistory) TestSyncClearHistory() {
 	messages, _, err = theirMessenger.persistence.MessageByChatID(publicChatName, "", 10)
 	s.Require().NoError(err)
 	s.Require().True(len(messages) == 0)
-
-	s.Require().NoError(theirMessenger.Shutdown())
-
 }

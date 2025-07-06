@@ -2,18 +2,12 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerSyncKeycardChangeSuite(t *testing.T) {
@@ -21,39 +15,23 @@ func TestMessengerSyncKeycardChangeSuite(t *testing.T) {
 }
 
 type MessengerSyncKeycardChangeSuite struct {
-	suite.Suite
-	main       *Messenger // main instance of Messenger paired with `other`
-	other      *Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh wakutypes.Waku
-
-	logger *zap.Logger
+	MessengerBaseTestSuite
+	main  *Messenger
+	other *Messenger
 }
 
 func (s *MessengerSyncKeycardChangeSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.MessengerBaseTestSuite.SetupTest()
 
-	shh, err := newTestWakuNode(s.logger)
-	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
-	s.shh = shh
-
-	s.main = s.newMessenger(s.shh)
-	s.privateKey = s.main.identity
-
-	// Create new device and add main account to
-	s.other, err = newMessengerWithKey(s.shh, s.main.identity, s.logger, nil)
-	s.Require().NoError(err)
+	s.main = s.m
+	s.other = s.anotherMessenger()
 
 	// Pair devices (main and other)
 	imOther := &multidevice.InstallationMetadata{
 		Name:       "other-device",
 		DeviceType: "other-device-type",
 	}
-	err = s.other.SetInstallationMetadata(s.other.installationID, imOther)
+	err := s.other.SetInstallationMetadata(s.other.installationID, imOther)
 	s.Require().NoError(err)
 	response, err := s.other.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
@@ -105,17 +83,7 @@ func (s *MessengerSyncKeycardChangeSuite) SetupTest() {
 
 func (s *MessengerSyncKeycardChangeSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.other)
-	TearDownMessenger(&s.Suite, s.main)
-}
-
-func (s *MessengerSyncKeycardChangeSuite) newMessenger(shh wakutypes.Waku) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-
-	return messenger
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestAddingNewKeycards() {

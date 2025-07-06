@@ -7,25 +7,20 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/mmcdole/gofeed"
 	"github.com/stretchr/testify/suite"
-
-	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 type MessengerNewsFeedSuite struct {
 	MessengerBaseTestSuite
-	m *Messenger // main instance of Messenger
 }
 
 func (s *MessengerNewsFeedSuite) SetupTest() {
-	s.MessengerBaseTestSuite.SetupTest()
+	s.MessengerBaseTestSuite.setupWaku()
 
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, []Option{WithNewsFeed()})
+	messenger, err := newRunningTestMessenger(s.shh, testMessengerConfig{extraOptions: []Option{WithNewsFeed()}})
 	s.Require().NoError(err)
 
 	s.m = messenger
+	s.privateKey = s.m.identity
 }
 
 func TestMessengerNewsFeedSuite(t *testing.T) {

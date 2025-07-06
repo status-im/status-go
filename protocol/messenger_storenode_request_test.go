@@ -186,9 +186,6 @@ func (s *MessengerStoreNodeRequestSuite) tearDownBob() {
 }
 
 func (s *MessengerStoreNodeRequestSuite) newMessenger(shh wakutypes.Waku, logger *zap.Logger, mailserverAddress *multiaddr.Multiaddr) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
 	options := []Option{
 		WithAutoRequestHistoricMessages(false),
 		WithCuratedCommunitiesUpdateLoop(false),
@@ -200,9 +197,9 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh wakutypes.Waku, logger
 		)
 	}
 
-	messenger, err := newMessengerWithKey(shh, privateKey, logger, options)
-
+	messenger, err := newRunningTestMessenger(shh, testMessengerConfig{logger: logger, extraOptions: options})
 	s.Require().NoError(err)
+
 	return messenger
 }
 
@@ -1049,7 +1046,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 			}
 
 			// Create user without `createBob` func to force desired fleet
-			user, err := newMessengerWithKey(userWaku, privateKey, messengerLogger, options)
+			user, err := newRunningTestMessenger(userWaku, testMessengerConfig{privateKey: privateKey, logger: messengerLogger, extraOptions: options})
 			s.Require().NoError(err)
 			defer TearDownMessenger(&s.Suite, user)
 
