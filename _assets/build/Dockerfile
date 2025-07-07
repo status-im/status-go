@@ -6,7 +6,7 @@ ENV CC=clang
 ENV CXX=clang++
 
 RUN apt-get update \
-    && apt-get install -y git bash make llvm clang protobuf-compiler build-essential pkg-config iproute2 \
+    && apt-get install -y git bash make llvm clang protobuf-compiler build-essential pkg-config \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
