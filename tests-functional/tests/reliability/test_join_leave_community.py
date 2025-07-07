@@ -32,12 +32,15 @@ class TestJoinLeaveCommunities(MessengerSteps):
     def test_multiple_join_leave_community_requests(self):
         self.test_join_leave_community_baseline(num_joins=10)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_join_leave_community_with_latency(self):
         self.test_join_leave_community_baseline(network_condition=self.add_latency)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_join_leave_community_with_packet_loss(self):
         self.test_join_leave_community_baseline(network_condition=self.add_packet_loss)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_join_leave_community_with_low_bandwidth(self):
         self.test_join_leave_community_baseline(network_condition=self.add_low_bandwith)
 

@@ -23,13 +23,16 @@ class TestContactRequests(MessengerSteps):
     def test_multiple_contact_requests(self, execution_number):
         self.test_contact_request_baseline(execution_number=execution_number)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     @pytest.mark.parametrize("execution_number", range(10))
     def test_contact_request_with_latency(self, execution_number):
         self.test_contact_request_baseline(execution_number=execution_number, network_condition=self.add_latency)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_contact_request_with_packet_loss(self):
         self.test_contact_request_baseline(execution_number=10, network_condition=self.add_packet_loss)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_contact_request_with_low_bandwidth(self):
         self.test_contact_request_baseline(execution_number=10, network_condition=self.add_low_bandwith)
 

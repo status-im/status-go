@@ -23,14 +23,17 @@ class TestPrivateGroupMessages(MessengerSteps):
     def test_multiple_group_chat_messages(self):
         self.test_private_group_messages_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_private_group_chat_messages_with_latency(self):
         with self.add_latency(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_private_group_chat_messages_with_packet_loss(self):
         with self.add_packet_loss(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_private_group_chat_messages_with_low_bandwidth(self):
         with self.add_low_bandwith(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
