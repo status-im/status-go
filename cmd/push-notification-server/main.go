@@ -43,7 +43,8 @@ var (
 	logNoColors     = flag.Bool("log-no-color", false, "Disables log colors")
 	wakuFleet       = flag.String("waku-fleet", "status.prod", "Waku fleet to use")
 	wakuFleetConfig = flag.String("waku-fleet-config", "", "path to Waku fleet config file")
-
+	Port            = flag.Int("tcp-port", 30303, "Libp2p TCP port")
+	UDPPort         = flag.Int("udp-port", 30303, "Libp2p UDP port")
 	// TODO: add pprof and metrics
 
 	logger *zap.Logger
@@ -265,7 +266,7 @@ func buildWakuConfig() *wakuv2.Config {
 	cfg := &wakuv2.Config{
 		MaxMessageSize:                         wakuv2common.DefaultMaxMessageSize,
 		Host:                                   "0.0.0.0",
-		Port:                                   0,
+		Port:                                   *Port,
 		LightClient:                            false,
 		EnablePeerExchangeClient:               false,
 		EnablePeerExchangeServer:               true,
@@ -277,7 +278,7 @@ func buildWakuConfig() *wakuv2.Config {
 		DiscoveryLimit:                         20,
 		DiscV5BootstrapNodes:                   params.DefaultDiscV5Nodes(*wakuFleet),
 		Nameserver:                             "",
-		UDPPort:                                0,
+		UDPPort:                                *UDPPort,
 		AutoUpdate:                             true,
 		DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
 		TelemetryServerURL:                     "",
