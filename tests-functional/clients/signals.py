@@ -32,6 +32,7 @@ class WalletEventType(Enum):
     WALLET_ACTIVITY_SESSION_UPDATED = "wallet-activity-session-updated"
     TRANSACTIONS_PENDING_TRANSACTION_UPDATE = "pending-transaction-update"
     TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED = "pending-transaction-status-changed"
+    WALLET_TICK_RELOAD = "wallet-tick-reload"
 
 
 class LocalPairingEventType(Enum):
