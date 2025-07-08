@@ -4,6 +4,7 @@ package wallet
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"math/big"
 	"sync"
@@ -23,6 +24,7 @@ import (
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/transactions"
 )
 
 // WalletTickReload emitted every 15mn to reload the wallet balance and history
@@ -185,10 +187,25 @@ func (r *Reader) startWalletEventsWatcher() {
 		return
 	}
 
-	// Respond to ETH/Token transfers
+	// Respond to ETH/Token transfers or any sent transaction
 	walletEventCb := func(event walletevent.Event) {
-		if event.Type != transfer.EventInternalETHTransferDetected &&
-			event.Type != transfer.EventInternalERC20TransferDetected {
+		delayed := true
+		switch event.Type {
+		case transfer.EventInternalETHTransferDetected, transfer.EventInternalERC20TransferDetected:
+			// Delayed refresh
+		case transactions.EventPendingTransactionUpdate:
+			var p transactions.PendingTxUpdatePayload
+			err := json.Unmarshal([]byte(event.Message), &p)
+			if err != nil {
+				return
+			}
+			if p.Deleted {
+				// Immediate refresh
+				delayed = false
+			}
+			// Delayed refresh
+		default:
+			// Unrelated event, do not trigger a reload
 			return
 		}
 
@@ -200,8 +217,12 @@ func (r *Reader) startWalletEventsWatcher() {
 			}
 
 			if !ok || event.At > timecheck {
-				r.triggerDelayedWalletReload()
 				r.invalidateBalanceCache()
+				if delayed {
+					r.triggerDelayedWalletReload()
+				} else {
+					r.triggerWalletReload()
+				}
 				break
 			}
 		}
