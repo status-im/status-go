@@ -90,7 +90,7 @@ func NewService(
 		defer mutex.Unlock()
 
 		if len(blockchainStatus) == 0 {
-			networks, err := rpcClient.NetworkManager.Get(false)
+			networks, err := rpcClient.GetNetworkManager().Get(false)
 			if err != nil {
 				return
 			}
@@ -117,7 +117,7 @@ func NewService(
 
 	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
-	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountsPublisher, accountsDB, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.GetNetworkManager(), appDB, mediaServer, feed, accountsPublisher, accountsDB, token.NewPersistence(db))
 
 	cryptoOnRampProviders := []onramp.Provider{
 		onramp.NewMoonPayProvider(),
@@ -206,7 +206,7 @@ func NewService(
 		mediaServer,
 		feed,
 	)
-	collectibles := collectibles.NewService(db, feed, accountsDB, accountsPublisher, communityManager, rpcClient.NetworkManager, collectiblesManager)
+	collectibles := collectibles.NewService(db, feed, accountsDB, accountsPublisher, communityManager, rpcClient.GetNetworkManager(), collectiblesManager)
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
@@ -274,7 +274,7 @@ func buildPathProcessors(
 	erc1155Transfer := pathprocessor.NewERC1155Processor(rpcClient, transactor)
 	ret = append(ret, erc1155Transfer)
 
-	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager, rpcClient.NetworkManager)
+	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager, rpcClient.GetNetworkManager())
 	ret = append(ret, hop)
 
 	if featureFlags.EnableCelerBridge {

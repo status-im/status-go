@@ -187,7 +187,7 @@ func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
 
 func (b *StatusNode) connectorService() *connector.Service {
 	if b.connectorSrvc == nil {
-		b.connectorSrvc = connector.NewService(b.walletDB, b.rpcClient, b.rpcClient.NetworkManager)
+		b.connectorSrvc = connector.NewService(b.walletDB, b.rpcClient, b.rpcClient.GetNetworkManager())
 	}
 	return b.connectorSrvc
 }

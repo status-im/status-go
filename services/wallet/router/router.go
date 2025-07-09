@@ -375,7 +375,7 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 		r.routeCanceledMutex.Unlock()
 	}()
 
-	testnetMode, err := r.rpcClient.NetworkManager.GetTestNetworksEnabled()
+	testnetMode, err := r.rpcClient.GetNetworkManager().GetTestNetworksEnabled()
 	if err != nil {
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
@@ -387,12 +387,12 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
-	fromChain := r.rpcClient.NetworkManager.Find(input.FromChainID)
+	fromChain := r.rpcClient.GetNetworkManager().Find(input.FromChainID)
 	if fromChain == nil {
 		return nil, errors.CreateErrorResponseFromError(fmt.Errorf("from chain %d not found", input.FromChainID))
 	}
 
-	toChain := r.rpcClient.NetworkManager.Find(input.ToChainID)
+	toChain := r.rpcClient.GetNetworkManager().Find(input.ToChainID)
 	if toChain == nil {
 		return nil, errors.CreateErrorResponseFromError(fmt.Errorf("to chain %d not found", input.ToChainID))
 	}

@@ -110,8 +110,8 @@ func (c *Controller) startAccountWatcher() {
 }
 
 func (c *Controller) startNetworksWatcher() {
-	if c.rpcClient != nil && c.rpcClient.NetworkManager != nil {
-		networksPublisher := c.rpcClient.NetworkManager.GetPublisher()
+	if c.rpcClient != nil && c.rpcClient.GetNetworkManager() != nil {
+		networksPublisher := c.rpcClient.GetNetworkManager().GetPublisher()
 		if networksPublisher == nil {
 			return
 		}
@@ -155,7 +155,7 @@ func (c *Controller) restartReactor() {
 
 	logutils.ZapLogger().Debug("list of accounts was changed from a previous version. reactor will be restarted", zap.Stringers("new", currentAddresses))
 
-	currentNetworks, err := c.rpcClient.NetworkManager.Get(false)
+	currentNetworks, err := c.rpcClient.GetNetworkManager().Get(false)
 	if err != nil {
 		logutils.ZapLogger().Error("failed getting active networks", zap.Error(err))
 		return

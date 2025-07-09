@@ -100,7 +100,7 @@ type Client struct {
 	limiterPerProvider map[string]*rpclimiter.RPCRpsLimiter
 
 	router         *router
-	NetworkManager *network.Manager
+	networkManager *network.Manager
 
 	healthMgr          *healthmanager.BlockchainHealthManager
 	stopMonitoringFunc context.CancelFunc
@@ -146,7 +146,7 @@ func NewClient(config ClientConfig) (*Client, error) {
 
 	c := Client{
 		local:              config.Client,
-		NetworkManager:     networkManager,
+		networkManager:     networkManager,
 		handlers:           make(map[string]Handler),
 		rpcClients:         make(map[uint64]chain.ClientInterface),
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
@@ -167,7 +167,7 @@ func NewClient(config ClientConfig) (*Client, error) {
 }
 
 func (c *Client) Start(ctx context.Context) {
-	c.NetworkManager.Start()
+	c.networkManager.Start()
 
 	if c.stopMonitoringFunc != nil {
 		c.logger.Warn("Blockchain health manager already started")
@@ -181,7 +181,7 @@ func (c *Client) Start(ctx context.Context) {
 }
 
 func (c *Client) Stop() {
-	c.NetworkManager.Stop()
+	c.networkManager.Stop()
 
 	c.rpcClientsMutex.Lock()
 	for _, client := range c.rpcClients {
@@ -233,7 +233,7 @@ func (c *Client) GetHealthManagerFullStatus() healthmanager.BlockchainFullStatus
 }
 
 func (c *Client) GetNetworkManager() *network.Manager {
-	return c.NetworkManager
+	return c.networkManager
 }
 
 func (c *Client) SetWalletNotifier(notifier func(chainID uint64, message string)) {
@@ -250,7 +250,7 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 		return rpcClient, nil
 	}
 
-	network := c.NetworkManager.Find(chainID)
+	network := c.networkManager.Find(chainID)
 	if network == nil {
 		return nil, fmt.Errorf("could not find network: %d", chainID)
 	}

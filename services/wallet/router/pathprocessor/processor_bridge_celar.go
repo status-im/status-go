@@ -303,7 +303,7 @@ func (s *CelerBridgeProcessor) GetContractAddress(params ProcessorInputParams) (
 
 // TODO: remove this struct once mobile switches to the new approach
 func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (*ethTypes.Transaction, error) {
-	fromChain := s.rpcClient.NetworkManager.Find(sendArgs.ChainID)
+	fromChain := s.rpcClient.GetNetworkManager().Find(sendArgs.ChainID)
 	if fromChain == nil {
 		return nil, ErrNetworkNotFound
 	}
@@ -365,7 +365,7 @@ func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, s
 }
 
 func (s *CelerBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (*ethTypes.Transaction, error) {
-	fromChain := s.rpcClient.NetworkManager.Find(sendArgs.FromChainID)
+	fromChain := s.rpcClient.GetNetworkManager().Find(sendArgs.FromChainID)
 	if fromChain == nil {
 		return nil, ErrNetworkNotFound
 	}
