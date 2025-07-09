@@ -26,7 +26,6 @@ class TestWalletAssets(StatusBackendSteps):
         super().setup_class(skip_login)
         cls.wallet_service.start_wallet()
 
-    @pytest.mark.skip("cryptocompare limit reached")
     def test_balance_refresh_ticker_after_sending_transaction(self):
         uuid = str(uuid_lib.uuid4())
         amount_in = "0xde0b6b3a7640000"

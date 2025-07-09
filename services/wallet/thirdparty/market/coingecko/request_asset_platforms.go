@@ -20,7 +20,7 @@ func (c *Client) FetchPlatforms(ctx context.Context) ([]Chain, error) {
 
 	params := netUrl.Values{}
 	url := fmt.Sprintf(platformsURL, c.baseURL)
-	response, err := c.httpClient.DoGetRequest(ctx, url, params)
+	response, err := c.doGetRequestWithOptionalAuth(ctx, url, params)
 	if err != nil {
 		return nil, err
 	}
