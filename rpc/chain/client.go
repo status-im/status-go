@@ -10,9 +10,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
-
-	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -26,7 +23,6 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/rpc/chain/tagger"
@@ -39,8 +35,6 @@ type ClientInterface interface {
 	ethclient.EthClientInterface
 	NetworkID() uint64
 	ToBigInt() *big.Int
-	GetWalletNotifier() func(chainId uint64, message string)
-	SetWalletNotifier(notifier func(chainId uint64, message string))
 	connection.Connectable
 	GetLimiter() rpclimiter.RequestLimiter
 	SetLimiter(rpclimiter.RequestLimiter)
@@ -77,11 +71,6 @@ type ClientWithFallback struct {
 	circuitbreaker         *circuitbreaker.CircuitBreaker
 	providersHealthManager *healthmanager.ProvidersHealthManager
 
-	WalletNotifier func(chainId uint64, message string)
-
-	isConnected   *atomic.Bool
-	LastCheckedAt int64
-
 	tag      string // tag for the limiter
 	groupTag string // tag for the limiter group
 
@@ -103,9 +92,6 @@ func (c *ClientWithFallback) createCopy() *ClientWithFallback {
 		commonLimiter:          c.commonLimiter,
 		circuitbreaker:         c.circuitbreaker,
 		providersHealthManager: c.providersHealthManager,
-		WalletNotifier:         c.WalletNotifier,
-		isConnected:            c.isConnected,
-		LastCheckedAt:          c.LastCheckedAt,
 		tag:                    c.tag,
 		groupTag:               c.groupTag,
 		done:                   make(chan struct{}),
@@ -145,14 +131,9 @@ func NewClient(ethClients []ethclient.RPSLimitedEthClientInterface, chainID uint
 		ErrorPercentThreshold: 25,
 	}
 
-	isConnected := &atomic.Bool{}
-	isConnected.Store(true)
-
 	return &ClientWithFallback{
 		ChainID:                chainID,
 		ethClients:             ethClients,
-		isConnected:            isConnected,
-		LastCheckedAt:          time.Now().Unix(),
 		circuitbreaker:         circuitbreaker.NewCircuitBreaker(cbConfig),
 		providersHealthManager: providersHealthManager,
 		done:                   make(chan struct{}),
@@ -175,13 +156,6 @@ func (c *ClientWithFallback) Close() {
 	}
 }
 
-// Not found should not be cancelling the requests, as that's returned
-// when we are hitting a non-archival node for example, it should continue the
-// chain as the next provider might have archival support.
-func isNotFoundError(err error) bool {
-	return strings.Contains(err.Error(), ethereum.NotFound.Error())
-}
-
 func isVMError(err error) bool {
 	if strings.Contains(err.Error(), core.ErrInsufficientFunds.Error()) {
 		return true
@@ -194,31 +168,12 @@ func isVMError(err error) bool {
 	return false
 }
 
-func (c *ClientWithFallback) SetIsConnected(value bool) {
-	c.LastCheckedAt = time.Now().Unix()
-	if !value {
-		if c.isConnected.Load() {
-			if c.WalletNotifier != nil {
-				c.WalletNotifier(c.ChainID, "down")
-			}
-			c.isConnected.Store(false)
-		}
-
-	} else {
-		if !c.isConnected.Load() {
-			c.isConnected.Store(true)
-			if c.WalletNotifier != nil {
-				c.WalletNotifier(c.ChainID, "up")
-			}
-		}
-	}
-}
-
 func (c *ClientWithFallback) IsConnected() bool {
-	return c.isConnected.Load()
+	return c.providersHealthManager.Status().Status == rpcstatus.StatusUp
 }
 
 func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (interface{}, error) {
+	rpcstats.CountCall(f.MethodName)
 	if c.closed.Load() {
 		return nil, errors.New("client is closed")
 	}
@@ -250,8 +205,6 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (i
 			return nil, fmt.Errorf("groupTag=%s, %w", c.groupTag, err)
 		}
 	}
-
-	c.LastCheckedAt = time.Now().Unix()
 
 	cmd := circuitbreaker.NewCommand(ctx, nil)
 	// Try making requests with each RPC provider.
@@ -287,15 +240,8 @@ type MakeCallFunctor struct {
 	Func       func(client ethclient.EthClientInterface) (interface{}, error)
 }
 
-func (c *ClientWithFallback) makeCallAndToggleConnectionState(ctx context.Context, f MakeCallFunctor) (interface{}, error) {
-	rpcstats.CountCall(f.MethodName)
-	res, err := c.makeCall(ctx, f)
-	c.toggleConnectionState(err)
-	return res, err
-}
-
 func (c *ClientWithFallback) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_BlockByHash",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -311,7 +257,7 @@ func (c *ClientWithFallback) BlockByHash(ctx context.Context, hash common.Hash) 
 }
 
 func (c *ClientWithFallback) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_BlockByNumber",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -327,7 +273,7 @@ func (c *ClientWithFallback) BlockByNumber(ctx context.Context, number *big.Int)
 }
 
 func (c *ClientWithFallback) BlockNumber(ctx context.Context) (uint64, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_BlockNumber",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -343,7 +289,7 @@ func (c *ClientWithFallback) BlockNumber(ctx context.Context) (uint64, error) {
 }
 
 func (c *ClientWithFallback) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_HeaderByHash",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -359,7 +305,7 @@ func (c *ClientWithFallback) HeaderByHash(ctx context.Context, hash common.Hash)
 }
 
 func (c *ClientWithFallback) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_HeaderByNumber",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -375,7 +321,7 @@ func (c *ClientWithFallback) HeaderByNumber(ctx context.Context, number *big.Int
 }
 
 func (c *ClientWithFallback) TransactionByHash(ctx context.Context, hash common.Hash) (*types.Transaction, bool, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_TransactionByHash",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -393,7 +339,7 @@ func (c *ClientWithFallback) TransactionByHash(ctx context.Context, hash common.
 }
 
 func (c *ClientWithFallback) TransactionSender(ctx context.Context, tx *types.Transaction, block common.Hash, index uint) (common.Address, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_TransactionSender",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -409,7 +355,7 @@ func (c *ClientWithFallback) TransactionSender(ctx context.Context, tx *types.Tr
 }
 
 func (c *ClientWithFallback) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_TransactionReceipt",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -425,7 +371,7 @@ func (c *ClientWithFallback) TransactionReceipt(ctx context.Context, txHash comm
 }
 
 func (c *ClientWithFallback) SyncProgress(ctx context.Context) (*ethereum.SyncProgress, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_SyncProgress",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -445,7 +391,7 @@ func (c *ClientWithFallback) NetworkID() uint64 {
 }
 
 func (c *ClientWithFallback) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_BalanceAt",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -461,7 +407,7 @@ func (c *ClientWithFallback) BalanceAt(ctx context.Context, account common.Addre
 }
 
 func (c *ClientWithFallback) StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_StorageAt",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -477,7 +423,7 @@ func (c *ClientWithFallback) StorageAt(ctx context.Context, account common.Addre
 }
 
 func (c *ClientWithFallback) CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_CodeAt",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -493,7 +439,7 @@ func (c *ClientWithFallback) CodeAt(ctx context.Context, account common.Address,
 }
 
 func (c *ClientWithFallback) NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_NonceAt",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -515,7 +461,7 @@ func (c *ClientWithFallback) FilterLogs(ctx context.Context, q ethereum.FilterQu
 		ethClients[i] = client.CopyWithCircuitName(client.GetCircuitName() + "_FilterLogs")
 	}
 
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_FilterLogs",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -535,7 +481,7 @@ func (c *ClientWithFallback) FilterLogs(ctx context.Context, q ethereum.FilterQu
 }
 
 func (c *ClientWithFallback) SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_SubscribeFilterLogs",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -551,7 +497,7 @@ func (c *ClientWithFallback) SubscribeFilterLogs(ctx context.Context, q ethereum
 }
 
 func (c *ClientWithFallback) PendingBalanceAt(ctx context.Context, account common.Address) (*big.Int, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingBalanceAt",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -567,7 +513,7 @@ func (c *ClientWithFallback) PendingBalanceAt(ctx context.Context, account commo
 }
 
 func (c *ClientWithFallback) PendingStorageAt(ctx context.Context, account common.Address, key common.Hash) ([]byte, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingStorageAt",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -583,7 +529,7 @@ func (c *ClientWithFallback) PendingStorageAt(ctx context.Context, account commo
 }
 
 func (c *ClientWithFallback) PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingCodeAt",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -599,7 +545,7 @@ func (c *ClientWithFallback) PendingCodeAt(ctx context.Context, account common.A
 }
 
 func (c *ClientWithFallback) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingNonceAt",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -615,7 +561,7 @@ func (c *ClientWithFallback) PendingNonceAt(ctx context.Context, account common.
 }
 
 func (c *ClientWithFallback) PendingTransactionCount(ctx context.Context) (uint, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingTransactionCount",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -631,7 +577,7 @@ func (c *ClientWithFallback) PendingTransactionCount(ctx context.Context) (uint,
 }
 
 func (c *ClientWithFallback) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_CallContract",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -647,7 +593,7 @@ func (c *ClientWithFallback) CallContract(ctx context.Context, msg ethereum.Call
 }
 
 func (c *ClientWithFallback) PendingCallContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingCallContract",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -663,7 +609,7 @@ func (c *ClientWithFallback) PendingCallContract(ctx context.Context, msg ethere
 }
 
 func (c *ClientWithFallback) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_SuggestGasPrice",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -679,7 +625,7 @@ func (c *ClientWithFallback) SuggestGasPrice(ctx context.Context) (*big.Int, err
 }
 
 func (c *ClientWithFallback) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_SuggestGasTipCap",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -695,7 +641,7 @@ func (c *ClientWithFallback) SuggestGasTipCap(ctx context.Context) (*big.Int, er
 }
 
 func (c *ClientWithFallback) FeeHistory(ctx context.Context, blockCount uint64, lastBlock *big.Int, rewardPercentiles []float64) (*ethereum.FeeHistory, error) {
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_FeeHistory",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -715,7 +661,7 @@ func (c *ClientWithFallback) EstimateGas(ctx context.Context, msg ethereum.CallM
 		return c.LineaEstimateGas(ctx, msg)
 	}
 
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_EstimateGas",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -736,7 +682,7 @@ func (c *ClientWithFallback) LineaEstimateGas(ctx context.Context, msg ethereum.
 	}
 
 	const method = "linea_estimateGas"
-	res, err := c.makeCallAndToggleConnectionState(
+	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: method,
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -759,7 +705,7 @@ func (c *ClientWithFallback) LineaEstimateGas(ctx context.Context, msg ethereum.
 }
 
 func (c *ClientWithFallback) SendTransaction(ctx context.Context, tx *types.Transaction) error {
-	_, err := c.makeCallAndToggleConnectionState(
+	_, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_SendTransaction",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -771,7 +717,7 @@ func (c *ClientWithFallback) SendTransaction(ctx context.Context, tx *types.Tran
 }
 
 func (c *ClientWithFallback) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
-	_, err := c.makeCallAndToggleConnectionState(
+	_, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_CallContext",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -783,7 +729,7 @@ func (c *ClientWithFallback) CallContext(ctx context.Context, result interface{}
 }
 
 func (c *ClientWithFallback) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
-	_, err := c.makeCallAndToggleConnectionState(
+	_, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_BatchCallContext",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
@@ -816,27 +762,6 @@ func (c *ClientWithFallback) GetBaseFeeFromBlock(ctx context.Context, blockNumbe
 	}
 
 	return baseGasFee, err
-}
-
-func (c *ClientWithFallback) GetWalletNotifier() func(chainId uint64, message string) {
-	return c.WalletNotifier
-}
-
-func (c *ClientWithFallback) SetWalletNotifier(notifier func(chainId uint64, message string)) {
-	c.WalletNotifier = notifier
-}
-
-func (c *ClientWithFallback) toggleConnectionState(err error) {
-	connected := true
-	if err != nil {
-		if !isNotFoundError(err) && !isVMError(err) && !errors.Is(err, rpclimiter.ErrRequestsOverLimit) && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			logutils.ZapLogger().Warn("Error not in chain call", zap.Uint64("chain", c.ChainID), zap.Error(err))
-			connected = false
-		} else {
-			logutils.ZapLogger().Warn("Error in chain call", zap.Error(err))
-		}
-	}
-	c.SetIsConnected(connected)
 }
 
 func (c *ClientWithFallback) Tag() string {

@@ -53,7 +53,6 @@ func TestBlockedRoutesCall(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              db,
-		WalletFeed:      nil,
 	}
 	c, err := NewClient(config)
 	require.NoError(t, err)
@@ -99,7 +98,6 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              db,
-		WalletFeed:      nil,
 	}
 	c, err := NewClient(config)
 	require.NoError(t, err)
@@ -185,7 +183,6 @@ func TestGetClientsUsingCache(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        networks,
 		DB:              db,
-		WalletFeed:      nil,
 	}
 
 	c, err := NewClient(config)

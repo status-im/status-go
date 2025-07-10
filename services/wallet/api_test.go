@@ -153,15 +153,9 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 		UpstreamChainID: chainID,
 		Networks:        networks,
 		DB:              appDB,
-		WalletFeed:      nil,
 	}
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)
-
-	chainClient, err := c.EthClient(chainID)
-	require.NoError(t, err)
-	chainClient.SetWalletNotifier(func(chainID uint64, message string) {})
-	c.SetWalletNotifier(func(chainID uint64, message string) {})
 
 	service := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, "")
 
@@ -247,7 +241,6 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 		UpstreamChainID: chainID,
 		Networks:        networks,
 		DB:              appDB,
-		WalletFeed:      nil,
 	}
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)

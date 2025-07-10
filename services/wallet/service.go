@@ -3,14 +3,11 @@ package wallet
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
@@ -48,8 +45,6 @@ import (
 )
 
 const (
-	EventBlockchainStatusChanged walletevent.EventType = "wallet-blockchain-status-changed"
-
 	defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
 	defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
 )
@@ -83,38 +78,6 @@ func NewService(
 	signals := &walletevent.SignalsTransmitter{
 		Publisher: feed,
 	}
-	blockchainStatus := make(map[uint64]string)
-	mutex := sync.Mutex{}
-	rpcClient.SetWalletNotifier(func(chainID uint64, message string) {
-		mutex.Lock()
-		defer mutex.Unlock()
-
-		if len(blockchainStatus) == 0 {
-			networks, err := rpcClient.GetNetworkManager().Get(false)
-			if err != nil {
-				return
-			}
-
-			for _, network := range networks {
-				blockchainStatus[network.ChainID] = "up"
-			}
-		}
-
-		blockchainStatus[chainID] = message
-		encodedmessage, err := json.Marshal(blockchainStatus)
-		if err != nil {
-			return
-		}
-
-		feed.Send(walletevent.Event{
-			Type:     EventBlockchainStatusChanged,
-			Accounts: []common.Address{},
-			Message:  string(encodedmessage),
-			At:       time.Now().Unix(),
-			ChainID:  chainID,
-		})
-	})
-
 	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
 	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.GetNetworkManager(), appDB, mediaServer, feed, accountsPublisher, accountsDB, token.NewPersistence(db))

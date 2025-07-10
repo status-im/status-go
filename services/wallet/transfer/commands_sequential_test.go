@@ -585,19 +585,6 @@ func (tc *TestClient) CallContext(ctx context.Context, result interface{}, metho
 	return err
 }
 
-func (tc *TestClient) GetWalletNotifier() func(chainId uint64, message string) {
-	if tc.traceAPICalls {
-		tc.t.Log("GetWalletNotifier")
-	}
-	return nil
-}
-
-func (tc *TestClient) SetWalletNotifier(notifier func(chainId uint64, message string)) {
-	if tc.traceAPICalls {
-		tc.t.Log("SetWalletNotifier")
-	}
-}
-
 func (tc *TestClient) EstimateGas(ctx context.Context, call ethereum.CallMsg) (gas uint64, err error) {
 	err = tc.countAndlog("EstimateGas")
 	return 0, err
@@ -1132,7 +1119,6 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appDb,
-		WalletFeed:      nil,
 	}
 	client, err := statusRpc.NewClient(config)
 	require.NoError(t, err)
@@ -1392,7 +1378,6 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1504,7 +1489,6 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 			UpstreamChainID: 1,
 			Networks:        []params.Network{},
 			DB:              appdb,
-			WalletFeed:      nil,
 		}
 		client, _ := statusRpc.NewClient(config)
 
@@ -1573,7 +1557,6 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1695,7 +1678,6 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1823,7 +1805,6 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 

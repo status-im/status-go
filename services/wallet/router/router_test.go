@@ -56,7 +56,6 @@ func setupRouter(t *testing.T) (*Router, func()) {
 		UpstreamChainID: 1,
 		Networks:        defaultNetworks,
 		DB:              db,
-		WalletFeed:      nil,
 	}
 	client, _ := rpc.NewClient(config)
 

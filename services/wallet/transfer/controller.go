@@ -110,29 +110,31 @@ func (c *Controller) startAccountWatcher() {
 }
 
 func (c *Controller) startNetworksWatcher() {
-	if c.rpcClient != nil && c.rpcClient.GetNetworkManager() != nil {
-		networksPublisher := c.rpcClient.GetNetworkManager().GetPublisher()
-		if networksPublisher == nil {
-			return
-		}
-
-		ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](networksPublisher, 10)
-		go func() {
-			defer gocommon.LogOnPanic()
-			defer unsubFn()
-			for {
-				select {
-				case <-c.stopCh:
-					return
-				case _, ok := <-ch:
-					if !ok {
-						return
-					}
-					c.restartReactor()
-				}
-			}
-		}()
+	if c.rpcClient == nil {
+		return
 	}
+
+	networksPublisher := c.rpcClient.GetNetworksPublisher()
+	if networksPublisher == nil {
+		return
+	}
+
+	ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](networksPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubFn()
+		for {
+			select {
+			case <-c.stopCh:
+				return
+			case _, ok := <-ch:
+				if !ok {
+					return
+				}
+				c.restartReactor()
+			}
+		}
+	}()
 }
 
 func (c *Controller) restartReactor() {

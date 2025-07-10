@@ -256,7 +256,6 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		Networks:          n.config.Networks,
 		DB:                n.appDB,
 		AccountsPublisher: n.accountsPublisher,
-		WalletFeed:        &n.walletFeed,
 	}
 	n.rpcClient, err = rpc.NewClient(config)
 	if err != nil {
