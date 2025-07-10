@@ -3,8 +3,6 @@ package leaderboard
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -18,23 +16,7 @@ import (
 const (
 	MARKETS_ENDPOINT = "/v1/leaderboard/markets"
 	PRICES_ENDPOINT  = "/v1/leaderboard/prices"
-
-	// Host suffix for market proxy
-	MarketProxyHostSuffix = "market.status.im"
 )
-
-// getMarketProxyHost creates market proxy URL based on stage name
-// Similar to getProxyHost in api/default_networks.go but for market proxy
-func getMarketProxyHost(customUrl, stageName string) string {
-	if customUrl != "" {
-		return strings.TrimRight(customUrl, "/")
-	}
-	// Use stageName if provided, otherwise default to "test"
-	if stageName == "" {
-		stageName = "test"
-	}
-	return fmt.Sprintf("https://%s.%s", stageName, MarketProxyHostSuffix)
-}
 
 // DataFetcher defines the interface for fetching market and price data
 type DataFetcher interface {
@@ -221,7 +203,7 @@ func (f *ProxyFetcher) FetchPrices(ctx context.Context) error {
 }
 
 func (f *ProxyFetcher) fetchData(ctx context.Context, endpoint string, etag string) ([]byte, string, bool) {
-	baseUrl := getMarketProxyHost(f.config.UrlOverride.Reveal(), f.config.StageName)
+	baseUrl := GetMarketProxyHost(f.config.UrlOverride.Reveal(), f.config.StageName)
 	url := f.client.BuildURL(baseUrl, endpoint)
 
 	options := []thirdparty.RequestOption{}
