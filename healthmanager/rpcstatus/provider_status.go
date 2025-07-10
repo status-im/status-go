@@ -19,8 +19,8 @@ const (
 // ProviderStatus holds the status information for a single provider.
 type ProviderStatus struct {
 	Name              string        `json:"name"`
-	LastSuccessAt     time.Time     `json:"last_success_at"`
-	LastErrorAt       time.Time     `json:"last_error_at"`
+	LastSuccessAt     time.Time     `json:"-"` // ignore this field during standard marshaling
+	LastErrorAt       time.Time     `json:"-"` // ignore this field during standard marshaling
 	LastError         error         `json:"-"` // ignore this field during standard marshaling
 	Status            StatusType    `json:"status"`
 	TotalDuration     time.Duration `json:"-"` // ignore this field during standard marshaling
@@ -36,10 +36,14 @@ func (ps ProviderStatus) MarshalJSON() ([]byte, error) {
 	// Create a new struct for JSON marshaling
 	return json.Marshal(&struct {
 		Alias
+		LastSuccessAt   int64  `json:"last_success_at"`
+		LastErrorAt     int64  `json:"last_error_at"`
 		LastError       string `json:"last_error,omitempty"`
 		TotalDurationMs int64  `json:"total_duration_ms"` // Include duration as milliseconds
 	}{
-		Alias: Alias(ps),
+		Alias:         Alias(ps),
+		LastSuccessAt: ps.LastSuccessAt.Unix(),
+		LastErrorAt:   ps.LastErrorAt.Unix(),
 		LastError: func() string {
 			if ps.LastError != nil {
 				return ps.LastError.Error()
