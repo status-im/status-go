@@ -10,6 +10,7 @@ extern void SetEventCallback(void *cb);
 import "C"
 import (
 	"encoding/json"
+	"time"
 	"unsafe"
 
 	"sync"
@@ -32,15 +33,17 @@ var logger = logutils.ZapLogger().Named("signal")
 
 // Envelope is a general signal sent upward from node to RN app
 type Envelope struct {
-	Type  string      `json:"type"`
-	Event interface{} `json:"event"`
+	Type      string      `json:"type"`
+	Event     interface{} `json:"event"`
+	Timestamp int64       `json:"timestamp"`
 }
 
 // NewEnvelope creates new envlope of given type and event payload.
 func NewEnvelope(typ string, event interface{}) *Envelope {
 	return &Envelope{
-		Type:  typ,
-		Event: event,
+		Type:      typ,
+		Event:     event,
+		Timestamp: time.Now().Unix(),
 	}
 }
 
