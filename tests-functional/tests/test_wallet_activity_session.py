@@ -36,7 +36,6 @@ class TestWalletActivitySession(WalletSteps):
         self.request_id = str(random.randint(1, 8888))
         self.mint_snt(user_1.address, 1000000000000000000000000)
 
-    @pytest.mark.skip("cryptocompare limit reached")
     def test_wallet_start_activity_filter_session(self):
         uuid = str(uuid_lib.uuid4())
         amount_in = "0xde0b6b3a7640000"

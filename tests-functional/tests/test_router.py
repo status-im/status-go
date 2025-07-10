@@ -21,7 +21,6 @@ class TestRouter(StatusBackendSteps):
         SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
     ]
 
-    @pytest.mark.skip("cryptocompare limit reached")
     def test_tx_from_route(self):
         uuid = str(uuid_lib.uuid4())
         amount_in = "0xde0b6b3a7640000"
@@ -55,7 +54,6 @@ class TestRouter(StatusBackendSteps):
         tx_status = wallet_utils.send_router_transactions_with_signatures(self.rpc_client, uuid, tx_signatures)
         wallet_utils.check_tx_details(self.rpc_client, tx_status["hash"], self.network_id, constants.user_2.address, amount_in)
 
-    @pytest.mark.skip("cryptocompare limit reached")
     def test_setting_different_fee_modes(self):
         uuid = str(uuid_lib.uuid4())
         gas_fee_mode = constants.gas_fee_mode_medium
@@ -122,7 +120,6 @@ class TestRouter(StatusBackendSteps):
         response = self.rpc_client.rpc_request(method, [tx_identity_params, gas_fee_mode])
         self.rpc_client.verify_is_json_rpc_error(response)
 
-    @pytest.mark.skip("cryptocompare limit reached")
     def test_setting_custom_fee_mode(self):
         uuid = str(uuid_lib.uuid4())
         gas_fee_mode = constants.gas_fee_mode_medium

@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -39,7 +41,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/opensea"
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/rarible"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/coingecko"
-	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -52,6 +53,16 @@ const (
 	defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
 	defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
 )
+
+func createCoingeckoProxyClient(config params.MarketDataProxyConfig) *coingecko.Client {
+	baseURL := leaderboard.GetMarketProxyUrl(config.UrlOverride.Reveal(), config.StageName)
+
+	return coingecko.NewClientWithParams(coingecko.Params{
+		URL:      baseURL,
+		User:     config.User,
+		Password: config.Password,
+	})
+}
 
 // NewService initializes service instance.
 func NewService(
@@ -133,14 +144,15 @@ func NewService(
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountsPublisher, transactionManager, blockChainState)
 
 	cryptoCompare := cryptocompare.NewClient()
-	coingecko := coingecko.NewClient()
+	coingeckoClient := coingecko.NewClient()
+	coingeckoProxy := createCoingeckoProxyClient(config.WalletConfig.MarketDataProxyConfig)
 	cryptoCompareProxy := cryptocompare.NewClientWithParams(cryptocompare.Params{
 		ID:       fmt.Sprintf("%s-proxy", cryptoCompare.ID()),
 		URL:      fmt.Sprintf("https://%s.api.status.im/cryptocompare/", statusProxyStageName),
 		User:     config.WalletConfig.StatusProxyMarketUser,
 		Password: config.WalletConfig.StatusProxyMarketPassword,
 	})
-	marketManager := market.NewManager([]thirdparty.MarketDataProvider{cryptoCompare, coingecko, cryptoCompareProxy}, tokenManager, feed)
+	marketManager := market.NewManager([]thirdparty.MarketDataProvider{coingeckoProxy, coingeckoClient, cryptoCompare, cryptoCompareProxy}, tokenManager, feed)
 	reader := NewReader(tokenManager, marketManager, token.NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, accountsPublisher, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
