@@ -1883,3 +1883,12 @@ func getFreePortIfNeeded(tcpPort int, discV5UDPPort int, logger *zap.Logger) (in
 
 	return tcpPort, discV5UDPPort, nil
 }
+
+func (w *Waku) Metrics() string {
+	metrics, err := w.node.GetMetrics()
+
+	if err != nil {
+		panic(err)
+	}
+	return metrics
+}

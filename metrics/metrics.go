@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	gethprom "github.com/ethereum/go-ethereum/metrics/prometheus"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/wakuv2"
 
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -18,19 +19,21 @@ import (
 
 // Server runs and controls a HTTP pprof interface.
 type Server struct {
-	server *http.Server
+	server   *http.Server
+	wakuNode *wakuv2.Waku
 }
 
-func NewMetricsServer(address string, r metrics.Registry) *Server {
+func NewMetricsServer(address string, r metrics.Registry, wakuNode *wakuv2.Waku) *Server {
 	mux := http.NewServeMux()
 	mux.Handle("/health", healthHandler())
-	mux.Handle("/metrics", Handler(r))
+	mux.Handle("/metrics", Handler(r, wakuNode))
 	p := Server{
 		server: &http.Server{
 			Addr:              address,
 			ReadHeaderTimeout: 5 * time.Second,
 			Handler:           mux,
 		},
+		wakuNode: wakuNode,
 	}
 	return &p
 }
@@ -44,7 +47,7 @@ func healthHandler() http.Handler {
 	})
 }
 
-func Handler(reg metrics.Registry) http.Handler {
+func Handler(reg metrics.Registry, wakuNode *wakuv2.Waku) http.Handler {
 	// we disable compression because geth doesn't support it
 	opts := promhttp.HandlerOpts{DisableCompression: true}
 	// we are using only our own metrics
@@ -54,9 +57,21 @@ func Handler(reg metrics.Registry) http.Handler {
 	}
 	// if registry is provided, combine handlers
 	gethMetrics := gethprom.Handler(reg)
+
+	// Create waku metrics handler
+	wakuMetrics := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if wakuNode != nil {
+			wakuMetrics := wakuNode.Metrics()
+			if wakuMetrics != "" {
+				w.Write([]byte(wakuMetrics))
+			}
+		}
+	})
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		statusMetrics.ServeHTTP(w, r)
 		gethMetrics.ServeHTTP(w, r)
+		wakuMetrics.ServeHTTP(w, r)
 	})
 }
 

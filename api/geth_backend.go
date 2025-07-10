@@ -297,7 +297,7 @@ func (b *GethStatusBackend) StartPrometheusMetricsServer(address string) error {
 	if b.prometheusMetrics != nil {
 		return nil
 	}
-	b.prometheusMetrics = metrics.NewMetricsServer(address, nil)
+	b.prometheusMetrics = metrics.NewMetricsServer(address, nil, nil)
 	go b.prometheusMetrics.Listen()
 	return nil
 }
