@@ -163,7 +163,7 @@ class WakuextService(Service):
         return response.json()
 
     def leave_group_chat(self, chat_id: str, remove: bool):
-        params = [chat_id, remove]
+        params = [None, chat_id, remove]
         response = self.rpc_request("leaveGroupChat", params)
         return response.json()
 
