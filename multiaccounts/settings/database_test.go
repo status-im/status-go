@@ -296,3 +296,23 @@ func TestDatabase_NewsRSSEnabled(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, false, settings.NewsRSSEnabled)
 }
+
+func TestDatabase_BackupPath(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	path, err := db.BackupPath()
+	require.NoError(t, err)
+	// The default backup path is empty
+	require.Equal(t, "", path)
+
+	testPath := "/path/to/backup"
+	err = db.SaveSetting(BackupPath.GetReactName(), testPath)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, testPath, settings.BackupPath)
+}

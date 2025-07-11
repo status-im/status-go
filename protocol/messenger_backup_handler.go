@@ -60,6 +60,7 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message *protobuf.
 	return nil
 }
 
+// TODO remove this function once we do the Waku backup removal
 func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.Backup) []error {
 	var errors []error
 
@@ -85,7 +86,7 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 		errors = append(errors, communityErrors...)
 	}
 
-	err = m.handleBackedUpSettings(message.Setting)
+	err = m.HandleBackedUpSettings(message.Setting)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -95,7 +96,7 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 		errors = append(errors, err)
 	}
 
-	err = m.handleWatchOnlyAccount(message.WatchOnlyAccount)
+	err = m.HandleWatchOnlyAccount(message.WatchOnlyAccount)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -122,6 +123,34 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 	}
 
 	state.Response.BackupHandled = true
+
+	return errors
+}
+
+func (m *Messenger) handleLocalBackup(state *ReceivedMessageState, message *protobuf.MessengerLocalBackup) []error {
+	var errors []error
+
+	err := m.handleBackedUpProfile(message.Profile, message.Clock)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	for _, contact := range message.Contacts {
+		err = m.HandleSyncInstallationContactV2(state, contact, nil)
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	err = m.handleSyncChats(state, message.Chats)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	communityErrors := m.handleLocalBackupCommunities(state, message.Communities)
+	if len(communityErrors) > 0 {
+		errors = append(errors, communityErrors...)
+	}
 
 	return errors
 }
@@ -376,7 +405,7 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 	return err
 }
 
-func (m *Messenger) handleBackedUpSettings(message *protobuf.SyncSetting) error {
+func (m *Messenger) HandleBackedUpSettings(message *protobuf.SyncSetting) error {
 	if message == nil {
 		return nil
 	}
@@ -405,7 +434,7 @@ func (m *Messenger) handleBackedUpSettings(message *protobuf.SyncSetting) error 
 				m.account.Name = message.GetValueString()
 				err = m.multiAccounts.SaveAccount(*m.account)
 				if err != nil {
-					m.logger.Warn("[handleBackedUpSettings] failed to save account", zap.Error(err))
+					m.logger.Warn("[HandleBackedUpSettings] failed to save account", zap.Error(err))
 					return nil
 				}
 			}
@@ -456,7 +485,7 @@ func (m *Messenger) handleKeypair(message *protobuf.SyncKeypair) error {
 	return nil
 }
 
-func (m *Messenger) handleWatchOnlyAccount(message *protobuf.SyncAccount) error {
+func (m *Messenger) HandleWatchOnlyAccount(message *protobuf.SyncAccount) error {
 	if message == nil {
 		return nil
 	}
@@ -492,9 +521,27 @@ func syncInstallationCommunitiesSet(communities []*protobuf.SyncInstallationComm
 	return ret
 }
 
+// TODO remove this function once we do the Waku backup removal
 func (m *Messenger) handleSyncedCommunities(state *ReceivedMessageState, message *protobuf.Backup) []error {
 	var errors []error
 	for _, syncCommunity := range syncInstallationCommunitiesSet(message.Communities) {
+		err := m.handleSyncInstallationCommunity(state, syncCommunity)
+		if err != nil {
+			errors = append(errors, err)
+		}
+
+		err = m.requestCommunityKeysAndSharedAddresses(state, syncCommunity)
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	return errors
+}
+
+func (m *Messenger) handleLocalBackupCommunities(state *ReceivedMessageState, communities []*protobuf.SyncInstallationCommunity) []error {
+	var errors []error
+	for _, syncCommunity := range syncInstallationCommunitiesSet(communities) {
 		err := m.handleSyncInstallationCommunity(state, syncCommunity)
 		if err != nil {
 			errors = append(errors, err)

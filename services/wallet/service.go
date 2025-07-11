@@ -28,6 +28,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/leaderboard"
+	"github.com/status-im/status-go/services/wallet/localbackup"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/routeexecution"
@@ -173,6 +174,8 @@ func NewService(
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
+	localBackup := localbackup.NewService(accountsDB, feed)
+
 	router := router.NewRouter(rpcClient, transactor, tokenManager, marketManager, collectibles,
 		collectiblesManager)
 	pathProcessors := buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags)
@@ -216,6 +219,7 @@ func NewService(
 		routeExecutionManager: routeExecutionManager,
 		leaderboardService:    leaderboardService,
 		started:               false,
+		localBackup:           localBackup,
 	}
 }
 
@@ -317,6 +321,7 @@ type Service struct {
 	routeExecutionManager *routeexecution.Manager
 	leaderboardService    *leaderboard.MarketDataService
 	started               bool
+	localBackup           *localbackup.Service
 
 	cancelWalletServiceCtx context.CancelFunc
 }
@@ -425,4 +430,8 @@ func (s *Service) GetCollectiblesService() *collectibles.Service {
 
 func (s *Service) GetCollectiblesManager() *collectibles.Manager {
 	return s.collectiblesManager
+}
+
+func (s *Service) LocalBackup() *localbackup.Service {
+	return s.localBackup
 }

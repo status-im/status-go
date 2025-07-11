@@ -580,6 +580,7 @@ func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []
 		if err != nil {
 			return err
 		}
+		messageState.AllChats.Store(chat.ID, chat)
 		messageState.Response.AddChat(chat)
 	}
 

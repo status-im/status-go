@@ -2401,3 +2401,37 @@ func IntendedPanic(message string) string {
 		panic(err)
 	})
 }
+
+func performLocalBackup() string {
+	filePath, err := statusBackend.StatusNode().PerformLocalBackup()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	respJSON, err := json.Marshal(map[string]interface{}{
+		"filePath": filePath,
+	})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(respJSON)
+}
+
+func PerformLocalBackup() string {
+	return callWithResponse(performLocalBackup)
+}
+
+func LoadLocalBackup(requestJSON string) string {
+	var request requests.LoadLocalBackup
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = statusBackend.StatusNode().LoadLocalBackup(request.FilePath)
+	return makeJSONResponse(err)
+}

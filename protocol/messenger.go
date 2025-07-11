@@ -3478,6 +3478,13 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 		if ok {
 			contactsToSave = append(contactsToSave, contact)
 			messageState.Response.AddContact(contact)
+
+			_, ok := m.allContacts.Load(id)
+			if !ok {
+				// If the contact is not in the allContacts map, it means it's a new contact
+				// and we need to add it to the allContacts map.
+				m.allContacts.Store(id, contact)
+			}
 		}
 		return true
 	})

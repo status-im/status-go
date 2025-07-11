@@ -34,6 +34,10 @@ var (
 		dBColumnName:   "backup_fetched",
 		valueHandler:   BoolHandler,
 	}
+	BackupPath = SettingField{
+		reactFieldName: "backup-path",
+		dBColumnName:   "backup_path",
+	}
 	ChaosMode = SettingField{
 		reactFieldName: "chaos-mode?",
 		dBColumnName:   "chaos_mode",
@@ -544,6 +548,7 @@ var (
 		AutoMessageEnabled,
 		BackupEnabled,
 		BackupFetched,
+		BackupPath,
 		Bio,
 		ChaosMode,
 		CollectibleGroupByCollection,

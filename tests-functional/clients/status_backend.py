@@ -53,6 +53,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.ws_url = f"{url}".replace("http", "ws")
         self.rpc_url = f"{url}/statusgo/CallRPC"
         self.public_key = ""
+        self.mnemonic = ""
         self.key_uid = ""
         self.password = ""
         self.display_name = ""
@@ -214,6 +215,22 @@ class StatusBackend(RpcClient, SignalClient):
 
         return self.container.extract_data(path)
 
+    def import_data(self, src_path: str, dest_path: str):
+        """
+        Import a file from the host (src_path) into the container at dest_path.
+        If not running in a container, just copy the file locally.
+        """
+        if not self.container:
+            # Not running in a container, just copy the file locally
+            if os.path.exists(src_path):
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                with open(src_path, "rb") as src, open(dest_path, "wb") as dst:
+                    dst.write(src.read())
+                return
+            return
+
+        self.container.import_data(src_path, dest_path)
+
     def _set_display_name(self, **kwargs):
         self.display_name = kwargs.get(
             "display_name",
@@ -279,7 +296,9 @@ class StatusBackend(RpcClient, SignalClient):
             error_details = signal["event"]["error"]
             assert not error_details, f"Unexpected error during login: {error_details}"
         self.node_login_event = signal
+        logging.debug(f"Node login event: {self.node_login_event}")
         self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
+        self.mnemonic = self.node_login_event.get("event", {}).get("settings", {}).get("mnemonic")
         self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
         return signal
 
