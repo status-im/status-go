@@ -142,7 +142,7 @@ func NewService(
 	openseaHTTPClient := opensea.NewHTTPClient()
 	openseaV2Client := opensea.NewClientV2(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient)
 	raribleClient := rarible.NewClient(config.WalletConfig.RaribleMainnetAPIKey, config.WalletConfig.RaribleTestnetAPIKey)
-	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
+	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKey)
 
 	// Collectible providers in priority order (i.e. provider N+1 will be tried only if provider N fails)
 	contractOwnershipProviders := []thirdparty.CollectibleContractOwnershipProvider{

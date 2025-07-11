@@ -102,15 +102,7 @@ type WalletSecretsConfig struct {
 	OpenseaAPIKey        security.SensitiveString `json:"openseaApiKey"`
 	RaribleMainnetAPIKey security.SensitiveString `json:"raribleMainnetApiKey"`
 	RaribleTestnetAPIKey security.SensitiveString `json:"raribleTestnetApiKey"`
-
-	AlchemyEthereumMainnetToken security.SensitiveString `json:"alchemyEthereumMainnetToken"`
-	AlchemyEthereumSepoliaToken security.SensitiveString `json:"alchemyEthereumSepoliaToken"`
-	AlchemyArbitrumMainnetToken security.SensitiveString `json:"alchemyArbitrumMainnetToken"`
-	AlchemyArbitrumSepoliaToken security.SensitiveString `json:"alchemyArbitrumSepoliaToken"`
-	AlchemyOptimismMainnetToken security.SensitiveString `json:"alchemyOptimismMainnetToken"`
-	AlchemyOptimismSepoliaToken security.SensitiveString `json:"alchemyOptimismSepoliaToken"`
-	AlchemyBaseMainnetToken     security.SensitiveString `json:"alchemyBaseMainnetToken"`
-	AlchemyBaseSepoliaToken     security.SensitiveString `json:"alchemyBaseSepoliaToken"`
+	AlchemyAPIKey        security.SensitiveString `json:"alchemyApiKey"`
 
 	StatusProxyStageName      string                   `json:"statusProxyStageName"`
 	StatusProxyMarketUser     security.SensitiveString `json:"statusProxyMarketUser"`

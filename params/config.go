@@ -215,15 +215,15 @@ type NodeConfig struct {
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
 	Enabled                   bool
-	OpenseaAPIKey             security.SensitiveString            `json:"OpenseaAPIKey"`
-	RaribleMainnetAPIKey      security.SensitiveString            `json:"RaribleMainnetAPIKey"`
-	RaribleTestnetAPIKey      security.SensitiveString            `json:"RaribleTestnetAPIKey"`
-	AlchemyAPIKeys            map[uint64]security.SensitiveString `json:"AlchemyAPIKeys"`
-	InfuraAPIKey              security.SensitiveString            `json:"InfuraAPIKey"`
-	InfuraAPIKeySecret        security.SensitiveString            `json:"InfuraAPIKeySecret"`
-	StatusProxyMarketUser     security.SensitiveString            `json:"StatusProxyMarketUser"`
-	StatusProxyMarketPassword security.SensitiveString            `json:"StatusProxyMarketPassword"`
-	MarketDataProxyConfig     MarketDataProxyConfig               `json:"MarketDataProxyConfig"`
+	OpenseaAPIKey             security.SensitiveString `json:"OpenseaAPIKey"`
+	RaribleMainnetAPIKey      security.SensitiveString `json:"RaribleMainnetAPIKey"`
+	RaribleTestnetAPIKey      security.SensitiveString `json:"RaribleTestnetAPIKey"`
+	AlchemyAPIKey             security.SensitiveString `json:"AlchemyAPIKey"`
+	InfuraAPIKey              security.SensitiveString `json:"InfuraAPIKey"`
+	InfuraAPIKeySecret        security.SensitiveString `json:"InfuraAPIKeySecret"`
+	StatusProxyMarketUser     security.SensitiveString `json:"StatusProxyMarketUser"`
+	StatusProxyMarketPassword security.SensitiveString `json:"StatusProxyMarketPassword"`
+	MarketDataProxyConfig     MarketDataProxyConfig    `json:"MarketDataProxyConfig"`
 	// FIXME: remove when EthRpcProxy* is integrated
 	StatusProxyBlockchainUser     security.SensitiveString `json:"StatusProxyBlockchainUser"`
 	StatusProxyBlockchainPassword security.SensitiveString `json:"StatusProxyBlockchainPassword"`
