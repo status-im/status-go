@@ -43,7 +43,6 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
@@ -1258,14 +1257,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 
 	poktToken := fakeToken()
 	infuraToken := fakeToken()
-	alchemyEthereumMainnetToken := fakeToken()
-	alchemyEthereumSepoliaToken := fakeToken()
-	alchemyArbitrumMainnetToken := fakeToken()
-	alchemyArbitrumSepoliaToken := fakeToken()
-	alchemyOptimismMainnetToken := fakeToken()
-	alchemyOptimismSepoliaToken := fakeToken()
-	alchemyBaseMainnetToken := fakeToken()
-	alchemyBaseSepoliaToken := fakeToken()
+	alchemyAPIKey := fakeToken()
 	raribleMainnetAPIKey := fakeToken()
 	raribleTestnetAPIKey := fakeToken()
 
@@ -1295,18 +1287,11 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 		KeyUID:   newAccount.KeyUID,
 		Password: testPassword,
 		WalletSecretsConfig: requests.WalletSecretsConfig{
-			PoktToken:                   poktToken,
-			InfuraToken:                 infuraToken,
-			AlchemyEthereumMainnetToken: alchemyEthereumMainnetToken,
-			AlchemyEthereumSepoliaToken: alchemyEthereumSepoliaToken,
-			AlchemyArbitrumMainnetToken: alchemyArbitrumMainnetToken,
-			AlchemyArbitrumSepoliaToken: alchemyArbitrumSepoliaToken,
-			AlchemyOptimismMainnetToken: alchemyOptimismMainnetToken,
-			AlchemyOptimismSepoliaToken: alchemyOptimismSepoliaToken,
-			AlchemyBaseMainnetToken:     alchemyBaseMainnetToken,
-			AlchemyBaseSepoliaToken:     alchemyBaseSepoliaToken,
-			RaribleMainnetAPIKey:        raribleMainnetAPIKey,
-			RaribleTestnetAPIKey:        raribleTestnetAPIKey,
+			PoktToken:            poktToken,
+			InfuraToken:          infuraToken,
+			AlchemyAPIKey:        alchemyAPIKey,
+			RaribleMainnetAPIKey: raribleMainnetAPIKey,
+			RaribleTestnetAPIKey: raribleTestnetAPIKey,
 		},
 	}
 
@@ -1322,14 +1307,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 
 	walletConfig := testContext.backend.config.WalletConfig
 	require.Equal(t, walletConfig.InfuraAPIKey, infuraToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.EthereumMainnet], alchemyEthereumMainnetToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.EthereumSepolia], alchemyEthereumSepoliaToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.ArbitrumMainnet], alchemyArbitrumMainnetToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.ArbitrumSepolia], alchemyArbitrumSepoliaToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.OptimismMainnet], alchemyOptimismMainnetToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.OptimismSepolia], alchemyOptimismSepoliaToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.BaseMainnet], alchemyBaseMainnetToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.BaseSepolia], alchemyBaseSepoliaToken)
+	require.Equal(t, walletConfig.AlchemyAPIKey, alchemyAPIKey)
 	require.Equal(t, walletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
 	require.Equal(t, walletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
 

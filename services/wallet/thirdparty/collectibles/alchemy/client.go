@@ -81,21 +81,18 @@ func getNFTBaseURL(chainID walletCommon.ChainID, apiKey security.SensitiveString
 type Client struct {
 	thirdparty.CollectibleContractOwnershipProvider
 	client           *http.Client
-	apiKeys          map[uint64]security.SensitiveString
+	apiKey           security.SensitiveString
 	connectionStatus *connection.Status
 }
 
-func NewClient(apiKeys map[uint64]security.SensitiveString) *Client {
-	for _, chainID := range walletCommon.AllChainIDs() {
-		key := apiKeys[uint64(chainID)]
-		if key.Empty() {
-			logutils.ZapLogger().Warn("Alchemy API key not available for", zap.Stringer("chainID", chainID))
-		}
+func NewClient(apiKey security.SensitiveString) *Client {
+	if apiKey.Empty() {
+		logutils.ZapLogger().Warn("Alchemy API key not available")
 	}
 
 	return &Client{
 		client:           &http.Client{Timeout: time.Minute},
-		apiKeys:          apiKeys,
+		apiKey:           apiKey,
 		connectionStatus: connection.NewStatus(),
 	}
 }
@@ -175,7 +172,7 @@ func (o *Client) FetchCollectibleOwnersByContractAddress(ctx context.Context, ch
 		"withTokenBalances": {"true"},
 	}
 
-	baseURL, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
+	baseURL, err := getNFTBaseURL(chainID, o.apiKey)
 
 	if err != nil {
 		return nil, err
@@ -246,7 +243,7 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 	}
 	assets.Provider = o.ID()
 
-	baseURL, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
+	baseURL, err := getNFTBaseURL(chainID, o.apiKey)
 
 	if err != nil {
 		return nil, err
@@ -328,7 +325,7 @@ func getCollectibleUniqueIDBatches(ids []thirdparty.CollectibleUniqueID) []Batch
 }
 
 func (o *Client) fetchAssetsByBatchTokenIDs(ctx context.Context, chainID walletCommon.ChainID, batchIDs BatchTokenIDs) ([]thirdparty.FullCollectibleData, error) {
-	baseURL, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
+	baseURL, err := getNFTBaseURL(chainID, o.apiKey)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +416,7 @@ func getContractAddressBatches(ids []thirdparty.ContractID) []BatchContractAddre
 }
 
 func (o *Client) fetchCollectionsDataByBatchContractAddresses(ctx context.Context, chainID walletCommon.ChainID, batchAddresses BatchContractAddresses) ([]thirdparty.CollectionData, error) {
-	baseURL, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
+	baseURL, err := getNFTBaseURL(chainID, o.apiKey)
 	if err != nil {
 		return nil, err
 	}
