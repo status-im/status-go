@@ -195,6 +195,8 @@ func (b *GethStatusBackend) StartNode(config *params.NodeConfig) error {
 		return err
 	}
 
+	b.StartPrometheusMetricsServer()
+
 	// Set initial connection state
 	b.statusNode.ConnectionChanged(b.connectionState)
 
@@ -297,7 +299,25 @@ func (b *GethStatusBackend) StartPrometheusMetricsServer(address string) error {
 	if b.prometheusMetrics != nil {
 		return nil
 	}
-	b.prometheusMetrics = metrics.NewMetricsServer(address, nil, nil)
+
+	statusNode := b.StatusNode()
+
+	if statusNode == nil {
+		b.logger.Error("---------- gabriel statusNode is nil")
+	}
+
+	wakuExt := statusNode.WakuV2ExtService()
+
+	if wakuExt == nil {
+		b.logger.Error("---------- gabriel wakuExt is nil")
+	}
+
+	waku := wakuExt.Waku()
+	if waku == nil {
+		b.logger.Error("---------- gabriel waku is nil")
+	}
+
+	b.prometheusMetrics = metrics.NewMetricsServer(address, nil, b.StatusNode().WakuV2ExtService().Waku())
 	go b.prometheusMetrics.Listen()
 	return nil
 }

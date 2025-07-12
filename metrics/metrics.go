@@ -19,8 +19,7 @@ import (
 
 // Server runs and controls a HTTP pprof interface.
 type Server struct {
-	server   *http.Server
-	wakuNode *wakuv2.Waku
+	server *http.Server
 }
 
 func NewMetricsServer(address string, r metrics.Registry, wakuNode *wakuv2.Waku) *Server {
@@ -33,7 +32,6 @@ func NewMetricsServer(address string, r metrics.Registry, wakuNode *wakuv2.Waku)
 			ReadHeaderTimeout: 5 * time.Second,
 			Handler:           mux,
 		},
-		wakuNode: wakuNode,
 	}
 	return &p
 }

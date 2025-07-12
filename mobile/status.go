@@ -117,19 +117,33 @@ func initializeApplication(requestJSON string) string {
 	statusBackend.StatusNode().SetMediaServerEnableTLS(request.MediaServerEnableTLS)
 	statusBackend.UpdateRootDataDir(request.DataDir)
 
+	logutils.ZapLogger().Info("----------- gabriel initializeApplication 1")
 	err = statusBackend.OpenAccounts()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	logutils.ZapLogger().Info("----------- gabriel initializeApplication 2")
 	accs, err := statusBackend.GetAccounts()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	logutils.ZapLogger().Info("----------- gabriel initializeApplication 3")
 
 	metricsInfo, err := statusBackend.CentralizedMetricsInfo()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	logutils.ZapLogger().Info("----------- gabriel initializeApplication 4")
+
+	/* if request.MetricsEnabled {
+		// Start metrics server
+		err := statusBackend.StartPrometheusMetricsServer(request.MetricsAddress)
+		if err != nil {
+			return makeJSONResponse(err)
+		}
+		logutils.ZapLogger().Info("metrics prometheus server started", zap.String("address", request.MetricsAddress))
+	}
+	logutils.ZapLogger().Info("----------- gabriel initializeApplication 5") */
 
 	statusBackend.SetSentryDSN(request.SentryDSN)
 	if metricsInfo.Enabled {
@@ -138,6 +152,7 @@ func initializeApplication(requestJSON string) string {
 			return makeJSONResponse(err)
 		}
 	}
+	logutils.ZapLogger().Info("----------- gabriel initializeApplication 6")
 
 	if request.WakuFleetsConfigFilePath != "" {
 		err = params.LoadWakuFleetsFromFile(request.WakuFleetsConfigFilePath)
@@ -145,6 +160,7 @@ func initializeApplication(requestJSON string) string {
 			return makeJSONResponse(err)
 		}
 	}
+	logutils.ZapLogger().Info("----------- gabriel initializeApplication 7")
 
 	if request.PushFleetsConfigFilePath != "" {
 		err = params.LoadPushFleetsFromFile(request.PushFleetsConfigFilePath)
@@ -152,6 +168,7 @@ func initializeApplication(requestJSON string) string {
 			return makeJSONResponse(err)
 		}
 	}
+	logutils.ZapLogger().Info("----------- gabriel initializeApplication 8")
 
 	response := &InitializeApplicationResponse{
 		Accounts:               accs,
@@ -200,15 +217,6 @@ func initializeLogging(request *requests.InitializeApplication) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if request.MetricsEnabled {
-		// Start metrics server
-		err := statusBackend.StartPrometheusMetricsServer(request.MetricsAddress)
-		if err != nil {
-			return err
-		}
-		logutils.ZapLogger().Info("metrics prometheus server started", zap.String("address", request.MetricsAddress))
 	}
 
 	return nil
