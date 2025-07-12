@@ -59,8 +59,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		return err
 	}
 
-	b.logger.Info("--------------- gabriel initializing services")
-
 	services := []common.StatusService{}
 	services = append(services, b.rpcStatsService())
 	services = append(services, b.appmetricsService())

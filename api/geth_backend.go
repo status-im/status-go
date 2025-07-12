@@ -196,8 +196,6 @@ func (b *GethStatusBackend) StartNode(config *params.NodeConfig) error {
 		return err
 	}
 
-	// register waku handler
-
 	// Set initial connection state
 	b.statusNode.ConnectionChanged(b.connectionState)
 
@@ -300,7 +298,6 @@ func (b *GethStatusBackend) StartPrometheusMetricsServer(address string) error {
 	if b.prometheusMetrics != nil {
 		return nil
 	}
-
 	b.prometheusMetrics = metrics.NewMetricsServer(address, nil)
 	go b.prometheusMetrics.Listen()
 	return nil
