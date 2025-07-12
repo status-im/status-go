@@ -195,7 +195,7 @@ func (b *GethStatusBackend) StartNode(config *params.NodeConfig) error {
 		return err
 	}
 
-	b.StartPrometheusMetricsServer()
+	// register waku handler
 
 	// Set initial connection state
 	b.statusNode.ConnectionChanged(b.connectionState)
@@ -317,7 +317,7 @@ func (b *GethStatusBackend) StartPrometheusMetricsServer(address string) error {
 		b.logger.Error("---------- gabriel waku is nil")
 	}
 
-	b.prometheusMetrics = metrics.NewMetricsServer(address, nil, b.StatusNode().WakuV2ExtService().Waku())
+	b.prometheusMetrics = metrics.NewMetricsServer(address, nil)
 	go b.prometheusMetrics.Listen()
 	return nil
 }

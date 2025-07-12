@@ -2,38 +2,83 @@ package metrics
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/metrics"
 	gethprom "github.com/ethereum/go-ethereum/metrics/prometheus"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/wakuv2"
-
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/status-im/status-go/logutils"
 
 	"github.com/status-im/status-go/common"
 )
 
 // Server runs and controls a HTTP pprof interface.
 type Server struct {
-	server *http.Server
+	server        *http.Server
+	handlers      map[string]http.Handler
+	handlersMutex sync.RWMutex
 }
 
-func NewMetricsServer(address string, r metrics.Registry, wakuNode *wakuv2.Waku) *Server {
+func NewMetricsServer(address string, r metrics.Registry) *Server {
 	mux := http.NewServeMux()
-	mux.Handle("/health", healthHandler())
-	mux.Handle("/metrics", Handler(r, wakuNode))
-	p := Server{
+
+	s := &Server{
+		handlers: make(map[string]http.Handler),
 		server: &http.Server{
 			Addr:              address,
 			ReadHeaderTimeout: 5 * time.Second,
 			Handler:           mux,
 		},
 	}
-	return &p
+
+	// we disable compression because geth doesn't support it
+	opts := promhttp.HandlerOpts{DisableCompression: true}
+	// register status handler
+	s.RegisterHandler("status", promhttp.HandlerFor(prom.DefaultGatherer, opts))
+
+	// register geth handler
+	if r != nil {
+		s.RegisterHandler("geth", gethprom.Handler(r))
+	}
+
+	mux.Handle("/health", healthHandler())
+	mux.Handle("/metrics", s.metricsHandler())
+
+	return s
+}
+
+// RegisterHandler adds a new metrics provider with a given name
+func (s *Server) RegisterHandler(name string, handler http.Handler) {
+	s.handlersMutex.Lock()
+	defer s.handlersMutex.Unlock()
+	s.handlers[name] = handler
+}
+
+// UnregisterHandler removes a metrics provider
+func (s *Server) UnregisterHandler(name string) {
+	s.handlersMutex.Lock()
+	defer s.handlersMutex.Unlock()
+	delete(s.handlers, name)
+}
+
+// metricsHandler creates the combined metrics handler
+func (s *Server) metricsHandler() http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		// Write all dynamic metrics
+		s.handlersMutex.RLock()
+		for _, handler := range s.handlers {
+			if handler != nil {
+				handler.ServeHTTP(w, r)
+			}
+		}
+		s.handlersMutex.RUnlock()
+	})
 }
 
 func healthHandler() http.Handler {
@@ -45,44 +90,16 @@ func healthHandler() http.Handler {
 	})
 }
 
-func Handler(reg metrics.Registry, wakuNode *wakuv2.Waku) http.Handler {
-	// we disable compression because geth doesn't support it
-	opts := promhttp.HandlerOpts{DisableCompression: true}
-	// we are using only our own metrics
-	statusMetrics := promhttp.HandlerFor(prom.DefaultGatherer, opts)
-	if reg == nil {
-		return statusMetrics
-	}
-	// if registry is provided, combine handlers
-	gethMetrics := gethprom.Handler(reg)
-
-	// Create waku metrics handler
-	wakuMetrics := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if wakuNode != nil {
-			wakuMetrics := wakuNode.Metrics()
-			if wakuMetrics != "" {
-				w.Write([]byte(wakuMetrics))
-			}
-		}
-	})
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		statusMetrics.ServeHTTP(w, r)
-		gethMetrics.ServeHTTP(w, r)
-		wakuMetrics.ServeHTTP(w, r)
-	})
-}
-
 // Listen starts the HTTP server in the background.
-func (p *Server) Listen() {
+func (s *Server) Listen() {
 	defer common.LogOnPanic()
-	logutils.ZapLogger().Info("metrics server stopped", zap.Error(p.server.ListenAndServe()))
+	logutils.ZapLogger().Info("metrics server stopped", zap.Error(s.server.ListenAndServe()))
 }
 
 // Stop gracefully shuts down the metrics server
-func (p *Server) Stop() error {
-	if p.server != nil {
-		return p.server.Close()
+func (s *Server) Stop() error {
+	if s.server != nil {
+		return s.server.Close()
 	}
 	return nil
 }
