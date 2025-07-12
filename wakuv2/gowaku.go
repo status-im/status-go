@@ -2133,3 +2133,9 @@ func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
 func (w *Waku) Version() uint {
 	return 2
 }
+
+// This function is needed for nwaku, adding here for compatibility
+func (w *Waku) Metrics() string {
+
+	return ""
+}

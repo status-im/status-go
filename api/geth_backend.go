@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -298,23 +299,6 @@ func (b *GethStatusBackend) AcceptTerms() error {
 func (b *GethStatusBackend) StartPrometheusMetricsServer(address string) error {
 	if b.prometheusMetrics != nil {
 		return nil
-	}
-
-	statusNode := b.StatusNode()
-
-	if statusNode == nil {
-		b.logger.Error("---------- gabriel statusNode is nil")
-	}
-
-	wakuExt := statusNode.WakuV2ExtService()
-
-	if wakuExt == nil {
-		b.logger.Error("---------- gabriel wakuExt is nil")
-	}
-
-	waku := wakuExt.Waku()
-	if waku == nil {
-		b.logger.Error("---------- gabriel waku is nil")
 	}
 
 	b.prometheusMetrics = metrics.NewMetricsServer(address, nil)
@@ -2276,6 +2260,8 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		b.statusNode.WalletService().KeycardPairings().SetKeycardPairingsFile(config.KeycardPairingDataFile)
 	}
 
+	b.prometheusMetrics.RegisterHandler("waku", b.wakuMetricsHandler())
+
 	signal.SendNodeReady()
 	return nil
 }
@@ -2932,4 +2918,17 @@ func (b *GethStatusBackend) SetPreLoginLogLevel(level string) error {
 		return err
 	}
 	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
+}
+
+func (b *GethStatusBackend) wakuMetricsHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if b.StatusNode() == nil || b.StatusNode().WakuV2ExtService() == nil {
+			return
+		}
+
+		wakuMetrics := b.StatusNode().WakuV2ExtService().Waku().Metrics()
+		if wakuMetrics != "" {
+			w.Write([]byte(wakuMetrics))
+		}
+	})
 }
