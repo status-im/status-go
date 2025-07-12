@@ -152,7 +152,6 @@ func initializeApplication(requestJSON string) string {
 			return makeJSONResponse(err)
 		}
 	}
-	logutils.ZapLogger().Info("----------- gabriel initializeApplication 8")
 
 	response := &InitializeApplicationResponse{
 		Accounts:               accs,
