@@ -5,8 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/metrics"
 )
 
 func createTestServer(t *testing.T) *Server {
