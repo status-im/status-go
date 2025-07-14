@@ -7,10 +7,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/metrics"
-	gethprom "github.com/ethereum/go-ethereum/metrics/prometheus"
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/ethereum/go-ethereum/metrics"
+	gethprom "github.com/ethereum/go-ethereum/metrics/prometheus"
 	"github.com/status-im/status-go/logutils"
 
 	"github.com/status-im/status-go/common"
