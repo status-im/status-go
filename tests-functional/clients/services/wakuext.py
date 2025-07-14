@@ -173,17 +173,17 @@ class WakuextService(Service):
         return response.json()
 
     def add_members_to_group_chat(self, chat_id: str, members: list):
-        params = [chat_id, members]
+        params = [None, chat_id, members]
         response = self.rpc_request("addMembersToGroupChat", params)
         return response.json()
 
     def remove_member_from_group_chat(self, chat_id: str, member: str):
-        params = [chat_id, member]
+        params = [None, chat_id, member]
         response = self.rpc_request("removeMemberFromGroupChat", params)
         return response.json()
 
     def remove_members_from_group_chat(self, chat_id: str, members: list):
-        params = [chat_id, members]
+        params = [None, chat_id, members]
         response = self.rpc_request("removeMembersFromGroupChat", params)
         return response.json()
 
@@ -193,12 +193,12 @@ class WakuextService(Service):
         return response.json()
 
     def change_group_chat_name(self, chat_id: str, name: str):
-        params = [chat_id, name]
+        params = [None, chat_id, name]
         response = self.rpc_request("changeGroupChatName", params)
         return response.json()
 
     def send_group_chat_invitation_request(self, chat_id: str, admin_pk: str, message: str):
-        params = [chat_id, admin_pk, message]
+        params = [None, chat_id, admin_pk, message]
         response = self.rpc_request("sendGroupChatInvitationRequest", params)
         return response.json()
 

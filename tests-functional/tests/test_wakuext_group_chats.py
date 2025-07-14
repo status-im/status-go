@@ -2,6 +2,7 @@ from uuid import uuid4
 import pytest
 from steps.messenger import MessengerSteps
 from resources.enums import MessageContentType
+from utils.schema_builder import CustomSchemaBuilder
 
 
 @pytest.mark.reliability
@@ -30,100 +31,155 @@ class TestCreatePrivateGroups(MessengerSteps):
         )[0]
 
     def test_leave_group_chat(self):
-        create_group_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"private_group_{uuid4()}")
+        create_group_response = self.sender.wakuext_service.create_group_chat_with_members(
+            [self.receiver.public_key],
+        )
+
         group_id = create_group_response.get("result", {}).get("chats", [])[0].get("id")
         leave_group_response = self.sender.wakuext_service.leave_group_chat(group_id, True)
-        assert "error" not in leave_group_response
+
+        CustomSchemaBuilder("wakuext_leaveGroupChat").create_schema(leave_group_response)
+        self.sender.verify_json_schema(leave_group_response, method="wakuext_leaveGroupChat")
+
+        self.get_message_by_content_type(
+            leave_group_response,
+            content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
+            message_pattern=f"@{self.sender.public_key} left the group",
+        )[0]
+
+    def test_send_group_chat_invitation_request(self, backend_factory):
+        third_node = backend_factory("third_node")
+        self.make_contacts(self.sender, third_node)
+
+        create_group_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"private_group_{uuid4()}")
+        group_id = create_group_response.get("result", {}).get("chats", [])[0].get("id")
+
+        invitation_message = f"Please join {uuid4()}"
+        invite_response = self.sender.wakuext_service.send_group_chat_invitation_request(group_id, third_node.public_key, invitation_message)
+        self.sender.verify_json_schema(invite_response, method="wakuext_sendGroupChatInvitationRequest")
+
+        invitations = invite_response.get("result", {}).get("invitations", [])
+        assert len(invitations) == 1
+        assert invitations[0].get("chatId", "") == group_id
+        assert invitations[0].get("from", "") == self.sender.public_key
+        assert invitations[0].get("introductionMessage", "") == invitation_message
+        assert invitations[0].get("state", 0) == 1
 
     def test_create_group_chat_from_invitation(self):
-        self.make_contacts(self.sender, self.receiver)
-        group_name = f"invitation_group_{uuid4()}"
-        create_resp = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], group_name)
-        group_id = create_resp.get("result", {}).get("chat", {}).get("id")
-        assert group_id is not None
-        # Simulate invitation by sending invitation request
-        invite_resp = self.sender.wakuext_service.send_group_chat_invitation_request(group_id, self.receiver.public_key, "Please join")
-        assert "error" not in invite_resp
-        # Receiver creates group chat from invitation
-        create_from_inv_resp = self.receiver.wakuext_service.create_group_chat_from_invitation(group_name, group_id, self.sender.public_key)
-        assert "error" not in create_from_inv_resp
+        invitation_group = f"Group name {uuid4()}"
+        group_id = str(uuid4())
+        create_from_inv = self.receiver.wakuext_service.create_group_chat_from_invitation(invitation_group, group_id, self.sender.public_key)
+        self.sender.verify_json_schema(create_from_inv, method="wakuext_createGroupChatFromInvitation")
 
-    def test_add_members_to_group_chat(self):
-        self.make_contacts(self.sender, self.receiver)
-        group_name = f"add_members_group_{uuid4()}"
-        create_resp = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], group_name)
-        group_id = create_resp.get("result", {}).get("chat", {}).get("id")
-        assert group_id is not None
-        # Add sender again as member (for test)
-        add_resp = self.sender.wakuext_service.add_members_to_group_chat(group_id, [self.sender.public_key])
-        assert "error" not in add_resp
+        chats = create_from_inv.get("result", {}).get("chats", [])
+        assert len(chats) == 1
+        assert chats[0].get("id", "") == group_id
+        assert chats[0].get("invitationAdmin", "") == self.sender.public_key
+        assert chats[0].get("name", "") == invitation_group
+
+    def test_add_members_to_group_chat(self, backend_factory):
+        third_node = backend_factory("third_node")
+        self.make_contacts(self.sender, third_node)
+
+        create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"add_members_group_{uuid4()}")
+        group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
+
+        add_members_response = self.sender.wakuext_service.add_members_to_group_chat(group_id, [third_node.public_key])
+        self.sender.verify_json_schema(add_members_response, method="wakuext_addMembersToGroupChat")
+        self.get_message_by_content_type(
+            add_members_response,
+            content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
+            message_pattern=f"@{self.sender.public_key} has added @{third_node.public_key}",
+        )[0]
 
     def test_remove_member_from_group_chat(self):
-        self.make_contacts(self.sender, self.receiver)
-        group_name = f"remove_member_group_{uuid4()}"
-        create_resp = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key, self.sender.public_key], group_name)
-        group_id = create_resp.get("result", {}).get("chat", {}).get("id")
-        assert group_id is not None
-        remove_resp = self.sender.wakuext_service.remove_member_from_group_chat(group_id, self.sender.public_key)
-        assert "error" not in remove_resp
+        create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"group_{uuid4()}")
+        group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
 
-    def test_remove_members_from_group_chat(self):
-        self.make_contacts(self.sender, self.receiver)
-        group_name = f"remove_members_group_{uuid4()}"
-        create_resp = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key, self.sender.public_key], group_name)
-        group_id = create_resp.get("result", {}).get("chat", {}).get("id")
-        assert group_id is not None
-        remove_resp = self.sender.wakuext_service.remove_members_from_group_chat(group_id, [self.sender.public_key, self.receiver.public_key])
-        assert "error" not in remove_resp
+        remove_member_response = self.sender.wakuext_service.remove_member_from_group_chat(group_id, self.receiver.public_key)
+        self.sender.verify_json_schema(remove_member_response, method="wakuext_removeMemberFromGroupChat")
+        self.get_message_by_content_type(
+            remove_member_response,
+            content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
+            message_pattern=f"@{self.receiver.public_key} left the group",
+        )[0]
+
+    def test_remove_members_from_group_chat(self, backend_factory):
+        third_node = backend_factory("third_node")
+        self.make_contacts(self.sender, third_node)
+
+        create_response = self.sender.wakuext_service.create_group_chat_with_members(
+            [self.receiver.public_key, third_node.public_key], f"add_members_group_{uuid4()}"
+        )
+        group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
+
+        remove_members_response = self.sender.wakuext_service.remove_members_from_group_chat(
+            group_id, [self.receiver.public_key, third_node.public_key]
+        )
+        self.sender.verify_json_schema(remove_members_response, method="wakuext_removeMembersFromGroupChat")
+        self.get_message_by_content_type(
+            remove_members_response,
+            content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
+            message_pattern=f"@{self.receiver.public_key} left the group",
+        )[0]
+        self.get_message_by_content_type(
+            remove_members_response,
+            content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
+            message_pattern=f"@{third_node.public_key} left the group",
+        )[0]
 
     def test_confirm_joining_group(self):
-        self.make_contacts(self.sender, self.receiver)
-        group_name = f"confirm_join_group_{uuid4()}"
-        create_resp = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], group_name)
-        group_id = create_resp.get("result", {}).get("chat", {}).get("id")
-        assert group_id is not None
-        confirm_resp = self.receiver.wakuext_service.confirm_joining_group(group_id)
-        assert "error" not in confirm_resp
+        create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"confirm_join_group_{uuid4()}")
+        group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
+
+        confirm_response = self.sender.wakuext_service.confirm_joining_group(group_id)
+        self.sender.verify_json_schema(confirm_response, method="wakuext_confirmJoiningGroup")
+
+        chats = confirm_response.get("result", {}).get("chats", [])
+        assert len(chats) == 1
+        assert len(chats[0].get("members", [])) == 2
 
     def test_change_group_chat_name(self):
-        self.make_contacts(self.sender, self.receiver)
-        group_name = f"change_name_group_{uuid4()}"
-        create_resp = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], group_name)
-        group_id = create_resp.get("result", {}).get("chat", {}).get("id")
-        assert group_id is not None
-        new_name = f"new_name_{uuid4()}"
-        change_resp = self.sender.wakuext_service.change_group_chat_name(group_id, new_name)
-        assert "error" not in change_resp
+        initial_group_name = "initial_group_name"
+        create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], initial_group_name)
+        group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
 
-    def test_send_group_chat_invitation_request(self):
-        self.make_contacts(self.sender, self.receiver)
-        group_name = f"invitation_request_group_{uuid4()}"
-        create_resp = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], group_name)
-        group_id = create_resp.get("result", {}).get("chat", {}).get("id")
-        assert group_id is not None
-        invite_resp = self.sender.wakuext_service.send_group_chat_invitation_request(group_id, self.receiver.public_key, "Join us!")
-        assert "error" not in invite_resp
+        new_group_name = f"new_group_name_{uuid4()}"
+        change_name_response = self.sender.wakuext_service.change_group_chat_name(group_id, new_group_name)
+        CustomSchemaBuilder("wakuext_changeGroupChatName").create_schema(change_name_response)
+        self.sender.verify_json_schema(change_name_response, method="wakuext_changeGroupChatName")
+
+        self.get_message_by_content_type(
+            change_name_response,
+            content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
+            message_pattern=f"@{self.sender.public_key} changed the group's name to {new_group_name}",
+        )[0]
+
+        chats = change_name_response.get("result", {}).get("chats", [])
+        assert chats[0].get("name", "") == new_group_name
 
     def test_get_group_chat_invitations(self):
+        # WIP
         self.make_contacts(self.sender, self.receiver)
         group_name = f"get_invitations_group_{uuid4()}"
-        create_resp = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], group_name)
-        group_id = create_resp.get("result", {}).get("chat", {}).get("id")
+        create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], group_name)
+        group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
         assert group_id is not None
         self.sender.wakuext_service.send_group_chat_invitation_request(group_id, self.receiver.public_key, "Please join")
         invitations = self.receiver.wakuext_service.get_group_chat_invitations()
         assert isinstance(invitations, list)
 
     def test_send_group_chat_invitation_rejection(self):
+        # WIP
         self.make_contacts(self.sender, self.receiver)
         group_name = f"reject_invitation_group_{uuid4()}"
-        create_resp = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], group_name)
-        group_id = create_resp.get("result", {}).get("chat", {}).get("id")
+        create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], group_name)
+        group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
         assert group_id is not None
         self.sender.wakuext_service.send_group_chat_invitation_request(group_id, self.receiver.public_key, "Please join")
         invitations = self.receiver.wakuext_service.get_group_chat_invitations()
         assert isinstance(invitations, list) and len(invitations) > 0
         invitation_id = invitations[0].get("id") if isinstance(invitations[0], dict) else None
         assert invitation_id is not None
-        reject_resp = self.receiver.wakuext_service.send_group_chat_invitation_rejection(invitation_id)
-        assert "error" not in reject_resp
+        reject_response = self.receiver.wakuext_service.send_group_chat_invitation_rejection(invitation_id)
+        assert "error" not in reject_response
