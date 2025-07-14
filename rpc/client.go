@@ -159,7 +159,9 @@ func NewClient(config ClientConfig) (*Client, error) {
 }
 
 func (c *Client) Start(ctx context.Context) {
-	c.signalsTransmitter.Start()
+	if err := c.signalsTransmitter.Start(); err != nil {
+		c.logger.Error("Failed to start signals transmitter", zap.Error(err))
+	}
 	c.networkManager.Start()
 
 	if c.stopMonitoringFunc != nil {

@@ -23,12 +23,14 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multicommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
@@ -703,12 +705,12 @@ func (tc *TestClient) SetIsConnected(value bool) {
 	}
 }
 
-func (tc *TestClient) IsConnected() bool {
+func (tc *TestClient) GetConnectionStatus() rpcstatus.StatusType {
 	if tc.traceAPICalls {
-		tc.t.Log("GetIsConnected")
+		tc.t.Log("GetConnectionStatus")
 	}
 
-	return true
+	return rpcstatus.StatusUp
 }
 
 func (tc *TestClient) GetLimiter() rpclimiter.RequestLimiter {

@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -28,7 +27,12 @@ func TestKeycardPairingsFile(t *testing.T) {
 
 	accountsPublisher := pubsub.NewPublisher()
 
-	service := NewService(db, accountsDb, appDB, &rpc.Client{NetworkManager: network.NewManager(db, nil)}, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, "")
+	rpcClient, err := rpc.NewClient(rpc.ClientConfig{
+		DB:                db,
+		AccountsPublisher: accountsPublisher,
+	})
+	require.NoError(t, err)
+	service := NewService(db, accountsDb, appDB, rpcClient, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, "")
 
 	data, err := service.KeycardPairings().GetPairingsJSONFileContent()
 	require.NoError(t, err)
