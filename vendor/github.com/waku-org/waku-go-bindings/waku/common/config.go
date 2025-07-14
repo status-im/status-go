@@ -36,4 +36,5 @@ type WakuConfig struct {
 	DnsAddrsNameServers         []string         `json:"dnsAddrsNameServers,omitempty"`
 	Discv5EnrAutoUpdate         bool             `json:"discv5EnrAutoUpdate,omitempty"`
 	MaxConnections              int              `json:"maxConnections,omitempty"`
+	NumShardsInNetwork          uint16           `json:"numShardsInNetwork"`
 }

@@ -398,15 +398,15 @@ func NewWakuNode(config *common.WakuConfig, nodeName string) (*WakuNode, error) 
 	defer C.free(unsafe.Pointer(cJsonConfig))
 	defer C.freeResp(resp)
 
+	wg.Add(1)
+	n.wakuCtx = C.cGoWakuNew(cJsonConfig, resp)
+	wg.Wait()
+
 	if C.getRet(resp) != C.RET_OK {
 		errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		Error("error wakuNew for %s: %v", nodeName, errMsg)
 		return nil, errors.New(errMsg)
 	}
-
-	wg.Add(1)
-	n.wakuCtx = C.cGoWakuNew(cJsonConfig, resp)
-	wg.Wait()
 
 	n.MsgChan = make(chan common.Envelope, MsgChanBufferSize)
 	n.TopicHealthChan = make(chan topicHealth, TopicHealthChanBufferSize)
