@@ -94,16 +94,11 @@ type IMetricsHandler interface {
 	SetDeviceType(deviceType string)
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
-	// PushPeerConnFailures(peerConnFailures map[string]int)
 	PushMessageCheckSuccess()
 	PushMessageCheckFailure()
-	// PushPeerCountByShard(peerCountByShard map[uint16]uint)
-	// PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
-	// PushDialFailure(dialFailure common.DialError)
 	PushMissedMessage(envelope common.Envelope)
 	PushMissedRelevantMessage(message *common.ReceivedMessage)
 	PushMessageDeliveryConfirmed()
-	// PushSentMessageTotal(messageSize uint32, publishMethod string)
 	PushRawMessageByType(pubsubTopic string, contentTopic string, messageType string, messageSize uint32)
 }
 
@@ -362,33 +357,6 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 		w.logger.Error("couldn't connect to peer", zap.Error(err), zap.Stringer("peerID", peerInfo.ID))
 	}
 }
-
-/* TODO-nwaku - implement when metrics are supported
-func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
-
-	if telemetryServerURL == "" {
-		return
-	}
-
-	telemetry := NewBandwidthTelemetryClient(w.logger, telemetryServerURL)
-
-	ticker := time.NewTicker(time.Second * 20)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-w.ctx.Done():
-			return
-		case <-ticker.C:
-			bandwidthPerProtocol := w.bandwidthCounter.GetBandwidthByProtocol()
-			w.bandwidthCounter.Reset()
-			go telemetry.PushProtocolStats(bandwidthPerProtocol)
-		}
-	}
-}
-*/
 
 func (w *Waku) GetStats() types.StatsSummary {
 	stats := w.bandwidthCounter.GetBandwidthTotals()
@@ -868,58 +836,6 @@ func (w *Waku) Start() error {
 		}
 	}()
 
-	// TODO-nwaku
-	/* if w.cfg.TelemetryServerURL != "" {
-		w.wg.Add(1)
-		go func() {
-			defer gocommon.LogOnPanic()
-			defer w.wg.Done()
-			peerTelemetryTickerInterval := time.Duration(w.cfg.TelemetryPeerCountSendPeriod) * time.Millisecond
-			if peerTelemetryTickerInterval == 0 {
-				peerTelemetryTickerInterval = 10 * time.Second
-			}
-			peerTelemetryTicker := time.NewTicker(peerTelemetryTickerInterval)
-			defer peerTelemetryTicker.Stop()
-
-			dialErrSub, err := w.node.Host().EventBus().Subscribe(new(utils.DialError))
-			if err != nil {
-				w.logger.Error("failed to subscribe to dial errors", zap.Error(err))
-				return
-			}
-			defer dialErrSub.Close()
-
-			messageSentSub, err := w.node.Host().EventBus().Subscribe(new(publish.MessageSent))
-			if err != nil {
-				w.logger.Error("failed to subscribe to message sent events", zap.Error(err))
-				return
-			}
-
-			publishMethod := "relay"
-			if w.cfg.LightClient {
-				publishMethod = "lightpush"
-			}
-
-			for {
-				select {
-				case <-w.ctx.Done():
-					return
-				case <-peerTelemetryTicker.C:
-					w.reportPeerMetrics()
-				case dialErr := <-dialErrSub.Out():
-					errors := common.ParseDialErrors(dialErr.(utils.DialError).Err.Error())
-					for _, dialError := range errors {
-						w.metricsHandler.PushDialFailure(common.DialError{ErrType: dialError.ErrType, ErrMsg: dialError.ErrMsg, Protocols: dialError.Protocols})
-					}
-				case messageSent := <-messageSentSub.Out():
-					w.metricsHandler.PushSentMessageTotal(messageSent.(publish.MessageSent).Size, publishMethod)
-				}
-			}
-		}()
-	}
-
-	w.wg.Add(1)
-	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL) */
-
 	if w.cfg.EnableMissingMessageVerification {
 		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
 			newStorenodeRequestor(w.node, w.logger),
@@ -1041,11 +957,6 @@ func (w *Waku) startMessageSender() error {
 		w.logger.Error("failed to create message sender", zap.Error(err))
 		return err
 	}
-
-	/* TODO-nwaku
-	if w.cfg.TelemetryServerURL != "" {
-		sender.WithMessageSentEmitter(w.node.Host())
-	} */
 
 	if w.cfg.EnableStoreConfirmationForMessagesSent {
 		msgStoredChan := make(chan gethcommon.Hash, 1000)
