@@ -2257,7 +2257,9 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		b.statusNode.WalletService().KeycardPairings().SetKeycardPairingsFile(config.KeycardPairingDataFile)
 	}
 
-	b.prometheusMetrics.RegisterHandler("waku", b.wakuMetricsHandler())
+	if b.prometheusMetrics != nil {
+		b.prometheusMetrics.RegisterHandler("waku", b.wakuMetricsHandler())
+	}
 
 	signal.SendNodeReady()
 	return nil
