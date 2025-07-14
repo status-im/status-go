@@ -2920,6 +2920,7 @@ func (b *GethStatusBackend) SetPreLoginLogLevel(level string) error {
 func (b *GethStatusBackend) wakuMetricsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if b.StatusNode() == nil || b.StatusNode().WakuV2ExtService() == nil {
+			b.logger.Error("failed to get waku metrics: waku service not mounted")
 			return
 		}
 
@@ -2928,7 +2929,7 @@ func (b *GethStatusBackend) wakuMetricsHandler() http.Handler {
 			_, err := w.Write([]byte(wakuMetrics))
 
 			if err != nil {
-				b.logger.Error("failed to write waku metrics")
+				b.logger.Error("failed to write waku metrics", zap.Error(err))
 			}
 		}
 	})
