@@ -34,7 +34,8 @@ func TestServer_RegisterHandler(t *testing.T) {
 	server := createTestServer(t)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("test"))
+		_, err := w.Write([]byte("test"))
+		require.NoError(t, err)
 	})
 
 	server.RegisterHandler("test", handler)
@@ -72,7 +73,8 @@ func TestServer_MetricsHandler(t *testing.T) {
 	server := createTestServer(t)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("test-metrics"))
+		_, err := w.Write([]byte("test-metrics"))
+		require.NoError(t, err)
 	})
 	server.RegisterHandler("test", handler)
 
