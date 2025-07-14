@@ -2925,7 +2925,11 @@ func (b *GethStatusBackend) wakuMetricsHandler() http.Handler {
 
 		wakuMetrics := b.StatusNode().WakuV2ExtService().Waku().Metrics()
 		if wakuMetrics != "" {
-			w.Write([]byte(wakuMetrics))
+			_, err := w.Write([]byte(wakuMetrics))
+
+			if err != nil {
+				b.logger.Error("failed to write waku metrics")
+			}
 		}
 	})
 }
