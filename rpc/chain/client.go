@@ -28,14 +28,13 @@ import (
 	"github.com/status-im/status-go/rpc/chain/tagger"
 	"github.com/status-im/status-go/services/rpcstats"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/connection"
 )
 
 type ClientInterface interface {
 	ethclient.EthClientInterface
 	NetworkID() uint64
 	ToBigInt() *big.Int
-	connection.Connectable
+	GetConnectionStatus() rpcstatus.StatusType
 	GetLimiter() rpclimiter.RequestLimiter
 	SetLimiter(rpclimiter.RequestLimiter)
 }
@@ -168,8 +167,8 @@ func isVMError(err error) bool {
 	return false
 }
 
-func (c *ClientWithFallback) IsConnected() bool {
-	return c.providersHealthManager.Status().Status == rpcstatus.StatusUp
+func (c *ClientWithFallback) GetConnectionStatus() rpcstatus.StatusType {
+	return c.providersHealthManager.Status().Status
 }
 
 func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (interface{}, error) {
