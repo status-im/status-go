@@ -106,6 +106,8 @@ if [[ $(echo "${UNIT_TEST_PACKAGES}" | grep -E '\s?\S+protocol\s+') == "" ]]; th
   HAS_PROTOCOL_PACKAGE=false
 fi
 
+bg_pids=()
+
 if [[ $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
   # This is the default single-line flow for testing all packages
   # The `else` branch is temporary and will be removed once the `protocol` package runtime is optimized.
@@ -114,12 +116,38 @@ else
   # Spawn a process to test all packages except `protocol`
   UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES}" | tr ' ' '\n' | grep -v '/protocol$' | tr '\n' ' ')
   run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
+  bg_pids+=("$!")
 
   # Spawn separate processes to run `protocol` package
   for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
     run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
+    bg_pids+=("$!")
   done
+fi
 
+# Wait for jobs and handle failfast
+if [[ $UNIT_TEST_FAILFAST == 'true' ]]; then
+  while [[ ${#bg_pids[@]} -gt 0 ]]; do
+    wait -n
+    exit_code=$?
+    if [[ $exit_code -ne 0 ]]; then
+      # Kill all remaining background jobs
+      for kill_pid in "${bg_pids[@]}"; do
+        kill "$kill_pid" 2>/dev/null
+      done
+      echo -e "${RED}Failfast: Stopping all tests due to failure${RST}"
+      exit $exit_code
+    fi
+    # Remove finished jobs from bg_pids
+    remaining_bg_pids=()
+    for pid in "${bg_pids[@]}"; do
+      if kill -0 "$pid" 2>/dev/null; then
+        remaining_bg_pids+=("$pid")
+      fi
+    done
+    bg_pids=("${remaining_bg_pids[@]}")
+  done
+else
   wait
 fi
 
