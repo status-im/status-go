@@ -207,7 +207,7 @@ class WakuextService(Service):
         return response.json()
 
     def send_group_chat_invitation_rejection(self, invitation_request_id: str):
-        params = [invitation_request_id]
+        params = [None, invitation_request_id]
         response = self.rpc_request("sendGroupChatInvitationRejection", params)
         return response.json()
 
