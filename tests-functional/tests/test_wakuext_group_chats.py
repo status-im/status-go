@@ -4,7 +4,7 @@ from steps.messenger import MessengerSteps
 from resources.enums import MessageContentType
 
 
-@pytest.mark.reliability
+@pytest.mark.rpc
 class TestCreatePrivateGroups(MessengerSteps):
 
     @pytest.fixture(autouse=True)
