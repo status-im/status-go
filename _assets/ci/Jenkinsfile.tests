@@ -151,6 +151,7 @@ pipeline {
             "--tcp-port=${NWAKU_TCP_PORT}",
             "--discv5-discovery=true",
             "--cluster-id=16",
+            "--num-shards-in-network=0",
             "--shard=32",
             "--shard=64",
             "--nat=extip:${ipAddress}",
