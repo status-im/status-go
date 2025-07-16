@@ -115,6 +115,8 @@ func (s *MessengerCommunitiesShardingSuite) testPostToCommunityChat(shard *wakuv
 }
 
 func (s *MessengerCommunitiesShardingSuite) TestPostToCommunityChat() {
+	s.Require().True(false)
+
 	community, chat := createCommunity(&s.Suite, s.owner)
 
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
