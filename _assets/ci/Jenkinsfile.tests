@@ -142,7 +142,7 @@ pipeline {
           "--env=POSTGRES_HOST_AUTH_METHOD=trust",
           "--publish=${DB_PORT}:${DB_PORT}",
         ].join(' '), "-p ${DB_PORT}") { c ->
-          nwaku = docker.image('harbor.status.im/wakuorg/nwaku:v0.35.1').withRun([
+          nwaku = docker.image('harbor.status.im/wakuorg/nwaku:latest').withRun([
             "--name=${NWAKU_CONT}",
             "--publish=${NWAKU_TCP_PORT}:${NWAKU_TCP_PORT}/tcp",
             "--publish=${NWAKU_UDP_PORT}:${NWAKU_UDP_PORT}/udp",
