@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -16,25 +15,17 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/wakuv2"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const minimumResendDelay = 500 * time.Millisecond
 const waitForResentDelay = minimumResendDelay + 100*time.Millisecond
 
 type MessengerOfflineSuite struct {
-	suite.Suite
+	MessengerBaseTestSuite
 
 	owner *Messenger
 	bob   *Messenger
 	alice *Messenger
-
-	ownerWaku wakutypes.Waku
-	bobWaku   wakutypes.Waku
-	aliceWaku wakutypes.Waku
-
-	logger *zap.Logger
 
 	mockedBalances          communities.BalancesByChain
 	collectiblesManagerMock *CollectiblesManagerMock
@@ -48,26 +39,16 @@ func TestMessengerOfflineSuite(t *testing.T) {
 }
 
 func (s *MessengerOfflineSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.MessengerBaseTestSuite.setupWaku()
 
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 	s.collectiblesManagerMock = &CollectiblesManagerMock{}
 	s.accountsTestData = make(map[string][]string)
 	s.accountsPasswords = make(map[string]string)
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
-
-	ownerLogger := s.logger.With(zap.String("name", "owner"))
-	s.ownerWaku = wakuNodes[0]
-	s.owner = s.newMessenger(s.ownerWaku, ownerLogger, "", []string{})
-
-	bobLogger := s.logger.With(zap.String("name", "bob"))
-	s.bobWaku = wakuNodes[1]
-	s.bob = s.newMessenger(s.bobWaku, bobLogger, bobPassword, []string{bobAccountAddress})
-
-	aliceLogger := s.logger.With(zap.String("name", "alice"))
-	s.aliceWaku = wakuNodes[2]
-	s.alice = s.newMessenger(s.aliceWaku, aliceLogger, alicePassword, []string{aliceAddress1})
+	s.owner = s.newMessenger("", []string{})
+	s.bob = s.newMessenger(bobPassword, []string{bobAccountAddress})
+	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1})
 
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
@@ -80,32 +61,15 @@ func (s *MessengerOfflineSuite) SetupTest() {
 }
 
 func (s *MessengerOfflineSuite) TearDownTest() {
-	if s.owner != nil {
-		s.Require().NoError(s.owner.Shutdown())
-	}
-	if s.ownerWaku != nil {
-		s.Require().NoError(s.ownerWaku.Stop())
-	}
-
-	if s.bob != nil {
-		s.Require().NoError(s.bob.Shutdown())
-	}
-	if s.bobWaku != nil {
-		s.Require().NoError(s.bobWaku.Stop())
-	}
-	if s.alice != nil {
-		s.Require().NoError(s.alice.Shutdown())
-	}
-	if s.aliceWaku != nil {
-		s.Require().NoError(s.aliceWaku.Stop())
-	}
-	_ = s.logger.Sync()
+	s.Require().NoError(s.owner.Shutdown())
+	s.Require().NoError(s.bob.Shutdown())
+	s.Require().NoError(s.alice.Shutdown())
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
-func (s *MessengerOfflineSuite) newMessenger(waku wakutypes.Waku, logger *zap.Logger, password string, accounts []string) *Messenger {
-	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
+func (s *MessengerOfflineSuite) newMessenger(password string, accounts []string) *Messenger {
+	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
-			logger: s.logger,
 			extraOptions: []Option{
 				WithResendParams(minimumResendDelay, 1),
 			},
@@ -140,7 +104,7 @@ func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
 	s.checkMessageDelivery(ctx, inputMessage)
 
 	// Simulate going offline
-	wakuv2 := s.aliceWaku.(*wakuv2.Waku)
+	wakuv2 := s.shh.(*wakuv2.Waku)
 	wakuv2.SkipPublishToTopic(true)
 
 	resp, err := s.alice.SendChatMessage(ctx, inputMessage)

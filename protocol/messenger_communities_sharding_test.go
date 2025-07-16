@@ -7,16 +7,12 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/wakuv2"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerCommunitiesShardingSuite(t *testing.T) {
@@ -24,16 +20,12 @@ func TestMessengerCommunitiesShardingSuite(t *testing.T) {
 }
 
 type MessengerCommunitiesShardingSuite struct {
-	suite.Suite
+	MessengerBaseTestSuite
 
-	owner     *Messenger
-	ownerWaku wakutypes.Waku
+	owner *Messenger
+	alice *Messenger
 
-	alice                         *Messenger
-	aliceWaku                     wakutypes.Waku
 	aliceUnhandledMessagesTracker *unhandledMessagesTracker
-
-	logger *zap.Logger
 
 	mockedBalances          communities.BalancesByChain
 	mockedCollectibles      communities.CollectiblesByChain
@@ -44,7 +36,8 @@ type MessengerCommunitiesShardingSuite struct {
 }
 
 func (s *MessengerCommunitiesShardingSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.MessengerBaseTestSuite.setupWaku()
+
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 	s.mockedCollectibles = make(communities.CollectiblesByChain)
 	s.collectiblesManagerMock = &CollectiblesManagerMock{
@@ -53,15 +46,11 @@ func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 	s.accountsTestData = make(map[string][]string)
 	s.accountsPasswords = make(map[string]string)
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "alice"})
-
 	nodeConfig := defaultTestCommunitiesMessengerNodeConfig()
 
-	s.ownerWaku = wakuNodes[0]
-	s.owner = newTestCommunitiesMessenger(&s.Suite, s.ownerWaku, testCommunitiesMessengerConfig{
+	s.owner = newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			name:       "owner",
-			logger:     s.logger,
 			nodeConfig: nodeConfig,
 		},
 		walletAddresses:     []string{},
@@ -73,11 +62,10 @@ func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 	s.aliceUnhandledMessagesTracker = &unhandledMessagesTracker{
 		messages: map[protobuf.ApplicationMetadataMessage_Type][]*unhandedMessage{},
 	}
-	s.aliceWaku = wakuNodes[1]
-	s.alice = newTestCommunitiesMessenger(&s.Suite, s.aliceWaku, testCommunitiesMessengerConfig{
+
+	s.alice = newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			name:                     "alice",
-			logger:                   s.logger,
 			unhandledMessagesTracker: s.aliceUnhandledMessagesTracker,
 			nodeConfig:               nodeConfig,
 		},
@@ -93,19 +81,9 @@ func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 }
 
 func (s *MessengerCommunitiesShardingSuite) TearDownTest() {
-	if s.owner != nil {
-		TearDownMessenger(&s.Suite, s.owner)
-	}
-	if s.ownerWaku != nil {
-		s.Require().NoError(s.ownerWaku.Stop())
-	}
-	if s.alice != nil {
-		TearDownMessenger(&s.Suite, s.alice)
-	}
-	if s.aliceWaku != nil {
-		s.Require().NoError(s.aliceWaku.Stop())
-	}
-	_ = s.logger.Sync()
+	TearDownMessenger(&s.Suite, s.owner)
+	TearDownMessenger(&s.Suite, s.alice)
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func (s *MessengerCommunitiesShardingSuite) testPostToCommunityChat(shard *wakuv2.Shard, community *communities.Community, chat *Chat) {
