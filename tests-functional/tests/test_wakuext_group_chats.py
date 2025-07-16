@@ -31,9 +31,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         )[0]
 
     def test_leave_group_chat(self):
-        create_group_response = self.sender.wakuext_service.create_group_chat_with_members(
-            [self.receiver.public_key],
-        )
+        create_group_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"private_group_{uuid4()}")
 
         group_id = create_group_response.get("result", {}).get("chats", [])[0].get("id")
         leave_group_response = self.sender.wakuext_service.leave_group_chat(group_id, True)
