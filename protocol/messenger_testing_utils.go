@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"math/big"
 	mathRand "math/rand"
 	"sync"
@@ -173,62 +172,6 @@ func WaitOnSignaledMessengerResponse(m *Messenger, condition func(*MessengerResp
 	}
 }
 
-func WaitOnSignaledCommunityFound(m *Messenger, action func(), condition func(community *communities.Community) bool, timeout time.Duration, errorMessage string) error {
-	timeoutChan := time.After(timeout)
-
-	if m.config.messengerSignalsHandler != nil {
-		return errors.New("messengerSignalsHandler already provided/mocked")
-	}
-
-	communityFoundChan := make(chan *communities.Community, 1)
-	m.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{
-		communityFoundChan: communityFoundChan,
-	}
-
-	defer func() {
-		m.config.messengerSignalsHandler = nil
-	}()
-
-	// Call the action after setting up the mock
-	action()
-
-	// Wait for condition after
-	for {
-		select {
-		case c := <-communityFoundChan:
-			if condition(c) {
-				return nil
-			}
-		case <-timeoutChan:
-			return errors.New("timed out: " + errorMessage)
-		}
-	}
-}
-
-func WaitForConnectionStatus(s *suite.Suite, waku wakutypes.Waku, action func() bool) {
-	subscription, err := waku.SubscribeToConnStatusChanges()
-	s.Require().NoError(err)
-	defer subscription.Unsubscribe()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Action should return the desired online status
-	wantedOnline := action()
-
-	for {
-		select {
-		case status := <-subscription.C:
-			if status.IsOnline == wantedOnline {
-				return
-			}
-		case <-ctx.Done():
-			s.Require().Fail(fmt.Sprintf("timeout waiting for waku connection status '%t'", wantedOnline))
-			return
-		}
-	}
-}
-
 func hasAllPeers(m map[peer.ID]wakutypes.WakuV2Peer, checkSlice peer.IDSlice) bool {
 	for _, check := range checkSlice {
 		if _, ok := m[check]; !ok {
@@ -236,35 +179,6 @@ func hasAllPeers(m map[peer.ID]wakutypes.WakuV2Peer, checkSlice peer.IDSlice) bo
 		}
 	}
 	return true
-}
-
-func WaitForPeersConnected(s *suite.Suite, waku wakutypes.Waku, action func() peer.IDSlice) {
-	subscription, err := waku.SubscribeToConnStatusChanges()
-	s.Require().NoError(err)
-	defer subscription.Unsubscribe()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Action should return the desired peer ID
-	peerIDs := action()
-	if hasAllPeers(waku.Peers(), peerIDs) {
-		return
-	}
-
-	for {
-		select {
-		case status := <-subscription.C:
-			if hasAllPeers(status.Peers, peerIDs) {
-				// Give some time for p2p events, otherwise might look like peer is available, but fail to send a message.
-				time.Sleep(100 * time.Millisecond)
-				return
-			}
-		case <-ctx.Done():
-			s.Require().Fail(fmt.Sprintf("timeout waiting for peers connected '%+v'", peerIDs))
-			return
-		}
-	}
 }
 
 func FindFirstByContentType(messages []*common.Message, contentType protobuf.ChatMessage_ContentType) *common.Message {
