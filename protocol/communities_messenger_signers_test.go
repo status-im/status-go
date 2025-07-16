@@ -8,7 +8,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	utils "github.com/status-im/status-go/common"
 
@@ -59,7 +58,6 @@ func (s *MessengerCommunitiesSignersSuite) newMessenger(password string, walletA
 	}
 
 	return s.newMessengerWithConfig(testMessengerConfig{
-		logger:       s.logger,
 		extraOptions: []Option{WithCommunityManagerOptions(communityManagerOptions)},
 	}, password, walletAddresses)
 }
@@ -599,7 +597,6 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 	// Create alice second instance
 	alice2, err := newRunningTestMessenger(s.shh, testMessengerConfig{
 		privateKey:   s.alice.identity,
-		logger:       s.logger.With(zap.String("name", "alice-2")),
 		extraOptions: []Option{WithCommunityTokensService(s.collectiblesServiceMock)},
 	})
 
