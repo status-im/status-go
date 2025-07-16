@@ -12,9 +12,6 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2"
-	waku2 "github.com/status-im/status-go/wakuv2"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type testWakuV2Config struct {
@@ -24,8 +21,8 @@ type testWakuV2Config struct {
 	nodekey     []byte
 }
 
-func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
-	wakuConfig := &waku2.Config{
+func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *wakuv2.Waku {
+	wakuConfig := &wakuv2.Config{
 		ClusterID:                cfg.clusterID,
 		LightClient:              false,
 		EnablePeerExchangeServer: true,
@@ -48,7 +45,7 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 		wakuConfig.StoreSeconds = 200
 	}
 
-	wakuNode, err := waku2.New(
+	wakuNode, err := wakuv2.New(
 		nodeKey,
 		wakuConfig,
 		cfg.logger,
@@ -67,35 +64,4 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 	s.Require().NoError(err)
 
 	return wakuNode
-}
-
-func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []string) []wakutypes.Waku {
-	nodes := make([]wakutypes.Waku, len(nodeNames))
-
-	for i, name := range nodeNames {
-		nodes[i] = NewTestWakuV2(s, testWakuV2Config{
-			logger:      parentLogger.Named("waku-" + name),
-			enableStore: false,
-			clusterID:   wakuv2.MainStatusShardCluster,
-		})
-	}
-
-	// Setup local network graph
-	for i := 0; i < len(nodes); i++ {
-		for j := 0; j < len(nodes); j++ {
-			if i == j {
-				continue
-			}
-
-			addrs, err := nodes[j].ListenAddresses()
-			s.Require().NoError(err)
-			s.Require().Greater(len(addrs), 0)
-			_, err = nodes[i].AddRelayPeer(addrs[0])
-			s.Require().NoError(err)
-			err = nodes[i].DialPeer(addrs[0])
-			s.Require().NoError(err)
-		}
-	}
-
-	return nodes
 }

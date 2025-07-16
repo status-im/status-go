@@ -9,14 +9,11 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/signal"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerMessagesTrackingSuite(t *testing.T) {
@@ -75,58 +72,34 @@ func (i *EnvelopeEventsInterceptorMock) Enable() {
 }
 
 type MessengerMessagesTrackingSuite struct {
-	suite.Suite
+	MessengerBaseTestSuite
 
-	bobWaku        wakutypes.Waku
 	bobInterceptor *EnvelopeEventsInterceptorMock
 	bob            *Messenger
 
-	aliceWaku        wakutypes.Waku
 	aliceInterceptor *EnvelopeEventsInterceptorMock
 	alice            *Messenger
-
-	logger *zap.Logger
 }
 
 func (s *MessengerMessagesTrackingSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"bob", "alice"})
-
-	s.bobWaku = wakuNodes[0]
-	s.bob, s.bobInterceptor = s.newMessenger(s.bobWaku, s.logger.With(zap.String("name", "bob")))
-
-	s.aliceWaku = wakuNodes[1]
-	s.alice, s.aliceInterceptor = s.newMessenger(s.aliceWaku, s.logger.With(zap.String("name", "alice")))
+	s.MessengerBaseTestSuite.setupWaku()
+	s.bob, s.bobInterceptor = s.newMessenger()
+	s.alice, s.aliceInterceptor = s.newMessenger()
 }
 
 func (s *MessengerMessagesTrackingSuite) TearDownTest() {
-	if s.bob != nil {
-		TearDownMessenger(&s.Suite, s.bob)
-
-	}
-	if s.bobWaku != nil {
-		s.Require().NoError(s.bobWaku.Stop())
-	}
-
-	if s.alice != nil {
-		TearDownMessenger(&s.Suite, s.alice)
-	}
-	if s.aliceWaku != nil {
-		s.Require().NoError(s.aliceWaku.Stop())
-	}
-
-	_ = s.logger.Sync()
+	TearDownMessenger(&s.Suite, s.bob)
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
-func (s *MessengerMessagesTrackingSuite) newMessenger(waku wakutypes.Waku, logger *zap.Logger) (*Messenger, *EnvelopeEventsInterceptorMock) {
+func (s *MessengerMessagesTrackingSuite) newMessenger() (*Messenger, *EnvelopeEventsInterceptorMock) {
 	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
 		EnvelopeEventsHandler:      EnvelopeSignalHandlerMock{},
 		MaxMessageDeliveryAttempts: 1,
 		MailServerConfirmations:    false,
 	}
 
-	messenger, err := newRunningTestMessenger(waku, testMessengerConfig{logger: logger, extraOptions: []Option{WithEnvelopeEventsConfig(envelopeEventsConfig)}})
+	messenger, err := newRunningTestMessenger(s.shh, testMessengerConfig{extraOptions: []Option{WithEnvelopeEventsConfig(envelopeEventsConfig)}})
 	s.Require().NoError(err)
 
 	interceptor := &EnvelopeEventsInterceptorMock{

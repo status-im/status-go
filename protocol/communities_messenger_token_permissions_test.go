@@ -31,9 +31,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/wakuv2"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const testChainID1 = 1
@@ -136,16 +133,11 @@ func TestMessengerCommunitiesTokenPermissionsSuite(t *testing.T) {
 }
 
 type MessengerCommunitiesTokenPermissionsSuite struct {
-	suite.Suite
+	MessengerBaseTestSuite
+
 	owner *Messenger
 	bob   *Messenger
 	alice *Messenger
-
-	ownerWaku wakutypes.Waku
-	bobWaku   wakutypes.Waku
-	aliceWaku wakutypes.Waku
-
-	logger *zap.Logger
 
 	mockedBalances          communities.BalancesByChain
 	mockedCollectibles      communities.CollectiblesByChain
@@ -156,13 +148,7 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
-	// Initialize with nil to avoid panics in TearDownTest
-	s.owner = nil
-	s.bob = nil
-	s.alice = nil
-	s.ownerWaku = nil
-	s.bobWaku = nil
-	s.aliceWaku = nil
+	s.MessengerBaseTestSuite.setupWaku()
 
 	s.accountsTestData = make(map[string][]string)
 	s.accountsPasswords = make(map[string]string)
@@ -173,19 +159,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	}
 	s.resetMockedBalances()
 
-	s.logger = tt.MustCreateTestLogger()
+	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, "owner", []Option{})
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
-
-	s.ownerWaku = wakuNodes[0]
-	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, "owner", []Option{})
-
-	s.bobWaku = wakuNodes[1]
-	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, "bob", []Option{})
+	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, "bob", []Option{})
 	s.bob.EnableBackedupMessagesProcessing()
 
-	s.aliceWaku = wakuNodes[2]
-	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, s.aliceWaku, "alice", []Option{})
+	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{})
 
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
@@ -199,27 +178,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.owner)
 	TearDownMessenger(&s.Suite, s.bob)
 	TearDownMessenger(&s.Suite, s.alice)
-	if s.ownerWaku != nil {
-		s.Require().NoError(s.ownerWaku.Stop())
-	}
-	if s.bobWaku != nil {
-		s.Require().NoError(s.bobWaku.Stop())
-	}
-	if s.aliceWaku != nil {
-		s.Require().NoError(s.aliceWaku.Stop())
-	}
-	_ = s.logger.Sync()
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku wakutypes.Waku, name string, extraOptions []Option) *Messenger {
+func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, name string, extraOptions []Option) *Messenger {
 	communityManagerOptions := []communities.ManagerOption{
 		communities.WithAllowForcingCommunityMembersReevaluation(true),
 	}
 	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
 
-	messenger := newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
+	messenger := newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
-			logger:       s.logger.Named(name),
 			extraOptions: extraOptions,
 		},
 		password:            password,
@@ -479,57 +448,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 	}
 }
 
-// NOTE(cammellos): Disabling for now as flaky, for some reason does not pass on CI, but passes locally
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
-	s.T().Skip("flaky test")
-
-	// Create a store node
-	// This is needed to fetch the messages after rejoining the community
-	var err error
-
-	cfg := testWakuV2Config{
-		logger:      s.logger.Named("store-node-waku"),
-		enableStore: false,
-		clusterID:   wakuv2.MainStatusShardCluster,
-	}
-	wakuStoreNode := NewTestWakuV2(&s.Suite, cfg)
-
-	storeNodeListenAddresses, err := wakuStoreNode.ListenAddresses()
-	s.Require().NoError(err)
-	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
-
-	storeNodeAddress := storeNodeListenAddresses[0]
-	s.logger.Info("store node ready", zap.Stringer("address", storeNodeAddress))
-
-	// Create messengers
-
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob"})
-	s.ownerWaku = wakuNodes[0]
-	s.bobWaku = wakuNodes[1]
-
-	options := []Option{
-		WithTestStoreNode(&s.Suite, localMailserverID, storeNodeAddress, localFleet, s.collectiblesServiceMock),
-	}
-
-	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, "owner", options)
-	s.Require().NoError(err)
-
-	_, err = s.owner.Start()
-	s.Require().NoError(err)
-
-	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, "bob", options)
-	s.Require().NoError(err)
-
-	_, err = s.bob.Start()
-	s.Require().NoError(err)
-
-	// Force the owner to use the store node as relay peer
-
-	err = s.owner.DialPeer(storeNodeAddress)
-	s.Require().NoError(err)
-
 	// Create a community
-
 	community, chat := s.createCommunity()
 
 	// bob joins the community
@@ -544,7 +464,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 
 	// send message to the channel
 	msg := s.sendChatMessage(s.owner, chat.ID, messages[0])
-	s.logger.Debug("owner sent a message",
+	s.T().Log("owner sent a message",
 		zap.String("messageText", msg.Text),
 		zap.String("messageID", msg.ID),
 	)
@@ -576,11 +496,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 		CommunityID: community.ID(),
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
+			{
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -615,23 +535,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	)
 	s.Require().NoError(err)
 
-	// We are not member of the community anymore, so we need to refetch
-	// the data, since we would not be pulling it anymore
-	_, err = WaitOnMessengerResponse(
-		s.bob,
-		func(r *MessengerResponse) bool {
-			_, err := s.bob.FetchCommunity(&FetchCommunityRequest{WaitForResponse: true, TryDatabase: false, CommunityKey: community.IDString()})
-			if err != nil {
-				return false
-			}
-			c, err := s.bob.communitiesManager.GetByID(community.ID())
-			return err == nil && c != nil && len(c.TokenPermissions()) > 0 && !c.Joined()
-		},
-		"no token permissions",
-	)
-
-	s.Require().NoError(err)
-
 	// bob tries to join, but he doesn't satisfy so the request isn't sent
 	request := s.createRequestToJoinCommunity(community.ID(), s.bob)
 	_, err = s.bob.RequestToJoinCommunity(request)
@@ -662,7 +565,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 
 	// send message to channel
 	msg = s.sendChatMessage(s.owner, chat.ID, messages[2])
-	s.logger.Debug("owner sent a message",
+	s.T().Log("owner sent a message",
 		zap.String("messageText", msg.Text),
 		zap.String("messageID", msg.ID),
 	)
