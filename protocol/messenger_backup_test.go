@@ -36,7 +36,14 @@ type MessengerBackupSuite struct {
 	MessengerBaseTestSuite
 }
 
+var failOnce bool = true
+
 func (s *MessengerBackupSuite) TestBackupContacts() {
+	if failOnce {
+		failOnce = false
+		s.FailNow("Testing re-try")
+	}
+
 	bob1 := s.m
 	// Create bob2
 	bob2 := s.anotherMessenger()
