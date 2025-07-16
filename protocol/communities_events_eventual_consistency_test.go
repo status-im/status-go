@@ -9,7 +9,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestCommunityEventsEventualConsistencySuite(t *testing.T) {
@@ -23,7 +22,6 @@ type CommunityEventsEventualConsistencySuite struct {
 }
 
 func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 	s.accountsTestData = make(map[string][]string)
 	s.accountsPasswords = make(map[string]string)
@@ -51,7 +49,6 @@ func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
 func (s *CommunityEventsEventualConsistencySuite) newMessenger(password string, walletAddresses []string) *Messenger {
 	messenger := newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
-			logger:                  s.logger,
 			messagesOrderController: s.messagesOrderController,
 		},
 		password:            password,

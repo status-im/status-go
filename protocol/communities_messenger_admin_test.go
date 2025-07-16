@@ -83,7 +83,6 @@ func (s *EventSenderCommunityEventsSuiteBase) newMessenger(password string, wall
 	}
 
 	return s.newMessengerWithConfig(testMessengerConfig{
-		logger:       s.logger,
 		privateKey:   privateKey,
 		extraOptions: []Option{WithCommunityManagerOptions(communityManagerOptions)},
 	}, password, walletAddresses)
