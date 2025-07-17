@@ -15,6 +15,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
@@ -416,11 +417,9 @@ func (m *Messenger) sendDataSync(receiver state.PeerID, payload *datasyncproto.P
 
 	m.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.Strings("hashes", types.EncodeHexes(hashes)))
 	m.messaging.TrackMany(messageIDs, hashes, newMessages)
-	if m.wakuMetricsHandler != nil {
-		for _, message := range newMessages {
-			m.wakuMetricsHandler.PushRawMessageByType(message.PubsubTopic, message.Topic.String(), "DATASYNC", uint32(len(message.Payload)))
-		}
-	}
+	pubsub.Publish(m.publisher, DatasyncMessagesSentEvent{
+		Messages: newMessages,
+	})
 
 	return nil
 }

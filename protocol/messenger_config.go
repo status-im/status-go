@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/wakuv2"
 
 	"go.uber.org/zap"
 
@@ -116,10 +115,6 @@ type config struct {
 	outputMessagesCSV bool
 
 	messengerSignalsHandler MessengerSignalsHandler
-
-	telemetryServerURL  string
-	telemetrySendPeriod time.Duration
-	wakuService         *wakuv2.Waku
 
 	messageResendMinDelay time.Duration
 	messageResendMaxCount int
@@ -268,14 +263,6 @@ func WithAnonMetricsServerConfig(anonMetricsServerConfig *anonmetrics.ServerConf
 	}
 }
 
-func WithTelemetry(serverURL string, sendPeriod time.Duration) Option {
-	return func(c *config) error {
-		c.telemetryServerURL = serverURL
-		c.telemetrySendPeriod = sendPeriod
-		return nil
-	}
-}
-
 func WithPushNotificationClientConfig(pushNotificationClientConfig *pushnotificationclient.Config) Option {
 	return func(c *config) error {
 		c.pushNotificationClientConfig = pushNotificationClientConfig
@@ -377,13 +364,6 @@ func WithWalletService(s *wallet.Service) Option {
 func WithCommunityTokensService(s communities.CommunityTokensServiceInterface) Option {
 	return func(c *config) error {
 		c.communityTokensService = s
-		return nil
-	}
-}
-
-func WithWakuService(s *wakuv2.Waku) Option {
-	return func(c *config) error {
-		c.wakuService = s
 		return nil
 	}
 }
