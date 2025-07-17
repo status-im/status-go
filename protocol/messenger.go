@@ -38,6 +38,7 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/pkg/pubsub"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -166,7 +167,6 @@ type Messenger struct {
 	}
 
 	connectionState       connection.State
-	wakuMetricsHandler    *wakumetrics.Client
 	contractMaker         *contracts.ContractMaker
 	verificationDatabase  *verification.Persistence
 	savedAddressesManager *wallet.SavedAddressesManager
@@ -202,6 +202,8 @@ type Messenger struct {
 	backedUpFetchingStatus *BackupFetchingStatus
 
 	newsFeedManager *newsfeed.NewsFeedManager
+
+	publisher *pubsub.Publisher
 }
 
 type EnvelopeEventsInterceptor struct {
@@ -471,9 +473,6 @@ func NewMessenger(
 	// "communities/manager_archive.go" version of this function based on the build instructions for those files.
 	// See those file for more details.
 	archiveManager := communities.NewArchiveManager(amc)
-	if err != nil {
-		return nil, err
-	}
 
 	settings, err := accounts.NewDB(database)
 	if err != nil {
@@ -487,25 +486,6 @@ func NewMessenger(
 		return nil, fmt.Errorf("failed to build contact of ourself: %w", err)
 	}
 
-	var wakuMetricsHandler *wakumetrics.Client
-	if c.telemetryServerURL != "" {
-		options := []wakumetrics.TelemetryClientOption{
-			wakumetrics.WithPeerID(waku.PeerID().String()),
-		}
-		wakuMetricsHandler, err = wakumetrics.NewClient(options...)
-		if err != nil {
-			return nil, err
-		}
-		if c.wakuService != nil {
-			c.wakuService.SetMetricsHandler(wakuMetricsHandler)
-		}
-		sender.SetMetricsHandler(wakuMetricsHandler)
-		err = wakuMetricsHandler.RegisterWithRegistry()
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	messenger = &Messenger{
 		config:                     &c,
@@ -516,7 +496,6 @@ func NewMessenger(
 		sender:                     sender,
 		anonMetricsClient:          anonMetricsClient,
 		anonMetricsServer:          anonMetricsServer,
-		wakuMetricsHandler:         wakuMetricsHandler,
 		communityTokensService:     c.communityTokensService,
 		pushNotificationClient:     pushNotificationClient,
 		pushNotificationServer:     c.pushNotificationServer,
@@ -588,6 +567,7 @@ func NewMessenger(
 		logger:                           logger,
 		savedAddressesManager:            savedAddressesManager,
 		retrievedMessagesIteratorFactory: NewDefaultMessagesIterator,
+		publisher:                        pubsub.NewPublisher(),
 	}
 
 	if c.rpcClient != nil {
@@ -1738,6 +1718,7 @@ func (m *Messenger) Shutdown() (err error) {
 	close(m.quit)
 	m.cancel()
 	m.shutdownWaitGroup.Wait()
+	m.publisher.Close()
 	for i, task := range m.shutdownTasks {
 		m.logger.Debug("running shutdown task", zap.Int("n", i))
 		if tErr := task(); tErr != nil {
@@ -3366,13 +3347,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 
 			statusMessages := handleMessagesResponse.StatusMessages
 
-			if m.wakuMetricsHandler != nil {
-				m.wakuMetricsHandler.PushReceivedMessages(wakumetrics.ReceivedMessages{
-					Filter:     filter,
-					SHHMessage: shhMessage,
-					Messages:   statusMessages,
-				})
-			}
+			pubsub.Publish(m.publisher, RetrievedMessagesEvent{
+				Filter:     filter,
+				SHHMessage: shhMessage,
+				Messages:   statusMessages,
+			})
 
 			err = m.handleDatasyncMetadata(handleMessagesResponse)
 			if err != nil {
@@ -5590,4 +5569,8 @@ func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string
 
 func (m *Messenger) MessageSender() *common.MessageSender {
 	return m.sender
+}
+
+func (m *Messenger) Publisher() *pubsub.Publisher {
+	return m.publisher
 }

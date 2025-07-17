@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/metrics/wakumetrics"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -85,6 +86,7 @@ type Service struct {
 	accountsDB      *accounts.Database
 	multiAccountsDB *multiaccounts.Database
 	account         *multiaccounts.Account
+	wakumetrics     *wakumetrics.Client
 }
 
 // Make sure that Service implements node.Service interface.
@@ -234,7 +236,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		s.config.ShhextConfig.VerifyENSContractAddress,
 	)
 
-	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, s.waku, logger, &MessengerSignalsHandler{}, accountsManager, accountsPublisher, ensVerifier)
+	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, logger, &MessengerSignalsHandler{}, accountsManager, accountsPublisher, ensVerifier)
 	if err != nil {
 		return err
 	}
@@ -259,11 +261,98 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	return s.messenger.InitInstallations()
 }
 
+func (s *Service) startWakuMetrics() error {
+	if s.wakumetrics == nil {
+		options := []wakumetrics.TelemetryClientOption{
+			wakumetrics.WithPeerID(s.waku.PeerID().String()),
+		}
+
+		wakuMetricsHandler, err := wakumetrics.NewClient(options...)
+		if err != nil {
+			return err
+		}
+
+		err = wakuMetricsHandler.RegisterWithRegistry()
+		if err != nil {
+			return err
+		}
+
+		installation, err := s.messenger.GetOurInstallationMetadata()
+		if err != nil {
+			return err
+		}
+		wakuMetricsHandler.SetDeviceType(installation.DeviceType)
+
+		s.waku.SetMetricsHandler(wakuMetricsHandler)
+
+		s.wakumetrics = wakuMetricsHandler
+	}
+
+	go func() {
+		defer gocommon.LogOnPanic()
+
+		retrievedMessagesSub, unsubRetrievedMessages := pubsub.Subscribe[protocol.RetrievedMessagesEvent](s.messenger.Publisher(), 100)
+		defer unsubRetrievedMessages()
+
+		sentMessagesSub, unsubSentMessages := pubsub.Subscribe[common.MessageEvent](s.messenger.MessageSender().Publisher(), 100)
+		defer unsubSentMessages()
+
+		sentDatasyncSub, unsubSentDatasync := pubsub.Subscribe[protocol.DatasyncMessagesSentEvent](s.messenger.Publisher(), 100)
+		defer unsubSentDatasync()
+
+		for {
+			select {
+			case sub := <-retrievedMessagesSub:
+				s.wakumetrics.PushReceivedMessages(wakumetrics.ReceivedMessages{
+					Filter:     sub.Filter,
+					SHHMessage: sub.SHHMessage,
+					Messages:   sub.Messages,
+				})
+
+			case sub := <-sentMessagesSub:
+				if sub.Type != common.RawMessageSent {
+					continue
+				}
+				msg := sub.RawMessage
+				s.wakumetrics.PushRawMessageByType(
+					msg.PubsubTopic,
+					msg.ContentTopic,
+					msg.MessageType.String(),
+					uint32(len(msg.Payload)),
+				)
+
+			case sub := <-sentDatasyncSub:
+				for _, msg := range sub.Messages {
+					s.wakumetrics.PushRawMessageByType(
+						msg.PubsubTopic,
+						msg.Topic.String(),
+						"DATASYNC",
+						uint32(len(msg.Payload)),
+					)
+				}
+
+			case <-s.cancelMessenger:
+				return
+			}
+		}
+	}()
+
+	return nil
+}
+
 func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	err := s.waku.Start()
 	if err != nil {
 		return nil, err
 	}
+
+	if s.config.WakuV2Config.TelemetryServerURL != "" {
+		err = s.startWakuMetrics()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Start a loop that retrieves all messages and propagates them to status-mobile.
 	s.cancelMessenger = make(chan struct{})
 	response, err := s.messenger.Start()
@@ -466,7 +555,6 @@ func buildMessengerOptions(
 	accountsDB *accounts.Database,
 	walletService *wallet.Service,
 	communityTokensService *communitytokens.Service,
-	wakuService *wakuv2.Waku,
 	logger *zap.Logger,
 	messengerSignalsHandler protocol.MessengerSignalsHandler,
 	accountsManager *accsmanagement.AccountsManager,
@@ -493,7 +581,6 @@ func buildMessengerOptions(
 		protocol.WithMessageCSV(config.OutputMessageCSVEnabled),
 		protocol.WithWalletService(walletService),
 		protocol.WithCommunityTokensService(communityTokensService),
-		protocol.WithWakuService(wakuService),
 		protocol.WithAccountsManager(accountsManager),
 		protocol.WithAccountsPublisher(accountsPublisher),
 		protocol.WithNewsFeed(),
@@ -539,10 +626,6 @@ func buildMessengerOptions(
 			PostgresURI: config.ShhextConfig.AnonMetricsServerPostgresURI,
 		}
 		options = append(options, protocol.WithAnonMetricsServerConfig(amsc))
-	}
-
-	if settings.TelemetryServerURL != "" {
-		options = append(options, protocol.WithTelemetry(settings.TelemetryServerURL, time.Duration(settings.TelemetrySendPeriodMs)*time.Millisecond))
 	}
 
 	var pushNotifServKey []*ecdsa.PublicKey
