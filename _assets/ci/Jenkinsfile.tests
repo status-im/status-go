@@ -48,6 +48,7 @@ pipeline {
     /* Prevent Jenkins jobs from running forever */
     timeout(time: getDefaultTimeout(), unit: 'MINUTES')
     disableConcurrentBuilds()
+    disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: getAmountToKeep(),

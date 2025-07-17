@@ -28,7 +28,7 @@ pipeline {
     ansiColor('xterm')
     /* Prevent Jenkins jobs from running forever */
     timeout(time: 30, unit: 'MINUTES')
-    disableConcurrentBuilds()
+    disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: '5',
