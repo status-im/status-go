@@ -7,32 +7,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
-	"golang.org/x/exp/slices"
-	"golang.org/x/time/rate"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-
-	"go.uber.org/zap"
-
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"

@@ -5,23 +5,17 @@ import (
 	"database/sql"
 	"fmt"
 	"math/big"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/services/wallet/blockchainstate"
-	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
-	"github.com/status-im/status-go/t/utils"
-
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
-	"go.uber.org/mock/gomock"
-	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
-
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -30,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
@@ -46,10 +41,13 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 )
