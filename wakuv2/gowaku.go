@@ -606,31 +606,6 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
-func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
-
-	if telemetryServerURL == "" {
-		return
-	}
-
-	telemetry := NewBandwidthTelemetryClient(w.logger, telemetryServerURL)
-
-	ticker := time.NewTicker(time.Second * 20)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-w.ctx.Done():
-			return
-		case <-ticker.C:
-			bandwidthPerProtocol := w.bandwidthCounter.GetBandwidthByProtocol()
-			w.bandwidthCounter.Reset()
-			go telemetry.PushProtocolStats(bandwidthPerProtocol)
-		}
-	}
-}
-
 func (w *Waku) GetStats() types.StatsSummary {
 	stats := w.bandwidthCounter.GetBandwidthTotals()
 	return types.StatsSummary{
@@ -1146,15 +1121,12 @@ func (w *Waku) Start() error {
 		}
 	}()
 
-	if w.cfg.TelemetryServerURL != "" {
+	if w.cfg.MetricsEnabled {
 		w.wg.Add(1)
 		go func() {
 			defer gocommon.LogOnPanic()
 			defer w.wg.Done()
-			peerTelemetryTickerInterval := time.Duration(w.cfg.TelemetryPeerCountSendPeriod) * time.Millisecond
-			if peerTelemetryTickerInterval == 0 {
-				peerTelemetryTickerInterval = 10 * time.Second
-			}
+			peerTelemetryTickerInterval := 10 * time.Second
 			peerTelemetryTicker := time.NewTicker(peerTelemetryTickerInterval)
 			defer peerTelemetryTicker.Stop()
 
@@ -1193,11 +1165,6 @@ func (w *Waku) Start() error {
 			}
 		}()
 	}
-
-	w.wg.Add(1)
-	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
-	//TODO: commenting for now so that only fleet nodes are used.
-	//Need to uncomment once filter peer scoring etc is implemented.
 
 	w.wg.Add(1)
 	go w.runPeerExchangeLoop()
@@ -1358,7 +1325,7 @@ func (w *Waku) startMessageSender() error {
 		return err
 	}
 
-	if w.cfg.TelemetryServerURL != "" {
+	if w.cfg.MetricsEnabled {
 		sender.WithMessageSentEmitter(w.node.Host())
 	}
 

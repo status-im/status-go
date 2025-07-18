@@ -131,8 +131,6 @@ type WakuV2Config struct {
 	// StoreSeconds indicates the maximum number of seconds before a message is removed from the store
 	StoreSeconds int
 
-	TelemetryServerURL string
-
 	// EnableMissingMessageVerification indicates whether the storenodes must be queried periodically to retrieve any missing message
 	EnableMissingMessageVerification bool
 

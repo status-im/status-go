@@ -395,7 +395,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance,
 		profile_pictures_show_to, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens,
 		waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents,
-		gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key,
+		gif_favorites, opensea_enabled, last_backup, backup_enabled, auto_message_enabled, gif_api_key,
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, wallet_token_preferences_group_by_community, url_unfurling_mode,
 		mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
 		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community,
@@ -468,7 +468,6 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.OpenseaEnabled,
 		&s.LastBackup,
 		&s.BackupEnabled,
-		&s.TelemetryServerURL,
 		&s.AutoMessageEnabled,
 		&s.GifAPIKey,
 		&s.TestNetworksEnabled,
@@ -834,10 +833,6 @@ func (db *Database) GetCollectibleGroupByCommunity() (result bool, err error) {
 
 func (db *Database) SetCollectibleGroupByCommunity(value bool) error {
 	return db.SaveSettingField(CollectibleGroupByCommunity, value)
-}
-
-func (db *Database) GetTelemetryServerURL() (string, error) {
-	return db.makeSelectString(TelemetryServerURL)
 }
 
 func (db *Database) ProfileMigrationNeeded() (result bool, err error) {

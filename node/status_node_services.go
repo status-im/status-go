@@ -92,17 +92,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	// We handle circular dependency between the two by delaying ininitalization of the CommunityCollectibleInfoProvider
 	// in the CollectiblesManager.
 	if config.WakuV2Config.Enabled {
-		telemetryServerURL := ""
-		if accDB.DB() != nil {
-			telemetryServerURL, err = accDB.GetTelemetryServerURL()
-			if err != nil {
-				return err
-			}
-			if telemetryServerURL != "" {
-				config.WakuV2Config.TelemetryServerURL = telemetryServerURL
-			}
-		}
-
 		wakuext, err := b.wakuV2ExtService(config)
 		if err != nil {
 			return err

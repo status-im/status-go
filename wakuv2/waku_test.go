@@ -6,7 +6,6 @@ package wakuv2
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"math/big"
 	"os"
@@ -15,8 +14,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
-	"github.com/libp2p/go-libp2p/core/metrics"
-	libp2pprotocol "github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -30,10 +27,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
-	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
-	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/status-im/status-go/connection"
@@ -528,26 +522,4 @@ func TestOnlineChecker(t *testing.T) {
 	f := &common.Filter{}
 	lightNode.filterManager.SubscribeFilter("test", protocol.NewContentFilter(f.PubsubTopic, f.ContentTopics.ContentTopics()...))
 
-}
-
-func TestTelemetryFormat(t *testing.T) {
-	tc := NewBandwidthTelemetryClient(tt.MustCreateTestLogger(), "#")
-
-	s := metrics.Stats{
-		TotalIn:  10,
-		TotalOut: 20,
-		RateIn:   30,
-		RateOut:  40,
-	}
-
-	m := make(map[libp2pprotocol.ID]metrics.Stats)
-	m[relay.WakuRelayID_v200] = s
-	m[filter.FilterPushID_v20beta1] = s
-	m[filter.FilterSubscribeID_v20beta1] = s
-	m[legacy_store.StoreID_v20beta4] = s
-	m[lightpush.LightPushID_v20beta1] = s
-
-	requestBody := tc.getTelemetryRequestBody(m)
-	_, err := json.Marshal(requestBody)
-	require.NoError(t, err)
 }

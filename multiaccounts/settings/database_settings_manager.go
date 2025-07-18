@@ -42,7 +42,6 @@ type DatabaseSettingsManager interface {
 	GetTokenGroupByCommunity() (result bool, err error)
 	GetCollectibleGroupByCommunity() (result bool, err error)
 	GetCollectibleGroupByCollection() (result bool, err error)
-	GetTelemetryServerURL() (string, error)
 
 	SetSettingsNotifier(n Notifier)
 	SetSettingLastSynced(setting SettingField, clock uint64) error

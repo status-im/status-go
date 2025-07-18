@@ -364,10 +364,6 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.WakuV2Config.Nameserver = *request.WakuV2Nameserver
 	}
 
-	if request.TelemetryServerURL != "" {
-		nodeConfig.WakuV2Config.TelemetryServerURL = request.TelemetryServerURL
-	}
-
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		InstallationID:             installationID,
 		MaxMessageDeliveryAttempts: DefaultMaxMessageDeliveryAttempts,
