@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"reflect"
+	"slices"
 	"sort"
 
 	"go.uber.org/mock/gomock"
@@ -67,13 +68,7 @@ func (m *AddressSliceMatcher) Matches(x interface{}) bool {
 	sort.Slice(expectedCopy, func(i, j int) bool { return expectedCopy[i].Hex() < expectedCopy[j].Hex() })
 	sort.Slice(actualCopy, func(i, j int) bool { return actualCopy[i].Hex() < actualCopy[j].Hex() })
 
-	for i := range expectedCopy {
-		if expectedCopy[i] != actualCopy[i] {
-			return false
-		}
-	}
-
-	return true
+	return slices.Equal(expectedCopy, actualCopy)
 }
 
 func (m *AddressSliceMatcher) String() string {
@@ -108,13 +103,7 @@ func (m *Uint64SliceMatcher) Matches(x interface{}) bool {
 	sort.Slice(expectedCopy, func(i, j int) bool { return expectedCopy[i] < expectedCopy[j] })
 	sort.Slice(actualCopy, func(i, j int) bool { return actualCopy[i] < actualCopy[j] })
 
-	for i := range expectedCopy {
-		if expectedCopy[i] != actualCopy[i] {
-			return false
-		}
-	}
-
-	return true
+	return slices.Equal(expectedCopy, actualCopy)
 }
 
 func (m *Uint64SliceMatcher) String() string {
