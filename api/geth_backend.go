@@ -59,6 +59,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server/pairing/statecontrol"
 	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
@@ -690,7 +691,6 @@ func (b *GethStatusBackend) convertLoginRequestToAccountRequest(loginRequest *re
 	createAccount.WakuV2LightClient = loginRequest.WakuV2LightClient
 	createAccount.WakuV2EnableMissingMessageVerification = loginRequest.WakuV2EnableMissingMessageVerification
 	createAccount.WakuV2EnableStoreConfirmationForMessagesSent = loginRequest.WakuV2EnableStoreConfirmationForMessagesSent
-	createAccount.TelemetryServerURL = loginRequest.TelemetryServerURL
 	createAccount.VerifyTransactionURL = loginRequest.VerifyTransactionURL
 	createAccount.VerifyENSURL = loginRequest.VerifyENSURL
 	createAccount.VerifyTransactionChainID = loginRequest.VerifyTransactionChainID
@@ -2688,40 +2688,49 @@ func (b *GethStatusBackend) initProtocol() error {
 	if st == nil {
 		return nil
 	}
-
 	chatAccount, err := b.accountsManager.SelectedChatAccount()
 	if err != nil {
 		return err
 	}
-
 	identity := chatAccount.PrivateKey()
-
 	acc, err := b.GetActiveAccount()
 	if err != nil {
 		return err
 	}
-
-	if st != nil {
-		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.walletDB,
-			b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountsManager, b.statusNode.RPCClient(),
-			b.statusNode.WalletService(), b.statusNode.CommunityTokensService(),
-			logutils.ZapLogger(), b.statusNode.AccountsPublisher(), b.statusNode.TimeSource()); err != nil {
-			return err
-		}
-
-		messenger := st.Messenger()
-		// Init public status api
-		b.statusNode.StatusPublicService().Init(messenger)
-		b.statusNode.AccountService().Init(messenger)
-		// Init chat service
-		accDB, err := accounts.NewDB(b.appDB)
-		if err != nil {
-			return err
-		}
-		b.statusNode.ChatService(accDB).Init(messenger)
-		b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
-		b.statusNode.CommunityTokensService().Init(messenger)
+	params := ext.InitProtocolParams{
+		NodeName:               b.statusNode.GethNode().Config().Name,
+		Identity:               identity,
+		AppDB:                  b.appDB,
+		WalletDB:               b.walletDB,
+		HTTPServer:             b.statusNode.HTTPServer(),
+		MultiAccountDB:         b.multiaccountsDB,
+		Account:                acc,
+		AccountsManager:        b.accountsManager,
+		RPCClient:              b.statusNode.RPCClient(),
+		WalletService:          b.statusNode.WalletService(),
+		CommunityTokensService: b.statusNode.CommunityTokensService(),
+		Logger:                 logutils.ZapLogger(),
+		AccountsPublisher:      b.statusNode.AccountsPublisher(),
+		TimeSource:             b.statusNode.TimeSource(),
+		MetricsEnabled:         b.prometheusMetrics != nil,
 	}
+	err = st.InitProtocol(params)
+	if err != nil {
+		return err
+	}
+
+	messenger := st.Messenger()
+	// Init public status api
+	b.statusNode.StatusPublicService().Init(messenger)
+	b.statusNode.AccountService().Init(messenger)
+	// Init chat service
+	accDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
+	b.statusNode.ChatService(accDB).Init(messenger)
+	b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
+	b.statusNode.CommunityTokensService().Init(messenger)
 
 	return nil
 }

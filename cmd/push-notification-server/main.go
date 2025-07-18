@@ -281,7 +281,6 @@ func buildWakuConfig() *wakuv2.Config {
 		UDPPort:                                *UDPPort,
 		AutoUpdate:                             true,
 		DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
-		TelemetryServerURL:                     "",
 		ClusterID:                              16,
 		EnableMissingMessageVerification:       false,
 		EnableStoreConfirmationForMessagesSent: false,

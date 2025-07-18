@@ -86,7 +86,9 @@ type Service struct {
 	accountsDB      *accounts.Database
 	multiAccountsDB *multiaccounts.Database
 	account         *multiaccounts.Account
-	wakumetrics     *wakumetrics.Client
+
+	metricsEnabled bool
+	wakumetrics    *wakumetrics.Client
 }
 
 // Make sure that Service implements node.Service interface.
@@ -102,7 +104,7 @@ func New(
 	}
 }
 
-func newWakuV2(identity *ecdsa.PrivateKey, nodeConfig *params.NodeConfig, appDB *sql.DB, ts *timesource.NTPTimeSource) (*wakuv2.Waku, error) {
+func newWakuV2(identity *ecdsa.PrivateKey, nodeConfig *params.NodeConfig, appDB *sql.DB, ts *timesource.NTPTimeSource, metricsEnabled bool) (*wakuv2.Waku, error) {
 	cfg := &wakuv2.Config{
 		MaxMessageSize:                         wakuv2common.DefaultMaxMessageSize,
 		Host:                                   nodeConfig.WakuV2Config.Host,
@@ -118,11 +120,11 @@ func newWakuV2(identity *ecdsa.PrivateKey, nodeConfig *params.NodeConfig, appDB 
 		UDPPort:                                nodeConfig.WakuV2Config.UDPPort,
 		AutoUpdate:                             nodeConfig.WakuV2Config.AutoUpdate,
 		DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
-		TelemetryServerURL:                     nodeConfig.WakuV2Config.TelemetryServerURL,
 		ClusterID:                              nodeConfig.ClusterConfig.ClusterID,
 		EnableMissingMessageVerification:       nodeConfig.WakuV2Config.EnableMissingMessageVerification,
 		EnableStoreConfirmationForMessagesSent: nodeConfig.WakuV2Config.EnableStoreConfirmationForMessagesSent,
 		UseThrottledPublish:                    true,
+		MetricsEnabled:                         metricsEnabled,
 	}
 
 	// Configure peer exchange and discv5 settings based on node type
@@ -180,15 +182,31 @@ func newWakuV2(identity *ecdsa.PrivateKey, nodeConfig *params.NodeConfig, appDB 
 	return waku, nil
 }
 
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB,
-	httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account,
-	accountsManager *accsmanagement.AccountsManager, rpcClient *rpc.Client, walletService *wallet.Service,
-	communityTokensService *communitytokens.Service, logger *zap.Logger,
-	accountsPublisher *pubsub.Publisher, ts *timesource.NTPTimeSource) error {
+type InitProtocolParams struct {
+	NodeName               string
+	Identity               *ecdsa.PrivateKey
+	AppDB                  *sql.DB
+	WalletDB               *sql.DB
+	HTTPServer             *server.MediaServer
+	MultiAccountDB         *multiaccounts.Database
+	Account                *multiaccounts.Account
+	AccountsManager        *accsmanagement.AccountsManager
+	RPCClient              *rpc.Client
+	WalletService          *wallet.Service
+	CommunityTokensService *communitytokens.Service
+	Logger                 *zap.Logger
+	AccountsPublisher      *pubsub.Publisher
+	TimeSource             *timesource.NTPTimeSource
+	MetricsEnabled         bool
+}
+
+func (s *Service) InitProtocol(params InitProtocolParams) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
 	}
+
+	s.metricsEnabled = params.MetricsEnabled
 
 	// If Messenger has been already set up, we need to shut it down
 	// before we init it again. Otherwise, it will lead to goroutines leakage
@@ -216,33 +234,33 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		MailServerConfirmations:    s.config.ShhextConfig.MailServerConfirmations,
 		EnvelopeEventsHandler:      EnvelopeSignalHandler{},
 	}
-	s.accountsDB, err = accounts.NewDB(appDb)
+	s.accountsDB, err = accounts.NewDB(params.AppDB)
 	if err != nil {
 		return err
 	}
-	s.multiAccountsDB = multiAccountDb
-	s.account = acc
+	s.multiAccountsDB = params.MultiAccountDB
+	s.account = params.Account
 
-	s.waku, err = newWakuV2(identity, &s.config, appDb, ts)
+	s.waku, err = newWakuV2(params.Identity, &s.config, params.AppDB, params.TimeSource, params.MetricsEnabled)
 	if err != nil {
 		return err
 	}
 
 	ensVerifier := ens.New(
-		logger,
+		params.Logger,
 		s.waku, // timesource
-		appDb,
+		params.AppDB,
 		s.config.ShhextConfig.VerifyENSURL,
 		s.config.ShhextConfig.VerifyENSContractAddress,
 	)
 
-	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, logger, &MessengerSignalsHandler{}, accountsManager, accountsPublisher, ensVerifier)
+	options, err := buildMessengerOptions(s.config, params.Identity, params.AppDB, params.WalletDB, params.HTTPServer, s.rpcClient, s.multiAccountsDB, params.Account, envelopeEventsConfig, s.accountsDB, params.WalletService, params.CommunityTokensService, params.Logger, &MessengerSignalsHandler{}, params.AccountsManager, params.AccountsPublisher, ensVerifier)
 	if err != nil {
 		return err
 	}
 
 	messenger, err := protocol.NewMessenger(
-		identity,
+		params.Identity,
 		s.waku,
 		s.config.ShhextConfig.InstallationID,
 		options...,
@@ -346,7 +364,7 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 		return nil, err
 	}
 
-	if s.config.WakuV2Config.TelemetryServerURL != "" {
+	if s.metricsEnabled {
 		err = s.startWakuMetrics()
 		if err != nil {
 			return nil, err

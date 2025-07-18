@@ -45,7 +45,6 @@ type Login struct {
 	WakuV2LightClient                            bool    `json:"wakuV2LightClient"`
 	WakuV2EnableStoreConfirmationForMessagesSent bool    `json:"wakuV2EnableStoreConfirmationForMessagesSent"`
 	WakuV2EnableMissingMessageVerification       bool    `json:"wakuV2EnableMissingMessageVerification"`
-	TelemetryServerURL                           string  `json:"telemetryServerURL"`
 	VerifyTransactionURL                         *string `json:"verifyTransactionURL"`
 	VerifyENSURL                                 *string `json:"verifyENSURL"`
 	VerifyENSContractAddress                     *string `json:"verifyENSContractAddress"`
