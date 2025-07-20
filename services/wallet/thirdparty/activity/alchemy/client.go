@@ -140,6 +140,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 			break
 		}
 	}
+
 	response.Items = TransfersToCommon(responseTransfers, chainID, parameters.Address)
 
 	return response, nil
@@ -183,3 +184,10 @@ func encodeCursor(outgoingCursor string, outgoingDone bool, incomingCursor strin
 	}
 	return fmt.Sprintf(cursorFormat, outgoingCursor, outgoingDone, incomingCursor, incomingDone)
 }
+
+// Local Variables:
+// default-directory: "/Users/vkjr/work/projects/status/status-desktop/vendor/status-go/"
+// compile-command: "go test -v -run ^TestFetchHistoryBoth$ ./tests-unit-network/alchemy-activity"
+// End:
+
+// (setq default-directory "/Users/vkjr/work/projects/status/status-desktop/vendor/status-go/")

@@ -2,6 +2,7 @@ package thirdparty
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -69,4 +70,8 @@ type ActivityEntryContainer ItemsContainer[ActivityEntry]
 type ActivityFetcher interface {
 	ActivityProvider
 	FetchActivity(ctx context.Context, chainID uint64, parameters ActivityFetchParameters, cursor string, limit int) (ActivityEntryContainer, error)
+}
+
+func (e ActivityEntry) String() string {
+	return fmt.Sprintf("%s %v ->%s <-%s", e.TxHash.TerminalString(), e.ActivityType, e.AmountOut.ToInt().String(), e.AmountIn.ToInt().String())
 }

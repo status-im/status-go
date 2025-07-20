@@ -2,6 +2,7 @@ package alchemy
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -64,14 +65,111 @@ func TransfersToCommon(tt []Transfer, chainID uint64, accountAddress common.Addr
 	}
 
 	for _, txTransfers := range transfersPerHash {
-		entries = append(entries, processTxTransfers(txTransfers, chainID, accountAddress)...)
+		fmt.Println("--------------")
+		fmt.Println("Input:")
+		for _, transfer := range txTransfers {
+			fmt.Printf("\tTransfer: %v\n", transfer)
+		}
+
+		// newEntries := processTxTransfers(txTransfers, chainID, accountAddress)
+		newEntries := processTxTransfersV2(txTransfers, chainID, accountAddress)
+		entries = append(entries, newEntries...)
+
+		for _, entry := range newEntries {
+			fmt.Println("Output:")
+			fmt.Printf("\tEntry: %v \n", entry)
+		}
+	}
+
+	return entries
+}
+
+type TransferAnalytics struct {
+	transfersCount           int
+	test                     bool
+	externalTransfers        []Transfer
+	tokenTransfers           []Transfer
+	outboundNonZeroTransfers []Transfer
+	inboundNonZeroTransfers  []Transfer
+}
+
+func (a TransferAnalytics) isContractDeployment() bool {
+	return len(a.externalTransfers) == 1 && a.externalTransfers[0].IsContractDeployment()
+}
+
+func (a TransferAnalytics) isSwapTransfer() bool {
+
+	if len(a.externalTransfers) == 1 {
+		to := a.externalTransfers[0].ToAddress.Hex()
+		_, known := dexRouters[strings.ToLower(to)]
+		return known
+	}
+	return false
+}
+
+func (a TransferAnalytics) isErc20Transfer() bool {
+	if len(a.externalTransfers) == 1 && len(a.tokenTransfers) == 1 {
+		et := a.externalTransfers[0]
+		tt := a.tokenTransfers[0]
+
+		return *et.ToAddress == *tt.RawContract.Address
+	}
+	return false
+}
+
+func analyzeTransfers(txTransfers []Transfer, chainID uint64, accountAddress common.Address) TransferAnalytics {
+
+	analytics := TransferAnalytics{test: true}
+	analytics.test = true
+
+	for _, transfer := range txTransfers {
+		analytics.transfersCount += 1
+		// Transfer(s) or contract interaction
+		if transfer.Category == TransferCategoryExternal {
+			analytics.externalTransfers = append(analytics.externalTransfers, transfer)
+		} else {
+			analytics.tokenTransfers = append(analytics.tokenTransfers, transfer)
+		}
+
+		if transfer.Value > 0 {
+			if transfer.IsIncoming(accountAddress) {
+				analytics.inboundNonZeroTransfers = append(analytics.inboundNonZeroTransfers, transfer)
+			} else {
+				analytics.outboundNonZeroTransfers = append(analytics.outboundNonZeroTransfers, transfer)
+			}
+		}
+	}
+
+	return analytics
+}
+
+func processTxTransfersV2(txTransfers []Transfer, chainID uint64, accountAddress common.Address) []thirdparty.ActivityEntry {
+
+	// Simple transaction, just return the entry
+	if len(txTransfers) == 1 {
+		return transferToEntries(txTransfers[0], chainID, accountAddress)
+	}
+
+	entries := make([]thirdparty.ActivityEntry, 0)
+	analytics := analyzeTransfers(txTransfers, chainID, accountAddress)
+
+	if analytics.isContractDeployment() {
+		entries = transferToEntries(analytics.externalTransfers[0], chainID, accountAddress)
+	} else if analytics.isSwapTransfer() {
+		fmt.Println("SwapDetected!! ", len(analytics.inboundNonZeroTransfers), "-", len(analytics.outboundNonZeroTransfers))
+		if len(analytics.inboundNonZeroTransfers) == 1 && len(analytics.outboundNonZeroTransfers) == 1 {
+			entries = append(entries, makeSwapEntry(analytics.outboundNonZeroTransfers[0], analytics.inboundNonZeroTransfers[0], chainID))
+		}
+	} else if analytics.isErc20Transfer() {
+		entries = transferToEntries(analytics.tokenTransfers[0], chainID, accountAddress)
 	}
 
 	return entries
 }
 
 func processTxTransfers(txTransfers []Transfer, chainID uint64, accountAddress common.Address) []thirdparty.ActivityEntry {
-	fmt.Println("processing tx transfers", len(txTransfers), txTransfers[0].Hash.Hex())
+	// fmt.Println("processing tx transfers", len(txTransfers), txTransfers[0].Hash.Hex())
+
 	// Notes about what Alchemy gives us:
 	// - For contract deployments, we should get a single External transfer with toAddress nil.
 	// - For native transfers, we should get a single External transfer with toAddress equal to the recipient
@@ -140,25 +238,10 @@ type transferData struct {
 	Value *hexutil.Big
 }
 
-func transferToEntries(t Transfer, chainID uint64, accountAddress common.Address) []thirdparty.ActivityEntry {
-	baseEntry := thirdparty.ActivityEntry{
-		Timestamp:   t.Metadata.BlockTimestamp.Unix(),
-		Sender:      t.FromAddress,
-		Recipient:   t.ToAddress,
-		TxHash:      t.Hash,
-		BlockNumber: (*hexutil.Big)(t.BlockNum.Int),
-		TxStatus:    ac.Success,
-	}
-
-	if t.ToAddress == nil {
-		entry := baseEntry
-		entry.ActivityType = ac.ContractDeploymentAT
-		entry.ContractAddress = t.RawContract.Address
-		entry.ChainIDOut = &chainID
-		return []thirdparty.ActivityEntry{entry}
-	}
+func extractTransfersData(t Transfer, chainID uint64) []transferData {
 
 	transfersData := make([]transferData, 0, 1)
+
 	switch t.Category {
 	case TransferCategoryExternal:
 		transfersData = append(transfersData, transferData{
@@ -199,6 +282,28 @@ func transferToEntries(t Transfer, chainID uint64, accountAddress common.Address
 			})
 		}
 	}
+	return transfersData
+}
+
+func transferToEntries(t Transfer, chainID uint64, accountAddress common.Address) []thirdparty.ActivityEntry {
+	baseEntry := thirdparty.ActivityEntry{
+		Timestamp:   t.Metadata.BlockTimestamp.Unix(),
+		Sender:      t.FromAddress,
+		Recipient:   t.ToAddress,
+		TxHash:      t.Hash,
+		BlockNumber: (*hexutil.Big)(t.BlockNum.Int),
+		TxStatus:    ac.Success,
+	}
+
+	if t.ToAddress == nil {
+		entry := baseEntry
+		entry.ActivityType = ac.ContractDeploymentAT
+		entry.ContractAddress = t.RawContract.Address
+		entry.ChainIDOut = &chainID
+		return []thirdparty.ActivityEntry{entry}
+	}
+
+	transfersData := extractTransfersData(t, chainID)
 
 	entries := make([]thirdparty.ActivityEntry, 0, len(transfersData))
 	for _, td := range transfersData {
@@ -218,6 +323,33 @@ func transferToEntries(t Transfer, chainID uint64, accountAddress common.Address
 		entries = append(entries, entry)
 	}
 	return entries
+}
+
+func makeSwapEntry(outbound Transfer, inbound Transfer, chainID uint64) thirdparty.ActivityEntry {
+
+	outboundTd := extractTransfersData(outbound, chainID)[0]
+	inboundTd := extractTransfersData(inbound, chainID)[0]
+
+	return thirdparty.ActivityEntry{
+		Timestamp:       outbound.Metadata.BlockTimestamp.Unix(),
+		ActivityType:    ac.SwapAT,
+		AmountOut:       outboundTd.Value,
+		AmountIn:        inboundTd.Value,
+		TokenOut:        &outboundTd.Token,
+		TokenIn:         &inboundTd.Token,
+		Sender:          outbound.FromAddress,
+		Recipient:       inbound.ToAddress,
+		ChainIDOut:      &chainID,
+		ChainIDIn:       &chainID,
+		ContractAddress: outbound.RawContract.Address,
+		TxHash:          outbound.Hash,
+		BlockNumber:     (*hexutil.Big)(outbound.BlockNum.Int),
+		TxStatus:        ac.Success,
+	}
+
+	// TxHash          common.Hash     `json:"txHash"`
+	// BlockNumber     *hexutil.Big    `json:"blockNumber"`
+	// TxStatus        ac.TxStatus     `json:"txStatus"`
 }
 
 func transferToContractInteractionEntry(t Transfer, chainID uint64) thirdparty.ActivityEntry {
@@ -240,6 +372,7 @@ type Transfer struct {
 	BlockNum        *bigint.VarHexBigInt `json:"blockNum"`
 	FromAddress     common.Address       `json:"from"`
 	ToAddress       *common.Address      `json:"to,omitempty"`
+	Value           float64              `json:"value,omitempty"`
 	Erc1155Metadata []Erc1155Metadata    `json:"erc1155Metadata,omitempty"`
 	TokenID         *bigint.VarHexBigInt `json:"tokenId"`
 	Asset           string               `json:"asset"`
@@ -247,6 +380,30 @@ type Transfer struct {
 	Hash            common.Hash          `json:"hash"`
 	RawContract     RawContract          `json:"rawContract"`
 	Metadata        Metadata             `json:"metadata"`
+}
+
+var dexRouters = map[string]string{
+	"0x7a250d5630b4cf539739df2c5dacb4c659f2488d": "Uniswap V2",
+	"0xe592427a0aece92de3edee1f18e0157c05861564": "Uniswap V3",
+	"0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45": "Uniswap V3",
+	"0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f": "SushiSwap",
+	"0x1111111254eeb25477b68fb85ed929f73a960582": "1inch",
+	"0x1111111254fb6c44bac0bed2854e76f90643097d": "1inch",
+	"0xba12222222228d8ba445958a75a0704d566bf2c8": "Balancer V2",
+	"0x99a58482bef6a0b58cf15a81c4b666b64ab56abc": "Curve",
+	"0x881d40237659c251811cec9c364ef91dc08d300c": "MetaMask Swap",
+}
+
+func addressToKnownDex(address string) string {
+	router, ok := dexRouters[strings.ToLower(address)]
+	if !ok {
+		return address
+	}
+	return router
+}
+
+func (t Transfer) String() string {
+	return fmt.Sprintf("%s %8s %5s %13.7f %s->%s, %s", t.Hash.TerminalString(), t.Category, t.Asset, t.Value, t.FromAddress.Hex(), addressToKnownDex(t.ToAddress.Hex()), t.RawContract.Address)
 }
 
 func (t Transfer) IsContractDeployment() bool {
