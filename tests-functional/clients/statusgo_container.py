@@ -10,6 +10,7 @@ import docker
 import docker.errors
 from docker.errors import APIError
 
+from clients.metrics import ContainerStats
 from utils.config import Config
 
 DATA_DIR = "/usr/status-user"
@@ -26,6 +27,11 @@ class StatusGoContainer:
         # Initialize stop event for monitoring thread
         self._stop_monitoring = threading.Event()
         self.health_monitor = None
+        self._stop_perf_monitoring = threading.Event()
+        self.perf_monitor = None
+
+        # Initialize performance metrics container
+        self.stats = list[ContainerStats]()
 
         # Prepare image and container name
         # NOTE: This part needs some love.
@@ -88,6 +94,15 @@ class StatusGoContainer:
     def data_dir(self):
         return DATA_DIR
 
+    def id(self):
+        return self.container.id if self.container else ""
+
+    def short_id(self):
+        return self.container.id[:8] if self.container else ""
+
+    def name(self):
+        return self.container.name if self.container else ""
+
     def _check_container_health(self):
         """Check if container is healthy"""
         if not self.container:
@@ -117,6 +132,46 @@ class StatusGoContainer:
         self.health_monitor = threading.Thread(target=monitor, daemon=True)
         self.health_monitor.start()
 
+    def start_performance_monitoring(self):
+        """Start a background performance monitoring thread that collects CPU and memory metrics"""
+        # Reset metrics storage
+        self.stats = list[ContainerStats]()
+        self._stop_perf_monitoring = threading.Event()
+
+        def monitor_performance():
+            stats_stream = self.docker_client.api.stats(self.id(), decode=True, stream=True)
+            prev_stat = None  # Store previous stat for rate calculations
+
+            for stat in stats_stream:
+                # Create ContainerStats with previous stat for network rate calculation
+                container_stats = ContainerStats(stat, prev_stat)
+                self.stats.append(container_stats)
+
+                # Store current stat as previous for the next iteration
+                prev_stat = stat
+
+                if self._stop_perf_monitoring.is_set():
+                    break
+
+            logging.debug(f"Performance monitoring stopped for container {self.name()}")
+
+        self._stop_perf_monitoring.clear()  # Reset the event
+        self.perf_monitor = threading.Thread(target=monitor_performance, daemon=True)
+        self.perf_monitor.start()
+        logging.info(f"Started performance monitoring for container {self.name()}")
+
+    def stop_performance_monitoring(self):
+        """Stop the performance monitoring thread and return the collected metrics"""
+        self._stop_perf_monitoring.set()  # Signal the thread to stop
+        if not self.perf_monitor or not self.perf_monitor.is_alive():
+            return None
+
+        self.perf_monitor.join(timeout=10)
+        if self.perf_monitor.is_alive():
+            logging.warning("Performance monitoring thread didn't stop gracefully")
+
+        return self.stats
+
     def stop_health_monitoring(self):
         """Stop the health monitoring thread"""
         self._stop_monitoring.set()  # Signal the thread to stop
@@ -128,7 +183,9 @@ class StatusGoContainer:
 
     def stop(self):
         """Stop the container and monitoring"""
-        self.stop_health_monitoring()  # Stop monitoring first
+        self.stop_health_monitoring()  # Stop health monitoring first
+        if hasattr(self, "_stop_perf_monitoring"):
+            self.stop_performance_monitoring()  # Stop performance monitoring if running
         if self.container:
             logging.debug(f"Stopping container {self.container.name}...")
             self.container.stop(timeout=10)
