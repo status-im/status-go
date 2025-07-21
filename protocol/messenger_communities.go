@@ -2385,7 +2385,7 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 
 	var chats []*Chat
 	for chatID, chat := range changes.ChatsAdded {
-		c := CreateCommunityChat(changes.Community.IDString(), chatID, chat, m.getTimesource())
+		c := CreateCommunityChat(changes.Community, chat, chatID, m.getTimesource())
 		chats = append(chats, c)
 		response.AddChat(c)
 	}
@@ -2414,7 +2414,7 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 
 	var chats []*Chat
 	for chatID, change := range changes.ChatsModified {
-		c := CreateCommunityChat(community.IDString(), chatID, change.ChatModified, m.getTimesource())
+		c := CreateCommunityChat(community, change.ChatModified, chatID, m.getTimesource())
 		chats = append(chats, c)
 		response.AddChat(c)
 	}

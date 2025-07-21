@@ -863,7 +863,8 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeDeviceChanged() {
 	s.Require().NoError(err)
 	s.Require().Len(community.Members(), 2)
 	for _, chat := range community.Chats() {
-		s.Require().Len(chat.Members, 2)
+		// All chats are public, so no members
+		s.Require().Len(chat.Members, 0)
 	}
 
 	// Bob will receive request to share RevealedAddresses and send request to join to the control node

@@ -643,7 +643,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 
 				community = changes.Community
 				for chatID, chat := range changes.ChatsAdded {
-					newChat = CreateCommunityChat(request.CommunityID.String(), chatID, chat, m.getTimesource())
+					newChat = CreateCommunityChat(community, chat, chatID, m.getTimesource())
 				}
 
 				progressValue = float32(1.0)
@@ -1242,7 +1242,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				// as we iterate over `ChatsAdded`, however at this point we
 				// know there was only a single such change (and it's a map)
 				for chatID, chat := range changes.ChatsAdded {
-					c := CreateCommunityChat(communityID, chatID, chat, m.getTimesource())
+					c := CreateCommunityChat(discordCommunity, chat, chatID, m.getTimesource())
 					createdChats[c.ID] = c
 					chatsToSave = append(chatsToSave, c)
 					processedChannelIds[channel.Channel.ID] = c.ID

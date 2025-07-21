@@ -520,7 +520,7 @@ func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource comm
 	}
 }
 
-func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource) *Chat {
+func createCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource) *Chat {
 	color := orgChat.Identity.Color
 	if color == "" {
 		color = chatColors[rand.Intn(len(chatColors))] // nolint: gosec
@@ -556,6 +556,16 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 		FirstMessageTimestamp:    orgChat.Identity.FirstMessageTimestamp,
 		ViewersCanPostReactions:  orgChat.ViewersCanPostReactions,
 	}
+}
+
+func CreateCommunityChat(org *communities.Community, orgChat *protobuf.CommunityChat, chatID string, timesource common.TimeSource) *Chat {
+	orgID := org.IDString()
+	chat := createCommunityChat(orgID, chatID, orgChat, timesource)
+	// No need for members in public channels
+	if !org.ChannelEncrypted(chatID) {
+		chat.Members = []ChatMember{}
+	}
+	return chat
 }
 
 func (c *Chat) CommunityChannelID() string {
@@ -595,10 +605,9 @@ func (c *Chat) DeepLink() string {
 
 func CreateCommunityChats(org *communities.Community, timesource common.TimeSource) []*Chat {
 	var chats []*Chat
-	orgID := org.IDString()
-
 	for chatID, chat := range org.Chats() {
-		chats = append(chats, CreateCommunityChat(orgID, chatID, chat, timesource))
+		chat := CreateCommunityChat(org, chat, chatID, timesource)
+		chats = append(chats, chat)
 	}
 	return chats
 }

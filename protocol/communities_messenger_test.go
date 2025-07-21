@@ -4548,9 +4548,9 @@ func (s *MessengerCommunitiesSuite) TestOpenAndNotJoinedCommunityNewChannelIsNot
 	s.Require().Len(response.CommunityChanges[0].ChatsAdded, 1)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Chats()[0].Members, 2)
+	s.Require().Len(response.Chats()[0].Members, 0)
 	for _, chat := range response.Communities()[0].Chats() {
-		s.Require().Len(chat.Members, 2)
+		s.Require().Len(chat.Members, 0)
 	}
 
 	// Check Alice gets the correct member list for a new channel
@@ -4559,16 +4559,16 @@ func (s *MessengerCommunitiesSuite) TestOpenAndNotJoinedCommunityNewChannelIsNot
 		func(r *MessengerResponse) bool {
 			if len(r.Chats()) == 1 && len(r.Communities()) > 0 {
 				for _, chat := range r.Chats() {
-					s.Require().Len(chat.Members, 2)
+					s.Require().Len(chat.Members, 0)
 				}
 				for _, chat := range r.Communities()[0].Chats() {
-					s.Require().Len(chat.Members, 2)
+					s.Require().Len(chat.Members, 0)
 				}
 				return true
 			}
 			return false
 		},
-		"no commiunity message for Alice",
+		"no community message for Alice",
 	)
 	s.Require().NoError(err)
 
@@ -4576,7 +4576,7 @@ func (s *MessengerCommunitiesSuite) TestOpenAndNotJoinedCommunityNewChannelIsNot
 	s.Require().NoError(err)
 	s.Require().Len(aliceCommunity.Chats(), 2)
 	for _, chat := range aliceCommunity.Chats() {
-		s.Require().Len(chat.Members, 2)
+		s.Require().Len(chat.Members, 0)
 	}
 }
 
