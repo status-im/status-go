@@ -76,6 +76,7 @@ func (s *MessengerCommunityChatsUnitSuite) TestEditCommunityChat_GlobalCommunity
 	communityResponse, err := s.m.CreateCommunity(description, false)
 	s.Require().NoError(err)
 	community := communityResponse.Communities()[0]
+	s.Require().Len(community.Members(), 1, "Community should have one member initially")
 
 	// Verify that the global community content topic filter is set
 	universalChatFilter := s.m.messaging.ChatFilterByChatID(community.UniversalChatID())
@@ -98,6 +99,7 @@ func (s *MessengerCommunityChatsUnitSuite) TestEditCommunityChat_GlobalCommunity
 
 	createdChat := createResponse.Chats()[0]
 	chatID := createdChat.CommunityChatID()
+	s.Require().Len(createdChat.Members, 0, "Created chat should have no members initially")
 
 	// Edit the chat
 	editedChat := &protobuf.CommunityChat{

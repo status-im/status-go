@@ -1559,21 +1559,37 @@ func TestSaveCommunityChat(t *testing.T) {
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
 
-	identity := &protobuf.ChatIdentity{
-		DisplayName:           "community-chat-name",
-		Description:           "community-chat-name-description",
-		FirstMessageTimestamp: 1,
-	}
-	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
+	chat := &Chat{
+		ID:          "test-community-chat-id",
+		Name:        "test-community-chat-name",
+		Description: "test-community-chat-description",
+		Color:       "#000000",
+		Emoji:       "test-emoji",
+		Active:      true,
+		Timestamp:   1,
+		// LastClockValue:        1,
+		DeletedAtClockValue:      0,
+		ReadMessagesAtClockValue: 0,
+		UnviewedMessagesCount:    0,
+		UnviewedMentionsCount:    0,
+		LastMessage:              nil,
+		Members:                  []ChatMember{},
+		MembershipUpdates:        nil,
+		Muted:                    false,
+		MuteTill:                 time.Time{},
+		InvitationAdmin:          "",
+		ReceivedInvitationAdmin:  "",
+		Profile:                  "",
+		CommunityID:              "test-community-id",
+		Joined:                   0,
+		SyncedTo:                 0,
+		SyncedFrom:               0,
+		FirstMessageTimestamp:    0,
+		Highlight:                false,
+		Base64Image:              "",
+		HideIfPermissionsNotMet:  false,
 	}
 
-	communityChat := &protobuf.CommunityChat{
-		Identity:    identity,
-		Permissions: permissions,
-	}
-
-	chat := CreateCommunityChat("test-or-gid", "test-chat-id", communityChat, &testTimeSource{})
 	chat.LastMessage = common.NewMessage()
 	err = p.SaveChat(*chat)
 	require.NoError(t, err)

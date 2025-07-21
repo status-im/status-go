@@ -711,7 +711,14 @@ func (o *Community) getChatMember(pk *ecdsa.PublicKey, chatID string) *protobuf.
 	}
 
 	key := common.PubkeyToHex(pk)
-	return chat.Members[key]
+	member := chat.Members[key]
+
+	if member == nil && !channelEncrypted(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
+		// User is a member of the community, but not in the chat. The chat is public, so we return the community member.
+		return o.getMember(pk)
+	}
+
+	return member
 }
 
 func (o *Community) hasMember(pk *ecdsa.PublicKey) bool {
@@ -1690,17 +1697,18 @@ func dehydrateChannelsMembers(description *protobuf.CommunityDescription) {
 	for channelID, channel := range description.Chats {
 		if !channelHasPermissions(ChatID(description.ID, channelID), description.TokenPermissions) {
 			channel.Members = map[string]*protobuf.CommunityMember{} // clean members
-		}
-	}
-}
-
-func hydrateChannelsMembers(description *protobuf.CommunityDescription) {
-	for channelID, channel := range description.Chats {
-		if !channelHasPermissions(ChatID(description.ID, channelID), description.TokenPermissions) {
-			channel.Members = make(map[string]*protobuf.CommunityMember)
-			for pubKey, member := range description.Members {
-				channel.Members[pubKey] = member
+		} else if !channelEncrypted(ChatID(description.ID, channelID), description.TokenPermissions) {
+			// Has some permissions, but not encrypted. Everyone can view, only members can post.
+			membersToKeep := make(map[string]*protobuf.CommunityMember)
+			for id, member := range channel.Members {
+				isViewer := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
+				if !isViewer {
+					// If the member is a viewer, we can remove them from the channel members
+					// as they are not allowed to post anyway.
+					membersToKeep[id] = member
+				}
 			}
+			channel.Members = membersToKeep // keep only members that can post
 		}
 	}
 }
@@ -1927,6 +1935,12 @@ func channelEncrypted(chatID string, permissions map[string]*protobuf.CommunityT
 	return hasPermission && !viewableByEveryone
 }
 
+func (o *Community) ChannelHasPermissions(channelID string) bool {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	return channelHasPermissions(o.ChatID(channelID), o.config.CommunityDescription.TokenPermissions)
+}
+
 func (o *Community) channelEncrypted(channelID string) bool {
 	return channelEncrypted(o.ChatID(channelID), o.config.CommunityDescription.TokenPermissions)
 }
@@ -2118,7 +2132,7 @@ func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) bool {
 	}
 
 	// community creator can always post, return immediately
-	if common.IsPubKeyEqual(pk, o.ControlNode()) {
+	if common.IsPubKeyEqual(pk, o.ControlNode()) || o.IsPrivilegedMember(pk) {
 		return true
 	}
 
@@ -2139,6 +2153,10 @@ func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) bool {
 		return false
 	}
 
+	if !channelEncrypted(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
+		return true
+	}
+
 	if chat.Members == nil {
 		o.config.Logger.Debug("Community.CanView: no members in chat", zap.String("chat-id", chatID))
 		return false
@@ -2154,8 +2172,18 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType prot
 		return false, nil
 	}
 
+	if o.IsPrivilegedMember(pk) || common.IsPubKeyEqual(pk, o.ControlNode()) {
+		// If the user is a privileged member, they can post in any chat
+		return true, nil
+	}
+
 	chat := o.config.CommunityDescription.Chats[chatID]
 	member := chat.Members[common.PubkeyToHex(pk)]
+
+	// Channels with permissions require the member to be present
+	if member == nil && channelHasPermissions(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
+		return false, nil
+	}
 
 	switch messageType {
 	case protobuf.ApplicationMetadataMessage_PIN_MESSAGE:
@@ -2369,49 +2397,6 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey,
 	return changes, nil
 }
 
-func (o *Community) PopulateChannelsWithAllMembers() {
-	members := o.Members()
-	for _, channel := range o.Chats() {
-		channel.Members = members
-	}
-	o.increaseClock()
-}
-
-func (o *Community) PopulateChatWithAllMembers(chatID string) (*CommunityChanges, error) {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
-	if !o.IsControlNode() {
-		return o.emptyCommunityChanges(), ErrNotControlNode
-	}
-
-	return o.populateChatWithAllMembers(chatID)
-}
-
-func (o *Community) populateChatWithAllMembers(chatID string) (*CommunityChanges, error) {
-	result := o.emptyCommunityChanges()
-
-	chat, exists := o.chats()[chatID]
-	if !exists {
-		return result, ErrChatNotFound
-	}
-
-	membersAdded := make(map[string]*protobuf.CommunityMember)
-	for pubKey, member := range o.Members() {
-		if chat.Members[pubKey] == nil {
-			membersAdded[pubKey] = member
-		}
-	}
-	result.ChatsModified[chatID] = &CommunityChatChanges{
-		MembersAdded: membersAdded,
-	}
-
-	chat.Members = o.Members()
-	o.increaseClock()
-
-	return result, nil
-}
-
 func ChatID(communityID, channelID string) string {
 	return communityID + channelID
 }
@@ -2601,11 +2586,6 @@ func (o *Community) createChat(chatID string, chat *protobuf.CommunityChat) erro
 		if c.CategoryId == chat.CategoryId {
 			chat.Position++
 		}
-	}
-
-	chat.Members = make(map[string]*protobuf.CommunityMember)
-	for pubKey, member := range o.config.CommunityDescription.Members {
-		chat.Members[pubKey] = member
 	}
 
 	o.config.CommunityDescription.Chats[chatID] = chat
