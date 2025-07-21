@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -130,6 +131,10 @@ func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
 		zap.String("backend geth version", version.Version()),
 		zap.String("commit", version.GitCommit()),
 		zap.String("IpfsGatewayURL", params.IpfsGatewayURL))
+
+	if gocommon.IsMobilePlatform() {
+		debug.SetMemoryLimit(1024 * 1024 * 150) // 150MB
+	}
 
 	return backend
 }
