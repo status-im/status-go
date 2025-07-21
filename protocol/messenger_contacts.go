@@ -781,6 +781,7 @@ func (m *Messenger) updateContactImagesURL(contact *Contact) error {
 				return err
 			}
 			v.LocalURL = m.httpServer.MakeContactImageURL(common.PubkeyToHex(publicKey), k, v.Clock)
+			v.Payload = nil
 			contact.Images[k] = v
 		}
 	}
