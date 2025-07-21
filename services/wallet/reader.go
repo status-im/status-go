@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/market"
@@ -558,7 +559,8 @@ func (r *Reader) FetchBalances(ctx context.Context, clients map[uint64]chain.Cli
 
 	connectedPerChain := map[uint64]bool{}
 	for chainID, client := range clients {
-		connectedPerChain[chainID] = client.IsConnected()
+		// Checked post-request, it should either be Up or Down
+		connectedPerChain[chainID] = client.GetConnectionStatus() == rpcstatus.StatusUp
 	}
 
 	tokens := r.balancesToTokensByAddress(connectedPerChain, addresses, allTokens, balances, cachedTokens)
@@ -588,7 +590,8 @@ func (r *Reader) GetCachedBalances(clients map[uint64]chain.ClientInterface, add
 
 	connectedPerChain := map[uint64]bool{}
 	for chainID, client := range clients {
-		connectedPerChain[chainID] = client.IsConnected()
+		// Checked post-request, it should either be Up or Down
+		connectedPerChain[chainID] = client.GetConnectionStatus() == rpcstatus.StatusUp
 	}
 
 	balances, err := tokensToBalancesPerChain(cachedTokens)

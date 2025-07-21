@@ -110,29 +110,31 @@ func (c *Controller) startAccountWatcher() {
 }
 
 func (c *Controller) startNetworksWatcher() {
-	if c.rpcClient != nil && c.rpcClient.NetworkManager != nil {
-		networksPublisher := c.rpcClient.NetworkManager.GetPublisher()
-		if networksPublisher == nil {
-			return
-		}
-
-		ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](networksPublisher, 10)
-		go func() {
-			defer gocommon.LogOnPanic()
-			defer unsubFn()
-			for {
-				select {
-				case <-c.stopCh:
-					return
-				case _, ok := <-ch:
-					if !ok {
-						return
-					}
-					c.restartReactor()
-				}
-			}
-		}()
+	if c.rpcClient == nil {
+		return
 	}
+
+	networksPublisher := c.rpcClient.GetNetworksPublisher()
+	if networksPublisher == nil {
+		return
+	}
+
+	ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](networksPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubFn()
+		for {
+			select {
+			case <-c.stopCh:
+				return
+			case _, ok := <-ch:
+				if !ok {
+					return
+				}
+				c.restartReactor()
+			}
+		}
+	}()
 }
 
 func (c *Controller) restartReactor() {
@@ -155,7 +157,7 @@ func (c *Controller) restartReactor() {
 
 	logutils.ZapLogger().Debug("list of accounts was changed from a previous version. reactor will be restarted", zap.Stringers("new", currentAddresses))
 
-	currentNetworks, err := c.rpcClient.NetworkManager.Get(false)
+	currentNetworks, err := c.rpcClient.GetNetworkManager().Get(false)
 	if err != nil {
 		logutils.ZapLogger().Error("failed getting active networks", zap.Error(err))
 		return

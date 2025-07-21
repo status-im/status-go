@@ -23,12 +23,14 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multicommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
@@ -585,19 +587,6 @@ func (tc *TestClient) CallContext(ctx context.Context, result interface{}, metho
 	return err
 }
 
-func (tc *TestClient) GetWalletNotifier() func(chainId uint64, message string) {
-	if tc.traceAPICalls {
-		tc.t.Log("GetWalletNotifier")
-	}
-	return nil
-}
-
-func (tc *TestClient) SetWalletNotifier(notifier func(chainId uint64, message string)) {
-	if tc.traceAPICalls {
-		tc.t.Log("SetWalletNotifier")
-	}
-}
-
 func (tc *TestClient) EstimateGas(ctx context.Context, call ethereum.CallMsg) (gas uint64, err error) {
 	err = tc.countAndlog("EstimateGas")
 	return 0, err
@@ -716,12 +705,12 @@ func (tc *TestClient) SetIsConnected(value bool) {
 	}
 }
 
-func (tc *TestClient) IsConnected() bool {
+func (tc *TestClient) GetConnectionStatus() rpcstatus.StatusType {
 	if tc.traceAPICalls {
-		tc.t.Log("GetIsConnected")
+		tc.t.Log("GetConnectionStatus")
 	}
 
-	return true
+	return rpcstatus.StatusUp
 }
 
 func (tc *TestClient) GetLimiter() rpclimiter.RequestLimiter {
@@ -1132,7 +1121,6 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appDb,
-		WalletFeed:      nil,
 	}
 	client, err := statusRpc.NewClient(config)
 	require.NoError(t, err)
@@ -1392,7 +1380,6 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1504,7 +1491,6 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 			UpstreamChainID: 1,
 			Networks:        []params.Network{},
 			DB:              appdb,
-			WalletFeed:      nil,
 		}
 		client, _ := statusRpc.NewClient(config)
 
@@ -1573,7 +1559,6 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1695,7 +1680,6 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1823,7 +1807,6 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 

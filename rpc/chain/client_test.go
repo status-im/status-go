@@ -92,12 +92,10 @@ func TestClientWithFallback_Copy(t *testing.T) {
 	// Setup test values
 	testTag := "test-tag"
 	testGroupTag := "test-group-tag"
-	testNotifier := func(chainId uint64, message string) {}
 
 	// Set values on the original client
 	client.tag = testTag
 	client.groupTag = testGroupTag
-	client.WalletNotifier = testNotifier
 
 	// Copy the client
 	clientCopy := client.Copy().(*ClientWithFallback)
@@ -106,7 +104,6 @@ func TestClientWithFallback_Copy(t *testing.T) {
 	require.Equal(t, client.ChainID, clientCopy.ChainID)
 	require.Equal(t, client.tag, clientCopy.tag)
 	require.Equal(t, client.groupTag, clientCopy.groupTag)
-	require.Equal(t, client.LastCheckedAt, clientCopy.LastCheckedAt)
 
 	// Verify that both clients have the same ethClients slice
 	require.Equal(t, len(client.ethClients), len(clientCopy.ethClients))
@@ -115,14 +112,8 @@ func TestClientWithFallback_Copy(t *testing.T) {
 	}
 
 	// Check that pointer values are the same (shallow copy)
-	require.Same(t, client.isConnected, clientCopy.isConnected)
 	require.Same(t, client.circuitbreaker, clientCopy.circuitbreaker)
 	require.Same(t, client.providersHealthManager, clientCopy.providersHealthManager)
-
-	// Verify that function references are the same
-	clientFuncPtr := getFuncPtr(client.WalletNotifier)
-	copyFuncPtr := getFuncPtr(clientCopy.WalletNotifier)
-	require.Equal(t, clientFuncPtr, copyFuncPtr)
 
 	// Modify the copy, ensure it doesn't affect the original
 	clientCopy.tag = "new-tag"
@@ -137,66 +128,6 @@ func getFuncPtr(f func(uint64, string)) uintptr {
 		return 0
 	}
 	return reflect.ValueOf(f).Pointer()
-}
-
-// TestClientWithFallback_NilClientPanic tests that a nil pointer panic occurs
-// when the client's internal state is nullified during operation
-func TestClientWithFallback_NilClientPanic(t *testing.T) {
-	client, ethClients, cleanup := setupClientTest(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	addr := common.HexToAddress("0x1234")
-
-	// Create channels to coordinate the test
-	done := make(chan struct{})
-	operationStarted := make(chan struct{})
-	stateNulled := make(chan struct{})
-
-	// Set up the first client to block for a short time
-	ethClients[0].EXPECT().CodeAt(ctx, addr, nil).DoAndReturn(
-		func(ctx context.Context, addr common.Address, blockNumber *big.Int) ([]byte, error) {
-			close(operationStarted) // Signal that operation has started
-			<-stateNulled           // Wait until state is nulled
-			return nil, errors.New("timeout")
-		}).Times(1)
-
-	// Set up expectations for other clients
-	ethClients[1].EXPECT().CodeAt(ctx, addr, nil).Return(nil, errors.New("error")).Times(1)
-	ethClients[2].EXPECT().CodeAt(ctx, addr, nil).Return(nil, errors.New("error")).Times(1)
-
-	// Start the operation in a goroutine
-	go func() {
-		defer close(done)
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic but got none")
-			} else {
-				// Verify it's the expected nil pointer panic
-				if _, ok := r.(runtime.Error); !ok {
-					t.Errorf("Expected runtime error, got: %v", r)
-				}
-			}
-		}()
-
-		// Start the operation that should trigger the panic
-		_, _ = client.CodeAt(ctx, addr, nil)
-		t.Error("Expected panic, but operation completed successfully")
-	}()
-
-	// Wait for operation to start
-	<-operationStarted
-
-	// Nullify the client's internal state while operation is running
-	client.ethClients = nil
-	client.circuitbreaker = nil
-	client.commonLimiter = nil
-	client.providersHealthManager = nil
-	client.isConnected = nil
-	close(stateNulled)
-
-	// Wait for the operation to complete
-	<-done
 }
 
 // TestClientWithFallback_CloseStopsOperations tests that closing the client

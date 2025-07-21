@@ -79,7 +79,7 @@ func NewService(db *sql.DB, accountsDB *accounts.Database, accountsPublisher *pu
 		accountsPublisher: accountsPublisher,
 		eventFeed:         eventFeed,
 		rpcClient:         rpcClient,
-		networkManager:    rpcClient.NetworkManager,
+		networkManager:    rpcClient.GetNetworkManager(),
 		tokenManager:      tokenManager,
 		exchange:          NewExchange(marketManager),
 		balanceCache:      balanceCache,

@@ -54,7 +54,6 @@ func (s *ProxySuite) startRpcClient(infuraURL string) *Client {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              db,
-		WalletFeed:      nil,
 	}
 	c, err := NewClient(config)
 	require.NoError(s.T(), err)

@@ -16,8 +16,6 @@ import (
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/ethereum/go-ethereum/event"
-
 	appCommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/logutils"
@@ -30,7 +28,6 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 const (
@@ -47,8 +44,6 @@ const (
 	// rpcUserAgentUpstreamFormat a separate user agent format for upstream, because we should not be using upstream
 	// if we see this user agent in the logs that means parts of the application are using a malconfigured http client
 	rpcUserAgentUpstreamFormat = "procuratee-%s-upstream/%s"
-
-	EventBlockchainHealthChanged walletevent.EventType = "wallet-blockchain-health-changed" // Full status of the blockchain (including provider statuses)
 )
 
 // List of RPC client errors.
@@ -100,18 +95,16 @@ type Client struct {
 	limiterPerProvider map[string]*rpclimiter.RPCRpsLimiter
 
 	router         *router
-	NetworkManager *network.Manager
+	networkManager *network.Manager
 
 	healthMgr          *healthmanager.BlockchainHealthManager
 	stopMonitoringFunc context.CancelFunc
 	accountsPublisher  *pubsub.Publisher
-	walletFeed         *event.Feed
+	signalsTransmitter *SignalsTransmitter
 
 	handlersMx sync.RWMutex       // mx guards handlers
 	handlers   map[string]Handler // locally registered handlers
 	logger     *zap.Logger
-
-	walletNotifier func(chainID uint64, message string)
 }
 
 // Is initialized in a build-tag-dependent module
@@ -124,7 +117,6 @@ type ClientConfig struct {
 	Networks          []params.Network
 	DB                *sql.DB
 	AccountsPublisher *pubsub.Publisher
-	WalletFeed        *event.Feed
 }
 
 // NewClient initializes Client
@@ -146,14 +138,14 @@ func NewClient(config ClientConfig) (*Client, error) {
 
 	c := Client{
 		local:              config.Client,
-		NetworkManager:     networkManager,
+		networkManager:     networkManager,
 		handlers:           make(map[string]Handler),
 		rpcClients:         make(map[uint64]chain.ClientInterface),
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		logger:             logger,
 		healthMgr:          healthmanager.NewBlockchainHealthManager(),
 		accountsPublisher:  config.AccountsPublisher,
-		walletFeed:         config.WalletFeed,
+		signalsTransmitter: NewSignalsTransmitter(networkManager.GetPublisher()),
 	}
 
 	c.UpstreamChainID = config.UpstreamChainID
@@ -167,7 +159,10 @@ func NewClient(config ClientConfig) (*Client, error) {
 }
 
 func (c *Client) Start(ctx context.Context) {
-	c.NetworkManager.Start()
+	if err := c.signalsTransmitter.Start(); err != nil {
+		c.logger.Error("Failed to start signals transmitter", zap.Error(err))
+	}
+	c.networkManager.Start()
 
 	if c.stopMonitoringFunc != nil {
 		c.logger.Warn("Blockchain health manager already started")
@@ -177,11 +172,15 @@ func (c *Client) Start(ctx context.Context) {
 	cancelableCtx, cancel := context.WithCancel(ctx)
 	c.stopMonitoringFunc = cancel
 	statusCh := c.healthMgr.Subscribe()
-	go c.monitorHealth(cancelableCtx, statusCh)
+	go func() {
+		defer appCommon.LogOnPanic()
+		c.monitorHealth(cancelableCtx, statusCh)
+	}()
 }
 
 func (c *Client) Stop() {
-	c.NetworkManager.Stop()
+	c.signalsTransmitter.Stop()
+	c.networkManager.Stop()
 
 	c.rpcClientsMutex.Lock()
 	for _, client := range c.rpcClients {
@@ -198,23 +197,13 @@ func (c *Client) Stop() {
 }
 
 func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
-	defer appCommon.LogOnPanic()
 	sendFullStatusEventFunc := func() {
-		blockchainStatus := c.healthMgr.GetFullStatus()
-		encodedMessage, err := json.Marshal(blockchainStatus)
-		if err != nil {
-			c.logger.Warn("could not marshal full blockchain status", zap.Error(err))
+		publisher := c.GetNetworksPublisher()
+		if publisher == nil {
 			return
 		}
-		if c.walletFeed == nil {
-			return
-		}
-		// FIXME: remove these excessive logs in future release (2.31+)
-		c.logger.Debug("Sending blockchain health status event", zap.String("status", string(encodedMessage)))
-		c.walletFeed.Send(walletevent.Event{
-			Type:    EventBlockchainHealthChanged,
-			Message: string(encodedMessage),
-			At:      time.Now().Unix(),
+		pubsub.Publish(publisher, EventBlockchainHealthChanged{
+			FullStatus: c.healthMgr.GetFullStatus(),
 		})
 	}
 
@@ -233,24 +222,24 @@ func (c *Client) GetHealthManagerFullStatus() healthmanager.BlockchainFullStatus
 }
 
 func (c *Client) GetNetworkManager() *network.Manager {
-	return c.NetworkManager
+	return c.networkManager
 }
 
-func (c *Client) SetWalletNotifier(notifier func(chainID uint64, message string)) {
-	c.walletNotifier = notifier
+func (c *Client) GetNetworksPublisher() *pubsub.Publisher {
+	if c.networkManager == nil {
+		return nil
+	}
+	return c.networkManager.GetPublisher()
 }
 
 func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, error) {
 	c.rpcClientsMutex.Lock()
 	defer c.rpcClientsMutex.Unlock()
 	if rpcClient, ok := c.rpcClients[chainID]; ok {
-		if rpcClient.GetWalletNotifier() == nil {
-			rpcClient.SetWalletNotifier(c.walletNotifier)
-		}
 		return rpcClient, nil
 	}
 
-	network := c.NetworkManager.Find(chainID)
+	network := c.networkManager.Find(chainID)
 	if network == nil {
 		return nil, fmt.Errorf("could not find network: %d", chainID)
 	}
@@ -267,7 +256,6 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 	}
 
 	client := chain.NewClient(ethClients, chainID, phm)
-	client.SetWalletNotifier(c.walletNotifier)
 	c.rpcClients[chainID] = client
 	return client, nil
 }
