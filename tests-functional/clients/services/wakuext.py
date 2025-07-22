@@ -162,6 +162,55 @@ class WakuextService(Service):
         response = self.rpc_request("sendGroupChatMessage", params)
         return response.json()
 
+    def leave_group_chat(self, chat_id: str, remove: bool):
+        params = [None, chat_id, remove]
+        response = self.rpc_request("leaveGroupChat", params)
+        return response.json()
+
+    def create_group_chat_from_invitation(self, name: str, chat_id: str, admin_pk: str):
+        params = [name, chat_id, admin_pk]
+        response = self.rpc_request("createGroupChatFromInvitation", params)
+        return response.json()
+
+    def add_members_to_group_chat(self, chat_id: str, members: list):
+        params = [None, chat_id, members]
+        response = self.rpc_request("addMembersToGroupChat", params)
+        return response.json()
+
+    def remove_member_from_group_chat(self, chat_id: str, member: str):
+        params = [None, chat_id, member]
+        response = self.rpc_request("removeMemberFromGroupChat", params)
+        return response.json()
+
+    def remove_members_from_group_chat(self, chat_id: str, members: list):
+        params = [None, chat_id, members]
+        response = self.rpc_request("removeMembersFromGroupChat", params)
+        return response.json()
+
+    def confirm_joining_group(self, chat_id: str):
+        params = [chat_id]
+        response = self.rpc_request("confirmJoiningGroup", params)
+        return response.json()
+
+    def change_group_chat_name(self, chat_id: str, name: str):
+        params = [None, chat_id, name]
+        response = self.rpc_request("changeGroupChatName", params)
+        return response.json()
+
+    def send_group_chat_invitation_request(self, chat_id: str, admin_pk: str, message: str):
+        params = [None, chat_id, admin_pk, message]
+        response = self.rpc_request("sendGroupChatInvitationRequest", params)
+        return response.json()
+
+    def get_group_chat_invitations(self):
+        response = self.rpc_request("getGroupChatInvitations")
+        return response.json()
+
+    def send_group_chat_invitation_rejection(self, invitation_request_id: str):
+        params = [None, invitation_request_id]
+        response = self.rpc_request("sendGroupChatInvitationRejection", params)
+        return response.json()
+
     def create_community(self, name, color="#ffffff", membership=3):
         params = [{"membership": membership, "name": name, "color": color, "description": name}]
         response = self.rpc_request("createCommunity", params)

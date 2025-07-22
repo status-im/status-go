@@ -112,7 +112,7 @@ class MessengerSteps(NetworkConditionsSteps):
         if matched_messages:
             return matched_messages
         else:
-            raise ValueError(f"Failed to find a message with contentType '{content_type}' in response")
+            raise ValueError(f"Failed to find a message with contentType '{content_type}' and message_pattern: `{message_pattern}` in response")
 
     def get_message_id(self, response, index=0):
         return response.get("result", {}).get("messages", [])[index].get("id", "")
