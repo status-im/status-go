@@ -34,6 +34,10 @@ class TestCreatePrivateGroups(MessengerSteps):
         create_group_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"private_group_{uuid4()}")
 
         group_id = create_group_response.get("result", {}).get("chats", [])[0].get("id")
+        members_before_leave = create_group_response.get("result", {}).get("chats", [])[0].get("members", [])
+        assert len(members_before_leave) == 2
+        assert self.sender.public_key in str(members_before_leave)
+
         leave_group_response = self.sender.wakuext_service.leave_group_chat(group_id, True)
         self.sender.verify_json_schema(leave_group_response, method="wakuext_leaveGroupChat")
 
@@ -42,6 +46,10 @@ class TestCreatePrivateGroups(MessengerSteps):
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
             message_pattern=f"@{self.sender.public_key} left the group",
         )[0]
+
+        members_after_leave = leave_group_response.get("result", {}).get("chats", [])[0].get("members", [])
+        assert len(members_after_leave) == 1
+        assert self.sender.public_key not in str(members_after_leave)
 
     def test_send_group_chat_invitation_request(self, backend_factory):
         third_node = backend_factory("third_node")
