@@ -1,9 +1,8 @@
 import random
 import pytest
-from steps.status_backend import StatusBackendSteps
 
 
-class TestRpc(StatusBackendSteps):
+class TestRpc:
 
     @pytest.fixture(autouse=True)
     def setup_backend(self, backend_factory):
