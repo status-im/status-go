@@ -13,7 +13,6 @@ import (
 func createTestServer(t *testing.T) *Server {
 	server := NewMetricsServer(":8080", nil)
 	require.NotNil(t, server)
-	require.NotNil(t, server.handlers)
 	return server
 }
 
@@ -21,14 +20,16 @@ func TestNewMetricsServer(t *testing.T) {
 	server := NewMetricsServer(":8080", nil)
 	require.NotNil(t, server)
 	require.Equal(t, ":8080", server.server.Addr)
-	require.NotNil(t, server.handlers)
 }
 
 func TestNewMetricsServer_WithRegistry(t *testing.T) {
 	registry := metrics.NewRegistry()
 	server := NewMetricsServer(":8080", registry)
 	require.NotNil(t, server)
-	require.Contains(t, server.handlers, "geth")
+
+	// Check that geth handler was registered
+	_, exists := server.handlers.Load("geth")
+	require.True(t, exists)
 }
 
 func TestServer_RegisterHandler(t *testing.T) {
@@ -41,11 +42,18 @@ func TestServer_RegisterHandler(t *testing.T) {
 
 	server.RegisterHandler("test", handler)
 
-	server.handlersMutex.RLock()
-	_, exists := server.handlers["test"]
-	server.handlersMutex.RUnlock()
-
+	_, exists := server.handlers.Load("test")
 	require.True(t, exists)
+}
+
+func TestServer_RegisterHandler_Nil(t *testing.T) {
+	server := createTestServer(t)
+
+	// Register nil handler - should be ignored
+	server.RegisterHandler("nil-test", nil)
+
+	_, exists := server.handlers.Load("nil-test")
+	require.False(t, exists)
 }
 
 func TestServer_UnregisterHandler(t *testing.T) {
@@ -55,18 +63,14 @@ func TestServer_UnregisterHandler(t *testing.T) {
 	server.RegisterHandler("test", handler)
 
 	// Verify it exists
-	server.handlersMutex.RLock()
-	_, exists := server.handlers["test"]
-	server.handlersMutex.RUnlock()
+	_, exists := server.handlers.Load("test")
 	require.True(t, exists)
 
 	// Unregister
 	server.UnregisterHandler("test")
 
 	// Verify it's gone
-	server.handlersMutex.RLock()
-	_, exists = server.handlers["test"]
-	server.handlersMutex.RUnlock()
+	_, exists = server.handlers.Load("test")
 	require.False(t, exists)
 }
 
