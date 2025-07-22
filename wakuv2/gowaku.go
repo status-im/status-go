@@ -125,7 +125,7 @@ type IMetricsHandler interface {
 	PushPeerCountByShard(peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
 	PushDialFailure(dialFailure common.DialError)
-	PushMissedMessage(envelope *protocol.Envelope)
+	PushMissedMessage(envelope common.Envelope)
 	PushMissedRelevantMessage(message *common.ReceivedMessage)
 	PushMessageDeliveryConfirmed()
 	PushSentMessageTotal(messageSize uint32, publishMethod string)
@@ -1461,7 +1461,8 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 
 	if w.metricsHandler != nil {
 		if msgType == common.MissingMessageType {
-			w.metricsHandler.PushMissedMessage(envelope)
+			commonEnv := common.NewWakuEnvelope(envelope.Message(), envelope.PubsubTopic(), envelope.Hash())
+			w.metricsHandler.PushMissedMessage(commonEnv)
 		}
 	}
 
@@ -2131,4 +2132,10 @@ func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
 
 func (w *Waku) Version() uint {
 	return 2
+}
+
+// This function is needed for nwaku, adding here for compatibility
+func (w *Waku) Metrics() string {
+
+	return ""
 }

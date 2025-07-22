@@ -9,7 +9,6 @@ import (
 	"github.com/status-im/status-go/wakuv2"
 
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
-	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	v2common "github.com/status-im/status-go/wakuv2/common"
@@ -135,7 +134,7 @@ func (c *Client) PushDialFailure(dialFailure v2common.DialError) {
 	).Inc()
 }
 
-func (c *Client) PushMissedMessage(envelope *v2protocol.Envelope) {
+func (c *Client) PushMissedMessage(envelope v2common.Envelope) {
 	metrics.MissedMessages.WithLabelValues(
 		envelope.PubsubTopic(),
 		envelope.Message().ContentTopic,

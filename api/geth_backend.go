@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -2256,6 +2257,10 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		b.statusNode.WalletService().KeycardPairings().SetKeycardPairingsFile(config.KeycardPairingDataFile)
 	}
 
+	if b.prometheusMetrics != nil {
+		b.prometheusMetrics.RegisterHandler("waku", b.wakuMetricsHandler())
+	}
+
 	signal.SendNodeReady()
 	return nil
 }
@@ -2912,4 +2917,27 @@ func (b *GethStatusBackend) SetPreLoginLogLevel(level string) error {
 		return err
 	}
 	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
+}
+
+func (b *GethStatusBackend) wakuMetricsHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if b.StatusNode() == nil {
+			b.logger.Error("failed to get waku metrics: StatusNode is nil")
+			return
+		}
+
+		if b.StatusNode().WakuV2ExtService() == nil {
+			b.logger.Error("failed to get waku metrics: WakuV2ExtService is nil")
+			return
+		}
+
+		wakuMetrics := b.StatusNode().WakuV2ExtService().Waku().Metrics()
+		if wakuMetrics != "" {
+			_, err := w.Write([]byte(wakuMetrics))
+
+			if err != nil {
+				b.logger.Error("failed to write waku metrics", zap.Error(err))
+			}
+		}
+	})
 }

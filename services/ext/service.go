@@ -680,6 +680,10 @@ func (s *Service) Messenger() *protocol.Messenger {
 	return s.messenger
 }
 
+func (s *Service) Waku() *wakuv2.Waku {
+	return s.waku
+}
+
 func tokenURIToCommunityID(tokenURI string) string {
 	tmpStr := strings.Split(tokenURI, "/")
 
