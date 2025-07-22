@@ -1,3 +1,6 @@
+//go:build use_gowaku
+// +build use_gowaku
+
 package wakuv2
 
 import (
