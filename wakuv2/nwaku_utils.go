@@ -1,6 +1,3 @@
-//go:build use_nwaku
-// +build use_nwaku
-
 package wakuv2
 
 // TODO-nwaku remove this entire file once go-waku is removed from status-go

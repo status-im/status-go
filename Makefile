@@ -149,7 +149,7 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 
 LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(LIBWAKU_EXT)
 $(LIBWAKU):
-ifeq ($(USE_NWAKU),true)
+ifeq (true,true)
 	@echo "Building libwaku"
 	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
 endif
