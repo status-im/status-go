@@ -19,16 +19,14 @@ import (
 
 // Server runs and controls a HTTP pprof interface.
 type Server struct {
-	server        *http.Server
-	handlers      map[string]http.Handler
-	handlersMutex sync.RWMutex
+	server   *http.Server
+	handlers sync.Map
 }
 
 func NewMetricsServer(address string, r metrics.Registry) *Server {
 	mux := http.NewServeMux()
 
 	s := &Server{
-		handlers: make(map[string]http.Handler),
 		server: &http.Server{
 			Addr:              address,
 			ReadHeaderTimeout: 5 * time.Second,
@@ -54,31 +52,26 @@ func NewMetricsServer(address string, r metrics.Registry) *Server {
 
 // RegisterHandler adds a new metrics provider with a given name
 func (s *Server) RegisterHandler(name string, handler http.Handler) {
-	s.handlersMutex.Lock()
-	defer s.handlersMutex.Unlock()
-	s.handlers[name] = handler
+	if handler == nil {
+		return // Don't store nil handlers
+	}
+	s.handlers.Store(name, handler)
 }
 
 // UnregisterHandler removes a metrics provider
 func (s *Server) UnregisterHandler(name string) {
-	s.handlersMutex.Lock()
-	defer s.handlersMutex.Unlock()
-	delete(s.handlers, name)
+	s.handlers.Delete(name)
 }
 
 // metricsHandler creates the combined metrics handler
 func (s *Server) metricsHandler() http.Handler {
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		// Write all dynamic metrics
-		s.handlersMutex.RLock()
-		for _, handler := range s.handlers {
-			if handler != nil {
-				handler.ServeHTTP(w, r)
-			}
-		}
-		s.handlersMutex.RUnlock()
+		s.handlers.Range(func(key, value interface{}) bool {
+			handler := value.(http.Handler) // Safe to cast since we validate in RegisterHandler
+			handler.ServeHTTP(w, r)
+			return true // continue iteration
+		})
 	})
 }
 
