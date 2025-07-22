@@ -295,6 +295,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.RootDataDir = request.RootDataDir
 	nodeConfig.LogEnabled = request.LogEnabled
+	nodeConfig.LogToStderr = request.LogToStderr
 	nodeConfig.LogFile = gocommon.TruncateWithDot(keyUID) + ".log"
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = DefaultLogLevel
