@@ -2,9 +2,12 @@ package settings
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/brianvoe/gofakeit/v6"
 
 	"github.com/stretchr/testify/require"
 
@@ -308,7 +311,9 @@ func TestDatabase_BackupPath(t *testing.T) {
 	// The default backup path is empty
 	require.Equal(t, "", path)
 
-	testPath := "/path/to/backup"
+	testPath, err := url.JoinPath(gofakeit.LetterN(3), gofakeit.LetterN(3))
+	require.NoError(t, err)
+	require.NotEmpty(t, testPath)
 	err = db.SaveSetting(BackupPath.GetReactName(), testPath)
 	require.NoError(t, err)
 

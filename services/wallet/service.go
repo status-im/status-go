@@ -174,7 +174,7 @@ func NewService(
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
-	localBackup := localbackup.NewService(accountsDB, feed)
+	localBackup := localbackup.NewBackupManager(accountsDB, feed)
 
 	router := router.NewRouter(rpcClient, transactor, tokenManager, marketManager, collectibles,
 		collectiblesManager)
@@ -321,7 +321,7 @@ type Service struct {
 	routeExecutionManager *routeexecution.Manager
 	leaderboardService    *leaderboard.MarketDataService
 	started               bool
-	localBackup           *localbackup.Service
+	localBackup           *localbackup.BackupManager
 
 	cancelWalletServiceCtx context.CancelFunc
 }
@@ -432,6 +432,6 @@ func (s *Service) GetCollectiblesManager() *collectibles.Manager {
 	return s.collectiblesManager
 }
 
-func (s *Service) LocalBackup() *localbackup.Service {
+func (s *Service) LocalBackup() *localbackup.BackupManager {
 	return s.localBackup
 }

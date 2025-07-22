@@ -26,20 +26,20 @@ const (
 	EventWatchOnlyAccountRetrieved walletevent.EventType = "wallet-watch-only-account-retrieved"
 )
 
-// Service is a wallet local backup service.
-type Service struct {
+// BackupManager is a wallet local backup service.
+type BackupManager struct {
 	accountsDB *accounts.Database
 	feed       *event.Feed
 }
 
-func NewService(accountsDB *accounts.Database, feed *event.Feed) *Service {
-	return &Service{
+func NewBackupManager(accountsDB *accounts.Database, feed *event.Feed) *BackupManager {
+	return &BackupManager{
 		accountsDB: accountsDB,
 		feed:       feed,
 	}
 }
 
-func (s *Service) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.SyncAccount {
+func (b *BackupManager) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.SyncAccount {
 	return &protobuf.SyncAccount{
 		Clock:                 acc.Clock,
 		Address:               acc.Address.Bytes(),
@@ -60,8 +60,8 @@ func (s *Service) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.Syn
 	}
 }
 
-func (s *Service) backupWatchOnlyAccounts() ([]*protobuf.Backup, error) {
-	accounts, err := s.accountsDB.GetAllWatchOnlyAccounts()
+func (b *BackupManager) backupWatchOnlyAccounts() ([]*protobuf.Backup, error) {
+	accounts, err := b.accountsDB.GetAllWatchOnlyAccounts()
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (s *Service) backupWatchOnlyAccounts() ([]*protobuf.Backup, error) {
 	for _, acc := range accounts {
 
 		backupMessage := &protobuf.Backup{}
-		backupMessage.WatchOnlyAccount = s.prepareSyncAccountMessage(acc)
+		backupMessage.WatchOnlyAccount = b.prepareSyncAccountMessage(acc)
 
 		backupMessages = append(backupMessages, backupMessage)
 	}
@@ -78,10 +78,10 @@ func (s *Service) backupWatchOnlyAccounts() ([]*protobuf.Backup, error) {
 	return backupMessages, nil
 }
 
-func (s *Service) ExportBackup() ([]byte, error) {
+func (b *BackupManager) ExportBackup() ([]byte, error) {
 	backup := &protobuf.WalletLocalBackup{}
 
-	woAccountsToBackup, err := s.backupWatchOnlyAccounts()
+	woAccountsToBackup, err := b.backupWatchOnlyAccounts()
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability a
 }
 
 // TODO this is a duplicate of the code in messenger_handler. Should it be moved to a common place?
-func (s *Service) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*accounts.Account, error) {
+func (b *BackupManager) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*accounts.Account, error) {
 	if message.KeyUid != "" {
 		return nil, ErrNotWatchOnlyAccount
 	}
@@ -123,7 +123,7 @@ func (s *Service) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*ac
 	accountOperability := accounts.AccountFullyOperable
 
 	accAddress := types.BytesToAddress(message.Address)
-	dbAccount, err := s.accountsDB.GetAccountByAddress(accAddress)
+	dbAccount, err := b.accountsDB.GetAccountByAddress(accAddress)
 	if err != nil && err != accounts.ErrDbAccountNotFound {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func (s *Service) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*ac
 		}
 
 		if message.Removed {
-			err = s.accountsDB.RemoveAccount(accAddress, message.Clock)
+			err = b.accountsDB.RemoveAccount(accAddress, message.Clock)
 			if err != nil {
 				return nil, err
 			}
@@ -145,7 +145,7 @@ func (s *Service) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*ac
 
 	acc := mapSyncAccountToAccount(message, accountOperability, accounts.AccountTypeWatch)
 
-	err = s.accountsDB.SaveOrUpdateAccounts([]*accounts.Account{acc}, false)
+	err = b.accountsDB.SaveOrUpdateAccounts([]*accounts.Account{acc}, false)
 	if err != nil {
 		return nil, err
 	}
@@ -153,12 +153,12 @@ func (s *Service) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*ac
 	return acc, nil
 }
 
-func (s *Service) handleWatchOnlyAccount(message *protobuf.SyncAccount) error {
+func (b *BackupManager) handleWatchOnlyAccount(message *protobuf.SyncAccount) error {
 	if message == nil {
 		return nil
 	}
 
-	acc, err := s.handleSyncWatchOnlyAccount(message)
+	acc, err := b.handleSyncWatchOnlyAccount(message)
 	if err != nil {
 		return err
 	}
@@ -173,12 +173,12 @@ func (s *Service) handleWatchOnlyAccount(message *protobuf.SyncAccount) error {
 		Type:    EventWatchOnlyAccountRetrieved,
 		Message: string(encodedmessage),
 	}
-	s.feed.Send(event)
+	b.feed.Send(event)
 
 	return nil
 }
 
-func (s *Service) ImportBackup(data []byte) error {
+func (b *BackupManager) ImportBackup(data []byte) error {
 	var backup protobuf.WalletLocalBackup
 	err := proto.Unmarshal(data, &backup)
 	if err != nil {
@@ -187,7 +187,7 @@ func (s *Service) ImportBackup(data []byte) error {
 	var errs []error
 
 	for _, watchOnlyAccount := range backup.WatchOnlyAccounts {
-		err = s.handleWatchOnlyAccount(watchOnlyAccount)
+		err = b.handleWatchOnlyAccount(watchOnlyAccount)
 		if err != nil {
 			errs = append(errs, err)
 		}

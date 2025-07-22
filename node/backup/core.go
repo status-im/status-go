@@ -9,33 +9,29 @@ import (
 )
 
 type core struct {
-	dumpers map[string]func() ([]byte, error)
-	loaders map[string]func([]byte) error
+	backupProviders map[string]BackupProvider
 }
 
 func newCore() *core {
 	return &core{
-		dumpers: make(map[string]func() ([]byte, error)),
-		loaders: make(map[string]func([]byte) error),
+		backupProviders: make(map[string]BackupProvider),
 	}
 }
 
 func (c *core) Register(
 	componentName string,
-	dumpFunc func() ([]byte, error),
-	loadFunc func([]byte) error,
+	provider BackupProvider,
 ) {
-	c.dumpers[componentName] = dumpFunc
-	c.loaders[componentName] = loadFunc
+	c.backupProviders[componentName] = provider
 }
 
 func (b *core) Create(privateKey []byte) ([]byte, error) {
-	dumped, err := b.dump()
+	backup, err := b.exportBackup()
 	if err != nil {
-		return nil, fmt.Errorf("dump failed: %w", err)
+		return nil, fmt.Errorf("exportBackup failed: %w", err)
 	}
 
-	data, err := marshal(dumped)
+	data, err := marshal(backup)
 	if err != nil {
 		return nil, fmt.Errorf("marshal failed: %w", err)
 	}
@@ -59,19 +55,19 @@ func (b *core) Restore(privateKey []byte, encrypted []byte) error {
 		return fmt.Errorf("unmarshal failed: %w", err)
 	}
 
-	err = b.load(data)
+	err = b.importBackup(data)
 	if err != nil {
-		return fmt.Errorf("load failed: %w", err)
+		return fmt.Errorf("importBackup failed: %w", err)
 	}
 
 	return nil
 }
 
-func (b *core) dump() (map[string][]byte, error) {
-	result := make(map[string][]byte)
+func (b *core) exportBackup() (map[string][]byte, error) {
+	result := make(map[string][]byte, len(b.backupProviders))
 
-	for name, fn := range b.dumpers {
-		raw, err := fn()
+	for name, provider := range b.backupProviders {
+		raw, err := provider.ExportBackup()
 		if err != nil {
 			return nil, err
 		}
@@ -81,14 +77,14 @@ func (b *core) dump() (map[string][]byte, error) {
 	return result, nil
 }
 
-func (b *core) load(data map[string][]byte) error {
-	for name, fn := range b.loaders {
+func (b *core) importBackup(data map[string][]byte) error {
+	for name, provider := range b.backupProviders {
 		raw, ok := data[name]
 		if !ok {
 			continue
 		}
-		if err := fn(raw); err != nil {
-			return fmt.Errorf("load %q failed: %w", name, err)
+		if err := provider.ImportBackup(raw); err != nil {
+			return fmt.Errorf("importBackup %q failed: %w", name, err)
 		}
 	}
 

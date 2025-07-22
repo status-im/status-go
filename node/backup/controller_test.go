@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/brianvoe/gofakeit/v6"
+
 	"go.uber.org/zap"
 
 	"github.com/stretchr/testify/require"
@@ -21,6 +23,34 @@ type Bar struct {
 	Surname string
 }
 
+type FooProvider struct {
+	foo Foo
+}
+
+func (f FooProvider) ExportBackup() ([]byte, error) {
+	return json.Marshal(f.foo)
+}
+
+var fooFromBackup Foo
+
+func (b FooProvider) ImportBackup(data []byte) error {
+	return json.Unmarshal(data, &fooFromBackup)
+}
+
+type BarProvider struct {
+	bar Bar
+}
+
+func (b BarProvider) ExportBackup() ([]byte, error) {
+	return xml.Marshal(b.bar)
+}
+
+var barFromBackup Bar
+
+func (b BarProvider) ImportBackup(data []byte) error {
+	return xml.Unmarshal(data, &barFromBackup)
+}
+
 func TestController(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
@@ -31,31 +61,34 @@ func TestController(t *testing.T) {
 	}, logger)
 	require.NoError(t, err)
 
-	foo := Foo{
-		Value:        123,
-		PreciseValue: 456.789,
-	}
-	bar := Bar{
-		Names:   []string{"Bob", "Tom"},
-		Surname: "Smith",
+	foo := Foo{}
+	bar := Bar{}
+	err = gofakeit.Struct(&foo)
+	require.NoError(t, err)
+	err = gofakeit.Struct(&bar)
+	require.NoError(t, err)
+
+	fooProvider := FooProvider{
+		foo: foo,
 	}
 
-	var fooFromBackup Foo
-	var barFromBackup Bar
+	barProvider := BarProvider{
+		bar: bar,
+	}
 
-	controller.Register("foo", func() ([]byte, error) { return json.Marshal(foo) }, func(data []byte) error { return json.Unmarshal(data, &fooFromBackup) })
-	controller.Register("bar", func() ([]byte, error) { return xml.Marshal(bar) }, func(data []byte) error { return xml.Unmarshal(data, &barFromBackup) })
+	controller.Register("foo", fooProvider)
+	controller.Register("bar", barProvider)
 
 	filename, err = controller.PerformBackup()
 	require.NoError(t, err)
 	require.Equal(t, filename, filename)
 
-	require.False(t, reflect.DeepEqual(bar, barFromBackup))
-	require.False(t, reflect.DeepEqual(foo, fooFromBackup))
+	require.False(t, reflect.DeepEqual(barProvider.bar, barFromBackup))
+	require.False(t, reflect.DeepEqual(fooProvider.foo, fooFromBackup))
 
 	err = controller.LoadBackup(filename)
 	require.NoError(t, err)
 
-	require.True(t, reflect.DeepEqual(bar, barFromBackup))
-	require.True(t, reflect.DeepEqual(foo, fooFromBackup))
+	require.True(t, reflect.DeepEqual(barProvider.bar, barFromBackup))
+	require.True(t, reflect.DeepEqual(fooProvider.foo, fooFromBackup))
 }

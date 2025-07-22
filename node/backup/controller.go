@@ -19,12 +19,18 @@ type BackupConfig struct {
 	Interval       time.Duration
 }
 
+type BackupProvider interface {
+	ExportBackup() ([]byte, error)
+	ImportBackup(data []byte) error
+}
+
 type Controller struct {
 	config BackupConfig
 	core   *core
 	logger *zap.Logger
 	quit   chan struct{}
 	mutex  sync.Mutex
+	wg     *sync.WaitGroup
 }
 
 func NewController(config BackupConfig, logger *zap.Logger) (*Controller, error) {
@@ -39,26 +45,29 @@ func NewController(config BackupConfig, logger *zap.Logger) (*Controller, error)
 		config: config,
 		core:   newCore(),
 		logger: logger,
+		wg:     &sync.WaitGroup{},
 		quit:   make(chan struct{}),
 	}, nil
 }
 
-func (c *Controller) Register(componentName string, dumpFunc func() ([]byte, error), loadFunc func([]byte) error) {
+func (c *Controller) Register(componentName string, provider BackupProvider) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	c.core.Register(componentName, dumpFunc, loadFunc)
+	c.core.Register(componentName, provider)
 }
 
 func (c *Controller) Start() {
 	if !c.config.BackupEnabled {
 		return
 	}
+	c.wg.Add(1)
 
 	go func() {
 		defer common.LogOnPanic()
 		ticker := time.NewTicker(c.config.Interval)
 		defer ticker.Stop()
+		defer c.wg.Done()
 		for {
 			select {
 			case <-ticker.C:
@@ -75,6 +84,7 @@ func (c *Controller) Start() {
 
 func (c *Controller) Stop() {
 	close(c.quit)
+	c.wg.Wait()
 }
 
 func (c *Controller) PerformBackup() (string, error) {

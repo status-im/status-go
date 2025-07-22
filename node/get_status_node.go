@@ -239,17 +239,17 @@ func (n *StatusNode) StartLocalBackup() error {
 		return err
 	}
 
-	n.localBackup.Register("settings",
-		func() ([]byte, error) { return n.accountsSrvc.ExportBackup() },
-		func(data []byte) error { return n.accountsSrvc.ImportBackup(data) })
+	if n.accountsSrvc != nil {
+		n.localBackup.Register("settings", n.accountsSrvc)
+	}
 
-	n.localBackup.Register("wallet",
-		func() ([]byte, error) { return n.walletSrvc.LocalBackup().ExportBackup() },
-		func(data []byte) error { return n.walletSrvc.LocalBackup().ImportBackup(data) })
+	if n.walletSrvc != nil {
+		n.localBackup.Register("wallet", n.walletSrvc.LocalBackup())
+	}
 
-	n.localBackup.Register("messenger",
-		func() ([]byte, error) { return n.statusPublicSrvc.Messenger().ExportBackup() },
-		func(data []byte) error { return n.statusPublicSrvc.Messenger().ImportBackup(data) })
+	if n.statusPublicSrvc != nil {
+		n.localBackup.Register("messenger", n.statusPublicSrvc.Messenger())
+	}
 
 	n.localBackup.Start()
 

@@ -2,7 +2,6 @@ package accounts
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -58,7 +57,6 @@ type Service struct {
 }
 
 func (s *Service) Init(messenger *protocol.Messenger) {
-	fmt.Println("Initializing accounts service with messenger")
 	s.messenger = messenger
 }
 
@@ -137,31 +135,33 @@ func (s *Service) prepareSyncSettingsMessages(currentClock uint64, prepareForBac
 	}
 
 	for _, sf := range settings.SettingFieldRegister {
-		if sf.CanSync(settings.FromStruct) {
-			// DisplayName is backed up via `protobuf.BackedUpProfile` message.
-			if prepareForBackup && sf.SyncProtobufFactory().SyncSettingProtobufType() == protobuf.SyncSetting_DISPLAY_NAME {
-				continue
-			}
-
-			// Pull clock from the db
-			clock, err := s.db.GetSettingLastSynced(sf)
-			if err != nil {
-				errorResult = err
-				return
-			}
-			if clock == 0 {
-				clock = currentClock
-			}
-
-			// Build protobuf
-			_, sm, err := sf.SyncProtobufFactory().FromStruct()(dbSettings, clock, types.EncodeHex(crypto.FromECDSAPub(s.messenger.IdentityPublicKey())))
-			if err != nil {
-				// Collect errors to give other sync messages a chance to send
-				errs = append(errs, err)
-			}
-
-			resultSync = append(resultSync, sm)
+		if !sf.CanSync(settings.FromStruct) {
+			continue
 		}
+
+		// DisplayName is backed up via `protobuf.BackedUpProfile` message.
+		if prepareForBackup && sf.SyncProtobufFactory().SyncSettingProtobufType() == protobuf.SyncSetting_DISPLAY_NAME {
+			continue
+		}
+
+		// Pull clock from the db
+		clock, err := s.db.GetSettingLastSynced(sf)
+		if err != nil {
+			errorResult = err
+			return
+		}
+		if clock == 0 {
+			clock = currentClock
+		}
+
+		// Build protobuf
+		_, sm, err := sf.SyncProtobufFactory().FromStruct()(dbSettings, clock, types.EncodeHex(crypto.FromECDSAPub(s.messenger.IdentityPublicKey())))
+		if err != nil {
+			// Collect errors to give other sync messages a chance to send
+			errs = append(errs, err)
+		}
+
+		resultSync = append(resultSync, sm)
 	}
 	errorResult = errors.Join(errs...)
 	return
