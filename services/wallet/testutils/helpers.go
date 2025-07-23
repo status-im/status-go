@@ -15,12 +15,7 @@ const SntSymbol = "SNT"
 const DaiSymbol = "DAI"
 
 func SliceContains[T comparable](slice []T, value T) bool {
-	for _, v := range slice {
-		if v == value {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, value)
 }
 func StructExistsInSlice[T any](target T, slice []T) bool {
 	for _, item := range slice {

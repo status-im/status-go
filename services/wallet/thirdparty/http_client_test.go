@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -252,13 +253,7 @@ func TestFetchDataCompression(t *testing.T) {
 			// Create test server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Check if client requested gzip
-				acceptsGzip := false
-				for _, encoding := range r.Header["Accept-Encoding"] {
-					if encoding == "gzip" {
-						acceptsGzip = true
-						break
-					}
-				}
+				acceptsGzip := slices.Contains(r.Header["Accept-Encoding"], "gzip")
 
 				// Verify auth
 				username, password, ok := r.BasicAuth()

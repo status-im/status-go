@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"slices"
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
@@ -33,12 +34,7 @@ func NetworksToChainIDs(networks []*params.Network) []uint64 {
 }
 
 func ArrayContainsElement[T comparable](el T, arr []T) bool {
-	for _, e := range arr {
-		if e == el {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(arr, el)
 }
 
 func IsSingleChainOperation(fromChain *params.Network, toChain *params.Network) bool {
