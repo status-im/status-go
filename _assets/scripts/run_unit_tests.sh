@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -o pipefail
 
+
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/_assets/scripts/colors.sh"
 source "${GIT_ROOT}/_assets/scripts/codecov.sh"
+
+export LD_LIBRARY_PATH="${GIT_ROOT}/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build:${LD_LIBRARY_PATH}"
 
 if [[ $UNIT_TEST_RERUN_FAILS == 'true' ]]; then
   GOTESTSUM_EXTRAFLAGS="${GOTESTSUM_EXTRAFLAGS} --rerun-fails"
