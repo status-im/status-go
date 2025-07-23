@@ -30,7 +30,6 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Equal(t, "/some/data/path", c.DataDir)
-	assert.Equal(t, "/some/data/path/keystore", c.KeyStoreDir)
 	// assert Whisper
 	assert.Equal(t, true, c.WakuV2Config.Enabled)
 	assert.Equal(t, "/some/data/path/wakuv2", c.WakuV2Config.DataDir)
@@ -62,7 +61,6 @@ func TestNewConfigFromJSON(t *testing.T) {
 	json := `{
 		"NetworkId": 3,
 		"DataDir": "` + tmpDir + `",
-		"KeyStoreDir": "` + tmpDir + `",
 		"KeycardPairingDataFile": "` + path.Join(tmpDir, "keycard/pairings.json") + `",
 		"NoDiscovery": true,
 		"TorrentConfig": {
@@ -77,7 +75,6 @@ func TestNewConfigFromJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), c.NetworkID)
 	require.Equal(t, tmpDir, c.DataDir)
-	require.Equal(t, tmpDir, c.KeyStoreDir)
 	require.Equal(t, false, c.TorrentConfig.Enabled)
 	require.Equal(t, 9025, c.TorrentConfig.Port)
 	require.Equal(t, tmpDir+"/archivedata", c.TorrentConfig.DataDir)
@@ -116,7 +113,6 @@ func TestNodeConfigValidate(t *testing.T) {
 				"NetworkId": 1,
 				"RootDataDir": "/tmp/data",
 				"DataDir": "/tmp/data",
-				"KeyStoreDir": "/tmp/data",
 				"KeycardPairingDataFile": "/tmp/data/keycard/pairings.json",
 				"NoDiscovery": true
 			}`,
@@ -137,7 +133,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			FieldErrors: map[string]string{
 				"NetworkID":              "required",
 				"DataDir":                "required",
-				"KeyStoreDir":            "required",
 				"KeycardPairingDataFile": "required",
 			},
 		},
@@ -146,7 +141,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"Name": "invalid/name"
 			}`,
@@ -159,7 +153,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"NoDiscovery": true,
 				"NodeKey": "foo"
@@ -171,7 +164,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"NoDiscovery": true,
 				"UpstreamConfig": {
@@ -185,7 +177,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"NoDiscovery": true,
 				"UpstreamConfig": {
@@ -199,7 +190,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"NoDiscovery": false
 			}`,
@@ -210,7 +200,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"NoDiscovery": true,
 				"ShhextConfig": {
@@ -224,7 +213,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json"
 			}`,
 			CheckFunc: func(t *testing.T, config *params.NodeConfig) {
@@ -237,7 +225,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"HTTPVirtualHosts": ["my.domain.com"],
 				"HTTPCors": ["http://my.domain.com:8080"]
@@ -252,13 +239,12 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json"
 			}`,
 		},
 		{
 			Name:   "Missing APIModules",
-			Config: `{"NetworkId": 1, "DataDir": "/tmp/data", "KeyStoreDir": "/tmp/data", "KeycardPairingDataFile": "/tmp/data/keycard/pairings.json", "APIModules" :""}`,
+			Config: `{"NetworkId": 1, "DataDir": "/tmp/data", "KeycardPairingDataFile": "/tmp/data/keycard/pairings.json", "APIModules" :""}`,
 			FieldErrors: map[string]string{
 				"APIModules": "required",
 			},
@@ -268,7 +254,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
         "TorrentConfig": {
           "Enabled": true,

@@ -8,7 +8,7 @@ This package is responsible for:
 - Creating and managing Ethereum accounts
 - Secure storage and retrieval of private keys
 - Account derivation from mnemonics and private keys
-- Keystore operations (encryption, decryption, migration)
+- **Automatic keystore management based on selected chat account and root data directory**
 - Account selection and authentication
 
 ## Package Structure
@@ -35,6 +35,7 @@ The main interface for account management operations. It provides methods for:
 - **Account Loading**: Load and decrypt accounts from the keystore
 - **Account Selection**: Select and manage the currently active account
 - **Account Derivation**: Derive child accounts from existing accounts
+- **Keystore Management**: Keystore is managed internally and switched automatically based on the selected chat account and root data directory
 
 #### Constructor
 ```go
@@ -45,14 +46,16 @@ manager, err := NewAccountsManager(logger)
 The constructor requires:
 - `logger`: A zap.Logger instance for logging operations
 
-After creation, you need to set up the persistence and keystore:
+After creation, you need to set up the persistence and root data directory:
 ```go
 // Set the persistence layer for account data storage
 manager.SetPersistence(persistence)
 
-// Set the keystore for secure key storage
-manager.SetKeystore(keystore)
+// Set the root data directory for keystore management
+manager.SetRootDataDir(rootDataDir)
 ```
+
+> **Note:** The keystore is now managed internally. You do not set it directly. It is created and switched automatically based on the selected chat account and the root data directory.
 
 ### Key Features
 
@@ -62,7 +65,8 @@ manager.SetKeystore(keystore)
 account, mnemonic, err := manager.CreateAndStoreAccount(password)
 
 // Create account from existing mnemonic
-account, err := manager.CreateFromMnemonicAndStoreAccount(mnemonic, password)
+account, err := manager.CreateFromMnemonicAndStoreAccount(mnemonic, password, profile)
+// profile: if true, creates a profile keypair and sets the keystore to the new one
 
 // Create account from private key
 account, err := manager.CreateFromPrivateKeyAndStoreAccount(privateKeyHex, password)
@@ -76,8 +80,12 @@ account, err := manager.LoadAccount(address, password)
 // Verify account password
 valid, err := manager.VerifyAccountPassword(address, password)
 
-// Sets chat account for use
-err := manager.SetChatAccount(chatAddress, password)
+// Set chat account for use (and switch keystore automatically) via chat address and password
+err := manager.SetChatAccount(chatAddress, password, nil)
+// Or Set chat account for use (and switch keystore automatically) via private key, the address doesn't need to be provided
+// since it will be evaluated from the provided private key
+err := manager.SetChatAccount(chatAddress, "", privateKey)
+
 
 // Get currently selected chat account
 account, err := manager.SelectedChatAccount()
@@ -140,9 +148,8 @@ func main() {
     // Set the persistence layer for account data storage
     manager.SetPersistence(persistence)
 
-    // Set up keystore instance aligning with `KeyStore` interface
-    keystore := yourKeystoreImplementation()
-    manager.SetKeystore(keystore)
+    // Set the root data directory for keystore management
+    manager.SetRootDataDir("/path/to/root/data/dir")
 
     // Create a new account
     account, mnemonic, err := manager.CreateAndStoreAccount("my-password")
@@ -153,8 +160,8 @@ func main() {
     log.Printf("Created account: %s", account.Address().Hex())
     log.Printf("Mnemonic: %s", mnemonic)
 
-    // Select the account
-    err = manager.SetChatAccount(account.Address(), "my-password")
+    // Select the account (this will also switch the keystore internally)
+    err = manager.SetChatAccount(account.Address(), "my-password", nil)
     if err != nil {
         log.Fatal(err)
     }
@@ -169,12 +176,21 @@ func main() {
 }
 ```
 
+## Persistence Interface Requirements
+
+Your `Persistence` implementation must provide:
+- `AddressExists(address ethtypes.Address) (bool, error)`
+- `GetProfileKeypair() (*accounts.Keypair, error)`
+- `GetWalletRootAddress() (ethtypes.Address, error)`
+- `GetPath(address ethtypes.Address) (string, error)`
+
 ## Security Considerations
 
 - **Password Protection**: All private keys are encrypted using the provided password
 - **Secure Storage**: Keys are stored in a Geth-compatible keystore format
 - **Memory Management**: Private keys are cleared from memory when not in use
 - **Account Isolation**: Each account is stored separately with its own encryption
+- **Keystore Isolation**: Keystore is managed per profile/account and switched automatically
 
 ## Error Handling
 
@@ -183,6 +199,7 @@ The package defines several custom errors:
 - `ErrNoAccountSelected`: No account has been selected (login required)
 - `ErrAccountKeyStoreMissing`: Keystore is not properly initialized
 - `ErrCannotLocateKeyFile`: Account file cannot be found for the given address
+- `ErrAddressAndPasswordOrPrivateKeyRequired`: Both address and password or a private key are required for SetChatAccount
 
 ## Dependencies
 
@@ -191,6 +208,7 @@ The package defines several custom errors:
 - `github.com/status-im/status-go/multiaccounts`: Multi-account support
 - `Persistence` interface: Required for account data storage operations
 - `KeyStore` interface: Required for secure cryptographic key storage, encryption/decryption, and keystore management operations
+- **Root data directory**: Required for keystore management
 
 ## Testing
 

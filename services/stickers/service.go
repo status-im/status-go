@@ -22,12 +22,11 @@ func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *
 		accountsDB:      acc,
 		rpcClient:       rpcClient,
 		accountsManager: accountsManager,
-		keyStoreDir:     config.KeyStoreDir,
 		downloader:      downloader,
 		httpServer:      httpServer,
 		ctx:             ctx,
 		cancel:          cancel,
-		api:             NewAPI(ctx, acc, rpcClient, accountsManager, pendingTracker, config.KeyStoreDir, downloader, httpServer),
+		api:             NewAPI(ctx, acc, rpcClient, accountsManager, pendingTracker, downloader, httpServer),
 	}
 }
 
@@ -37,7 +36,6 @@ type Service struct {
 	rpcClient       *rpc.Client
 	accountsManager *accsmanagement.AccountsManager
 	downloader      *ipfs.Downloader
-	keyStoreDir     string
 	httpServer      *server.MediaServer
 	ctx             context.Context
 	cancel          context.CancelFunc

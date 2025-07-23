@@ -30,4 +30,6 @@ type KeyStore interface {
 	ReEncryptKeyStoreDir(oldPass, newPass string) error
 	// MigrateKeyStoreDir migrates the keystore directory from one location to another.
 	MigrateKeyStoreDir(newDir string) error
+	// KeystorePath returns the path to the keystore directory
+	KeystorePath() string
 }

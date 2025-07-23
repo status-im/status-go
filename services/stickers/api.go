@@ -45,9 +45,8 @@ type API struct {
 	accountsDB      *accounts.Database
 	pendingTracker  *transactions.PendingTxTracker
 
-	keyStoreDir string
-	downloader  *ipfs.Downloader
-	httpServer  *server.MediaServer
+	downloader *ipfs.Downloader
+	httpServer *server.MediaServer
 
 	ctx context.Context
 }
@@ -89,7 +88,7 @@ type ednStickerPackInfo struct {
 }
 
 func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager,
-	pendingTracker *transactions.PendingTxTracker, keyStoreDir string, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
+	pendingTracker *transactions.PendingTxTracker, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
 	result := &API{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
@@ -97,7 +96,6 @@ func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, 
 		accountsManager: accountsManager,
 		accountsDB:      acc,
 		pendingTracker:  pendingTracker,
-		keyStoreDir:     keyStoreDir,
 		downloader:      downloader,
 		ctx:             ctx,
 		httpServer:      httpServer,
