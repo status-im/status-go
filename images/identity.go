@@ -38,15 +38,9 @@ func (i IdentityImage) GetDataURI() (string, error) {
 }
 
 func (i IdentityImage) MarshalJSON() ([]byte, error) {
-	uri, err := i.GetDataURI()
-	if err != nil {
-		return nil, err
-	}
-
 	temp := struct {
 		KeyUID       string `json:"keyUid"`
 		Name         string `json:"type"`
-		URI          string `json:"uri"`
 		Width        int    `json:"width"`
 		Height       int    `json:"height"`
 		FileSize     int    `json:"fileSize"`
@@ -56,7 +50,6 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 	}{
 		KeyUID:       i.KeyUID,
 		Name:         i.Name,
-		URI:          uri,
 		Width:        i.Width,
 		Height:       i.Height,
 		FileSize:     i.FileSize,

@@ -153,6 +153,12 @@ func initializeApplication(requestJSON string) string {
 		}
 	}
 
+	for i, acc := range accs {
+		for j, images := range acc.Images {
+			accs[i].Images[j].LocalURL = statusBackend.StatusNode().HTTPServer().MakeAccountImageURL(acc.KeyUID, images.Name, images.Clock)
+		}
+	}
+
 	response := &InitializeApplicationResponse{
 		Accounts:               accs,
 		CentralizedMetricsInfo: metricsInfo,

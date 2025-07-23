@@ -70,6 +70,10 @@ func (api *MultiAccountsAPI) StoreIdentityImage(keyUID, filepath string, aX, aY,
 		return nil, err
 	}
 
+	for k, v := range iis {
+		iis[k].LocalURL = api.mediaServer.MakeAccountImageURL(keyUID, v.Name, v.Clock)
+	}
+
 	return iis, err
 }
 

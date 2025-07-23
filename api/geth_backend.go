@@ -315,6 +315,9 @@ func (b *GethStatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Ac
 	}
 	for _, acc := range as {
 		if acc.KeyUID == keyUID {
+			for k, v := range acc.Images {
+				acc.Images[k].LocalURL = b.statusNode.HTTPServer().MakeAccountImageURL(acc.KeyUID, v.Name, v.Clock)
+			}
 			return &acc, nil
 		}
 	}
