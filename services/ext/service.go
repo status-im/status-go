@@ -121,7 +121,7 @@ func newWakuV2(identity *ecdsa.PrivateKey, nodeConfig *params.NodeConfig, appDB 
 		Nameserver:                             nodeConfig.WakuV2Config.Nameserver,
 		UDPPort:                                nodeConfig.WakuV2Config.UDPPort,
 		AutoUpdate:                             nodeConfig.WakuV2Config.AutoUpdate,
-		DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
+		DefaultShardPubsubTopic:                messagingtypes.DefaultShardPubsubTopic(),
 		ClusterID:                              nodeConfig.ClusterConfig.ClusterID,
 		EnableMissingMessageVerification:       nodeConfig.WakuV2Config.EnableMissingMessageVerification,
 		EnableStoreConfirmationForMessagesSent: nodeConfig.WakuV2Config.EnableStoreConfirmationForMessagesSent,

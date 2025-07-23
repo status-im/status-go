@@ -21,7 +21,6 @@ import (
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 type Persistence struct {
@@ -1772,7 +1771,7 @@ func (p *Persistence) AllNonApprovedCommunitiesRequestsToJoin() ([]*RequestToJoi
 	return nonApprovedRequestsToJoin, nil
 }
 
-func (p *Persistence) SaveCommunityShard(communityID types.HexBytes, shard *wakuv2.Shard, clock uint64) error {
+func (p *Persistence) SaveCommunityShard(communityID types.HexBytes, shard *messagingtypes.Shard, clock uint64) error {
 	var cluster, index *uint16
 
 	if shard != nil {
@@ -1807,7 +1806,7 @@ func (p *Persistence) SaveCommunityShard(communityID types.HexBytes, shard *waku
 }
 
 // if data will not be found, will return sql.ErrNoRows. Must be handled on the caller side
-func (p *Persistence) GetCommunityShard(communityID types.HexBytes) (*wakuv2.Shard, error) {
+func (p *Persistence) GetCommunityShard(communityID types.HexBytes) (*messagingtypes.Shard, error) {
 	var cluster sql.NullInt64
 	var index sql.NullInt64
 	err := p.db.QueryRow(`SELECT shard_cluster, shard_index FROM communities_shards WHERE community_id = ?`,
@@ -1821,7 +1820,7 @@ func (p *Persistence) GetCommunityShard(communityID types.HexBytes) (*wakuv2.Sha
 		return nil, nil
 	}
 
-	return &wakuv2.Shard{
+	return &messagingtypes.Shard{
 		Cluster: uint16(cluster.Int64),
 		Index:   uint16(index.Int64),
 	}, nil

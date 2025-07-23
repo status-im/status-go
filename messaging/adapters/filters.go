@@ -18,7 +18,7 @@ func ChatsToInitializeToTransport(c types.ChatsToInitialize) []transport.Filters
 
 func CommunityToInitializeToTransport(c *types.CommunityToInitialize) *transport.CommunityFilterToInitialize {
 	return &transport.CommunityFilterToInitialize{
-		Shard:   c.Shard,
+		Shard:   ToWakuShard(c.Shard),
 		PrivKey: c.PrivKey,
 	}
 }

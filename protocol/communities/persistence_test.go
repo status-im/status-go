@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/encryption"
@@ -21,7 +22,6 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 func TestPersistenceSuite(t *testing.T) {
@@ -811,7 +811,7 @@ func (s *PersistenceSuite) TestSaveShardInfo() {
 	s.Require().Nil(resultShard)
 
 	// not nil shard
-	expectedShard := &wakuv2.Shard{
+	expectedShard := &messagingtypes.Shard{
 		Cluster: 1,
 		Index:   2,
 	}
