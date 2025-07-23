@@ -446,6 +446,10 @@ func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, er
 		return "", "", err
 	}
 
+	if contact.DisplayName == "" && contact.Bio == "" {
+		return "", shortKey, nil
+	}
+
 	userProto := &protobuf.User{
 		DisplayName: contact.DisplayName,
 		Description: contact.Bio,
@@ -488,6 +492,15 @@ func (m *Messenger) ShareUserURLWithData(contactID string) (string, error) {
 }
 
 func parseUserURLWithData(data string, chatKey string) (*URLDataResponse, error) {
+	if data == "" {
+		return &URLDataResponse{
+			Contact: &ContactURLData{
+				DisplayName: "",
+				Description: "",
+				PublicKey:   chatKey,
+			},
+		}, nil
+	}
 	urlData, err := decodeDataURL(data)
 	if err != nil {
 		return nil, err

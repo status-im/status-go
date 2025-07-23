@@ -482,6 +482,19 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithData() {
 	s.Require().Equal(expectedURL, url)
 }
 
+func (s *MessengerShareUrlsSuite) TestPrepareEncodedUserDataWithEmptyAccount() {
+	_, contact := s.createContact()
+
+	contact.DisplayName = ""
+	contact.Bio = ""
+
+	userData, chatKey, err := s.m.prepareEncodedUserData(contact)
+	s.Require().NoError(err)
+	// The data should be empty if no display name or bio is set
+	s.Require().Empty(userData)
+	s.Require().NotEmpty(chatKey)
+}
+
 func (s *MessengerShareUrlsSuite) TestShareAndParseUserURLWithData() {
 	_, contact := s.createContact()
 
