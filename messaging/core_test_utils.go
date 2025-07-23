@@ -7,10 +7,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
+	"github.com/waku-org/waku-go-bindings/waku"
+
 	"github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
-	"github.com/waku-org/waku-go-bindings/waku"
 )
 
 type TestMessagingEnvironment struct {
