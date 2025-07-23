@@ -21,13 +21,13 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 const signatureLength = 65
@@ -54,7 +54,7 @@ type Config struct {
 	RequestsToJoin                      []*RequestToJoin
 	MemberIdentity                      *ecdsa.PrivateKey
 	EventsData                          *EventsData
-	Shard                               *wakuv2.Shard
+	Shard                               *messagingtypes.Shard
 	PubsubTopicPrivateKey               *ecdsa.PrivateKey
 	LastOpenedAt                        int64
 }
@@ -178,7 +178,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		ActiveMembersCount      uint64                               `json:"activeMembersCount"`
 		PubsubTopic             string                               `json:"pubsubTopic"`
 		PubsubTopicKey          string                               `json:"pubsubTopicKey"`
-		Shard                   *wakuv2.Shard                        `json:"shard"`
+		Shard                   *messagingtypes.Shard                `json:"shard"`
 	}{
 		ID:             o.ID(),
 		Verified:       o.config.Verified,
@@ -314,7 +314,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		ActiveMembersCount          uint64                               `json:"activeMembersCount"`
 		PubsubTopic                 string                               `json:"pubsubTopic"`
 		PubsubTopicKey              string                               `json:"pubsubTopicKey"`
-		Shard                       *wakuv2.Shard                        `json:"shard"`
+		Shard                       *messagingtypes.Shard                `json:"shard"`
 		LastOpenedAt                int64                                `json:"lastOpenedAt"`
 		Clock                       uint64                               `json:"clock"`
 	}{
@@ -467,7 +467,7 @@ func (o *Community) DescriptionText() string {
 	return ""
 }
 
-func (o *Community) Shard() *wakuv2.Shard {
+func (o *Community) Shard() *messagingtypes.Shard {
 	if o != nil && o.config != nil {
 		return o.config.Shard
 	}

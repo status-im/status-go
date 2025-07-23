@@ -50,8 +50,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
-
-	"github.com/status-im/status-go/wakuv2"
 )
 
 type Publisher interface {
@@ -774,8 +772,8 @@ func (m *Manager) All() ([]*Community, error) {
 }
 
 type CommunityShard struct {
-	CommunityID string        `json:"communityID"`
-	Shard       *wakuv2.Shard `json:"shard"`
+	CommunityID string                `json:"communityID"`
+	Shard       *messagingtypes.Shard `json:"shard"`
 }
 
 type CuratedCommunities struct {
@@ -1587,7 +1585,7 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
-func (m *Manager) updateShard(community *Community, shard *wakuv2.Shard, clock uint64) error {
+func (m *Manager) updateShard(community *Community, shard *messagingtypes.Shard, clock uint64) error {
 	community.config.Shard = shard
 	if shard == nil {
 		return m.persistence.DeleteCommunityShard(community.ID())
@@ -1596,7 +1594,7 @@ func (m *Manager) updateShard(community *Community, shard *wakuv2.Shard, clock u
 	return m.persistence.SaveCommunityShard(community.ID(), shard, clock)
 }
 
-func (m *Manager) UpdateShard(community *Community, shard *wakuv2.Shard, clock uint64) error {
+func (m *Manager) UpdateShard(community *Community, shard *messagingtypes.Shard, clock uint64) error {
 	m.communityLock.Lock(community.ID())
 	defer m.communityLock.Unlock(community.ID())
 
@@ -1604,7 +1602,7 @@ func (m *Manager) UpdateShard(community *Community, shard *wakuv2.Shard, clock u
 }
 
 // SetShard assigns a shard to a community
-func (m *Manager) SetShard(communityID types.HexBytes, shard *wakuv2.Shard) (*Community, error) {
+func (m *Manager) SetShard(communityID types.HexBytes, shard *messagingtypes.Shard) (*Community, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -2217,11 +2215,11 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		if err != nil {
 			return nil, err
 		}
-		var cShard *wakuv2.Shard
+		var cShard *messagingtypes.Shard
 		if communityShard == nil {
-			cShard = &wakuv2.Shard{Cluster: wakuv2.MainStatusShardCluster, Index: wakuv2.DefaultShardIndex}
+			cShard = &messagingtypes.Shard{Cluster: messagingtypes.MainStatusShardCluster, Index: messagingtypes.DefaultShardIndex}
 		} else {
-			cShard = wakuv2.FromProtobuff(communityShard)
+			cShard = messagingtypes.FromShardProtobuff(communityShard)
 		}
 		config := Config{
 			CommunityDescription:                processedDescription,
@@ -4025,11 +4023,11 @@ func (m *Manager) GetByIDStringReadonly(idString string) (ReadonlyCommunity, err
 	return ReadonlyCommunity(community), err
 }
 
-func (m *Manager) GetCommunityShard(communityID types.HexBytes) (*wakuv2.Shard, error) {
+func (m *Manager) GetCommunityShard(communityID types.HexBytes) (*messagingtypes.Shard, error) {
 	return m.persistence.GetCommunityShard(communityID)
 }
 
-func (m *Manager) SaveCommunityShard(communityID types.HexBytes, shard *wakuv2.Shard, clock uint64) error {
+func (m *Manager) SaveCommunityShard(communityID types.HexBytes, shard *messagingtypes.Shard, clock uint64) error {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 

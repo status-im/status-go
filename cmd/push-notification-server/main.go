@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
@@ -300,7 +301,7 @@ func buildWakuConfig() *wakuv2.Config {
 		Nameserver:                             "",
 		UDPPort:                                *UDPPort,
 		AutoUpdate:                             true,
-		DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
+		DefaultShardPubsubTopic:                messagingtypes.DefaultShardPubsubTopic(),
 		ClusterID:                              16,
 		EnableMissingMessageVerification:       false,
 		EnableStoreConfirmationForMessagesSent: false,

@@ -6,9 +6,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 func communityToRecord(community *Community) (*CommunityRecord, error) {
@@ -118,9 +118,9 @@ func recordBundleToCommunity(
 		}
 	}
 
-	var s *wakuv2.Shard = nil
+	var s *messagingtypes.Shard = nil
 	if r.community.shardCluster != nil && r.community.shardIndex != nil {
-		s = &wakuv2.Shard{
+		s = &messagingtypes.Shard{
 			Cluster: uint16(*r.community.shardCluster),
 			Index:   uint16(*r.community.shardIndex),
 		}

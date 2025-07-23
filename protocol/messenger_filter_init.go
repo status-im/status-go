@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/deprecation"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 // InitFilters analyzes chats and contacts in order to setup filters
@@ -24,7 +23,7 @@ func (m *Messenger) InitFilters() error {
 	rand.Seed(time.Now().Unix())
 
 	// Community requests will arrive in this pubsub topic
-	if err := m.SubscribeToPubsubTopic(wakuv2.DefaultNonProtectedPubsubTopic(), nil); err != nil {
+	if err := m.SubscribeToPubsubTopic(messagingtypes.DefaultNonProtectedPubsubTopic(), nil); err != nil {
 		return err
 	}
 

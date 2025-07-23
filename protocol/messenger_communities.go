@@ -41,7 +41,6 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 // 7 days interval
@@ -84,10 +83,10 @@ const (
 
 type FetchCommunityRequest struct {
 	// CommunityKey should be either a public or a private community key
-	CommunityKey    string        `json:"communityKey"`
-	Shard           *wakuv2.Shard `json:"shard"`
-	TryDatabase     bool          `json:"tryDatabase"`
-	WaitForResponse bool          `json:"waitForResponse"`
+	CommunityKey    string                `json:"communityKey"`
+	Shard           *messagingtypes.Shard `json:"shard"`
+	TryDatabase     bool                  `json:"tryDatabase"`
+	WaitForResponse bool                  `json:"waitForResponse"`
 }
 
 func (r *FetchCommunityRequest) Validate() error {
@@ -341,7 +340,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					Sender:              community.PrivateKey(),
 					SkipEncryptionLayer: true,
 					MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_USER_KICKED,
-					PubsubTopic:         wakuv2.DefaultNonProtectedPubsubTopic(),
+					PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
 				}
 
 				_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
@@ -676,7 +675,7 @@ func (m *Messenger) handleCommunitySharedAddressesRequest(state *ReceivedMessage
 		CommunityID:         community.ID(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_RESPONSE,
-		PubsubTopic:         wakuv2.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
 		ResendType:          common.ResendTypeRawMessage,
 		ResendMethod:        common.ResendMethodSendPrivate,
 		Recipients:          []*ecdsa.PublicKey{signer},
@@ -1032,7 +1031,7 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 	return mr, nil
 }
 
-func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *wakuv2.Shard) error {
+func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *messagingtypes.Shard) error {
 	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
 	pubsubTopic := shard.PubsubTopic()
 
@@ -1049,7 +1048,7 @@ func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *wakuv2.
 	return m.messaging.SubscribeToPubsubTopic(pubsubTopic, pubK)
 }
 
-func (m *Messenger) unsubscribeFromShard(shard *wakuv2.Shard) error {
+func (m *Messenger) unsubscribeFromShard(shard *messagingtypes.Shard) error {
 	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
 
 	return m.messaging.UnsubscribeFromPubsubTopic(shard.PubsubTopic())
@@ -1474,7 +1473,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		ResendType:          common.ResendTypeRawMessage,
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
-		PubsubTopic:         wakuv2.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
 		Priority:            &common.HighPriority,
 	}
 
@@ -1852,7 +1851,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 		CommunityID:         community.ID(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
-		PubsubTopic:         wakuv2.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
 		ResendType:          common.ResendTypeRawMessage,
 		Priority:            &common.HighPriority,
 	}
@@ -2010,7 +2009,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			CommunityID:         community.ID(),
 			SkipEncryptionLayer: true,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
-			PubsubTopic:         wakuv2.DefaultNonProtectedPubsubTopic(),
+			PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
 			ResendType:          common.ResendTypeRawMessage,
 			ResendMethod:        common.ResendMethodSendPrivate,
 			Recipients:          []*ecdsa.PublicKey{pk},
@@ -2456,7 +2455,7 @@ func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.Chat
 	chats := messagingtypes.ChatsToInitialize{
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
-		{ChatID: uncompressedPubKey, PubsubTopic: wakuv2.DefaultNonProtectedPubsubTopic()},
+		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.DefaultNonProtectedPubsubTopic()},
 	}
 
 	return chats
@@ -3478,7 +3477,7 @@ func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message
 }
 
 func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communities.Community, message *protobuf.CommunityShardKey) error {
-	err := m.communitiesManager.UpdateShard(community, wakuv2.FromProtobuff(message.Shard), message.Clock)
+	err := m.communitiesManager.UpdateShard(community, messagingtypes.FromShardProtobuff(message.Shard), message.Clock)
 	if err != nil {
 		return err
 	}
@@ -3500,7 +3499,7 @@ func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communiti
 	}
 
 	// Unsubscribing from existing shard
-	if community.Shard() != nil && community.Shard() != wakuv2.FromProtobuff(message.GetShard()) {
+	if community.Shard() != nil && community.Shard() != messagingtypes.FromShardProtobuff(message.GetShard()) {
 		err := m.unsubscribeFromShard(community.Shard())
 		if err != nil {
 			return err
@@ -3514,7 +3513,7 @@ func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communiti
 		return err
 	}
 	// Update community filters in case of change of shard
-	if community.Shard() != wakuv2.FromProtobuff(message.GetShard()) {
+	if community.Shard() != messagingtypes.FromShardProtobuff(message.GetShard()) {
 		err = m.UpdateCommunityFilters(community)
 		if err != nil {
 			return err

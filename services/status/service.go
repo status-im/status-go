@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 // Make sure that Service implements node.Lifecycle interface.
@@ -68,7 +68,7 @@ type PublicAPI struct {
 	service *Service
 }
 
-func (p *PublicAPI) CommunityInfo(communityID types.HexBytes, shard *wakuv2.Shard) (json.RawMessage, error) {
+func (p *PublicAPI) CommunityInfo(communityID types.HexBytes, shard *messagingtypes.Shard) (json.RawMessage, error) {
 	if p.service.messenger == nil {
 		return nil, ErrNotInitialized
 	}
