@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
+	"github.com/waku-org/waku-go-bindings/waku"
 )
 
 type TestMessagingEnvironment struct {
@@ -113,9 +114,21 @@ func (tp *testPublicWakuAPI) Post(ctx context.Context, req wakutypes.NewMessage)
 }
 
 func newTestWakuWrapper() (*testWakuWrapper, error) {
+
+	config := wakuv2.DefaultConfig
+
+	tcpPort, udpPort, err := waku.GetFreePortIfNeeded(0, 0)
+
+	if err != nil {
+		return nil, err
+	}
+
+	config.Port = tcpPort
+	config.UDPPort = udpPort
+
 	w, err := wakuv2.New(
 		nil,
-		&wakuv2.DefaultConfig,
+		&config,
 		zap.NewNop(),
 		nil,
 		nil,
