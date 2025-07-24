@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"encoding/json"
+	errorsLib "errors"
 
 	"go.uber.org/zap"
 
@@ -14,10 +15,11 @@ import (
 )
 
 // syncSettings syncs all settings that are syncable
-func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64, prepareForBackup bool) (resultRaw []*common.RawMessage, resultSync []*protobuf.SyncSetting, errors []error) {
+func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64, prepareForBackup bool) (resultRaw []*common.RawMessage, resultSync []*protobuf.SyncSetting, errorResult error) {
+	var errors []error
 	s, err := m.settings.GetSettings()
 	if err != nil {
-		errors = append(errors, err)
+		errorResult = err
 		return
 	}
 
@@ -36,7 +38,7 @@ func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64, prepareForB
 			clock, err := m.settings.GetSettingLastSynced(sf)
 			if err != nil {
 				logger.Error("m.settings.GetSettingLastSynced", zap.Error(err), zap.String("SettingField", sf.GetDBName()))
-				errors = append(errors, err)
+				errorResult = err
 				return
 			}
 			if clock == 0 {
@@ -55,6 +57,7 @@ func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64, prepareForB
 			resultSync = append(resultSync, sm)
 		}
 	}
+	errorResult = errorsLib.Join(errors...)
 	return
 }
 
@@ -62,11 +65,10 @@ func (m *Messenger) syncSettings(rawMessageHandler RawMessageHandler) error {
 	logger := m.logger.Named("syncSettings")
 
 	clock, _ := m.getLastClockWithRelatedChat()
-	rawMessages, _, errors := m.prepareSyncSettingsMessages(clock, false)
+	rawMessages, _, err := m.prepareSyncSettingsMessages(clock, false)
 
-	if len(errors) != 0 {
-		// return just the first error, the others have been logged
-		return errors[0]
+	if err != nil {
+		return err
 	}
 
 	for _, rm := range rawMessages {

@@ -66,6 +66,13 @@ class StatusBackend(RpcClient, SignalClient):
         self.ws_url = f"{url}".replace("http", "ws")
         self.rpc_url = f"{url}/statusgo/CallRPC"
         self.public_key = ""
+        self.mnemonic = ""
+        self.key_uid = ""
+        self.password = ""
+        self.display_name = ""
+        self.device_id = str(uuid.uuid4())  # In reality this is taken from the device, don't confuse with Status installation_id
+        self.device_platform = PushNotificationRegistrationTokenType.UNKNOWN
+        self.node_login_event = {}
 
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
@@ -252,27 +259,30 @@ class StatusBackend(RpcClient, SignalClient):
         return network
 
     def extract_data(self, path: str):
-        if not self.container:
-            if os.path.exists(path):
-                return path
+        if self.container:
+            return self.container.extract_data(path)
+
+        if not os.path.exists(path):
             return None
 
-        try:
-            stream, _ = self.container.get_archive(path)
-        except docker.errors.NotFound:
-            return None
+        return path
 
-        temp_dir = tempfile.mkdtemp()
-        tar_bytes = io.BytesIO(b"".join(stream))
+    def import_data(self, src_path: str, dest_path: str):
+        """
+        Import a file from the host (src_path) into the container at dest_path.
+        If not running in a container, just copy the file locally.
+        """
+        if self.container:
+            self.container.import_data(src_path, dest_path)
+            return
 
-        with tarfile.open(fileobj=tar_bytes) as tar:
-            tar.extractall(path=temp_dir)
-            # If the tar contains a single file, return the path to that file
-            # Otherwise it's a directory, just return temp_dir.
-            if len(tar.getmembers()) == 1:
-                return os.path.join(temp_dir, tar.getmembers()[0].name)
+        # Not running in a container, just copy the file locally
+        if not os.path.exists(src_path):
+            raise FileNotFoundError(f"Source path '{src_path}' does not exist.")
 
-        return temp_dir
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        with open(src_path, "rb") as src, open(dest_path, "wb") as dst:
+            dst.write(src.read())
 
     def _set_display_name(self, **kwargs):
         self.display_name = kwargs.get(
@@ -325,6 +335,18 @@ class StatusBackend(RpcClient, SignalClient):
     def logout(self):
         method = "Logout"
         return self.api_valid_request(method, {})
+
+    def wait_for_login(self):
+        signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
+        if "error" in signal["event"]:
+            error_details = signal["event"]["error"]
+            assert not error_details, f"Unexpected error during login: {error_details}"
+        self.node_login_event = signal
+        logging.debug(f"Node login event: {self.node_login_event}")
+        self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
+        self.mnemonic = self.node_login_event.get("event", {}).get("settings", {}).get("mnemonic")
+        self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
+        return signal
 
     def container_pause(self):
         if not self.container:

@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -16,9 +18,13 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/connection"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/node/backup"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
@@ -113,10 +119,13 @@ type StatusNode struct {
 	appGeneralSrvc         *appgeneral.Service
 	ethSrvc                *eth.Service
 
-	accountsFeed event.Feed
-	walletFeed   event.Feed
-	networksFeed event.Feed
-	settingsFeed event.Feed
+	accountsFeed      event.Feed
+	walletFeed        event.Feed
+	networksFeed      event.Feed
+	settingsFeed      event.Feed
+	accountsPublisher *pubsub.Publisher
+
+	localBackup *backup.Controller
 }
 
 // New makes new instance of StatusNode.
@@ -127,6 +136,7 @@ func New(transactor *transactions.Transactor, logger *zap.Logger) *StatusNode {
 		transactor:         transactor,
 		logger:             logger,
 		publicMethods:      make(map[string]bool),
+		accountsPublisher:  pubsub.NewPublisher(),
 	}
 }
 
@@ -216,6 +226,70 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 	return n.startWithDB(config, options.AccountsManager)
 }
 
+func (n *StatusNode) StartLocalBackup() error {
+	if n.localBackup != nil {
+		return errors.New("local backup already started")
+	}
+
+	chatAccount, err := n.gethAccountsManager.SelectedChatAccount()
+	if err != nil {
+		return err
+	}
+
+	privateKey := chatAccount.PrivateKey()
+	filenameGetter := func() (string, error) {
+		accountIdentifier := common.PubkeyToHex(&privateKey.PublicKey)
+
+		backupPath, err := n.accountsSrvc.GetBackupPath()
+		if err != nil {
+			return "", err
+		}
+		var backupDir string
+		if backupPath != "" {
+			backupDir = backupPath
+		} else {
+			backupDir = filepath.Join(n.config.RootDataDir, "backups")
+		}
+		fullPath := filepath.Join(backupDir, fmt.Sprintf("%x_user_data.bkp", accountIdentifier[:4]))
+		return fullPath, nil
+	}
+
+	n.localBackup, err = backup.NewController(backup.BackupConfig{
+		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
+		FileNameGetter: filenameGetter,
+		// TODO set to true to enable the local backup
+		BackupEnabled: false,
+		Interval:      time.Minute * 30,
+	}, n.logger.Named("LocalBackup"))
+	if err != nil {
+		return err
+	}
+
+	if n.accountsSrvc != nil {
+		n.localBackup.Register("settings", n.accountsSrvc)
+	}
+
+	if n.walletSrvc != nil {
+		n.localBackup.Register("wallet", n.walletSrvc)
+	}
+
+	if n.statusPublicSrvc != nil {
+		n.localBackup.Register("messenger", n.statusPublicSrvc.Messenger())
+	}
+
+	n.localBackup.Start()
+
+	return nil
+}
+
+func (n *StatusNode) PerformLocalBackup() (string, error) {
+	return n.localBackup.PerformBackup()
+}
+
+func (n *StatusNode) LoadLocalBackup(filePath string) error {
+	return n.localBackup.LoadBackup(filePath)
+}
+
 func (n *StatusNode) SetMediaServerEnableTLS(enableTLS *bool) {
 	n.mediaServerEnableTLS = enableTLS
 }
@@ -302,6 +376,11 @@ func (n *StatusNode) Stop() error {
 
 	if !n.isRunning() {
 		return ErrNoRunningNode
+	}
+
+	if n.localBackup != nil {
+		n.localBackup.Stop()
+		n.localBackup = nil
 	}
 
 	return n.stop()

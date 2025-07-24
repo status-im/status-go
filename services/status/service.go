@@ -42,6 +42,10 @@ func (s *Service) APIs() []rpc.API {
 	}
 }
 
+func (s *Service) Messenger() *protocol.Messenger {
+	return s.messenger
+}
+
 // NewPublicAPI returns a reference to the PublicAPI object
 func NewPublicAPI(s *Service) *PublicAPI {
 	api := &PublicAPI{

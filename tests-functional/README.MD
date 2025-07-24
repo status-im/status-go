@@ -35,7 +35,7 @@ Functional tests for status-go
 ### Run tests
 - In `./tests-functional` run `docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f docker-compose.status-go.local.yml up --build --remove-orphans`, as result:
     * a container with [status-backend](https://github.com/status-im/status-go/pull/5847) will be created with endpoint exposed on `0.0.0.0:3333`
-    * status-go will use [anvil](https://book.getfoundry.sh/reference/anvil/) as RPCURL with ChainID 31337 
+    * status-go will use [anvil](https://book.getfoundry.sh/reference/anvil/) as RPCURL with ChainID 31337
     * Status-im contracts will be deployed to the network
 
 * In `./tests-functional/tests` directory run `pytest -m rpc`
@@ -86,7 +86,40 @@ sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
 
 ## Import issues
 
-If you see some import issues, make sure that you have all requirements installed from `requirements.txt` 
+If you see some import issues, make sure that you have all requirements installed from `requirements.txt`
 
 ### For PyCharm users
 Make sure that you made `test-functional` source folder (Right click > Mark directory as > Source folder)
+
+
+## Reliability tests
+
+This framework also hosts a suite of reliability tests. See more info [here](https://github.com/status-im/status-go/blob/develop/tests-functional/tests/reliability/README.MD)
+
+## RuntimeError: Docker image 'statusgo-xyz:latest' not found
+
+First check with `docker images` that the image was created. If not, re-run the build command from [How to Run](#how-to-run)
+
+Second, if the image is present in the list, check if you Python env is not connected to the wrong Docker daemon.
+
+Run this in the shell:
+```shell
+echo $DOCKER_HOST
+docker context ls
+```
+
+Run this in the Python env (`python`):
+```py
+import docker
+print(docker.from_env().api.base_url)
+```
+
+You might see that Python is using something like:
+- unix:///run/docker.sock
+- vs your CLI using unix:///var/run/docker.sock
+
+If that is so, force Python to use the same Docker socket (from `docker context ls`):
+```shell
+export DOCKER_HOST=unix:///var/run/docker.sock
+```
+Add this before launching your test runner

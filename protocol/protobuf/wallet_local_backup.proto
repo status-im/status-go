@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+import "pairing.proto";
+
+option go_package = "./;protobuf";
+package protobuf;
+
+message WalletLocalBackup {
+  repeated SyncAccount watchOnlyAccounts = 1;
+}
