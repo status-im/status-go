@@ -115,21 +115,9 @@ func (tp *testPublicWakuAPI) Post(ctx context.Context, req wakutypes.NewMessage)
 }
 
 func newTestWakuWrapper() (*testWakuWrapper, error) {
-
-	config := wakuv2.DefaultConfig
-
-	tcpPort, udpPort, err := waku.GetFreePortIfNeeded(0, 0)
-
-	if err != nil {
-		return nil, err
-	}
-
-	config.Port = tcpPort
-	config.UDPPort = udpPort
-
 	w, err := wakuv2.New(
 		nil,
-		&config,
+		&wakuv2.DefaultConfig,
 		zap.NewNop(),
 		nil,
 		nil,
