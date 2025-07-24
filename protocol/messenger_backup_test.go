@@ -43,7 +43,6 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Create 2 contacts
-
 	contact1Key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	contactID1 := types.EncodeHex(crypto.FromECDSAPub(&contact1Key.PublicKey))
@@ -60,6 +59,7 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 
 	s.Require().Len(bob1.Contacts(), 2)
 
+	// Validate contacts
 	actualContacts := bob1.Contacts()
 	if actualContacts[0].ID == contactID1 {
 		s.Require().Equal(actualContacts[0].ID, contactID1)
@@ -75,7 +75,6 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 	s.Require().True(actualContacts[1].added())
 
 	// Backup
-
 	clock, err := bob1.BackupData(context.Background())
 	s.Require().NoError(err)
 
@@ -814,8 +813,7 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	bob2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, bob2)
 
-	// Create a communitie
-
+	// Create a community
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",

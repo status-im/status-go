@@ -44,7 +44,7 @@ Functional tests for status-go
     * Start Anvil with ChainID 31337 exposed on `0.0.0.0:8545`
     * Deploy required Status contracts to Anvil
 
-3. In `./tests-functional/tests` directory run:
+3. In `./tests-functional/tests` directory run (with the `venv` running):
    ```sh
     pytest -m rpc
    ```
@@ -142,3 +142,31 @@ Make sure that you made `test-functional` source folder (Right click > Mark dire
 ## Reliability tests
 
 This framework also hosts a suite of reliability tests. See more info [here](https://github.com/status-im/status-go/blob/develop/tests-functional/tests/reliability/README.MD)
+
+## RuntimeError: Docker image 'statusgo-xyz:latest' not found
+
+First check with `docker images` that the image was created. If not, re-run the build command from [How to Run](#how-to-run)
+
+Second, if the image is present in the list, check if you Python env is not connected to the wrong Docker daemon.
+
+Run this in the shell:
+```shell
+echo $DOCKER_HOST
+docker context ls
+```
+
+Run this in the Python env (`python`):
+```py
+import docker
+print(docker.from_env().api.base_url)
+```
+
+You might see that Python is using something like:
+- unix:///run/docker.sock
+- vs your CLI using unix:///var/run/docker.sock
+
+If that is so, force Python to use the same Docker socket (from `docker context ls`):
+```shell
+export DOCKER_HOST=unix:///var/run/docker.sock
+```
+Add this before launching your test runner

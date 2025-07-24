@@ -172,6 +172,7 @@ class StatusGoContainer:
         try:
             stream, _ = self.container.get_archive(path)
         except docker.errors.NotFound:
+            logging.error(f"Path '{path}' not found in container {self.container.name}.")
             return None
 
         temp_dir = tempfile.mkdtemp()
@@ -185,6 +186,37 @@ class StatusGoContainer:
                 return os.path.join(temp_dir, tar.getmembers()[0].name)
 
         return temp_dir
+
+    def import_data(self, src_path: str, dest_path: str):
+        """
+        Copy data from the host (src_path) into the container at dest_path.
+        """
+        if not self.container:
+            raise RuntimeError("Container is not initialized.")
+
+        if not os.path.exists(src_path):
+            raise FileNotFoundError(f"Source path '{src_path}' does not exist.")
+
+        # Create a tar archive of the source path
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+            arcname = os.path.basename(src_path)
+            tar.add(src_path, arcname=arcname)
+        tar_stream.seek(0)
+
+        # Put the archive into the container at the destination path
+        try:
+            # Ensure destination directory exists in the container
+            response = self.container.exec_run(cmd=["mkdir", "-p", dest_path])
+            assert response.exit_code == 0, f"Failed to ensure directory exists: {response.output.decode().strip()}"
+            success = self.container.put_archive(dest_path, tar_stream.getvalue())
+            assert success, f"Failed to put archive to {dest_path} in container {self.container.name}"
+        except Exception as e:
+            logging.error(f"Failed to import data to container: {e}")
+            raise
+
+    def get_name(self):
+        return self.container.name if self.container else None
 
     def save_logs(self):
         if not self.container:
