@@ -7,8 +7,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
-	"github.com/waku-org/waku-go-bindings/waku"
-
 	"github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
@@ -116,20 +114,9 @@ func (tp *testPublicWakuAPI) Post(ctx context.Context, req wakutypes.NewMessage)
 
 func newTestWakuWrapper() (*testWakuWrapper, error) {
 
-	config := wakuv2.DefaultConfig
-
-	tcpPort, udpPort, err := waku.GetFreePortIfNeeded(0, 0)
-
-	if err != nil {
-		return nil, err
-	}
-
-	config.Port = tcpPort
-	config.UDPPort = udpPort
-
 	w, err := wakuv2.New(
 		nil,
-		&config,
+		&wakuv2.DefaultConfig,
 		zap.NewNop(),
 		nil,
 		nil,
