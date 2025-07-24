@@ -1064,7 +1064,9 @@ func (w *Waku) Stop() error {
 		}
 	}
 
-	close(w.goingOnline)
+	if w.goingOnline != nil {
+		close(w.goingOnline)
+	}
 
 	w.wg.Wait()
 
