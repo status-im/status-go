@@ -54,6 +54,7 @@ type CreateAccount struct {
 	LogLevel    *string `json:"logLevel"`
 	LogFilePath string  `json:"logFilePath"` // absolute path
 	LogEnabled  bool    `json:"logEnabled"`
+	LogToStderr bool    `json:"logToStderr"`
 
 	PreviewPrivacy bool `json:"previewPrivacy"`
 

@@ -1776,7 +1776,7 @@ func (api *PublicAPI) SetMaxLogBackups(request *requests.SetMaxLogBackups) error
 	return api.service.messenger.SetMaxLogBackups(request)
 }
 
-func (api *PublicAPI) LogTest() error {
+func (api *PublicAPI) LogTest() {
 	l1 := logutils.ZapLogger().Named("test1")
 	l2 := l1.Named("test2")
 	l3 := l2.Named("test3")
@@ -1787,7 +1787,7 @@ func (api *PublicAPI) LogTest() error {
 		}
 	}
 
-	return l1.Sync()
+	_ = l1.Sync()
 }
 
 func (api *PublicAPI) SetCustomNodes(request *requests.SetCustomNodes) error {

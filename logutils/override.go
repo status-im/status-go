@@ -18,6 +18,7 @@ type LogSettings struct {
 	MaxBackups      int    `json:"MaxBackups"`
 	CompressRotated bool   `json:"CompressRotated"`
 	Colorized       bool   `json:"Colorized"` // FIXME: doesn't take effect
+	LogToStderr     bool   `json:"LogToStderr"`
 }
 
 func OverrideRootLoggerWithConfig(settings LogSettings) error {
@@ -45,21 +46,28 @@ func overrideCoreWithConfig(filteringCore *namespaceFilteringCore, settings LogS
 		return err
 	}
 
+	var syncers []zapcore.WriteSyncer
+
 	if settings.File != "" {
 		if settings.MaxBackups == 0 {
 			// Setting MaxBackups to 0 causes all log files to be kept. Even setting MaxAge to > 0 doesn't fix it
 			// Docs: https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2@v2.0.0#readme-cleaning-up-old-log-files
 			settings.MaxBackups = 1
 		}
-		core.UpdateSyncer(ZapSyncerWithRotation(FileOptions{
+
+		syncers = append(syncers, ZapSyncerWithRotation(FileOptions{
 			Filename:   settings.File,
 			MaxSize:    settings.MaxSize,
 			MaxBackups: settings.MaxBackups,
 			Compress:   settings.CompressRotated,
 		}))
-	} else {
-		core.UpdateSyncer(zapcore.Lock(zapcore.AddSync(os.Stderr)))
 	}
+
+	if settings.LogToStderr || len(syncers) == 0 {
+		syncers = append(syncers, zapcore.Lock(zapcore.AddSync(os.Stderr)))
+	}
+
+	core.UpdateSyncer(zapcore.NewMultiWriteSyncer(syncers...))
 
 	// FIXME: remove go-libp2p logging altogether
 	// go-libp2p logger

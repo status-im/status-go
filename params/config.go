@@ -1061,5 +1061,6 @@ func (c *NodeConfig) ProfileLogSettings() logutils.LogSettings {
 		MaxSize:         c.LogMaxSize,
 		MaxBackups:      c.LogMaxBackups,
 		CompressRotated: c.LogCompressRotated,
+		LogToStderr:     c.LogToStderr,
 	}
 }
