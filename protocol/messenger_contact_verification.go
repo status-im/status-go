@@ -1150,7 +1150,6 @@ func (m *Messenger) createContactVerificationMessage(challenge string, chat *Cha
 	chatMessage.From = state.CurrentMessageState.Contact.ID
 	chatMessage.Alias = state.CurrentMessageState.Contact.Alias
 	chatMessage.SigPubKey = state.CurrentMessageState.PublicKey
-	chatMessage.Identicon = state.CurrentMessageState.Contact.Identicon
 	chatMessage.WhisperTimestamp = state.CurrentMessageState.WhisperTimestamp
 
 	chatMessage.ChatId = chat.ID

@@ -86,9 +86,6 @@
                                     "id": {
                                         "type": "string"
                                     },
-                                    "identicon": {
-                                        "type": "string"
-                                    },
                                     "lineCount": {
                                         "type": "integer"
                                     },
@@ -166,7 +163,6 @@
                                     "ensName",
                                     "from",
                                     "id",
-                                    "identicon",
                                     "lineCount",
                                     "localChatId",
                                     "messageType",
@@ -182,7 +178,6 @@
                                     "whisperTimestamp"
                                 ],
                                 "type": "object"
-
                             },
                             "members": {
                                 "items": {
@@ -213,12 +208,6 @@
                             },
                             "name": {
                                 "type": "string"
-                            },
-                            "syncedFrom": {
-                                "type": "integer"
-                            },
-                            "syncedTo": {
-                                "type": "integer"
                             },
                             "timestamp": {
                                 "type": "integer"
@@ -549,8 +538,8 @@
                                 "type": "object"
                             },
                             "chatsModified": {
-                                "patternProperties": {
-                                    "^[a-zA-Z0-9-]+$": {
+                                "properties": {
+                                    "66dbc222-c960-4857-bb68-3d06527eac65": {
                                         "properties": {
                                             "CategoryModified": {
                                                 "type": "string"
@@ -967,9 +956,6 @@
                             "id": {
                                 "type": "string"
                             },
-                            "identicon": {
-                                "type": "string"
-                            },
                             "lineCount": {
                                 "type": "integer"
                             },
@@ -1048,7 +1034,6 @@
                             "from",
                             "gapParameters",
                             "id",
-                            "identicon",
                             "lineCount",
                             "localChatId",
                             "messageType",

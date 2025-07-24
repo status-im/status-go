@@ -65,6 +65,9 @@
                                     "compressedKey": {
                                         "type": "string"
                                     },
+                                    "contactRequestState": {
+                                        "type": "integer"
+                                    },
                                     "contentType": {
                                         "type": "integer"
                                     },
@@ -84,9 +87,6 @@
                                         "type": "string"
                                     },
                                     "id": {
-                                        "type": "string"
-                                    },
-                                    "identicon": {
                                         "type": "string"
                                     },
                                     "lineCount": {
@@ -167,7 +167,6 @@
                                     "ensName",
                                     "from",
                                     "id",
-                                    "identicon",
                                     "lineCount",
                                     "localChatId",
                                     "messageType",
