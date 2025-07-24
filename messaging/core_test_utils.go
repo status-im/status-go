@@ -113,7 +113,6 @@ func (tp *testPublicWakuAPI) Post(ctx context.Context, req wakutypes.NewMessage)
 }
 
 func newTestWakuWrapper() (*testWakuWrapper, error) {
-
 	w, err := wakuv2.New(
 		nil,
 		&wakuv2.DefaultConfig,
