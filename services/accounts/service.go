@@ -170,7 +170,6 @@ func (s *Service) prepareSyncSettingsMessages(currentClock uint64, prepareForBac
 func (s *Service) ExportBackup() ([]byte, error) {
 	backup := &protobuf.AccountsLocalBackup{}
 
-	// TODO is using this for the clock ok?
 	settings, err := s.prepareSyncSettingsMessages(uint64(time.Now().UnixMilli()), true)
 	if err != nil {
 		return nil, err

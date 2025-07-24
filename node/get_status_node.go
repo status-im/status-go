@@ -224,7 +224,6 @@ func (n *StatusNode) StartLocalBackup() error {
 			backupDir = filepath.Join(n.config.RootDataDir, "backups")
 		}
 		fullPath := filepath.Join(backupDir, fmt.Sprintf("%x_user_data.bkp", accountIdentifier[:4]))
-		fmt.Println("Generated full backup path:", fullPath)
 		return fullPath, nil
 	}
 
