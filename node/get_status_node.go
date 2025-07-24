@@ -243,7 +243,7 @@ func (n *StatusNode) StartLocalBackup() error {
 	}
 
 	if n.walletSrvc != nil {
-		n.localBackup.Register("wallet", n.walletSrvc.LocalBackup())
+		n.localBackup.Register("wallet", n.walletSrvc)
 	}
 
 	if n.statusPublicSrvc != nil {
