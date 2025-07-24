@@ -205,7 +205,6 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
         m2.deleted,
         m2.deleted_for_me,
 		c.alias,
-		c.identicon,
     COALESCE(m2.discord_message_id, ""),
 		COALESCE(m2_dm_author.name, ""),
 		COALESCE(m2_dm_author.nickname, ""),
@@ -251,7 +250,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var serializedUnfurledStatusLinks []byte
 	var serializedPaymentRequests []byte
 	var alias sql.NullString
-	var identicon sql.NullString
 	var communityID sql.NullString
 	var gapFrom sql.NullInt64
 	var gapTo sql.NullInt64
@@ -364,7 +362,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedDeleted,
 		&quotedDeletedForMe,
 		&alias,
-		&identicon,
 		&quotedDiscordMessage.Id,
 		&quotedDiscordMessage.Author.Name,
 		&quotedDiscordMessage.Author.Nickname,
@@ -444,7 +441,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		}
 	}
 	message.Alias = alias.String
-	message.Identicon = identicon.String
 
 	if gapFrom.Valid && gapTo.Valid {
 		message.GapParameters = &common.GapParameters{
