@@ -4834,6 +4834,8 @@ func (m *Messenger) SendMessageToControlNode(community *communities.Community, r
 		// MVDS only supports sending encrypted message
 		rawMessage.SkipEncryptionLayer = false
 		rawMessage.Recipients = append(rawMessage.Recipients, community.ControlNode())
+		// MVDS only works with sender set to nil
+		rawMessage.Sender = nil
 		return m.sender.SendPrivate(context.Background(), community.ControlNode(), rawMessage)
 	}
 	rawMessage.ResendMethod = common.ResendMethodSendCommunityMessage
