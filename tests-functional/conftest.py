@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import List, Any
 import pytest
 import logging
+from resources.constants import ANVIL_NETWORK_ID
 
 
 def pytest_addoption(parser):
@@ -292,6 +293,57 @@ def backend_factory(request):
             teardown_container(backend.container, log_prefix=f"🧹 [TEARDOWN] Cleaning up backend {len(created_backends) - i} container...")
         else:
             logging.debug(f"ℹ️ [TEARDOWN] Backend {len(created_backends) - i} has no container to cleanup")
+
+
+@pytest.fixture(scope="class", autouse=False)
+def backend_factory_class(request):
+    """
+    Class-scoped backend factory that allows creating and reusing multiple backends per class.
+    Each backend is created only once per class and reused in all tests.
+    Always sets reuse_container = True on the test class.
+
+    Usage:
+        @pytest.fixture(autouse=True)
+        def setup_backends(self, backend_factory_class):
+            self.sender = backend_factory_class(name="sender", user=user_1)
+            self.receiver = backend_factory_class(name="receiver", user=user_2)
+    """
+    request.cls.reuse_container = True
+    request.cls.network_id = ANVIL_NETWORK_ID
+
+    from clients.status_backend import StatusBackend
+    from resources.constants import USE_IPV6, user_1
+
+    await_signals = getattr(request.cls, "await_signals", ["node.login"])
+    params = getattr(request, "param", {})
+
+    privileged = params.get("privileged", False)
+    ipv6 = params.get("ipv6", USE_IPV6)
+    wakuV2LightClient = params.get("wakuV2LightClient", False)
+    light_client_mode = params.get("light_client_mode", False)
+    final_light_client = light_client_mode if "light_client_mode" in params else wakuV2LightClient
+
+    # Dictionary to store created backends by name
+    created_backends = {}
+
+    def recover_backend(*, name, user=user_1, start_messenger=True, skip_login=False):
+        if name not in created_backends:
+            backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6)
+            backend.init_status_backend()
+            if not skip_login:
+                backend.restore_account_and_login(user=user, wakuV2LightClient=final_light_client)
+                backend.wait_for_login()
+            if start_messenger:
+                backend.wakuext_service.start_messenger()
+            created_backends[name] = backend
+        return created_backends[name]
+
+    yield recover_backend
+
+    # Cleanup all created backends
+    for backend in created_backends.values():
+        if hasattr(backend, "container") and backend.container:
+            teardown_container(backend.container, log_prefix="[TEARDOWN] ")
 
 
 class SecretRedactingFilter(logging.Filter):

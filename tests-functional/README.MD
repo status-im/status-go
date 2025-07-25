@@ -113,6 +113,91 @@ sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
     - `jsonschema.validate()` is used to check that the response contains expected data, including required fields and types. Schemas are stored in `/schemas/wallet_MethodName`
     - New schemas can be generated using `./tests-functional/utils/schema_builder.py` by passing a response to the `CustomSchemaBuilder(schema_name).create_schema(response.json())` method, should be used only on test creation phase, please search `how to create schema:` to see an example in a test
 
+### Backend Setup and Cleanup with Pytest Fixtures
+
+Functional tests in this suite rely on robust backend setup and teardown, managed via reusable pytest fixtures defined in `conftest.py`. These fixtures ensure that backend containers are started, reused, and cleaned up efficiently, preventing resource leaks and test interference.
+
+#### 1. Factory Backend Fixtures
+
+There are two main backend factory fixtures:
+
+- **`backend_factory`** (function-scoped):  
+  Allows you to create and clean up multiple backend instances per test function.  
+  **Note:** Users/accounts are created from scratch for each backend instance.
+  
+  Example usage:
+  ```python
+  import pytest
+
+  class TestMessenger:
+      @pytest.fixture(autouse=True)
+      def setup_backends(self, backend_factory):
+          self.sender = backend_factory("sender")
+          self.receiver = backend_factory("receiver")
+
+      def test_send_message(self):
+          # Use self.sender and self.receiver in your test
+          self.sender.send_message(self.receiver, "Hello!")
+          assert self.receiver.has_received_message("Hello!")
+  ```
+  All containers created by this fixture are automatically stopped and removed after the test.
+
+- **`backend_factory_class`** (class-scoped):  
+  Allows you to create and reuse backend instances across all tests in a class.  
+  **Note:** Users/accounts are recovered from a seed phrase (mnemonic) for each backend instance.
+  
+  Example usage:
+  ```python
+  import pytest
+  from resources.constants import user_1, user_2
+
+  class TestWallet:
+      @pytest.fixture(autouse=True)
+      def setup_backends(self, backend_factory_class):
+          self.rpc_client = backend_factory_class(name="main_user", user=user_1)
+          # can add more users
+
+      def test_wallet_balance(self):
+          self.rpc_client.rpc_valid_request(method, params)
+          self.rpc_client.verify_json_schema(signal_response, method)
+  ```
+  Cleanup is handled automatically after all tests in the class have run.
+
+**Note:**  
+You do not need to manually clean up containers when using these factory fixtures—cleanup is built in.
+
+#### 2. Manual/Custom Backend Setup
+
+For advanced scenarios, you may set up backends manually in your test or test class (for example, to use custom logic or direct instantiation).  
+**In this case, you must ensure containers are cleaned up by using the `close_status_backend_containers` fixture.**
+
+Example (from `test_local_pairing.py`):
+```python
+@pytest.fixture(autouse=True)
+def setup_cleanup(self, close_status_backend_containers):
+    """Automatically cleanup containers after each test"""
+    yield
+```
+This fixture will stop, save logs, and remove all containers created during the test, preventing resource leaks.
+
+#### 3. Summary Table
+
+> **Note:** None of these fixtures are used automatically (`autouse=False` by default). You must explicitly use them in your test setup for visibility and control.
+
+| Fixture                           | Scope     | Usage                        | Cleanup         | User Creation Type                |
+|------------------------------------|-----------|------------------------------|-----------------|-----------------------------------|
+| `backend_factory`                  | function  | Per-test backend creation    | Automatic       | Created from scratch              |
+| `backend_factory_class`            | class     | Per-class backend reuse      | Automatic       | Recovered from seed phrase        |
+| `close_status_backend_containers`  | function  | For manual/custom setup      | Must be used manually | N/A (depends on your setup)   |
+
+#### 4. Best Practices
+
+- **Prefer the factory fixtures** for most tests—they are robust, reusable, and handle cleanup for you.
+- **Use `close_status_backend_containers`** if you create backends manually or outside the provided factories.
+- **Never leave containers running** after a test—always ensure cleanup is in place.
+
+For more details, see the docstrings in `conftest.py` and the example usages in the test files. 
+
 # Linting
 
 We use `pre-commit` setup for linting. To run linters:
@@ -129,6 +214,20 @@ Note that `pyright` uses `pyrightconfig.json` configuration from the repository 
 and expects a Python virtual environment to be in `./tests-functional/.venv`. 
 
 # Known issues
+
+## ethclient_transactionByHash is not found when running transaction tests locally
+
+Some tests require access to private API endpoints that are not enabled by default in local builds (enabled on CI by default).  
+To run these tests locally, you **must build `status-go` with the `enable_private_api` build tag**.
+
+```sh
+docker build --file _assets/build/Dockerfile . \
+  --build-arg "build_flags=--cover" \
+  --build-arg "build_tags='gowaku_no_rln,enable_private_api'" \
+  --tag "statusgo-$(git rev-parse --short HEAD)"
+```
+
+- The key part is `--build-arg "build_tags='gowaku_no_rln,enable_private_api'"` which enables the private API for testing.
 
 ## Import issues
 
