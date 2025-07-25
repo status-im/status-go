@@ -3,15 +3,16 @@ import uuid as uuid_lib
 import pytest
 import resources.constants as constants
 
-from steps.status_backend import StatusBackendSteps
 from clients.signals import SignalType
 from utils import wallet_utils
+from resources.constants import user_1
 
 
 @pytest.mark.rpc
 @pytest.mark.transaction
 @pytest.mark.wallet
-class TestRouter(StatusBackendSteps):
+class TestRouter:
+
     await_signals = [
         SignalType.NODE_LOGIN.value,
         SignalType.WALLET.value,
@@ -20,6 +21,10 @@ class TestRouter(StatusBackendSteps):
         SignalType.WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED.value,
         SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
     ]
+
+    @pytest.fixture(autouse=True)
+    def setup_backend(self, backend_factory_class):
+        self.rpc_client = backend_factory_class(name="main_user", user=user_1)
 
     def test_tx_from_route(self):
         uuid = str(uuid_lib.uuid4())
@@ -52,7 +57,7 @@ class TestRouter(StatusBackendSteps):
         transaction_hashes = wallet_router_sign_transactions["signingDetails"]["hashes"]
         tx_signatures = wallet_utils.sign_messages(self.rpc_client, transaction_hashes, constants.user_1.address)
         tx_status = wallet_utils.send_router_transactions_with_signatures(self.rpc_client, uuid, tx_signatures)
-        wallet_utils.check_tx_details(self.rpc_client, tx_status["hash"], self.network_id, constants.user_2.address, amount_in)
+        wallet_utils.check_tx_details(self.rpc_client, tx_status["hash"], self.network_id, constants.user_2.address, amount_in)  # type: ignore
 
     def test_setting_different_fee_modes(self):
         uuid = str(uuid_lib.uuid4())

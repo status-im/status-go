@@ -3,15 +3,15 @@ import json
 import pytest
 import resources.constants as constants
 
-from steps.status_backend import StatusBackendSteps
 from clients.signals import SignalType, WalletEventType
 from utils import wallet_utils
+from clients.services.wallet import WalletService
 
 
 @pytest.mark.rpc
 @pytest.mark.assets
 @pytest.mark.wallet
-class TestWalletAssets(StatusBackendSteps):
+class TestWalletAssets:
     await_signals = [
         SignalType.NODE_LOGIN.value,
         SignalType.WALLET.value,
@@ -21,10 +21,11 @@ class TestWalletAssets(StatusBackendSteps):
         SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
     ]
 
-    @classmethod
-    def setup_class(cls, skip_login=False):
-        super().setup_class(skip_login)
-        cls.wallet_service.start_wallet()
+    @pytest.fixture(autouse=True)
+    def setup_backend(self, backend_factory_class):
+        self.rpc_client = backend_factory_class(name="rpc_client", user=constants.user_1)
+        self.wallet_service = WalletService(self.rpc_client)
+        self.wallet_service.start_wallet()
 
     def test_balance_refresh_ticker_after_sending_transaction(self):
         uuid = str(uuid_lib.uuid4())

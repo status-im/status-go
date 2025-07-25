@@ -1,14 +1,11 @@
 import random
-
 import pytest
-
 from resources.constants import user_1
-from steps.status_backend import StatusBackendSteps
 
 
 @pytest.mark.accounts
 @pytest.mark.rpc
-class TestAccounts(StatusBackendSteps):
+class TestAccounts:
 
     @pytest.fixture(autouse=True)
     def setup_backend(self, backend_factory):
