@@ -104,7 +104,7 @@ def backend_new_profile(request, backend_factory) -> Generator[Callable[[str, bo
 
 @pytest.fixture(scope="function", autouse=False)
 def backend_recovered_profile(request, backend_factory) -> Generator[Callable[[str, object, bool], StatusBackend]]:
-    def _backend_recovered_profile(name: str, user: object, waku_light_client: bool) -> StatusBackend:
+    def _backend_recovered_profile(name: str, user: object, waku_light_client: bool = False) -> StatusBackend:
         logging.debug(f"📋 [SETUP] backend_recovered_profile parameters: wakuV2LightClient={waku_light_client}")
         backend = backend_factory(name)
         backend.init_status_backend()

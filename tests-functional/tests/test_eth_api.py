@@ -43,8 +43,8 @@ class TestEth:
     ]
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_factory_class):
-        self.rpc_client = backend_factory_class(name="rpc_client", user=user_1)
+    def setup_backend(self, backend_recovered_profile):
+        self.rpc_client = backend_recovered_profile("rpc_client", user_1)
         self.network_id = ANVIL_NETWORK_ID
         """Create a transaction and assign tx_data to self."""
         uuid = str(uuid4())
