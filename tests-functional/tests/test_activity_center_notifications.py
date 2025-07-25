@@ -16,14 +16,13 @@ def _get_activity_center_notifications(
 
 
 @pytest.mark.rpc
-@pytest.mark.parametrize("backend_factory", [{"privileged": False}], indirect=True, ids=["unprivileged"])
 class TestActivityCenterNotifications(MessengerSteps):
 
     @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_factory):
+    def setup_backends(self, backend_new_profile):
         """Initialize two unprivileged backends (sender and receiver) for each test function"""
-        self.sender = backend_factory("sender")
-        self.receiver = backend_factory("receiver")
+        self.sender = backend_new_profile("sender")
+        self.receiver = backend_new_profile("receiver")
 
     def test_activity_center_notifications(self):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)

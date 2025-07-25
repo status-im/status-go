@@ -6,13 +6,8 @@ from resources.enums import MessageContentType
 from steps.messenger import MessengerSteps
 
 
-@pytest.mark.parametrize(
-    "backend_factory",
-    [{"privileged": False, "wakuV2LightClient": False}, {"privileged": False, "wakuV2LightClient": True}],
-    indirect=True,
-    ids=["wakuV2LightClient_False", "wakuV2LightClient_True"],
-)
 @pytest.mark.rpc
+@pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 class TestTransactionsChatMessages(MessengerSteps):
     REQUEST_TRANSACTION_TEXT = "Request transaction"
     REQUEST_TRANSACTION_DECLINED_TEXT = "Transaction request declined"
@@ -22,10 +17,10 @@ class TestTransactionsChatMessages(MessengerSteps):
     TRANSACTION_SENT_TEXT = "Transaction sent"
 
     @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_factory):
+    def setup_backends(self, backend_new_profile, waku_light_client):
         """Initialize two backends (sender and receiver) for each test function"""
-        self.sender = backend_factory("sender")
-        self.receiver = backend_factory("receiver")
+        self.sender = backend_new_profile("sender", waku_light_client=waku_light_client)
+        self.receiver = backend_new_profile("receiver", waku_light_client=waku_light_client)
 
     @pytest.fixture
     def transaction_data(self):

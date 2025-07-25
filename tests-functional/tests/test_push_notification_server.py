@@ -54,10 +54,10 @@ def expect_push_notification(gorush, sender, receiver):
 class TestPushNotificationServer(MessengerSteps):
 
     @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_factory):
+    def setup_backends(self, backend_new_profile):
         """Initialize two backends (alice and bob) for each test function"""
-        self.sender = backend_factory("alice")
-        self.receiver = backend_factory("bob")
+        self.sender = backend_new_profile("alice")
+        self.receiver = backend_new_profile("bob")
 
     def test_push_notification_delivery(self, push_notification_server):
         server, gorush = push_notification_server

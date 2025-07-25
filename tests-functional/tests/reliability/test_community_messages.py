@@ -10,10 +10,10 @@ from resources.constants import USE_IPV6
 class TestCommunityMessages(MessengerSteps):
 
     @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_factory):
+    def setup_backends(self, backend_new_profile):
         """Initialize two unprivileged backends (sender and receiver) for each test function"""
-        self.sender = backend_factory("sender")
-        self.receiver = backend_factory("receiver")
+        self.sender = backend_new_profile("sender")
+        self.receiver = backend_new_profile("receiver")
 
     def test_community_messages_baseline(self, message_count=1, network_condition=None):
         self.create_community(self.sender)

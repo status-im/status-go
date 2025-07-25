@@ -10,17 +10,12 @@ from steps.messenger import MessengerSteps
 @pytest.mark.rpc
 class TestMessageReactions(MessengerSteps):
 
-    @pytest.mark.parametrize(
-        "backend_factory",
-        [{"privileged": False, "wakuV2LightClient": False}, {"privileged": False, "wakuV2LightClient": True}],
-        indirect=True,
-        ids=["wakuV2LightClient_False", "wakuV2LightClient_True"],
-    )
-    def test_one_to_one_message_reactions(self, backend_factory):
+    @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
+    def test_one_to_one_message_reactions(self, backend_new_profile, waku_light_client):
         """Test message reactions with different wakuV2LightClient configurations"""
         # Initialize two backends (sender and receiver) for this test
-        self.sender = backend_factory("sender")
-        self.receiver = backend_factory("receiver")
+        self.sender = backend_new_profile("sender", waku_light_client=waku_light_client)
+        self.receiver = backend_new_profile("receiver", waku_light_client=waku_light_client)
 
         self.make_contacts(self.sender, self.receiver)
         response = self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, "test_message")

@@ -5,22 +5,14 @@ from steps.messenger import MessengerSteps
 
 
 @pytest.mark.rpc
-@pytest.mark.parametrize(
-    "backend_factory",
-    [{"privileged": False, "wakuV2LightClient": False}, {"privileged": False, "wakuV2LightClient": True}],
-    indirect=True,
-    ids=["wakuV2LightClient_False", "wakuV2LightClient_True"],
-)
+@pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 class TestContactRequests(MessengerSteps):
 
     @pytest.fixture(autouse=True)
-    def setup_backends(
-        self,
-        backend_factory,
-    ):
+    def setup_backends(self, backend_new_profile, waku_light_client):
         """Initialize two backends (sender and receiver) for each test function"""
-        self.sender = backend_factory("sender")
-        self.receiver = backend_factory("receiver")
+        self.sender = backend_new_profile("sender", waku_light_client=waku_light_client)
+        self.receiver = backend_new_profile("receiver", waku_light_client=waku_light_client)
 
     def test_send_contact_request(self):
         message_text = "test_send_contact_request"
