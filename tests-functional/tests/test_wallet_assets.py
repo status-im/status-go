@@ -22,8 +22,8 @@ class TestWalletAssets:
     ]
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_factory_class):
-        self.rpc_client = backend_factory_class(name="rpc_client", user=constants.user_1)
+    def setup_backend(self, backend_recovered_profile):
+        self.rpc_client = backend_recovered_profile(name="rpc_client", user=constants.user_1)
         self.wallet_service = WalletService(self.rpc_client)
         self.wallet_service.start_wallet()
 

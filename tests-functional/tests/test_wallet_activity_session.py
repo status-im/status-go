@@ -37,7 +37,8 @@ class TestWalletActivitySession:
         SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
     ]
 
-    def _token_list_to_token_overrides(self, token_list):
+    @staticmethod
+    def _token_list_to_token_overrides(token_list):
         token_overrides = []
         for token_symbol, token_address in token_list.items():
             token_overrides.append(
@@ -60,9 +61,7 @@ class TestWalletActivitySession:
         self.anvil_client.eth.wait_for_transaction_receipt(tx_hash)
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_factory_class):
-        # Create backend, but skip login
-        self.rpc_client = backend_factory_class(name="rpc_client", user=user_1, start_messenger=False, skip_login=True)
+    def setup_backend(self, backend_recovered_profile):
         # Setup contracts and deployers
         self.anvil_client = Anvil()
         self.anvil_client.eth.default_account = Web3.to_checksum_address(DEPLOYER_ACCOUNT.address)
@@ -71,8 +70,10 @@ class TestWalletActivitySession:
         self.communities_deployer = CommunitiesDeployer(self.smart_contract_runner)
         self.erc20_token_list = {"SNT": self.snt_deployer.snt_contract_address}
         token_overrides = self._token_list_to_token_overrides(self.erc20_token_list)
-        self.rpc_client.restore_account_and_login(token_overrides=token_overrides)
-        self.rpc_client.wait_for_login()
+
+        # Create backend
+        self.rpc_client = backend_recovered_profile(name="rpc_client", user=user_1, token_overrides=token_overrides)
+
         self.request_id = str(random.randint(1, 8888))
         self.mint_snt(user_1.address, 1000000000000000000000000)
 
@@ -105,7 +106,7 @@ class TestWalletActivitySession:
         method = "wallet_startActivityFilterSessionV2"
         params = [
             [user_1.address],
-            [self.network_id],  # type: ignore
+            [self.rpc_client.network_id],  # type: ignore
             {
                 "period": {"startTimestamp": 0, "endTimestamp": 0},
                 "types": [],
