@@ -20,6 +20,7 @@ const AlchemyID = "alchemy"
 type Client struct {
 	ethClientGetter  rpc.EthClientGetter
 	connectionStatus *connection.Status
+	persistence      *Persistence
 }
 
 func (c *Client) ID() string {
@@ -35,10 +36,11 @@ func (c *Client) IsChainSupported(chainID wc.ChainID) bool {
 	return err == nil && client != nil
 }
 
-func NewClient(ethClientGetter rpc.EthClientGetter) *Client {
+func NewClient(ethClientGetter rpc.EthClientGetter, persistence *Persistence) *Client {
 	return &Client{
 		ethClientGetter:  ethClientGetter,
 		connectionStatus: connection.NewStatus(),
+		persistence:      persistence,
 	}
 }
 
@@ -48,6 +50,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 		PreviousCursor: cursor,
 		NextCursor:     cursor,
 	}
+
 	maxCount := MaxAssetTransfersCount
 	if limit > thirdparty.FetchNoLimit && limit < MaxAssetTransfersCount {
 		maxCount = limit
@@ -141,6 +144,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 		}
 	}
 
+	c.persistence.SaveTransfers(responseTransfers, chainID, parameters.Address)
 	response.Items = TransfersToCommon(responseTransfers, chainID, parameters.Address)
 
 	return response, nil

@@ -215,7 +215,8 @@ func NewService(
 	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, db, feed)
 
 	alchemyEthClientGetter := rpc.NewProviderChainClientGetter(api_common.SmartProxyAlchemy, rpcClient)
-	activityFetcher := activityfetcher_alchemy.NewClient(alchemyEthClientGetter)
+	alchemyFetcherDb := activityfetcher_alchemy.NewPersistence(db)
+	activityFetcher := activityfetcher_alchemy.NewClient(alchemyEthClientGetter, alchemyFetcherDb)
 	activityFetcherDb := activityfetcher.NewPersistence(db)
 	activityFetcherManager := activityfetcher.NewManager(activityFetcher, activityFetcherDb)
 	activityFetcherService := activityfetcher.NewService(activityFetcherManager, rpcClient.NetworkManager, networksFeed, accountsDB, accountFeed, activityFetcherDb, rpcClient)
