@@ -99,6 +99,7 @@ require (
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 	github.com/status-im/extkeys v1.1.0
 	github.com/waku-org/go-waku v0.8.1-0.20250411145637-900b98812a91
+	github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b
 	github.com/waku-org/waku-go-bindings v0.0.0-20250528131356-4af668737057
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
@@ -274,7 +275,6 @@ require (
 	github.com/waku-org/go-discover v0.0.0-20240506173252-4912704efdc5 // indirect
 	github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0 // indirect
 	github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 // indirect
-	github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b // indirect
 	github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065 // indirect
 	github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 // indirect
 	github.com/wk8/go-ordered-map v1.0.0 // indirect

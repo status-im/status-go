@@ -44,6 +44,10 @@ type Entry struct {
 	isNew bool // isNew is used to indicate if the entry is newer than session start (changed state also)
 }
 
+func (e Entry) String() string {
+	return fmt.Sprintf("%v", e.activityType)
+}
+
 func (e *Entry) Key() string {
 	if e.payloadType == ac.MultiTransactionPT {
 		key := fmt.Sprintf("%d", e.id)

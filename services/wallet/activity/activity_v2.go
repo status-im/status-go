@@ -362,6 +362,7 @@ func dataToEntriesV2(deps FilterDependencies, data []*entryDataV2, addresses []e
 			ret = append(ret, entry)
 		case EntryTypeFetchedTransaction:
 			d := data.FetchedEntryData
+			fmt.Printf("=== Fetched EntryTypeFetchedTransaction: %v\n", data.FetchedEntryData.FetchedEntry)
 			uChainID := wCommon.UnknownChainID
 			var chainIDOut *wCommon.ChainID
 			var chainIDIn *wCommon.ChainID
@@ -402,6 +403,7 @@ func dataToEntriesV2(deps FilterDependencies, data []*entryDataV2, addresses []e
 			}
 
 			entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
+			fmt.Printf("=== Returned Entry: %v\n", entry)
 
 			ret = append(ret, entry)
 		}

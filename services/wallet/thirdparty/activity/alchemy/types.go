@@ -66,7 +66,7 @@ func TransfersToCommon(tt []Transfer, chainID uint64, accountAddress common.Addr
 
 	for _, txTransfers := range transfersPerHash {
 		fmt.Println("--------------")
-		fmt.Println("Input:")
+		fmt.Println("Input transfers:")
 		for _, transfer := range txTransfers {
 			fmt.Printf("\tTransfer: %v\n", transfer)
 		}
@@ -76,7 +76,7 @@ func TransfersToCommon(tt []Transfer, chainID uint64, accountAddress common.Addr
 		entries = append(entries, newEntries...)
 
 		for _, entry := range newEntries {
-			fmt.Println("Output:")
+			fmt.Println("Output entries:")
 			fmt.Printf("\tEntry: %v \n", entry)
 		}
 	}
@@ -107,6 +107,15 @@ func (a TransferAnalytics) isSwapTransfer() bool {
 	return false
 }
 
+func (a TransferAnalytics) isBridgeTransfer() bool {
+	if len(a.externalTransfers) == 1 {
+		to := a.externalTransfers[0].ToAddress.Hex()
+		_, known := bridgeRouters[strings.ToLower(to)]
+		return known
+	}
+	return false
+}
+
 func (a TransferAnalytics) isErc20Transfer() bool {
 	if len(a.externalTransfers) == 1 && len(a.tokenTransfers) == 1 {
 		et := a.externalTransfers[0]
@@ -120,8 +129,6 @@ func (a TransferAnalytics) isErc20Transfer() bool {
 func analyzeTransfers(txTransfers []Transfer, chainID uint64, accountAddress common.Address) TransferAnalytics {
 
 	analytics := TransferAnalytics{test: true}
-	analytics.test = true
-
 	for _, transfer := range txTransfers {
 		analytics.transfersCount += 1
 		// Transfer(s) or contract interaction
@@ -145,23 +152,29 @@ func analyzeTransfers(txTransfers []Transfer, chainID uint64, accountAddress com
 
 func processTxTransfersV2(txTransfers []Transfer, chainID uint64, accountAddress common.Address) []thirdparty.ActivityEntry {
 
-	// Simple transaction, just return the entry
-	if len(txTransfers) == 1 {
-		return transferToEntries(txTransfers[0], chainID, accountAddress)
-	}
-
 	entries := make([]thirdparty.ActivityEntry, 0)
+
 	analytics := analyzeTransfers(txTransfers, chainID, accountAddress)
 
 	if analytics.isContractDeployment() {
+		fmt.Println("ContractDeploymentDetected!! ")
 		entries = transferToEntries(analytics.externalTransfers[0], chainID, accountAddress)
 	} else if analytics.isSwapTransfer() {
 		fmt.Println("SwapDetected!! ", len(analytics.inboundNonZeroTransfers), "-", len(analytics.outboundNonZeroTransfers))
 		if len(analytics.inboundNonZeroTransfers) == 1 && len(analytics.outboundNonZeroTransfers) == 1 {
 			entries = append(entries, makeSwapEntry(analytics.outboundNonZeroTransfers[0], analytics.inboundNonZeroTransfers[0], chainID))
 		}
+	} else if analytics.isBridgeTransfer() {
+		fmt.Println("BridgeDetected!! ")
+		if len(analytics.inboundNonZeroTransfers) == 0 && len(analytics.outboundNonZeroTransfers) == 1 {
+			entries = append(entries, makeBridgeEntry(analytics.outboundNonZeroTransfers[0], chainID))
+		}
 	} else if analytics.isErc20Transfer() {
+		fmt.Println("ERC20Transfer!! ")
 		entries = transferToEntries(analytics.tokenTransfers[0], chainID, accountAddress)
+	} else {
+		fmt.Println("SimpleTransfer!! ")
+		entries = transferToEntries(txTransfers[0], chainID, accountAddress)
 	}
 
 	return entries
@@ -346,10 +359,28 @@ func makeSwapEntry(outbound Transfer, inbound Transfer, chainID uint64) thirdpar
 		BlockNumber:     (*hexutil.Big)(outbound.BlockNum.Int),
 		TxStatus:        ac.Success,
 	}
+}
 
-	// TxHash          common.Hash     `json:"txHash"`
-	// BlockNumber     *hexutil.Big    `json:"blockNumber"`
-	// TxStatus        ac.TxStatus     `json:"txStatus"`
+func makeBridgeEntry(outbound Transfer, chainID uint64) thirdparty.ActivityEntry {
+
+	outboundTd := extractTransfersData(outbound, chainID)[0]
+
+	return thirdparty.ActivityEntry{
+		Timestamp:       outbound.Metadata.BlockTimestamp.Unix(),
+		ActivityType:    ac.BridgeAT,
+		AmountOut:       outboundTd.Value,
+		AmountIn:        outboundTd.Value,
+		TokenOut:        &outboundTd.Token,
+		TokenIn:         &outboundTd.Token,
+		Sender:          outbound.FromAddress,
+		Recipient:       outbound.ToAddress,
+		ChainIDOut:      &chainID,
+		ChainIDIn:       &chainID,
+		ContractAddress: outbound.RawContract.Address,
+		TxHash:          outbound.Hash,
+		BlockNumber:     (*hexutil.Big)(outbound.BlockNum.Int),
+		TxStatus:        ac.Success,
+	}
 }
 
 func transferToContractInteractionEntry(t Transfer, chainID uint64) thirdparty.ActivityEntry {
@@ -394,16 +425,38 @@ var dexRouters = map[string]string{
 	"0x881d40237659c251811cec9c364ef91dc08d300c": "MetaMask Swap",
 }
 
-func addressToKnownDex(address string) string {
+var bridgeRouters = map[string]string{
+	"0x0439e60f02a8900a951603950d8d4527f400c3f1": "MetaMask Bridge",
+	"0x2796317b0ff8538f253012862c06787adfb8ceb6": "Synapse Bridge",
+	"0x3666f603cc264fc1bea8f960f27b4bba7f960c58": "Hop ETH Bridge",
+	"0x3ee18b2214aff97000d974cf647e7c347e8fa585": "Wormhole Token Bridge",
+	"0x401f6c983ea34274ec46f84d70b31c151321188b": "Polygon PoS Bridge",
+	"0x5c7bcd6e7de5423a257d81b442b9608c8ba9488d": "Across V2 HubPool",
+	"0x66a71dcef29a0f5cb9584e92ed36966c3a3f437e": "LayerZero Endpoint",
+	"0x72ce9c846789fdb6fc1f34ac4ad25dd9ef7031ef": "Arbitrum L1 Gateway Router",
+	"0x8731d54e9d02c286767d56ac03e8037c07e01e98": "Stargate Router",
+	"0x8898b472c54c31894e3b9bb83cea802a5d0e63c6": "Connext Bridge",
+	"0x98f3c9e6e3face36baad05fe09d375ef1464288b": "Wormhole Core Bridge",
+	"0x99c9fc46f92e8a1c7aa79fd23f77c7222dd3c98b": "Optimism L1 Standard Bridge",
+	"0xa3a7b6f88361f48403514059f1f16c8e78d60eec": "Arbitrum L1 ERC20 Gateway",
+	"0xb8901acb165ed027e32754e0ffe830802919727f": "Hop USDC Bridge",
+}
+
+func addressToKnown(address string) string {
 	router, ok := dexRouters[strings.ToLower(address)]
-	if !ok {
-		return address
+	if ok {
+		return router
 	}
-	return router
+
+	router, ok = bridgeRouters[strings.ToLower(address)]
+	if ok {
+		return router
+	}
+	return address
 }
 
 func (t Transfer) String() string {
-	return fmt.Sprintf("%s %8s %5s %13.7f %s->%s, %s", t.Hash.TerminalString(), t.Category, t.Asset, t.Value, t.FromAddress.Hex(), addressToKnownDex(t.ToAddress.Hex()), t.RawContract.Address)
+	return fmt.Sprintf("%s %8s %5s %13.7f %s->%s, %s", t.Hash.TerminalString(), t.Category, t.Asset, t.Value, t.FromAddress.Hex(), addressToKnown(t.ToAddress.Hex()), t.RawContract.Address)
 }
 
 func (t Transfer) IsContractDeployment() bool {
