@@ -1,7 +1,7 @@
 import os
 import pytest
 import logging
-from typing import Generator
+from typing import Iterator
 
 from resources.constants import ANVIL_NETWORK_ID
 from clients.statusgo_container import StatusGoContainer
@@ -77,7 +77,7 @@ def pytest_addoption(parser):
     )
 
 
-def _status_backend_url_generator(urls) -> Generator[str]:
+def _status_backend_url_generator(urls) -> Iterator[str]:
     for url in urls:
         yield url
 
