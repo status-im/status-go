@@ -8,14 +8,14 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 // syncSettings syncs all settings that are syncable
-func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64, prepareForBackup bool) (resultRaw []*common.RawMessage, resultSync []*protobuf.SyncSetting, errorResult error) {
+func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64, prepareForBackup bool) (resultRaw []*messagingtypes.RawMessage, resultSync []*protobuf.SyncSetting, errorResult error) {
 	var errors []error
 	s, err := m.settings.GetSettings()
 	if err != nil {

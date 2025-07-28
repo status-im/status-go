@@ -13,6 +13,8 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/eth-node/types"
+	messagingevents "github.com/status-im/status-go/messaging/events"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -199,13 +201,13 @@ func (s *ClientSuite) TestHandleMessageScheduled() {
 	chatID := "chat-id"
 	installationID1 := "1"
 	installationID2 := "2"
-	rawMessage := &common.RawMessage{
+	rawMessage := &messagingtypes.RawMessage{
 		ID:                   types.EncodeHex(messageID),
 		SendPushNotification: true,
 		LocalChatID:          chatID,
 	}
 
-	event := &common.MessageEvent{
+	event := &messagingevents.MessageEvent{
 		RawMessage: rawMessage,
 	}
 

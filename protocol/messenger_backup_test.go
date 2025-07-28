@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/pkg/pubsub"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -249,7 +249,7 @@ func (s *MessengerBackupSuite) TestBackupProfileWithInvalidDisplayName() {
 			},
 			Clock: 1,
 		},
-		&v1protocol.StatusMessage{},
+		&messagingtypes.Message{},
 	)
 	// The backup will still work, but the display name will be skipped
 	s.Require().NoError(err)
@@ -287,7 +287,7 @@ func (s *MessengerBackupSuite) TestFetchingDuringBackup() {
 	err := bob1.HandleBackup(
 		&state,
 		backup,
-		&v1protocol.StatusMessage{},
+		&messagingtypes.Message{},
 	)
 	s.Require().NoError(err)
 	// The backup is not done, so no signal should be sent
@@ -326,7 +326,7 @@ func (s *MessengerBackupSuite) TestFetchingDuringBackup() {
 	err = bob1.HandleBackup(
 		&state,
 		backup,
-		&v1protocol.StatusMessage{},
+		&messagingtypes.Message{},
 	)
 	s.Require().NoError(err)
 	// The backup is not done, so no signal should be sent
@@ -349,7 +349,7 @@ func (s *MessengerBackupSuite) TestFetchingDuringBackup() {
 	err = bob1.HandleBackup(
 		&state,
 		backup,
-		&v1protocol.StatusMessage{},
+		&messagingtypes.Message{},
 	)
 	s.Require().NoError(err)
 	// The backup is not done, so no signal should be sent
@@ -389,7 +389,7 @@ func (s *MessengerBackupSuite) TestFetchingDuringBackup() {
 	err = bob1.HandleBackup(
 		&state,
 		backup,
-		&v1protocol.StatusMessage{},
+		&messagingtypes.Message{},
 	)
 	s.Require().NoError(err)
 	// The backup is not done, so no signal should be sent
@@ -406,7 +406,7 @@ func (s *MessengerBackupSuite) TestFetchingDuringBackup() {
 	err = bob1.HandleBackup(
 		&state,
 		backup,
-		&v1protocol.StatusMessage{},
+		&messagingtypes.Message{},
 	)
 	s.Require().NoError(err)
 	// The backup is done, so the signal should be sent
@@ -437,7 +437,7 @@ func (s *MessengerBackupSuite) TestBackupWithoutStatusFetching() {
 	err := bob1.HandleBackup(
 		&state,
 		backup,
-		&v1protocol.StatusMessage{},
+		&messagingtypes.Message{},
 	)
 	s.Require().NoError(err)
 	// The backup was handled but nothing was sent to the AC

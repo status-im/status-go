@@ -12,12 +12,11 @@ import (
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/wakusync"
 	ensservice "github.com/status-im/status-go/services/ens"
 )
@@ -45,7 +44,7 @@ type BackupFetchingStatus struct {
 	fetchingCompletedMutex sync.Mutex
 }
 
-func (m *Messenger) HandleBackup(state *ReceivedMessageState, message *protobuf.Backup, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleBackup(state *ReceivedMessageState, message *protobuf.Backup, statusMessage *messagingtypes.Message) error {
 	if !m.processBackedupMessages {
 		return nil
 	}
@@ -580,7 +579,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(state *ReceivedMessag
 		return err
 	}
 
-	rawMessage := &common.RawMessage{
+	rawMessage := &messagingtypes.RawMessage{
 		Payload:             payload,
 		Sender:              m.identity,
 		CommunityID:         community.ID(),

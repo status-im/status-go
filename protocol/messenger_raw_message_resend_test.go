@@ -7,7 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/protocol/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
@@ -142,7 +142,7 @@ func (s *MessengerRawMessageResendTest) TestInvalidRawMessageToWatchDoesNotProdu
 	rawMessage.Payload = payload
 
 	_, err = s.bobMessenger.AddRawMessageToWatch(rawMessage)
-	s.Require().Error(err, common.ErrModifiedRawMessage)
+	s.Require().Error(err, messagingtypes.ErrModifiedRawMessage)
 
 	// simulate storing msg with modified payload, but old message ID
 	_, err = s.bobMessenger.UpsertRawMessageToWatch(rawMessage)
@@ -163,13 +163,13 @@ func (s *MessengerRawMessageResendTest) TestInvalidRawMessageToWatchDoesNotProdu
 	s.Require().NoError(err)
 }
 
-func (s *MessengerRawMessageResendTest) GetRequestToJoinToControlNodeRawMessage(ids []string) *common.RawMessage {
+func (s *MessengerRawMessageResendTest) GetRequestToJoinToControlNodeRawMessage(ids []string) *messagingtypes.RawMessage {
 	for _, messageID := range ids {
 		rawMessage, err := s.bobMessenger.RawMessageByID(messageID)
 		s.Require().NoError(err)
 		s.Require().NotNil(rawMessage)
 
-		if rawMessage.ResendMethod == common.ResendMethodSendCommunityMessage {
+		if rawMessage.ResendMethod == messagingtypes.ResendMethodSendCommunityMessage {
 			return rawMessage
 		}
 	}

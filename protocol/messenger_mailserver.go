@@ -842,17 +842,6 @@ func (m *Messenger) RemoveFilters(filters []*messagingtypes.ChatFilter) error {
 
 func (m *Messenger) ConnectionChanged(state connection.State) {
 	m.messaging.ConnectionChanged(state)
-	if !m.connectionState.Offline && state.Offline {
-		m.sender.StopDatasync()
-	}
-
-	if m.connectionState.Offline && !state.Offline {
-		err := m.sender.StartDatasync(m.mvdsStatusChangeEvent, m.sendDataSync)
-		if err != nil {
-			m.logger.Error("failed to start datasync", zap.Error(err))
-		}
-	}
-
 	m.connectionState = state
 }
 

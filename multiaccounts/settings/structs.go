@@ -7,15 +7,15 @@ import (
 
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type ValueHandler func(interface{}) (interface{}, error)
 type ValueCastHandler func(interface{}) (interface{}, error)
-type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*common.RawMessage, *protobuf.SyncSetting, error)
-type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*common.RawMessage, *protobuf.SyncSetting, error)
+type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error)
+type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error)
 type SyncSettingProtobufToValue func(setting *protobuf.SyncSetting) interface{}
 
 // SyncProtobufFactory represents a collection of functionality to generate and parse *protobuf.SyncSetting

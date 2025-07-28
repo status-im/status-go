@@ -10,14 +10,13 @@ import (
 
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	v2common "github.com/status-im/status-go/wakuv2/common"
 )
 
 type ReceivedMessages struct {
 	Filter     messagingtypes.ChatFilter
 	SHHMessage *messagingtypes.ReceivedMessage
-	Messages   []*v1protocol.StatusMessage
+	Messages   []*messagingtypes.Message
 }
 
 type Client struct {

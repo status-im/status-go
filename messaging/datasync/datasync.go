@@ -7,11 +7,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	datasyncnode "github.com/status-im/mvds/node"
 	"github.com/status-im/mvds/protobuf"
-	datasyncproto "github.com/status-im/mvds/protobuf"
 	datasynctransport "github.com/status-im/mvds/transport"
 	"go.uber.org/zap"
 
-	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
+	datasyncpeer "github.com/status-im/status-go/messaging/datasync/peer"
 )
 
 type DataSync struct {
@@ -51,7 +50,7 @@ func (d *DataSync) Stop() {
 	d.Node.Stop()
 }
 
-func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage *datasyncproto.Payload) {
+func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage *protobuf.Payload) {
 	packet := datasynctransport.Packet{
 		Sender:  datasyncpeer.PublicKeyToPeerID(*publicKey),
 		Payload: datasyncMessage,
@@ -59,7 +58,7 @@ func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage *datasyncprot
 	d.NodeTransport.AddPacket(packet)
 }
 
-func unwrap(payload []byte) (datasyncPayload datasyncproto.Payload, err error) {
+func unwrap(payload []byte) (datasyncPayload protobuf.Payload, err error) {
 	err = proto.Unmarshal(payload, &datasyncPayload)
 	return
 }
