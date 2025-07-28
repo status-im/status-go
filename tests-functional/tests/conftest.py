@@ -149,11 +149,10 @@ def close_status_backend_containers(request):
 
     How it works:
     1. Yields immediately (runs before test execution)
-    2. After test completes, checks if container reuse is enabled
-    3. If reuse is disabled, stops all containers in StatusGoContainer.all_containers
-    4. Saves logs from each container for debugging
-    5. Removes containers to free up system resources
-    6. Clears the containers list
+    2. After test completes, stops all containers in StatusGoContainer.all_containers
+    3. Saves logs from each container for debugging
+    4. Removes containers to free up system resources
+    5. Clears the containers list
 
     Usage:
     # Automatic cleanup for all tests in a class
@@ -166,10 +165,6 @@ def close_status_backend_containers(request):
         # test code here
         pass
 
-    # Skip cleanup for tests that reuse containers
-    class TestReuseContainers:
-        reuse_container = True  # This will skip cleanup
-
     Parameters:
         request: pytest request object containing test metadata
 
@@ -181,8 +176,6 @@ def close_status_backend_containers(request):
     Autouse: False (must be explicitly requested)
     """
     yield
-    if hasattr(request.node.instance, "reuse_container"):
-        return
     for container in StatusGoContainer.all_containers:
         try:
             teardown_container(container, log_prefix="[close_status_backend_containers] ")
