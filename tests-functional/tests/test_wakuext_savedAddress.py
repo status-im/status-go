@@ -6,9 +6,9 @@ import pytest
 class TestSavedAddresses:
 
     @pytest.fixture(autouse=True)
-    def setup(self, backend_factory):
+    def setup(self, backend_new_profile):
         """Initialize backend for each test function"""
-        self.rpc_client = backend_factory("rpc_client")
+        self.rpc_client = backend_new_profile("rpc_client")
 
     @pytest.mark.parametrize(
         "method, params",

@@ -3,20 +3,15 @@ import pytest
 from steps.messenger import MessengerSteps
 
 
-@pytest.mark.parametrize(
-    "backend_factory",
-    [{"privileged": False, "wakuV2LightClient": False}, {"privileged": False, "wakuV2LightClient": True}],
-    indirect=True,
-    ids=["wakuV2LightClient_False", "wakuV2LightClient_True"],
-)
 @pytest.mark.rpc
+@pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 class TestFetchingChatMessages(MessengerSteps):
 
     @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_factory):
+    def setup_backends(self, backend_new_profile, waku_light_client):
         """Initialize two backends (sender and receiver) for each test function"""
-        self.sender = backend_factory("sender")
-        self.receiver = backend_factory("receiver")
+        self.sender = backend_new_profile("sender", waku_light_client=waku_light_client)
+        self.receiver = backend_new_profile("receiver", waku_light_client=waku_light_client)
 
     def test_chat_messages(self):
         sent_texts, _ = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)

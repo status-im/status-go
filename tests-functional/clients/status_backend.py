@@ -147,13 +147,13 @@ class StatusBackend(RpcClient, SignalClient):
         return self.api_valid_request(method, data)
 
     def _set_networks(self, data, **kwargs):
-        network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
+        self.network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
         anvil_network = {
-            "chainID": network_id,
+            "chainID": self.network_id,
             "chainName": "Anvil",
             "rpcProviders": [
                 {
-                    "chainId": network_id,
+                    "chainId": self.network_id,
                     "name": "Anvil Direct",
                     "url": "http://anvil:8545",
                     "enableRpsLimiter": False,
@@ -175,7 +175,7 @@ class StatusBackend(RpcClient, SignalClient):
         anvil_network = self._set_token_overrides(anvil_network, kwargs.get("token_overrides", []))
 
         data["testNetworksEnabled"] = False
-        data["networkId"] = network_id
+        data["networkId"] = self.network_id
         data["networksOverride"] = [anvil_network]
 
     def _set_proxy_credentials(self, data):

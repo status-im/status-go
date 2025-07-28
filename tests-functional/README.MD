@@ -15,6 +15,7 @@ Functional tests for status-go
 
 1. Install [Docker](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/)
 2. Install [Python 3](https://www.python.org/downloads/) (tested with 3.10 and 3.12 and it works with both)
+   - **Note:** For Python 3.10 compatibility, the codebase uses `Iterator[str]` instead of `Generator[str]` for type annotations to avoid typing issues with older Python versions.
 3. Set up a virtual environment (required for linting):
    - In `./tests-functional`, run:
      ```bash
@@ -108,6 +109,7 @@ sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
 ## Implementation details
 
 - Functional tests are implemented in `./tests-functional/tests` based on [pytest](https://docs.pytest.org/en/8.2.x/)
+- Backend fixtures and test infrastructure are defined in `./tests-functional/tests/conftest.py`
 - Every test has two types of verifications:
     - `verify_is_valid_json_rpc_response()` checks for status code 200, non-empty response, JSON-RPC structure, presence of the `result` field, and expected ID.
     - `jsonschema.validate()` is used to check that the response contains expected data, including required fields and types. Schemas are stored in `/schemas/wallet_MethodName`
@@ -115,11 +117,11 @@ sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
 
 ### Backend Setup and Cleanup with Pytest Fixtures
 
-Functional tests in this suite rely on robust backend setup and teardown, managed via reusable pytest fixtures defined in `conftest.py`. These fixtures ensure that backend containers are started, reused, and cleaned up efficiently, preventing resource leaks and test interference.
+Functional tests in this suite rely on robust backend setup and teardown, managed via reusable pytest fixtures defined in `tests/conftest.py`. These fixtures ensure that backend containers are started, reused, and cleaned up efficiently, preventing resource leaks and test interference.
 
-#### 1. Factory Backend Fixtures
+#### 1. Backend Factory Fixtures
 
-There are two main backend factory fixtures:
+The main backend factory fixture:
 
 - **`backend_factory`** (function-scoped):  
   Allows you to create and clean up multiple backend instances per test function.  
@@ -142,31 +144,42 @@ There are two main backend factory fixtures:
   ```
   All containers created by this fixture are automatically stopped and removed after the test.
 
-- **`backend_factory_class`** (class-scoped):  
-  Allows you to create and reuse backend instances across all tests in a class.  
-  **Note:** Users/accounts are recovered from a seed phrase (mnemonic) for each backend instance.
+#### 2. Specialized Backend Fixtures
+
+For more specific use cases, you can use these specialized fixtures:
+
+- **`backend_new_profile`** (function-scoped):  
+  Creates a backend with a new user profile from scratch.
   
   Example usage:
   ```python
-  import pytest
-  from resources.constants import user_1, user_2
-
-  class TestWallet:
-      @pytest.fixture(autouse=True)
-      def setup_backends(self, backend_factory_class):
-          self.rpc_client = backend_factory_class(name="main_user", user=user_1)
-          # can add more users
-
-      def test_wallet_balance(self):
-          self.rpc_client.rpc_valid_request(method, params)
-          self.rpc_client.verify_json_schema(signal_response, method)
+  def test_with_new_profile(self, backend_new_profile):
+      # Create a backend with a new profile
+      client = backend_new_profile("client1")
+      
+      # Or with light client mode
+      light_client = backend_new_profile("light_client", waku_light_client=True)
   ```
-  Cleanup is handled automatically after all tests in the class have run.
+  
+- **`backend_recovered_profile`** (function-scoped):  
+  Creates a backend by recovering an existing user profile from a seed phrase.
+  
+  Example usage:
+  ```python
+  from resources.constants import user_1
+  
+  def test_with_recovered_profile(self, backend_recovered_profile):
+      # Recover a backend from an existing user
+      client = backend_recovered_profile("client1", user=user_1)
+      
+      # Or with light client mode
+      light_client = backend_recovered_profile("light_client", user=user_1, waku_light_client=True)
+  ```
 
-**Note:**  
-You do not need to manually clean up containers when using these factory fixtures—cleanup is built in.
+- **`waku_light_client`** (function-scoped):  
+  A simple parametrization fixture for enabling/disabling Waku light client mode.
 
-#### 2. Manual/Custom Backend Setup
+#### 3. Manual/Custom Backend Setup
 
 For advanced scenarios, you may set up backends manually in your test or test class (for example, to use custom logic or direct instantiation).  
 **In this case, you must ensure containers are cleaned up by using the `close_status_backend_containers` fixture.**
@@ -180,23 +193,35 @@ def setup_cleanup(self, close_status_backend_containers):
 ```
 This fixture will stop, save logs, and remove all containers created during the test, preventing resource leaks.
 
-#### 3. Summary Table
+#### 4. Summary Table
 
 > **Note:** None of these fixtures are used automatically (`autouse=False` by default). You must explicitly use them in your test setup for visibility and control.
 
 | Fixture                           | Scope     | Usage                        | Cleanup         | User Creation Type                |
 |------------------------------------|-----------|------------------------------|-----------------|-----------------------------------|
 | `backend_factory`                  | function  | Per-test backend creation    | Automatic       | Created from scratch              |
-| `backend_factory_class`            | class     | Per-class backend reuse      | Automatic       | Recovered from seed phrase        |
+| `backend_new_profile`              | function  | New user profile creation    | Automatic       | Created from scratch              |
+| `backend_recovered_profile`        | function  | Existing profile recovery    | Automatic       | Recovered from seed phrase        |
+| `waku_light_client`                | function  | Light client parametrization | N/A             | N/A (configuration only)          |
 | `close_status_backend_containers`  | function  | For manual/custom setup      | Must be used manually | N/A (depends on your setup)   |
 
-#### 4. Best Practices
+#### 5. Best Practices
 
 - **Prefer the factory fixtures** for most tests—they are robust, reusable, and handle cleanup for you.
+- **Use specialized fixtures** (`backend_new_profile`, `backend_recovered_profile`) when you need specific profile creation behavior.
 - **Use `close_status_backend_containers`** if you create backends manually or outside the provided factories.
 - **Never leave containers running** after a test—always ensure cleanup is in place.
 
-For more details, see the docstrings in `conftest.py` and the example usages in the test files. 
+For more details, see the docstrings in `tests/conftest.py` and the example usages in the test files.
+
+#### 6. Recent Architectural Improvements
+
+The test fixture architecture has been recently improved with the following changes:
+- **Separation of Concerns**: Backend fixtures moved from root `conftest.py` to `tests/conftest.py` for better organization
+- **Simplified Architecture**: Removed complex class-scoped fixtures in favor of more predictable function-scoped ones
+- **Better Fixture Wrappers**: Added specialized `backend_new_profile` and `backend_recovered_profile` fixtures for specific use cases
+- **Network Configuration**: Network ID is now defined directly in `StatusBackend` for cleaner configuration management
+- **Python Compatibility**: Fixed typing issues for better Python 3.10+ compatibility 
 
 # Linting
 

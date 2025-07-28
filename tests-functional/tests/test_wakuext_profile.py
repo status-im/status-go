@@ -10,9 +10,9 @@ from steps.messenger import MessengerSteps
 class TestProfile:
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_factory):
+    def setup_backend(self, backend_new_profile):
         """Initialize one backend for each test function"""
-        self.rpc_client = backend_factory("rpc_client")
+        self.rpc_client = backend_new_profile("rpc_client")
 
     @pytest.mark.parametrize(
         "method, params",
@@ -133,15 +133,14 @@ class TestProfile:
         assert setting_name not in response.json()["result"]
 
 
-@pytest.mark.parametrize("backend_factory", [{"privileged": False}], indirect=True)
 @pytest.mark.rpc
 class TestUserStatus(MessengerSteps):
 
     @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_factory):
+    def setup_backends(self, backend_new_profile):
         """Initialize two unprivileged backends (sender and receiver) for each test function"""
-        self.sender = backend_factory("sender")
-        self.receiver = backend_factory("receiver")
+        self.sender = backend_new_profile("sender")
+        self.receiver = backend_new_profile("receiver")
 
     def test_status_updates(self):
         self.make_contacts(sender=self.sender, receiver=self.receiver)

@@ -12,9 +12,9 @@ class TestWalletSignals:
     await_signals = [SignalType.NODE_LOGIN.value, SignalType.WALLET.value]
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_factory_class):
+    def setup_backend(self, backend_recovered_profile):
         self.request_id = str(random.randint(1, 8888))
-        self.rpc_client = backend_factory_class(name="rpc_client", user=user_1)
+        self.rpc_client = backend_recovered_profile(name="rpc_client", user=user_1)
 
     @pytest.mark.skip  # TODO: returns empty response in most of the cases, so needs to be fixed with attention of required signals in signal_response
     def test_wallet_get_owned_collectibles_async(self):
@@ -22,7 +22,7 @@ class TestWalletSignals:
         params = [
             0,
             [
-                self.network_id,  # type: ignore
+                self.rpc_client.network_id,  # type: ignore
             ],
             [user_1.address],
             None,

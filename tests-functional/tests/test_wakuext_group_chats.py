@@ -8,10 +8,10 @@ from resources.enums import MessageContentType
 class TestCreatePrivateGroups(MessengerSteps):
 
     @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_factory):
+    def setup_backends(self, backend_new_profile):
         """Initialize two unprivileged backends (sender and receiver) for each test function"""
-        self.sender = backend_factory("sender")
-        self.receiver = backend_factory("receiver")
+        self.sender = backend_new_profile("sender")
+        self.receiver = backend_new_profile("receiver")
         self.make_contacts(self.sender, self.receiver)
 
     def test_create_group_chat_with_members(self):
@@ -51,8 +51,8 @@ class TestCreatePrivateGroups(MessengerSteps):
         assert len(members_after_leave) == 1
         assert self.sender.public_key not in str(members_after_leave)
 
-    def test_send_group_chat_invitation_request(self, backend_factory):
-        third_node = backend_factory("third_node")
+    def test_send_group_chat_invitation_request(self, backend_new_profile):
+        third_node = backend_new_profile("third_node")
         self.make_contacts(self.sender, third_node)
 
         create_group_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"private_group_{uuid4()}")
@@ -81,8 +81,8 @@ class TestCreatePrivateGroups(MessengerSteps):
         assert chats[0].get("invitationAdmin", "") == self.sender.public_key
         assert chats[0].get("name", "") == invitation_group
 
-    def test_add_members_to_group_chat(self, backend_factory):
-        third_node = backend_factory("third_node")
+    def test_add_members_to_group_chat(self, backend_new_profile):
+        third_node = backend_new_profile("third_node")
         self.make_contacts(self.sender, third_node)
 
         create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"add_members_group_{uuid4()}")
@@ -110,8 +110,8 @@ class TestCreatePrivateGroups(MessengerSteps):
             message_pattern=f"@{self.receiver.public_key} left the group",
         )[0]
 
-    def test_remove_members_from_group_chat(self, backend_factory):
-        third_node = backend_factory("third_node")
+    def test_remove_members_from_group_chat(self, backend_new_profile):
+        third_node = backend_new_profile("third_node")
         self.make_contacts(self.sender, third_node)
 
         create_response = self.sender.wakuext_service.create_group_chat_with_members(
@@ -165,8 +165,8 @@ class TestCreatePrivateGroups(MessengerSteps):
         assert chats[0].get("name", "") == new_group_name
 
     @pytest.mark.skip(reason="waiting for https://github.com/status-im/status-go/issues/6752 resolution")
-    def test_get_group_chat_invitations(self, backend_factory):
-        third_node = backend_factory("third_node")
+    def test_get_group_chat_invitations(self, backend_new_profile):
+        third_node = backend_new_profile("third_node")
         self.make_contacts(self.sender, third_node)
 
         create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"group_{uuid4()}")
@@ -178,8 +178,8 @@ class TestCreatePrivateGroups(MessengerSteps):
         # CustomSchemaBuilder("wakuext_getGroupChatInvitations").create_schema(get_invitations_response)
         self.sender.verify_json_schema(get_invitations_response, method="wakuext_getGroupChatInvitations")
 
-    def test_send_group_chat_invitation_rejection(self, backend_factory):
-        third_node = backend_factory("third_node")
+    def test_send_group_chat_invitation_rejection(self, backend_new_profile):
+        third_node = backend_new_profile("third_node")
         self.make_contacts(self.sender, third_node)
 
         create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"group_{uuid4()}")
