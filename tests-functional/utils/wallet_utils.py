@@ -4,11 +4,11 @@ import jsonschema
 import resources.constants as constants
 from clients.signals import SignalType, WalletEventType
 
-from conftest import option
+from utils.config import Config
 
 
 def verify_json_schema(response, method):
-    with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
+    with open(f"{Config.base_dir}/schemas/{method}", "r") as schema:
         jsonschema.validate(instance=response, schema=json.load(schema))
 
 
@@ -61,7 +61,7 @@ def sign_messages(rpc_client, hashes, address):
     for hash in hashes:
 
         method = "wallet_signMessage"
-        params = [hash, address, option.password]
+        params = [hash, address, Config.password]
 
         response = rpc_client.rpc_valid_request(method, params)
 

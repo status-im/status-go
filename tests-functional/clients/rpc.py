@@ -3,7 +3,7 @@ import logging
 import jsonschema
 import requests
 from tenacity import retry, stop_after_delay, wait_fixed
-from conftest import option
+from utils.config import Config
 from json import JSONDecodeError
 
 
@@ -74,5 +74,5 @@ class RpcClient:
         return response
 
     def verify_json_schema(self, response, method):
-        with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
+        with open(f"{Config.base_dir}/schemas/{method}", "r") as schema:
             jsonschema.validate(instance=response, schema=json.load(schema))

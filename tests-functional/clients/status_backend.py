@@ -6,7 +6,6 @@ import time
 import random
 import threading
 import uuid
-
 import requests
 import os
 
@@ -18,7 +17,7 @@ from clients.services.settings import SettingsService
 from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
 from clients.statusgo_container import StatusBackendContainer
-from conftest import option
+from utils.config import Config
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
 from utils import keys
 
@@ -33,14 +32,18 @@ class StatusBackend(RpcClient, SignalClient):
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
 
-        if option.status_backend_url:
-            url = next(option.status_backend_urls)
+        if Config.status_backend_urls:
+            try:
+                url = next(Config.status_backend_urls)
+            except StopIteration:
+                raise Exception("--status-backend-url is found, but not enough backends provided")
+
             assert url != "", "not enough status-backend urls provided"
             self.temp_dir = tempfile.TemporaryDirectory()
             self.data_dir = self.temp_dir.name
         else:
-            host_port = random.choice(option.status_backend_port_range)
-            option.status_backend_port_range.remove(host_port)
+            host_port = random.choice(Config.status_backend_port_range)
+            Config.status_backend_port_range.remove(host_port)
 
             self.container = StatusBackendContainer(host_port, privileged, self.ipv6)
             self.temp_dir = None
@@ -122,7 +125,7 @@ class StatusBackend(RpcClient, SignalClient):
         return response
 
     def init_status_backend(self):
-        if option.logout:
+        if Config.logout:
             logging.warning("automatically logging out before InitializeApplication")
             try:
                 self.logout()
@@ -137,8 +140,8 @@ class StatusBackend(RpcClient, SignalClient):
             "logEnabled": True,
             "logLevel": "DEBUG",
             "apiLoggingEnabled": True,
-            "wakuFleetsConfigFilePath": option.waku_fleets_config,
-            "pushFleetsConfigFilePath": option.push_fleets_config,
+            "wakuFleetsConfigFilePath": Config.waku_fleets_config,
+            "pushFleetsConfigFilePath": Config.push_fleets_config,
         }
 
         return self.api_valid_request(method, data)
@@ -254,9 +257,9 @@ class StatusBackend(RpcClient, SignalClient):
             "logLevel": "DEBUG",
             # Waku config
             "wakuV2LightClient": kwargs.get("wakuV2LightClient", False),
-            "wakuV2Fleet": option.waku_fleet,
+            "wakuV2Fleet": Config.waku_fleet,
         }
-        if not option.disable_override_networks:
+        if not Config.disable_override_networks:
             self._set_networks(data, **kwargs)
 
         data = self._set_proxy_credentials(data)
