@@ -14,6 +14,8 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -34,9 +36,9 @@ type Config struct {
 }
 
 type Server struct {
-	persistence   Persistence
-	config        *Config
-	messageSender *common.MessageSender
+	persistence Persistence
+	config      *Config
+	messaging   *messaging.API
 	// SentRequests keeps track of the requests sent to gorush, for testing only
 	SentRequests int64
 }
@@ -49,9 +51,9 @@ func New(config *Config) *Server {
 	return &Server{config: config}
 }
 
-func (s *Server) Start(persistence Persistence, messageSender *common.MessageSender) error {
+func (s *Server) Start(persistence Persistence, messaging *messaging.API) error {
 	s.persistence = persistence
-	s.messageSender = messageSender
+	s.messaging = messaging
 
 	if s.config.Logger == nil {
 		logger, err := zap.NewDevelopment()
@@ -108,14 +110,14 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION_RESPONSE,
 		// we skip encryption as might be sent from an ephemeral key
 		SkipEncryptionLayer: true,
 	}
 
-	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)
+	_, err = s.messaging.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 
@@ -135,14 +137,14 @@ func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, message
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY_RESPONSE,
 		// we skip encryption as sent from an ephemeral key
 		SkipEncryptionLayer: true,
 	}
 
-	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)
+	_, err = s.messaging.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 
@@ -178,14 +180,14 @@ func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE,
 		// We skip encryption here as the message has been sent from an ephemeral key
 		SkipEncryptionLayer: true,
 	}
 
-	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)
+	_, err = s.messaging.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 
@@ -466,11 +468,12 @@ func (s *Server) sendPushNotification(requestAndRegistrations []*RequestAndRegis
 
 // listenToPublicKeyQueryTopic listen to a topic derived from the hashed public key
 func (s *Server) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
-	if s.messageSender == nil {
+	if s.messaging == nil {
 		return nil
 	}
+
 	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
-	_, err := s.messageSender.JoinPublic(encodedPublicKey)
+	_, err := s.messaging.JoinPublicChat(encodedPublicKey)
 	return err
 }
 

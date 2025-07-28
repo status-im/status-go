@@ -7,6 +7,7 @@ import (
 	"time"
 
 	gocommon "github.com/status-im/status-go/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 
 	"github.com/pkg/errors"
@@ -61,7 +62,7 @@ func (m *Messenger) resendExpiredMessages() error {
 	return nil
 }
 
-func (m *Messenger) processMessageID(id string) (*common.RawMessage, bool, error) {
+func (m *Messenger) processMessageID(id string) (*messagingtypes.RawMessage, bool, error) {
 	rawMessage, err := m.persistence.RawMessageByID(id)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "Can't get raw message by ID")
@@ -73,11 +74,11 @@ func (m *Messenger) processMessageID(id string) (*common.RawMessage, bool, error
 	}
 
 	switch rawMessage.ResendMethod {
-	case common.ResendMethodSendCommunityMessage:
+	case messagingtypes.ResendMethodSendCommunityMessage:
 		err = m.handleSendCommunityMessage(rawMessage)
-	case common.ResendMethodSendPrivate:
+	case messagingtypes.ResendMethodSendPrivate:
 		err = m.handleSendPrivateMessage(rawMessage)
-	case common.ResendMethodDynamic:
+	case messagingtypes.ResendMethodDynamic:
 		shouldResend, err = m.handleOtherResendMethods(rawMessage)
 	default:
 		err = errors.New("Unknown resend method")
@@ -85,8 +86,8 @@ func (m *Messenger) processMessageID(id string) (*common.RawMessage, bool, error
 	return rawMessage, shouldResend, err
 }
 
-func (m *Messenger) handleSendCommunityMessage(rawMessage *common.RawMessage) error {
-	_, err := m.sender.SendCommunityMessage(context.TODO(), rawMessage)
+func (m *Messenger) handleSendCommunityMessage(rawMessage *messagingtypes.RawMessage) error {
+	_, err := m.messaging.SendCommunityMessage(context.TODO(), rawMessage)
 	if err != nil {
 		err = errors.Wrap(err, "Can't resend message with SendCommunityMessage")
 	}
@@ -94,7 +95,7 @@ func (m *Messenger) handleSendCommunityMessage(rawMessage *common.RawMessage) er
 	return err
 }
 
-func (m *Messenger) handleSendPrivateMessage(rawMessage *common.RawMessage) error {
+func (m *Messenger) handleSendPrivateMessage(rawMessage *messagingtypes.RawMessage) error {
 	if len(rawMessage.Recipients) == 0 {
 		m.logger.Error("No recipients to resend message", zap.String("id", rawMessage.ID))
 		m.upsertRawMessageToWatch(rawMessage)
@@ -103,7 +104,7 @@ func (m *Messenger) handleSendPrivateMessage(rawMessage *common.RawMessage) erro
 
 	var err error
 	for _, r := range rawMessage.Recipients {
-		_, err = m.sender.SendPrivate(context.TODO(), r, rawMessage)
+		_, err = m.messaging.SendPrivate(context.TODO(), r, rawMessage)
 		if err != nil {
 			err = errors.Wrap(err, fmt.Sprintf("Can't resend message with SendPrivate to %s", common.PubkeyToHex(r)))
 		}
@@ -113,7 +114,7 @@ func (m *Messenger) handleSendPrivateMessage(rawMessage *common.RawMessage) erro
 	return err
 }
 
-func (m *Messenger) handleOtherResendMethods(rawMessage *common.RawMessage) (bool, error) {
+func (m *Messenger) handleOtherResendMethods(rawMessage *messagingtypes.RawMessage) (bool, error) {
 	chat, ok := m.allChats.Load(rawMessage.LocalChatID)
 	if !ok {
 		m.logger.Error("Can't find chat with id", zap.String("id", rawMessage.LocalChatID))
@@ -134,7 +135,7 @@ func (m *Messenger) handleOtherResendMethods(rawMessage *common.RawMessage) (boo
 	return true, m.reSendRawMessage(context.Background(), rawMessage.ID)
 }
 
-func (m *Messenger) shouldResendMessage(message *common.RawMessage, t common.TimeSource) bool {
+func (m *Messenger) shouldResendMessage(message *messagingtypes.RawMessage, t common.TimeSource) bool {
 	if m.featureFlags.ResendRawMessagesDisabled {
 		return false
 	}
@@ -158,7 +159,7 @@ func (m *Messenger) reSendRawMessage(ctx context.Context, messageID string) erro
 		return errors.New("chat not found")
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     message.Payload,
 		PubsubTopic: message.PubsubTopic,
@@ -172,7 +173,7 @@ func (m *Messenger) reSendRawMessage(ctx context.Context, messageID string) erro
 
 // UpsertRawMessageToWatch insert/update the rawMessage to the database, resend it if necessary.
 // relate watch method: Messenger#watchExpiredMessages
-func (m *Messenger) UpsertRawMessageToWatch(rawMessage *common.RawMessage) (*common.RawMessage, error) {
+func (m *Messenger) UpsertRawMessageToWatch(rawMessage *messagingtypes.RawMessage) (*messagingtypes.RawMessage, error) {
 	rawMessage.SendCount++
 	rawMessage.LastSent = m.getTimesource().GetCurrentTime()
 	err := m.persistence.SaveRawMessage(rawMessage)
@@ -184,8 +185,8 @@ func (m *Messenger) UpsertRawMessageToWatch(rawMessage *common.RawMessage) (*com
 
 // AddRawMessageToWatch check if RawMessage is correct and insert the rawMessage to the database
 // relate watch method: Messenger#watchExpiredMessages
-func (m *Messenger) AddRawMessageToWatch(rawMessage *common.RawMessage) (*common.RawMessage, error) {
-	if err := m.sender.ValidateRawMessage(rawMessage); err != nil {
+func (m *Messenger) AddRawMessageToWatch(rawMessage *messagingtypes.RawMessage) (*messagingtypes.RawMessage, error) {
+	if err := m.messaging.ValidateRawMessage(rawMessage); err != nil {
 		m.logger.Error("Can't add raw message to watch", zap.String("messageID", rawMessage.ID), zap.Error(err))
 		return nil, err
 	}
@@ -193,7 +194,7 @@ func (m *Messenger) AddRawMessageToWatch(rawMessage *common.RawMessage) (*common
 	return m.UpsertRawMessageToWatch(rawMessage)
 }
 
-func (m *Messenger) upsertRawMessageToWatch(rawMessage *common.RawMessage) {
+func (m *Messenger) upsertRawMessageToWatch(rawMessage *messagingtypes.RawMessage) {
 	_, err := m.UpsertRawMessageToWatch(rawMessage)
 	if err != nil {
 		// this is unlikely to happen, but we should log it
@@ -205,7 +206,7 @@ func (m *Messenger) RawMessagesIDsByType(t protobuf.ApplicationMetadataMessage_T
 	return m.persistence.RawMessagesIDsByType(t)
 }
 
-func (m *Messenger) RawMessageByID(id string) (*common.RawMessage, error) {
+func (m *Messenger) RawMessageByID(id string) (*messagingtypes.RawMessage, error) {
 	return m.persistence.RawMessageByID(id)
 }
 

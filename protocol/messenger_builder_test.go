@@ -14,16 +14,16 @@ import (
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
@@ -121,9 +121,20 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 		return nil, err
 	}
 
+	installationID := uuid.New().String()
+
+	// Initialize encryption layer.
+	encryptionProtocol := encryption.New(
+		appDb,
+		installationID,
+		config.logger,
+	)
+
 	messaging, err := messagingEnv.NewTestCore(
 		config.privateKey,
-		common.NewMessagingPersistence(appDb),
+		appDb,
+		NewMessagingPersistence(appDb),
+		encryptionProtocol,
 		messaging.WithLogger(config.logger))
 	if err != nil {
 		return nil, err
@@ -155,7 +166,7 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 	m, err := NewMessenger(
 		config.privateKey,
 		messaging.API(),
-		uuid.New().String(),
+		installationID,
 		options...,
 	)
 	if err != nil {
@@ -205,7 +216,7 @@ func newRunningTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, c
 }
 
 type unhandedMessage struct {
-	*v1protocol.StatusMessage
+	*messagingtypes.Message
 	err error
 }
 
@@ -213,7 +224,7 @@ type unhandledMessagesTracker struct {
 	messages map[protobuf.ApplicationMetadataMessage_Type][]*unhandedMessage
 }
 
-func (u *unhandledMessagesTracker) addMessage(msg *v1protocol.StatusMessage, err error) {
+func (u *unhandledMessagesTracker) addMessage(msg *messagingtypes.Message, err error) {
 	msgType := msg.ApplicationLayer.Type
 
 	if _, exists := u.messages[msgType]; !exists {
@@ -221,8 +232,8 @@ func (u *unhandledMessagesTracker) addMessage(msg *v1protocol.StatusMessage, err
 	}
 
 	newMessage := &unhandedMessage{
-		StatusMessage: msg,
-		err:           err,
+		Message: msg,
+		err:     err,
 	}
 	u.messages[msgType] = append(u.messages[msgType], newMessage)
 }

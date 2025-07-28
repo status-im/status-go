@@ -11,9 +11,9 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/t/helpers"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -52,10 +52,10 @@ func (s *MessageSegmentationSuite) SetupTest() {
 	s.sender, err = NewMessageSender(
 		identity,
 		database,
+		NewStubPersistence(),
 		nil,
 		nil,
 		s.logger,
-		FeatureFlags{},
 	)
 	s.Require().NoError(err)
 }
@@ -145,7 +145,7 @@ func (s *MessageSegmentationSuite) TestHandleSegmentationLayer() {
 			s.Require().NoError(err)
 			s.Require().Len(segmentedMessages, tc.segmentsCount+tc.expectedParitySegmentsCount)
 
-			message := &protocol.StatusMessage{TransportLayer: protocol.TransportLayer{
+			message := &types.Message{TransportLayer: types.TransportLayer{
 				SigPubKey: &s.sender.identity.PublicKey,
 			}}
 
@@ -186,7 +186,7 @@ func (s *MessageSegmentationSuite) TestProtobufMissDecoding() {
 	// any byte sequence, and if the structure coincidentally matches valid encoding
 	// patterns (e.g., varint or byte fields), it produces seemingly valid but incorrect results.
 
-	segmentedMessage := SegmentMessage{
+	segmentedMessage := types.SegmentMessage{
 		SegmentMessage: &protobuf.SegmentMessage{},
 	}
 

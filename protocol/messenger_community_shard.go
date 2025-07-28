@@ -17,7 +17,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 func (m *Messenger) sendPublicCommunityShardInfo(community *communities.Community) error {
@@ -52,18 +51,18 @@ func (m *Messenger) sendPublicCommunityShardInfo(community *communities.Communit
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		Payload: payload,
 		Sender:  community.PrivateKey(),
 		// we don't want to wrap in an encryption layer message
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_SHARD_INFO,
 		PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(), // it must be sent always to default shard pubsub topic
-		Priority:            &common.HighPriority,
+		Priority:            &messagingtypes.HighPriority,
 	}
 
 	chatName := messaging.CommunityShardInfoTopic(community.IDString())
-	messageID, err := m.sender.SendPublic(context.Background(), chatName, rawMessage)
+	messageID, err := m.messaging.SendPublic(context.Background(), chatName, rawMessage)
 	if err == nil {
 		m.logger.Debug("published public community shard info",
 			zap.String("communityID", community.IDString()),
@@ -73,7 +72,7 @@ func (m *Messenger) sendPublicCommunityShardInfo(community *communities.Communit
 	return err
 }
 
-func (m *Messenger) HandleCommunityPublicShardInfo(state *ReceivedMessageState, a *protobuf.CommunityPublicShardInfo, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleCommunityPublicShardInfo(state *ReceivedMessageState, a *protobuf.CommunityPublicShardInfo, statusMessage *messagingtypes.Message) error {
 	publicShardInfo := &protobuf.PublicShardInfo{}
 	err := proto.Unmarshal(a.Payload, publicShardInfo)
 	if err != nil {

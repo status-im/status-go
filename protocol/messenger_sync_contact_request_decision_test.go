@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -41,12 +42,12 @@ func (s *MessengerSyncContactRequestDecisionSuite) TestSyncAcceptContactRequest(
 
 	numM1DispatchedAcceptContactRequest := 0
 	numM2DispatchedAcceptContactRequest := 0
-	s.m.dispatchMessageTestCallback = func(message common.RawMessage) {
+	s.m.dispatchMessageTestCallback = func(message messagingtypes.RawMessage) {
 		if message.MessageType == protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST {
 			numM1DispatchedAcceptContactRequest++
 		}
 	}
-	s.m2.dispatchMessageTestCallback = func(message common.RawMessage) {
+	s.m2.dispatchMessageTestCallback = func(message messagingtypes.RawMessage) {
 		if message.MessageType == protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST {
 			numM2DispatchedAcceptContactRequest++
 		}

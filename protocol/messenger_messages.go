@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	gocommon "github.com/status-im/status-go/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -103,7 +104,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 			return nil, err
 		}
 
-		rawMessage := common.RawMessage{
+		rawMessage := messagingtypes.RawMessage{
 			LocalChatID:          chat.ID,
 			Payload:              encodedMessage,
 			MessageType:          protobuf.ApplicationMetadataMessage_EDIT_MESSAGE,
@@ -228,7 +229,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		return nil, err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID:          chat.ID,
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_DELETE_MESSAGE,
@@ -351,11 +352,11 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, localChatID s
 				return err2
 			}
 
-			rawMessage := common.RawMessage{
+			rawMessage := messagingtypes.RawMessage{
 				LocalChatID: chatID,
 				Payload:     encodedMessage,
 				MessageType: protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE,
-				ResendType:  common.ResendTypeDataSync,
+				ResendType:  messagingtypes.ResendTypeDataSync,
 			}
 			_, err2 = m.dispatchMessage(ctx, rawMessage)
 			return err2

@@ -18,6 +18,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -757,11 +758,11 @@ func (m *Messenger) syncProfileShowcasePreferences(ctx context.Context, rawMessa
 	}
 
 	_, chat := m.getLastClockWithRelatedChat()
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_PROFILE_SHOWCASE_PREFERENCES,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 )
@@ -22,25 +23,25 @@ func TestSaveRawMessage(t *testing.T) {
 	pk, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	err = p.SaveRawMessage(&RawMessage{
+	err = p.SaveRawMessage(&messagingtypes.RawMessage{
 		ID:                    "1",
-		ResendType:            ResendTypeRawMessage,
+		ResendType:            messagingtypes.ResendTypeRawMessage,
 		LocalChatID:           "",
 		CommunityID:           []byte("c1"),
-		CommunityKeyExMsgType: KeyExMsgRekey,
+		CommunityKeyExMsgType: messagingtypes.KeyExMsgRekey,
 		Sender:                pk,
-		ResendMethod:          ResendMethodSendPrivate,
+		ResendMethod:          messagingtypes.ResendMethodSendPrivate,
 		Recipients:            []*ecdsa.PublicKey{pk.Public().(*ecdsa.PublicKey)},
 	})
 	require.NoError(t, err)
 	m, err := p.RawMessageByID("1")
 	require.NoError(t, err)
 	require.Equal(t, "1", m.ID)
-	require.Equal(t, ResendTypeRawMessage, m.ResendType)
-	require.Equal(t, KeyExMsgRekey, m.CommunityKeyExMsgType)
+	require.Equal(t, messagingtypes.ResendTypeRawMessage, m.ResendType)
+	require.Equal(t, messagingtypes.KeyExMsgRekey, m.CommunityKeyExMsgType)
 	require.Equal(t, "c1", string(m.CommunityID))
 	require.Equal(t, pk, m.Sender)
-	require.Equal(t, ResendMethodSendPrivate, m.ResendMethod)
+	require.Equal(t, messagingtypes.ResendMethodSendPrivate, m.ResendMethod)
 	require.Equal(t, 1, len(m.Recipients))
 }
 
@@ -96,15 +97,15 @@ func TestUpdateRawMessageLastSent(t *testing.T) {
 	require.Equal(t, m.LastSent, uint64(0))
 }
 
-func buildRawMessage(rawMessageID string, pk *ecdsa.PrivateKey) *RawMessage {
-	return &RawMessage{
+func buildRawMessage(rawMessageID string, pk *ecdsa.PrivateKey) *messagingtypes.RawMessage {
+	return &messagingtypes.RawMessage{
 		ID:                    rawMessageID,
-		ResendType:            ResendTypeRawMessage,
+		ResendType:            messagingtypes.ResendTypeRawMessage,
 		LocalChatID:           "",
 		CommunityID:           []byte("c1"),
-		CommunityKeyExMsgType: KeyExMsgRekey,
+		CommunityKeyExMsgType: messagingtypes.KeyExMsgRekey,
 		Sender:                pk,
-		ResendMethod:          ResendMethodSendPrivate,
+		ResendMethod:          messagingtypes.ResendMethodSendPrivate,
 		Recipients:            []*ecdsa.PublicKey{pk.Public().(*ecdsa.PublicKey)},
 		Sent:                  true,
 		LastSent:              uint64(time.Now().UnixNano() / int64(time.Millisecond)),

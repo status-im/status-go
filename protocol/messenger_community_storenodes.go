@@ -9,11 +9,10 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/storenodes"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 func (m *Messenger) sendCommunityPublicStorenodesInfo(community *communities.Community, snodes storenodes.Storenodes) error {
@@ -45,22 +44,22 @@ func (m *Messenger) sendCommunityPublicStorenodesInfo(community *communities.Com
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		Payload:             signedPayload,
 		Sender:              community.PrivateKey(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PUBLIC_STORENODES_INFO,
 		PubsubTopic:         community.PubsubTopic(),
-		Priority:            &common.HighPriority,
+		Priority:            &messagingtypes.HighPriority,
 	}
 
-	_, err = m.sender.SendPublic(context.Background(), community.IDString(), rawMessage)
+	_, err = m.messaging.SendPublic(context.Background(), community.IDString(), rawMessage)
 	return err
 }
 
 // HandleCommunityPublicStorenodesInfo will process the control message sent by the community owner on updating the community storenodes for his community (sendCommunityPublicStorenodesInfo).
 // The message will be received by many peers that are not interested on that community, so if we don't have this community in our DB we just ignore this message.
-func (m *Messenger) HandleCommunityPublicStorenodesInfo(state *ReceivedMessageState, a *protobuf.CommunityPublicStorenodesInfo, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleCommunityPublicStorenodesInfo(state *ReceivedMessageState, a *protobuf.CommunityPublicStorenodesInfo, statusMessage *messagingtypes.Message) error {
 	sn := &protobuf.CommunityStorenodes{}
 	err := proto.Unmarshal(a.Payload, sn)
 	if err != nil {

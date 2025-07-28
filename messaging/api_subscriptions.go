@@ -6,7 +6,7 @@ import (
 )
 
 func (a *API) SubscribeToConnStatusChanges() (types.ConnectionStatusSubscription, error) {
-	sub, err := a.waku.SubscribeToConnStatusChanges()
+	sub, err := a.core.waku.SubscribeToConnStatusChanges()
 	if err != nil {
 		return nil, err
 	}

@@ -103,7 +103,7 @@ func (s *MessengerPushNotificationSuite) newPushNotificationServer() (*Messenger
 	s.Require().NoError(err)
 
 	serverPersistence := pushnotificationserver.NewSQLitePersistence(messenger.database)
-	err = server.Start(serverPersistence, messenger.MessageSender())
+	err = server.Start(serverPersistence, messenger.Messaging())
 	s.Require().NoError(err)
 
 	return messenger, server

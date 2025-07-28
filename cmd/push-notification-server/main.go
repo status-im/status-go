@@ -26,7 +26,7 @@ import (
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/sqlite"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
@@ -151,10 +151,18 @@ func main() {
 		os.Exit(exitCodeDBMigrationFailed)
 	}
 
+	encryptionProtocol := encryption.New(
+		db,
+		installationID,
+		logger,
+	)
+
 	messaging, err := messaging.NewCore(
 		waku,
 		privateKey,
-		common.NewMessagingPersistence(db),
+		db,
+		protocol.NewMessagingPersistence(db),
+		encryptionProtocol,
 		messaging.WithLogger(logger.Named("messaging")),
 	)
 	if err != nil {
@@ -187,7 +195,7 @@ func main() {
 
 	// Start
 	serverPersistence := pushnotificationserver.NewSQLitePersistence(db)
-	err = server.Start(serverPersistence, messenger.MessageSender())
+	err = server.Start(serverPersistence, messenger.Messaging())
 	if err != nil {
 		logger.Error("failed to start push notifications server", zap.Error(err))
 		os.Exit(exitCodeStartServerFailed)
