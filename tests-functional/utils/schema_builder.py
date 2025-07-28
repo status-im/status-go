@@ -3,14 +3,14 @@ import os
 
 from genson import SchemaBuilder
 
-from conftest import option
+from utils.config import Config
 
 
 class CustomSchemaBuilder(SchemaBuilder):
 
     def __init__(self, schema_name):
         super().__init__()
-        self.path = f"{option.base_dir}/schemas/{schema_name}"
+        self.path = f"{Config.base_dir}/schemas/{schema_name}"
 
     def create_schema(self, response_json):
         builder = SchemaBuilder()

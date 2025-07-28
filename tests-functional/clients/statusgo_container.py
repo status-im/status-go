@@ -10,12 +10,13 @@ import docker
 import docker.errors
 from docker.errors import APIError
 
-from conftest import option
+from utils.config import Config
 
 DATA_DIR = "/usr/status-user"
 
 
 class StatusGoContainer:
+    all_containers = []
     container = None
 
     def __init__(self, entrypoint, ports=None, privileged=False, container_name_suffix=""):
@@ -29,13 +30,13 @@ class StatusGoContainer:
         # Prepare image and container name
         # NOTE: This part needs some love.
         #       There's magic with `docker_project_name`, `docker_image` and `identifier` variables.
-        docker_project_name = option.docker_project_name
+        docker_project_name = Config.docker_project_name
         self.network_name = f"{docker_project_name}_default"
         git_commit = os.popen("git rev-parse --short HEAD").read().strip()
         identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else git_commit
-        image_name = option.docker_image or f"statusgo-{identifier}:latest"
+        image_name = Config.docker_image or f"statusgo-{identifier}:latest"
         self.container_name = f"{docker_project_name}-{identifier}{container_name_suffix}"
-        coverage_path = option.codecov_dir if option.codecov_dir else os.path.abspath("./coverage/binary")
+        coverage_path = Config.codecov_dir if Config.codecov_dir else os.path.abspath("./coverage/binary")
 
         # Run the container
         logging.debug(f"Creating status-go container from image '{image_name}'")
@@ -74,7 +75,7 @@ class StatusGoContainer:
             raise RuntimeError(f"Docker image '{image_name}' not found")
 
         self.container = self.docker_client.containers.run(**container_args)
-        option.statusgo_containers.append(self)
+        StatusGoContainer.all_containers.append(self)
 
         logging.debug(f"Container {self.container.name} created. ID = {self.container.id}")
 
@@ -221,12 +222,12 @@ class StatusGoContainer:
     def save_logs(self):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
-        if option.logs_dir == "":
+        if Config.logs_dir == "":
             logging.debug("Save container logs skipped")
             return
 
         id_short = self.container.id[:12]
-        file_path = os.path.join(option.logs_dir, f"container_{id_short}.log")
+        file_path = os.path.join(Config.logs_dir, f"container_{id_short}.log")
         logging.info(f"Saving logs to {file_path}")
 
         with open(file_path, "wb") as f:
@@ -247,9 +248,9 @@ class PushNotificationServerContainer(StatusGoContainer):
             "--log-level",
             "DEBUG",
             "--waku-fleet-config",
-            option.waku_fleets_config,
+            Config.waku_fleets_config,
             "--waku-fleet",
-            option.waku_fleet,
+            Config.waku_fleet,
         ]
         super().__init__(entrypoint, container_name_suffix=f"-push-notification-server-{gorush_port}")
 
