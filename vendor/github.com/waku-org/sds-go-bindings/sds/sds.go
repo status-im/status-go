@@ -56,9 +56,9 @@ package sds
 	// resp must be set != NULL in case interest on retrieving data from the callback
 	void SdsGoCallback(int ret, char* msg, size_t len, void* resp);
 
-	static void* cGoSdsNewReliabilityManager(const char* channelId, void* resp) {
+	static void* cGoSdsNewReliabilityManager(void* resp) {
 		// We pass NULL because we are not interested in retrieving data from this callback
-		void* ret = SdsNewReliabilityManager(channelId, (SdsCallBack) SdsGoCallback, resp);
+		void* ret = SdsNewReliabilityManager((SdsCallBack) SdsGoCallback, resp);
 		return ret;
 	}
 
@@ -87,16 +87,18 @@ package sds
 	}
 
 	static void cGoSdsWrapOutgoingMessage(void* rmCtx,
-									void* message,
-                    				size_t messageLen,
-                    				const char* messageId,
-									void* resp) {
+					void* message,
+	                    		size_t messageLen,
+	                    		const char* messageId,
+				const char* channelId,
+				void* resp) {
 		SdsWrapOutgoingMessage(rmCtx,
-						message,
-						messageLen,
-						messageId,
-						(SdsCallBack) SdsGoCallback,
-						resp);
+				message,
+				messageLen,
+				messageId,
+				channelId,
+				(SdsCallBack) SdsGoCallback,
+				resp);
 	}
 	static void cGoSdsUnwrapReceivedMessage(void* rmCtx,
 									void* message,
@@ -110,14 +112,16 @@ package sds
 	}
 
 	static void cGoSdsMarkDependenciesMet(void* rmCtx,
-									char** messageIDs,
-                    				size_t count,
-									void* resp) {
+					char** messageIDs,
+	                    		size_t count,
+					const char* channelId,
+					void* resp) {
 		SdsMarkDependenciesMet(rmCtx,
-						messageIDs,
-						count,
-						(SdsCallBack) SdsGoCallback,
-						resp);
+				messageIDs,
+				count,
+				channelId,
+				(SdsCallBack) SdsGoCallback,
+				resp);
 	}
 
 	static void cGoSdsStartPeriodicTasks(void* rmCtx, void* resp) {
@@ -152,31 +156,25 @@ func SdsGoCallback(ret C.int, msg *C.char, len C.size_t, resp unsafe.Pointer) {
 }
 
 type EventCallbacks struct {
-	OnMessageReady        func(messageId MessageID)
-	OnMessageSent         func(messageId MessageID)
-	OnMissingDependencies func(messageId MessageID, missingDeps []MessageID)
+	OnMessageReady        func(messageId MessageID, channelId string)
+	OnMessageSent         func(messageId MessageID, channelId string)
+	OnMissingDependencies func(messageId MessageID, missingDeps []MessageID, channelId string)
 	OnPeriodicSync        func()
 }
 
 // ReliabilityManager represents an instance of a nim-sds ReliabilityManager
 type ReliabilityManager struct {
 	rmCtx     unsafe.Pointer
-	channelId string
 	callbacks EventCallbacks
 }
 
-func NewReliabilityManager(channelId string) (*ReliabilityManager, error) {
+func NewReliabilityManager() (*ReliabilityManager, error) {
 	Debug("Creating new Reliability Manager")
-	rm := &ReliabilityManager{
-		channelId: channelId,
-	}
+	rm := &ReliabilityManager{}
 
 	wg := sync.WaitGroup{}
 
-	var cChannelId = C.CString(string(channelId))
 	var resp = C.allocResp(unsafe.Pointer(&wg))
-
-	defer C.free(unsafe.Pointer(cChannelId))
 	defer C.freeResp(resp)
 
 	if C.getRet(resp) != C.RET_OK {
@@ -186,7 +184,7 @@ func NewReliabilityManager(channelId string) (*ReliabilityManager, error) {
 	}
 
 	wg.Add(1)
-	rm.rmCtx = C.cGoSdsNewReliabilityManager(cChannelId, resp)
+	rm.rmCtx = C.cGoSdsNewReliabilityManager(resp)
 	wg.Wait()
 
 	C.cGoSdsSetEventCallback(rm.rmCtx)
@@ -243,11 +241,13 @@ type jsonEvent struct {
 
 type msgEvent struct {
 	MessageId MessageID `json:"messageId"`
+	ChannelId string    `json:"channelId"`
 }
 
 type missingDepsEvent struct {
 	MessageId   MessageID   `json:"messageId"`
 	MissingDeps []MessageID `json:"missingDeps"`
+	ChannelId   string      `json:"channelId"`
 }
 
 func (rm *ReliabilityManager) RegisterCallbacks(callbacks EventCallbacks) {
@@ -288,7 +288,7 @@ func (rm *ReliabilityManager) parseMessageReadyEvent(eventStr string) {
 	}
 
 	if rm.callbacks.OnMessageReady != nil {
-		rm.callbacks.OnMessageReady(msgEvent.MessageId)
+		rm.callbacks.OnMessageReady(msgEvent.MessageId, msgEvent.ChannelId)
 	}
 }
 
@@ -301,7 +301,7 @@ func (rm *ReliabilityManager) parseMessageSentEvent(eventStr string) {
 	}
 
 	if rm.callbacks.OnMessageSent != nil {
-		rm.callbacks.OnMessageSent(msgEvent.MessageId)
+		rm.callbacks.OnMessageSent(msgEvent.MessageId, msgEvent.ChannelId)
 	}
 }
 
@@ -314,7 +314,7 @@ func (rm *ReliabilityManager) parseMissingDepsEvent(eventStr string) {
 	}
 
 	if rm.callbacks.OnMissingDependencies != nil {
-		rm.callbacks.OnMissingDependencies(missingDepsEvent.MessageId, missingDepsEvent.MissingDeps)
+		rm.callbacks.OnMissingDependencies(missingDepsEvent.MessageId, missingDepsEvent.MissingDeps, missingDepsEvent.ChannelId)
 	}
 }
 
@@ -375,7 +375,7 @@ func (rm *ReliabilityManager) Reset() error {
 	return errors.New(errMsg)
 }
 
-func (rm *ReliabilityManager) WrapOutgoingMessage(message []byte, messageId MessageID) ([]byte, error) {
+func (rm *ReliabilityManager) WrapOutgoingMessage(message []byte, messageId MessageID, channelId string) ([]byte, error) {
 	if rm == nil {
 		err := errors.New("reliability manager is nil in WrapOutgoingMessage")
 		Error("Failed to wrap outgoing message %v", err)
@@ -400,8 +400,11 @@ func (rm *ReliabilityManager) WrapOutgoingMessage(message []byte, messageId Mess
 	}
 	cMessageLen := C.size_t(len(message))
 
+	cChannelId := C.CString(channelId)
+	defer C.free(unsafe.Pointer(cChannelId))
+
 	wg.Add(1)
-	C.cGoSdsWrapOutgoingMessage(rm.rmCtx, cMessagePtr, cMessageLen, cMessageId, resp)
+	C.cGoSdsWrapOutgoingMessage(rm.rmCtx, cMessagePtr, cMessageLen, cMessageId, cChannelId, resp)
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
@@ -481,7 +484,7 @@ func (rm *ReliabilityManager) UnwrapReceivedMessage(message []byte) (*UnwrappedM
 }
 
 // MarkDependenciesMet informs the library that dependencies are met
-func (rm *ReliabilityManager) MarkDependenciesMet(messageIDs []MessageID) error {
+func (rm *ReliabilityManager) MarkDependenciesMet(messageIDs []MessageID, channelId string) error {
 	if rm == nil {
 		err := errors.New("reliability manager is nil in MarkDependenciesMet")
 		Error("Failed to mark dependencies met %v", err)
@@ -512,8 +515,11 @@ func (rm *ReliabilityManager) MarkDependenciesMet(messageIDs []MessageID) error 
 	}
 
 	wg.Add(1)
+	cChannelId := C.CString(channelId)
+	defer C.free(unsafe.Pointer(cChannelId))
+
 	// Pass the pointer variable (cMessageIDsPtr) directly, which is of type **C.char
-	C.cGoSdsMarkDependenciesMet(rm.rmCtx, cMessageIDsPtr, C.size_t(len(messageIDs)), resp)
+	C.cGoSdsMarkDependenciesMet(rm.rmCtx, cMessageIDsPtr, C.size_t(len(messageIDs)), cChannelId, resp)
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
