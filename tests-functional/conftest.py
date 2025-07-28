@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import Iterator
-from utils.config import Option
+from utils.config import Config
 
 
 def pytest_addoption(parser):
