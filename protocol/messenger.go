@@ -970,6 +970,10 @@ func (m *Messenger) handleConnectionChange(online bool) {
 }
 
 func (m *Messenger) Online() bool {
+	if !m.started {
+		return false
+	}
+
 	if m.config.onlineChecker != nil {
 		return m.config.onlineChecker()
 	}

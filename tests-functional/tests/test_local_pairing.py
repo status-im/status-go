@@ -184,6 +184,9 @@ class TestLocalPairing(MessengerSteps):
         # Make contacts before local pairing
         self.make_contacts(alice, bob)
 
+        # Create community before local pairing
+        self.create_community(bob)
+
         # Local pairing
         pair_server_as_sender(bob, bob_second_device)
 
@@ -215,6 +218,9 @@ class TestLocalPairing(MessengerSteps):
 
         # Make contacts before local pairing
         self.make_contacts(alice, bob)
+
+        # Create community before local pairing
+        self.create_community(bob)
 
         # Local pairing
         pair_server_as_receiver(bob, bob_second_device)

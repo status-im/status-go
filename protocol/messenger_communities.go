@@ -1032,6 +1032,9 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 }
 
 func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *messagingtypes.Shard) error {
+	if !m.started {
+		return nil
+	}
 	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
 	pubsubTopic := shard.PubsubTopic()
 
