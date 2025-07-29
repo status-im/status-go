@@ -49,18 +49,13 @@ def backend_factory(request):
         Returns:
             StatusBackend: Created backend instance
         """
+        test_name = request.cls.__name__ if hasattr(request, "cls") else "test"
         logging.debug(f"🔧 [SETUP] Creating {name} backend for {request.cls.__name__}")
+        logging.debug(f"🔧 [SETUP] Creating {name} backend for {test_name}")
         logging.debug(f"📋 [SETUP] Parameters: privileged={privileged}, ipv6={ipv6}")
 
         # Create backend
         backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6)
-        # backend.init_status_backend()
-        # backend.create_account_and_login(waku_light_client=final_light_client)
-        # backend.wait_for_login()
-
-        # if start_messenger:
-        #     backend.wakuext_service.start_messenger()
-
         created_backends.append(backend)
         logging.debug(f"✅ [SETUP] {name.capitalize()} backend created")
 
@@ -91,7 +86,7 @@ def backend_new_profile(request, backend_factory):
         logging.debug(f"📋 [SETUP] backend_new_profile parameters: wakuV2LightClient={waku_light_client}")
         backend = backend_factory(name)
         backend.init_status_backend()
-        backend.create_account_and_login(wakuV2LightClient=waku_light_client)
+        backend.create_account_and_login(waku_light_client=waku_light_client)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()
         return backend
@@ -106,7 +101,7 @@ def backend_recovered_profile(request, backend_factory):
         logging.debug(f"📋 [SETUP] backend_recovered_profile parameters: wakuV2LightClient={waku_light_client}")
         backend = backend_factory(name)
         backend.init_status_backend()
-        backend.restore_account_and_login(user=user, wakuV2LightClient=waku_light_client, **kwargs)
+        backend.restore_account_and_login(user=user, waku_light_client=waku_light_client, **kwargs)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()
         return backend
