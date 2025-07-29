@@ -3,6 +3,7 @@ package alchemy
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -55,7 +56,7 @@ func saveTransfers(creator sqlite.StatementCreator, transfers []Transfer, chainI
 func saveTransfer(creator sqlite.StatementCreator, id string, transfer Transfer, chainID uint64, address common.Address) error {
 	q := sq.Insert("fetched_alchemy_transfers").
 		Columns("transfer", "chain_id", "address").
-		Values(sqlite.ToJSONBlob(transfer), chainID, address.Hex())
+		Values(sqlite.ToJSONBlob(transfer), chainID, address)
 
 	query, args, err := q.ToSql()
 	if err != nil {
@@ -72,11 +73,15 @@ func saveTransfer(creator sqlite.StatementCreator, id string, transfer Transfer,
 }
 
 func (p *Persistence) GetTransfers(chainIDs []uint64, addresses []common.Address, limit uint64) ([]Transfer, error) {
+
+	fmt.Println("-- GetTransfers chainIDs: ", chainIDs)
+	fmt.Println("-- GetTransfers addresses: ", addresses)
 	q := sq.Select("e.transfer").
 		From("fetched_alchemy_transfers e").
+		// Where(sq.Eq{"e.chain_id": chainIDs})
 		Where(sq.And{
 			sq.Eq{"e.chain_id": chainIDs},
-			sq.Eq{"e.address": addresses}}).GroupBy("e.transfer")
+			sq.Eq{"e.address": addresses}})
 
 	if limit > 0 {
 		q = q.Limit(limit)
@@ -86,6 +91,8 @@ func (p *Persistence) GetTransfers(chainIDs []uint64, addresses []common.Address
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("Query: ", query)
 
 	stmt, err := p.db.Prepare(query)
 	if err != nil {
@@ -104,10 +111,12 @@ func (p *Persistence) GetTransfers(chainIDs []uint64, addresses []common.Address
 
 func rowsToTransfers(rows *sql.Rows) ([]Transfer, error) {
 	var transfers []Transfer
+	fmt.Println("rowsToTransfers")
 	for rows.Next() {
 		var transfer Transfer
 		var transferJSON = sqlite.ToJSONBlob(&transfer)
 		err := rows.Scan(transferJSON)
+		fmt.Println("Scanned json:", transferJSON)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +128,7 @@ func rowsToTransfers(rows *sql.Rows) ([]Transfer, error) {
 	return transfers, nil
 }
 
-func (p *aPersistence) GetLastFetchedBlockAndTimestamp(chainID uint64, address common.Address) (*rpc.BlockNumber, *time.Time, error) {
+func (p *Persistence) GetLastFetchedBlockAndTimestamp(chainID uint64, address common.Address) (*rpc.BlockNumber, *time.Time, error) {
 	q := sq.Select("fp.parameters -> '$.toBlock'", "fp.created_at").
 		From("fetched_activity_fetch_parameters fp").
 		Where(sq.And{

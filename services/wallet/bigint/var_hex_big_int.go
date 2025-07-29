@@ -24,3 +24,7 @@ func (b *VarHexBigInt) UnmarshalJSON(input []byte) error {
 	}
 	return nil
 }
+
+func (b *VarHexBigInt) MarshalJSON() ([]byte, error) {
+	return []byte("\"0x" + b.Text(16) + "\""), nil
+}
