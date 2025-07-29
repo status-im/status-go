@@ -1,4 +1,3 @@
-import logging
 import pytest
 import time
 
@@ -54,11 +53,8 @@ class TestBasicBenchmark(MessengerSteps):
         time.sleep(duration)
 
     def test_idle(self, aut):
-        """Benchmark StatusBackend in idle state after creating new profile"""
-
-        duration = 60  # seconds
-        logging.info(f"Running idle performance monitoring for {duration} seconds...")
-        self.sleep(aut, duration)
+        """Benchmark StatusBackend in idle state after creating a new profile"""
+        self.sleep(aut, 60)
 
     def test_one_to_one_messages(self, aut, backend_new_profile):
         """Benchmark StatusBackend during receiving 1-1 messages."""

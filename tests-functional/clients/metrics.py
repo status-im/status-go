@@ -451,3 +451,4 @@ class PerformanceMetrics:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, "w") as f:
             json.dump(metrics, f, indent=2)
+        logging.info(f"Performance report saved to {filename}")
