@@ -1,7 +1,7 @@
 import os
-from dataclasses import dataclass, field
-from typing import List
-import pytest
+import logging
+from typing import Iterator
+from utils.config import Config
 
 
 def pytest_addoption(parser):
@@ -10,12 +10,6 @@ def pytest_addoption(parser):
         action="append",
         help="",
         default=None,
-    )
-    parser.addoption(
-        "--anvil_url",
-        action="store",
-        help="",
-        default="http://0.0.0.0:8545",
     )
     parser.addoption(
         "--password",
@@ -71,33 +65,20 @@ def pytest_addoption(parser):
         help="Path to a local JSON file with Push Notifications fleets configuration. Default value is a path to config in Docker to run 1 pn-server",
         default="/static/configs/pushfleetconfig.json",
     )
+    parser.addoption(
+        "--disable-override-networks",
+        action="store_true",
+        help="When set, will disable overriding the networks to use Anvil and use default status-backend networks",
+        default=False,
+    )
 
 
-@dataclass
-class Option:
-    status_backend_port_range: List[int] = field(default_factory=list)
-    statusgo_containers: List[str] = field(default_factory=list)
-    base_dir: str = ""
-
-
-option = Option()
-
-
-def status_backend_url_generator(config):
-    if hasattr(option, "status_backend_url") and config.option.status_backend_url is not None:
-        urls = config.option.status_backend_url
-    else:
-        print("status_backend_url option not found or is None")
-        return
-
+def _status_backend_url_generator(urls) -> Iterator[str]:
     for url in urls:
         yield url
 
 
-def pytest_configure(config):
-    global option
-    option = config.option
-
+def _calculate_port_range():
     executor_number = int(os.getenv("EXECUTOR_NUMBER", 5))
     base_port = 7000
     range_size = 100
@@ -111,28 +92,77 @@ def pytest_configure(config):
     if start_port < min_port or end_port > max_port:
         raise ValueError(f"Generated port range ({start_port}-{end_port}) is outside the allowed range ({min_port}-{max_port}).")
 
-    option.status_backend_port_range = list(range(start_port, end_port))
-    option.statusgo_containers = []
+    return list(range(start_port, end_port))
 
-    option.base_dir = os.path.dirname(os.path.abspath(__file__))  # schemas directory
-    option.status_backend_urls = status_backend_url_generator(config)
+
+def pytest_configure(config):
+    status_backend_urls = config.getoption("--status_backend_url")
+    Config.status_backend_urls = _status_backend_url_generator(status_backend_urls) if status_backend_urls else None
+    Config.password = config.getoption("--password")
+    Config.docker_project_name = config.getoption("--docker_project_name")
+    Config.docker_image = config.getoption("--docker-image")
+    Config.codecov_dir = config.getoption("--codecov_dir")
+    Config.logs_dir = config.getoption("--logs-dir")
+    Config.logout = config.getoption("--logout")
+    Config.waku_fleets_config = config.getoption("--waku-fleets-config")
+    Config.waku_fleet = config.getoption("--waku-fleet")
+    Config.push_fleets_config = config.getoption("--push-fleets-config")
+    Config.disable_override_networks = config.getoption("--disable-override-networks")
+    Config.status_backend_port_range = _calculate_port_range()
+    Config.base_dir = os.path.dirname(os.path.abspath(__file__))  # schemas directory
 
 
 def pytest_report_header(config):
     return [
         f"waku fleets config file: {config.option.waku_fleets_config}",
         f"waku fleet: {config.option.waku_fleet}",
+        f"push fleets config file: {config.option.push_fleets_config}",
+        f"disable override networks: {config.option.disable_override_networks}",
     ]
 
 
-@pytest.fixture(scope="function", autouse=True)
-def close_status_backend_containers(request):
-    yield
-    if hasattr(request.node.instance, "reuse_container"):
-        return
-    for container in option.statusgo_containers:
-        container.stop()  # pyright: ignore[reportAttributeAccessIssue]
-        container.save_logs()  # pyright: ignore[reportAttributeAccessIssue]
-        container.remove()  # pyright: ignore[reportAttributeAccessIssue]
+class SecretRedactingFilter(logging.Filter):
+    secrets = []
+    placeholder = "***"
 
-    option.statusgo_containers = []
+    def __init__(self):
+        env_vars = [
+            "STATUS_BUILD_PROXY_USER",
+            "STATUS_BUILD_PROXY_PASSWORD",
+            "STATUS_BUILD_INFURA_TOKEN",
+            "STATUS_BUILD_INFURA_SECRET",
+            "STATUS_BUILD_POKT_TOKEN",
+        ]
+        for env_var in env_vars:
+            if env_var in os.environ:
+                self.secrets.append(os.environ[env_var])
+        super().__init__()
+
+    def redact(self, message):
+        for secret in self.secrets:
+            if secret:
+                message = message.replace(secret, self.placeholder)
+        return message
+
+    def filter(self, record):
+        # Redact secrets in the log message
+        if isinstance(record.msg, str):
+            message = record.getMessage()
+            record.msg = self.redact(message)
+
+        # Also redact secrets in args (if used with parameterized logging)
+        if record.args:
+            new_args = []
+            for arg in record.args:
+                redacted_arg = arg
+                if isinstance(arg, str):
+                    redacted_arg = self.redact(arg)
+                new_args.append(redacted_arg)
+            record.args = tuple(new_args)
+
+        return True
+
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger()
+logger.addFilter(SecretRedactingFilter())

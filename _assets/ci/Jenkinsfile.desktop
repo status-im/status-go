@@ -3,7 +3,7 @@ library 'status-jenkins-lib@v1.9.20'
 
 pipeline {
   /* This way we run the same Jenkinsfile on different platforms. */
-  agent { label "${params.AGENT_LABEL} && go-1.22" }
+  agent { label "${params.AGENT_LABEL} && go-1.23" }
 
   parameters {
     string(
@@ -29,6 +29,7 @@ pipeline {
     /* Prevent Jenkins jobs from running forever */
     timeout(time: 15, unit: 'MINUTES')
     disableConcurrentBuilds()
+    disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: '5',

@@ -8,6 +8,11 @@ import os
 @pytest.mark.rpc
 class TestInitialiseApp:
 
+    @pytest.fixture(autouse=True)
+    def setup_cleanup(self, close_status_backend_containers):
+        """Automatically cleanup containers after each test"""
+        yield
+
     @pytest.mark.init
     def test_init_app(self):
 
@@ -55,7 +60,7 @@ def assert_file_first_line(path, pattern: str, expected: bool):
 @pytest.mark.rpc
 @pytest.mark.init
 @pytest.mark.parametrize("log_enabled,api_logging_enabled", [(False, False), (True, True)])
-def test_check_logs(log_enabled: bool, api_logging_enabled: bool):
+def test_check_logs(log_enabled: bool, api_logging_enabled: bool, close_status_backend_containers):
     backend = StatusBackend()
 
     data_dir = os.path.join(backend.data_dir, "data")

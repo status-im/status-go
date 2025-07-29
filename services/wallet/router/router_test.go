@@ -56,7 +56,6 @@ func setupRouter(t *testing.T) (*Router, func()) {
 		UpstreamChainID: 1,
 		Networks:        defaultNetworks,
 		DB:              db,
-		WalletFeed:      nil,
 	}
 	client, _ := rpc.NewClient(config)
 
@@ -141,11 +140,11 @@ func TestRouter(t *testing.T) {
 				if routes == nil {
 					assert.Empty(t, tt.expectedCandidates)
 				} else {
-					assertPathsEqual(t, tt.expectedCandidates, routes.Candidates)
+					assertPathsEqual(t, tt.expectedCandidates, routes.Route)
 				}
 			} else {
 				assert.NoError(t, err)
-				assertPathsEqual(t, tt.expectedCandidates, routes.Candidates)
+				assertPathsEqual(t, tt.expectedCandidates, routes.Route)
 			}
 		})
 	}
@@ -158,7 +157,7 @@ func TestRouter(t *testing.T) {
 		case asyncRoutes := <-suggestedRoutesCh:
 			assert.Equal(t, tt.input.Uuid, asyncRoutes.Uuid)
 			assert.Equal(t, tt.expectedError, asyncRoutes.ErrorResponse)
-			assertPathsEqual(t, tt.expectedCandidates, asyncRoutes.Candidates)
+			assertPathsEqual(t, tt.expectedCandidates, asyncRoutes.Route)
 			break
 		case <-time.After(10 * time.Second):
 			t.FailNow()
@@ -188,14 +187,12 @@ func TestNoBalanceForTheBestRouteRouter(t *testing.T) {
 					assert.Nil(t, routes)
 				} else {
 					assert.NotNil(t, routes)
-					assertPathsEqual(t, tt.expectedCandidates, routes.Candidates)
+					assertPathsEqual(t, tt.expectedCandidates, routes.Route)
 				}
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, len(tt.expectedCandidates), len(routes.Candidates))
-				assert.Equal(t, len(tt.expectedBest), len(routes.Best))
-				assertPathsEqual(t, tt.expectedCandidates, routes.Candidates)
-				assertPathsEqual(t, tt.expectedBest, routes.Best)
+				assert.Equal(t, len(tt.expectedCandidates), len(routes.Route))
+				assertPathsEqual(t, tt.expectedCandidates, routes.Route)
 			}
 		})
 	}
@@ -210,9 +207,9 @@ func TestNoBalanceForTheBestRouteRouter(t *testing.T) {
 			case asyncRoutes := <-suggestedRoutesCh:
 				assert.Equal(t, tt.input.Uuid, asyncRoutes.Uuid)
 				assert.Equal(t, tt.expectedError, asyncRoutes.ErrorResponse)
-				assertPathsEqual(t, tt.expectedCandidates, asyncRoutes.Candidates)
+				assertPathsEqual(t, tt.expectedCandidates, asyncRoutes.Route)
 				if tt.expectedError == nil {
-					assertPathsEqual(t, tt.expectedBest, asyncRoutes.Best)
+					assertPathsEqual(t, tt.expectedBest, asyncRoutes.Route)
 				}
 				break
 			case <-time.After(10 * time.Second):

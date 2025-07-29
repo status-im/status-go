@@ -4,11 +4,11 @@ import jsonschema
 import resources.constants as constants
 from clients.signals import SignalType, WalletEventType
 
-from conftest import option
+from utils.config import Config
 
 
 def verify_json_schema(response, method):
-    with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
+    with open(f"{Config.base_dir}/schemas/{method}", "r") as schema:
         jsonschema.validate(instance=response, schema=json.load(schema))
 
 
@@ -61,7 +61,7 @@ def sign_messages(rpc_client, hashes, address):
     for hash in hashes:
 
         method = "wallet_signMessage"
-        params = [hash, address, option.password]
+        params = [hash, address, Config.password]
 
         response = rpc_client.rpc_valid_request(method, params)
 
@@ -169,7 +169,7 @@ def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
 
 def send_router_transaction(rpc_client, **kwargs):
     routes = get_suggested_routes(rpc_client, **kwargs)
-    assert "Best" in routes, f"No best route found: {routes}"
+    assert "Route" in routes, f"No route found: {routes}"
 
     build_tx = build_transactions_from_route(rpc_client, kwargs.get("uuid"))
 

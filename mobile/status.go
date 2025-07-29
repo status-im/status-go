@@ -394,7 +394,7 @@ func VerifyAccountPassword(keyStoreDir, address, password string) string {
 
 // verifyAccountPassword verifies account password.
 func verifyAccountPassword(keyStoreDir, address, password string) string {
-	_, err := statusBackend.AccountManager().LoadAccount(types.HexToAddress(address), password)
+	_, err := statusBackend.AccountsManager().LoadAccount(types.HexToAddress(address), password)
 	return makeJSONResponse(err)
 }
 
@@ -414,7 +414,7 @@ func verifyAccountPasswordV2(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	_, err = statusBackend.AccountManager().LoadAccount(types.HexToAddress(request.Address), request.Password)
+	_, err = statusBackend.AccountsManager().LoadAccount(types.HexToAddress(request.Address), request.Password)
 	return makeJSONResponse(err)
 }
 
@@ -464,7 +464,7 @@ func migrateKeyStoreDirV2(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.AccountManager().MigrateKeyStoreDir(request.NewDir)
+	err = statusBackend.AccountsManager().MigrateKeyStoreDir(request.NewDir)
 	return makeJSONResponse(err)
 }
 
@@ -475,7 +475,7 @@ func MigrateKeyStoreDir(accountData, password, oldDir, newDir string) string {
 
 // migrateKeyStoreDir migrates key files to a new directory
 func migrateKeyStoreDir(newDir string) string {
-	err := statusBackend.AccountManager().MigrateKeyStoreDir(newDir)
+	err := statusBackend.AccountsManager().MigrateKeyStoreDir(newDir)
 	return makeJSONResponse(err)
 }
 
@@ -729,7 +729,7 @@ func initKeystore(keydir string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	statusBackend.AccountManager().SetKeystore(keystoreAdapter)
+	statusBackend.AccountsManager().SetKeystore(keystoreAdapter)
 	return makeJSONResponse(nil)
 }
 
@@ -2400,4 +2400,38 @@ func IntendedPanic(message string) string {
 		err := intendedPanic{error: errors.New(message)}
 		panic(err)
 	})
+}
+
+func performLocalBackup() string {
+	filePath, err := statusBackend.StatusNode().PerformLocalBackup()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	respJSON, err := json.Marshal(map[string]interface{}{
+		"filePath": filePath,
+	})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(respJSON)
+}
+
+func PerformLocalBackup() string {
+	return callWithResponse(performLocalBackup)
+}
+
+func LoadLocalBackup(requestJSON string) string {
+	var request requests.LoadLocalBackup
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = statusBackend.StatusNode().LoadLocalBackup(request.FilePath)
+	return makeJSONResponse(err)
 }

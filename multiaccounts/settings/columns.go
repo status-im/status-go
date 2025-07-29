@@ -34,6 +34,10 @@ var (
 		dBColumnName:   "backup_fetched",
 		valueHandler:   BoolHandler,
 	}
+	BackupPath = SettingField{
+		reactFieldName: "backup-path",
+		dBColumnName:   "backup_path",
+	}
 	ChaosMode = SettingField{
 		reactFieldName: "chaos-mode?",
 		dBColumnName:   "chaos_mode",
@@ -408,10 +412,6 @@ var (
 		dBColumnName:   "syncing_on_mobile_network",
 		valueHandler:   BoolHandler,
 	}
-	TelemetryServerURL = SettingField{
-		reactFieldName: "telemetry-server-url",
-		dBColumnName:   "telemetry_server_url",
-	}
 	TestNetworksEnabled = SettingField{
 		reactFieldName: "test-networks-enabled?",
 		dBColumnName:   "test_networks_enabled",
@@ -548,6 +548,7 @@ var (
 		AutoMessageEnabled,
 		BackupEnabled,
 		BackupFetched,
+		BackupPath,
 		Bio,
 		ChaosMode,
 		CollectibleGroupByCollection,
@@ -613,7 +614,6 @@ var (
 		StickersPacksPending,
 		StickersRecentStickers,
 		SyncingOnMobileNetwork,
-		TelemetryServerURL,
 		TestNetworksEnabled,
 		TokenGroupByCommunity,
 		URLUnfurlingMode,

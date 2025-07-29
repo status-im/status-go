@@ -1,13 +1,14 @@
 import random
-
 import pytest
-
-from steps.status_backend import StatusBackendSteps
+from resources.constants import user_1
 
 
 @pytest.mark.wallet
 @pytest.mark.rpc
-class TestRpc(StatusBackendSteps):
+class TestRpc:
+    @pytest.fixture(autouse=True)
+    def setup_backend(self, backend_recovered_profile):
+        self.rpc_client = backend_recovered_profile(name="main_user", user=user_1)
 
     @pytest.mark.parametrize(
         "method, params",

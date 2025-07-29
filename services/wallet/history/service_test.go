@@ -1,6 +1,7 @@
 package history
 
 import (
+	"context"
 	"errors"
 	"math/big"
 	"reflect"
@@ -17,6 +18,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/t/helpers"
@@ -398,7 +400,7 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 	require.NoError(t, err)
 
 	address := common.HexToAddress("0x1234")
-	accountFeed := event.Feed{}
+	accountsPublisher := pubsub.NewPublisher()
 	walletFeed := event.Feed{}
 	chainID := uint64(1)
 	txServiceMockCtrl := gomock.NewController(t)
@@ -410,12 +412,11 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 		UpstreamChainID: chainID,
 		Networks:        nil,
 		DB:              appDB,
-		WalletFeed:      nil,
 	}
 	rpcClient, _ := rpc.NewClient(config)
 	rpcClient.UpstreamChainID = chainID
 
-	service := NewService(walletDB, accountsDB, &accountFeed, &walletFeed, rpcClient, nil, nil, nil)
+	service := NewService(walletDB, accountsDB, accountsPublisher, &walletFeed, rpcClient, nil, nil, nil)
 
 	// Insert balances for address
 	database := service.balance.db
@@ -443,7 +444,7 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 	require.Len(t, entries, 2)
 
 	// Start service
-	service.startAccountWatcher()
+	service.Start(context.Background())
 
 	// Watching accounts must start before sending event.
 	// To avoid running goroutine immediately and let the controller subscribe first,
@@ -454,8 +455,7 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 		defer group.Done()
 		time.Sleep(1 * time.Millisecond)
 
-		accountFeed.Send(accountsevent.Event{
-			Type:     accountsevent.EventTypeRemoved,
+		pubsub.Publish(accountsPublisher, accountsevent.AccountsRemovedEvent{
 			Accounts: []common.Address{address},
 		})
 
@@ -474,5 +474,5 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 	// Stop service
 	txServiceMockCtrl.Finish()
 	server.Stop()
-	service.stopAccountWatcher()
+	service.Stop()
 }

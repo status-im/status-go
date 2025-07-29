@@ -4,6 +4,7 @@ package wallet
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"math/big"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/market"
@@ -23,6 +25,7 @@ import (
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/transactions"
 )
 
 // WalletTickReload emitted every 15mn to reload the wallet balance and history
@@ -185,10 +188,25 @@ func (r *Reader) startWalletEventsWatcher() {
 		return
 	}
 
-	// Respond to ETH/Token transfers
+	// Respond to ETH/Token transfers or any sent transaction
 	walletEventCb := func(event walletevent.Event) {
-		if event.Type != transfer.EventInternalETHTransferDetected &&
-			event.Type != transfer.EventInternalERC20TransferDetected {
+		delayed := true
+		switch event.Type {
+		case transfer.EventInternalETHTransferDetected, transfer.EventInternalERC20TransferDetected:
+			// Delayed refresh
+		case transactions.EventPendingTransactionUpdate:
+			var p transactions.PendingTxUpdatePayload
+			err := json.Unmarshal([]byte(event.Message), &p)
+			if err != nil {
+				return
+			}
+			if p.Deleted {
+				// Immediate refresh
+				delayed = false
+			}
+			// Delayed refresh
+		default:
+			// Unrelated event, do not trigger a reload
 			return
 		}
 
@@ -200,8 +218,12 @@ func (r *Reader) startWalletEventsWatcher() {
 			}
 
 			if !ok || event.At > timecheck {
-				r.triggerDelayedWalletReload()
 				r.invalidateBalanceCache()
+				if delayed {
+					r.triggerDelayedWalletReload()
+				} else {
+					r.triggerWalletReload()
+				}
 				break
 			}
 		}
@@ -318,7 +340,7 @@ func (r *Reader) isBalanceUpdateNeededAnyway(clients map[uint64]chain.ClientInte
 	return updateAnyway
 }
 
-func tokensToBalancesPerChain(cachedTokens map[common.Address][]tokenTypes.StorageToken) map[uint64]map[common.Address]map[common.Address]*hexutil.Big {
+func tokensToBalancesPerChain(cachedTokens map[common.Address][]tokenTypes.StorageToken) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
 	cachedBalancesPerChain := map[uint64]map[common.Address]map[common.Address]*hexutil.Big{}
 	for address, tokens := range cachedTokens {
 		for _, token := range tokens {
@@ -330,13 +352,16 @@ func tokensToBalancesPerChain(cachedTokens map[common.Address][]tokenTypes.Stora
 					cachedBalancesPerChain[balance.ChainID][address] = map[common.Address]*hexutil.Big{}
 				}
 
-				bigBalance, _ := new(big.Int).SetString(balance.RawBalance, 10)
+				bigBalance, ok := new(big.Int).SetString(balance.RawBalance, 10)
+				if !ok {
+					return nil, gocommon.ErrBigIntSetFromString(balance.RawBalance)
+				}
 				cachedBalancesPerChain[balance.ChainID][address][balance.Address] = (*hexutil.Big)(bigBalance)
 			}
 		}
 	}
 
-	return cachedBalancesPerChain
+	return cachedBalancesPerChain, nil
 }
 
 func (r *Reader) fetchBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address, tokenAddresses []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
@@ -534,7 +559,8 @@ func (r *Reader) FetchBalances(ctx context.Context, clients map[uint64]chain.Cli
 
 	connectedPerChain := map[uint64]bool{}
 	for chainID, client := range clients {
-		connectedPerChain[chainID] = client.IsConnected()
+		// Checked post-request, it should either be Up or Down
+		connectedPerChain[chainID] = client.GetConnectionStatus() == rpcstatus.StatusUp
 	}
 
 	tokens := r.balancesToTokensByAddress(connectedPerChain, addresses, allTokens, balances, cachedTokens)
@@ -564,9 +590,14 @@ func (r *Reader) GetCachedBalances(clients map[uint64]chain.ClientInterface, add
 
 	connectedPerChain := map[uint64]bool{}
 	for chainID, client := range clients {
-		connectedPerChain[chainID] = client.IsConnected()
+		// Checked post-request, it should either be Up or Down
+		connectedPerChain[chainID] = client.GetConnectionStatus() == rpcstatus.StatusUp
 	}
 
-	balances := tokensToBalancesPerChain(cachedTokens)
+	balances, err := tokensToBalancesPerChain(cachedTokens)
+	if err != nil {
+		return nil, err
+	}
+
 	return r.balancesToTokensByAddress(connectedPerChain, addresses, allTokens, balances, cachedTokens), nil
 }

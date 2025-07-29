@@ -20,11 +20,15 @@ import (
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
+	"github.com/status-im/status-go/protocol/sqlite"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/timesource"
@@ -43,7 +47,8 @@ var (
 	logNoColors     = flag.Bool("log-no-color", false, "Disables log colors")
 	wakuFleet       = flag.String("waku-fleet", "status.prod", "Waku fleet to use")
 	wakuFleetConfig = flag.String("waku-fleet-config", "", "path to Waku fleet config file")
-
+	Port            = flag.Int("tcp-port", 30303, "Libp2p TCP port")
+	UDPPort         = flag.Int("udp-port", 30303, "Libp2p UDP port")
 	// TODO: add pprof and metrics
 
 	logger *zap.Logger
@@ -55,6 +60,7 @@ const (
 	exitCodeInvalidKey
 	exitCodeCreateWakuFailed
 	exitCodeStartWakuFailed
+	exitCodeDBMigrationFailed
 	exitCodeCreateMessengerFailed
 	exitCodeCreateDatabaseFailed
 	exitCodeStartServerFailed
@@ -139,6 +145,22 @@ func main() {
 		}
 	}()
 
+	err = sqlite.Migrate(db)
+	if err != nil {
+		logger.Error("failed to migrate database", zap.Error(err))
+		os.Exit(exitCodeDBMigrationFailed)
+	}
+
+	messaging, err := messaging.NewCore(
+		waku,
+		privateKey,
+		common.NewMessagingPersistence(db),
+		messaging.WithLogger(logger.Named("messaging")),
+	)
+	if err != nil {
+		os.Exit(exitCodeCreateMessengerFailed)
+	}
+
 	// Set up the push notifications server
 	config := &pushnotificationserver.Config{
 		Enabled:   true,
@@ -157,7 +179,7 @@ func main() {
 		protocol.WithMessageSigner(personal.New()),
 		protocol.WithPushNotificationServer(server),
 	}
-	messenger, err := protocol.NewMessenger(privateKey, waku, installationID, options...)
+	messenger, err := protocol.NewMessenger(privateKey, messaging.API(), installationID, options...)
 	if err != nil {
 		logger.Error("failed to create messenger", zap.Error(err))
 		os.Exit(exitCodeCreateMessengerFailed)
@@ -216,6 +238,16 @@ func main() {
 }
 
 func parseNodeKey(nodeKey string) (*ecdsa.PrivateKey, string, error) {
+	// Check for environment variable if CLI flag is empty
+	if nodeKey == "" {
+		nodeKey = os.Getenv("STATUS_GO_NODE_KEY")
+	}
+
+	// If still empty, return error
+	if nodeKey == "" {
+		return nil, "", errors.New("Nodekey must be provided via -identity flag or STATUS_GO_NODE_KEY environment variable")
+	}
+
 	// Parse private key
 	privateKey, err := crypto.HexToECDSA(nodeKey)
 	if err != nil {
@@ -255,7 +287,7 @@ func buildWakuConfig() *wakuv2.Config {
 	cfg := &wakuv2.Config{
 		MaxMessageSize:                         wakuv2common.DefaultMaxMessageSize,
 		Host:                                   "0.0.0.0",
-		Port:                                   0,
+		Port:                                   *Port,
 		LightClient:                            false,
 		EnablePeerExchangeClient:               false,
 		EnablePeerExchangeServer:               true,
@@ -267,10 +299,9 @@ func buildWakuConfig() *wakuv2.Config {
 		DiscoveryLimit:                         20,
 		DiscV5BootstrapNodes:                   params.DefaultDiscV5Nodes(*wakuFleet),
 		Nameserver:                             "",
-		UDPPort:                                0,
+		UDPPort:                                *UDPPort,
 		AutoUpdate:                             true,
-		DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
-		TelemetryServerURL:                     "",
+		DefaultShardPubsubTopic:                messagingtypes.DefaultShardPubsubTopic(),
 		ClusterID:                              16,
 		EnableMissingMessageVerification:       false,
 		EnableStoreConfirmationForMessagesSent: false,

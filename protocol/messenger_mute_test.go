@@ -8,7 +8,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/deprecation"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/requests"
 )
 
@@ -21,17 +20,14 @@ type MessengerMuteSuite struct {
 }
 
 func (s *MessengerMuteSuite) TestSetMute() {
-	key, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	theirMessenger, err := newMessengerWithKey(s.shh, key, s.logger, nil)
-	s.Require().NoError(err)
+	theirMessenger := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	chatID := publicChatName
 
 	chat := CreatePublicChat(chatID, s.m.getTimesource())
 
-	err = s.m.SaveChat(chat)
+	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
 	_, err = s.m.Join(chat)
@@ -68,23 +64,19 @@ func (s *MessengerMuteSuite) TestSetMute() {
 	}
 
 	s.Require().False(actualChat.Muted)
-	s.Require().NoError(theirMessenger.Shutdown())
 }
 
 func (s *MessengerMuteSuite) TestSetMuteForDuration() {
-	key, err := crypto.GenerateKey()
 	mockTimeOneMinuteAgo := time.Now().Add(-time.Minute)
 
-	s.Require().NoError(err)
-
-	theirMessenger, err := newMessengerWithKey(s.shh, key, s.logger, nil)
-	s.Require().NoError(err)
+	theirMessenger := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	chatID := publicChatName
 
 	chat := CreatePublicChat(chatID, s.m.getTimesource())
 
-	err = s.m.SaveChat(chat)
+	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
 	_, err = s.m.Join(chat)
@@ -117,11 +109,11 @@ func (s *MessengerMuteSuite) TestSetMuteForDuration() {
 		currTime, currTimeErr := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 
 		if chatMuteTillErr != nil {
-			s.logger.Info("err", zap.Any("Couldn't parse muteTill", err))
+			s.T().Log("err", zap.Any("Couldn't parse muteTill", err))
 			return
 		}
 		if currTimeErr != nil {
-			s.logger.Info("err", zap.Any("Couldn't parse current time", err))
+			s.T().Log("err", zap.Any("Couldn't parse current time", err))
 			return
 		}
 
@@ -132,6 +124,4 @@ func (s *MessengerMuteSuite) TestSetMuteForDuration() {
 
 	s.Require().NotNil(actualChat)
 	s.Require().False(actualChat.Muted)
-
-	s.Require().NoError(theirMessenger.Shutdown())
 }

@@ -2,25 +2,19 @@ package protocol
 
 import (
 	"database/sql"
-	"encoding/json"
 	"time"
-
-	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/accounts-management/generator"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/wakuv2"
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/appdatabase/migrations"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
@@ -118,16 +112,12 @@ type config struct {
 
 	messengerSignalsHandler MessengerSignalsHandler
 
-	telemetryServerURL  string
-	telemetrySendPeriod time.Duration
-	wakuService         *wakuv2.Waku
-
 	messageResendMinDelay time.Duration
 	messageResendMaxCount int
 
 	communityManagerOptions []communities.ManagerOption
 
-	accountsFeed *event.Feed
+	accountsPublisher *pubsub.Publisher
 
 	onlineChecker func() bool
 }
@@ -190,37 +180,6 @@ func WithWalletDatabase(db *sql.DB) Option {
 	}
 }
 
-func WithToplevelDatabaseMigrations() Option {
-	return func(c *config) error {
-		c.afterDbCreatedHooks = append(c.afterDbCreatedHooks, func(c *config) error {
-			return migrations.Migrate(c.appDb, nil)
-		})
-		return nil
-	}
-}
-
-func WithAppSettings(s settings.Settings, nc params.NodeConfig) Option {
-	return func(c *config) error {
-		c.afterDbCreatedHooks = append(c.afterDbCreatedHooks, func(c *config) error {
-			if s.Networks == nil {
-				networks := new(json.RawMessage)
-				if err := networks.UnmarshalJSON([]byte("net")); err != nil {
-					return err
-				}
-
-				s.Networks = networks
-			}
-
-			sDB, err := accounts.NewDB(c.appDb)
-			if err != nil {
-				return err
-			}
-			return sDB.CreateSettings(s, nc)
-		})
-		return nil
-	}
-}
-
 func WithMultiAccounts(ma *multiaccounts.Database) Option {
 	return func(c *config) error {
 		c.multiAccount = ma
@@ -245,12 +204,6 @@ func WithAccount(acc *multiaccounts.Account) Option {
 func WithBrowserDatabase(bd *browsers.Database) Option {
 	return func(c *config) error {
 		c.browserDatabase = bd
-		if c.browserDatabase == nil {
-			c.afterDbCreatedHooks = append(c.afterDbCreatedHooks, func(c *config) error {
-				c.browserDatabase = browsers.NewDB(c.appDb)
-				return nil
-			})
-		}
 		return nil
 	}
 }
@@ -265,14 +218,6 @@ func WithAnonMetricsClientConfig(anonMetricsClientConfig *anonmetrics.ClientConf
 func WithAnonMetricsServerConfig(anonMetricsServerConfig *anonmetrics.ServerConfig) Option {
 	return func(c *config) error {
 		c.anonMetricsServerConfig = anonMetricsServerConfig
-		return nil
-	}
-}
-
-func WithTelemetry(serverURL string, sendPeriod time.Duration) Option {
-	return func(c *config) error {
-		c.telemetryServerURL = serverURL
-		c.telemetrySendPeriod = sendPeriod
 		return nil
 	}
 }
@@ -382,13 +327,6 @@ func WithCommunityTokensService(s communities.CommunityTokensServiceInterface) O
 	}
 }
 
-func WithWakuService(s *wakuv2.Waku) Option {
-	return func(c *config) error {
-		c.wakuService = s
-		return nil
-	}
-}
-
 func WithTokenManager(tokenManager communities.TokenManager) Option {
 	return func(c *config) error {
 		c.tokenManager = tokenManager
@@ -403,9 +341,9 @@ func WithCollectiblesManager(collectiblesManager communities.CollectiblesManager
 	}
 }
 
-func WithAccountManager(accountManager AccountsManager) Option {
+func WithAccountsManager(accountsManager AccountsManager) Option {
 	return func(c *config) error {
-		c.accountsManager = accountManager
+		c.accountsManager = accountsManager
 		return nil
 	}
 }
@@ -417,9 +355,9 @@ func WithMessageSigner(signer communities.MessageSigner) Option {
 	}
 }
 
-func WithAccountsFeed(feed *event.Feed) Option {
+func WithAccountsPublisher(publisher *pubsub.Publisher) Option {
 	return func(c *config) error {
-		c.accountsFeed = feed
+		c.accountsPublisher = publisher
 		return nil
 	}
 }

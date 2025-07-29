@@ -92,8 +92,7 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 	s.Require().True(accounts.SameKeypairs(profileKp, dbProfileKp))
 
 	// Create new device and add main account to
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	// Store only chat and default wallet account on other device
@@ -210,11 +209,11 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() 
 	}
 
 	setInvalidName("dot.not", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("t", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("tt", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("ttt", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("tttt", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("name is bigger than 24 symb", utils.ErrInvalidDisplayNameRegExp)
+	setInvalidName("t", utils.ErrInvalidDisplayNameLength)
+	setInvalidName("tt", utils.ErrInvalidDisplayNameLength)
+	setInvalidName("ttt", utils.ErrInvalidDisplayNameLength)
+	setInvalidName("tttt", utils.ErrInvalidDisplayNameLength)
+	setInvalidName("name is bigger than 24 symb", utils.ErrInvalidDisplayNameLength)
 
 	err = s.m.SetDisplayName("name with space")
 	s.Require().NoError(err)

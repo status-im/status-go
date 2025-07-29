@@ -7,11 +7,17 @@ from resources.enums import MessageContentType
 from steps.messenger import MessengerSteps
 
 
-@pytest.mark.parametrize("setup_two_unprivileged_nodes", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 @pytest.mark.rpc
 class TestMessageReactions(MessengerSteps):
-    def test_one_to_one_message_reactions(self, setup_two_unprivileged_nodes):
-        self.make_contacts()
+
+    @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
+    def test_one_to_one_message_reactions(self, backend_new_profile, waku_light_client):
+        """Test message reactions with different wakuV2LightClient configurations"""
+        # Initialize two backends (sender and receiver) for this test
+        self.sender = backend_new_profile("sender", waku_light_client=waku_light_client)
+        self.receiver = backend_new_profile("receiver", waku_light_client=waku_light_client)
+
+        self.make_contacts(self.sender, self.receiver)
         response = self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, "test_message")
         message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id, sender_chat_id = message["id"], message["chatId"]

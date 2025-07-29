@@ -33,7 +33,7 @@ func (s *MessengerContactRequestSuite) findFirstByContentType(messages []*common
 }
 
 func (s *MessengerContactRequestSuite) sendContactRequestWithState(request *requests.SendContactRequest, messenger *Messenger, requestState common.ContactRequestState, mutualState bool) *MessengerResponse {
-	s.logger.Info("sendContactRequest", zap.String("sender", messenger.IdentityPublicKeyString()), zap.String("receiver", request.ID))
+	s.T().Log("sendContactRequest", zap.String("sender", messenger.IdentityPublicKeyString()), zap.String("receiver", request.ID))
 
 	// Send contact request
 	resp, err := messenger.SendContactRequest(context.Background(), request)
@@ -93,7 +93,7 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 }
 
 func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string, theirMessenger *Messenger) *common.Message {
-	s.logger.Info("receiveContactRequest", zap.String("receiver", theirMessenger.IdentityPublicKeyString()))
+	s.T().Log("receiveContactRequest", zap.String("receiver", theirMessenger.IdentityPublicKeyString()))
 
 	// Wait for the message to reach its destination
 	resp, err := WaitOnMessengerResponse(
@@ -173,10 +173,10 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 // This is helpful for testing response content during long tests.
 // Logged contents: Messages, Contacts, ActivityCenterNotifications
 func (s *MessengerContactRequestSuite) logResponse(response *MessengerResponse, description string) {
-	s.logger.Debug("MessengerResponse", zap.String("description", description))
+	s.T().Log("MessengerResponse", zap.String("description", description))
 
 	for i, message := range response.Messages() {
-		s.logger.Debug("message",
+		s.T().Log("message",
 			zap.Int("index", i),
 			zap.String("Text", message.Text),
 			zap.Any("ContentType", message.ContentType),
@@ -184,7 +184,7 @@ func (s *MessengerContactRequestSuite) logResponse(response *MessengerResponse, 
 	}
 
 	for i, contact := range response.Contacts {
-		s.logger.Debug("contact",
+		s.T().Log("contact",
 			zap.Int("index", i),
 			zap.Bool("Blocked", contact.Blocked),
 			zap.Bool("Removed", contact.Removed),
@@ -198,7 +198,7 @@ func (s *MessengerContactRequestSuite) logResponse(response *MessengerResponse, 
 		if notification.Message != nil {
 			messageText = notification.Message.Text
 		}
-		s.logger.Debug("acNotification",
+		s.T().Log("acNotification",
 			zap.Int("index", i),
 			zap.Any("id", notification.ID),
 			zap.Any("Type", notification.Type),
@@ -211,7 +211,7 @@ func (s *MessengerContactRequestSuite) logResponse(response *MessengerResponse, 
 
 func (s *MessengerContactRequestSuite) acceptContactRequest(
 	contactRequest *common.Message, sender *Messenger, receiver *Messenger) {
-	s.logger.Info("acceptContactRequest",
+	s.T().Log("acceptContactRequest",
 		zap.String("sender", sender.IdentityPublicKeyString()),
 		zap.String("receiver", receiver.IdentityPublicKeyString()))
 
@@ -813,8 +813,7 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 	messageText := "hello!"
 
 	alice1 := s.m
-	alice2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alice2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alice2)
 
 	prepAliceMessengersForPairing(&s.Suite, alice1, alice2)
@@ -903,15 +902,14 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateSendContactRequest()
 	s.acceptContactRequest(contactRequest, alice1, bob)
 
 	// Alice resets her device
-	alice2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alice2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alice2)
 
 	// adds bob again to her device
 	s.sendContactRequest(request, alice2)
 
 	// Wait for the message to reach its destination
-	_, err = WaitOnMessengerResponse(
+	_, err := WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool {
 			return len(r.Contacts) > 0
@@ -970,8 +968,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateReceiveContactReques
 	s.acceptContactRequest(contactRequest, alice1, bob)
 
 	// Alice resets her device
-	alice2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alice2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alice2)
 
 	// We want to facilitate the discovery of the x3dh bundl here, since bob does not know about alice device
@@ -1350,7 +1347,7 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 	s.Require().NotNil(contactRequest)
 
 	// Bob resets his device
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	bob2, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{privateKey: bob1.identity})
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
 
@@ -1427,8 +1424,7 @@ func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFr
 	s.Require().NotNil(contactRequest)
 
 	// Bob resets his device
-	alice2, err := newMessengerWithKey(s.shh, alice1.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alice2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alice2)
 
 	// Get bob perspective of alice for backup
@@ -1437,7 +1433,7 @@ func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFr
 
 	// Restore alice's contact from backup
 	sync := s.syncInstallationContactV2FromContact(bobFromAlice)
-	err = alice2.HandleSyncInstallationContactV2(state, &sync, nil)
+	err := alice2.HandleSyncInstallationContactV2(state, &sync, nil)
 	s.Require().NoError(err)
 
 	// Accept latest CR for a contact
@@ -1598,24 +1594,23 @@ func (s *MessengerContactRequestSuite) TestBlockedContactSyncing() {
 	bob := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, bob)
 	_ = bob.SetDisplayName("bob-1")
-	s.logger.Info("Bob account set up", zap.String("publicKey", bob.IdentityPublicKeyString()))
+	s.T().Log("Bob account set up", zap.String("publicKey", bob.IdentityPublicKeyString()))
 
 	// Setup Alice-1
 	alice1 := s.m
-	s.logger.Info("Alice account set up", zap.String("publicKey", alice1.IdentityPublicKeyString()))
+	s.T().Log("Alice account set up", zap.String("publicKey", alice1.IdentityPublicKeyString()))
 
 	// Setup Alice-2
-	alice2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alice2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alice2)
 
 	// Pair alice-1 <-> alice-2
 	// NOTE: This doesn't include initial data sync. Local pairing could be used.
-	s.logger.Info("pairing Alice-1 and Alice-2")
+	s.T().Log("pairing Alice-1 and Alice-2")
 	prepAliceMessengersForPairing(&s.Suite, alice1, alice2)
 	PairDevices(&s.Suite, alice1, alice2)
 	PairDevices(&s.Suite, alice2, alice1)
-	s.logger.Info("pairing Alice-1 and Alice-2 finished")
+	s.T().Log("pairing Alice-1 and Alice-2 finished")
 
 	// Loop cr-block-unblock. Some bugs happen at second iteration.
 	for i := 0; i < 2; i++ {

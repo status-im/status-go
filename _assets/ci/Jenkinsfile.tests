@@ -48,6 +48,7 @@ pipeline {
     /* Prevent Jenkins jobs from running forever */
     timeout(time: getDefaultTimeout(), unit: 'MINUTES')
     disableConcurrentBuilds()
+    disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: getAmountToKeep(),
@@ -85,7 +86,17 @@ pipeline {
 
   stages {
     stage('Prep') {
-      steps { /* Go needs to find status-go in GOPATH. */
+      steps {
+        /* Check NWAKU ports before starting containers */
+        sh '''
+          for port in ${NWAKU_REST_PORT} ${NWAKU_TCP_PORT} ${NWAKU_UDP_PORT}; do
+            if lsof -i :$port; then
+              echo "Port $port is already in use! Failing early."
+              exit 1
+            fi
+          done
+        '''
+        /* Go needs to find status-go in GOPATH. */
         sh "mkdir -p \$(dirname ${REPO_SRC})"
         sh "ln -s ${WORKSPACE} ${REPO_SRC}"
       }
@@ -132,7 +143,7 @@ pipeline {
           "--env=POSTGRES_HOST_AUTH_METHOD=trust",
           "--publish=${DB_PORT}:${DB_PORT}",
         ].join(' '), "-p ${DB_PORT}") { c ->
-          nwaku = docker.image('harbor.status.im/wakuorg/nwaku:latest').withRun([
+          nwaku = docker.image('harbor.status.im/wakuorg/nwaku:v0.35.1').withRun([
             "--name=${NWAKU_CONT}",
             "--publish=${NWAKU_TCP_PORT}:${NWAKU_TCP_PORT}/tcp",
             "--publish=${NWAKU_UDP_PORT}:${NWAKU_UDP_PORT}/udp",
@@ -164,8 +175,8 @@ pipeline {
         }
       } }
       post { cleanup { /* Leftover DB containers. */
-        sh "docker rm ${DB_CONT} || true"
-        sh "docker rm ${NWAKU_CONT} || true"
+        sh "docker rm -f ${DB_CONT} || true"
+        sh "docker rm -f ${NWAKU_CONT} || true"
       } }
     }
   } // stages
@@ -202,9 +213,9 @@ pipeline {
       }
     }
     success { script { github.notifyPR(true) } }
-    failure { 
-      script { 
-        github.notifyPR(false) 
+    failure {
+      script {
+        github.notifyPR(false)
         archiveArtifacts('**/test_*.log')
       }
     }

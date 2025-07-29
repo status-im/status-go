@@ -38,6 +38,7 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/pkg/pubsub"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -55,7 +56,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/storenodes"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
@@ -166,7 +166,6 @@ type Messenger struct {
 	}
 
 	connectionState       connection.State
-	wakuMetricsHandler    *wakumetrics.Client
 	contractMaker         *contracts.ContractMaker
 	verificationDatabase  *verification.Persistence
 	savedAddressesManager *wallet.SavedAddressesManager
@@ -202,6 +201,8 @@ type Messenger struct {
 	backedUpFetchingStatus *BackupFetchingStatus
 
 	newsFeedManager *newsfeed.NewsFeedManager
+
+	publisher *pubsub.Publisher
 }
 
 type EnvelopeEventsInterceptor struct {
@@ -290,7 +291,7 @@ func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash types
 
 func NewMessenger(
 	identity *ecdsa.PrivateKey,
-	waku wakutypes.Waku,
+	messaging *messaging.API,
 	installationID string,
 	opts ...Option,
 ) (*Messenger, error) {
@@ -329,23 +330,6 @@ func NewMessenger(
 		}
 	}
 
-	// Apply migrations for all components.
-	err := sqlite.Migrate(database)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to apply migrations")
-	}
-
-	messaging, err := messaging.NewCore(
-		waku,
-		identity,
-		common.NewMessagingPersistence(database),
-		messaging.WithLogger(logger),
-		messaging.WithEnvelopeEventsConfig(c.envelopeEventsConfig),
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create  messaging core")
-	}
-
 	// Initialize encryption layer.
 	encryptionProtocol := encryption.New(
 		database,
@@ -356,7 +340,7 @@ func NewMessenger(
 	sender, err := common.NewMessageSender(
 		identity,
 		database,
-		messaging.API(),
+		messaging,
 		encryptionProtocol,
 		logger,
 		c.featureFlags,
@@ -424,8 +408,8 @@ func NewMessenger(
 	if c.tokenManager != nil {
 		managerOptions = append(managerOptions, communities.WithTokenManager(c.tokenManager))
 	} else if c.rpcClient != nil {
-		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, community.NewManager(database, c.httpServer, nil), c.rpcClient.NetworkManager, database, c.httpServer, nil, nil, nil, token.NewPersistence(c.walletDb))
-		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager, c.rpcClient.NetworkManager)))
+		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, community.NewManager(database, c.httpServer, nil), c.rpcClient.GetNetworkManager(), database, c.httpServer, nil, nil, nil, token.NewPersistence(c.walletDb))
+		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager, c.rpcClient.GetNetworkManager())))
 	}
 
 	if c.communityTokensService != nil {
@@ -447,8 +431,8 @@ func NewMessenger(
 		logger,
 		c.ensVerifier,
 		c.communityTokensService,
-		messaging.API(),
-		messaging.API(),
+		messaging,
+		messaging,
 		communitiesKeyDistributor,
 		c.httpServer,
 		managerOptions...,
@@ -461,7 +445,7 @@ func NewMessenger(
 		TorrentConfig: c.torrentConfig,
 		Logger:        logger,
 		Persistence:   communitiesManager.GetPersistence(),
-		Messaging:     messaging.API(),
+		Messaging:     messaging,
 		Identity:      identity,
 		Encryptor:     encryptionProtocol,
 		Publisher:     communitiesManager,
@@ -471,9 +455,6 @@ func NewMessenger(
 	// "communities/manager_archive.go" version of this function based on the build instructions for those files.
 	// See those file for more details.
 	archiveManager := communities.NewArchiveManager(amc)
-	if err != nil {
-		return nil, err
-	}
 
 	settings, err := accounts.NewDB(database)
 	if err != nil {
@@ -487,36 +468,16 @@ func NewMessenger(
 		return nil, fmt.Errorf("failed to build contact of ourself: %w", err)
 	}
 
-	var wakuMetricsHandler *wakumetrics.Client
-	if c.telemetryServerURL != "" {
-		options := []wakumetrics.TelemetryClientOption{
-			wakumetrics.WithPeerID(waku.PeerID().String()),
-		}
-		wakuMetricsHandler, err = wakumetrics.NewClient(options...)
-		if err != nil {
-			return nil, err
-		}
-		if c.wakuService != nil {
-			c.wakuService.SetMetricsHandler(wakuMetricsHandler)
-		}
-		sender.SetMetricsHandler(wakuMetricsHandler)
-		err = wakuMetricsHandler.RegisterWithRegistry()
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	messenger = &Messenger{
 		config:                     &c,
 		identity:                   identity,
-		messaging:                  messaging.API(),
+		messaging:                  messaging,
 		persistence:                sqlitePersistence,
 		encryptor:                  encryptionProtocol,
 		sender:                     sender,
 		anonMetricsClient:          anonMetricsClient,
 		anonMetricsServer:          anonMetricsServer,
-		wakuMetricsHandler:         wakuMetricsHandler,
 		communityTokensService:     c.communityTokensService,
 		pushNotificationClient:     pushNotificationClient,
 		pushNotificationServer:     c.pushNotificationServer,
@@ -541,7 +502,7 @@ func NewMessenger(
 		database:                database,
 		multiAccounts:           c.multiAccount,
 		settings:                settings,
-		peersyncing:             peersyncing.New(peersyncing.Config{Database: database, Timesource: messaging.API()}),
+		peersyncing:             peersyncing.New(peersyncing.Config{Database: database, Timesource: messaging}),
 		peersyncingOffers:       make(map[string]uint64),
 		peersyncingRequests:     make(map[string]uint64),
 		mvdsStatusChangeEvent:   make(chan datasyncnode.PeerStatusChangeEvent, 5),
@@ -570,7 +531,7 @@ func NewMessenger(
 			func() error {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 				defer cancel()
-				err := messaging.API().ResetChatFilters(ctx)
+				err := messaging.ResetChatFilters(ctx)
 				if err != nil {
 					logger.Warn("could not reset filters", zap.Error(err))
 				}
@@ -578,7 +539,7 @@ func NewMessenger(
 				// fail
 				return nil
 			},
-			messaging.API().Stop,
+			messaging.Stop,
 			func() error { sender.Stop(); return nil },
 			// Currently this often fails, seems like it's safe to ignore them
 			// https://github.com/uber-go/zap/issues/328
@@ -588,6 +549,7 @@ func NewMessenger(
 		logger:                           logger,
 		savedAddressesManager:            savedAddressesManager,
 		retrievedMessagesIteratorFactory: NewDefaultMessagesIterator,
+		publisher:                        pubsub.NewPublisher(),
 	}
 
 	if c.rpcClient != nil {
@@ -1008,6 +970,10 @@ func (m *Messenger) handleConnectionChange(online bool) {
 }
 
 func (m *Messenger) Online() bool {
+	if !m.started {
+		return false
+	}
+
 	if m.config.onlineChecker != nil {
 		return m.config.onlineChecker()
 	}
@@ -1723,7 +1689,7 @@ func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 
 // Shutdown takes care of ensuring a clean shutdown of Messenger
 func (m *Messenger) Shutdown() (err error) {
-	if m == nil {
+	if m == nil || !m.started {
 		return nil
 	}
 
@@ -1738,6 +1704,7 @@ func (m *Messenger) Shutdown() (err error) {
 	close(m.quit)
 	m.cancel()
 	m.shutdownWaitGroup.Wait()
+	m.publisher.Close()
 	for i, task := range m.shutdownTasks {
 		m.logger.Debug("running shutdown task", zap.Int("n", i))
 		if tErr := task(); tErr != nil {
@@ -1752,6 +1719,8 @@ func (m *Messenger) Shutdown() (err error) {
 			}
 		}
 	}
+	m.started = false
+	_ = m.logger.Sync()
 	return
 }
 
@@ -3364,13 +3333,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 
 			statusMessages := handleMessagesResponse.StatusMessages
 
-			if m.wakuMetricsHandler != nil {
-				m.wakuMetricsHandler.PushReceivedMessages(wakumetrics.ReceivedMessages{
-					Filter:     filter,
-					SHHMessage: shhMessage,
-					Messages:   statusMessages,
-				})
-			}
+			pubsub.Publish(m.publisher, RetrievedMessagesEvent{
+				Filter:     filter,
+				SHHMessage: shhMessage,
+				Messages:   statusMessages,
+			})
 
 			err = m.handleDatasyncMetadata(handleMessagesResponse)
 			if err != nil {
@@ -3515,6 +3482,13 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 		if ok {
 			contactsToSave = append(contactsToSave, contact)
 			messageState.Response.AddContact(contact)
+
+			_, ok := m.allContacts.Load(id)
+			if !ok {
+				// If the contact is not in the allContacts map, it means it's a new contact
+				// and we need to add it to the allContacts map.
+				m.allContacts.Store(id, contact)
+			}
 		}
 		return true
 	})
@@ -5588,4 +5562,8 @@ func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string
 
 func (m *Messenger) MessageSender() *common.MessageSender {
 	return m.sender
+}
+
+func (m *Messenger) Publisher() *pubsub.Publisher {
+	return m.publisher
 }

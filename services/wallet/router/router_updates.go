@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/common"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain"
@@ -31,7 +32,7 @@ type fetchingLastBlock struct {
 	closeCh   chan struct{}
 }
 
-func (r *Router) subscribeForUdates(chainID uint64) error {
+func (r *Router) subscribeForUdates(chainID uint64, address common.Address) error {
 	if _, ok := r.clientsForUpdatesPerChains.Load(chainID); ok {
 		return nil
 	}
@@ -111,7 +112,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 					flbLoaded.lastBlock = blockNumber
 					r.clientsForUpdatesPerChains.Store(chainID, flbLoaded)
 
-					fees, err := r.feesManager.SuggestedFees(ctx, chainID)
+					fees, noBaseFee, noPriorityFee, err := r.feesManager.SuggestedFees(ctx, chainID, address)
 					if err != nil {
 						logutils.ZapLogger().Error("Failed to get suggested fees", zap.Error(err))
 						r.sendUpdatesError(err)
@@ -119,10 +120,10 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 					}
 
 					r.activeRoutesMutex.Lock()
-					if r.activeRoutes != nil && r.activeRoutes.Best != nil && len(r.activeRoutes.Best) > 0 {
+					if r.activeRoutes != nil && r.activeRoutes.Route != nil && len(r.activeRoutes.Route) > 0 {
 						usedNonces := make(map[uint64]uint64)
-						for _, path := range r.activeRoutes.Best {
-							err = r.evaluateAndUpdatePathDetails(ctx, path, fees, usedNonces, false, 0)
+						for _, path := range r.activeRoutes.Route {
+							err = r.evaluateAndUpdatePathDetails(ctx, path, fees, usedNonces, noBaseFee, noPriorityFee, false, 0)
 							if err != nil {
 								break
 							}
@@ -134,7 +135,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 							continue
 						}
 
-						_, err = r.checkBalancesForTheBestRoute(ctx, r.activeRoutes.Best)
+						err = r.checkBalancesForTheBestRoute(r.activeRoutes.Route)
 						if err != nil {
 							logutils.ZapLogger().Error("Failed to check balances for the best route", zap.Error(err))
 							r.activeRoutesMutex.Unlock()

@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/rpc/chain"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	"github.com/status-im/status-go/services/wallet/testutils"
@@ -349,7 +350,8 @@ func TestTokensToBalancesPerChain(t *testing.T) {
 		},
 	}
 
-	result := tokensToBalancesPerChain(cachedTokens)
+	result, err := tokensToBalancesPerChain(cachedTokens)
+	assert.NoError(t, err)
 
 	assert.Equal(t, expectedBalancesPerChain, result)
 }
@@ -884,8 +886,8 @@ func TestGetCachedBalances(t *testing.T) {
 	expectedChains := []uint64{1, 2}
 	tokenManager.EXPECT().GetTokensByChainIDs(testutils.NewUint64SliceMatcher(expectedChains)).Return(allTokens, nil)
 	tokenManager.EXPECT().GetTokenHistoricalBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
-	mockClientIface1.EXPECT().IsConnected().Return(true)
-	mockClientIface2.EXPECT().IsConnected().Return(true)
+	mockClientIface1.EXPECT().GetConnectionStatus().Return(rpcstatus.StatusUp)
+	mockClientIface2.EXPECT().GetConnectionStatus().Return(rpcstatus.StatusUp)
 	tokens, err := reader.GetCachedBalances(clients, addresses)
 	require.NoError(t, err)
 
@@ -1011,8 +1013,8 @@ func TestFetchBalances(t *testing.T) {
 
 	tokenAddresses := getTokenAddresses(allTokens)
 	tokenManager.EXPECT().GetBalancesByChain(context.TODO(), clients, addresses, testutils.NewAddressSliceMatcher(tokenAddresses)).Return(expectedBalances, nil)
-	mockClientIface1.EXPECT().IsConnected().Return(true)
-	mockClientIface2.EXPECT().IsConnected().Return(true)
+	mockClientIface1.EXPECT().GetConnectionStatus().Return(rpcstatus.StatusUp)
+	mockClientIface2.EXPECT().GetConnectionStatus().Return(rpcstatus.StatusUp)
 	tokens, err := reader.FetchBalances(context.TODO(), clients, addresses)
 	require.NoError(t, err)
 

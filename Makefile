@@ -148,9 +148,9 @@ $(GO_CMD_BUILDS): generate
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
-		-o ./$@ ./cmd/$(notdir $@) ;\
-	echo "Compilation done." ;\
-	echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
+		-o ./$@ ./cmd/$(notdir $@)
+	@echo "Compilation done."
+	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
 LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(LIBWAKU_EXT)
 $(LIBWAKU):
@@ -188,8 +188,8 @@ statusgo-cross: statusgo-android statusgo-ios
 	@ls -ld build/bin/statusgo-*
 
 status-go-deps:
-	go clean -cache
-	go clean -modcache
+	go clean -cache || true
+	go clean -modcache || true
 	go install go.uber.org/mock/mockgen@v0.4.0
 	go install github.com/kevinburke/go-bindata/v4/...@v4.0.2
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
@@ -202,7 +202,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 	export GOFLAGS="-mod=mod"; \
 	gomobile init; \
 	gomobile bind -v \
-		-target=android -ldflags="-s -w" \
+		-target=android -ldflags="-s -w -checklinkname=0" \
 		-tags '$(BUILD_TAGS) disable_torrent' \
 		$(BUILD_FLAGS_MOBILE) \
 		--androidapi="23" \
@@ -266,7 +266,7 @@ endif
 	@ls -la build/bin/libstatus.*
 
 docker-image: SHELL := /bin/sh
-docker-image: BUILD_TARGET ?= statusd
+docker-image: BUILD_TARGET ?= cmd
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
 	docker build --file _assets/build/Dockerfile . \
@@ -474,5 +474,5 @@ codecov-validate:
 
 .PHONY: pytest-lint
 pytest-lint:
-	@echo "Running python linting on all files..."
-	pre-commit run --all-files --verbose --config tests-functional/.pre-commit-config.yaml
+	$(MAKE) -C tests-functional lint
+

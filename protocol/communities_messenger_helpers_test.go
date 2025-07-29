@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -31,8 +32,6 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type AccountsManagerMock struct {
@@ -256,9 +255,6 @@ func (s *CollectiblesServiceMock) ProcessCommunityTokenAction(message *protobuf.
 type testCommunitiesMessengerConfig struct {
 	testMessengerConfig
 
-	nodeConfig  *params.NodeConfig
-	appSettings *settings.Settings
-
 	password            string
 	walletAddresses     []string
 	mockedBalances      *communities.BalancesByChain
@@ -267,16 +263,16 @@ type testCommunitiesMessengerConfig struct {
 }
 
 func (tcmc *testCommunitiesMessengerConfig) complete() error {
-	err := tcmc.testMessengerConfig.complete()
-	if err != nil {
-		return err
-	}
-
 	if tcmc.nodeConfig == nil {
 		tcmc.nodeConfig = defaultTestCommunitiesMessengerNodeConfig()
 	}
 	if tcmc.appSettings == nil {
 		tcmc.appSettings = defaultTestCommunitiesMessengerSettings()
+	}
+
+	err := tcmc.testMessengerConfig.complete()
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -313,7 +309,7 @@ func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
 }
 
-func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config testCommunitiesMessengerConfig) *Messenger {
+func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMessagingEnvironment, config testCommunitiesMessengerConfig) *Messenger {
 	err := config.complete()
 	s.Require().NoError(err)
 
@@ -328,17 +324,16 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config tes
 	}
 
 	options := []Option{
-		WithAccountManager(accountsManagerMock),
+		WithAccountsManager(accountsManagerMock),
 		WithTokenManager(tokenManagerMock),
 		WithMessageSigner(NewSignerStub()),
 		WithCollectiblesManager(config.collectiblesManager),
 		WithCommunityTokensService(config.collectiblesService),
-		WithAppSettings(*config.appSettings, *config.nodeConfig),
 	}
 
 	config.extraOptions = append(config.extraOptions, options...)
 
-	messenger, err := newTestMessenger(waku, config.testMessengerConfig)
+	messenger, err := newTestMessenger(messagingEnv, config.testMessengerConfig)
 	s.Require().NoError(err)
 
 	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)

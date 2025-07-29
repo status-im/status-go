@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -11,7 +12,7 @@ import (
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/errors"
+	maErrors "github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
@@ -213,7 +214,7 @@ func (db *Database) getSettingFieldFromReactName(reactName string) (SettingField
 			return s, nil
 		}
 	}
-	return SettingField{}, errors.ErrInvalidConfig
+	return SettingField{}, maErrors.ErrInvalidConfig
 }
 
 func (db *Database) makeSelectRow(setting SettingField) *sql.Row {
@@ -242,11 +243,21 @@ func (db *Database) saveSetting(setting SettingField, value interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer update.Close()
 
-	_, err = update.Exec(value)
-
+	result, err := update.Exec(value)
 	if err != nil {
 		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		// If no rows were affected, it means the setting does not exist
+		return errors.New("settings not initialized, please call CreateSettings first")
 	}
 
 	if db.notifier != nil {
@@ -334,7 +345,7 @@ func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clo
 		return err
 	}
 	if clock <= ls {
-		return errors.ErrNewClockOlderThanCurrent
+		return maErrors.ErrNewClockOlderThanCurrent
 	}
 
 	err = db.SetSettingLastSynced(setting, clock)
@@ -394,11 +405,11 @@ func (db *Database) GetSettings() (Settings, error) {
 		syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance,
 		profile_pictures_show_to, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens,
 		waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents,
-		gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key,
+		gif_favorites, opensea_enabled, last_backup, backup_enabled, auto_message_enabled, gif_api_key,
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, wallet_token_preferences_group_by_community, url_unfurling_mode,
 		mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
 		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community,
-		peer_syncing_enabled, auto_refresh_tokens_enabled, last_tokens_update, news_feed_enabled, news_feed_last_fetched_timestamp, news_rss_enabled
+		peer_syncing_enabled, auto_refresh_tokens_enabled, last_tokens_update, news_feed_enabled, news_feed_last_fetched_timestamp, news_rss_enabled, backup_path
 	FROM
 		settings
 	WHERE
@@ -467,7 +478,6 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.OpenseaEnabled,
 		&s.LastBackup,
 		&s.BackupEnabled,
-		&s.TelemetryServerURL,
 		&s.AutoMessageEnabled,
 		&s.GifAPIKey,
 		&s.TestNetworksEnabled,
@@ -487,6 +497,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.NewsFeedEnabled,
 		&newsFeedLastFetchedTimestamp,
 		&s.NewsRSSEnabled,
+		&s.BackupPath,
 	)
 
 	if err != nil {
@@ -835,10 +846,6 @@ func (db *Database) SetCollectibleGroupByCommunity(value bool) error {
 	return db.SaveSettingField(CollectibleGroupByCommunity, value)
 }
 
-func (db *Database) GetTelemetryServerURL() (string, error) {
-	return db.makeSelectString(TelemetryServerURL)
-}
-
 func (db *Database) ProfileMigrationNeeded() (result bool, err error) {
 	err = db.makeSelectRow(ProfileMigrationNeeded).Scan(&result)
 	return result, err
@@ -923,6 +930,14 @@ func (db *Database) NewsNotificationsEnabled() (result bool, err error) {
 
 func (db *Database) NewsRSSEnabled() (result bool, err error) {
 	err = db.makeSelectRow(NewsRSSEnabled).Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
+func (db *Database) BackupPath() (result string, err error) {
+	err = db.makeSelectRow(BackupPath).Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}

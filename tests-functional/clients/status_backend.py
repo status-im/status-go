@@ -6,7 +6,6 @@ import time
 import random
 import threading
 import uuid
-
 import requests
 import os
 
@@ -18,7 +17,7 @@ from clients.services.settings import SettingsService
 from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
 from clients.statusgo_container import StatusBackendContainer
-from conftest import option
+from utils.config import Config
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
 from utils import keys
 
@@ -33,14 +32,18 @@ class StatusBackend(RpcClient, SignalClient):
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
 
-        if option.status_backend_url:
-            url = next(option.status_backend_urls)
+        if Config.status_backend_urls:
+            try:
+                url = next(Config.status_backend_urls)
+            except StopIteration:
+                raise Exception("--status-backend-url is found, but not enough backends provided")
+
             assert url != "", "not enough status-backend urls provided"
             self.temp_dir = tempfile.TemporaryDirectory()
             self.data_dir = self.temp_dir.name
         else:
-            host_port = random.choice(option.status_backend_port_range)
-            option.status_backend_port_range.remove(host_port)
+            host_port = random.choice(Config.status_backend_port_range)
+            Config.status_backend_port_range.remove(host_port)
 
             self.container = StatusBackendContainer(host_port, privileged, self.ipv6)
             self.temp_dir = None
@@ -53,6 +56,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.ws_url = f"{url}".replace("http", "ws")
         self.rpc_url = f"{url}/statusgo/CallRPC"
         self.public_key = ""
+        self.mnemonic = ""
         self.key_uid = ""
         self.password = ""
         self.display_name = ""
@@ -83,10 +87,10 @@ class StatusBackend(RpcClient, SignalClient):
         while time.time() - start_time <= timeout:
             try:
                 self.health(enable_logging=True)
-                logging.info(f"StatusBackend is healthy after {time.time() - start_time} seconds")
+                logging.debug(f"StatusBackend is healthy after {time.time() - start_time} seconds")
                 return
             except Exception as ex:
-                logging.error(ex)
+                logging.debug(f"StatusBackend error: {ex}")
                 time.sleep(0.1)
         raise TimeoutError(f"StatusBackend was not healthy after {timeout} seconds")
 
@@ -121,7 +125,7 @@ class StatusBackend(RpcClient, SignalClient):
         return response
 
     def init_status_backend(self):
-        if option.logout:
+        if Config.logout:
             logging.warning("automatically logging out before InitializeApplication")
             try:
                 self.logout()
@@ -136,20 +140,20 @@ class StatusBackend(RpcClient, SignalClient):
             "logEnabled": True,
             "logLevel": "DEBUG",
             "apiLoggingEnabled": True,
-            "wakuFleetsConfigFilePath": option.waku_fleets_config,
-            "pushFleetsConfigFilePath": option.push_fleets_config,
+            "wakuFleetsConfigFilePath": Config.waku_fleets_config,
+            "pushFleetsConfigFilePath": Config.push_fleets_config,
         }
 
         return self.api_valid_request(method, data)
 
     def _set_networks(self, data, **kwargs):
-        network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
+        self.network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
         anvil_network = {
-            "chainID": network_id,
+            "chainID": self.network_id,
             "chainName": "Anvil",
             "rpcProviders": [
                 {
-                    "chainId": network_id,
+                    "chainId": self.network_id,
                     "name": "Anvil Direct",
                     "url": "http://anvil:8545",
                     "enableRpsLimiter": False,
@@ -171,7 +175,7 @@ class StatusBackend(RpcClient, SignalClient):
         anvil_network = self._set_token_overrides(anvil_network, kwargs.get("token_overrides", []))
 
         data["testNetworksEnabled"] = False
-        data["networkId"] = network_id
+        data["networkId"] = self.network_id
         data["networksOverride"] = [anvil_network]
 
     def _set_proxy_credentials(self, data):
@@ -190,6 +194,15 @@ class StatusBackend(RpcClient, SignalClient):
         data["StatusProxyStageName"] = "test"
         return data
 
+    def _set_wallet_secrets(self, data):
+        if "STATUS_BUILD_INFURA_TOKEN" in os.environ:
+            data["infuraToken"] = os.environ["STATUS_BUILD_INFURA_TOKEN"]
+        if "STATUS_BUILD_INFURA_SECRET" in os.environ:
+            data["infuraSecret"] = os.environ["STATUS_BUILD_INFURA_SECRET"]
+        if "STATUS_BUILD_POKT_TOKEN" in os.environ:
+            data["poktToken"] = os.environ["STATUS_BUILD_POKT_TOKEN"]
+        return data
+
     def _set_token_overrides(self, network, token_overrides):
         if not token_overrides:
             return network
@@ -198,12 +211,30 @@ class StatusBackend(RpcClient, SignalClient):
         return network
 
     def extract_data(self, path: str):
-        if not self.container:
-            if os.path.exists(path):
-                return path
+        if self.container:
+            return self.container.extract_data(path)
+
+        if not os.path.exists(path):
             return None
 
-        return self.container.extract_data(path)
+        return path
+
+    def import_data(self, src_path: str, dest_path: str):
+        """
+        Import a file from the host (src_path) into the container at dest_path.
+        If not running in a container, just copy the file locally.
+        """
+        if self.container:
+            self.container.import_data(src_path, dest_path)
+            return
+
+        # Not running in a container, just copy the file locally
+        if not os.path.exists(src_path):
+            raise FileNotFoundError(f"Source path '{src_path}' does not exist.")
+
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        with open(src_path, "rb") as src, open(dest_path, "wb") as dst:
+            dst.write(src.read())
 
     def _set_display_name(self, **kwargs):
         self.display_name = kwargs.get(
@@ -222,13 +253,17 @@ class StatusBackend(RpcClient, SignalClient):
             "customizationColor": kwargs.get("customizationColor", "primary"),
             # Logs config
             "logEnabled": True,
+            "logToStderr": True,
             "logLevel": "DEBUG",
             # Waku config
             "wakuV2LightClient": kwargs.get("wakuV2LightClient", False),
-            "wakuV2Fleet": option.waku_fleet,
+            "wakuV2Fleet": Config.waku_fleet,
         }
-        self._set_networks(data, **kwargs)
+        if not Config.disable_override_networks:
+            self._set_networks(data, **kwargs)
+
         data = self._set_proxy_credentials(data)
+        data = self._set_wallet_secrets(data)
         return data
 
     def create_account_and_login(self, user=user_1, **kwargs):
@@ -253,6 +288,7 @@ class StatusBackend(RpcClient, SignalClient):
             "kdfIterations": 256000,
         }
         data = self._set_proxy_credentials(data)
+        data = self._set_wallet_secrets(data)
         return self.api_valid_request(method, data)
 
     def logout(self):
@@ -265,7 +301,9 @@ class StatusBackend(RpcClient, SignalClient):
             error_details = signal["event"]["error"]
             assert not error_details, f"Unexpected error during login: {error_details}"
         self.node_login_event = signal
+        logging.debug(f"Node login event: {self.node_login_event}")
         self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
+        self.mnemonic = self.node_login_event.get("event", {}).get("settings", {}).get("mnemonic")
         self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
         return signal
 
@@ -377,5 +415,5 @@ class StatusBackend(RpcClient, SignalClient):
                 "clientConfig": {},
             },
         }
-        response = self.api_valid_request(method, data)
+        response = self.api_request(method, data)
         return json.loads(response.content)

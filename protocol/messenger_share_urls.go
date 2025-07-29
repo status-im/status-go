@@ -15,12 +15,12 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/utils"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 type CommunityURLData struct {
@@ -50,7 +50,7 @@ type URLDataResponse struct {
 	Community *CommunityURLData        `json:"community"`
 	Channel   *CommunityChannelURLData `json:"channel"`
 	Contact   *ContactURLData          `json:"contact"`
-	Shard     *wakuv2.Shard            `json:"shard,omitempty"`
+	Shard     *messagingtypes.Shard    `json:"shard,omitempty"`
 }
 
 const baseShareURL = "https://status.app"
@@ -205,7 +205,7 @@ func parseCommunityURLWithData(data string, chatKey string) (*URLDataResponse, e
 			TagIndices:   tagIndices,
 			CommunityID:  types.EncodeHex(communityID),
 		},
-		Shard: wakuv2.FromProtobuff(urlDataProto.Shard),
+		Shard: messagingtypes.FromShardProtobuff(urlDataProto.Shard),
 	}, nil
 }
 
@@ -381,7 +381,7 @@ func parseCommunityChannelURLWithData(data string, chatKey string) (*URLDataResp
 			Color:       channelProto.Color,
 			ChannelUUID: channelProto.Uuid,
 		},
-		Shard: wakuv2.FromProtobuff(urlDataProto.Shard),
+		Shard: messagingtypes.FromShardProtobuff(urlDataProto.Shard),
 	}, nil
 }
 
@@ -446,6 +446,10 @@ func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, er
 		return "", "", err
 	}
 
+	if contact.DisplayName == "" && contact.Bio == "" {
+		return "", shortKey, nil
+	}
+
 	userProto := &protobuf.User{
 		DisplayName: contact.DisplayName,
 		Description: contact.Bio,
@@ -488,6 +492,15 @@ func (m *Messenger) ShareUserURLWithData(contactID string) (string, error) {
 }
 
 func parseUserURLWithData(data string, chatKey string) (*URLDataResponse, error) {
+	if data == "" {
+		return &URLDataResponse{
+			Contact: &ContactURLData{
+				DisplayName: "",
+				Description: "",
+				PublicKey:   chatKey,
+			},
+		}, nil
+	}
 	urlData, err := decodeDataURL(data)
 	if err != nil {
 		return nil, err

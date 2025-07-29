@@ -15,10 +15,19 @@
           "maximum": 65535
         }
       },
-      "required": ["port"],
+      "required": [
+        "port"
+      ],
       "additionalProperties": false
+    },
+    "timestamp": {
+      "type": "integer",
+      "description": "Unix timestamp of event emit-time"
     }
   },
-  "required": ["type", "event"],
+  "required": [
+    "type",
+    "event"
+  ],
   "additionalProperties": false
 }

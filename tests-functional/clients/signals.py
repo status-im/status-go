@@ -32,6 +32,7 @@ class WalletEventType(Enum):
     WALLET_ACTIVITY_SESSION_UPDATED = "wallet-activity-session-updated"
     TRANSACTIONS_PENDING_TRANSACTION_UPDATE = "pending-transaction-update"
     TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED = "pending-transaction-status-changed"
+    WALLET_TICK_RELOAD = "wallet-tick-reload"
 
 
 class LocalPairingEventType(Enum):
@@ -164,10 +165,10 @@ class SignalClient:
         logging.error(f"Error: {error}")
 
     def _on_close(self, ws, close_status_code, close_msg):
-        logging.info(f"Connection closed: {close_status_code}, {close_msg}")
+        logging.debug(f"Connection closed: {close_status_code}, {close_msg}")
 
     def _on_open(self, ws):
-        logging.info("Connection opened")
+        logging.debug("Connection opened")
 
     def _connect(self):
         ws = websocket.WebSocketApp(

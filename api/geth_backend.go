@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
@@ -66,17 +68,10 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
-	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
 var (
-	// ErrWhisperClearIdentitiesFailure clearing whisper identities has failed.
-	ErrWhisperClearIdentitiesFailure = errors.New("failed to clear whisper identities")
-	// ErrWhisperIdentityInjectionFailure injecting whisper identities has failed.
-	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
-	// ErrWakuIdentityInjectionFailure injecting whisper identities has failed.
-	ErrWakuIdentityInjectionFailure = errors.New("failed to inject identity into waku")
 	// ErrUnsupportedRPCMethod is for methods not supported by the RPC interface
 	ErrUnsupportedRPCMethod = errors.New("method is unsupported by RPC interface")
 	// ErrRPCClientUnavailable is returned if an RPC client can't be retrieved.
@@ -108,11 +103,10 @@ type GethStatusBackend struct {
 	signer                   communities.MessageSigner
 	multiaccountsDB          *multiaccounts.Database
 	account                  *multiaccounts.Account
-	accountManager           *accsmanagement.AccountsManager
+	accountsManager          *accsmanagement.AccountsManager
 	transactor               *transactions.Transactor
 	connectionState          connection.State
 	appState                 AppState
-	selectedAccountKeyID     string
 	allowAllRPC              bool // used only for tests, disables api method restrictions
 	LocalPairingStateManager *statecontrol.ProcessStateManager
 	centralizedMetrics       *centralizedmetrics.MetricService
@@ -148,7 +142,7 @@ func (b *GethStatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
 }
 
 func (b *GethStatusBackend) initialize() (err error) {
-	accountManager, err := accsmanagement.NewAccountsManager(b.logger)
+	accountsManager, err := accsmanagement.NewAccountsManager(b.logger)
 	if err != nil {
 		b.logger.Error("failed to create new *AccountsManager instance", zap.Error(err))
 		return
@@ -156,10 +150,10 @@ func (b *GethStatusBackend) initialize() (err error) {
 
 	transactor := transactions.NewTransactor()
 	personalService := personal.New()
-	statusNode := node.New(transactor, accountManager, b.logger)
+	statusNode := node.New(transactor, accountsManager, b.logger)
 
 	b.statusNode = statusNode
-	b.accountManager = accountManager
+	b.accountsManager = accountsManager
 	b.transactor = transactor
 	b.signer = personalService
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
@@ -174,9 +168,9 @@ func (b *GethStatusBackend) StatusNode() *node.StatusNode {
 	return b.statusNode
 }
 
-// AccountManager returns reference to account manager
-func (b *GethStatusBackend) AccountManager() *accsmanagement.AccountsManager {
-	return b.accountManager
+// AccountsManager returns reference to accounts manager
+func (b *GethStatusBackend) AccountsManager() *accsmanagement.AccountsManager {
+	return b.accountsManager
 }
 
 // Transactor returns reference to a status transactor
@@ -186,11 +180,6 @@ func (b *GethStatusBackend) Transactor() *transactions.Transactor {
 
 func (b *GethStatusBackend) MessageSigner() communities.MessageSigner {
 	return b.signer
-}
-
-// SelectedAccountKeyID returns a Whisper key ID of the selected chat key pair.
-func (b *GethStatusBackend) SelectedAccountKeyID() string {
-	return b.selectedAccountKeyID
 }
 
 // IsNodeRunning confirm that node is running
@@ -206,6 +195,10 @@ func (b *GethStatusBackend) StartNode(config *params.NodeConfig) error {
 		signal.SendNodeCrashed(err)
 		return err
 	}
+
+	// Set initial connection state
+	b.statusNode.ConnectionChanged(b.connectionState)
+
 	return nil
 }
 
@@ -469,7 +462,7 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 		b.logger.Error("failed to create new *Database instance", zap.Error(err))
 		return
 	}
-	b.accountManager.SetPersistence(accountsDB)
+	b.accountsManager.SetPersistence(accountsDB)
 
 	return nil
 }
@@ -699,7 +692,6 @@ func (b *GethStatusBackend) convertLoginRequestToAccountRequest(loginRequest *re
 	createAccount.WakuV2LightClient = loginRequest.WakuV2LightClient
 	createAccount.WakuV2EnableMissingMessageVerification = loginRequest.WakuV2EnableMissingMessageVerification
 	createAccount.WakuV2EnableStoreConfirmationForMessagesSent = loginRequest.WakuV2EnableStoreConfirmationForMessagesSent
-	createAccount.TelemetryServerURL = loginRequest.TelemetryServerURL
 	createAccount.VerifyTransactionURL = loginRequest.VerifyTransactionURL
 	createAccount.VerifyENSURL = loginRequest.VerifyENSURL
 	createAccount.VerifyTransactionChainID = loginRequest.VerifyTransactionChainID
@@ -825,18 +817,22 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		}
 	} else {
 		// In case of keycard, we don't have a keystore, instead we have private key loaded from the keycard
-		if err := b.accountManager.SetChatAccountWithPrivateKey(chatKey); err != nil {
+		if err := b.accountsManager.SetChatAccountWithPrivateKey(chatKey); err != nil {
 			return errors.Wrap(err, "failed to set chat account")
 		}
-		_, err = b.accountManager.SelectedChatAccount()
+		_, err = b.accountsManager.SelectedChatAccount()
 		if err != nil {
 			return errors.Wrap(err, "failed to get selected chat account")
 		}
 
-		err = b.injectAccountsIntoServices()
+		err = b.initProtocol()
 		if err != nil {
-			return errors.Wrap(err, "failed to inject accounts into services")
+			return errors.Wrap(err, "failed to init protocol")
 		}
+	}
+
+	if err = b.statusNode.StartLocalBackup(); err != nil {
+		return err
 	}
 
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
@@ -938,18 +934,22 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		}
 	} else {
 		// In case of keycard, we don't have keystore, but we directly have the private key
-		if err := b.accountManager.SetChatAccountWithPrivateKey(chatKey); err != nil {
+		if err := b.accountsManager.SetChatAccountWithPrivateKey(chatKey); err != nil {
 			return err
 		}
-		_, err = b.accountManager.SelectedChatAccount()
+		_, err = b.accountsManager.SelectedChatAccount()
 		if err != nil {
 			return err
 		}
 
-		err = b.injectAccountsIntoServices()
+		err = b.initProtocol()
 		if err != nil {
 			return err
 		}
+	}
+
+	if err = b.statusNode.StartLocalBackup(); err != nil {
+		return err
 	}
 
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
@@ -971,12 +971,12 @@ func (b *GethStatusBackend) GetSettings() (*settings.Settings, error) {
 		return nil, err
 	}
 
-	settings, err := accountsDB.GetSettings()
+	s, err := accountsDB.GetSettings()
 	if err != nil {
 		return nil, err
 	}
 
-	return &settings, nil
+	return &s, nil
 }
 
 func (b *GethStatusBackend) GetEnsUsernames() ([]*ens.UsernameDetail, error) {
@@ -1007,11 +1007,11 @@ func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
 		signal.SendLoggedIn(nil, nil, nil, err)
 		return err
 	}
-	settings, err := b.GetSettings()
+	s, err := b.GetSettings()
 	if err != nil {
 		return err
 	}
-	account, err := b.getAccountByKeyUID(keyUID)
+	acc, err := b.getAccountByKeyUID(keyUID)
 	if err != nil {
 		return err
 	}
@@ -1027,7 +1027,7 @@ func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
 			return err
 		}
 	}
-	signal.SendLoggedIn(account, settings, ensUsernamesJSON, nil)
+	signal.SendLoggedIn(acc, s, ensUsernamesJSON, nil)
 	return nil
 }
 
@@ -1075,7 +1075,7 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 }
 
 func (b *GethStatusBackend) reEncryptKeyStoreDir(currentPassword string, newPassword string) error {
-	err := b.accountManager.ReEncryptKeyStoreDir(currentPassword, newPassword)
+	err := b.accountsManager.ReEncryptKeyStoreDir(currentPassword, newPassword)
 	if err != nil {
 		return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
 	}
@@ -1083,7 +1083,7 @@ func (b *GethStatusBackend) reEncryptKeyStoreDir(currentPassword string, newPass
 }
 
 func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
-	account, err := b.multiaccountsDB.GetAccount(keyUID)
+	acc, err := b.multiaccountsDB.GetAccount(keyUID)
 	if err != nil {
 		return err
 	}
@@ -1120,7 +1120,7 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 			// because UI calls Logout and Quit afterwards. It should not be UI-dependent
 			// and should be handled gracefully here if it makes sense to run dummy node after
 			// logout
-			err = b.startNodeWithAccount(*account, pass, b.config, nil)
+			err = b.startNodeWithAccount(*acc, pass, b.config, nil)
 			if err != nil {
 				b.logger.Error("failed to start node", zap.Error(err))
 				return
@@ -1139,16 +1139,16 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	// First change app DB password, because it also reencrypts the keystore,
 	// otherwise if we call changeWalletDbPassword first and logout, we will fail
 	// to reencrypt	the keystore
-	err = b.changeAppDBPassword(account, logout, password, newPassword)
+	err = b.changeAppDBPassword(acc, logout, password, newPassword)
 	if err != nil {
 		return err
 	}
 
 	// Already logged out but pass a param to decouple the logic for testing
-	err = b.changeWalletDBPassword(account, noLogout, password, newPassword)
+	err = b.changeWalletDBPassword(acc, noLogout, password, newPassword)
 	if err != nil {
 		// Revert the password to original
-		err2 := b.changeAppDBPassword(account, noLogout, newPassword, password)
+		err2 := b.changeAppDBPassword(acc, noLogout, newPassword, password)
 		if err2 != nil {
 			b.logger.Error("failed to revert app db password", zap.Error(err2))
 		}
@@ -1335,7 +1335,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	// This check is added due to mobile app cause it doesn't support a Keycard features as desktop app.
+	// This check is added due to mobile app because it doesn't support a Keycard features as desktop app.
 	// We should remove the following line once mobile and desktop app align.
 	if len(keycardUID) > 0 {
 		displayName, err := accountDB.DisplayName()
@@ -1392,23 +1392,23 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 
 	// We need to delete all accounts for the Keycard which is being added
 	for _, acc := range keypair.Accounts {
-		err = b.accountManager.DeleteAccount(acc.Address)
+		err = b.accountsManager.DeleteAccount(acc.Address)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = b.accountManager.DeleteAccount(masterAddress)
+	err = b.accountsManager.DeleteAccount(masterAddress)
 	if err != nil {
 		return err
 	}
 
-	err = b.accountManager.DeleteAccount(eip1581Address)
+	err = b.accountsManager.DeleteAccount(eip1581Address)
 	if err != nil {
 		return err
 	}
 
-	err = b.accountManager.DeleteAccount(walletRootAddress)
+	err = b.accountsManager.DeleteAccount(walletRootAddress)
 	if err != nil {
 		return err
 	}
@@ -1629,7 +1629,7 @@ func (b *GethStatusBackend) InitKeyStoreDirWithAccount(rootDataDir, keyUID strin
 	if err != nil {
 		return "", err
 	}
-	b.accountManager.SetKeystore(keystoreAdapter)
+	b.accountsManager.SetKeystore(keystoreAdapter)
 
 	return keystoreAbsolutePath, nil
 }
@@ -1668,7 +1668,7 @@ func (b *GethStatusBackend) generateDerivedAddresses(genAcc *generator.Account, 
 
 func (b *GethStatusBackend) StoreAccount(mnemonic string, password string, paths []string) (accInfo generator.IdentifiedAccountInfo, derivedAccsInfo map[string]generator.AccountInfo, err error) {
 	var genAcc *generator.Account
-	genAcc, err = b.accountManager.CreateFromMnemonicAndStoreAccount(mnemonic, password)
+	genAcc, err = b.accountsManager.CreateFromMnemonicAndStoreAccount(mnemonic, password)
 	if err != nil {
 		return
 	}
@@ -1676,7 +1676,7 @@ func (b *GethStatusBackend) StoreAccount(mnemonic string, password string, paths
 	accInfo = genAcc.ToIdentifiedAccountInfo()
 
 	var genDerivedAccs map[string]*generator.Account
-	genDerivedAccs, err = b.accountManager.DeriveChildrenAccountsForPathsAndStore(genAcc.Address(), paths, password)
+	genDerivedAccs, err = b.accountsManager.DeriveChildrenAccountsForPathsAndStore(genAcc.Address(), paths, password)
 	if err != nil {
 		return
 	}
@@ -1741,34 +1741,34 @@ func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, input 
 }
 
 func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, input *prepareAccountInput) (*settings.Settings, error) {
-	settings, err := defaultSettings(input.keyUID, input.address, input.derivedAddresses)
+	s, err := defaultSettings(input.keyUID, input.address, input.derivedAddresses)
 	if err != nil {
 		return nil, err
 	}
 
-	settings.DeviceName = request.DeviceName
-	settings.DisplayName = request.DisplayName
-	settings.PreviewPrivacy = request.PreviewPrivacy
-	settings.CurrentNetwork = request.CurrentNetwork
-	settings.TestNetworksEnabled = request.TestNetworksEnabled
-	settings.AutoRefreshTokensEnabled = request.AutoRefreshTokensEnabled
+	s.DeviceName = request.DeviceName
+	s.DisplayName = request.DisplayName
+	s.PreviewPrivacy = request.PreviewPrivacy
+	s.CurrentNetwork = request.CurrentNetwork
+	s.TestNetworksEnabled = request.TestNetworksEnabled
+	s.AutoRefreshTokensEnabled = request.AutoRefreshTokensEnabled
 	if !input.restoringAccount {
-		settings.Mnemonic = &input.mnemonic
+		s.Mnemonic = &input.mnemonic
 		// TODO(rasom): uncomment it as soon as address will be properly
 		// marked as shown on mobile client
-		//settings.MnemonicWasNotShown = true
+		//s.MnemonicWasNotShown = true
 	}
 
 	if !input.fetchBackup {
-		// This is a an account created from scratch, we can mark the BackupFetched as true
-		settings.BackupFetched = true
+		// This is an account created from scratch, we can mark the BackupFetched as true
+		s.BackupFetched = true
 	}
 
 	if request.WakuV2Fleet != "" {
-		settings.Fleet = &request.WakuV2Fleet
+		s.Fleet = &request.WakuV2Fleet
 	}
 
-	return settings, nil
+	return s, nil
 }
 
 func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, input *prepareAccountInput, installationID string) (*params.NodeConfig, error) {
@@ -1980,7 +1980,7 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 	}
 
 	if !b.appDBExists(keyUID) || !b.walletDBExists(keyUID) {
-		return errors.New("One or more databases not created")
+		return errors.New("one or more databases not created")
 	}
 
 	err = b.ensureDBsOpened(multiaccounts.Account{KeyUID: keyUID, KDFIterations: kdfIterations}, password)
@@ -2130,7 +2130,7 @@ func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, 
 		LastUsedDerivationIndex: 0,
 	}
 
-	// When creating a new account, the chat account should have position -1, cause it doesn't participate
+	// When creating a new account, the chat account should have position -1, because it doesn't participate
 	// in the wallet view and default wallet account should be at position 0.
 	for _, acc := range subaccs {
 		if acc.Chat {
@@ -2253,8 +2253,8 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 
 	// Handle a case when a node is stopped and resumed.
 	// If there is no account selected, an error is returned.
-	if _, err := b.accountManager.SelectedChatAccount(); err == nil {
-		if err := b.injectAccountsIntoServices(); err != nil {
+	if _, err := b.accountsManager.SelectedChatAccount(); err == nil {
+		if err := b.initProtocol(); err != nil {
 			return err
 		}
 	} else if err != accsmanagement.ErrNoAccountSelected {
@@ -2263,6 +2263,10 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 
 	if b.statusNode.WalletService() != nil {
 		b.statusNode.WalletService().KeycardPairings().SetKeycardPairingsFile(config.KeycardPairingDataFile)
+	}
+
+	if b.prometheusMetrics != nil {
+		b.prometheusMetrics.RegisterHandler("waku", b.wakuMetricsHandler())
 	}
 
 	signal.SendNodeReady()
@@ -2391,26 +2395,26 @@ func (b *GethStatusBackend) Recover(rpcParams personal.RecoverParams) (types.Add
 
 // SignTypedData accepts data and password. Gets verified account and signs typed data.
 func (b *GethStatusBackend) SignTypedData(typed typeddata.TypedData, address string, password string) (types.HexBytes, error) {
-	account, err := b.getVerifiedWalletAccount(address, password)
+	acc, err := b.getVerifiedWalletAccount(address, password)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
-	sig, err := typeddata.Sign(typed, account.PrivateKey(), chain)
+	sig, err := typeddata.Sign(typed, acc.PrivateKey(), chain)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
-	return types.HexBytes(sig), err
+	return sig, err
 }
 
 // SignTypedDataV4 accepts data and password. Gets verified account and signs typed data.
 func (b *GethStatusBackend) SignTypedDataV4(typed signercore.TypedData, address string, password string) (types.HexBytes, error) {
-	account, err := b.getVerifiedWalletAccount(address, password)
+	acc, err := b.getVerifiedWalletAccount(address, password)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
-	sig, err := typeddata.SignTypedDataV4(typed, account.PrivateKey(), chain)
+	sig, err := typeddata.SignTypedDataV4(typed, acc.PrivateKey(), chain)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
@@ -2438,7 +2442,7 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 }
 
 func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*generator.Account, error) {
-	return b.accountManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
+	return b.accountsManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
 }
 
 // registerHandlers attaches Status callback handlers to running node
@@ -2455,7 +2459,7 @@ func (b *GethStatusBackend) registerHandlers() error {
 		client.RegisterHandler(
 			params.AccountsMethodName,
 			func(context.Context, uint64, ...interface{}) (interface{}, error) {
-				return b.accountManager.Accounts()
+				return b.accountsManager.Accounts()
 			},
 		)
 
@@ -2471,7 +2475,7 @@ func (b *GethStatusBackend) registerHandlers() error {
 	return nil
 }
 
-func unsupportedMethodHandler(ctx context.Context, chainID uint64, rpcParams ...interface{}) (interface{}, error) {
+func unsupportedMethodHandler(_ context.Context, _ uint64, _ ...interface{}) (interface{}, error) {
 	return nil, ErrUnsupportedRPCMethod
 }
 
@@ -2569,7 +2573,7 @@ func (b *GethStatusBackend) Logout() error {
 		return err
 	}
 
-	b.AccountManager().Logout()
+	b.AccountsManager().Logout()
 	b.account = nil
 
 	if b.statusNode != nil {
@@ -2609,9 +2613,8 @@ func (b *GethStatusBackend) switchToPreLoginLog() error {
 	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
-// cleanupServices stops parts of services that doesn't managed by a node and removes injected data from services.
+// cleanupServices stops parts of services that aren't managed by a node and removes injected data from services.
 func (b *GethStatusBackend) cleanupServices() error {
-	b.selectedAccountKeyID = ""
 	if b.statusNode == nil {
 		return nil
 	}
@@ -2656,7 +2659,7 @@ func (b *GethStatusBackend) SelectAccount(loginParams LoginParams) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	err := b.accountManager.SetChatAccount(loginParams.ChatAddress, loginParams.Password)
+	err := b.accountsManager.SetChatAccount(loginParams.ChatAddress, loginParams.Password)
 	if err != nil {
 		return err
 	}
@@ -2665,7 +2668,7 @@ func (b *GethStatusBackend) SelectAccount(loginParams LoginParams) error {
 		b.account = loginParams.MultiAccount
 	}
 
-	if err := b.injectAccountsIntoServices(); err != nil {
+	if err := b.initProtocol(); err != nil {
 		return err
 	}
 
@@ -2693,50 +2696,54 @@ func (b *GethStatusBackend) LocalPairingStarted() error {
 	return accountDB.MnemonicWasShown()
 }
 
-func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyManager, st *ext.Service) error {
-	chatAccount, err := b.accountManager.SelectedChatAccount()
+func (b *GethStatusBackend) initProtocol() error {
+	st := b.statusNode.WakuV2ExtService()
+	if st == nil {
+		return nil
+	}
+	chatAccount, err := b.accountsManager.SelectedChatAccount()
 	if err != nil {
 		return err
 	}
-
 	identity := chatAccount.PrivateKey()
-
 	acc, err := b.GetActiveAccount()
 	if err != nil {
 		return err
 	}
-
-	if err := w.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
+	params := ext.InitProtocolParams{
+		NodeName:               b.statusNode.GethNode().Config().Name,
+		Identity:               identity,
+		AppDB:                  b.appDB,
+		WalletDB:               b.walletDB,
+		HTTPServer:             b.statusNode.HTTPServer(),
+		MultiAccountDB:         b.multiaccountsDB,
+		Account:                acc,
+		AccountsManager:        b.accountsManager,
+		RPCClient:              b.statusNode.RPCClient(),
+		WalletService:          b.statusNode.WalletService(),
+		CommunityTokensService: b.statusNode.CommunityTokensService(),
+		Logger:                 logutils.ZapLogger(),
+		AccountsPublisher:      b.statusNode.AccountsPublisher(),
+		TimeSource:             b.statusNode.TimeSource(),
+		MetricsEnabled:         b.prometheusMetrics != nil,
+	}
+	err = st.InitProtocol(params)
+	if err != nil {
 		return err
 	}
-	b.selectedAccountKeyID, err = w.AddKeyPair(identity)
+
+	messenger := st.Messenger()
+	// Init public status api
+	b.statusNode.StatusPublicService().Init(messenger)
+	b.statusNode.AccountService().Init(messenger)
+	// Init chat service
+	accDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
-		return ErrWakuIdentityInjectionFailure
+		return err
 	}
-
-	if st != nil {
-		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.walletDB,
-			b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, b.statusNode.RPCClient(),
-			b.statusNode.WalletService(), b.statusNode.CommunityTokensService(), b.statusNode.WakuV2Service(),
-			logutils.ZapLogger(), b.statusNode.AccountsFeed()); err != nil {
-			return err
-		}
-		// Set initial connection state
-		st.ConnectionChanged(b.connectionState)
-
-		messenger := st.Messenger()
-		// Init public status api
-		b.statusNode.StatusPublicService().Init(messenger)
-		b.statusNode.AccountService().Init(messenger)
-		// Init chat service
-		accDB, err := accounts.NewDB(b.appDB)
-		if err != nil {
-			return err
-		}
-		b.statusNode.ChatService(accDB).Init(messenger)
-		b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
-		b.statusNode.CommunityTokensService().Init(messenger)
-	}
+	b.statusNode.ChatService(accDB).Init(messenger)
+	b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
+	b.statusNode.CommunityTokensService().Init(messenger)
 
 	return nil
 }
@@ -2757,19 +2764,6 @@ func (b *GethStatusBackend) KeyUID() string {
 	return ""
 }
 
-func (b *GethStatusBackend) injectAccountsIntoServices() error {
-	if b.statusNode.WakuV2Service() != nil {
-		return b.injectAccountsIntoWakuService(b.statusNode.WakuV2Service(), func() *ext.Service {
-			if b.statusNode.WakuV2ExtService() == nil {
-				return nil
-			}
-			return b.statusNode.WakuV2ExtService().Service
-		}())
-	}
-
-	return nil
-}
-
 // ExtractGroupMembershipSignatures extract signatures from tuples of content/signature
 func (b *GethStatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2]string) ([]string, error) {
 	return crypto.ExtractSignatures(signaturePairs)
@@ -2777,7 +2771,7 @@ func (b *GethStatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2
 
 // SignGroupMembership signs a piece of data containing membership information
 func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) {
-	selectedChatAccount, err := b.accountManager.SelectedChatAccount()
+	selectedChatAccount, err := b.accountsManager.SelectedChatAccount()
 	if err != nil {
 		return "", err
 	}
@@ -2786,9 +2780,9 @@ func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) 
 }
 
 func (b *GethStatusBackend) Messenger() *protocol.Messenger {
-	node := b.StatusNode()
-	if node != nil {
-		accountService := node.AccountService()
+	statusNode := b.StatusNode()
+	if statusNode != nil {
+		accountService := statusNode.AccountService()
 		if accountService != nil {
 			return accountService.GetMessenger()
 		}
@@ -2803,7 +2797,7 @@ func (b *GethStatusBackend) SignHash(hexEncodedHash string) (string, error) {
 		return "", fmt.Errorf("SignHash: could not unmarshal the input: %v", err)
 	}
 
-	chatAccount, err := b.accountManager.SelectedChatAccount()
+	chatAccount, err := b.accountsManager.SelectedChatAccount()
 	if err != nil {
 		return "", fmt.Errorf("SignHash: could not select account: %v", err.Error())
 	}
@@ -2931,4 +2925,27 @@ func (b *GethStatusBackend) SetPreLoginLogLevel(level string) error {
 		return err
 	}
 	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
+}
+
+func (b *GethStatusBackend) wakuMetricsHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if b.StatusNode() == nil {
+			b.logger.Error("failed to get waku metrics: StatusNode is nil")
+			return
+		}
+
+		if b.StatusNode().WakuV2ExtService() == nil {
+			b.logger.Error("failed to get waku metrics: WakuV2ExtService is nil")
+			return
+		}
+
+		wakuMetrics := b.StatusNode().WakuV2ExtService().Waku().Metrics()
+		if wakuMetrics != "" {
+			_, err := w.Write([]byte(wakuMetrics))
+
+			if err != nil {
+				b.logger.Error("failed to write waku metrics", zap.Error(err))
+			}
+		}
+	})
 }

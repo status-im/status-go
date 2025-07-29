@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -12,6 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network"
 	mock_market "github.com/status-im/status-go/services/wallet/market/mock"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -28,12 +32,27 @@ func setupTokenManager(t *testing.T) (*token.Manager, func()) {
 	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	nm := network.NewManager(appDb, nil, nil, nil)
+	nm := network.NewManager(appDb, nil)
 
-	return token.NewTokenManager(walletDb, nil, nil, nm, appDb, nil, nil, nil, nil, token.NewPersistence(walletDb)),
+	accDb, err := accounts.NewDB(appDb)
+	require.NoError(t, err)
+	config := params.NodeConfig{
+		NetworkID: 10,
+		DataDir:   "test",
+	}
+	networks := json.RawMessage("{}")
+	settingsObj := settings.Settings{
+		Networks: &networks,
+	}
+
+	err = accDb.CreateSettings(settingsObj, config)
+	require.NoError(t, err)
+
+	return token.NewTokenManager(walletDb, nil, nil, nm, appDb, nil, nil, nil, accDb, token.NewPersistence(walletDb)),
 		func() {
 			require.NoError(t, appDb.Close())
 			require.NoError(t, walletDb.Close())
+			require.NoError(t, accDb.Close())
 		}
 }
 

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
@@ -16,12 +15,13 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 )
 
-func NewAccountsAPI(manager *accsmanagement.AccountsManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed, messenger **protocol.Messenger) *API {
-	return &API{manager, config, db, feed, messenger}
+func NewAccountsAPI(manager *accsmanagement.AccountsManager, config *params.NodeConfig, db *accounts.Database, messenger **protocol.Messenger, publisher *pubsub.Publisher) *API {
+	return &API{manager, config, db, messenger, publisher}
 }
 
 // API is class with methods available over RPC.
@@ -29,8 +29,8 @@ type API struct {
 	manager   *accsmanagement.AccountsManager
 	config    *params.NodeConfig
 	db        *accounts.Database
-	feed      *event.Feed
 	messenger **protocol.Messenger
+	publisher *pubsub.Publisher
 }
 
 type DerivedAddress struct {
@@ -47,10 +47,11 @@ func (api *API) SaveAccount(ctx context.Context, account *accounts.Account) erro
 		return err
 	}
 
-	api.feed.Send(accountsevent.Event{
-		Type:     accountsevent.EventTypeAdded,
-		Accounts: []common.Address{common.Address(account.Address)},
-	})
+	if api.publisher != nil {
+		pubsub.Publish(api.publisher, accountsevent.AccountsAddedEvent{
+			Accounts: []common.Address{common.Address(account.Address)},
+		})
+	}
 	return nil
 }
 
@@ -67,10 +68,12 @@ func (api *API) SaveKeypair(ctx context.Context, keypair *accounts.Keypair) erro
 		commonAddresses = append(commonAddresses, common.Address(acc.Address))
 	}
 
-	api.feed.Send(accountsevent.Event{
-		Type:     accountsevent.EventTypeAdded,
-		Accounts: commonAddresses,
-	})
+	if api.publisher != nil {
+		pubsub.Publish(api.publisher, accountsevent.AccountsAddedEvent{
+			Accounts: commonAddresses,
+		})
+	}
+
 	return nil
 }
 
@@ -129,10 +132,11 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 		return err
 	}
 
-	api.feed.Send(accountsevent.Event{
-		Type:     accountsevent.EventTypeRemoved,
-		Accounts: []common.Address{common.Address(address)},
-	})
+	if api.publisher != nil {
+		pubsub.Publish(api.publisher, accountsevent.AccountsRemovedEvent{
+			Accounts: []common.Address{common.Address(address)},
+		})
+	}
 
 	return nil
 }
@@ -156,10 +160,11 @@ func (api *API) DeleteKeypair(ctx context.Context, keyUID string) error {
 		addresses = append(addresses, common.Address(acc.Address))
 	}
 
-	api.feed.Send(accountsevent.Event{
-		Type:     accountsevent.EventTypeRemoved,
-		Accounts: addresses,
-	})
+	if api.publisher != nil {
+		pubsub.Publish(api.publisher, accountsevent.AccountsRemovedEvent{
+			Accounts: addresses,
+		})
+	}
 
 	return nil
 }

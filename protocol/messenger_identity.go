@@ -128,7 +128,7 @@ func (m *Messenger) SetBio(bio string) error {
 }
 
 func (m *Messenger) setInstallationHostname() error {
-	imd, err := m.getOurInstallationMetadata()
+	imd, err := m.GetOurInstallationMetadata()
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func (m *Messenger) setInstallationHostname() error {
 
 }
 
-func (m *Messenger) getOurInstallationMetadata() (*multidevice.InstallationMetadata, error) {
+func (m *Messenger) GetOurInstallationMetadata() (*multidevice.InstallationMetadata, error) {
 	ourInstallation, ok := m.allInstallations.Load(m.installationID)
 	if !ok {
 		return nil, fmt.Errorf("messenger's installationID is not set or not loadable")
@@ -182,7 +182,7 @@ func (m *Messenger) SetInstallationDeviceType(deviceType string) error {
 		return errors.New("device type is empty")
 	}
 
-	imd, err := m.getOurInstallationMetadata()
+	imd, err := m.GetOurInstallationMetadata()
 	if err != nil {
 		return err
 	}

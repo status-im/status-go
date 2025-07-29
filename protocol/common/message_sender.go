@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/datasync"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 	"github.com/status-im/status-go/protocol/encryption"
@@ -27,7 +28,6 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
-	wakuv2 "github.com/status-im/status-go/wakuv2"
 
 	sds "github.com/waku-org/sds-go-bindings/sds"
 )
@@ -56,6 +56,7 @@ type MessageEventType uint32
 const (
 	MessageScheduled = iota + 1
 	MessageSent
+	RawMessageSent // TODO: ideally it should be merged with above
 )
 
 type MessageEvent struct {
@@ -73,6 +74,7 @@ type MessageSender struct {
 	protocol    *encryption.Protocol
 	logger      *zap.Logger
 	persistence *RawMessagesPersistence
+	publisher   *pubsub.Publisher
 
 	datasyncEnabled bool
 
@@ -89,8 +91,6 @@ type MessageSender struct {
 
 	// handleSharedSecrets is a callback that is called every time a new shared secret is negotiated
 	handleSharedSecrets func([]*sharedsecret.Secret) error
-
-	metricsHandler wakuv2.IMetricsHandler
 
 	reliabilityManagers      map[string]*sds.ReliabilityManager
 	reliabilityManagersMutex sync.Mutex
@@ -110,6 +110,7 @@ func NewMessageSender(
 		protocol:            enc,
 		database:            database,
 		persistence:         NewRawMessagesPersistence(database),
+		publisher:           pubsub.NewPublisher(),
 		messaging:           messaging,
 		logger:              logger,
 		ephemeralKeys:       make(map[string]*ecdsa.PrivateKey),
@@ -121,22 +122,12 @@ func NewMessageSender(
 }
 
 func (s *MessageSender) Stop() {
-	s.messageEventsSubscriptionsMutex.Lock()
-	defer s.messageEventsSubscriptionsMutex.Unlock()
-
-	for _, c := range s.messageEventsSubscriptions {
-		close(c)
-	}
-	s.messageEventsSubscriptions = nil
+	s.publisher.Close()
 	s.StopDatasync()
 }
 
 func (s *MessageSender) SetHandleSharedSecrets(handler func([]*sharedsecret.Secret) error) {
 	s.handleSharedSecrets = handler
-}
-
-func (s *MessageSender) SetMetricsHandler(handler wakuv2.IMetricsHandler) {
-	s.metricsHandler = handler
 }
 
 func (s *MessageSender) StartDatasync(statusChangeEvent chan datasyncnode.PeerStatusChangeEvent, handler func(peer state.PeerID, payload *datasyncproto.Payload) error) error {
@@ -444,7 +435,7 @@ func (s *MessageSender) sendCommunity(
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
 	s.messaging.Track(messageID, hashes, newMessages)
-	s.sendBandwidthMetrics(rawMessage)
+	s.notifyOnSentRawMessage(rawMessage)
 
 	return messageID, nil
 }
@@ -562,7 +553,7 @@ func (s *MessageSender) sendPrivate(
 		s.messaging.Track(messageID, hashes, newMessages)
 	}
 
-	s.sendBandwidthMetrics(rawMessage)
+	s.notifyOnSentRawMessage(rawMessage)
 
 	return messageID, nil
 }
@@ -593,7 +584,7 @@ func (s *MessageSender) SendPairInstallation(
 	}
 
 	s.messaging.Track(messageID, hashes, newMessages)
-	s.sendBandwidthMetrics(&rawMessage)
+	s.notifyOnSentRawMessage(&rawMessage)
 
 	return messageID, nil
 }
@@ -833,7 +824,7 @@ func (s *MessageSender) SendPublic(
 		zap.String("messageType", "public"),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
 	s.messaging.Track(messageID, hashes, newMessages)
-	s.sendBandwidthMetrics(&rawMessage)
+	s.notifyOnSentRawMessage(&rawMessage)
 
 	return messageID, nil
 }
@@ -1276,50 +1267,26 @@ func (s *MessageSender) sendMessageSpec(ctx context.Context, publicKey *ecdsa.Pu
 	return hashes, newMessages, nil
 }
 
-func (s *MessageSender) SubscribeToMessageEvents() <-chan *MessageEvent {
-	c := make(chan *MessageEvent, 100)
-	s.messageEventsSubscriptions = append(s.messageEventsSubscriptions, c)
-	return c
-}
-
 func (s *MessageSender) notifyOnSentMessage(sentMessage *SentMessage) {
-	event := &MessageEvent{
+	pubsub.Publish(s.publisher, MessageEvent{
 		Type:        MessageSent,
 		SentMessage: sentMessage,
-	}
+	})
+}
 
-	s.messageEventsSubscriptionsMutex.Lock()
-	defer s.messageEventsSubscriptionsMutex.Unlock()
-
-	// Publish on channels, drop if buffer is full
-	for _, c := range s.messageEventsSubscriptions {
-		select {
-		case c <- event:
-		default:
-			s.logger.Warn("message events subscription channel full when publishing sent event, dropping message")
-		}
-	}
-
+func (s *MessageSender) notifyOnSentRawMessage(rawMessage *RawMessage) {
+	pubsub.Publish(s.publisher, MessageEvent{
+		Type:       RawMessageSent,
+		RawMessage: rawMessage,
+	})
 }
 
 func (s *MessageSender) notifyOnScheduledMessage(recipient *ecdsa.PublicKey, message *RawMessage) {
-	event := &MessageEvent{
-		Recipient:  recipient,
+	pubsub.Publish(s.publisher, MessageEvent{
 		Type:       MessageScheduled,
+		Recipient:  recipient,
 		RawMessage: message,
-	}
-
-	s.messageEventsSubscriptionsMutex.Lock()
-	defer s.messageEventsSubscriptionsMutex.Unlock()
-
-	// Publish on channels, drop if buffer is full
-	for _, c := range s.messageEventsSubscriptions {
-		select {
-		case c <- event:
-		default:
-			s.logger.Warn("message events subscription channel full when publishing scheduled event, dropping message")
-		}
-	}
+	})
 }
 
 func (s *MessageSender) JoinPublic(id string) (*messagingtypes.ChatFilter, error) {
@@ -1357,12 +1324,6 @@ func (s *MessageSender) GetEphemeralKey() (*ecdsa.PrivateKey, error) {
 	}
 
 	return privateKey, nil
-}
-
-func (s *MessageSender) sendBandwidthMetrics(rawMessage *RawMessage) {
-	if s.metricsHandler != nil {
-		s.metricsHandler.PushRawMessageByType(rawMessage.PubsubTopic, rawMessage.ContentTopic, rawMessage.MessageType.String(), uint32(len(rawMessage.Payload)))
-	}
 }
 
 func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*wakutypes.NewMessage, error) {
@@ -1477,4 +1438,8 @@ func (s *MessageSender) unwrapPayloadForSDS(msg *v1protocol.StatusMessage) error
 	}
 
 	return nil
+}
+
+func (s *MessageSender) Publisher() *pubsub.Publisher {
+	return s.publisher
 }

@@ -2,9 +2,12 @@ package settings
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/brianvoe/gofakeit/v6"
 
 	"github.com/stretchr/testify/require"
 
@@ -295,4 +298,26 @@ func TestDatabase_NewsRSSEnabled(t *testing.T) {
 	settings, err = db.GetSettings()
 	require.NoError(t, err)
 	require.Equal(t, false, settings.NewsRSSEnabled)
+}
+
+func TestDatabase_BackupPath(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	path, err := db.BackupPath()
+	require.NoError(t, err)
+	// The default backup path is empty
+	require.Equal(t, "", path)
+
+	testPath, err := url.JoinPath(gofakeit.LetterN(3), gofakeit.LetterN(3))
+	require.NoError(t, err)
+	require.NotEmpty(t, testPath)
+	err = db.SaveSetting(BackupPath.GetReactName(), testPath)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, testPath, settings.BackupPath)
 }

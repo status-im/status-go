@@ -5,10 +5,15 @@ import logging
 
 from clients.signals import SignalType
 from steps.messenger import MessengerSteps
-from steps.status_backend import StatusBackendSteps
 
 
-class TestProfile(StatusBackendSteps):
+class TestProfile:
+
+    @pytest.fixture(autouse=True)
+    def setup_backend(self, backend_new_profile):
+        """Initialize one backend for each test function"""
+        self.rpc_client = backend_new_profile("rpc_client")
+
     @pytest.mark.parametrize(
         "method, params",
         [
@@ -72,7 +77,6 @@ class TestProfile(StatusBackendSteps):
         "method, setting_name, set_value",
         [
             ("settings_saveSetting", "mnemonic-removed?", True),
-            ("settings_saveSetting", "push-notifications-server-enabled?", True),
             ("settings_saveSetting", "push-notifications-from-contacts-only?", True),
             ("settings_saveSetting", "push-notifications-block-mentions?", True),
             ("settings_saveSetting", "remember-syncing-choice?", True),
@@ -129,12 +133,17 @@ class TestProfile(StatusBackendSteps):
         assert setting_name not in response.json()["result"]
 
 
-@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc
 class TestUserStatus(MessengerSteps):
 
+    @pytest.fixture(autouse=True)
+    def setup_backends(self, backend_new_profile):
+        """Initialize two unprivileged backends (sender and receiver) for each test function"""
+        self.sender = backend_new_profile("sender")
+        self.receiver = backend_new_profile("receiver")
+
     def test_status_updates(self):
-        self.make_contacts()
+        self.make_contacts(sender=self.sender, receiver=self.receiver)
 
         statuses = [[1, "text_1"], [2, "text_2"], [3, "text_3"], [4, "text_4"]]
 

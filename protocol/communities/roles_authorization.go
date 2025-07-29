@@ -1,7 +1,7 @@
 package communities
 
 import (
-	"golang.org/x/exp/slices"
+	"slices"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )

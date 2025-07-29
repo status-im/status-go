@@ -70,7 +70,6 @@ func (s *TransactorSuite) SetupTest() {
 		UpstreamChainID: chainID,
 		Networks:        nil,
 		DB:              db,
-		WalletFeed:      nil,
 	}
 	rpcClient, _ := statusRpc.NewClient(config)
 

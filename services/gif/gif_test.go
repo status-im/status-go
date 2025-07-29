@@ -9,6 +9,8 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -21,6 +23,18 @@ func setupSQLTestDb(t *testing.T) (*sql.DB, func()) {
 func setupTestDB(t *testing.T, db *sql.DB) (*accounts.Database, func()) {
 	acc, err := accounts.NewDB(db)
 	require.NoError(t, err)
+	config := params.NodeConfig{
+		NetworkID: 10,
+		DataDir:   "test",
+	}
+	networks := json.RawMessage("{}")
+	settingsObj := settings.Settings{
+		Networks: &networks,
+	}
+
+	err = acc.CreateSettings(settingsObj, config)
+	require.NoError(t, err)
+
 	return acc, func() {
 		require.NoError(t, db.Close())
 	}

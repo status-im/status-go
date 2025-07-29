@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/rpc"
@@ -110,8 +111,10 @@ type FeeManager struct {
 }
 
 func (f *FeeManager) IsEIP1559Enabled(ctx context.Context, chainID uint64) (bool, error) {
-	if common.IsGaslessChainAndEIP1559Compatible(chainID) {
-		return true, nil
+	// Since the Status Network is gasless chain, but EIP-1559 compatible, we should not rely on checking the BaseFeePerGas, that's why we have this special case.
+	eip1559Enabled, err := common.IsPartiallyOrFullyGaslessChainEIP1559Compatible(chainID)
+	if err == nil {
+		return eip1559Enabled, nil
 	}
 
 	backend, err := f.RPCClient.EthClient(chainID)
@@ -125,18 +128,40 @@ func (f *FeeManager) IsEIP1559Enabled(ctx context.Context, chainID uint64) (bool
 	return block.BaseFee() != nil && block.BaseFee().Cmp(big.NewInt(0)) > 0, nil
 }
 
-func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
+func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address ethCommon.Address) (suggestedFees *SuggestedFees, noBaseFee bool, noPriorityFee bool, err error) {
 	feeHistory, err := f.getFeeHistory(ctx, chainID, "latest", []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3})
 	if err != nil {
-		return f.getNonEIP1559SuggestedFees(ctx, chainID)
+		suggestedFees, err = f.getNonEIP1559SuggestedFees(ctx, chainID)
+		return
 	}
 
-	lowPriorityFeePerGasLowerBound, mediumPriorityFeePerGas, maxPriorityFeePerGasUpperBound, baseFee, err := getEIP1559SuggestedFees(chainID, feeHistory)
-	if err != nil {
-		return f.getNonEIP1559SuggestedFees(ctx, chainID)
+	var (
+		lowPriorityFeePerGasLowerBound *big.Int
+		mediumPriorityFeePerGas        *big.Int
+		maxPriorityFeePerGasUpperBound *big.Int
+		baseFee                        *big.Int
+	)
+
+	if chainID == common.StatusNetworkSepolia {
+		baseFee, lowPriorityFeePerGasLowerBound, err = f.getGaslessParamsForAccount(ctx, chainID, address)
+		if err != nil {
+			return
+		}
+
+		mediumPriorityFeePerGas = new(big.Int).Set(lowPriorityFeePerGasLowerBound)
+		maxPriorityFeePerGasUpperBound = new(big.Int).Set(lowPriorityFeePerGasLowerBound)
+
+		noBaseFee = baseFee == nil || baseFee.Cmp(common.ZeroBigIntValue()) == 0
+		noPriorityFee = lowPriorityFeePerGasLowerBound == nil || lowPriorityFeePerGasLowerBound.Cmp(common.ZeroBigIntValue()) == 0
+	} else {
+		lowPriorityFeePerGasLowerBound, mediumPriorityFeePerGas, maxPriorityFeePerGasUpperBound, baseFee, err = getEIP1559SuggestedFees(chainID, feeHistory)
+		if err != nil {
+			suggestedFees, err = f.getNonEIP1559SuggestedFees(ctx, chainID)
+			return
+		}
 	}
 
-	suggestedFees := &SuggestedFees{
+	suggestedFees = &SuggestedFees{
 		GasPrice:             big.NewInt(0),
 		BaseFee:              baseFee,
 		CurrentBaseFee:       baseFee,
@@ -184,14 +209,14 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 	suggestedFees.MaxFeesLevels.MediumEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Medium.ToInt(), suggestedFees.MaxFeesLevels.MediumPriority.ToInt(), chainID, 1)
 	suggestedFees.MaxFeesLevels.HighEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.High.ToInt(), suggestedFees.MaxFeesLevels.HighPriority.ToInt(), chainID, 1)
 
-	return suggestedFees, nil
+	return
 }
 
 // //////////////////////////////////////////////////////////////////////////////
 // TODO: remove `SuggestedFeesGwei` once mobile app fully switched to router, this function should not be exposed via api
 // //////////////////////////////////////////////////////////////////////////////
 func (f *FeeManager) SuggestedFeesGwei(ctx context.Context, chainID uint64) (*SuggestedFeesGwei, error) {
-	fees, err := f.SuggestedFees(ctx, chainID)
+	fees, _, _, err := f.SuggestedFees(ctx, chainID, common.ZeroAddress())
 	if err != nil {
 		return nil, err
 	}

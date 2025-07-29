@@ -53,6 +53,7 @@ var (
 		ArbitrumMainnet: true,
 		BaseMainnet:     true,
 		BSCMainnet:      true,
+		AnvilMainnet:    true,
 	}
 
 	SupportedTestNetworks = map[uint64]bool{
@@ -122,6 +123,10 @@ func AllChainIDs() []ChainID {
 		ChainID(TestnetChainID),
 		ChainID(AnvilMainnet),
 	}
+}
+
+func IsSupportedChainID(chainID uint64) bool {
+	return SupportedNetworks[chainID] || SupportedTestNetworks[chainID]
 }
 
 var AverageBlockDurationForChain = map[ChainID]time.Duration{

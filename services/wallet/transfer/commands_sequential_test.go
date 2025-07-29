@@ -5,23 +5,17 @@ import (
 	"database/sql"
 	"fmt"
 	"math/big"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/services/wallet/blockchainstate"
-	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
-	"github.com/status-im/status-go/t/utils"
-
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
-	"go.uber.org/mock/gomock"
-	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
-
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -29,11 +23,14 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multicommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
@@ -46,10 +43,13 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -587,19 +587,6 @@ func (tc *TestClient) CallContext(ctx context.Context, result interface{}, metho
 	return err
 }
 
-func (tc *TestClient) GetWalletNotifier() func(chainId uint64, message string) {
-	if tc.traceAPICalls {
-		tc.t.Log("GetWalletNotifier")
-	}
-	return nil
-}
-
-func (tc *TestClient) SetWalletNotifier(notifier func(chainId uint64, message string)) {
-	if tc.traceAPICalls {
-		tc.t.Log("SetWalletNotifier")
-	}
-}
-
 func (tc *TestClient) EstimateGas(ctx context.Context, call ethereum.CallMsg) (gas uint64, err error) {
 	err = tc.countAndlog("EstimateGas")
 	return 0, err
@@ -718,12 +705,12 @@ func (tc *TestClient) SetIsConnected(value bool) {
 	}
 }
 
-func (tc *TestClient) IsConnected() bool {
+func (tc *TestClient) GetConnectionStatus() rpcstatus.StatusType {
 	if tc.traceAPICalls {
-		tc.t.Log("GetIsConnected")
+		tc.t.Log("GetConnectionStatus")
 	}
 
-	return true
+	return rpcstatus.StatusUp
 }
 
 func (tc *TestClient) GetLimiter() rpclimiter.RequestLimiter {
@@ -1134,13 +1121,12 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appDb,
-		WalletFeed:      nil,
 	}
 	client, err := statusRpc.NewClient(config)
 	require.NoError(t, err)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager = token.NewTokenManager(walletDb, client, community.NewManager(appDb, nil, nil), network.NewManager(appDb, nil, nil, nil), appDb, mediaServer, nil, nil, nil, token.NewPersistence(walletDb))
+	tokenManager = token.NewTokenManager(walletDb, client, community.NewManager(appDb, nil, nil), network.NewManager(appDb, nil), appDb, mediaServer, nil, nil, nil, token.NewPersistence(walletDb))
 
 	tokenListsFetcher := fetcher.NewTokenListsFetcher(walletDb)
 	err = tokenListsFetcher.StoreTokenList("sequential-commands-tests-list", "", "abcd", sequentialCommandsTestsListJsonData)
@@ -1394,12 +1380,11 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 	address := common.HexToAddress("0x1234")
 	chainClient := newMockChainClient()
@@ -1506,12 +1491,11 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 			UpstreamChainID: 1,
 			Networks:        []params.Network{},
 			DB:              appdb,
-			WalletFeed:      nil,
 		}
 		client, _ := statusRpc.NewClient(config)
 
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 		cmd := &findNewBlocksCommand{
 			findBlocksCommand: &findBlocksCommand{
@@ -1575,12 +1559,11 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 	wdb := NewDB(db)
 	blockChannel := make(chan []*DBHeader, 10)
@@ -1697,13 +1680,12 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
 	client.SetClient(tc.NetworkID(), tc)
 
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
 	cmd := &findNewBlocksCommand{
 		findBlocksCommand: &findBlocksCommand{
@@ -1825,7 +1807,6 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
-		WalletFeed:      nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 

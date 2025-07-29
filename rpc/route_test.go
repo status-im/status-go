@@ -47,3 +47,11 @@ func TestBlockedRoutes(t *testing.T) {
 		require.True(t, router.routeBlocked(method))
 	}
 }
+
+func TestLineaEstimateGasRouting(t *testing.T) {
+	router := newRouter(true)
+
+	require.True(t, router.routeRemote("linea_estimateGas"), "linea_estimateGas should be routed to remote")
+
+	require.False(t, router.routeBlocked("linea_estimateGas"), "linea_estimateGas should not be blocked")
+}

@@ -2,8 +2,6 @@ package types
 
 import (
 	"crypto/ecdsa"
-
-	"github.com/status-im/status-go/wakuv2"
 )
 
 type ChatToInitialize struct {
@@ -14,7 +12,7 @@ type ChatToInitialize struct {
 type ChatsToInitialize []*ChatToInitialize
 
 type CommunityToInitialize struct {
-	Shard   *wakuv2.Shard
+	Shard   *Shard
 	PrivKey *ecdsa.PrivateKey
 }
 

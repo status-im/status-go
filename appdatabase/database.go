@@ -14,10 +14,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/appdatabase/migrations"
 	migrationsprevnodecfg "github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
@@ -407,6 +407,7 @@ func migrateWalletJSONBlobs(sqlTx *sql.Tx) error {
 			if err != nil {
 				return err
 			}
+			defer stmt.Close()
 
 			for _, dataEntry := range batchEntries {
 				_, err = stmt.Exec(dataEntry...)
@@ -522,6 +523,7 @@ func migrateWalletTransferFromToAddresses(sqlTx *sql.Tx) error {
 			if err != nil {
 				return err
 			}
+			defer stmt.Close()
 
 			for _, dataEntry := range batchEntries {
 				_, err = stmt.Exec(dataEntry...)

@@ -1259,6 +1259,8 @@ func (db *sqlitePersistence) AddBookmark(bookmark browsers.Bookmark) (browsers.B
 		return bookmark, err
 	}
 
+	defer insert.Close()
+
 	// Get the right icon
 	finder := besticon.IconFinder{}
 	icons, iconError := finder.FetchIcons(bookmark.URL)
@@ -1457,6 +1459,8 @@ func (db *sqlitePersistence) UpdateBookmark(oldURL string, bookmark browsers.Boo
 	if err != nil {
 		return err
 	}
+	defer insert.Close()
+
 	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock, bookmark.DeletedAt, oldURL)
 	return err
 }

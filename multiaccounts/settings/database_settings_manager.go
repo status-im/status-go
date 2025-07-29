@@ -42,7 +42,6 @@ type DatabaseSettingsManager interface {
 	GetTokenGroupByCommunity() (result bool, err error)
 	GetCollectibleGroupByCommunity() (result bool, err error)
 	GetCollectibleGroupByCollection() (result bool, err error)
-	GetTelemetryServerURL() (string, error)
 
 	SetSettingsNotifier(n Notifier)
 	SetSettingLastSynced(setting SettingField, clock uint64) error
@@ -63,6 +62,7 @@ type DatabaseSettingsManager interface {
 	CanSyncOnMobileNetwork() (result bool, err error)
 	ShouldBroadcastUserStatus() (result bool, err error)
 	BackupEnabled() (result bool, err error)
+	BackupPath() (result string, err error)
 	AutoMessageEnabled() (result bool, err error)
 	LastBackup() (result uint64, err error)
 	BackupFetched() (result bool, err error)

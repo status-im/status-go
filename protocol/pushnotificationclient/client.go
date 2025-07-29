@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -715,10 +716,11 @@ func (c *Client) subscribeForMessageEvents() {
 	go func() {
 		defer gocommon.LogOnPanic()
 		c.config.Logger.Debug("subscribing for message events")
-		messageEventsSubscription := c.messageSender.SubscribeToMessageEvents()
+		messageEventsSub, unsubMessageEvents := pubsub.Subscribe[common.MessageEvent](c.messageSender.Publisher(), 100)
+		defer unsubMessageEvents()
 		for {
 			select {
-			case m, more := <-messageEventsSubscription:
+			case m, more := <-messageEventsSub:
 				if !more {
 					c.config.Logger.Debug("no more message events, quitting")
 					return
@@ -726,12 +728,12 @@ func (c *Client) subscribeForMessageEvents() {
 				switch m.Type {
 				case common.MessageScheduled:
 					c.config.Logger.Debug("handling message scheduled")
-					if err := c.handleMessageScheduled(m); err != nil {
+					if err := c.handleMessageScheduled(&m); err != nil {
 						c.config.Logger.Error("failed to handle message", zap.Error(err))
 					}
 				case common.MessageSent:
 					c.config.Logger.Debug("handling message sent")
-					if err := c.handleMessageSent(m); err != nil {
+					if err := c.handleMessageSent(&m); err != nil {
 						c.config.Logger.Error("failed to handle message", zap.Error(err))
 					}
 				default:

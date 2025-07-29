@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
@@ -88,12 +89,13 @@ type Manager struct {
 	communityManager     *community.Manager
 	mediaServer          *server.MediaServer
 	walletFeed           *event.Feed
-	accountFeed          *event.Feed
-	accountWatcher       *accountsevent.Watcher
 	accountsDB           *accounts.Database
+	accountsPublisher    *pubsub.Publisher
 	tokenBalancesStorage TokenBalancesStorage
 
 	tokenLists *tokenlists.TokenLists
+
+	stopCh chan struct{}
 }
 
 func NewTokenManager(
@@ -104,7 +106,7 @@ func NewTokenManager(
 	appDB *sql.DB,
 	mediaServer *server.MediaServer,
 	walletFeed *event.Feed,
-	accountFeed *event.Feed,
+	accountsPublisher *pubsub.Publisher,
 	accountsDB *accounts.Database,
 	tokenBalancesStorage TokenBalancesStorage,
 ) *Manager {
@@ -126,7 +128,7 @@ func NewTokenManager(
 		communityTokensDB:    communitytokensdatabase.NewCommunityTokensDatabase(appDB),
 		mediaServer:          mediaServer,
 		walletFeed:           walletFeed,
-		accountFeed:          accountFeed,
+		accountsPublisher:    accountsPublisher,
 		accountsDB:           accountsDB,
 		tokenBalancesStorage: tokenBalancesStorage,
 		tokenLists:           tokensLists,
@@ -134,6 +136,7 @@ func NewTokenManager(
 }
 
 func (tm *Manager) Start(ctx context.Context, autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) {
+	tm.stopCh = make(chan struct{})
 	tm.startAccountsWatcher()
 
 	// For now we don't have the list of tokens lists remotely set so we're uisng the harcoded default lists. Once we have it
@@ -142,24 +145,34 @@ func (tm *Manager) Start(ctx context.Context, autoRefreshInterval time.Duration,
 }
 
 func (tm *Manager) startAccountsWatcher() {
-	if tm.accountWatcher != nil || tm.accountFeed == nil || tm.accountsDB == nil {
+	if tm.accountsPublisher == nil || tm.accountsDB == nil {
 		return
 	}
 
-	tm.accountWatcher = accountsevent.NewWatcher(tm.accountsDB, tm.accountFeed, tm.onAccountsChange)
-	tm.accountWatcher.Start()
+	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](tm.accountsPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubFn()
+		for {
+			select {
+			case <-tm.stopCh:
+				return
+			case event, ok := <-ch:
+				if !ok {
+					return
+				}
+				tm.onAccountsRemoved(event.Accounts)
+			}
+		}
+	}()
 }
 
 func (tm *Manager) Stop() {
-	tm.tokenLists.Stop()
-	tm.stopAccountsWatcher()
-}
-
-func (tm *Manager) stopAccountsWatcher() {
-	if tm.accountWatcher != nil {
-		tm.accountWatcher.Stop()
-		tm.accountWatcher = nil
+	if tm.stopCh != nil {
+		close(tm.stopCh)
+		tm.stopCh = nil
 	}
+	tm.tokenLists.Stop()
 }
 
 // overrideTokensInPlace overrides tokens in the store with the ones from the networks
@@ -368,6 +381,7 @@ func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *tokenTyp
 		logutils.ZapLogger().Error("Cannot prepare token update query", zap.Error(err))
 		return
 	}
+	defer update.Close()
 
 	if uri == "" {
 		// Update token community ID to prevent further checks
@@ -657,6 +671,7 @@ func (tm *Manager) UpsertCustom(token tokenTypes.Token) error {
 	if err != nil {
 		return err
 	}
+	defer insert.Close()
 	_, err = insert.Exec(token.ChainID, token.Address, token.Name, token.Symbol, token.Decimals)
 	return err
 }
@@ -759,13 +774,11 @@ func (tm *Manager) removeTokenBalances(account common.Address) error {
 	return err
 }
 
-func (tm *Manager) onAccountsChange(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
-	if eventType == accountsevent.EventTypeRemoved {
-		for _, account := range changedAddresses {
-			err := tm.removeTokenBalances(account)
-			if err != nil {
-				logutils.ZapLogger().Error("token.Manager: can't remove token balances", zap.Error(err))
-			}
+func (tm *Manager) onAccountsRemoved(removedAddresses []common.Address) {
+	for _, account := range removedAddresses {
+		err := tm.removeTokenBalances(account)
+		if err != nil {
+			logutils.ZapLogger().Error("token.Manager: can't remove token balances", zap.Error(err))
 		}
 	}
 }

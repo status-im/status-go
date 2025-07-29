@@ -12,7 +12,11 @@ import (
 )
 
 func NewSettingsAPI(messenger **protocol.Messenger, db *accounts.Database, config *params.NodeConfig) *SettingsAPI {
-	return &SettingsAPI{messenger, db, config}
+	return &SettingsAPI{
+		messenger: messenger,
+		db:        db,
+		config:    config,
+	}
 }
 
 // SettingsAPI is class with methods available over RPC.
@@ -61,6 +65,11 @@ func (api *SettingsAPI) NewsNotificationsEnabled() (bool, error) {
 
 func (api *SettingsAPI) NewsRSSEnabled() (bool, error) {
 	return api.db.NewsRSSEnabled()
+}
+
+// Backup Settings
+func (api *SettingsAPI) BackupPath() (string, error) {
+	return api.db.BackupPath()
 }
 
 // Notifications Settings

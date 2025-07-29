@@ -6,24 +6,32 @@ from clients.signals import SignalType
 from resources.constants import USE_IPV6
 
 
-@pytest.mark.usefixtures("setup_two_privileged_nodes")
 @pytest.mark.reliability
 class TestOneToOneMessages(MessengerSteps):
 
+    @pytest.fixture(autouse=True)
+    def setup_backends(self, backend_new_profile):
+        """Initialize two unprivileged backends (sender and receiver) for each test function"""
+        self.sender = backend_new_profile("sender")
+        self.receiver = backend_new_profile("receiver")
+
     def test_one_to_one_message_baseline(self, message_count=1):
-        self.one_to_one_message(message_count)
+        self.one_to_one_message(message_count, sender=self.sender, receiver=self.receiver)
 
     def test_multiple_one_to_one_messages(self):
         self.test_one_to_one_message_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_one_to_one_message_with_latency(self):
         with self.add_latency(self.receiver):
             self.test_one_to_one_message_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_one_to_one_message_with_packet_loss(self):
         with self.add_packet_loss(self.receiver):
             self.test_one_to_one_message_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_one_to_one_message_with_low_bandwidth(self):
         with self.add_low_bandwith(self.receiver):
             self.test_one_to_one_message_baseline(message_count=50)

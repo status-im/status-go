@@ -1,12 +1,14 @@
 import pytest
-import logging
-
-from steps.status_backend import StatusBackendSteps
 
 
 @pytest.mark.rpc
 @pytest.mark.wallet
-class TestSavedAddresses(StatusBackendSteps):
+class TestSavedAddresses:
+
+    @pytest.fixture(autouse=True)
+    def setup(self, backend_new_profile):
+        """Initialize backend for each test function"""
+        self.rpc_client = backend_new_profile("rpc_client")
 
     @pytest.mark.parametrize(
         "method, params",
@@ -55,22 +57,22 @@ class TestSavedAddresses(StatusBackendSteps):
     def test_add_saved_address(self, method, params):
         """Test adding saved addresses and verifying their presence in the lists."""
 
-        logging.info("Step: Adding item in mainnet mode")
+        # Step: Adding item in mainnet mode
         self.rpc_client.rpc_valid_request(method, params)
         response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddresses", [])
 
-        logging.info("Step: Verifying the item is in the saved addresses list")
+        # Step: Verifying the item is in the saved addresses list
         self.rpc_client.verify_json_schema(response.json(), "wakuext_getSavedAddresses")
         assert any(params[0].items() <= item.items() for item in response.json()["result"]), f"{params[0]['name']} not found in getSavedAddresses"
 
-        logging.info("Step: Checking if the item is listed under mainnet saved addresses")
+        # Step: Checking if the item is listed under mainnet saved addresses
         response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [False])
         self.rpc_client.verify_json_schema(response.json(), "wakuext_getSavedAddressesPerMode")
         assert any(
             params[0].items() <= item.items() for item in response.json()["result"]
         ), f"{params[0]['name']} not found in getSavedAddressesPerMode"
 
-        logging.info("Step: Ensuring the item is NOT in the testnet saved addresses list")
+        # Step: Ensuring the item is NOT in the testnet saved addresses list
         response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [True])
         assert response.json()["result"] is None, "wakuext_getSavedAddressesPerMode for test mode is not empty"
 
@@ -87,16 +89,16 @@ class TestSavedAddresses(StatusBackendSteps):
             }
         ]
 
-        logging.info("Step: Adding item in testnet mode")
+        # Step: Adding item in testnet mode
         self.rpc_client.rpc_valid_request("wakuext_upsertSavedAddress", params)
 
-        logging.info("Step: Verifying the item exists in testnet saved addresses")
+        # Step: Verifying the item exists in testnet saved addresses
         response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [is_test])
         assert any(
             params[0].items() <= item.items() for item in response.json()["result"]
         ), f"{params[0]['name']} not found in getSavedAddressesPerMode"
 
-        logging.info("Step: Deleting the item and verifying removal")
+        # Step: Deleting the item and verifying removal
         self.rpc_client.rpc_valid_request("wakuext_deleteSavedAddress", [address, is_test])
         response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [is_test])
         assert response.json()["result"] is None, "getSavedAddressesPerMode for test mode is not empty"
@@ -127,15 +129,15 @@ class TestSavedAddresses(StatusBackendSteps):
             "0x09B69c2F46E7F63131C54BAfae242EEc2C600762",
         ]
 
-        logging.info("Step: Checking remaining capacity")
+        # Step: Checking remaining capacity
         response = self.rpc_client.rpc_valid_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
         remaining_capacity = response.json()["result"]
 
-        logging.info("Step: adding  addresses to fill capacity")
+        # Step: adding  addresses to fill capacity
         for i in range(remaining_capacity):
             self.rpc_client.rpc_valid_request("wakuext_upsertSavedAddress", [{"address": addresses[i], "name": f"test{i}", "isTest": is_test}])
 
-        logging.info("Step: Verifying that capacity is now 0")
+        # Step: Verifying that capacity is now 0
         response = self.rpc_client.rpc_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
         self.rpc_client.verify_is_json_rpc_error(response)
         assert response.json()["error"]["message"] == "no more save addresses can be added"

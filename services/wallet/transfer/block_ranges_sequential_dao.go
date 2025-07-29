@@ -142,6 +142,7 @@ func (b *BlockRangeSequentialDAO) deleteRange(account common.Address) error {
 		logutils.ZapLogger().Error("Failed to prepare deletion of sequential block range", zap.Error(err))
 		return err
 	}
+	defer delete.Close()
 
 	_, err = delete.Exec(account)
 	return err
@@ -188,6 +189,7 @@ func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Add
 	if err != nil {
 		return err
 	}
+	defer query.Close()
 	_, err = query.Exec((*bigint.SQLBigInt)(ethBlockRange.Start), (*bigint.SQLBigInt)(ethBlockRange.FirstKnown), (*bigint.SQLBigInt)(ethBlockRange.LastKnown),
 		(*bigint.SQLBigInt)(tokensBlockRange.Start), (*bigint.SQLBigInt)(tokensBlockRange.FirstKnown), (*bigint.SQLBigInt)(tokensBlockRange.LastKnown), newBlockRange.balanceCheckHash, chainID, account)
 
@@ -229,6 +231,7 @@ func (b *BlockRangeSequentialDAO) upsertEthRange(chainID uint64, account common.
 	if err != nil {
 		return err
 	}
+	defer query.Close()
 	_, err = query.Exec((*bigint.SQLBigInt)(blockRange.Start), (*bigint.SQLBigInt)(blockRange.FirstKnown), (*bigint.SQLBigInt)(blockRange.LastKnown), chainID, account)
 
 	return err
@@ -253,6 +256,7 @@ func (b *BlockRangeSequentialDAO) updateTokenRange(chainID uint64, account commo
 	if err != nil {
 		return err
 	}
+	defer update.Close()
 
 	_, err = update.Exec((*bigint.SQLBigInt)(blockRange.Start), (*bigint.SQLBigInt)(blockRange.FirstKnown),
 		(*bigint.SQLBigInt)(blockRange.LastKnown), chainID, account)

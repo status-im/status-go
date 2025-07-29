@@ -50,9 +50,15 @@ def expect_push_notification(gorush, sender, receiver):
     assert push["data"]["chatId"] == keys.shake256(sender.public_key.encode("utf-8"))
 
 
-@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc
 class TestPushNotificationServer(MessengerSteps):
+
+    @pytest.fixture(autouse=True)
+    def setup_backends(self, backend_new_profile):
+        """Initialize two backends (alice and bob) for each test function"""
+        self.sender = backend_new_profile("alice")
+        self.receiver = backend_new_profile("bob")
+
     def test_push_notification_delivery(self, push_notification_server):
         server, gorush = push_notification_server
         alice = self.sender
@@ -68,10 +74,10 @@ class TestPushNotificationServer(MessengerSteps):
         assert "error" not in response
 
         # There is currently no way to reliably check if the devices have been registered, so we just wait a few seconds
-        time.sleep(5)
+        time.sleep(10)
 
         # Make contacts, this should force delivery of a push notification
-        self.make_contacts()
+        self.make_contacts(alice, bob)
         expect_push_notification(gorush, alice, bob)
 
         # Send a message from Alice to Bob

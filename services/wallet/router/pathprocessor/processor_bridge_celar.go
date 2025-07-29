@@ -18,11 +18,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/accounts-management/generator"
+
+	statuscommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts/celer"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/rpc"
-
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/utils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor/cbridge"
@@ -302,7 +303,7 @@ func (s *CelerBridgeProcessor) GetContractAddress(params ProcessorInputParams) (
 
 // TODO: remove this struct once mobile switches to the new approach
 func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (*ethTypes.Transaction, error) {
-	fromChain := s.rpcClient.NetworkManager.Find(sendArgs.ChainID)
+	fromChain := s.rpcClient.GetNetworkManager().Find(sendArgs.ChainID)
 	if fromChain == nil {
 		return nil, ErrNetworkNotFound
 	}
@@ -364,7 +365,7 @@ func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, s
 }
 
 func (s *CelerBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (*ethTypes.Transaction, error) {
-	fromChain := s.rpcClient.NetworkManager.Find(sendArgs.FromChainID)
+	fromChain := s.rpcClient.GetNetworkManager().Find(sendArgs.FromChainID)
 	if fromChain == nil {
 		return nil, ErrNetworkNotFound
 	}
@@ -455,6 +456,9 @@ func (s *CelerBridgeProcessor) CalculateAmountOut(params ProcessorInputParams) (
 	if amt.Err != nil {
 		return nil, createBridgeCellerErrorResponse(err)
 	}
-	amountOut, _ := new(big.Int).SetString(amt.EqValueTokenAmt, 10)
+	amountOut, ok := new(big.Int).SetString(amt.EqValueTokenAmt, 10)
+	if !ok {
+		return nil, statuscommon.ErrBigIntSetFromString(amt.EqValueTokenAmt)
+	}
 	return amountOut, nil
 }

@@ -17,12 +17,9 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerProfilePictureHandlerSuite(t *testing.T) {
@@ -30,62 +27,26 @@ func TestMessengerProfilePictureHandlerSuite(t *testing.T) {
 }
 
 type MessengerProfilePictureHandlerSuite struct {
-	suite.Suite
+	MessengerBaseTestSuite
+
 	alice *Messenger // client instance of Messenger
 	bob   *Messenger // server instance of Messenger
-
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh    wakutypes.Waku
-	logger *zap.Logger
-}
-
-func (s *MessengerProfilePictureHandlerSuite) SetupSuite() {
-	s.logger = tt.MustCreateTestLogger()
-
-	shh, err := newTestWakuNode(s.logger.Named("Waku"))
-	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
-	s.shh = shh
-}
-
-func (s *MessengerProfilePictureHandlerSuite) TearDownSuite() {
-	_ = s.shh.Stop()
-	_ = s.logger.Sync()
-}
-
-func (s *MessengerProfilePictureHandlerSuite) newMessenger(name string) *Messenger {
-	m, err := newTestMessenger(s.shh, testMessengerConfig{
-		logger: s.logger.Named(fmt.Sprintf("messenger-%s", name)),
-		name:   name,
-		extraOptions: []Option{
-			WithAppSettings(newTestSettings(), params.NodeConfig{}),
-		},
-	})
-	s.Require().NoError(err)
-
-	_, err = m.Start()
-	s.Require().NoError(err)
-
-	return m
 }
 
 func (s *MessengerProfilePictureHandlerSuite) SetupTest() {
+	s.MessengerBaseTestSuite.SetupTest()
+
 	// Generate Alice Messenger
-	s.alice = s.newMessenger("Alice")
-	s.bob = s.newMessenger("Bobby")
+	s.alice = s.m
+	s.bob = s.newMessenger()
 
 	// Setup MultiAccount for Alice Messenger
 	s.setupMultiAccount(s.alice)
 }
 
 func (s *MessengerProfilePictureHandlerSuite) TearDownTest() {
-	// Shutdown messengers
-	TearDownMessenger(&s.Suite, s.alice)
-	s.alice = nil
 	TearDownMessenger(&s.Suite, s.bob)
-	s.bob = nil
-	_ = s.logger.Sync()
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
@@ -240,10 +201,10 @@ func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided()
 		s.Require().NotNil(response)
 
 		contacts := response.Contacts
-		s.logger.Debug("RetryWithBackOff contact data", zap.Any("contacts", contacts))
+		s.T().Log("RetryWithBackOff contact data", zap.Any("contacts", contacts))
 
 		if len(contacts) > 0 && len(contacts[0].Images) > 0 {
-			s.logger.Debug("", zap.Any("contacts", contacts))
+			s.T().Log("", zap.Any("contacts", contacts))
 			return nil
 		}
 
@@ -299,27 +260,26 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 
 func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePicture(args *e2eArgs) {
 	// Generate Alice Messenger
-	alice := s.newMessenger("Alice")
-	bob := s.newMessenger("Bobby")
-
-	// Setup MultiAccount for Alice Messenger
-	s.setupMultiAccount(alice)
+	alice := s.newMessenger()
+	bob := s.newMessenger()
 
 	defer func() {
 		TearDownMessenger(&s.Suite, alice)
 		alice = nil
 		TearDownMessenger(&s.Suite, bob)
 		bob = nil
-		_ = s.logger.Sync()
 	}()
 
-	s.logger.Info("testing with criteria:", zap.Any("args", args))
-	defer s.logger.Info("Completed testing with criteria:", zap.Any("args", args))
+	// Setup MultiAccount for Alice Messenger
+	s.setupMultiAccount(alice)
+
+	s.T().Log("testing with criteria:", zap.Any("args", args))
+	defer s.T().Log("Completed testing with criteria:", zap.Any("args", args))
 
 	expectPicture, err := args.resultExpected()
 	s.Require().NoError(err)
 
-	s.logger.Debug("expect to receive a profile pic?",
+	s.T().Log("expect to receive a profile pic?",
 		zap.Bool("result", expectPicture),
 		zap.Error(err))
 

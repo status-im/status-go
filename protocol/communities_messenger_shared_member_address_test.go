@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
@@ -16,9 +15,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerCommunitiesSharedMemberAddressSuite(t *testing.T) {
@@ -26,16 +22,11 @@ func TestMessengerCommunitiesSharedMemberAddressSuite(t *testing.T) {
 }
 
 type MessengerCommunitiesSharedMemberAddressSuite struct {
-	suite.Suite
+	MessengerBaseTestSuite
+
 	owner *Messenger
 	bob   *Messenger
 	alice *Messenger
-
-	ownerWaku wakutypes.Waku
-	bobWaku   wakutypes.Waku
-	aliceWaku wakutypes.Waku
-
-	logger *zap.Logger
 
 	mockedBalances          map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
 	collectiblesServiceMock *CollectiblesServiceMock
@@ -44,13 +35,7 @@ type MessengerCommunitiesSharedMemberAddressSuite struct {
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) SetupTest() {
-	// Initialize with nil to avoid panics in TearDownTest
-	s.owner = nil
-	s.bob = nil
-	s.alice = nil
-	s.ownerWaku = nil
-	s.bobWaku = nil
-	s.aliceWaku = nil
+	s.MessengerBaseTestSuite.setupMessaging()
 
 	communities.SetValidateInterval(300 * time.Millisecond)
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
@@ -61,19 +46,12 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) SetupTest() {
 
 	s.resetMockedBalances()
 
-	s.logger = tt.MustCreateTestLogger()
+	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, "owner", []Option{})
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
-
-	s.ownerWaku = wakuNodes[0]
-	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, "owner", []Option{})
-
-	s.bobWaku = wakuNodes[1]
-	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, "bob", []Option{})
+	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, "bob", []Option{})
 	s.bob.EnableBackedupMessagesProcessing()
 
-	s.aliceWaku = wakuNodes[2]
-	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, s.aliceWaku, "alice", []Option{})
+	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{})
 
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
@@ -87,27 +65,17 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.owner)
 	TearDownMessenger(&s.Suite, s.bob)
 	TearDownMessenger(&s.Suite, s.alice)
-	if s.ownerWaku != nil {
-		s.Require().NoError(s.ownerWaku.Stop())
-	}
-	if s.bobWaku != nil {
-		s.Require().NoError(s.bobWaku.Stop())
-	}
-	if s.aliceWaku != nil {
-		s.Require().NoError(s.aliceWaku.Stop())
-	}
-	_ = s.logger.Sync()
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
-func (s *MessengerCommunitiesSharedMemberAddressSuite) newMessenger(password string, walletAddresses []string, waku wakutypes.Waku, name string, extraOptions []Option) *Messenger {
+func (s *MessengerCommunitiesSharedMemberAddressSuite) newMessenger(password string, walletAddresses []string, name string, extraOptions []Option) *Messenger {
 	communityManagerOptions := []communities.ManagerOption{
 		communities.WithAllowForcingCommunityMembersReevaluation(true),
 	}
 	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
 
-	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
+	return newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
-			logger:       s.logger.Named(name),
 			extraOptions: extraOptions,
 		},
 		password:            password,

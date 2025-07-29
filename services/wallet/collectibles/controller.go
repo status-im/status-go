@@ -15,8 +15,8 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/rpc/network/networksevent"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/async"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -35,47 +35,44 @@ type timerPerChainID = map[walletCommon.ChainID]*time.Timer
 type timerPerAddressAndChainID = map[common.Address]timerPerChainID
 
 type Controller struct {
-	manager      *Manager
-	ownershipDB  OwnershipStorage
-	walletFeed   *event.Feed
-	accountsDB   *accounts.Database
-	accountsFeed *event.Feed
-	networksFeed *event.Feed
+	manager           *Manager
+	ownershipDB       OwnershipStorage
+	walletFeed        *event.Feed
+	accountsDB        *accounts.Database
+	accountsPublisher *pubsub.Publisher
 
 	networkManager *network.Manager
 	cancelFn       context.CancelFunc
 
-	commands             commandPerAddressAndChainID
-	timers               timerPerAddressAndChainID
-	group                *async.Group
-	accountsWatcher      *accountsevent.Watcher
-	walletEventsWatcher  *walletevent.Watcher
-	networkEventsWatcher *networksevent.Watcher
+	commands            commandPerAddressAndChainID
+	timers              timerPerAddressAndChainID
+	group               *async.Group
+	walletEventsWatcher *walletevent.Watcher
 
 	ownedCollectiblesChangeCb OwnedCollectiblesChangeCb
 	collectiblesTransferCb    TransferCb
 
 	commandsLock sync.RWMutex
+
+	stopCh chan struct{}
 }
 
 func NewController(
 	db *sql.DB,
 	walletFeed *event.Feed,
 	accountsDB *accounts.Database,
-	accountsFeed *event.Feed,
-	networksFeed *event.Feed,
+	accountsPublisher *pubsub.Publisher,
 	networkManager *network.Manager,
 	manager *Manager) *Controller {
 	return &Controller{
-		manager:        manager,
-		ownershipDB:    NewOwnershipDB(db),
-		walletFeed:     walletFeed,
-		accountsDB:     accountsDB,
-		accountsFeed:   accountsFeed,
-		networksFeed:   networksFeed,
-		networkManager: networkManager,
-		commands:       make(commandPerAddressAndChainID),
-		timers:         make(timerPerAddressAndChainID),
+		manager:           manager,
+		ownershipDB:       NewOwnershipDB(db),
+		walletFeed:        walletFeed,
+		accountsDB:        accountsDB,
+		accountsPublisher: accountsPublisher,
+		networkManager:    networkManager,
+		commands:          make(commandPerAddressAndChainID),
+		timers:            make(timerPerAddressAndChainID),
 	}
 }
 
@@ -88,6 +85,8 @@ func (c *Controller) SetCollectiblesTransferCb(cb TransferCb) {
 }
 
 func (c *Controller) Start() {
+	c.stopCh = make(chan struct{})
+
 	// Setup periodical collectibles refresh
 	_ = c.startPeriodicalOwnershipFetch()
 
@@ -102,11 +101,12 @@ func (c *Controller) Start() {
 }
 
 func (c *Controller) Stop() {
-	c.stopNetworkEventsWatcher()
+	if c.stopCh != nil {
+		close(c.stopCh)
+		c.stopCh = nil
+	}
 
 	c.stopWalletEventsWatcher()
-
-	c.stopAccountsWatcher()
 
 	c.stopPeriodicalOwnershipFetch()
 }
@@ -291,43 +291,59 @@ func (c *Controller) stopPeriodicalOwnershipFetchForAccountAndChainID(address co
 }
 
 func (c *Controller) startAccountsWatcher() {
-	if c.accountsWatcher != nil {
+	if c.accountsPublisher == nil {
 		return
 	}
 
-	accountChangeCb := func(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
-		c.commandsLock.Lock()
-		defer c.commandsLock.Unlock()
-		// Whenever an account gets added, start fetching
-		if eventType == accountsevent.EventTypeAdded {
-			for _, address := range changedAddresses {
-				err := c.startPeriodicalOwnershipFetchForAccount(address)
-				if err != nil {
-					as := address.String()
-					logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.String("address", gocommon.TruncateWithDot(as)), zap.Error(err))
+	chAdded, unsubFnAdded := pubsub.Subscribe[accountsevent.AccountsAddedEvent](c.accountsPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubFnAdded()
+		for {
+			select {
+			case <-c.stopCh:
+				return
+			case event, ok := <-chAdded:
+				if !ok {
+					return
 				}
-			}
-		} else if eventType == accountsevent.EventTypeRemoved {
-			for _, address := range changedAddresses {
-				err := c.stopPeriodicalOwnershipFetchForAccount(address)
-				if err != nil {
-					as := address.String()
-					logutils.ZapLogger().Error("Error stopping periodical collectibles fetch", zap.String("address", gocommon.TruncateWithDot(as)), zap.Error(err))
+				c.commandsLock.Lock()
+				for _, address := range event.Accounts {
+					err := c.startPeriodicalOwnershipFetchForAccount(address)
+					if err != nil {
+						as := address.String()
+						logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.String("address", gocommon.TruncateWithDot(as)), zap.Error(err))
+					}
 				}
+				c.commandsLock.Unlock()
 			}
 		}
-	}
+	}()
 
-	c.accountsWatcher = accountsevent.NewWatcher(c.accountsDB, c.accountsFeed, accountChangeCb)
-
-	c.accountsWatcher.Start()
-}
-
-func (c *Controller) stopAccountsWatcher() {
-	if c.accountsWatcher != nil {
-		c.accountsWatcher.Stop()
-		c.accountsWatcher = nil
-	}
+	chRemoved, unsubFnRemoved := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](c.accountsPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubFnRemoved()
+		for {
+			select {
+			case <-c.stopCh:
+				return
+			case event, ok := <-chRemoved:
+				if !ok {
+					return
+				}
+				c.commandsLock.Lock()
+				for _, address := range event.Accounts {
+					err := c.stopPeriodicalOwnershipFetchForAccount(address)
+					if err != nil {
+						as := address.String()
+						logutils.ZapLogger().Error("Error stopping periodical collectibles fetch", zap.String("address", gocommon.TruncateWithDot(as)), zap.Error(err))
+					}
+				}
+				c.commandsLock.Unlock()
+			}
+		}
+	}()
 }
 
 func (c *Controller) startWalletEventsWatcher() {
@@ -366,34 +382,32 @@ func (c *Controller) stopWalletEventsWatcher() {
 }
 
 func (c *Controller) startNetworkEventsWatcher() {
-	if c.networkEventsWatcher != nil {
+	if c.networkManager == nil {
 		return
 	}
 
-	activeNetworksChangeCb := func() {
-		// Lazy logic for now, just restart everything if there's any network change.
-		// TODO #17183: Per-network logic
-		c.stopPeriodicalOwnershipFetch()
-		err := c.startPeriodicalOwnershipFetch()
-		if err != nil {
-			logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Error(err))
+	ch, unsub := pubsub.Subscribe[network.EventActiveNetworksChanged](c.networkManager.GetPublisher(), 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsub()
+		for {
+			select {
+			case <-c.stopCh:
+				return
+			case _, ok := <-ch:
+				if !ok {
+					return
+				}
+				// Lazy logic for now, just restart everything if there's any network change.
+				// TODO #17183: Per-network logic
+				c.stopPeriodicalOwnershipFetch()
+				err := c.startPeriodicalOwnershipFetch()
+				if err != nil {
+					logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Error(err))
+				}
+			}
 		}
-	}
-
-	networkEventsWatcherCallbacks := networksevent.EventCallbacks{
-		ActiveNetworksChangeCb: activeNetworksChangeCb,
-	}
-
-	c.networkEventsWatcher = networksevent.NewWatcher(c.networksFeed, networkEventsWatcherCallbacks)
-
-	c.networkEventsWatcher.Start()
-}
-
-func (c *Controller) stopNetworkEventsWatcher() {
-	if c.networkEventsWatcher != nil {
-		c.networkEventsWatcher.Stop()
-		c.networkEventsWatcher = nil
-	}
+	}()
 }
 
 func (c *Controller) refetchOwnershipIfRecentTransfer(account common.Address, chainID walletCommon.ChainID, latestTxTimestamp int64) {

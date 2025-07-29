@@ -5,15 +5,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/multiaccounts/common"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerAccountCustomizationColor(t *testing.T) {
@@ -21,38 +16,23 @@ func TestMessengerAccountCustomizationColor(t *testing.T) {
 }
 
 type MessengerSyncAccountCustomizationColorSuite struct {
-	suite.Suite
+	MessengerBaseTestSuite
 	alice  *Messenger
 	alice2 *Messenger
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh    wakutypes.Waku
-	logger *zap.Logger
 }
 
 func (s *MessengerSyncAccountCustomizationColorSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.MessengerBaseTestSuite.SetupTest()
 
-	shh, err := newTestWakuNode(s.logger)
-	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
-	s.shh = shh
-
-	pk, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	s.alice, err = newMessengerWithKey(s.shh, pk, s.logger, nil)
-	s.Require().NoError(err)
-
-	s.alice2, err = newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
-	s.Require().NoError(err)
+	s.alice = s.m
+	s.alice2 = s.anotherMessenger()
 
 	prepareAliceMessengersForPairing(&s.Suite, s.alice, s.alice2)
 }
 
 func (s *MessengerSyncAccountCustomizationColorSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.alice)
 	TearDownMessenger(&s.Suite, s.alice2)
-	_ = s.logger.Sync()
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func prepareAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {

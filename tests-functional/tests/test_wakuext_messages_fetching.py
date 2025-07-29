@@ -3,11 +3,18 @@ import pytest
 from steps.messenger import MessengerSteps
 
 
-@pytest.mark.parametrize("setup_two_unprivileged_nodes", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 @pytest.mark.rpc
+@pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 class TestFetchingChatMessages(MessengerSteps):
-    def test_chat_messages(self, setup_two_unprivileged_nodes):
-        sent_texts, _ = self.send_multiple_one_to_one_messages(1)
+
+    @pytest.fixture(autouse=True)
+    def setup_backends(self, backend_new_profile, waku_light_client):
+        """Initialize two backends (sender and receiver) for each test function"""
+        self.sender = backend_new_profile("sender", waku_light_client=waku_light_client)
+        self.receiver = backend_new_profile("receiver", waku_light_client=waku_light_client)
+
+    def test_chat_messages(self):
+        sent_texts, _ = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
 
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.chat_messages(sender_chat_id)
@@ -19,8 +26,8 @@ class TestFetchingChatMessages(MessengerSteps):
         actual_text = messages[0].get("text", "")
         assert actual_text == sent_texts[0]
 
-    def test_chat_messages_with_pagination(self, setup_two_unprivileged_nodes):
-        sent_texts, _ = self.send_multiple_one_to_one_messages(5)
+    def test_chat_messages_with_pagination(self):
+        sent_texts, _ = self.send_multiple_one_to_one_messages(5, sender=self.sender, receiver=self.receiver)
         sender_chat_id = self.receiver.public_key
 
         # Page 1
@@ -44,8 +51,8 @@ class TestFetchingChatMessages(MessengerSteps):
         assert messages_page2[1].get("text", "") == sent_texts[0]
         assert cursor2 == ""
 
-    def test_message_by_message_id(self, setup_two_unprivileged_nodes):
-        sent_texts, responses = self.send_multiple_one_to_one_messages(1)
+    def test_message_by_message_id(self):
+        sent_texts, responses = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
 
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
         response = self.sender.wakuext_service.message_by_message_id(message_id)
@@ -63,8 +70,8 @@ class TestFetchingChatMessages(MessengerSteps):
             # ("TEST_MESSAGE_", True, 0),  # Skipped due to https://github.com/status-im/status-go/issues/6359
         ],
     )
-    def test_all_messages_from_chat_which_match_term(self, searchTerm, caseSensitive, expectedCount, setup_two_unprivileged_nodes):
-        self.send_multiple_one_to_one_messages(3)
+    def test_all_messages_from_chat_which_match_term(self, searchTerm, caseSensitive, expectedCount):
+        self.send_multiple_one_to_one_messages(3, sender=self.sender, receiver=self.receiver)
         sender_chat_id = self.receiver.public_key
 
         response = self.sender.wakuext_service.all_messages_from_chat_which_match_term(sender_chat_id, searchTerm, caseSensitive)
@@ -74,20 +81,20 @@ class TestFetchingChatMessages(MessengerSteps):
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == expectedCount
 
-    def test_all_messages_from_chats_and_communities_which_match_term(self, setup_two_unprivileged_nodes):
+    def test_all_messages_from_chats_and_communities_which_match_term(self):
         # One to one
-        self.make_contacts()
-        sent_texts_one_to_one, _ = self.send_multiple_one_to_one_messages(1)
+        self.make_contacts(self.sender, self.receiver)
+        sent_texts_one_to_one, _ = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
         one_to_one_chat_id = self.receiver.public_key
 
         # Group
-        private_group_chat_id = self.join_private_group()
+        private_group_chat_id = self.join_private_group(admin=self.sender, member=self.receiver)
         text_group = "test_message_group"
         response = self.sender.wakuext_service.send_group_chat_message(private_group_chat_id, text_group)
 
         # Community
         self.create_community(self.sender)
-        community_chat_id = self.join_community(self.receiver)
+        community_chat_id = self.join_community(member=self.receiver, admin=self.sender)
         text_community = "test_message_community"
         response = self.sender.wakuext_service.send_chat_message(community_chat_id, text_community)
 
@@ -103,19 +110,19 @@ class TestFetchingChatMessages(MessengerSteps):
         assert text_community in actual_texts
 
     @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6359")
-    def test_all_messages_from_chats_and_communities_which_match_term_case_sensitive(self, setup_two_unprivileged_nodes):
+    def test_all_messages_from_chats_and_communities_which_match_term_case_sensitive(self):
         # One to one
-        self.make_contacts()
-        _, _ = self.send_multiple_one_to_one_messages(1)
+        self.make_contacts(self.sender, self.receiver)
+        _, _ = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
         one_to_one_chat_id = self.receiver.public_key
 
         # Group
-        private_group_chat_id = self.join_private_group()
+        private_group_chat_id = self.join_private_group(admin=self.sender, member=self.receiver)
         self.sender.wakuext_service.send_group_chat_message(private_group_chat_id, "test_message_group")
 
         # Community
         self.create_community(self.sender)
-        community_chat_id = self.join_community(self.receiver)
+        community_chat_id = self.join_community(member=self.receiver, admin=self.sender)
         self.sender.wakuext_service.send_chat_message(community_chat_id, "test_message_community")
 
         response = self.sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
@@ -125,8 +132,8 @@ class TestFetchingChatMessages(MessengerSteps):
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == 0
 
-    def test_first_unseen_message(self, setup_two_unprivileged_nodes):
-        _, responses = self.send_multiple_one_to_one_messages(1)
+    def test_first_unseen_message(self):
+        _, responses = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
         sender_chat_id = self.receiver.public_key
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
 

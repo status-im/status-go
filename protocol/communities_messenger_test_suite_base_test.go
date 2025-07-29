@@ -4,9 +4,6 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -15,18 +12,11 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
-// TODO: in future adapt this struct to use waku v2 and switch all tests to waku v2
 type CommunitiesMessengerTestSuiteBase struct {
-	suite.Suite
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh                     wakutypes.Waku
-	logger                  *zap.Logger
+	MessengerBaseTestSuite
+
 	mockedBalances          communities.BalancesByChain
 	mockedCollectibles      communities.CollectiblesByChain
 	collectiblesServiceMock *CollectiblesServiceMock
@@ -36,7 +26,8 @@ type CommunitiesMessengerTestSuiteBase struct {
 }
 
 func (s *CommunitiesMessengerTestSuiteBase) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.MessengerBaseTestSuite.setupMessaging()
+
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 	s.accountsTestData = make(map[string][]string)
 	s.accountsPasswords = make(map[string]string)
@@ -46,15 +37,6 @@ func (s *CommunitiesMessengerTestSuiteBase) SetupTest() {
 	}
 
 	s.mockedBalances = make(communities.BalancesByChain)
-
-	shh, err := newTestWakuNode(s.logger)
-	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
-	s.shh = shh
-}
-
-func (s *CommunitiesMessengerTestSuiteBase) TearDownTest() {
-	_ = s.logger.Sync()
 }
 
 func (s *CommunitiesMessengerTestSuiteBase) newMessenger(password string, walletAddresses []string) *Messenger {
@@ -62,7 +44,6 @@ func (s *CommunitiesMessengerTestSuiteBase) newMessenger(password string, wallet
 	s.Require().NoError(err)
 
 	return s.newMessengerWithConfig(testMessengerConfig{
-		logger:     s.logger,
 		privateKey: privateKey,
 	}, password, walletAddresses)
 }
@@ -70,12 +51,11 @@ func (s *CommunitiesMessengerTestSuiteBase) newMessenger(password string, wallet
 func (s *CommunitiesMessengerTestSuiteBase) newMessengerWithKey(privateKey *ecdsa.PrivateKey, password string, walletAddresses []string) *Messenger {
 	return s.newMessengerWithConfig(testMessengerConfig{
 		privateKey: privateKey,
-		logger:     s.logger,
 	}, password, walletAddresses)
 }
 
 func (s *CommunitiesMessengerTestSuiteBase) newMessengerWithConfig(config testMessengerConfig, password string, walletAddresses []string) *Messenger {
-	messenger := newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	messenger := newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: config,
 		password:            password,
 		walletAddresses:     walletAddresses,

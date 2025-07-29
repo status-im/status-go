@@ -59,7 +59,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -126,7 +125,7 @@ type IMetricsHandler interface {
 	PushPeerCountByShard(peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
 	PushDialFailure(dialFailure common.DialError)
-	PushMissedMessage(envelope *protocol.Envelope)
+	PushMissedMessage(envelope common.Envelope)
 	PushMissedRelevantMessage(message *common.ReceivedMessage)
 	PushMessageDeliveryConfirmed()
 	PushSentMessageTotal(messageSize uint32, publishMethod string)
@@ -245,7 +244,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 		return nil, err
 	}
 
-	logger.Info("starting wakuv2 with config", zap.Any("config", cfg))
+	logger.Info("starting wakuv2")
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -607,31 +606,6 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
-func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
-
-	if telemetryServerURL == "" {
-		return
-	}
-
-	telemetry := NewBandwidthTelemetryClient(w.logger, telemetryServerURL)
-
-	ticker := time.NewTicker(time.Second * 20)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-w.ctx.Done():
-			return
-		case <-ticker.C:
-			bandwidthPerProtocol := w.bandwidthCounter.GetBandwidthByProtocol()
-			w.bandwidthCounter.Reset()
-			go telemetry.PushProtocolStats(bandwidthPerProtocol)
-		}
-	}
-}
-
 func (w *Waku) GetStats() types.StatsSummary {
 	stats := w.bandwidthCounter.GetBandwidthTotals()
 	return types.StatsSummary{
@@ -766,18 +740,6 @@ func (w *Waku) MaxMessageSize() uint32 {
 // CurrentTime returns current time.
 func (w *Waku) CurrentTime() time.Time {
 	return w.timesource.Now()
-}
-
-// APIs returns the RPC descriptors the Waku implementation offers
-func (w *Waku) APIs() []rpc.API {
-	return []rpc.API{
-		{
-			Namespace: Name,
-			Version:   VersionStr,
-			Service:   NewPublicWakuAPI(w),
-			Public:    false,
-		},
-	}
 }
 
 func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
@@ -1106,10 +1068,9 @@ func (w *Waku) OnNewEnvelope(env *protocol.Envelope) error {
 	return w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 }
 
-// Start implements node.Service, starting the background data propagation thread
-// of the Waku protocol.
+// Starts the background data propagation thread of the Waku protocol.
 func (w *Waku) Start() error {
-	if w.ctx == nil {
+	if w.cancel == nil {
 		w.ctx, w.cancel = context.WithCancel(context.Background())
 	}
 
@@ -1160,15 +1121,12 @@ func (w *Waku) Start() error {
 		}
 	}()
 
-	if w.cfg.TelemetryServerURL != "" {
+	if w.cfg.MetricsEnabled {
 		w.wg.Add(1)
 		go func() {
 			defer gocommon.LogOnPanic()
 			defer w.wg.Done()
-			peerTelemetryTickerInterval := time.Duration(w.cfg.TelemetryPeerCountSendPeriod) * time.Millisecond
-			if peerTelemetryTickerInterval == 0 {
-				peerTelemetryTickerInterval = 10 * time.Second
-			}
+			peerTelemetryTickerInterval := 10 * time.Second
 			peerTelemetryTicker := time.NewTicker(peerTelemetryTickerInterval)
 			defer peerTelemetryTicker.Stop()
 
@@ -1207,11 +1165,6 @@ func (w *Waku) Start() error {
 			}
 		}()
 	}
-
-	w.wg.Add(1)
-	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
-	//TODO: commenting for now so that only fleet nodes are used.
-	//Need to uncomment once filter peer scoring etc is implemented.
 
 	w.wg.Add(1)
 	go w.runPeerExchangeLoop()
@@ -1372,7 +1325,7 @@ func (w *Waku) startMessageSender() error {
 		return err
 	}
 
-	if w.cfg.TelemetryServerURL != "" {
+	if w.cfg.MetricsEnabled {
 		sender.WithMessageSentEmitter(w.node.Host())
 	}
 
@@ -1465,10 +1418,17 @@ func (w *Waku) setupRelaySubscriptions() error {
 	return nil
 }
 
-// Stop implements node.Service, stopping the background data propagation thread
-// of the Waku protocol.
+// Stops the background data propagation thread of the Waku protocol.
 func (w *Waku) Stop() error {
+	// Never started
+	if w.node == nil {
+		return nil
+	}
+
 	w.cancel()
+	defer func() {
+		w.cancel = nil
+	}()
 
 	w.envelopeCache.Stop()
 
@@ -1484,8 +1444,7 @@ func (w *Waku) Stop() error {
 	close(w.goingOnline)
 	w.wg.Wait()
 
-	w.ctx = nil
-	w.cancel = nil
+	_ = w.logger.Sync()
 
 	return nil
 }
@@ -1502,7 +1461,8 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 
 	if w.metricsHandler != nil {
 		if msgType == common.MissingMessageType {
-			w.metricsHandler.PushMissedMessage(envelope)
+			commonEnv := common.NewWakuEnvelope(envelope.Message(), envelope.PubsubTopic(), envelope.Hash())
+			w.metricsHandler.PushMissedMessage(commonEnv)
 		}
 	}
 
@@ -1589,9 +1549,6 @@ func (w *Waku) postEvent(envelope *common.ReceivedMessage) {
 func (w *Waku) processQueueLoop() {
 	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
-	if w.ctx == nil {
-		return
-	}
 	for {
 		select {
 		case <-w.ctx.Done():
@@ -2177,4 +2134,10 @@ func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
 
 func (w *Waku) Version() uint {
 	return 2
+}
+
+// This function is needed for nwaku, adding here for compatibility
+func (w *Waku) Metrics() string {
+
+	return ""
 }

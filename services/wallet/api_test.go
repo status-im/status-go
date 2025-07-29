@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network/testutil"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
@@ -126,7 +126,7 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	accountFeed := &event.Feed{}
+	accountsPublisher := pubsub.NewPublisher()
 
 	chainID := uint64(1)
 	address := "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -153,17 +153,11 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 		UpstreamChainID: chainID,
 		Networks:        networks,
 		DB:              appDB,
-		WalletFeed:      nil,
 	}
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)
 
-	chainClient, err := c.EthClient(chainID)
-	require.NoError(t, err)
-	chainClient.SetWalletNotifier(func(chainID uint64, message string) {})
-	c.SetWalletNotifier(func(chainID uint64, message string) {})
-
-	service := NewService(db, accountsDb, appDB, c, accountFeed, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, "")
+	service := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, "")
 
 	api := &API{
 		s: service,
@@ -247,7 +241,6 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 		UpstreamChainID: chainID,
 		Networks:        networks,
 		DB:              appDB,
-		WalletFeed:      nil,
 	}
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)

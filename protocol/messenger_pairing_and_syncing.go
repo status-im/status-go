@@ -465,13 +465,6 @@ func (m *Messenger) InitInstallations() error {
 		return err
 	}
 
-	if m.wakuMetricsHandler != nil {
-		installation, ok := m.allInstallations.Load(m.installationID)
-		if ok {
-			m.wakuMetricsHandler.SetDeviceType(installation.InstallationMetadata.DeviceType)
-		}
-	}
-
 	return nil
 }
 

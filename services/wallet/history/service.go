@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
 	statusrpc "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
@@ -53,44 +54,48 @@ func (vp *ValuePoint) String() string {
 }
 
 type Service struct {
-	balance         *Balance
-	db              *sql.DB
-	accountsDB      *accounts.Database
-	accountFeed     *event.Feed
-	eventFeed       *event.Feed
-	rpcClient       *statusrpc.Client
-	networkManager  *network.Manager
-	tokenManager    *token.Manager
-	serviceContext  context.Context
-	cancelFn        context.CancelFunc
-	transferWatcher *Watcher
-	accWatcher      *accountsevent.Watcher
-	exchange        *Exchange
-	balanceCache    balance.CacheIface
+	balance           *Balance
+	db                *sql.DB
+	accountsDB        *accounts.Database
+	accountsPublisher *pubsub.Publisher
+	eventFeed         *event.Feed
+	rpcClient         *statusrpc.Client
+	networkManager    *network.Manager
+	tokenManager      *token.Manager
+	serviceContext    context.Context
+	cancelFn          context.CancelFunc
+	transferWatcher   *Watcher
+	exchange          *Exchange
+	balanceCache      balance.CacheIface
+
+	stopCh chan struct{}
 }
 
-func NewService(db *sql.DB, accountsDB *accounts.Database, accountFeed *event.Feed, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager, marketManager *market.Manager, balanceCache balance.CacheIface) *Service {
+func NewService(db *sql.DB, accountsDB *accounts.Database, accountsPublisher *pubsub.Publisher, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager, marketManager *market.Manager, balanceCache balance.CacheIface) *Service {
 	return &Service{
-		balance:        NewBalance(NewBalanceDB(db)),
-		db:             db,
-		accountsDB:     accountsDB,
-		accountFeed:    accountFeed,
-		eventFeed:      eventFeed,
-		rpcClient:      rpcClient,
-		networkManager: rpcClient.NetworkManager,
-		tokenManager:   tokenManager,
-		exchange:       NewExchange(marketManager),
-		balanceCache:   balanceCache,
+		balance:           NewBalance(NewBalanceDB(db)),
+		db:                db,
+		accountsDB:        accountsDB,
+		accountsPublisher: accountsPublisher,
+		eventFeed:         eventFeed,
+		rpcClient:         rpcClient,
+		networkManager:    rpcClient.GetNetworkManager(),
+		tokenManager:      tokenManager,
+		exchange:          NewExchange(marketManager),
+		balanceCache:      balanceCache,
 	}
 }
 
 func (s *Service) Stop() {
+	if s.stopCh != nil {
+		close(s.stopCh)
+		s.stopCh = nil
+	}
 	if s.cancelFn != nil {
 		s.cancelFn()
 	}
 
 	s.stopTransfersWatcher()
-	s.stopAccountWatcher()
 }
 
 func (s *Service) triggerEvent(eventType walletevent.EventType, account statustypes.Address, message string) {
@@ -105,6 +110,7 @@ func (s *Service) triggerEvent(eventType walletevent.EventType, account statusty
 
 func (s *Service) Start(ctx context.Context) {
 	logutils.ZapLogger().Debug("Starting balance history service")
+	s.stopCh = make(chan struct{})
 
 	s.startTransfersWatcher()
 	s.startAccountWatcher()
@@ -659,31 +665,32 @@ func (s *Service) stopTransfersWatcher() {
 }
 
 func (s *Service) startAccountWatcher() {
-	if s.accWatcher == nil {
-		s.accWatcher = accountsevent.NewWatcher(s.accountsDB, s.accountFeed, func(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
-			s.onAccountsChanged(changedAddresses, eventType, currentAddresses)
-		})
+	if s.accountsPublisher == nil {
+		return
 	}
-	s.accWatcher.Start()
-}
 
-func (s *Service) stopAccountWatcher() {
-	if s.accWatcher != nil {
-		s.accWatcher.Stop()
-		s.accWatcher = nil
-	}
-}
-
-func (s *Service) onAccountsChanged(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
-	if eventType == accountsevent.EventTypeRemoved {
-		for _, address := range changedAddresses {
-			err := s.balance.db.removeBalanceHistory(address)
-			if err != nil {
-				logutils.ZapLogger().Error("Error removing balance history",
-					zap.String("address", address.String()),
-					zap.Error(err),
-				)
+	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](s.accountsPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubFn()
+		for {
+			select {
+			case <-s.stopCh:
+				return
+			case event, ok := <-ch:
+				if !ok {
+					return
+				}
+				for _, address := range event.Accounts {
+					err := s.balance.db.removeBalanceHistory(address)
+					if err != nil {
+						logutils.ZapLogger().Error("Error removing balance history",
+							zap.String("address", address.String()),
+							zap.Error(err),
+						)
+					}
+				}
 			}
 		}
-	}
+	}()
 }

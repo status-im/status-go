@@ -4,19 +4,27 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/golang/protobuf/proto"
+
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
+
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
 	protocolCommon "github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/ens/ensresolver"
@@ -38,7 +46,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/opensea"
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/rarible"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/coingecko"
-	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -46,11 +53,29 @@ import (
 )
 
 const (
-	EventBlockchainStatusChanged walletevent.EventType = "wallet-blockchain-status-changed"
-
 	defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
 	defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
 )
+
+// TODO this is duplicated
+var (
+	ErrNotWatchOnlyAccount           = errors.New("an account is not a watch only account")
+	ErrTryingToStoreOldWalletAccount = errors.New("trying to store an old wallet account")
+)
+
+const (
+	EventWatchOnlyAccountRetrieved walletevent.EventType = "wallet-watch-only-account-retrieved"
+)
+
+func createCoingeckoProxyClient(config params.MarketDataProxyConfig) *coingecko.Client {
+	baseURL := leaderboard.GetMarketProxyUrl(config.UrlOverride.Reveal(), config.StageName)
+
+	return coingecko.NewClientWithParams(coingecko.Params{
+		URL:      baseURL,
+		User:     config.User,
+		Password: config.Password,
+	})
+}
 
 // NewService initializes service instance.
 func NewService(
@@ -58,8 +83,7 @@ func NewService(
 	accountsDB *accounts.Database,
 	appDB *sql.DB,
 	rpcClient *rpc.Client,
-	accountFeed *event.Feed,
-	networksFeed *event.Feed,
+	accountsPublisher *pubsub.Publisher,
 	gethManager *accsmanagement.AccountsManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
@@ -72,41 +96,9 @@ func NewService(
 	signals := &walletevent.SignalsTransmitter{
 		Publisher: feed,
 	}
-	blockchainStatus := make(map[uint64]string)
-	mutex := sync.Mutex{}
-	rpcClient.SetWalletNotifier(func(chainID uint64, message string) {
-		mutex.Lock()
-		defer mutex.Unlock()
-
-		if len(blockchainStatus) == 0 {
-			networks, err := rpcClient.NetworkManager.Get(false)
-			if err != nil {
-				return
-			}
-
-			for _, network := range networks {
-				blockchainStatus[network.ChainID] = "up"
-			}
-		}
-
-		blockchainStatus[chainID] = message
-		encodedmessage, err := json.Marshal(blockchainStatus)
-		if err != nil {
-			return
-		}
-
-		feed.Send(walletevent.Event{
-			Type:     EventBlockchainStatusChanged,
-			Accounts: []common.Address{},
-			Message:  string(encodedmessage),
-			At:       time.Now().Unix(),
-			ChainID:  chainID,
-		})
-	})
-
 	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
-	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountFeed, accountsDB, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.GetNetworkManager(), appDB, mediaServer, feed, accountsPublisher, accountsDB, token.NewPersistence(db))
 
 	cryptoOnRampProviders := []onramp.Provider{
 		onramp.NewMoonPayProvider(),
@@ -130,20 +122,20 @@ func NewService(
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(transfer.NewMultiTransactionDB(db), gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	blockChainState := blockchainstate.NewBlockChainState()
-	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
-		tokenManager, balanceCacher, blockChainState)
+	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountsPublisher, transactionManager, blockChainState)
 
 	cryptoCompare := cryptocompare.NewClient()
-	coingecko := coingecko.NewClient()
+	coingeckoClient := coingecko.NewClient()
+	coingeckoProxy := createCoingeckoProxyClient(config.WalletConfig.MarketDataProxyConfig)
 	cryptoCompareProxy := cryptocompare.NewClientWithParams(cryptocompare.Params{
 		ID:       fmt.Sprintf("%s-proxy", cryptoCompare.ID()),
 		URL:      fmt.Sprintf("https://%s.api.status.im/cryptocompare/", statusProxyStageName),
 		User:     config.WalletConfig.StatusProxyMarketUser,
 		Password: config.WalletConfig.StatusProxyMarketPassword,
 	})
-	marketManager := market.NewManager([]thirdparty.MarketDataProvider{cryptoCompare, coingecko, cryptoCompareProxy}, tokenManager, feed)
+	marketManager := market.NewManager([]thirdparty.MarketDataProvider{coingeckoProxy, coingeckoClient, cryptoCompare, cryptoCompareProxy}, tokenManager, feed)
 	reader := NewReader(tokenManager, marketManager, token.NewPersistence(db), feed)
-	history := history.NewService(db, accountsDB, accountFeed, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
+	history := history.NewService(db, accountsDB, accountsPublisher, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 
 	openseaHTTPClient := opensea.NewHTTPClient()
@@ -195,7 +187,7 @@ func NewService(
 		mediaServer,
 		feed,
 	)
-	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, networksFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
+	collectibles := collectibles.NewService(db, feed, accountsDB, accountsPublisher, communityManager, rpcClient.GetNetworkManager(), collectiblesManager)
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
@@ -263,7 +255,7 @@ func buildPathProcessors(
 	erc1155Transfer := pathprocessor.NewERC1155Processor(rpcClient, transactor)
 	ret = append(ret, erc1155Transfer)
 
-	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager, rpcClient.NetworkManager)
+	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager, rpcClient.GetNetworkManager())
 	ret = append(ret, hop)
 
 	if featureFlags.EnableCelerBridge {
@@ -451,4 +443,162 @@ func (s *Service) GetCollectiblesService() *collectibles.Service {
 
 func (s *Service) GetCollectiblesManager() *collectibles.Manager {
 	return s.collectiblesManager
+}
+
+// LocalBackup Code
+func (s *Service) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.SyncAccount {
+	return &protobuf.SyncAccount{
+		Clock:                 acc.Clock,
+		Address:               acc.Address.Bytes(),
+		KeyUid:                acc.KeyUID,
+		PublicKey:             acc.PublicKey,
+		Path:                  acc.Path,
+		Name:                  acc.Name,
+		ColorId:               string(acc.ColorID),
+		Emoji:                 acc.Emoji,
+		Wallet:                acc.Wallet,
+		Chat:                  acc.Chat,
+		Hidden:                acc.Hidden,
+		Removed:               acc.Removed,
+		Operable:              acc.Operable.String(),
+		Position:              acc.Position,
+		ProdPreferredChainIDs: acc.ProdPreferredChainIDs,
+		TestPreferredChainIDs: acc.TestPreferredChainIDs,
+	}
+}
+
+func (s *Service) backupWatchOnlyAccounts() ([]*protobuf.Backup, error) {
+	accounts, err := s.accountsDB.GetAllWatchOnlyAccounts()
+	if err != nil {
+		return nil, err
+	}
+
+	var backupMessages []*protobuf.Backup
+	for _, acc := range accounts {
+
+		backupMessage := &protobuf.Backup{}
+		backupMessage.WatchOnlyAccount = s.prepareSyncAccountMessage(acc)
+
+		backupMessages = append(backupMessages, backupMessage)
+	}
+
+	return backupMessages, nil
+}
+
+func (s *Service) ExportBackup() ([]byte, error) {
+	backup := &protobuf.WalletLocalBackup{}
+
+	woAccountsToBackup, err := s.backupWatchOnlyAccounts()
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range woAccountsToBackup {
+		backup.WatchOnlyAccounts = append(backup.WatchOnlyAccounts, d.WatchOnlyAccount)
+	}
+
+	return proto.Marshal(backup)
+}
+
+func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability accounts.AccountOperable, accType accounts.AccountType) *accounts.Account {
+	return &accounts.Account{
+		Address:               types.BytesToAddress(message.Address),
+		KeyUID:                message.KeyUid,
+		PublicKey:             types.HexBytes(message.PublicKey),
+		Type:                  accType,
+		Path:                  message.Path,
+		Name:                  message.Name,
+		ColorID:               multiaccountscommon.CustomizationColor(message.ColorId),
+		Emoji:                 message.Emoji,
+		Wallet:                message.Wallet,
+		Chat:                  message.Chat,
+		Hidden:                message.Hidden,
+		Clock:                 message.Clock,
+		Operable:              accountOperability,
+		Removed:               message.Removed,
+		Position:              message.Position,
+		ProdPreferredChainIDs: message.ProdPreferredChainIDs,
+		TestPreferredChainIDs: message.TestPreferredChainIDs,
+	}
+}
+
+// TODO this is a duplicate of the code in messenger_handler. Should it be moved to a common place?
+func (s *Service) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*accounts.Account, error) {
+	if message.KeyUid != "" {
+		return nil, ErrNotWatchOnlyAccount
+	}
+
+	accountOperability := accounts.AccountFullyOperable
+
+	accAddress := types.BytesToAddress(message.Address)
+	dbAccount, err := s.accountsDB.GetAccountByAddress(accAddress)
+	if err != nil && err != accounts.ErrDbAccountNotFound {
+		return nil, err
+	}
+
+	if dbAccount != nil {
+		if message.Clock <= dbAccount.Clock {
+			return nil, ErrTryingToStoreOldWalletAccount
+		}
+
+		if message.Removed {
+			err = s.accountsDB.RemoveAccount(accAddress, message.Clock)
+			if err != nil {
+				return nil, err
+			}
+			dbAccount.Removed = true
+			return dbAccount, nil
+		}
+	}
+
+	acc := mapSyncAccountToAccount(message, accountOperability, accounts.AccountTypeWatch)
+
+	err = s.accountsDB.SaveOrUpdateAccounts([]*accounts.Account{acc}, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return acc, nil
+}
+
+func (s *Service) handleWatchOnlyAccount(message *protobuf.SyncAccount) error {
+	if message == nil {
+		return nil
+	}
+
+	acc, err := s.handleSyncWatchOnlyAccount(message)
+	if err != nil {
+		return err
+	}
+	response := wakusync.WakuBackedUpDataResponse{
+		WatchOnlyAccount: acc,
+	}
+	encodedmessage, err := json.Marshal(response)
+	if err != nil {
+		return err
+	}
+	event := walletevent.Event{
+		Type:    EventWatchOnlyAccountRetrieved,
+		Message: string(encodedmessage),
+	}
+	s.feed.Send(event)
+
+	return nil
+}
+
+func (s *Service) ImportBackup(data []byte) error {
+	var backup protobuf.WalletLocalBackup
+	err := proto.Unmarshal(data, &backup)
+	if err != nil {
+		return err
+	}
+	var errs []error
+
+	for _, watchOnlyAccount := range backup.WatchOnlyAccounts {
+		err = s.handleWatchOnlyAccount(watchOnlyAccount)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
 }

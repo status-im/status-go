@@ -15,6 +15,7 @@ Functional tests for status-go
 
 1. Install [Docker](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/)
 2. Install [Python 3](https://www.python.org/downloads/) (tested with 3.10 and 3.12 and it works with both)
+   - **Note:** For Python 3.10 compatibility, the codebase uses `Iterator[str]` instead of `Generator[str]` for type annotations to avoid typing issues with older Python versions.
 3. Set up a virtual environment (required for linting):
    - In `./tests-functional`, run:
      ```bash
@@ -29,10 +30,10 @@ Functional tests for status-go
 ## How to Run
 
 1. Functional tests will spawn `status-go` containers as needed, using the docker image name provided in `--docker-image`.
-    Run this command to build a docker image for local runs:
+    Run this command to build a docker image for local runs in root dir `status-go`:
     ```sh
     # Note we tag the image with the commit hash. Functional tests will refer to the same when `--docker-image` is empty.
-    docker build --file _assets/build/Dockerfile . --tag "statusgo-$(git rev-parse --short HEAD)"
+    docker build --file _assets/build/Dockerfile --tag "statusgo-$(git rev-parse --short HEAD)" .
     ```
 2. Functional tests rely on local instances of Waku and Anvil.
    Run this command to start all environment dependencies:
@@ -44,7 +45,7 @@ Functional tests for status-go
     * Start Anvil with ChainID 31337 exposed on `0.0.0.0:8545`
     * Deploy required Status contracts to Anvil
 
-3. In `./tests-functional/tests` directory run:
+3. In `./tests-functional/tests` directory run (with the `venv` running):
    ```sh
     pytest -m rpc
    ```
@@ -108,12 +109,150 @@ sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
 ## Implementation details
 
 - Functional tests are implemented in `./tests-functional/tests` based on [pytest](https://docs.pytest.org/en/8.2.x/)
+- Backend fixtures and test infrastructure are defined in `./tests-functional/tests/conftest.py`
 - Every test has two types of verifications:
     - `verify_is_valid_json_rpc_response()` checks for status code 200, non-empty response, JSON-RPC structure, presence of the `result` field, and expected ID.
     - `jsonschema.validate()` is used to check that the response contains expected data, including required fields and types. Schemas are stored in `/schemas/wallet_MethodName`
     - New schemas can be generated using `./tests-functional/utils/schema_builder.py` by passing a response to the `CustomSchemaBuilder(schema_name).create_schema(response.json())` method, should be used only on test creation phase, please search `how to create schema:` to see an example in a test
 
+### Backend Setup and Cleanup with Pytest Fixtures
+
+Functional tests in this suite rely on robust backend setup and teardown, managed via reusable pytest fixtures defined in `tests/conftest.py`. These fixtures ensure that backend containers are started, reused, and cleaned up efficiently, preventing resource leaks and test interference.
+
+#### 1. Backend Factory Fixtures
+
+The main backend factory fixture:
+
+- **`backend_factory`** (function-scoped):  
+  Allows you to create and clean up multiple backend instances per test function.  
+  **Note:** Users/accounts are created from scratch for each backend instance.
+  
+  Example usage:
+  ```python
+  import pytest
+
+  class TestMessenger:
+      @pytest.fixture(autouse=True)
+      def setup_backends(self, backend_factory):
+          self.sender = backend_factory("sender")
+          self.receiver = backend_factory("receiver")
+
+      def test_send_message(self):
+          # Use self.sender and self.receiver in your test
+          self.sender.send_message(self.receiver, "Hello!")
+          assert self.receiver.has_received_message("Hello!")
+  ```
+  All containers created by this fixture are automatically stopped and removed after the test.
+
+#### 2. Specialized Backend Fixtures
+
+For more specific use cases, you can use these specialized fixtures:
+
+- **`backend_new_profile`** (function-scoped):  
+  Creates a backend with a new user profile from scratch.
+  
+  Example usage:
+  ```python
+  def test_with_new_profile(self, backend_new_profile):
+      # Create a backend with a new profile
+      client = backend_new_profile("client1")
+      
+      # Or with light client mode
+      light_client = backend_new_profile("light_client", waku_light_client=True)
+  ```
+  
+- **`backend_recovered_profile`** (function-scoped):  
+  Creates a backend by recovering an existing user profile from a seed phrase.
+  
+  Example usage:
+  ```python
+  from resources.constants import user_1
+  
+  def test_with_recovered_profile(self, backend_recovered_profile):
+      # Recover a backend from an existing user
+      client = backend_recovered_profile("client1", user=user_1)
+      
+      # Or with light client mode
+      light_client = backend_recovered_profile("light_client", user=user_1, waku_light_client=True)
+  ```
+
+- **`waku_light_client`** (function-scoped):  
+  A simple parametrization fixture for enabling/disabling Waku light client mode.
+
+#### 3. Manual/Custom Backend Setup
+
+For advanced scenarios, you may set up backends manually in your test or test class (for example, to use custom logic or direct instantiation).  
+**In this case, you must ensure containers are cleaned up by using the `close_status_backend_containers` fixture.**
+
+Example (from `test_local_pairing.py`):
+```python
+@pytest.fixture(autouse=True)
+def setup_cleanup(self, close_status_backend_containers):
+    """Automatically cleanup containers after each test"""
+    yield
+```
+This fixture will stop, save logs, and remove all containers created during the test, preventing resource leaks.
+
+#### 4. Summary Table
+
+> **Note:** None of these fixtures are used automatically (`autouse=False` by default). You must explicitly use them in your test setup for visibility and control.
+
+| Fixture                           | Scope     | Usage                        | Cleanup         | User Creation Type                |
+|------------------------------------|-----------|------------------------------|-----------------|-----------------------------------|
+| `backend_factory`                  | function  | Per-test backend creation    | Automatic       | Created from scratch              |
+| `backend_new_profile`              | function  | New user profile creation    | Automatic       | Created from scratch              |
+| `backend_recovered_profile`        | function  | Existing profile recovery    | Automatic       | Recovered from seed phrase        |
+| `waku_light_client`                | function  | Light client parametrization | N/A             | N/A (configuration only)          |
+| `close_status_backend_containers`  | function  | For manual/custom setup      | Must be used manually | N/A (depends on your setup)   |
+
+#### 5. Best Practices
+
+- **Prefer the factory fixtures** for most tests—they are robust, reusable, and handle cleanup for you.
+- **Use specialized fixtures** (`backend_new_profile`, `backend_recovered_profile`) when you need specific profile creation behavior.
+- **Use `close_status_backend_containers`** if you create backends manually or outside the provided factories.
+- **Never leave containers running** after a test—always ensure cleanup is in place.
+
+For more details, see the docstrings in `tests/conftest.py` and the example usages in the test files.
+
+#### 6. Recent Architectural Improvements
+
+The test fixture architecture has been recently improved with the following changes:
+- **Separation of Concerns**: Backend fixtures moved from root `conftest.py` to `tests/conftest.py` for better organization
+- **Simplified Architecture**: Removed complex class-scoped fixtures in favor of more predictable function-scoped ones
+- **Better Fixture Wrappers**: Added specialized `backend_new_profile` and `backend_recovered_profile` fixtures for specific use cases
+- **Network Configuration**: Network ID is now defined directly in `StatusBackend` for cleaner configuration management
+- **Python Compatibility**: Fixed typing issues for better Python 3.10+ compatibility 
+
+# Linting
+
+We use `pre-commit` setup for linting. To run linters:
+```shell
+cd tests-functional
+make lint
+```
+or run from the root of `status-go` repo:
+```shell
+make pytest-lint
+```
+
+Note that `pyright` uses `pyrightconfig.json` configuration from the repository root 
+and expects a Python virtual environment to be in `./tests-functional/.venv`. 
+
 # Known issues
+
+## ethclient_transactionByHash is not found when running transaction tests locally
+
+Some tests require access to private API endpoints that are not enabled by default in local builds (enabled on CI by default).  
+To run these tests locally, you **must build `status-go` with the `enable_private_api` build tag**.
+
+```sh
+docker build --file _assets/build/Dockerfile . \
+  --build-arg "build_flags=--cover" \
+  --build-arg "build_tags='gowaku_no_rln,enable_private_api'" \
+  --tag "statusgo-$(git rev-parse --short HEAD)"
+```
+
+- The key part is `--build-arg "build_tags='gowaku_no_rln,enable_private_api'"` which enables the private API for testing.
 
 ## Import issues
 
@@ -127,3 +266,31 @@ Make sure that you made `test-functional` source folder (Right click > Mark dire
 ## Reliability tests
 
 This framework also hosts a suite of reliability tests. See more info [here](https://github.com/status-im/status-go/blob/develop/tests-functional/tests/reliability/README.MD)
+
+## RuntimeError: Docker image 'statusgo-xyz:latest' not found
+
+First check with `docker images` that the image was created. If not, re-run the build command from [How to Run](#how-to-run)
+
+Second, if the image is present in the list, check if you Python env is not connected to the wrong Docker daemon.
+
+Run this in the shell:
+```shell
+echo $DOCKER_HOST
+docker context ls
+```
+
+Run this in the Python env (`python`):
+```py
+import docker
+print(docker.from_env().api.base_url)
+```
+
+You might see that Python is using something like:
+- unix:///run/docker.sock
+- vs your CLI using unix:///var/run/docker.sock
+
+If that is so, force Python to use the same Docker socket (from `docker context ls`):
+```shell
+export DOCKER_HOST=unix:///var/run/docker.sock
+```
+Add this before launching your test runner

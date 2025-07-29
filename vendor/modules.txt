@@ -224,7 +224,7 @@ github.com/edsrzf/mmap-go
 ## explicit; go 1.14
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.19
+# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.21
 ## explicit; go 1.21
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
@@ -289,10 +289,6 @@ github.com/ethereum/go-ethereum/rlp/internal/rlpstruct
 github.com/ethereum/go-ethereum/rpc
 github.com/ethereum/go-ethereum/signer/core/apitypes
 github.com/ethereum/go-ethereum/trie
-# github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5
-## explicit
-github.com/fjl/memsize
-github.com/fjl/memsize/memsizeui
 # github.com/flynn/noise v1.1.0
 ## explicit; go 1.16
 github.com/flynn/noise
@@ -718,9 +714,6 @@ github.com/mutecomm/go-sqlcipher/v4
 # github.com/nfnt/resize v0.0.0-00010101000000-000000000000 => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
 ## explicit
 github.com/nfnt/resize
-# github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
-## explicit
-github.com/okzk/sdnotify
 # github.com/olekukonko/tablewriter v0.0.5
 ## explicit; go 1.12
 github.com/olekukonko/tablewriter
@@ -1122,10 +1115,7 @@ github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-pc-windows-gnu
 github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-unknown-linux-gnu
 github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-unknown-linux-musl
 github.com/waku-org/go-zerokit-rln-x86_64/rln
-# github.com/waku-org/sds-go-bindings v0.0.0-20250724095249-05e797c76b8c
-## explicit; go 1.22.10
-github.com/waku-org/sds-go-bindings/sds
-# github.com/waku-org/waku-go-bindings v0.0.0-20250528131356-4af668737057
+# github.com/waku-org/waku-go-bindings v0.0.0-20250714110306-6feba5b0df4d
 ## explicit; go 1.21
 github.com/waku-org/waku-go-bindings/utils
 github.com/waku-org/waku-go-bindings/waku

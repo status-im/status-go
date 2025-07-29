@@ -10,12 +10,13 @@ import docker
 import docker.errors
 from docker.errors import APIError
 
-from conftest import option
+from utils.config import Config
 
 DATA_DIR = "/usr/status-user"
 
 
 class StatusGoContainer:
+    all_containers = []
     container = None
 
     def __init__(self, entrypoint, ports=None, privileged=False, container_name_suffix=""):
@@ -29,16 +30,16 @@ class StatusGoContainer:
         # Prepare image and container name
         # NOTE: This part needs some love.
         #       There's magic with `docker_project_name`, `docker_image` and `identifier` variables.
-        docker_project_name = option.docker_project_name
+        docker_project_name = Config.docker_project_name
         self.network_name = f"{docker_project_name}_default"
         git_commit = os.popen("git rev-parse --short HEAD").read().strip()
         identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else git_commit
-        image_name = option.docker_image or f"statusgo-{identifier}:latest"
+        image_name = Config.docker_image or f"statusgo-{identifier}:latest"
         self.container_name = f"{docker_project_name}-{identifier}{container_name_suffix}"
-        coverage_path = option.codecov_dir if option.codecov_dir else os.path.abspath("./coverage/binary")
+        coverage_path = Config.codecov_dir if Config.codecov_dir else os.path.abspath("./coverage/binary")
 
         # Run the container
-        logging.info(f"Creating status-go container from image '{image_name}'")
+        logging.debug(f"Creating status-go container from image '{image_name}'")
 
         container_args = {
             "image": image_name,
@@ -74,9 +75,9 @@ class StatusGoContainer:
             raise RuntimeError(f"Docker image '{image_name}' not found")
 
         self.container = self.docker_client.containers.run(**container_args)
-        option.statusgo_containers.append(self)
+        StatusGoContainer.all_containers.append(self)
 
-        logging.info(f"Container {self.container.name} created. ID = {self.container.id}")
+        logging.debug(f"Container {self.container.name} created. ID = {self.container.id}")
 
         network = self.docker_client.networks.get(self.network_name)
         network.connect(self.container)
@@ -131,7 +132,7 @@ class StatusGoContainer:
         if self.container:
             logging.debug(f"Stopping container {self.container.name}...")
             self.container.stop(timeout=10)
-            logging.info(f"Container {self.container.name} stopped.")
+            logging.debug(f"Container {self.container.name} stopped.")
 
     def remove(self):
         """Remove the container"""
@@ -140,7 +141,7 @@ class StatusGoContainer:
             logging.debug(f"Removing container {name}...")
             self.container.remove()
             self.container = None
-            logging.info(f"Container {name} removed.")
+            logging.debug(f"Container {name} removed.")
 
     def pause(self):
         if not self.container:
@@ -172,6 +173,7 @@ class StatusGoContainer:
         try:
             stream, _ = self.container.get_archive(path)
         except docker.errors.NotFound:
+            logging.error(f"Path '{path}' not found in container {self.container.name}.")
             return None
 
         temp_dir = tempfile.mkdtemp()
@@ -186,15 +188,46 @@ class StatusGoContainer:
 
         return temp_dir
 
+    def import_data(self, src_path: str, dest_path: str):
+        """
+        Copy data from the host (src_path) into the container at dest_path.
+        """
+        if not self.container:
+            raise RuntimeError("Container is not initialized.")
+
+        if not os.path.exists(src_path):
+            raise FileNotFoundError(f"Source path '{src_path}' does not exist.")
+
+        # Create a tar archive of the source path
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+            arcname = os.path.basename(src_path)
+            tar.add(src_path, arcname=arcname)
+        tar_stream.seek(0)
+
+        # Put the archive into the container at the destination path
+        try:
+            # Ensure destination directory exists in the container
+            response = self.container.exec_run(cmd=["mkdir", "-p", dest_path])
+            assert response.exit_code == 0, f"Failed to ensure directory exists: {response.output.decode().strip()}"
+            success = self.container.put_archive(dest_path, tar_stream.getvalue())
+            assert success, f"Failed to put archive to {dest_path} in container {self.container.name}"
+        except Exception as e:
+            logging.error(f"Failed to import data to container: {e}")
+            raise
+
+    def get_name(self):
+        return self.container.name if self.container else None
+
     def save_logs(self):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
-        if option.logs_dir == "":
-            logging.warning("Save container logs skipped")
+        if Config.logs_dir == "":
+            logging.debug("Save container logs skipped")
             return
 
         id_short = self.container.id[:12]
-        file_path = os.path.join(option.logs_dir, f"container_{id_short}.log")
+        file_path = os.path.join(Config.logs_dir, f"container_{id_short}.log")
         logging.info(f"Saving logs to {file_path}")
 
         with open(file_path, "wb") as f:
@@ -215,9 +248,9 @@ class PushNotificationServerContainer(StatusGoContainer):
             "--log-level",
             "DEBUG",
             "--waku-fleet-config",
-            option.waku_fleets_config,
+            Config.waku_fleets_config,
             "--waku-fleet",
-            option.waku_fleet,
+            Config.waku_fleet,
         ]
         super().__init__(entrypoint, container_name_suffix=f"-push-notification-server-{gorush_port}")
 

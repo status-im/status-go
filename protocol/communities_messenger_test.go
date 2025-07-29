@@ -20,7 +20,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
@@ -2607,8 +2606,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	tcs, err := alicesOtherDevice.communitiesManager.All()
 	s.Require().NoError(err)
 	s.Len(tcs, 1, "There must be 1 community")
-
-	s.logger.Debug("", zap.Any("tcs", tcs))
 
 	// Get the new community from their db
 	tnc, err := alicesOtherDevice.communitiesManager.GetByID(newCommunity.ID())

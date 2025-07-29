@@ -37,6 +37,9 @@ linters-settings:
   goconst:
     min-len: 3
     min-occurrences: 2
+  gosec:
+    excludes:
+      - G115
 
 linters:
   disable-all: true
@@ -46,7 +49,6 @@ linters:
     - goimports
     - govet
     - ineffassign
-    - megacheck
     - misspell
     # You can't disable typecheck, see:
     # https://github.com/golangci/golangci-lint/blob/master/docs/src/docs/welcome/faq.mdx#why-do-you-have-typecheck-errors

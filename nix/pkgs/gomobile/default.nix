@@ -2,7 +2,7 @@
   stdenv,
   lib,
   fetchgit,
-  buildGo122Module,
+  buildGo123Module,
   zlib,
   makeWrapper,
   xcodeenv,
@@ -17,7 +17,7 @@
   ),
 }:
 
-buildGo122Module {
+buildGo123Module {
   pname = "gomobile";
   version = "0-unstable-2024-12-13";
 

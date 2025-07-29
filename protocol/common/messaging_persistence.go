@@ -136,6 +136,7 @@ func (c *messagingPersistence) MessageCacheAdd(ids []string, timestamp uint64) (
 		if err != nil {
 			return
 		}
+		defer stmt.Close()
 
 		_, err = stmt.Exec(id, timestamp)
 		if err != nil {

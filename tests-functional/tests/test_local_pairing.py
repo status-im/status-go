@@ -160,15 +160,32 @@ class TestLocalPairing(MessengerSteps):
         SignalType.LOCAL_PAIRING.value,
     ]
 
+    @pytest.fixture(autouse=True)
+    def setup_cleanup(self, close_status_backend_containers):
+        """Automatically cleanup containers after each test"""
+        yield
+
+    def initialize_backend(self, await_signals, privileged=True, **kwargs):
+        backend = StatusBackend(await_signals, privileged=privileged)
+        backend.init_status_backend()
+        backend.create_account_and_login(**kwargs)
+        backend.wait_for_login()
+        backend.wakuext_service.start_messenger()
+        return backend
+
     def test_pairing_server_as_sender(self):
         # Create users
         alice = self.initialize_backend(self.await_signals, False)
         bob = self.initialize_backend(self.await_signals, False)
+
         bob_second_device = StatusBackend(self.await_signals)
         bob_second_device.init_status_backend()
 
         # Make contacts before local pairing
         self.make_contacts(alice, bob)
+
+        # Create community before local pairing
+        self.create_community(bob)
 
         # Local pairing
         pair_server_as_sender(bob, bob_second_device)
@@ -201,6 +218,9 @@ class TestLocalPairing(MessengerSteps):
 
         # Make contacts before local pairing
         self.make_contacts(alice, bob)
+
+        # Create community before local pairing
+        self.create_community(bob)
 
         # Local pairing
         pair_server_as_receiver(bob, bob_second_device)
@@ -278,3 +298,17 @@ class TestLocalPairing(MessengerSteps):
             assert user_declined_notification["read"] is True
             assert user_declined_notification["accepted"] is False
             assert user_declined_notification["dismissed"] is True
+
+    def test_pairing_receiver_must_be_logged_out(self):
+        sender = self.initialize_backend(self.await_signals, False)
+        receiver = self.initialize_backend(self.await_signals, False)
+
+        # Client receiver must be logged out
+        connection_string = sender.get_connection_string_for_bootstrapping_another_device()
+        response = receiver.input_connection_string_for_bootstrapping(connection_string)
+        assert response["error"] is not None
+
+        # Server receiver must be logged out
+        connection_string = receiver.get_connection_string_for_being_bootstrapped()
+        response = sender.input_connection_string_for_bootstrapping_another_device(connection_string)
+        assert response["error"] is not None
