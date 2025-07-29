@@ -121,6 +121,7 @@ def pytest_configure(config):
 
 def pytest_report_header(config):
     return [
+        f"docker image: {Config.docker_image}",
         f"waku fleets config file: {config.option.waku_fleets_config}",
         f"waku fleet: {config.option.waku_fleet}",
         f"push fleets config file: {config.option.push_fleets_config}",

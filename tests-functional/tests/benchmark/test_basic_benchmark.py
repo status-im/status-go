@@ -29,7 +29,7 @@ class TestBasicBenchmark(MessengerSteps):
         # Create a new user
         status_backend = backend_factory("AUT")
         status_backend.container.start_performance_monitoring()
-        time.sleep(5)  # Keep idle for a short time
+        self.sleep(status_backend, 5)  # Keep idle for a short time
 
         status_backend.init_status_backend()
         status_backend.events.append("CreateAccountAndLogin")
