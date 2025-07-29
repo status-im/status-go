@@ -1674,7 +1674,7 @@ func (o *Community) toProtocolMessageBytes() ([]byte, error) {
 	}
 
 	// sign
-	return protocol.WrapMessageV1(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, o.config.PrivateKey, nil)
+	return protocol.WrapMessageV1(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, o.config.PrivateKey)
 }
 
 // ToProtocolMessageBytes returns the community in a wrapped & signed protocol message

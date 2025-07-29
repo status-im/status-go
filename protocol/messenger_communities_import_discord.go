@@ -183,7 +183,7 @@ func (m *Messenger) createPinMessageFromDiscordMessage(message *common.Message, 
 		return nil, discord.Warning(err.Error())
 	}
 
-	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, community.PrivateKey(), nil)
+	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, community.PrivateKey())
 	if err != nil {
 		m.logger.Error("failed to wrap pin message", zap.Error(err))
 		return nil, discord.Warning(err.Error())
@@ -1380,7 +1380,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 							continue
 						}
 
-						wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, discordCommunity.PrivateKey(), nil)
+						wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, discordCommunity.PrivateKey())
 						if err != nil {
 							m.logger.Error("failed to wrap pin message", zap.Error(err))
 							importProgress.AddTaskError(discord.ImportMessagesTask, discord.Warning(err.Error()))

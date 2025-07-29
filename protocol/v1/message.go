@@ -31,7 +31,7 @@ func MessageID(author *ecdsa.PublicKey, data []byte) types.HexBytes {
 }
 
 // WrapMessageV1 wraps a payload into a protobuf message and signs it if an identity is provided
-func WrapMessageV1(payload []byte, messageType protobuf.ApplicationMetadataMessage_Type, identity *ecdsa.PrivateKey, channelId *string) ([]byte, error) {
+func WrapMessageV1(payload []byte, messageType protobuf.ApplicationMetadataMessage_Type, identity *ecdsa.PrivateKey) ([]byte, error) {
 	var signature []byte
 	if identity != nil {
 		var err error
@@ -45,7 +45,6 @@ func WrapMessageV1(payload []byte, messageType protobuf.ApplicationMetadataMessa
 		Signature: signature,
 		Type:      messageType,
 		Payload:   payload,
-		ChannelId: channelId,
 	}
 	return proto.Marshal(message)
 }

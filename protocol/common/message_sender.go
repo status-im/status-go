@@ -92,7 +92,7 @@ type MessageSender struct {
 	// handleSharedSecrets is a callback that is called every time a new shared secret is negotiated
 	handleSharedSecrets func([]*sharedsecret.Secret) error
 
-	reliabilityManagers      map[string]*sds.ReliabilityManager
+	reliabilityManager       *sds.ReliabilityManager
 	reliabilityManagersMutex sync.Mutex
 }
 
@@ -104,18 +104,29 @@ func NewMessageSender(
 	logger *zap.Logger,
 	features FeatureFlags,
 ) (*MessageSender, error) {
+	reliabilityManager, err := sds.NewReliabilityManager()
+	if err != nil {
+		return nil, errors.Wrap(err, "SDS: failed to create reliability manager")
+	}
+	callbacks := sds.EventCallbacks{
+		OnMessageSent: func(messageId sds.MessageID, channelId string) {
+			logger.Debug("SDS: message sent", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
+		},
+	}
+	reliabilityManager.RegisterCallbacks(callbacks)
+
 	p := &MessageSender{
-		identity:            identity,
-		datasyncEnabled:     features.Datasync,
-		protocol:            enc,
-		database:            database,
-		persistence:         NewRawMessagesPersistence(database),
-		publisher:           pubsub.NewPublisher(),
-		messaging:           messaging,
-		logger:              logger,
-		ephemeralKeys:       make(map[string]*ecdsa.PrivateKey),
-		featureFlags:        features,
-		reliabilityManagers: make(map[string]*sds.ReliabilityManager),
+		identity:           identity,
+		datasyncEnabled:    features.Datasync,
+		protocol:           enc,
+		database:           database,
+		persistence:        NewRawMessagesPersistence(database),
+		publisher:          pubsub.NewPublisher(),
+		messaging:          messaging,
+		logger:             logger,
+		ephemeralKeys:      make(map[string]*ecdsa.PrivateKey),
+		featureFlags:       features,
+		reliabilityManager: reliabilityManager,
 	}
 
 	return p, nil
@@ -1019,10 +1030,12 @@ func (s *MessageSender) handleMessage(msg *messagingtypes.ReceivedMessage) (*han
 		if err != nil {
 			hlogger.Error("failed to handle application metadata layer message", zap.Error(err))
 		}
+		hlogger.Debug("app payload before sds", zap.String("appPayload", types.EncodeHex(msg.ApplicationLayer.Payload)))
 		err = s.unwrapPayloadForSDS(msg)
 		if err != nil {
 			hlogger.Error("failed to unwrap payload for SDS", zap.Error(err))
 		}
+		hlogger.Debug("app payload after sds", zap.String("appPayload", types.EncodeHex(msg.ApplicationLayer.Payload)))
 	}
 
 	return response, nil
@@ -1096,13 +1109,7 @@ func (s *MessageSender) handleErrDeviceNotFound(ctx context.Context, publicKey *
 }
 
 func (s *MessageSender) wrapMessageV1(rawMessage *RawMessage) ([]byte, error) {
-	var channelId *string
-	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 {
-		hexEncodedChannelId := types.EncodeHex(rawMessage.CommunityID)
-		channelId = &hexEncodedChannelId
-	}
-
-	wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender, channelId)
+	wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -1369,72 +1376,46 @@ func (s *MessageSender) CleanupHashRatchetEncryptedMessages() error {
 
 // Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
 func (s *MessageSender) wrapPayloadForSDS(rawMessage *RawMessage) ([]byte, error) {
-	var err error
-	reliabilityManager, ok := s.reliabilityManagers[types.EncodeHex(rawMessage.CommunityID)]
-	s.logger.Debug("SDS: rmanager lookup", zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)), zap.Bool("exists", ok))
-	if !ok {
-		s.reliabilityManagersMutex.Lock()
-		reliabilityManager, err = sds.NewReliabilityManager()
-
-		if err != nil {
-			return nil, errors.Wrap(err, "SDS: failed to create reliability manager")
-		}
-		callbacks := sds.EventCallbacks{
-			OnMessageSent: func(messageId sds.MessageID, channelId string) {
-				s.logger.Debug("SDS: message sent", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
-			},
-		}
-
-		// Register callback on rm1 (the original sender)
-		reliabilityManager.RegisterCallbacks(callbacks)
-		s.reliabilityManagers[types.EncodeHex(rawMessage.CommunityID)] = reliabilityManager
-		s.reliabilityManagersMutex.Unlock()
-	}
-
 	s.logger.Debug("SDS: wrap payload", zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)))
 
 	// TODO: need the message ID related to Waku or SDS for history retrieval
 	sdsMessageID := crypto.Keccak256(rawMessage.Payload)
-	if err != nil {
-		return nil, err
-	}
 
-	s.logger.Debug("SDS: original payload", zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)),
-		zap.Int("payload-length", len(rawMessage.Payload)), zap.String("messageId", types.EncodeHex(sdsMessageID)))
-	sdsWrappedPayload, err := reliabilityManager.WrapOutgoingMessage(rawMessage.Payload, sds.MessageID(types.EncodeHex(sdsMessageID)), types.EncodeHex(rawMessage.CommunityID))
+	s.logger.Debug("SDS: original payload",
+		zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)),
+		zap.Int("payload-length", len(rawMessage.Payload)),
+		zap.String("messageId", types.EncodeHex(sdsMessageID)),
+		zap.String("original payload", types.EncodeHex(rawMessage.Payload)),
+	)
+	sdsWrappedPayload, err := s.reliabilityManager.WrapOutgoingMessage(rawMessage.Payload, sds.MessageID(types.EncodeHex(sdsMessageID)), types.EncodeHex(rawMessage.CommunityID))
 	if err != nil {
 		return nil, errors.Wrap(err, "SDS: failed to wrap a community message")
 	}
 
 	rawMessage.Payload = sdsWrappedPayload
 
-	s.logger.Debug("SDS: wrapped payload", zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)),
-		zap.Int("payload-length", len(sdsWrappedPayload)), zap.String("messageId", types.EncodeHex(sdsMessageID)))
+	s.logger.Debug("SDS: wrapped payload",
+		zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)),
+		zap.Int("payload-length", len(sdsWrappedPayload)),
+		zap.String("messageId", types.EncodeHex(sdsMessageID)),
+		zap.String("sdspayload", types.EncodeHex(sdsWrappedPayload)),
+	)
 
 	return sdsWrappedPayload, nil
 }
 
 func (s *MessageSender) unwrapPayloadForSDS(msg *v1protocol.StatusMessage) error {
-	s.logger.Debug("SDS: unwrap start", zap.Any("channelId", msg.ApplicationLayer.ChannelId))
-	if msg.ApplicationLayer.ChannelId != nil && len(msg.ApplicationLayer.Payload) > 0 {
-		s.logger.Debug("SDS: unwrap payload", zap.String("channelId", *msg.ApplicationLayer.ChannelId))
-		reliabilityManager, ok := s.reliabilityManagers[*msg.ApplicationLayer.ChannelId]
-		var err error
-		if !ok {
-			s.reliabilityManagersMutex.Lock()
-			reliabilityManager, err = sds.NewReliabilityManager()
-			if err != nil {
-				return errors.Wrap(err, "sds: failed to create reliability manager")
-			}
-			s.reliabilityManagers[*msg.ApplicationLayer.ChannelId] = reliabilityManager
-			s.reliabilityManagersMutex.Unlock()
-		}
-		unwrappedMessage, err := reliabilityManager.UnwrapReceivedMessage(msg.ApplicationLayer.Payload)
+	if len(msg.ApplicationLayer.Payload) > 0 {
+		s.logger.Debug("SDS: unwrap payload", zap.String("beforeunwrappayload", types.EncodeHex(msg.ApplicationLayer.Payload)))
+		unwrappedMessage, err := s.reliabilityManager.UnwrapReceivedMessage(msg.ApplicationLayer.Payload)
 		if err != nil {
 			s.logger.Error("SDS: failed to unwrap received message", zap.Error(err))
 		} else {
 			msg.ApplicationLayer.Payload = *unwrappedMessage.Message
-			s.logger.Debug("SDS: missing deps", zap.Any("missing-deps", *unwrappedMessage.MissingDeps))
+			s.logger.Debug("SDS: missing deps",
+				zap.Any("missing-deps", *unwrappedMessage.MissingDeps),
+				zap.String("unwrapped-payload", types.EncodeHex(msg.ApplicationLayer.Payload)),
+			)
 		}
 	}
 
