@@ -42,6 +42,12 @@ def pytest_addoption(parser):
         default="",
     )
     parser.addoption(
+        "--benchmark-results-dir",
+        action="store",
+        help="Path to a directory where benchmarks results will be saved",
+        default="./.results/benchmarks/",
+    )
+    parser.addoption(
         "--logout",
         action="store_true",
         help="When set, will automatically call Logout() before InitializeApplication()",
@@ -103,6 +109,7 @@ def pytest_configure(config):
     Config.docker_image = config.getoption("--docker-image")
     Config.codecov_dir = config.getoption("--codecov_dir")
     Config.logs_dir = config.getoption("--logs-dir")
+    Config.benchmark_results_dir = config.getoption("--benchmark-results-dir")
     Config.logout = config.getoption("--logout")
     Config.waku_fleets_config = config.getoption("--waku-fleets-config")
     Config.waku_fleet = config.getoption("--waku-fleet")

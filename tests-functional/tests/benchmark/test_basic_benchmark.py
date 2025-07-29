@@ -4,6 +4,7 @@ import time
 
 from clients.signals import SignalType
 from clients.status_backend import StatusBackend
+from utils.config import Config
 from steps.messenger import MessengerSteps
 
 
@@ -42,7 +43,7 @@ class TestBasicBenchmark(MessengerSteps):
 
         # Finalize
         test_name = request.node.name
-        filename = f"./.results/{test_name}-{time.strftime('%Y%m%d-%H%M%S')}"
+        filename = f"{Config.benchmark_results_dir}/{test_name}-{time.strftime('%Y%m%d-%H%M%S')}"
 
         metrics = status_backend.gather_metrics()
         metrics.save_to_file(f"{filename}.json")

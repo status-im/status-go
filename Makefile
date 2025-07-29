@@ -364,6 +364,9 @@ test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
 	@./_assets/scripts/run_functional_tests.sh
 
+benchmark:
+	@./_assets/scripts/run_benchmark.sh
+
 lint-panics: export GOFLAGS ?= -tags='$(BUILD_TAGS)'
 lint-panics: generate
 	go run ./cmd/lint-panics -root="$(call sh, pwd)" -skip=./cmd -test=false ./...
