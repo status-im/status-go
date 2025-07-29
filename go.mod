@@ -1,14 +1,8 @@
 module github.com/status-im/status-go
 
-<<<<<<< HEAD
-go 1.22.10
-
-replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.19
-=======
 go 1.23
 
 replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.21
->>>>>>> develop
 
 replace github.com/rjeczalik/notify => github.com/status-im/notify v1.0.2-status
 
