@@ -1374,13 +1374,14 @@ func (s *MessageSender) wrapPayloadForSDS(rawMessage *RawMessage) ([]byte, error
 	s.logger.Debug("SDS: rmanager lookup", zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)), zap.Bool("exists", ok))
 	if !ok {
 		s.reliabilityManagersMutex.Lock()
-		reliabilityManager, err = sds.NewReliabilityManager(types.EncodeHex(rawMessage.CommunityID))
+		reliabilityManager, err = sds.NewReliabilityManager()
+
 		if err != nil {
 			return nil, errors.Wrap(err, "SDS: failed to create reliability manager")
 		}
 		callbacks := sds.EventCallbacks{
-			OnMessageSent: func(messageId sds.MessageID) {
-				s.logger.Debug("SDS: message sent", zap.String("messageId", string(messageId)))
+			OnMessageSent: func(messageId sds.MessageID, channelId string) {
+				s.logger.Debug("SDS: message sent", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
 			},
 		}
 
@@ -1400,7 +1401,7 @@ func (s *MessageSender) wrapPayloadForSDS(rawMessage *RawMessage) ([]byte, error
 
 	s.logger.Debug("SDS: original payload", zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)),
 		zap.Int("payload-length", len(rawMessage.Payload)), zap.String("messageId", types.EncodeHex(sdsMessageID)))
-	sdsWrappedPayload, err := reliabilityManager.WrapOutgoingMessage(rawMessage.Payload, sds.MessageID(types.EncodeHex(sdsMessageID)))
+	sdsWrappedPayload, err := reliabilityManager.WrapOutgoingMessage(rawMessage.Payload, sds.MessageID(types.EncodeHex(sdsMessageID)), types.EncodeHex(rawMessage.CommunityID))
 	if err != nil {
 		return nil, errors.Wrap(err, "SDS: failed to wrap a community message")
 	}
@@ -1421,7 +1422,7 @@ func (s *MessageSender) unwrapPayloadForSDS(msg *v1protocol.StatusMessage) error
 		var err error
 		if !ok {
 			s.reliabilityManagersMutex.Lock()
-			reliabilityManager, err = sds.NewReliabilityManager(*msg.ApplicationLayer.ChannelId)
+			reliabilityManager, err = sds.NewReliabilityManager()
 			if err != nil {
 				return errors.Wrap(err, "sds: failed to create reliability manager")
 			}
