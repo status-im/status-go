@@ -10,7 +10,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
@@ -19,7 +18,6 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/rpc/network/networksevent"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 const (
@@ -330,17 +328,6 @@ func (s *Service) startFetchActivity(ctx context.Context, fetcherID fetcherID) {
 }
 
 func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account gethcommon.Address) {
-	parameters := thirdparty.ActivityFetchParameters{
-		Address:   account,
-		Order:     thirdparty.NewToOld,
-		Direction: thirdparty.Both,
-	}
-	// Get last fetched block
-	lastFetchedBlock, _, err := s.persistence.GetLastFetchedBlockAndTimestamp(ctx, chainID, account)
-	if err != nil {
-		s.logger.Error("Failed to get last fetched block", zap.Error(err))
-		return
-	}
 
 	// Get current block
 	rpcClient, err := s.rpcClient.EthClient(chainID)
@@ -353,39 +340,10 @@ func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account get
 		s.logger.Error("Failed to get current block", zap.Error(err))
 		return
 	}
-	toBlock := gethrpc.BlockNumber(currentBlock)
-	parameters.ToBlock = &toBlock
 
-	if lastFetchedBlock == nil {
-		fromBlock := gethrpc.EarliestBlockNumber
-		parameters.FromBlock = &fromBlock
-	} else if uint64(lastFetchedBlock.Int64()) >= currentBlock {
-		// Nothing to fetch
-		return
-	} else {
-		fromBlock := gethrpc.BlockNumber(*lastFetchedBlock + 1)
-		parameters.FromBlock = &fromBlock
-	}
-
-	startTime := time.Now()
-	s.logger.Debug("Fetching activity",
-		zap.String("account", account.Hex()),
-		zap.Uint64("chainID", chainID),
-		zap.Int64("fromBlock", int64(*parameters.FromBlock)),
-		zap.Int64("toBlock", int64(*parameters.ToBlock)),
-	)
-
-	_, err = s.activityFetcherManager.FetchActivity(ctx, chainID, parameters, "")
+	_, err = s.activityFetcherManager.FetchActivity(ctx, chainID, account, currentBlock)
 	if err != nil {
 		s.logger.Error("Failed to fetch activity", zap.Error(err))
 		return
 	}
-
-	duration := time.Since(startTime)
-	s.logger.Debug("Fetch activity completed",
-		zap.String("account", account.Hex()),
-		zap.Uint64("chainID", chainID),
-		zap.Int64("fromBlock", int64(*parameters.FromBlock)),
-		zap.Int64("toBlock", int64(*parameters.ToBlock)),
-		zap.Duration("duration", duration))
 }
