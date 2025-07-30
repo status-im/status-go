@@ -1,5 +1,6 @@
 import random
 import string
+import threading
 from clients.status_backend import StatusBackend
 import pytest
 
@@ -160,3 +161,27 @@ class TestrestoreMnemonic:
         }
         restored_account_response = restored_account.api_request("RestoreAccountAndLogin", data)
         assert restored_account_response.json().get("error") == "restore-account: both mnemonic and keycard info are set"
+
+    def test_concurrent_restore_requests_using_same_mnemonic(self):
+        # Concurrent restore requests using same mnemonic
+        user = user_mnemonic_12
+        num_threads = 5
+        results = []
+
+        def restore_task():
+            restored_account = StatusBackend()
+            restored_account.init_status_backend()
+            restored_account.restore_account_and_login(user=user)
+            settings = restored_account.settings_service.get_settings().get("result", {})
+            results.append(settings.get("address", None))
+
+        threads = [threading.Thread(target=restore_task) for _ in range(num_threads)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Assert all restores succeeded and addresses are consistent
+        assert len(results) == num_threads, "Not all restore requests have addresses"
+        assert all(addr == results[0] for addr in results), "Not all addresses are the same"
+        assert all(not addr for addr in results), f"Some addresses are none or emtpty, see: {results}"
