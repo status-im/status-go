@@ -690,6 +690,14 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 	// notify before dispatching
 	s.notifyOnScheduledMessage(nil, rawMessage)
 
+	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 {
+		s.logger.Debug("SDS: dispatchCommunityChatMessage with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
+		_, err := s.wrapPayloadForSDS(newMessage, rawMessage.CommunityID)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to wrap payload for SDS")
+		}
+	}
+
 	newMessages, err := s.segmentMessage(newMessage)
 	if err != nil {
 		return nil, nil, err
@@ -1201,6 +1209,14 @@ func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey 
 	newMessage := &wakutypes.NewMessage{
 		Payload:     payload,
 		PubsubTopic: pubsubTopic,
+	}
+
+	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 {
+		s.logger.Debug("SDS: dispatchCommunityMessage with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
+		_, err := s.wrapPayloadForSDS(newMessage, rawMessage.CommunityID)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to wrap payload for SDS")
+		}
 	}
 
 	newMessages, err := s.segmentMessage(newMessage)
