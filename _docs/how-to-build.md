@@ -8,10 +8,10 @@ status-go is an underlying part of Status. It heavily depends on [go-ethereum](h
 
 ### 1. Requirements
 
-* Nix (Installed automatically)
 * Docker (only if cross-compiling).
 
-> go is provided by Nix
+> go is provided by Nix, if Nix shell is used else go has to be
+  downloaded and installed (https://go.dev/doc/install).
 
 ### 2. Clone the repository
 
@@ -27,6 +27,13 @@ You can enter the development shell by using either of two:
 ```bash
 make shell
 nix develop
+```
+		OR
+
+If not using nix shell, go dependency packages have to be installed by using the following make command:
+
+```
+make status-go-deps
 ```
 
 ### 4. Build the status-backend
