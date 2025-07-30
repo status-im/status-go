@@ -16,6 +16,7 @@ from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
 from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
+from clients.metrics import Events, PerformanceMetrics
 from clients.statusgo_container import StatusBackendContainer
 from utils.config import Config
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
@@ -63,6 +64,8 @@ class StatusBackend(RpcClient, SignalClient):
         self.device_id = str(uuid.uuid4())  # In reality this is taken from the device, don't confuse with Status installation_id
         self.device_platform = PushNotificationRegistrationTokenType.UNKNOWN
         self.node_login_event = {}
+        self.events = Events()
+        self.version = "unknown"
 
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
@@ -86,7 +89,9 @@ class StatusBackend(RpcClient, SignalClient):
         start_time = time.time()
         while time.time() - start_time <= timeout:
             try:
-                self.health(enable_logging=True)
+                response = self.health()
+                response = json.loads(response.content)
+                self.version = response.get("version", "unknown")
                 logging.debug(f"StatusBackend is healthy after {time.time() - start_time} seconds")
                 return
             except Exception as ex:
@@ -94,16 +99,16 @@ class StatusBackend(RpcClient, SignalClient):
                 time.sleep(0.1)
         raise TimeoutError(f"StatusBackend was not healthy after {timeout} seconds")
 
-    def health(self, enable_logging=True):
-        return self.api_request("health", data=[], url=self.base_url, enable_logging=enable_logging)
+    def health(self):
+        return self.api_request("health", data=[], url=self.base_url, quiet=True)
 
-    def api_request(self, method, data, url=None, enable_logging=True):
+    def api_request(self, method, data, url=None, quiet=False):
         url = url if url else self.api_url
         url = f"{url}/{method}"
-        if enable_logging:
+        if not quiet:
             logging.debug(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True)}")
         response = requests.post(url, json=data)
-        if enable_logging:
+        if not quiet:
             logging.debug(f"Got response: {response.content}")
         return response
 
@@ -256,7 +261,7 @@ class StatusBackend(RpcClient, SignalClient):
             "logToStderr": True,
             "logLevel": "DEBUG",
             # Waku config
-            "wakuV2LightClient": kwargs.get("wakuV2LightClient", False),
+            "wakuV2LightClient": kwargs.get("waku_light_client", False),
             "wakuV2Fleet": Config.waku_fleet,
         }
         if not Config.disable_override_networks:
@@ -417,3 +422,9 @@ class StatusBackend(RpcClient, SignalClient):
         }
         response = self.api_request(method, data)
         return json.loads(response.content)
+
+    def gather_metrics(self):
+        if not self.container:
+            raise RuntimeError("Gathering metrics is only supported when running status-backend in a Docker container")
+        stats = self.container.stop_performance_monitoring()
+        return PerformanceMetrics(stats, self.events, version=self.version)

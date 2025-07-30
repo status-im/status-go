@@ -12,6 +12,7 @@ class Config:
     docker_image: str = ""
     codecov_dir: str = ""
     logs_dir: str = ""
+    benchmark_results_dir: str = ""
     logout: bool = False
     waku_fleets_config: str = ""
     waku_fleet: str = ""
