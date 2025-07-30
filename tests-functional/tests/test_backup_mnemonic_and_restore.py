@@ -10,7 +10,7 @@ from resources.utils import assert_response_attributes
 
 @pytest.mark.create_account
 @pytest.mark.rpc
-class TestrestoreMnemonic:
+class TestBackupMnemonicAndRestore:
 
     @pytest.fixture(autouse=True)
     def setup_cleanup(self, close_status_backend_containers):
