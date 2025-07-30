@@ -125,24 +125,38 @@ class TestrestoreMnemonic:
         assert restored_settings.get("address", None)
 
     def test_restore_with_empty_mnemonic(self):
-        # Restore with an mnemonic with special chars
+        # Restore with empty mnemonic isn't allowed
         user = user_mnemonic_12
-        user.passphrase = ""
 
         restored_account = StatusBackend()
         restored_account.init_status_backend()
+        restored_account.restore_account_and_login(user=user)
+        restored_account._set_display_name()
+        data = restored_account._create_account_request(user)
+        data["mnemonic"] = ""
+        restored_account_response = restored_account.api_request("RestoreAccountAndLogin", data)
+        assert restored_account_response.json().get("error") == "restore-account: no mnemonic or keycard is set"
 
-        try:
-            restored_account.restore_account_and_login(user=user)
-            raise AssertionError("Restore with empty mnemonic worked")
-        except Exception as ex:
-            assert "restore-account: no mnemonic or keycard is set" in str(ex)
-
-    # def test_restore_with_empty_mnemonic22(self):
-    #     # Restore with an mnemonic with special chars
-    #     user = user_mnemonic_12
-    #     user.passphrase = '324324324'
-
-    #     restored_account = StatusBackend()
-    #     restored_account.init_status_backend()
-    #     restored_account.restore_account_and_login(user=user)
+    def test_restore_with_both_mnemonic_and_keycard(self):
+        # Restore with both keycard and mnemonic isn't allowed
+        user = user_mnemonic_12
+        restored_account = StatusBackend()
+        restored_account.init_status_backend()
+        restored_account.restore_account_and_login(user=user)
+        restored_account._set_display_name()
+        data = restored_account._create_account_request(user)
+        data["mnemonic"] = user.passphrase
+        data["keycard"] = {
+            "keyUID": "5a0dd657-165a-4810-b800-6005452be42f",
+            "address": "0x1234567890abcdef1234567890abcdef12345678",
+            "whisperPrivateKey": "example-whisper-private-key",
+            "whisperPublicKey": "example-whisper-public-key",
+            "whisperAddress": "example-whisper-address",
+            "walletPublicKey": "example-wallet-public-key",
+            "walletAddress": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+            "walletRootAddress": "0xrootaddressrootaddressrootaddressrootaddr",
+            "eip1581Address": "0xeip1581address1234567890abcdef1234567890",
+            "encryptionPublicKey": "example-encryption-public-key",
+        }
+        restored_account_response = restored_account.api_request("RestoreAccountAndLogin", data)
+        assert restored_account_response.json().get("error") == "restore-account: both mnemonic and keycard info are set"
