@@ -27,7 +27,7 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 class StatusBackend(RpcClient, SignalClient):
     container = None
 
-    def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6):
+    def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6, **kwargs):
         self.temp_dir = None
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
@@ -45,7 +45,7 @@ class StatusBackend(RpcClient, SignalClient):
             host_port = random.choice(Config.status_backend_port_range)
             Config.status_backend_port_range.remove(host_port)
 
-            self.container = StatusBackendContainer(host_port, privileged, self.ipv6)
+            self.container = StatusBackendContainer(host_port, privileged, self.ipv6, **kwargs)
             self.temp_dir = None
             self.data_dir = self.container.data_dir()
             url = self.container.url
