@@ -313,12 +313,14 @@ class PushNotificationServerContainer(StatusGoContainer):
 
 
 class StatusBackendContainer(StatusGoContainer):
-    def __init__(self, host_port: int, privileged=False, ipv6=False):
+    def __init__(self, host_port: int, privileged=False, ipv6=False, **kwargs):
         container_port = 3333
         entrypoint = [
             "status-backend",
             "--address",
             f"0.0.0.0:{container_port}" if not ipv6 else f"[::]:{container_port}",
+            "--pprof",
+            "true" if kwargs.get("pprof_enabled", False) else "false",
         ]
 
         self.ipv6 = ipv6

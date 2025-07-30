@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	_ "expvar"
 	"io"
 	"net"
 	"net/http"
@@ -114,6 +115,7 @@ func (s *Server) Listen(address string) error {
 		s.mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 		s.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		s.mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		s.mux.HandleFunc("/debug/vars", http.DefaultServeMux.ServeHTTP)
 	}
 
 	s.listener, err = net.Listen("tcp", address)

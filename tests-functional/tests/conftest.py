@@ -38,7 +38,7 @@ def backend_factory(request):
     # Store created backends for cleanup
     created_backends = []
 
-    def factory(name, *, start_messenger=True) -> StatusBackend:
+    def factory(name, **kwargs) -> StatusBackend:
         """
         Create a single backend with the given name.
 
@@ -55,7 +55,7 @@ def backend_factory(request):
         logging.debug(f"📋 [SETUP] Parameters: privileged={privileged}, ipv6={ipv6}")
 
         # Create backend
-        backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6)
+        backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6, **kwargs)
         created_backends.append(backend)
         logging.debug(f"✅ [SETUP] {name.capitalize()} backend created")
 
@@ -82,9 +82,9 @@ def waku_light_client(request) -> bool:
 
 @pytest.fixture(scope="function", autouse=False)
 def backend_new_profile(request, backend_factory):
-    def _backend_new_profile(name: str, waku_light_client: bool = False) -> StatusBackend:
+    def _backend_new_profile(name: str, waku_light_client: bool = False, **kwargs) -> StatusBackend:
         logging.debug(f"📋 [SETUP] backend_new_profile parameters: wakuV2LightClient={waku_light_client}")
-        backend = backend_factory(name)
+        backend = backend_factory(name, **kwargs)
         backend.init_status_backend()
         backend.create_account_and_login(waku_light_client=waku_light_client)
         backend.wait_for_login()
@@ -99,7 +99,7 @@ def backend_new_profile(request, backend_factory):
 def backend_recovered_profile(request, backend_factory):
     def _backend_recovered_profile(name: str, user: object, waku_light_client: bool = False, **kwargs) -> StatusBackend:
         logging.debug(f"📋 [SETUP] backend_recovered_profile parameters: wakuV2LightClient={waku_light_client}")
-        backend = backend_factory(name)
+        backend = backend_factory(name, **kwargs)
         backend.init_status_backend()
         backend.restore_account_and_login(user=user, waku_light_client=waku_light_client, **kwargs)
         backend.wait_for_login()
