@@ -718,14 +718,6 @@ func (s *MessageSender) SendPublic(
 		rawMessage.Sender = s.identity
 	}
 
-	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 {
-		s.logger.Debug("SDS: SendPublic with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
-		_, err := s.wrapPayloadForSDS(&rawMessage)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
-		}
-	}
-
 	var err error
 	var wrappedMessage []byte
 	if rawMessage.SkipApplicationWrap {
@@ -802,6 +794,14 @@ func (s *MessageSender) SendPublic(
 
 	// notify before dispatching
 	s.notifyOnScheduledMessage(nil, &rawMessage)
+
+	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 {
+		s.logger.Debug("SDS: SendPublic with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
+		_, err := s.wrapPayloadForSDS(newMessage, rawMessage.CommunityID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
+		}
+	}
 
 	s.logger.Debug("segment params",
 		zap.Int("messageSize", len(newMessage.Payload)),
@@ -1006,6 +1006,13 @@ func (s *MessageSender) handleMessage(msg *messagingtypes.ReceivedMessage) (*han
 		hlogger.Error("failed to handle segmentation layer message", zap.Error(err))
 	}
 
+	hlogger.Debug("app payload before sds", zap.String("appPayload", types.EncodeHex(message.TransportLayer.Payload)))
+	err = s.unwrapPayloadForSDS(message)
+	if err != nil {
+		hlogger.Error("failed to unwrap payload for SDS", zap.Error(err))
+	}
+	hlogger.Debug("app payload after sds", zap.String("appPayload", types.EncodeHex(message.TransportLayer.Payload)))
+
 	err = s.handleEncryptionLayer(context.Background(), message)
 	hlogger.Debug("handle encryption layer", zap.Int("messageSize", len(message.EncryptionLayer.Payload)),
 		zap.Int("messagesizetransport", len(message.TransportLayer.Payload)))
@@ -1030,12 +1037,6 @@ func (s *MessageSender) handleMessage(msg *messagingtypes.ReceivedMessage) (*han
 		if err != nil {
 			hlogger.Error("failed to handle application metadata layer message", zap.Error(err))
 		}
-		hlogger.Debug("app payload before sds", zap.String("appPayload", types.EncodeHex(msg.ApplicationLayer.Payload)))
-		err = s.unwrapPayloadForSDS(msg)
-		if err != nil {
-			hlogger.Error("failed to unwrap payload for SDS", zap.Error(err))
-		}
-		hlogger.Debug("app payload after sds", zap.String("appPayload", types.EncodeHex(msg.ApplicationLayer.Payload)))
 	}
 
 	return response, nil
@@ -1375,27 +1376,27 @@ func (s *MessageSender) CleanupHashRatchetEncryptedMessages() error {
 }
 
 // Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
-func (s *MessageSender) wrapPayloadForSDS(rawMessage *RawMessage) ([]byte, error) {
-	s.logger.Debug("SDS: wrap payload", zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)))
+func (s *MessageSender) wrapPayloadForSDS(message *wakutypes.NewMessage, communityID []byte) ([]byte, error) {
+	s.logger.Debug("SDS: wrap payload", zap.String("channelId", types.EncodeHex(communityID)))
 
 	// TODO: need the message ID related to Waku or SDS for history retrieval
-	sdsMessageID := crypto.Keccak256(rawMessage.Payload)
+	sdsMessageID := crypto.Keccak256(message.Payload)
 
 	s.logger.Debug("SDS: original payload",
-		zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)),
-		zap.Int("payload-length", len(rawMessage.Payload)),
+		zap.String("channelId", types.EncodeHex(communityID)),
+		zap.Int("payload-length", len(message.Payload)),
 		zap.String("messageId", types.EncodeHex(sdsMessageID)),
-		zap.String("original payload", types.EncodeHex(rawMessage.Payload)),
+		zap.String("original payload", types.EncodeHex(message.Payload)),
 	)
-	sdsWrappedPayload, err := s.reliabilityManager.WrapOutgoingMessage(rawMessage.Payload, sds.MessageID(types.EncodeHex(sdsMessageID)), types.EncodeHex(rawMessage.CommunityID))
+	sdsWrappedPayload, err := s.reliabilityManager.WrapOutgoingMessage(message.Payload, sds.MessageID(types.EncodeHex(sdsMessageID)), types.EncodeHex(communityID))
 	if err != nil {
 		return nil, errors.Wrap(err, "SDS: failed to wrap a community message")
 	}
 
-	rawMessage.Payload = sdsWrappedPayload
+	message.Payload = sdsWrappedPayload
 
 	s.logger.Debug("SDS: wrapped payload",
-		zap.String("channelId", types.EncodeHex(rawMessage.CommunityID)),
+		zap.String("channelId", types.EncodeHex(communityID)),
 		zap.Int("payload-length", len(sdsWrappedPayload)),
 		zap.String("messageId", types.EncodeHex(sdsMessageID)),
 		zap.String("sdspayload", types.EncodeHex(sdsWrappedPayload)),
@@ -1405,16 +1406,16 @@ func (s *MessageSender) wrapPayloadForSDS(rawMessage *RawMessage) ([]byte, error
 }
 
 func (s *MessageSender) unwrapPayloadForSDS(msg *v1protocol.StatusMessage) error {
-	if len(msg.ApplicationLayer.Payload) > 0 {
-		s.logger.Debug("SDS: unwrap payload", zap.String("beforeunwrappayload", types.EncodeHex(msg.ApplicationLayer.Payload)))
-		unwrappedMessage, err := s.reliabilityManager.UnwrapReceivedMessage(msg.ApplicationLayer.Payload)
+	if len(msg.TransportLayer.Payload) > 0 {
+		s.logger.Debug("SDS: unwrap payload", zap.String("beforeunwrappayload", types.EncodeHex(msg.TransportLayer.Payload)))
+		unwrappedMessage, err := s.reliabilityManager.UnwrapReceivedMessage(msg.TransportLayer.Payload)
 		if err != nil {
 			s.logger.Error("SDS: failed to unwrap received message", zap.Error(err))
 		} else {
-			msg.ApplicationLayer.Payload = *unwrappedMessage.Message
+			msg.TransportLayer.Payload = *unwrappedMessage.Message
 			s.logger.Debug("SDS: missing deps",
 				zap.Any("missing-deps", *unwrappedMessage.MissingDeps),
-				zap.String("unwrapped-payload", types.EncodeHex(msg.ApplicationLayer.Payload)),
+				zap.String("unwrapped-payload", types.EncodeHex(msg.TransportLayer.Payload)),
 			)
 		}
 	}
