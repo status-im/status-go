@@ -46,7 +46,7 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 	temp := struct {
 		KeyUID       string `json:"keyUid"`
 		Name         string `json:"type"`
-		URI          string `json:"uri"`
+		URI          string `json:"uri"` // Deprecated, use LocalURL instead
 		Width        int    `json:"width"`
 		Height       int    `json:"height"`
 		FileSize     int    `json:"fileSize"`
