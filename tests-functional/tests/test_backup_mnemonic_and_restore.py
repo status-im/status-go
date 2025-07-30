@@ -184,4 +184,4 @@ class TestBackupMnemonicAndRestore:
         # Assert all restores succeeded and addresses are consistent
         assert len(results) == num_threads, "Not all restore requests have addresses"
         assert all(addr == results[0] for addr in results), "Not all addresses are the same"
-        assert all(not addr for addr in results), f"Some addresses are none or emtpty, see: {results}"
+        assert all(addr for addr in results), f"Some addresses are none or emtpty, see: {results}"
