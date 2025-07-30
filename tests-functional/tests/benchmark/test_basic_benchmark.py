@@ -28,7 +28,7 @@ class TestBasicBenchmark(MessengerSteps):
 
         # Create a new user
         status_backend = backend_factory("AUT", pprof_enabled=True)
-        status_backend.container.start_performance_monitoring()
+        status_backend.start_performance_monitoring()
         self.sleep(status_backend, 5)  # Keep idle for a short time
 
         status_backend.init_status_backend()

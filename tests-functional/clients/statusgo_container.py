@@ -133,19 +133,19 @@ class StatusGoContainer:
         self.health_monitor.start()
 
     def start_performance_monitoring(self):
-        """Start a background performance monitoring thread that collects CPU and memory metrics"""
+        """Start independent container performance monitoring thread"""
         # Reset metrics storage
-        self.stats = list[ContainerStats]()
+        self.container_stats = []
         self._stop_perf_monitoring = threading.Event()
 
         def monitor_performance():
             stats_stream = self.docker_client.api.stats(self.id(), decode=True, stream=True)
-            prev_stat = None  # Store previous stat for rate calculations
+            prev_stat = None
 
             for stat in stats_stream:
-                # Create ContainerStats with previous stat for network rate calculation
-                container_stats = ContainerStats(stat, prev_stat)
-                self.stats.append(container_stats)
+                # Create ContainerStats with only container data
+                container_stats = ContainerStats(stat, prev_stat, go_memory_stats=None)
+                self.container_stats.append(container_stats)
 
                 # Store current stat as previous for the next iteration
                 prev_stat = stat
@@ -155,7 +155,7 @@ class StatusGoContainer:
 
             logging.debug(f"Performance monitoring stopped for container {self.name()}")
 
-        self._stop_perf_monitoring.clear()  # Reset the event
+        self._stop_perf_monitoring.clear()
         self.perf_monitor = threading.Thread(target=monitor_performance, daemon=True)
         self.perf_monitor.start()
         logging.info(f"Started performance monitoring for container {self.name()}")
@@ -164,13 +164,13 @@ class StatusGoContainer:
         """Stop the performance monitoring thread and return the collected metrics"""
         self._stop_perf_monitoring.set()  # Signal the thread to stop
         if not self.perf_monitor or not self.perf_monitor.is_alive():
-            return None
+            return []
 
         self.perf_monitor.join(timeout=10)
         if self.perf_monitor.is_alive():
             logging.warning("Performance monitoring thread didn't stop gracefully")
 
-        return self.stats
+        return self.container_stats
 
     def stop_health_monitoring(self):
         """Stop the health monitoring thread"""
