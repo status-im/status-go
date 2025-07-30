@@ -1,3 +1,4 @@
+import os
 import random
 import pytest
 from resources.constants import user_1
@@ -27,3 +28,26 @@ class TestAccounts:
 
         response = self.rpc_client.rpc_valid_request(method, params, _id)
         self.rpc_client.verify_json_schema(response.json(), method)
+
+    def test_store_identity_image(self):
+        self.rpc_client.import_data(
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "../resources/images/test-image-200x200.jpg")), "/tmp/images/"
+        )
+        response = self.rpc_client.rpc_valid_request(
+            "multiaccounts_storeIdentityImage", [self.rpc_client.key_uid, "/tmp/images/test-image-200x200.jpg", 0, 0, 200, 200]
+        )
+
+        jsonResponse = response.json()
+        result = jsonResponse.get("result", {})
+        assert result is not None, "Identity images were not stored (no result)"
+        assert len(result) == 2, "Identity images were not stored (wrong count)"
+        assert result[0]["localUrl"] is not None, "Local URL for identity image 1 is not set"
+        assert result[1]["localUrl"] is not None, "Local URL for identity image 2 is not set"
+
+        response = self.rpc_client.rpc_valid_request("multiaccounts_getIdentityImages", [self.rpc_client.key_uid])
+        jsonResponse = response.json()
+        result = jsonResponse.get("result", {})
+        assert result is not None, "Identity images were not retrieved (no result)"
+        assert len(result) == 2, "Identity images were not retrieved (wrong count)"
+        assert result[0]["localUrl"] is not None, "Local URL for identity image 1 is not set"
+        assert result[1]["localUrl"] is not None, "Local URL for identity image 2 is not set"

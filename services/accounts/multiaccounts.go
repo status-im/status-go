@@ -45,14 +45,47 @@ func (api *MultiAccountsAPI) UpdateAccount(account multiaccounts.Account) error 
 // Profile Images
 //
 
+func (api *MultiAccountsAPI) setLocalURLOnImage(keyUID string, image *images.IdentityImage) {
+	image.LocalURL = api.mediaServer.MakeAccountImageURL(keyUID, image.Name, image.Clock)
+}
+
+func (api *MultiAccountsAPI) setLocalURLOnImages(keyUID string, iis []*images.IdentityImage) {
+	for k := range iis {
+		if iis[k] == nil {
+			continue
+		}
+		api.setLocalURLOnImage(keyUID, iis[k])
+	}
+}
+
+func (api *MultiAccountsAPI) setLocalURLOnImages2(keyUID string, iis []images.IdentityImage) {
+	for k := range iis {
+		api.setLocalURLOnImage(keyUID, &iis[k])
+	}
+}
+
 // GetIdentityImages returns an array of json marshalled IdentityImages assigned to the user's identity
 func (api *MultiAccountsAPI) GetIdentityImages(keyUID string) ([]*images.IdentityImage, error) {
-	return api.db.GetIdentityImages(keyUID)
+	images, err := api.db.GetIdentityImages(keyUID)
+	if err != nil {
+		return nil, err
+	}
+	api.setLocalURLOnImages(keyUID, images)
+	return images, nil
 }
 
 // GetIdentityImage returns a json object representing the image with the given name
 func (api *MultiAccountsAPI) GetIdentityImage(keyUID, name string) (*images.IdentityImage, error) {
-	return api.db.GetIdentityImage(keyUID, name)
+	image, err := api.db.GetIdentityImage(keyUID, name)
+
+	if err != nil {
+		return nil, err
+	}
+	if image == nil {
+		return nil, nil
+	}
+	api.setLocalURLOnImage(keyUID, image)
+	return image, nil
 }
 
 // StoreIdentityImage takes the filepath of an image, crops it as per the rect coords and finally resizes the image.
@@ -70,7 +103,9 @@ func (api *MultiAccountsAPI) StoreIdentityImage(keyUID, filepath string, aX, aY,
 		return nil, err
 	}
 
-	return iis, err
+	api.setLocalURLOnImages2(keyUID, iis)
+
+	return iis, nil
 }
 
 func (api *MultiAccountsAPI) StoreIdentityImageFromURL(keyUID, url string) ([]images.IdentityImage, error) {
@@ -84,7 +119,9 @@ func (api *MultiAccountsAPI) StoreIdentityImageFromURL(keyUID, url string) ([]im
 		return nil, err
 	}
 
-	return iis, err
+	api.setLocalURLOnImages2(keyUID, iis)
+
+	return iis, nil
 }
 
 // DeleteIdentityImage deletes an IdentityImage from the db with the given name
