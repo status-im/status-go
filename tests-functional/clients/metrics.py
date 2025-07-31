@@ -588,6 +588,203 @@ class StatusGoMetrics:
             logging.error(f"Error generating performance chart: {e}")
             return None
 
+    def save_go_metrics_chart(self, title: str, output_path=None):
+        """Generate and save a dedicated Go metrics chart as a PNG image
+
+        Args:
+            title: Chart title
+            output_path: Path to save the chart. If None, saves to ./go_metrics_{timestamp}.png
+
+        Returns:
+            str: Path to the saved chart file
+        """
+        if not self.go_metrics:
+            logging.warning("No Go metrics data to generate chart")
+            return None
+
+        if output_path is None:
+            output_path = f"./go_metrics_{int(time.time())}.png"
+
+        mb = 1024 * 1024
+
+        try:
+            # Create a figure with three subplots for Go metrics
+            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 16), sharex=True)
+            fig.suptitle(title)
+
+            # Extract data from Go metrics
+            go_timestamps = [metric.timestamp for metric in self.go_metrics]
+            start_time = go_timestamps[0]
+            go_time_points = [t - start_time for t in go_timestamps]
+
+            # Memory-related metrics (in MB)
+            alloc_values = [metric.alloc_bytes / mb for metric in self.go_metrics]
+            sys_bytes_values = [metric.sys_bytes / mb for metric in self.go_metrics]
+            heap_alloc_values = [metric.heap_alloc_bytes / mb for metric in self.go_metrics]
+            heap_sys_values = [metric.heap_sys_bytes / mb for metric in self.go_metrics]
+            heap_idle_values = [metric.heap_idle_bytes / mb for metric in self.go_metrics]
+            heap_in_use_values = [metric.heap_in_use_bytes / mb for metric in self.go_metrics]
+            heap_released_values = [metric.heap_released_bytes / mb for metric in self.go_metrics]
+
+            # Count-based metrics
+            heap_objects_values = [metric.heap_objects for metric in self.go_metrics]
+            mallocs_values = [metric.mallocs for metric in self.go_metrics]
+            frees_values = [metric.frees for metric in self.go_metrics]
+            num_gc_values = [metric.num_gc for metric in self.go_metrics]
+
+            # GC metrics
+            gc_cpu_fraction_values = [metric.gc_cpu_fraction * 100 for metric in self.go_metrics]  # Convert to percentage
+
+            # Plot 1: Memory metrics
+            if alloc_values:
+                alloc_median = statistics.median(alloc_values)
+                alloc_max = max(alloc_values)
+                ax1.plot(
+                    go_time_points, alloc_values, "r-", label=f"Alloc (MB)\nmedian = {alloc_median:.2f} MB\nmax = {alloc_max:.2f} MB", linewidth=2
+                )
+
+            if heap_alloc_values:
+                heap_alloc_median = statistics.median(heap_alloc_values)
+                heap_alloc_max = max(heap_alloc_values)
+                ax1.plot(
+                    go_time_points,
+                    heap_alloc_values,
+                    "b-",
+                    label=f"Heap Alloc (MB)\nmedian = {heap_alloc_median:.2f} MB\nmax = {heap_alloc_max:.2f} MB",
+                    linewidth=2,
+                )
+
+            if heap_sys_values:
+                heap_sys_median = statistics.median(heap_sys_values)
+                heap_sys_max = max(heap_sys_values)
+                ax1.plot(
+                    go_time_points,
+                    heap_sys_values,
+                    "orange",
+                    label=f"Heap Sys (MB)\nmedian = {heap_sys_median:.2f} MB\nmax = {heap_sys_max:.2f} MB",
+                    linewidth=2,
+                )
+
+            if heap_idle_values:
+                heap_idle_median = statistics.median(heap_idle_values)
+                heap_idle_max = max(heap_idle_values)
+                ax1.plot(
+                    go_time_points,
+                    heap_idle_values,
+                    "c--",
+                    label=f"Heap Idle (MB)\nmedian = {heap_idle_median:.2f} MB\nmax = {heap_idle_max:.2f} MB",
+                    linewidth=1,
+                )
+
+            if heap_in_use_values:
+                heap_in_use_median = statistics.median(heap_in_use_values)
+                heap_in_use_max = max(heap_in_use_values)
+                ax1.plot(
+                    go_time_points,
+                    heap_in_use_values,
+                    "g--",
+                    label=f"Heap In Use (MB)\nmedian = {heap_in_use_median:.2f} MB\nmax = {heap_in_use_max:.2f} MB",
+                    linewidth=1,
+                )
+
+            if heap_released_values:
+                heap_released_median = statistics.median(heap_released_values)
+                heap_released_max = max(heap_released_values)
+                ax1.plot(
+                    go_time_points,
+                    heap_released_values,
+                    "purple",
+                    linestyle="--",
+                    label=f"Heap Released (MB)\nmedian = {heap_released_median:.2f} MB\nmax = {heap_released_max:.2f} MB",
+                    linewidth=1,
+                )
+
+            if sys_bytes_values:
+                total_alloc_median = statistics.median(sys_bytes_values)
+                total_alloc_max = max(sys_bytes_values)
+                ax1.plot(
+                    go_time_points,
+                    sys_bytes_values,
+                    "brown",
+                    linestyle=":",
+                    label=f"Sys (MB)\nmedian = {total_alloc_median:.2f} MB\nmax = {total_alloc_max:.2f} MB",
+                    linewidth=1,
+                )
+
+            ax1.set_ylabel("Memory Usage (MB)")
+            ax1.set_title("Go Memory Metrics Over Time")
+            ax1.grid(True)
+            ax1.set_xlim(left=0)
+            ax1.set_ylim(bottom=0)
+            ax1.legend(loc="best")
+
+            # Plot 2: Count-based metrics
+            if heap_objects_values:
+                heap_objects_median = statistics.median(heap_objects_values)
+                heap_objects_max = max(heap_objects_values)
+                ax2.plot(
+                    go_time_points,
+                    heap_objects_values,
+                    "pink",
+                    label=f"Heap Objects\nmedian = {heap_objects_median:.0f}\nmax = {heap_objects_max:.0f}",
+                    linewidth=2,
+                )
+
+            if mallocs_values:
+                mallocs_median = statistics.median(mallocs_values)
+                mallocs_max = max(mallocs_values)
+                ax2.plot(
+                    go_time_points, mallocs_values, "gray", label=f"Mallocs\nmedian = {mallocs_median:.0f}\nmax = {mallocs_max:.0f}", linewidth=2
+                )
+
+            if frees_values:
+                frees_median = statistics.median(frees_values)
+                frees_max = max(frees_values)
+                ax2.plot(go_time_points, frees_values, "lightgray", label=f"Frees\nmedian = {frees_median:.0f}\nmax = {frees_max:.0f}", linewidth=2)
+
+            if num_gc_values:
+                num_gc_median = statistics.median(num_gc_values)
+                num_gc_max = max(num_gc_values)
+                ax2.plot(go_time_points, num_gc_values, "black", label=f"GC Count\nmedian = {num_gc_median:.0f}\nmax = {num_gc_max:.0f}", linewidth=2)
+
+            ax2.set_ylabel("Count")
+            ax2.set_title("Go Count Metrics Over Time")
+            ax2.grid(True)
+            ax2.set_xlim(left=0)
+            ax2.set_ylim(bottom=0)
+            ax2.legend(loc="best")
+
+            # Plot 3: GC CPU fraction
+            if gc_cpu_fraction_values:
+                gc_cpu_median = statistics.median(gc_cpu_fraction_values)
+                gc_cpu_max = max(gc_cpu_fraction_values)
+                ax3.plot(
+                    go_time_points,
+                    gc_cpu_fraction_values,
+                    "red",
+                    label=f"GC CPU Fraction (%)\nmedian = {gc_cpu_median:.4f}%\nmax = {gc_cpu_max:.4f}%",
+                    linewidth=2,
+                )
+
+            ax3.set_ylabel("GC CPU Fraction (%)")
+            ax3.set_title("Go GC CPU Usage Over Time")
+            ax3.set_xlabel("Time (seconds)")
+            ax3.grid(True)
+            ax3.set_xlim(left=0)
+            ax3.set_ylim(bottom=0)
+            ax3.legend(loc="best")
+
+            plt.tight_layout()
+            plt.savefig(output_path, dpi=150, bbox_inches="tight")
+            plt.close()
+
+            logging.info(f"Go metrics chart saved to {output_path}")
+            return output_path
+
+        except Exception as e:
+            logging.error(f"Error generating Go metrics chart: {e}")
+            return None
+
     def save_to_file(self, filename: str):
         metrics = self.to_dict()
         os.makedirs(os.path.dirname(filename), exist_ok=True)

@@ -51,6 +51,7 @@ class TestBasicBenchmark(MessengerSteps):
         metrics = status_backend.gather_metrics()
         metrics.save_to_file(f"{filename}.json")
         metrics.save_performance_chart(test_name, f"{filename}.png")
+        metrics.save_go_metrics_chart(f"{test_name} - Go Metrics", f"{filename}_go_metrics.png")
 
     def sleep(self, backend: StatusBackend, duration: int):
         backend.events.append(f"Sleep for {duration} seconds")
