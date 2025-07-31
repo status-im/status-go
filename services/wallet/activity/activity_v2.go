@@ -45,17 +45,7 @@ type FilterDependencies struct {
 	currentTimestamp func() int64
 }
 
-// getActivityEntriesV2 queries the route_* and tracked_transactions based on filter parameters and arguments
-// it returns metadata for all entries ordered by timestamp column
-func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresses []eth.Address, allAddresses bool, chainIDs []wCommon.ChainID, filter Filter, offset int, limit int) ([]Entry, error) {
-	if len(addresses) == 0 {
-		return nil, ErrNoAddressesProvided
-	}
-	if len(chainIDs) == 0 {
-		return nil, ErrNoChainIDsProvided
-	}
-
-	// Get all sent transactions
+func sentTxQueryBuilder(addresses []eth.Address, chainIDs []wCommon.ChainID) sq.SelectBuilder {
 	sentTxQ := sq.Select(`
 		'sent_transaction' as entry_type,
 		st.tx_json as sent_tx_json,
@@ -88,15 +78,10 @@ func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresse
 	})
 	sentTxQ = sentTxQ.Where(sentTxCond)
 
-	sentTxQuery, sentTxArgs, err := sentTxQ.ToSql()
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println("sentTxQuery")
-	fmt.Println(sentTxQuery)
-	fmt.Println(sentTxArgs)
+	return sentTxQ
+}
 
-	// Get all fetched transactions
+func fetchedTxQueryBuilder(addresses []eth.Address, chainIDs []wCommon.ChainID) sq.SelectBuilder {
 	fetchedTxQ := sq.Select(`
 		'fetched_transaction' as entry_type,
 		NULL as sent_tx_json,
@@ -130,7 +115,31 @@ func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresse
 
 	fetchedTxCond = append(fetchedTxCond, distinctTxSubQ)
 	fetchedTxQ = fetchedTxQ.Where(fetchedTxCond)
+	return fetchedTxQ
+}
 
+// getActivityEntriesV2 queries the route_* and tracked_transactions based on filter parameters and arguments
+// it returns metadata for all entries ordered by timestamp column
+func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresses []eth.Address, allAddresses bool, chainIDs []wCommon.ChainID, filter Filter, offset int, limit int) ([]Entry, error) {
+	if len(addresses) == 0 {
+		return nil, ErrNoAddressesProvided
+	}
+	if len(chainIDs) == 0 {
+		return nil, ErrNoChainIDsProvided
+	}
+
+	// Get all sent transactions
+	sentTxQ := sentTxQueryBuilder(addresses, chainIDs)
+	sentTxQuery, sentTxArgs, err := sentTxQ.ToSql()
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println("sentTxQuery")
+	fmt.Println(sentTxQuery)
+	fmt.Println(sentTxArgs)
+
+	// Get all fetched transactions
+	fetchedTxQ := fetchedTxQueryBuilder(addresses, chainIDs)
 	fetchedTxQuery, fetchedTxArgs, err := fetchedTxQ.ToSql()
 	if err != nil {
 		return nil, err
@@ -138,11 +147,6 @@ func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresse
 	fmt.Println("fetchedTxQuery")
 	fmt.Println(fetchedTxQuery)
 	fmt.Println(fetchedTxArgs)
-
-	// Merge the two queries:
-	// - distinct by tx hash
-	// - prioritize sent transactions
-	//q := sentTxQ.SuffixExpr(fetchedTxQ.Prefix("UNION ALL"))
 
 	// Due to non-native support for UNION/UNION ALL, these need to be added ub a bit of
 	// a hacky way
