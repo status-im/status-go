@@ -4,7 +4,7 @@ from clients.status_backend import StatusBackend
 from clients.signals import SignalType
 import pytest
 
-from resources.constants import user_mnemonic_12, user_mnemonic_15, user_mnemonic_24
+from resources.constants import user_mnemonic_12, user_mnemonic_15, user_mnemonic_24, user_keycard_1
 from resources.utils import assert_response_attributes
 
 
@@ -32,26 +32,26 @@ class TestBackupMnemonicAndRestore:
         account.create_account_and_login()
         account.wait_for_login()
 
-        # Retrieve and verify the menmonic
+        # Retrieve and verify the mnemonic
         settings = account.settings_service.get_settings()
-        menmonic = settings.get("result", {}).get("mnemonic", None)
-        assert menmonic is not None
-        assert isinstance(menmonic, str)
-        assert len(menmonic.split()) == 12  # Basic check for mnemonic length
+        mnemonic = settings.get("result", {}).get("mnemonic", None)
+        assert mnemonic is not None
+        assert isinstance(mnemonic, str)
+        assert len(mnemonic.split()) == 12  # Basic check for mnemonic length
 
     def test_backup_account_and_restore_it_via_mnemonics(self):
-        # Create original account and backup menmonic
+        # Create original account and backup mnemonic
         original_account = StatusBackend(self.await_signals)
         original_account.init_status_backend()
         original_account.create_account_and_login()
         original_account.wait_for_login()
         original_get_settings_response = original_account.settings_service.get_settings()
         original_settings = original_get_settings_response.get("result", {})
-        menmonic = original_settings.get("mnemonic", None)
-        assert menmonic is not None
+        mnemonic = original_settings.get("mnemonic", None)
+        assert mnemonic is not None
 
         user = user_mnemonic_12
-        user.passphrase = menmonic
+        user.passphrase = mnemonic
 
         # Restore account in a new container
         restored_account = StatusBackend(self.await_signals)
@@ -59,7 +59,7 @@ class TestBackupMnemonicAndRestore:
         restored_account.restore_account_and_login(user=user)
         restored_account.wait_for_login()
 
-        # Verify menmonic is not exposed after restore
+        # Verify mnemonic is not exposed after restore
         restored_get_settings_response = restored_account.settings_service.get_settings()
         restored_settings = restored_get_settings_response.get("result", {})
         assert restored_settings.get("mnemonic", None) is None
@@ -158,18 +158,7 @@ class TestBackupMnemonicAndRestore:
         restored_account._set_display_name()
         data = restored_account._create_account_request(user)
         data["mnemonic"] = user.passphrase
-        data["keycard"] = {
-            "keyUID": "5a0dd657-165a-4810-b800-6005452be42f",
-            "address": "0x1234567890abcdef1234567890abcdef12345678",
-            "whisperPrivateKey": "example-whisper-private-key",
-            "whisperPublicKey": "example-whisper-public-key",
-            "whisperAddress": "example-whisper-address",
-            "walletPublicKey": "example-wallet-public-key",
-            "walletAddress": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-            "walletRootAddress": "0xrootaddressrootaddressrootaddressrootaddr",
-            "eip1581Address": "0xeip1581address1234567890abcdef1234567890",
-            "encryptionPublicKey": "example-encryption-public-key",
-        }
+        data["keycard"] = user_keycard_1
         restored_account_response = restored_account.api_request("RestoreAccountAndLogin", data)
         assert restored_account_response.json().get("error") == "restore-account: both mnemonic and keycard info are set"
 
