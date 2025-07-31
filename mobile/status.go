@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"runtime/debug"
 	"time"
 	"unsafe"
 
@@ -20,6 +21,8 @@ import (
 	"github.com/status-im/zxcvbn-go/scoring"
 
 	"github.com/status-im/extkeys"
+
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
@@ -2363,4 +2366,9 @@ func LoadLocalBackup(requestJSON string) string {
 	}
 	err = statusBackend.StatusNode().LoadLocalBackup(request.FilePath)
 	return makeJSONResponse(err)
+}
+
+func FreeOSMemory(string) string {
+	debug.FreeOSMemory()
+	return ""
 }
