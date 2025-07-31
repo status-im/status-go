@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
@@ -25,7 +24,6 @@ import (
 
 const testPassword = "test-password"
 const newTestPassword = "new-test-password"
-const keystoreReloadDelay = 2 * time.Second
 
 func TestVerifyAccountPassword(t *testing.T) {
 	accManager, err := NewAccountsManager(tt.MustCreateTestLogger())
@@ -111,12 +109,21 @@ func TestVerifyAccountPassword(t *testing.T) {
 		if testCase.importToLocation {
 			err = utils.ImportTestAccount(keystore.KeystorePath(), utils.GetAccount1PKFile())
 			require.NoError(t, err)
+
+			persistence.EXPECT().GetProfileKeypair().Return(
+				&accounts.Keypair{
+					KeyUID: testCase.keyUID,
+				},
+				nil,
+			)
+
+			// now we need to re-create the keystore in order to make the get-keystore aware of the copied account
+			keystore, err = accManager.createKeystore()
+			require.NoError(t, err)
 		}
 
 		if testCase.keystoreSet {
 			accManager.setKeystore(keystore)
-
-			time.Sleep(keystoreReloadDelay)
 		} else {
 			accManager.setKeystore(nil)
 		}
@@ -155,17 +162,19 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 			KeyUID: utils.TestConfig.Account3.KeyUID,
 		},
 		nil,
-	)
+	).Times(2)
 
 	accManager.SetRootDataDir(rootDataDir)
+
 	keystore, err := accManager.createKeystore()
 	require.NoError(t, err)
 
 	err = utils.ImportTestAccount(keystore.KeystorePath(), "test-account3-before-eip55.pk") // Import keys and make sure one was created before EIP55 introduction.
 	require.NoError(t, err)
 
-	accManager.setKeystore(keystore)
-	time.Sleep(keystoreReloadDelay)
+	// now we need to reload the keystore (re-create it) in order to make the get-keystore aware of the copied account
+	err = accManager.ReloadKeystore()
+	require.NoError(t, err)
 
 	address := ethtypes.HexToAddress(utils.TestConfig.Account3.WalletAddress)
 	ok, err := accManager.VerifyAccountPassword(address, utils.TestConfig.Account3.Password)
