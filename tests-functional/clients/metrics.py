@@ -388,205 +388,156 @@ class StatusGoMetrics:
         Returns:
             str: Path to the saved chart file
         """
-        if not self.container_stats and not self.go_metrics:
-            logging.warning("No performance data to generate chart")
-            return None
+        if not self.container_stats or not self.go_metrics:
+            raise ValueError("No performance data to generate chart")
 
         mb = 1024 * 1024
-        start_time = 0
 
-        try:
-            # Create a figure with four subplots (CPU, Memory, Network, and Accumulated Network)
-            fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(12, 16), sharex=True)
-            fig.suptitle(title)
+        # Create a figure with four subplots (CPU, Memory, Network, and Accumulated Network)
+        fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(12, 18), sharex=True)
+        fig.suptitle(title, fontsize=16, y=0.98)
 
-            # Extract data from container stats
-            if self.container_stats:
-                container_timestamps = [stat.timestamp for stat in self.container_stats]
-                cpu_values = [stat.cpu.cpu_percent for stat in self.container_stats]
-                ram_values = [stat.ram.memory_usage_mb for stat in self.container_stats]
-                rx_values = [stat.network.rx_bytes_per_sec / mb for stat in self.container_stats]
-                tx_values = [stat.network.tx_bytes_per_sec / mb for stat in self.container_stats]
+        # Extract data from container stats
+        container_timestamps = [stat.timestamp for stat in self.container_stats]
+        cpu_values = [stat.cpu.cpu_percent for stat in self.container_stats]
+        ram_values = [stat.ram.memory_usage_mb for stat in self.container_stats]
+        rx_values = [stat.network.rx_bytes_per_sec / mb for stat in self.container_stats]
+        tx_values = [stat.network.tx_bytes_per_sec / mb for stat in self.container_stats]
 
-                # Convert to relative time
-                start_time = container_timestamps[0]
-                container_time_points = [t - start_time for t in container_timestamps]
+        # Convert to relative time
+        start_time = container_timestamps[0]
+        container_time_points = [t - start_time for t in container_timestamps]
 
-                # Extract accumulated network data
-                rx_bytes = [stat.network.rx_bytes for stat in self.container_stats]
-                tx_bytes = [stat.network.tx_bytes for stat in self.container_stats]
-                rx_bytes_mb = [bytes / mb for bytes in rx_bytes]
-                tx_bytes_mb = [bytes / mb for bytes in tx_bytes]
-            else:
-                container_time_points = []
-                cpu_values = []
-                ram_values = []
-                rx_values = []
-                tx_values = []
-                rx_bytes = []
-                tx_bytes = []
-                rx_bytes_mb = []
-                tx_bytes_mb = []
+        # Extract accumulated network data
+        rx_bytes = [stat.network.rx_bytes for stat in self.container_stats]
+        tx_bytes = [stat.network.tx_bytes for stat in self.container_stats]
+        rx_bytes_mb = [bytes / mb for bytes in rx_bytes]
+        tx_bytes_mb = [bytes / mb for bytes in tx_bytes]
 
-            # Extract data from Go metrics independently
-            go_timestamps = [metric.timestamp for metric in self.go_metrics]
-            sys_values = [metric.sys_bytes / mb for metric in self.go_metrics]
-            actual_memory_values = [(metric.sys_bytes - metric.heap_released_bytes) / mb for metric in self.go_metrics]
-            could_be_released = [(metric.heap_idle_bytes - metric.heap_released_bytes) / mb for metric in self.go_metrics]
+        # Extract data from Go metrics independently
+        go_timestamps = [metric.timestamp for metric in self.go_metrics]
+        sys_values = [metric.sys_bytes / mb for metric in self.go_metrics]
+        actual_memory_values = [(metric.sys_bytes - metric.heap_released_bytes) / mb for metric in self.go_metrics]
+        could_be_released = [(metric.heap_idle_bytes - metric.heap_released_bytes) / mb for metric in self.go_metrics]
 
-            # Convert to relative time (use container start time if available, otherwise Go metrics start time)
-            go_start_time = start_time if self.container_stats else go_timestamps[0]
-            go_time_points = [t - go_start_time for t in go_timestamps]
+        # Convert to relative time (use container start time if available, otherwise Go metrics start time)
+        go_start_time = start_time if self.container_stats else go_timestamps[0]
+        go_time_points = [t - go_start_time for t in go_timestamps]
 
-            # CPU usage plot
-            if cpu_values:
-                cpu_median = statistics.median(cpu_values)
-                cpu_max = max(cpu_values)
-                ax1.plot(container_time_points, cpu_values, "b-", label=f"CPU Usage (%)\nmedian = {cpu_median:.2f}%\nmax = {cpu_max:.2f}%")
+        # CPU usage plot
+        cpu_median = statistics.median(cpu_values)
+        cpu_max = max(cpu_values)
+        ax1.plot(container_time_points, cpu_values, "b-", label="CPU Usage (%)")
+        ax1.set_ylabel("CPU Usage (%)")
+        ax1.set_title("CPU Usage Over Time")
+        ax1.grid(True)
+        ax1.set_xlim(left=0)
+        ax1.set_ylim(bottom=0)
+        ax1.legend(loc="best")
 
-            ax1.set_ylabel("CPU Usage (%)")
-            ax1.set_title("CPU Usage Over Time")
-            ax1.grid(True)
-            ax1.set_xlim(left=0)
-            ax1.set_ylim(bottom=0)
-            ax1.legend(loc="best")
+        # Memory usage plot with independent arrays
+        median_memory = statistics.median(ram_values)
+        max_memory = max(ram_values)
+        ax2.plot(container_time_points, ram_values, "m-", label="Container Memory (MB)")
 
-            # Memory usage plot with independent arrays
-            if ram_values:
-                median_memory = statistics.median(ram_values)
-                max_memory = max(ram_values)
-                ax2.plot(
-                    container_time_points,
-                    ram_values,
-                    "m-",
-                    label=f"Container Memory (MB)\nmedian = {median_memory:.2f} MB\nmax = {max_memory:.2f} MB",
-                )
+        sys_median = statistics.median(sys_values)
+        sys_max = max(sys_values)
+        ax2.plot(go_time_points, sys_values, "orange", label="Go Sys Memory (MB)", linewidth=2)
 
-            if sys_values:
-                sys_median = statistics.median(sys_values)
-                sys_max = max(sys_values)
-                ax2.plot(
-                    go_time_points,
-                    sys_values,
-                    "orange",
-                    label=f"Go Sys Memory (MB)\nmedian = {sys_median:.2f} MB\nmax = {sys_max:.2f} MB",
-                    linewidth=2,
-                )
+        actual_memory_median = statistics.median(actual_memory_values)
+        actual_memory_max = max(actual_memory_values)
+        ax2.plot(go_time_points, actual_memory_values, "g-", label="Go Actual Memory Usage (MB)", linewidth=2)
+        ax2.plot(go_time_points, could_be_released, "b", label="Go Idle Memory (MB)", linewidth=2)
 
-            actual_memory_median = statistics.median(actual_memory_values)
-            actual_memory_max = max(actual_memory_values)
-            ax2.plot(
-                go_time_points,
-                actual_memory_values,
-                "g-",
-                label=f"Go Actual Memory Usage (MB)\nmedian = {actual_memory_median:.2f} MB\nmax = {actual_memory_max:.2f} MB",
-                linewidth=2,
-            )
+        ax2.set_ylabel("Memory Usage (MB)")
+        ax2.set_title("Memory Usage Over Time")
+        ax2.grid(True)
+        ax2.set_xlim(left=0)
+        ax2.set_ylim(bottom=0)
+        ax2.legend(loc="best")
 
-            ax2.plot(
-                go_time_points,
-                could_be_released,
-                "b",
-                label="Go Idle Memory (MB)",
-                linewidth=2,
-            )
+        # Network usage plot
+        rx_median = statistics.median(rx_values)
+        tx_median = statistics.median(tx_values)
+        rx_max = max(rx_values)
+        tx_max = max(tx_values)
+        ax3.plot(container_time_points, rx_values, "c-", label="Download (MB/s)", linewidth=2)
+        ax3.plot(container_time_points, tx_values, "r-", label="Upload (MB/s)", linewidth=2)
+        ax3.set_ylabel("Network Throughput (MB/s)")
+        ax3.set_title("Network Activity Over Time")
+        ax3.grid(True)
+        ax3.set_xlim(left=0)
+        ax3.set_ylim(bottom=0)
+        ax3.legend(loc="best", labelspacing=2)
 
-            ax2.set_ylabel("Memory Usage (MB)")
-            ax2.set_title("Memory Usage Over Time")
-            ax2.grid(True)
-            ax2.set_xlim(left=0)
-            ax2.set_ylim(bottom=0)
-            ax2.legend(loc="best")
+        # Accumulated network usage plot
+        rx_total_bytes = rx_bytes[-1]
+        tx_total_bytes = tx_bytes[-1]
+        ax4.plot(container_time_points, rx_bytes_mb, "c-", label=f"Download (MB), total: {rx_total_bytes / mb:.2f} MB", linewidth=2)
+        ax4.plot(container_time_points, tx_bytes_mb, "r-", label=f"Upload (MB), total: {tx_total_bytes / mb:.2f} MB", linewidth=2)
+        ax4.set_xlabel("Time (seconds)")
+        ax4.set_ylabel("Total Data Transferred (MB)")
+        ax4.set_title("Accumulated Network Data Over Time")
+        ax4.grid(True)
+        ax4.set_xlim(left=0)
+        ax4.set_ylim(bottom=0)
+        ax4.legend(loc="best")
 
-            # Network usage plot
-            if rx_values and tx_values:
-                rx_median = statistics.median(rx_values)
-                tx_median = statistics.median(tx_values)
-                rx_max = max(rx_values)
-                tx_max = max(tx_values)
-                ax3.plot(
-                    container_time_points,
-                    rx_values,
-                    "c-",
-                    label=f"Download (MB/s)\nmedian = {rx_median:.2f} MB/s\nmax = {rx_max:.2f} MB/s",
-                    linewidth=2,
-                )
-                ax3.plot(
-                    container_time_points,
-                    tx_values,
-                    "r-",
-                    label=f"Upload (MB/s)\nmedian = {tx_median:.2f} MB/s\nmax = {tx_max:.2f} MB/s",
-                    linewidth=2,
-                )
-            ax3.set_ylabel("Network Throughput (MB/s)")
-            ax3.set_title("Network Activity Over Time")
-            ax3.grid(True)
-            ax3.set_xlim(left=0)
-            ax3.set_ylim(bottom=0)
-            ax3.legend(loc="best", labelspacing=2)
+        # Add vertical lines for events across all plots
+        if self.events and hasattr(self.events, "events") and self.events.events:
+            for event_name, event_timestamp in self.events.events.items():
+                # Convert the event timestamp to relative time (seconds from start)
+                event_time = event_timestamp - start_time
 
-            # Accumulated network usage plot
-            if rx_bytes and tx_bytes:
-                rx_total_bytes = rx_bytes[-1]
-                tx_total_bytes = tx_bytes[-1]
-                ax4.plot(container_time_points, rx_bytes_mb, "c-", label=f"Download (MB), total: {rx_total_bytes / mb:.2f} MB", linewidth=2)
-                ax4.plot(container_time_points, tx_bytes_mb, "r-", label=f"Upload (MB), total: {tx_total_bytes / mb:.2f} MB", linewidth=2)
-            ax4.set_xlabel("Time (seconds)")
-            ax4.set_ylabel("Total Data Transferred (MB)")
-            ax4.set_title("Accumulated Network Data Over Time")
-            ax4.grid(True)
-            ax4.set_xlim(left=0)
-            ax4.set_ylim(bottom=0)
-            ax4.legend(loc="best")
+                # Only add lines for events that occur within our time range
+                if container_time_points and 0 <= event_time <= max(container_time_points):
+                    # Add vertical line to all subplots
+                    for ax in [ax1, ax2, ax3, ax4]:
+                        ax.axvline(x=event_time, color="black", linestyle="--", alpha=0.7, linewidth=1)
 
-            # Add vertical lines for events across all plots
-            if self.events and hasattr(self.events, "events") and self.events.events:
-                for event_name, event_timestamp in self.events.events.items():
-                    # Convert the event timestamp to relative time (seconds from start)
-                    if self.container_stats:
-                        start_time = self.container_stats[0].timestamp
-                        event_time = event_timestamp - start_time
+                    # Add an event label to the top plot (CPU) to avoid cluttering
+                    ax1.text(
+                        event_time,
+                        ax1.get_ylim()[1] * 0.95,
+                        event_name,
+                        rotation=90,
+                        verticalalignment="top",
+                        horizontalalignment="right",
+                        fontsize=8,
+                        color="black",
+                        alpha=0.8,
+                    )
 
-                        # Only add lines for events that occur within our time range
-                        if container_time_points and 0 <= event_time <= max(container_time_points):
-                            # Add vertical line to all subplots
-                            for ax in [ax1, ax2, ax3, ax4]:
-                                ax.axvline(x=event_time, color="black", linestyle="--", alpha=0.7, linewidth=1)
+        # Create consolidated statistical summary outside plots
+        stats_text = "Performance Statistics:\n"
+        stats_text += f"- CPU Usage: median = {cpu_median:.2f}%, max = {cpu_max:.2f}%\n"
+        stats_text += f"- Container Memory: median = {median_memory:.2f} MB, max = {max_memory:.2f} MB\n"
+        stats_text += f"- Go Sys Memory: median = {sys_median:.2f} MB, max = {sys_max:.2f} MB\n"
+        stats_text += f"- Go Actual Memory: median = {actual_memory_median:.2f} MB, max = {actual_memory_max:.2f} MB\n"
+        stats_text += f"- Network Download: median = {rx_median:.2f} MB/s, max = {rx_max:.2f} MB/s\n"
+        stats_text += f"- Network Upload: median = {tx_median:.2f} MB/s, max = {tx_max:.2f} MB/s"
 
-                            # Add an event label to the top plot (CPU) to avoid cluttering
-                            ax1.text(
-                                event_time,
-                                ax1.get_ylim()[1] * 0.95,
-                                event_name,
-                                rotation=90,
-                                verticalalignment="top",
-                                horizontalalignment="right",
-                                fontsize=8,
-                                color="black",
-                                alpha=0.8,
-                            )
+        # Adjust layout to make room for the statistics text at the bottom
+        plt.tight_layout(rect=(0, 0.15, 1, 1))
 
-            # Adjust layout
-            plt.tight_layout(rect=(0, 0, 1, 1))
+        ax5.axis("off")
+        ax5.invert_yaxis()
+        ax5.text(0.5, 0.5, stats_text, verticalalignment="top")
 
-            # Save the figure
-            if output_path is None:
-                timestamp = time.strftime("%Y%m%d-%H%M%S")
-                output_path = f"./performance_metrics_{timestamp}.png"
+        # Save the figure
+        if output_path is None:
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            output_path = f"./performance_metrics_{timestamp}.png"
 
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
-            # Save figure
-            plt.savefig(output_path, dpi=100, bbox_inches="tight")
-            plt.close(fig)
+        # Save figure
+        plt.savefig(output_path, dpi=100, bbox_inches="tight")
+        plt.close(fig)
 
-            logging.info(f"Performance chart saved to {output_path}")
-            return output_path
-
-        except Exception as e:
-            logging.error(f"Error generating performance chart: {e}")
-            return None
+        logging.info(f"Performance chart saved to {output_path}")
+        return output_path
 
     def save_to_file(self, filename: str):
         metrics = self.to_dict()
