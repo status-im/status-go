@@ -177,7 +177,6 @@ func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessag
 	segmentMessage := &SegmentMessage{
 		SegmentMessage: &protobuf.SegmentMessage{},
 	}
-
 	err := proto.Unmarshal(message.TransportLayer.Payload, segmentMessage.SegmentMessage)
 	if err != nil {
 		return errors.Wrap(err, "failed to unmarshal SegmentMessage")

@@ -12,9 +12,6 @@ message ApplicationMetadataMessage {
   // The type of protobuf message sent
   Type type = 3;
 
-  // Identifier of the channel this message belongs to, used by SDS protocol
-  optional string channel_id = 4;
-
   enum Type {
     reserved 14;
     reserved "SYNC_INSTALLATION_PUBLIC_CHAT";

@@ -1515,8 +1515,6 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool)
 	}
 
 	logger := w.logger.With(zap.String("envelopeHash", recvMessage.Hash().Hex()))
-	logger.Debug("adding envelope to cache", zap.Bool("alreadyCached", alreadyCached),
-		zap.Bool("envelopeProcessed", envelopeProcessed), zap.Bool("processImmediately", processImmediately))
 
 	if alreadyCached {
 		logger.Debug("w envelope already cached")

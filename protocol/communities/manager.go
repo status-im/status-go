@@ -2172,7 +2172,6 @@ func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uin
 
 func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, verifiedOwner *ecdsa.PublicKey, communityShard *protobuf.Shard) (*CommunityResponse, error) {
 	m.logger.Debug("HandleCommunityDescriptionMessage", zap.String("communityID", description.ID), zap.Uint64("clock", description.Clock))
-	m.logger.Debug("HandleCommunityDescriptionMessage payload", zap.String("payload", hex.EncodeToString(payload)))
 
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
