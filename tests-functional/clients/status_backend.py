@@ -455,4 +455,5 @@ class StatusBackend(RpcClient, SignalClient):
         logging.info("Started performance monitoring with independent container and Go metrics threads")
 
     def free_os_memory(self):
-        self.api_request("FreeOSMemory", {})
+        url = f"{self.base_url}/statusgo/debug/FreeOSMemory"
+        requests.post(url)

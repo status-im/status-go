@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"runtime/debug"
 	"time"
 	"unsafe"
 
@@ -2366,9 +2365,4 @@ func LoadLocalBackup(requestJSON string) string {
 	}
 	err = statusBackend.StatusNode().LoadLocalBackup(request.FilePath)
 	return makeJSONResponse(err)
-}
-
-func FreeOSMemory(string) string {
-	debug.FreeOSMemory()
-	return ""
 }

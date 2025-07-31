@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
@@ -117,6 +118,8 @@ func (s *Server) Listen(address string) error {
 		s.mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 		s.mux.HandleFunc("/debug/vars", http.DefaultServeMux.ServeHTTP)
 	}
+
+	s.mux.HandleFunc("/statusgo/debug/FreeOSMemory", s.freeOSMemory)
 
 	s.listener, err = net.Listen("tcp", address)
 	if err != nil {
@@ -231,4 +234,9 @@ func (s *Server) setHeaders(name string, w http.ResponseWriter) {
 		w.Header().Set("Deprecation", "true")
 	}
 	w.Header().Set("Content-Type", "application/json")
+}
+
+func (s *Server) freeOSMemory(w http.ResponseWriter, r *http.Request) {
+	debug.FreeOSMemory()
+	w.WriteHeader(http.StatusOK)
 }
