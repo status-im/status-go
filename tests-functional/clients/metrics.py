@@ -202,22 +202,6 @@ def calculate_network_metrics(stats, prev_stats=None):
     )
 
 
-def calculate_expvars_metrics(expvars_memory_stats):
-    """Calculate expvars metrics from GoMemoryStats"""
-    if not expvars_memory_stats:
-        return GoMemStats(idle_memory_mb=0, heap_alloc_mb=0, heap_sys_mb=0, heap_in_use_mb=0, num_gc=0, gc_cpu_fraction=0.0)
-
-    mb = 1024 * 1024
-    return GoMemStats(
-        idle_memory_mb=expvars_memory_stats.heap_idle_bytes / mb,
-        heap_alloc_mb=expvars_memory_stats.heap_alloc_bytes / mb,
-        heap_sys_mb=expvars_memory_stats.heap_sys_bytes / mb,
-        heap_in_use_mb=expvars_memory_stats.heap_in_use_bytes / mb,
-        num_gc=expvars_memory_stats.num_gc,
-        gc_cpu_fraction=expvars_memory_stats.gc_cpu_fraction,
-    )
-
-
 @dataclass
 class ContainerStats:
     """Container stats object"""
@@ -250,12 +234,11 @@ class StatusGoMetrics:
     total_network_errors = 0
 
     # Expvars metrics
-    idle_memory_median = 0
+    total_memory_median = 0
+    total_memory_max = 0
+    idle_memory_median = 0  # "Idle" that is kepy by Go and not released to OS
     idle_memory_max = 0
-    heap_alloc_median = 0
-    heap_alloc_max = 0
     final_gc_count = 0
-    gc_cpu_fraction_avg = 0.0
     timestamp = 0
     version = ""
 
@@ -327,21 +310,15 @@ class StatusGoMetrics:
         # Convert to MB for consistency
         mb = 1024 * 1024
 
-        # "HeapIdle minus HeapReleased estimates the amount of memory
-        # that could be returned to the OS..."
-
+        total_memory = [metric.sys_bytes - metric.heap_released_bytes for metric in self.go_metrics]
         idle_memory = [metric.heap_idle_bytes - metric.heap_released_bytes for metric in self.go_metrics]
-        heap_alloc = [metric.heap_alloc_bytes for metric in self.go_metrics]
-        gc_cpu_fractions = [metric.gc_cpu_fraction for metric in self.go_metrics]
 
+        if total_memory:
+            self.total_memory_median = statistics.median(total_memory) / mb
+            self.total_memory_max = max(total_memory) / mb
         if idle_memory:
             self.idle_memory_median = statistics.median(idle_memory) / mb
             self.idle_memory_max = max(idle_memory) / mb
-        if heap_alloc:
-            self.heap_alloc_median = statistics.median(heap_alloc) / mb
-            self.heap_alloc_max = max(heap_alloc) / mb
-        if gc_cpu_fractions:
-            self.gc_cpu_fraction_avg = statistics.mean(gc_cpu_fractions)
 
         # Final GC count from the last sample
         self.final_gc_count = self.go_metrics[-1].num_gc
@@ -387,17 +364,16 @@ class StatusGoMetrics:
                     },
                     "total_errors": self.total_network_errors,
                 },
-                "expvars": {
+                "expvar": {
                     "idle_memory_mb": {
                         "median": self.idle_memory_median,
                         "max": self.idle_memory_max,
                     },
                     "heap_alloc_mb": {
-                        "median": self.heap_alloc_median,
-                        "max": self.heap_alloc_max,
+                        "median": self.total_memory_median,
+                        "max": self.total_memory_max,
                     },
                     "gc_count": self.final_gc_count,
-                    "gc_cpu_fraction_avg": self.gc_cpu_fraction_avg,
                 },
             },
         }
@@ -453,27 +429,21 @@ class StatusGoMetrics:
                 tx_bytes_mb = []
 
             # Extract data from Go metrics independently
-            if self.go_metrics:
-                go_timestamps = [metric.timestamp for metric in self.go_metrics]
-                sys_values = [metric.heap_sys_bytes / mb for metric in self.go_metrics]
-                idle_memory_values = [(metric.heap_idle_bytes - metric.heap_released_bytes) / mb for metric in self.go_metrics]
+            go_timestamps = [metric.timestamp for metric in self.go_metrics]
+            sys_values = [metric.sys_bytes / mb for metric in self.go_metrics]
+            actual_memory_values = [(metric.sys_bytes - metric.heap_released_bytes) / mb for metric in self.go_metrics]
+            could_be_released = [(metric.heap_idle_bytes - metric.heap_released_bytes) / mb for metric in self.go_metrics]
 
-                # Calculate actual memory usage (excluding idle memory)
-                actual_memory_values = [max(0, sys - idle) for sys, idle in zip(sys_values, idle_memory_values)]
-
-                # Convert to relative time (use container start time if available, otherwise Go metrics start time)
-                go_start_time = start_time if self.container_stats else go_timestamps[0]
-                go_time_points = [t - go_start_time for t in go_timestamps]
-            else:
-                go_time_points = []
-                sys_values = []
-                actual_memory_values = []
+            # Convert to relative time (use container start time if available, otherwise Go metrics start time)
+            go_start_time = start_time if self.container_stats else go_timestamps[0]
+            go_time_points = [t - go_start_time for t in go_timestamps]
 
             # CPU usage plot
             if cpu_values:
                 cpu_median = statistics.median(cpu_values)
                 cpu_max = max(cpu_values)
                 ax1.plot(container_time_points, cpu_values, "b-", label=f"CPU Usage (%)\nmedian = {cpu_median:.2f}%\nmax = {cpu_max:.2f}%")
+
             ax1.set_ylabel("CPU Usage (%)")
             ax1.set_title("CPU Usage Over Time")
             ax1.grid(True)
@@ -503,16 +473,23 @@ class StatusGoMetrics:
                     linewidth=2,
                 )
 
-            if actual_memory_values:
-                actual_memory_median = statistics.median(actual_memory_values)
-                actual_memory_max = max(actual_memory_values)
-                ax2.plot(
-                    go_time_points,
-                    actual_memory_values,
-                    "g-",
-                    label=f"Go Actual Memory Usage (MB)\nmedian = {actual_memory_median:.2f} MB\nmax = {actual_memory_max:.2f} MB",
-                    linewidth=2,
-                )
+            actual_memory_median = statistics.median(actual_memory_values)
+            actual_memory_max = max(actual_memory_values)
+            ax2.plot(
+                go_time_points,
+                actual_memory_values,
+                "g-",
+                label=f"Go Actual Memory Usage (MB)\nmedian = {actual_memory_median:.2f} MB\nmax = {actual_memory_max:.2f} MB",
+                linewidth=2,
+            )
+
+            ax2.plot(
+                go_time_points,
+                could_be_released,
+                "b",
+                label="Go Idle Memory (MB)",
+                linewidth=2,
+            )
 
             ax2.set_ylabel("Memory Usage (MB)")
             ax2.set_title("Memory Usage Over Time")

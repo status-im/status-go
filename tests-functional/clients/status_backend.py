@@ -445,6 +445,6 @@ class StatusBackend(RpcClient, SignalClient):
         self.container.start_performance_monitoring()
 
         # Start Go metrics monitoring with more frequent sampling if desired
-        self.expvar_client.start_monitoring(interval=0.5)  # Sample every 0.5 seconds
+        self.expvar_client.start_monitoring()
 
         logging.info("Started performance monitoring with independent container and Go metrics threads")
