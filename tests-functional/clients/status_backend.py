@@ -448,3 +448,6 @@ class StatusBackend(RpcClient, SignalClient):
         self.expvar_client.start_monitoring()
 
         logging.info("Started performance monitoring with independent container and Go metrics threads")
+
+    def free_os_memory(self):
+        self.api_request("FreeOSMemory", {})

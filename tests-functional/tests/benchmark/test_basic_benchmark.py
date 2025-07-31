@@ -40,6 +40,10 @@ class TestBasicBenchmark(MessengerSteps):
 
         yield status_backend
 
+        status_backend.events.append("FreeOSMemory")
+        status_backend.free_os_memory()
+        time.sleep(20)
+
         # Finalize
         test_name = request.node.name
         filename = f"{Config.benchmark_results_dir}/{test_name}-{time.strftime('%Y%m%d-%H%M%S')}"
