@@ -162,22 +162,22 @@ class SignalClient:
         return [signal.get("event") for signal in signals]
 
     def _on_error(self, ws, error):
-        logging.error(f"Error: {error}")
+        logging.error(f"SignalClient websocket error: {error}")
 
     def _on_close(self, ws, close_status_code, close_msg):
-        logging.debug(f"Connection closed: {close_status_code}, {close_msg}")
+        logging.debug(f"SignalClient websocket connection closed to {self.url}: {close_status_code}, {close_msg}")
 
     def _on_open(self, ws):
-        logging.debug("Connection opened")
+        logging.debug(f"SignalClient websocket connection opened to {self.url}")
 
     def _connect(self):
         ws = websocket.WebSocketApp(
-            self.url,
+            url=self.url,
             on_message=self.on_message,
             on_error=self._on_error,
+            on_open=self._on_open,
             on_close=self._on_close,
         )
-        ws.on_open = self._on_open
         ws.run_forever()
 
     def write_signal_to_file(self, signal_data):

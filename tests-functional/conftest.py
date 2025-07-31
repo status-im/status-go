@@ -174,3 +174,5 @@ class SecretRedactingFilter(logging.Filter):
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
 logger.addFilter(SecretRedactingFilter())
+
+logging.getLogger("websocket").setLevel(logging.ERROR)
