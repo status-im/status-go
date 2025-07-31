@@ -25,11 +25,6 @@ class TestBackupMnemonicAndRestore:
         """Automatically cleanup containers after each test"""
         yield
 
-    @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_new_profile):
-        """Initialize one backend for each test function"""
-        self.rpc_client = backend_new_profile("rpc_client")
-
     def test_profile_creation_and_mnemonics_backup(self):
         # Create a new account container and initialize
         account = StatusBackend(self.await_signals)
