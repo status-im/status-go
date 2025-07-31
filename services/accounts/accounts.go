@@ -437,7 +437,7 @@ func (api *API) ImportMnemonic(ctx context.Context, mnemonic string, password st
 		return errors.New("provided mnemonic was already imported, to add new account use `AddAccount` endpoint")
 	}
 
-	_, err = api.manager.CreateFromMnemonicAndStoreAccount(mnemonic, password)
+	_, err = api.manager.CreateFromMnemonicAndStoreAccount(mnemonic, password, false)
 	return err
 }
 
@@ -461,7 +461,7 @@ func (api *API) MakeSeedPhraseKeypairFullyOperable(ctx context.Context, mnemonic
 		return errors.New("keypair for the provided seed phrase is not known")
 	}
 
-	_, err = api.manager.CreateFromMnemonicAndStoreAccount(mnemonicNoExtraSpaces, password)
+	_, err = api.manager.CreateFromMnemonicAndStoreAccount(mnemonicNoExtraSpaces, password, false)
 	if err != nil {
 		return err
 	}
@@ -529,7 +529,7 @@ func (api *API) MigrateNonProfileKeycardKeypairToApp(ctx context.Context, mnemon
 		return errors.New("wrong password provided")
 	}
 
-	_, err = api.manager.CreateFromMnemonicAndStoreAccount(mnemonicNoExtraSpaces, password)
+	_, err = api.manager.CreateFromMnemonicAndStoreAccount(mnemonicNoExtraSpaces, password, false)
 	if err != nil {
 		return err
 	}

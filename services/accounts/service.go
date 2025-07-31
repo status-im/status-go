@@ -4,13 +4,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/golang/protobuf/proto"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
-	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
@@ -62,11 +60,6 @@ func (s *Service) Init(messenger *protocol.Messenger) {
 
 // Start a service.
 func (s *Service) Start() error {
-	keystoreAdapter, err := geth.NewGethKeystoreAdapter(s.config.KeyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
-	if err != nil {
-		return err
-	}
-	s.manager.SetKeystore(keystoreAdapter)
 	return nil
 }
 

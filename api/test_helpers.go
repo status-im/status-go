@@ -2,98 +2,167 @@ package api
 
 import (
 	"encoding/json"
-	"path/filepath"
+	"path"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/status-im/status-go/accounts-management/keystore/geth"
+	"github.com/status-im/status-go/accounts-management/common"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 
 	"github.com/stretchr/testify/require"
 )
 
-func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend, defersFunc func(), err error) {
+const (
+	testPassword = "test-password"
+)
+
+var (
+	networks = json.RawMessage("{}")
+)
+
+type setupContext struct {
+	backend        *GethStatusBackend
+	mnemonic       string
+	settings       settings.Settings
+	config         *params.NodeConfig
+	multiAcc       *multiaccounts.Account
+	profileKeypair *accounts.Keypair
+	chatPrivateKey string
+}
+
+func setupTestContext(t *testing.T, password string, storeProfile bool, storeMultiAcc bool, useDefaultSettings bool) (data *setupContext) {
 	tmpdir := t.TempDir()
 
-	defers := make([]func(), 0)
-	defersFunc = func() {
-		for _, f := range defers {
-			f()
-		}
+	data = &setupContext{}
+
+	var err error
+	data.mnemonic, err = common.CreateRandomMnemonicWithDefaultLength()
+	require.NoError(t, err)
+
+	genMasterAcc, err := generator.CreateAccountFromMnemonic(data.mnemonic, "")
+	require.NoError(t, err)
+
+	accountsPaths := []string{accscommon.PathWalletRoot, accscommon.PathEIP1581Chat, accscommon.PathDefaultWalletAccount}
+	derivedAccs, err := generator.DeriveChildrenFromAccount(genMasterAcc, append([]string{accscommon.PathWalletRoot}, accountsPaths...))
+	require.NoError(t, err)
+
+	data.profileKeypair = &accounts.Keypair{
+		KeyUID:      genMasterAcc.KeyUID(),
+		Name:        "Test Keypair",
+		Type:        accounts.KeypairTypeProfile,
+		DerivedFrom: genMasterAcc.Address().Hex(),
 	}
 
-	backend = NewGethStatusBackend(tt.MustCreateTestLogger())
-	backend.UpdateRootDataDir(tmpdir)
+	data.chatPrivateKey = derivedAccs[accscommon.PathEIP1581Chat].PrivateKeyHex()
 
-	keystoreDir := filepath.Join(tmpdir, "keystore")
-	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keystoreDir, keystore.LightScryptN, keystore.LightScryptP)
-	if err != nil {
-		return
-	}
-	backend.AccountsManager().SetKeystore(keystoreAdapter)
-
-	genAccount, _, err := backend.AccountsManager().CreateAndStoreAccount(password)
-	if err != nil {
-		return
+	for path, acc := range derivedAccs {
+		data.profileKeypair.Accounts = append(data.profileKeypair.Accounts, &accounts.Account{
+			Address:   acc.Address(),
+			KeyUID:    genMasterAcc.KeyUID(),
+			Path:      path,
+			PublicKey: types.Hex2Bytes(acc.PublicKeyHex()),
+			Wallet:    path == accscommon.PathDefaultWalletAccount,
+			Chat:      path == accscommon.PathEIP1581Chat,
+		})
 	}
 
-	masterAccInfo := genAccount.ToIdentifiedAccountInfo()
-
-	const pathWalletRoot = "m/44'/60'/0'/0"
-	derivedAccount, err := backend.AccountsManager().DeriveChildAccountForPathAndStore(types.HexToAddress(masterAccInfo.Address), pathWalletRoot, password)
-	if err != nil {
-		return
-	}
-
-	account := multiaccounts.Account{
+	data.multiAcc = &multiaccounts.Account{
 		Name:           "foo",
 		Timestamp:      1,
 		KeycardPairing: "pairing",
-		KeyUID:         masterAccInfo.KeyUID,
+		KeyUID:         genMasterAcc.KeyUID(),
+		KDFIterations:  1,
 	}
 
-	err = backend.ensureDBsOpened(account, password)
+	if useDefaultSettings {
+		derivedAddresses := make(map[string]generator.AccountInfo)
+		for path, acc := range derivedAccs {
+			derivedAddresses[path] = generator.AccountInfo{
+				Address:   acc.Address().Hex(),
+				PublicKey: acc.PublicKeyHex(),
+			}
+		}
+
+		defSettings, err := defaultSettings(genMasterAcc.KeyUID(), genMasterAcc.Address().Hex(), derivedAddresses)
+		require.NoError(t, err)
+
+		data.settings = *defSettings
+
+		data.config, err = DefaultNodeConfig(data.settings.InstallationID, genMasterAcc.KeyUID(), &requests.CreateAccount{
+			LogLevel: data.settings.LogLevel,
+		})
+		require.NoError(t, err)
+		data.config.RootDataDir = tmpdir
+		data.config.DataDir = tmpdir
+	} else {
+		json := `{
+		"NetworkId": 3,
+		"DataDir": "` + tmpdir + `",
+		"KeycardPairingDataFile": "` + path.Join(tmpdir, "keycard/pairings.json") + `",
+		"NoDiscovery": true,
+		"TorrentConfig": {
+			"Port": 9025,
+			"Enabled": false,
+			"DataDir": "` + tmpdir + `/archivedata",
+			"TorrentDir": "` + tmpdir + `/torrents"
+		},
+		"RuntimeLogLevel": "INFO",
+		"LogLevel": "DEBUG"
+	}`
+
+		data.config, err = params.NewConfigFromJSON(json)
+		require.NoError(t, err)
+
+		data.config, err = params.NewNodeConfig(tmpdir, 178733)
+		require.NoError(t, err)
+
+		data.settings = settings.Settings{
+			KeyUID:            genMasterAcc.KeyUID(),
+			Address:           genMasterAcc.Address(),
+			DisplayName:       "UserDisplayName",
+			CurrentNetwork:    "mainnet_rpc",
+			DappsAddress:      derivedAccs[accscommon.PathDefaultWalletAccount].Address(),
+			InstallationID:    multidevice.GenerateInstallationID(),
+			LatestDerivedPath: 0,
+			Name:              "Jittery Cornflowerblue Kingbird",
+			Networks:          &networks,
+			PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
+			PreviewPrivacy:    false,
+			PublicKey:         genMasterAcc.PublicKeyHex(),
+			SigningPhrase:     "yurt joey vibe",
+			WalletRootAddress: derivedAccs[accscommon.PathWalletRoot].Address(),
+		}
+	}
+
+	data.backend = NewGethStatusBackend(tt.MustCreateTestLogger())
+	data.backend.UpdateRootDataDir(tmpdir)
+
+	err = data.backend.OpenAccounts()
 	require.NoError(t, err)
 
-	walletRootAddress := derivedAccount.Address().Hex()
+	if storeMultiAcc {
+		err = data.backend.SaveAccount(*data.multiAcc)
+		require.NoError(t, err)
+	}
 
-	config, err := params.NewNodeConfig(tmpdir, 178733)
-	require.NoError(t, err)
-	networks := json.RawMessage("{}")
-	s := settings.Settings{
-		Address:           types.HexToAddress(walletRootAddress),
-		DisplayName:       "UserDisplayName",
-		CurrentNetwork:    "mainnet_rpc",
-		DappsAddress:      types.HexToAddress(walletRootAddress),
-		EIP1581Address:    types.HexToAddress(walletRootAddress),
-		InstallationID:    "d3efcff6-cffa-560e-a547-21d3858cbc51",
-		KeyUID:            account.KeyUID,
-		LatestDerivedPath: 0,
-		Name:              "Jittery Cornflowerblue Kingbird",
-		Networks:          &networks,
-		PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
-		PreviewPrivacy:    false,
-		PublicKey:         masterAccInfo.PublicKey,
-		SigningPhrase:     "yurt joey vibe",
-		WalletRootAddress: types.HexToAddress(walletRootAddress)}
+	if storeProfile {
+		err = data.backend.ensureDBsOpened(*data.multiAcc, password)
+		require.NoError(t, err)
 
-	err = backend.saveAccountsAndSettings(s, config, nil)
-	require.Error(t, err)
-	require.True(t, err == accounts.ErrKeypairWithoutAccounts)
+		err = data.backend.saveKeypairAndSettings(data.settings, data.config, data.profileKeypair)
+		require.NoError(t, err)
 
-	// this is for StatusNode().Config() call inside of the getVerifiedWalletAccount
-	err = backend.StartNode(config)
-	require.NoError(t, err)
-
-	defers = append(defers, func() {
-		require.NoError(t, backend.StopNode())
-	})
+		_, _, err = data.backend.StoreAccount(data.mnemonic, password, accountsPaths, true)
+		require.NoError(t, err)
+	}
 
 	return
 }

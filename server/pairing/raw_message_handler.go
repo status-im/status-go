@@ -136,12 +136,7 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 		return err
 	}
 
-	keystoreRelativePath, err := s.backend.InitKeyStoreDirWithAccount(nodeConfig.RootDataDir, account.KeyUID)
-	nodeConfig.KeyStoreDir = keystoreRelativePath
-
-	if err != nil {
-		return err
-	}
+	s.backend.UpdateRootDataDir(nodeConfig.RootDataDir)
 
 	var chatKey *ecdsa.PrivateKey
 	if accountPayload.chatKey != "" {
@@ -162,11 +157,12 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 	rmp.setting.CurrentNetwork = api.DefaultCurrentNetwork
 
 	return s.backend.StartNodeWithAccountAndInitialConfig(
+		"",
 		*account,
 		accountPayload.password,
 		*rmp.setting,
 		nodeConfig,
-		rmp.profileKeypair.Accounts,
+		rmp.profileKeypair,
 		chatKey,
 	)
 }

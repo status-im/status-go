@@ -68,8 +68,7 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 	require.NoError(t, err)
 
 	config := params.NodeConfig{
-		DataDir:     dir,
-		KeyStoreDir: keyStoreDir,
+		DataDir: dir,
 	}
 
 	n, stop1, stop2, err := createStatusNode()

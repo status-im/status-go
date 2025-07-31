@@ -15,10 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/types"
@@ -67,16 +64,10 @@ func (s *SyncDeviceSuite) SetupTest() {
 	s.tmpdir = s.T().TempDir()
 }
 
-func setKeystore(accManager *accsmanagement.AccountsManager, keyStoreDir string) error {
-	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keyStoreDir, keystore.LightScryptN, keystore.LightScryptP)
-	if err != nil {
-		return err
-	}
-	accManager.SetKeystore(keystoreAdapter)
-	return nil
-}
-
 func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *api.GethStatusBackend {
+	err := os.MkdirAll(tmpdir, 0755) // making sure the dir is created
+	s.Require().NoError(err)
+
 	backend := s.prepareBackendWithoutAccount(tmpdir)
 
 	displayName, err := common.RandomAlphabeticalString(8)
@@ -261,8 +252,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 		require.True(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
 	}
 
-	// reinit keystore on client
-	err = setKeystore(accountsManager, clientKeystorePath)
+	err = accountsManager.ReloadKeystore()
 	require.NoError(s.T(), err)
 
 	// check keystore on client

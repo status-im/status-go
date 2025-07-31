@@ -8,9 +8,6 @@ import (
 type DeleteMultiaccount struct {
 	// KeyUID is the unique identifier for the key.
 	KeyUID string `json:"keyUID" validate:"required"`
-
-	// KeyStoreDir is the directory where the keystore files are located.
-	KeyStoreDir string `json:"keyStoreDir" validate:"required"`
 }
 
 // Validate checks the validity of the DeleteMultiaccount request.

@@ -118,7 +118,6 @@ func randomNodeConfig() *params.NodeConfig {
 	return &params.NodeConfig{
 		NetworkID:                 uint64(int64(randomInt(math.MaxInt64))),
 		DataDir:                   randomString(),
-		KeyStoreDir:               randomString(),
 		NodeKey:                   randomString(),
 		NoDiscovery:               randomBool(),
 		ListenAddr:                randomString(),
