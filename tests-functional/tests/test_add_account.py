@@ -25,7 +25,7 @@ class TestAddAccount:
         add_account_response = self.account.accounts_service.add_account(account_data)
         assert "error" not in add_account_response
 
-        # After adding the account check that the get accounts will retrieve the created account
+        # After adding the account check that the get accounts will retrieve the new account
         accounts_response = self.account.accounts_service.get_accounts()
         accounts = accounts_response.get("result", [])
 
@@ -98,25 +98,45 @@ class TestAddAccount:
         add_account_response = self.account.accounts_service.add_account(account_data, skip_validation=True)
         assert add_account_response.get("error", {}).get("message", "") == "account already exists"
 
-    def test_add_new_keypair_and_add_account_for_it(self):
-        # Import mnemonic to create keypair
-        mnemonic = "test test test test test test test test test test test junk"
-        password = "testpassword"
-
-        response = self.account.accounts_service.import_mnemonic(mnemonic, password)
-        assert "error" not in response
-
-        # Get keypairs to find the key-uid and full keypair data
+    def test_add_new_account_via_add_keypair(self):
+        # Get keypairs to find the keypair data
         response = self.account.accounts_service.get_account_keypairs()
         keypairs = response.get("result", [])
         assert len(keypairs) > 0
         keypair = keypairs[0]
 
+        # Add new account for the existing key-uid
         account_data = new_account_data_1
         account_data["key-uid"] = keypair["key-uid"]
 
-        # Filter out default wallet and chat accounts before adding a new keypair
+        # Add the new account to the keypair accounts
         keypair["accounts"] = [account_data]
 
-        # Call accounts_addKeypair with the retrieved keypair data
-        response = self.account.accounts_service.add_keypair(password, keypair)
+        # Call accounts_addKeypair with the new account
+        password = self.account.created_account.get("password")
+        self.account.accounts_service.add_keypair(password, keypair)
+
+        # After adding the account check that the get accounts will retrieve the new account
+        accounts_response = self.account.accounts_service.get_accounts()
+        accounts = accounts_response.get("result", [])
+
+        mismatch_details = ""
+        for acc in accounts:
+            mismatches = []
+            for key, value in account_data.items():
+                if key not in acc:
+                    mismatches.append(f"Missing key: {key}")
+                    continue
+                actual_value = acc[key]
+                if key == "address":
+                    if value.lower() != actual_value.lower():
+                        mismatches.append(f"Mismatch in key '{key}': expected '{value}', got '{actual_value}'")
+                else:
+                    if value != actual_value:
+                        mismatches.append(f"Mismatch in key '{key}': expected '{value}', got '{actual_value}'")
+            if not mismatches:
+                break
+            else:
+                mismatch_details = "\\n".join(mismatches)
+        else:
+            assert False, f"Added account not found or mismatched in accounts list. Details:\\n{mismatch_details}"
