@@ -446,13 +446,8 @@ class StatusBackend(RpcClient, SignalClient):
         if not self.container:
             raise RuntimeError("Performance monitoring is only supported when running status-backend in a Docker container")
 
-        # Start container performance monitoring
         self.container.start_performance_monitoring()
-
-        # Start Go metrics monitoring with more frequent sampling if desired
         self.expvar_client.start_monitoring()
-
-        logging.info("Started performance monitoring with independent container and Go metrics threads")
 
     def free_os_memory(self):
         url = f"{self.base_url}/statusgo/debug/FreeOSMemory"

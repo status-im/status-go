@@ -1,6 +1,7 @@
 import logging
 import requests
 import time
+import threading
 from dataclasses import dataclass
 from typing import Optional
 
@@ -89,8 +90,6 @@ class ExpvarClient:
         Args:
             interval: Monitoring interval in seconds
         """
-        import threading
-
         self.go_metrics = []
         self._stop_monitoring = threading.Event()
 
