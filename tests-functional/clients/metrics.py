@@ -369,7 +369,7 @@ class StatusGoMetrics:
                         "median": self.idle_memory_median,
                         "max": self.idle_memory_max,
                     },
-                    "heap_alloc_mb": {
+                    "total_memory_mb": {
                         "median": self.total_memory_median,
                         "max": self.total_memory_max,
                     },
