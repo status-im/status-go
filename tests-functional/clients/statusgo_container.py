@@ -181,6 +181,23 @@ class StatusGoContainer:
         if self.health_monitor.is_alive():
             logging.warning("Health monitoring thread didn't stop gracefully")
 
+    def shutdown(self):
+        """
+        Stops, saves logs, and removes a container with error handling.
+        Args:
+            container: The container object (should have stop, save_logs, remove methods)
+            log_prefix: Optional string for logging context
+        """
+        if not self.container:
+            logging.debug("No container to shutdown")
+            return
+
+        container_id = self.short_id()
+        self.stop()
+        self.save_logs()
+        self.remove()
+        logging.debug(f"Container '{container_id}' shutdown finished")
+
     def stop(self):
         """Stop the container and monitoring"""
         self.stop_health_monitoring()  # Stop health monitoring first
@@ -283,8 +300,7 @@ class StatusGoContainer:
             logging.debug("Save container logs skipped")
             return
 
-        id_short = self.container.id[:12]
-        file_path = os.path.join(Config.logs_dir, f"container_{id_short}.log")
+        file_path = os.path.join(Config.logs_dir, f"container_{self.short_id()}.log")
         logging.info(f"Saving logs to {file_path}")
 
         with open(file_path, "wb") as f:

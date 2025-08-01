@@ -4,7 +4,6 @@ import string
 import tempfile
 import time
 import random
-import threading
 import uuid
 import requests
 import os
@@ -72,9 +71,7 @@ class StatusBackend(RpcClient, SignalClient):
 
         self.wait_for_healthy()
 
-        websocket_thread = threading.Thread(target=self._connect)
-        websocket_thread.daemon = True
-        websocket_thread.start()
+        SignalClient.connect(self)
 
         self.wallet_service = WalletService(self)
         self.wakuext_service = WakuextService(self)
@@ -82,6 +79,14 @@ class StatusBackend(RpcClient, SignalClient):
         self.settings_service = SettingsService(self)
 
     def __del__(self):
+        self.shutdown()
+
+    def shutdown(self):
+        SignalClient.disconnect(self)
+
+        if self.container:
+            self.container.shutdown()
+
         if self.temp_dir is not None:
             self.temp_dir.cleanup()
 

@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 import time
 
 import websocket
@@ -162,23 +163,31 @@ class SignalClient:
         return [signal.get("event") for signal in signals]
 
     def _on_error(self, ws, error):
-        logging.error(f"SignalClient websocket error: {error}")
+        logging.error(f"SignalClient [{self.url}]: websocket error: {error}")
 
     def _on_close(self, ws, close_status_code, close_msg):
-        logging.debug(f"SignalClient websocket connection closed to {self.url}: {close_status_code}, {close_msg}")
+        logging.debug(f"SignalClient [{self.url}]: websocket connection closed: {close_status_code}, {close_msg}")
 
     def _on_open(self, ws):
-        logging.debug(f"SignalClient websocket connection opened to {self.url}")
+        logging.debug(f"SignalClient [{self.url}]: websocket connection opened")
 
     def _connect(self):
-        ws = websocket.WebSocketApp(
+        self.wsapp = websocket.WebSocketApp(
             url=self.url,
             on_message=self.on_message,
             on_error=self._on_error,
             on_open=self._on_open,
             on_close=self._on_close,
         )
-        ws.run_forever()
+        self.wsapp.run_forever()
+
+    def connect(self):
+        websocket_thread = threading.Thread(target=self._connect)
+        websocket_thread.daemon = True
+        websocket_thread.start()
+
+    def disconnect(self):
+        self.wsapp.close()
 
     def write_signal_to_file(self, signal_data):
         with open(self.signal_file_path, "a+") as file:
