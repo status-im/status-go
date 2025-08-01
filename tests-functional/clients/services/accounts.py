@@ -13,3 +13,8 @@ class AccountService(Service):
     def get_account_keypairs(self):
         response = self.rpc_request("getKeypairs")
         return response.json()
+
+    def add_account(self, account_data):
+        params = ["", account_data]
+        response = self.rpc_request("addAccount", params)
+        return response.json()
