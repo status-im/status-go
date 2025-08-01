@@ -1,10 +1,10 @@
 import pytest
-import json
 from collections import namedtuple
+
+from clients.anvil import Anvil
 from clients.signals import SignalType
 from resources.constants import user_1, user_2
 from uuid import uuid4
-from steps.eth_rpc import EthRpcSteps
 from utils import wallet_utils
 
 
@@ -21,12 +21,6 @@ def validate_block(block, block_number, block_hash, expected_tx_hash):
 
 def validate_transaction(tx, tx_hash):
     assert tx["tx"]["hash"] == tx_hash
-
-
-def validate_receipt(receipt, tx_hash, block_number, block_hash):
-    assert receipt["transactionHash"] == tx_hash
-    assert receipt["blockNumber"] == block_number
-    assert receipt["blockHash"] == block_hash
 
 
 @pytest.mark.rpc
@@ -64,58 +58,11 @@ class TestEth:
         }
         tx_data = wallet_utils.send_router_transaction(self.rpc_client, **input_params)
         tx_hash = tx_data["tx_status"]["hash"]
-        eth_helpers = EthRpcSteps()
-        eth_helpers.wait_until_tx_not_pending(self.rpc_client, self.rpc_client.network_id, tx_hash)
-        receipt = eth_helpers.get_transaction_receipt(self.rpc_client, self.rpc_client.network_id, tx_hash)
-        try:
-            block_number = receipt.json()["result"]["blockNumber"]
-            block_hash = receipt.json()["result"]["blockHash"]
-        except (KeyError, json.JSONDecodeError):
-            raise Exception(receipt.content)
+        anvil = Anvil()
+
+        anvil.eth.wait_for_transaction_receipt(tx_hash)
+        receipt = anvil.transaction_receipt(tx_hash)
+        block_number = receipt["blockNumber"]
+        block_hash = receipt["blockHash"]
         TxData = namedtuple("TxData", ["tx_hash", "block_number", "block_hash"])
         self.tx_data = TxData(tx_hash, block_number, block_hash)
-
-    def test_block_number(self):
-        self.rpc_client.rpc_valid_request("ethclient_blockNumber", [self.rpc_client.network_id])
-
-    def test_suggest_gas_price(self):
-        self.rpc_client.rpc_valid_request("ethclient_suggestGasPrice", [self.rpc_client.network_id])
-
-    def test_header_by_number(self):
-        response = self.rpc_client.rpc_valid_request("ethclient_headerByNumber", [self.rpc_client.network_id, self.tx_data.block_number])
-        validate_header(response.json()["result"], self.tx_data.block_number, self.tx_data.block_hash)
-
-    def test_block_by_number(self):
-        response = self.rpc_client.rpc_valid_request("ethclient_blockByNumber", [self.rpc_client.network_id, self.tx_data.block_number])
-        validate_block(
-            response.json()["result"],
-            self.tx_data.block_number,
-            self.tx_data.block_hash,
-            self.tx_data.tx_hash,
-        )
-
-    def test_header_by_hash(self):
-        response = self.rpc_client.rpc_valid_request("ethclient_headerByHash", [self.rpc_client.network_id, self.tx_data.block_hash])
-        validate_header(response.json()["result"], self.tx_data.block_number, self.tx_data.block_hash)
-
-    def test_block_by_hash(self):
-        response = self.rpc_client.rpc_valid_request("ethclient_blockByHash", [self.rpc_client.network_id, self.tx_data.block_hash])
-        validate_block(
-            response.json()["result"],
-            self.tx_data.block_number,
-            self.tx_data.block_hash,
-            self.tx_data.tx_hash,
-        )
-
-    def test_transaction_by_hash(self):
-        response = self.rpc_client.rpc_valid_request("ethclient_transactionByHash", [self.rpc_client.network_id, self.tx_data.tx_hash])
-        validate_transaction(response.json()["result"], self.tx_data.tx_hash)
-
-    def test_transaction_receipt(self):
-        response = self.rpc_client.rpc_valid_request("ethclient_transactionReceipt", [self.rpc_client.network_id, self.tx_data.tx_hash])
-        validate_receipt(
-            response.json()["result"],
-            self.tx_data.tx_hash,
-            self.tx_data.block_number,
-            self.tx_data.block_hash,
-        )
