@@ -228,9 +228,8 @@ func (n *StatusNode) StartLocalBackup() error {
 	n.localBackup, err = backup.NewController(backup.BackupConfig{
 		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
 		FileNameGetter: filenameGetter,
-		// TODO set to true to enable the local backup
-		BackupEnabled: false,
-		Interval:      time.Minute * 30,
+		BackupEnabled:  true,
+		Interval:       time.Minute * 30,
 	}, n.logger.Named("LocalBackup"))
 	if err != nil {
 		return err
