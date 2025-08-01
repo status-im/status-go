@@ -582,7 +582,7 @@ func (r *Router) prepareBalanceMapForTokenOnChains(ctx context.Context, input *r
 
 func (r *Router) getSelectedChains(input *requests.RouteInputParams) (selectedFromChains []*params.Network, selectedToChains []*params.Network, err error) {
 	var networks []*params.Network
-	networks, err = r.rpcClient.NetworkManager.Get(false)
+	networks, err = r.rpcClient.NetworkManager.GetActiveNetworks()
 	if err != nil {
 		return nil, nil, errors.CreateErrorResponseFromError(err)
 	}
