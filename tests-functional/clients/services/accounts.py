@@ -14,7 +14,17 @@ class AccountService(Service):
         response = self.rpc_request("getKeypairs")
         return response.json()
 
-    def add_account(self, account_data):
+    def add_account(self, account_data, skip_validation=False):
         params = ["", account_data]
-        response = self.rpc_request("addAccount", params)
+        response = self.rpc_request("addAccount", params, skip_validation=skip_validation)
+        return response.json()
+
+    def import_mnemonic(self, mnemonic, password):
+        params = [mnemonic, password]
+        response = self.rpc_request("importMnemonic", params)
+        return response.json()
+
+    def add_keypair(self, password, keypair):
+        params = [password, keypair]
+        response = self.rpc_request("addKeypair", params)
         return response.json()
