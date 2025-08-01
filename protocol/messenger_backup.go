@@ -25,7 +25,7 @@ var backupTickerInterval = 120 * time.Second
 
 // backupIntervalSeconds is the amount of seconds we should allow between
 // backups
-var backupIntervalSeconds uint64 = 28800
+var backupIntervalSeconds uint64 = 57600
 
 type CommunitySet struct {
 	Joined  []*communities.Community
