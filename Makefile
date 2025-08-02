@@ -154,9 +154,8 @@ ifeq ($(USE_NWAKU),true)
 	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
 endif
 
-statusgo: ##@build Build status-go as statusd server
-statusgo: build/bin/statusd
-statusd: statusgo
+statusgo: ##@build Build status-go as status-backend server
+statusgo: build/bin/status-backend
 
 status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend

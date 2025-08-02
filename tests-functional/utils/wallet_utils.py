@@ -80,17 +80,6 @@ def sign_messages(rpc_client, hashes, address):
     return tx_signatures
 
 
-def check_tx_details(rpc_client, tx_hash, network_id, address_to, expected_amount_in):
-    method = "ethclient_transactionByHash"
-    params = [network_id, tx_hash]
-
-    response = rpc_client.rpc_valid_request(method, params)
-    tx_details = response.json()["result"]["tx"]
-
-    assert tx_details["value"] == expected_amount_in
-    assert tx_details["to"].upper() == address_to.upper()
-
-
 def check_fees(fee_mode, base_fee, max_priority_fee_per_gas, max_fee_per_gas, suggested_fee_levels):
     assert base_fee.startswith("0x")
     assert max_priority_fee_per_gas.startswith("0x")

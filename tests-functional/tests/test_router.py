@@ -1,7 +1,9 @@
 import uuid as uuid_lib
-
 import pytest
+
 import resources.constants as constants
+from clients.anvil import Anvil
+from web3.types import Wei
 
 from clients.signals import SignalType
 from utils import wallet_utils
@@ -29,6 +31,7 @@ class TestRouter:
     def test_tx_from_route(self):
         uuid = str(uuid_lib.uuid4())
         amount_in = "0xde0b6b3a7640000"
+        amount_in_wei = Wei(1000000000000000000)
 
         params = {
             "uuid": uuid,
@@ -57,7 +60,13 @@ class TestRouter:
         transaction_hashes = wallet_router_sign_transactions["signingDetails"]["hashes"]
         tx_signatures = wallet_utils.sign_messages(self.rpc_client, transaction_hashes, constants.user_1.address)
         tx_status = wallet_utils.send_router_transactions_with_signatures(self.rpc_client, uuid, tx_signatures)
-        wallet_utils.check_tx_details(self.rpc_client, tx_status["hash"], self.rpc_client.network_id, constants.user_2.address, amount_in)
+
+        # Check tx details
+        tx_data = Anvil().get_transaction(tx_status["hash"])
+
+        assert tx_data.get("value", 0) == int(amount_in, 16)
+        assert tx_data.get("value", 0) == amount_in_wei
+        assert tx_data.get("to", "").upper() == constants.user_2.address.upper()
 
     def test_setting_different_fee_modes(self):
         uuid = str(uuid_lib.uuid4())
