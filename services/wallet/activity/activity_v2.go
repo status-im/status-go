@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -124,14 +125,6 @@ func getFetchedActivitiesEntries(ctx context.Context, deps FilterDependencies, a
 			sq.Eq{"e.chain_id": chainIDs},
 			sq.Eq{"e.address": addresses}})
 
-	// TBD: remove
-	limit = ac.NoLimit
-
-	if limit != ac.NoLimit {
-		q = q.Limit(uint64(limit))
-		q = q.Offset(uint64(offset))
-	}
-
 	query, args, err := q.ToSql()
 	if err != nil {
 		return nil, err
@@ -164,8 +157,24 @@ func getFetchedActivitiesEntries(ctx context.Context, deps FilterDependencies, a
 		}
 	}
 
-	entries := thirdpartyActivityEntriesToEntries(deps, allActivityEntries)
-	return entries, nil
+	allEntries := thirdpartyActivityEntriesToEntries(deps, allActivityEntries)
+
+	// Sort entries by timestamp in descending order (most recent first)
+	sort.Slice(allEntries, func(i, j int) bool {
+		return allEntries[i].timestamp > allEntries[j].timestamp
+	})
+
+	// Apply offset and limit
+	if offset > len(allEntries) {
+		return []Entry{}, nil
+	}
+	start := offset
+	end := start + limit
+	if limit == ac.NoLimit || end > len(allEntries) {
+		end = len(allEntries)
+	}
+
+	return allEntries[start:end], nil
 }
 
 func thirdpartyActivityEntriesToEntries(deps FilterDependencies, activityEntries []thirdparty.ActivityEntry) []Entry {
