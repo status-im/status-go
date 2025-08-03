@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/requests"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -107,6 +108,9 @@ func getSentActivitiesEntries(ctx context.Context, deps FilterDependencies, addr
 }
 
 func getFetchedActivitiesEntries(ctx context.Context, deps FilterDependencies, addresses []eth.Address, chainIDs []wCommon.ChainID, offset int, limit int) ([]Entry, error) {
+
+	fmt.Printf("== getFetchedActivitiesEntries addresses: %v, chainIDs: %v \n", addresses, chainIDs)
+
 	if len(addresses) == 0 {
 		return nil, ErrNoAddressesProvided
 	}
@@ -147,7 +151,105 @@ func getFetchedActivitiesEntries(ctx context.Context, deps FilterDependencies, a
 		return nil, err
 	}
 
-	return alchemy.TransfersToWalletActivityEntries(alchemyTransfers, uint64(chainIDs[0]), addresses[0])
+	activityEntries := alchemy.TransfersToThirdpartyActivityEntries(alchemyTransfers, uint64(chainIDs[0]), addresses[0])
+
+	entries := thirdpartyActivityEntriesToEntries(deps, activityEntries)
+	return entries, nil
+}
+
+func thirdpartyActivityEntriesToEntries(deps FilterDependencies, activityEntries []thirdparty.ActivityEntry) []Entry {
+	fmt.Printf("== thirdpartyActivityEntriesToEntries count: %d\n", len(activityEntries))
+	entries := make([]Entry, 0, len(activityEntries))
+
+	for _, ae := range activityEntries {
+		fmt.Printf("== entry: %s\n", ae)
+		// Determine the main chain ID and set chainIDOut/chainIDIn
+		uChainID := wCommon.UnknownChainID
+		var chainIDOut *wCommon.ChainID
+		var chainIDIn *wCommon.ChainID
+		if ae.ChainIDOut != nil {
+			uChainID = *ae.ChainIDOut
+			chainIDOut = new(wCommon.ChainID)
+			*chainIDOut = wCommon.ChainID(uChainID)
+		} else if ae.ChainIDIn != nil {
+			uChainID = *ae.ChainIDIn
+			chainIDIn = new(wCommon.ChainID)
+			*chainIDIn = wCommon.ChainID(uChainID)
+		}
+		chainID := wCommon.ChainID(uChainID)
+
+		entry := Entry{
+			payloadType: ac.SimpleTransactionPT,
+			transaction: &ac.TransactionIdentity{
+				ChainID: chainID,
+				Hash:    ae.TxHash,
+				Address: ae.Sender,
+			},
+			timestamp:                 ae.Timestamp,
+			activityType:              ae.ActivityType,
+			activityStatus:            getActivityStatusFromTxStatus(ae.TxStatus, ae.Timestamp, chainID),
+			amountOut:                 ae.AmountOut,
+			amountIn:                  ae.AmountIn,
+			tokenOut:                  ae.TokenOut,
+			tokenIn:                   ae.TokenIn,
+			sender:                    &ae.Sender,
+			recipient:                 ae.Recipient,
+			chainIDOut:                chainIDOut,
+			chainIDIn:                 chainIDIn,
+			transferType:              getTransferTypeFromTokens(ae.TokenIn, ae.TokenOut),
+			interactedContractAddress: ae.ContractAddress,
+		}
+
+		entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
+		entries = append(entries, entry)
+	}
+
+	return entries
+}
+
+func getActivityStatusFromTxStatus(status ac.TxStatus, timestamp int64, chainID wCommon.ChainID) ac.Status {
+	switch status {
+	case ac.Pending:
+		return ac.PendingAS
+	case ac.Success:
+		now := time.Now().Unix()
+		if timestamp+getFinalizationPeriod(chainID) > now {
+			return ac.FinalizedAS
+		}
+		return ac.CompleteAS
+	case ac.Failed:
+		return ac.FailedAS
+	}
+
+	logutils.ZapLogger().Error("unhandled transaction status value")
+	return ac.FailedAS
+}
+
+func getTransferTypeFromTokens(tokenIn, tokenOut *ac.Token) *ac.TransferType {
+	var token *ac.Token
+	if tokenIn != nil {
+		token = tokenIn
+	} else if tokenOut != nil {
+		token = tokenOut
+	} else {
+		return nil
+	}
+
+	ret := new(ac.TransferType)
+	switch token.TokenType {
+	case ac.Native:
+		*ret = ac.TransferTypeEth
+	case ac.Erc20:
+		*ret = ac.TransferTypeErc20
+	case ac.Erc721:
+		*ret = ac.TransferTypeErc721
+	case ac.Erc1155:
+		*ret = ac.TransferTypeErc1155
+	default:
+		return nil
+	}
+
+	return ret
 }
 
 func rowsToTransfers(rows *sql.Rows) ([]alchemy.Transfer, error) {

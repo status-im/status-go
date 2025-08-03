@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/services/wallet/activity"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	wCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -150,36 +149,6 @@ func sameHashTransfersToThirdpartyActivityEntries(txTransfers []Transfer, chainI
 	return entries
 }
 
-func sameHashTransfersToWalletActivityEntries(txTransfers []Transfer, chainID uint64, accountAddress common.Address) []activity.Entry {
-
-	entries := make([]activity.Entry, 0)
-
-	analytics := analyzeTransfers(txTransfers, chainID, accountAddress)
-
-	if analytics.isContractDeployment() {
-		fmt.Println("ContractDeploymentDetected!! ")
-		entries = transferToWalletActivityEntries(analytics.externalTransfers[0], chainID, accountAddress)
-	} else if analytics.isSwapTransfer() {
-		fmt.Println("SwapDetected!! ", len(analytics.inboundNonZeroTransfers), "-", len(analytics.outboundNonZeroTransfers))
-		if len(analytics.inboundNonZeroTransfers) == 1 && len(analytics.outboundNonZeroTransfers) == 1 {
-			entries = append(entries, makeSwapThirdpartyActivityEntry(analytics.outboundNonZeroTransfers[0], analytics.inboundNonZeroTransfers[0], chainID))
-		}
-	} else if analytics.isBridgeTransfer() {
-		fmt.Println("BridgeDetected!! ")
-		if len(analytics.inboundNonZeroTransfers) == 0 && len(analytics.outboundNonZeroTransfers) == 1 {
-			entries = append(entries, makeBridgeThirdpartyActivityEntry(analytics.outboundNonZeroTransfers[0], chainID))
-		}
-	} else if analytics.isErc20Transfer() {
-		fmt.Println("ERC20Transfer!! ")
-		entries = transferToThirdpartyActivityEntries(analytics.tokenTransfers[0], chainID, accountAddress)
-	} else {
-		fmt.Println("SimpleTransfer!! ")
-		entries = transferToThirdpartyActivityEntries(txTransfers[0], chainID, accountAddress)
-	}
-
-	return entries
-}
-
 type transferTokenAndValue struct {
 	Token ac.Token
 	Value *hexutil.Big
@@ -272,46 +241,6 @@ func transferToThirdpartyActivityEntries(t Transfer, chainID uint64, accountAddr
 	return entries
 }
 
-func transferToWalletctivityEntries(t Transfer, chainID uint64, accountAddress common.Address) []thirdparty.ActivityEntry {
-	baseEntry := activity.Entry{
-		timestamp: t.Metadata.BlockTimestamp.Unix(),
-		sender:    t.FromAddress,
-		recipient: t.ToAddress,
-		// TxHash:      t.Hash,
-		// BlockNumber: (*hexutil.Big)(t.BlockNum.Int),
-		// TxStatus: ac.Success,
-	}
-
-	if t.ToAddress == nil {
-		entry := baseEntry
-		entry.ActivityType = ac.ContractDeploymentAT
-		entry.ContractAddress = t.RawContract.Address
-		entry.ChainIDOut = &chainID
-		return []thirdparty.ActivityEntry{entry}
-	}
-
-	transfersTokenAndValue := extractTransferTokenAndValue(t, chainID)
-
-	entries := make([]thirdparty.ActivityEntry, 0, len(transfersTokenAndValue))
-	for _, td := range transfersTokenAndValue {
-		entry := baseEntry
-
-		if t.IsIncoming(accountAddress) {
-			entry.ActivityType = ac.ReceiveAT
-			entry.ChainIDIn = &chainID
-			entry.TokenIn = &td.Token
-			entry.AmountIn = td.Value
-		} else {
-			entry.ActivityType = ac.SendAT
-			entry.ChainIDOut = &chainID
-			entry.TokenOut = &td.Token
-			entry.AmountOut = td.Value
-		}
-		entries = append(entries, entry)
-	}
-	return entries
-}
-
 func makeSwapThirdpartyActivityEntry(outbound Transfer, inbound Transfer, chainID uint64) thirdparty.ActivityEntry {
 
 	outboundTd := extractTransferTokenAndValue(outbound, chainID)[0]
@@ -368,25 +297,12 @@ func groupTransfersByHash(transfers []Transfer) map[common.Hash][]Transfer {
 }
 
 func TransfersToThirdpartyActivityEntries(tt []Transfer, chainID uint64, accountAddress common.Address) []thirdparty.ActivityEntry {
+	fmt.Printf("== TransfersToThirdpartyActivityEntries addresses: %v, chainIDs: %v \n", accountAddress, chainID)
 	entries := make([]thirdparty.ActivityEntry, 0, len(tt))
-
 	transfersPerHash := groupTransfersByHash(tt)
 
 	for _, txTransfers := range transfersPerHash {
 		newEntries := sameHashTransfersToThirdpartyActivityEntries(txTransfers, chainID, accountAddress)
-		entries = append(entries, newEntries...)
-	}
-
-	return entries
-}
-
-func TransfersToWalletActivityEntries(tt []Transfer, chainID uint64, accountAddress common.Address) []activity.Entry {
-	entries := make([]thirdparty.ActivityEntry, 0, len(tt))
-
-	transfersPerHash := groupTransfersByHash(tt)
-
-	for _, txTransfers := range transfersPerHash {
-		newEntries := sameHashTransfersToWalletActivityEntries(txTransfers, chainID, accountAddress)
 		entries = append(entries, newEntries...)
 	}
 
