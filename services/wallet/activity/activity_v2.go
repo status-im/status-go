@@ -109,7 +109,7 @@ func getSentActivitiesEntries(ctx context.Context, deps FilterDependencies, addr
 
 func getFetchedActivitiesEntries(ctx context.Context, deps FilterDependencies, addresses []eth.Address, chainIDs []wCommon.ChainID, offset int, limit int) ([]Entry, error) {
 
-	fmt.Printf("== getFetchedActivitiesEntries addresses: %v, chainIDs: %v \n", addresses, chainIDs)
+	fmt.Printf("==== getFetchedActivitiesEntries addresses: %v, chainIDs: %v \n", addresses, chainIDs)
 
 	if len(addresses) == 0 {
 		return nil, ErrNoAddressesProvided
@@ -118,11 +118,14 @@ func getFetchedActivitiesEntries(ctx context.Context, deps FilterDependencies, a
 		return nil, ErrNoChainIDsProvided
 	}
 
-	q := sq.Select("e.transfer").
+	q := sq.Select("e.transfer", "e.chain_id", "e.address").
 		From("fetched_alchemy_transfers e").
 		Where(sq.And{
 			sq.Eq{"e.chain_id": chainIDs},
 			sq.Eq{"e.address": addresses}})
+
+	// TBD: remove
+	limit = ac.NoLimit
 
 	if limit != ac.NoLimit {
 		q = q.Limit(uint64(limit))
@@ -146,23 +149,29 @@ func getFetchedActivitiesEntries(ctx context.Context, deps FilterDependencies, a
 	}
 	defer rows.Close()
 
-	alchemyTransfers, err := rowsToTransfers(rows)
+	// Get transfers grouped by chainId and address
+	transfersMap, err := rowsToTransfersGrouped(rows)
 	if err != nil {
 		return nil, err
 	}
 
-	activityEntries := alchemy.TransfersToThirdpartyActivityEntries(alchemyTransfers, uint64(chainIDs[0]), addresses[0])
+	// Process all combinations and accumulate activity entries
+	var allActivityEntries []thirdparty.ActivityEntry
+	for chainID, addressMap := range transfersMap {
+		for address, transfers := range addressMap {
+			activityEntries := alchemy.TransfersToThirdpartyActivityEntries(transfers, uint64(chainID), address)
+			allActivityEntries = append(allActivityEntries, activityEntries...)
+		}
+	}
 
-	entries := thirdpartyActivityEntriesToEntries(deps, activityEntries)
+	entries := thirdpartyActivityEntriesToEntries(deps, allActivityEntries)
 	return entries, nil
 }
 
 func thirdpartyActivityEntriesToEntries(deps FilterDependencies, activityEntries []thirdparty.ActivityEntry) []Entry {
-	fmt.Printf("== thirdpartyActivityEntriesToEntries count: %d\n", len(activityEntries))
 	entries := make([]Entry, 0, len(activityEntries))
 
 	for _, ae := range activityEntries {
-		fmt.Printf("== entry: %s\n", ae)
 		// Determine the main chain ID and set chainIDOut/chainIDIn
 		uChainID := wCommon.UnknownChainID
 		var chainIDOut *wCommon.ChainID
@@ -250,6 +259,42 @@ func getTransferTypeFromTokens(tokenIn, tokenOut *ac.Token) *ac.TransferType {
 	}
 
 	return ret
+}
+
+// rowsToTransfersGrouped returns transfers grouped by chainId and then by address
+func rowsToTransfersGrouped(rows *sql.Rows) (map[wCommon.ChainID]map[eth.Address][]alchemy.Transfer, error) {
+	transfersMap := make(map[wCommon.ChainID]map[eth.Address][]alchemy.Transfer)
+
+	var counter int = 0
+
+	for rows.Next() {
+		var transfer alchemy.Transfer
+		var chainID uint64
+		var address eth.Address
+		var transferJSON = sqlite.ToJSONBlob(&transfer)
+
+		err := rows.Scan(transferJSON, &chainID, &address)
+		fmt.Println("Scanned json:", transferJSON)
+		if err != nil {
+			return nil, err
+		}
+		if !transferJSON.Valid {
+			return nil, errors.New("invalid entry")
+		}
+
+		// Initialize nested map if needed
+		wChainID := wCommon.ChainID(chainID)
+		if transfersMap[wChainID] == nil {
+			transfersMap[wChainID] = make(map[eth.Address][]alchemy.Transfer)
+		}
+		fmt.Printf("==== added to  transfersMap[%d][%s] \n", chainID, address)
+		transfersMap[wChainID][address] = append(transfersMap[wChainID][address], transfer)
+		counter = counter + 1
+	}
+
+	fmt.Printf("====  rowsToTransfersGrouped found: %d \n", counter)
+
+	return transfersMap, nil
 }
 
 func rowsToTransfers(rows *sql.Rows) ([]alchemy.Transfer, error) {

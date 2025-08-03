@@ -68,6 +68,7 @@ func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, of
 	// allAddresses := s.areAllAddresses(f.addresses)
 
 	// entries, err := getSentActivitiesEntries(ctx, s.getDeps(), f.addresses, f.chainIDs, offset, count)
+	fmt.Printf("==== getActivityEntries offset: %d, count: %d \n", offset, count)
 	entries, err := getFetchedActivitiesEntries(ctx, s.getDeps(), f.addresses, f.chainIDs, offset, count)
 	if err != nil {
 		fmt.Println("error getting activity entries", err)
