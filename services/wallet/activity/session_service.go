@@ -65,9 +65,9 @@ func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, of
 	if f.version != V2 {
 		return nil, errors.New("unsupported version")
 	}
-	allAddresses := s.areAllAddresses(f.addresses)
+	// allAddresses := s.areAllAddresses(f.addresses)
 
-	entries, err := getActivityEntriesV2(ctx, s.getDeps(), f.addresses, allAddresses, f.chainIDs, f.filter, offset, count)
+	entries, err := getSentActivitiesEntries(ctx, s.getDeps(), f.addresses, f.chainIDs, offset, count)
 	if err != nil {
 		fmt.Println("error getting activity entries", err)
 	}

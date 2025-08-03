@@ -145,7 +145,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 	}
 
 	c.persistence.SaveTransfers(responseTransfers, chainID, parameters.Address)
-	response.Items = TransfersToCommon(responseTransfers, chainID, parameters.Address)
+	response.Items = TransfersToThirdpartyActivityEntries(responseTransfers, chainID, parameters.Address)
 
 	return response, nil
 }
