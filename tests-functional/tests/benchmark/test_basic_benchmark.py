@@ -27,8 +27,8 @@ class TestBasicBenchmark(MessengerSteps):
         """Creates a AUT (Application Under Test) - a StatusBackend instance initialized for performance testing."""
 
         # Create a new user
-        status_backend = backend_factory("AUT")
-        status_backend.container.start_performance_monitoring()
+        status_backend = backend_factory("AUT", pprof_enabled=True)
+        status_backend.start_performance_monitoring()
         self.sleep(status_backend, 5)  # Keep idle for a short time
 
         status_backend.init_status_backend()
@@ -39,6 +39,10 @@ class TestBasicBenchmark(MessengerSteps):
         status_backend.wakuext_service.start_messenger()
 
         yield status_backend
+
+        status_backend.events.append("FreeOSMemory")
+        status_backend.free_os_memory()
+        time.sleep(20)
 
         # Finalize
         test_name = request.node.name

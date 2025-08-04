@@ -15,7 +15,8 @@ from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
 from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
-from clients.metrics import Events, PerformanceMetrics
+from clients.metrics import Events, StatusGoMetrics
+from clients.expvar import ExpvarClient
 from clients.statusgo_container import StatusBackendContainer
 from utils.config import Config
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
@@ -27,7 +28,7 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 class StatusBackend(RpcClient, SignalClient):
     container = None
 
-    def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6):
+    def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6, **kwargs):
         self.temp_dir = None
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
@@ -45,7 +46,7 @@ class StatusBackend(RpcClient, SignalClient):
             host_port = random.choice(Config.status_backend_port_range)
             Config.status_backend_port_range.remove(host_port)
 
-            self.container = StatusBackendContainer(host_port, privileged, self.ipv6)
+            self.container = StatusBackendContainer(host_port, privileged, self.ipv6, **kwargs)
             self.temp_dir = None
             self.data_dir = self.container.data_dir()
             url = self.container.url
@@ -77,6 +78,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.wakuext_service = WakuextService(self)
         self.accounts_service = AccountService(self)
         self.settings_service = SettingsService(self)
+        self.expvar_client = ExpvarClient(self.base_url)
 
     def __del__(self):
         self.shutdown()
@@ -431,5 +433,22 @@ class StatusBackend(RpcClient, SignalClient):
     def gather_metrics(self):
         if not self.container:
             raise RuntimeError("Gathering metrics is only supported when running status-backend in a Docker container")
-        stats = self.container.stop_performance_monitoring()
-        return PerformanceMetrics(stats, self.events, version=self.version)
+
+        # Stop both monitoring threads and get independent arrays
+        container_stats = self.container.stop_performance_monitoring()
+        go_metrics = self.expvar_client.stop_monitoring()
+
+        # Create PerformanceMetrics with independent arrays
+        return StatusGoMetrics(container_stats=container_stats, go_metrics=go_metrics, events=self.events, version=self.version)
+
+    def start_performance_monitoring(self):
+        """Start performance monitoring with independent threads"""
+        if not self.container:
+            raise RuntimeError("Performance monitoring is only supported when running status-backend in a Docker container")
+
+        self.container.start_performance_monitoring()
+        self.expvar_client.start_monitoring()
+
+    def free_os_memory(self):
+        url = f"{self.base_url}/statusgo/debug/FreeOSMemory"
+        requests.post(url)
