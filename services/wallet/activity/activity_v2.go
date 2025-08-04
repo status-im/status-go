@@ -148,7 +148,7 @@ func getFetchedActivitiesEntries(ctx context.Context, deps FilterDependencies, a
 		return nil, err
 	}
 
-	// Process all combinations and accumulate activity entries
+	// Process all combinations of address and chain-id and accumulate activity entries
 	var allActivityEntries []thirdparty.ActivityEntry
 	for chainID, addressMap := range transfersMap {
 		for address, transfers := range addressMap {
@@ -182,26 +182,34 @@ func thirdpartyActivityEntriesToEntries(deps FilterDependencies, activityEntries
 
 	for _, ae := range activityEntries {
 		// Determine the main chain ID and set chainIDOut/chainIDIn
-		uChainID := wCommon.UnknownChainID
+		// uChainID := wCommon.UnknownChainID
 		var chainIDOut *wCommon.ChainID
 		var chainIDIn *wCommon.ChainID
 		if ae.ChainIDOut != nil {
-			uChainID = *ae.ChainIDOut
 			chainIDOut = new(wCommon.ChainID)
-			*chainIDOut = wCommon.ChainID(uChainID)
-		} else if ae.ChainIDIn != nil {
-			uChainID = *ae.ChainIDIn
-			chainIDIn = new(wCommon.ChainID)
-			*chainIDIn = wCommon.ChainID(uChainID)
+			*chainIDOut = wCommon.ChainID(*ae.ChainIDOut)
 		}
-		chainID := wCommon.ChainID(uChainID)
+		if ae.ChainIDIn != nil {
+			chainIDIn = new(wCommon.ChainID)
+			*chainIDIn = wCommon.ChainID(*ae.ChainIDIn)
+		}
+		var chainID wCommon.ChainID
+		if chainIDOut != nil {
+			chainID = *chainIDOut
+		} else if chainIDIn != nil {
+			chainID = *chainIDIn
+		} else {
+			chainID = wCommon.ChainID(wCommon.UnknownChainID)
+		}
 
 		entry := Entry{
-			payloadType: ac.SimpleTransactionPT,
-			transaction: &ac.TransactionIdentity{
-				ChainID: chainID,
-				Hash:    ae.TxHash,
-				Address: ae.Sender,
+			payloadType: ac.MultiTransactionPT,
+			transactions: []*ac.TransactionIdentity{
+				{
+					ChainID: chainID,
+					Hash:    ae.TxHash,
+					Address: ae.Sender,
+				},
 			},
 			timestamp:                 ae.Timestamp,
 			activityType:              ae.ActivityType,
@@ -217,6 +225,8 @@ func thirdpartyActivityEntriesToEntries(deps FilterDependencies, activityEntries
 			transferType:              getTransferTypeFromTokens(ae.TokenIn, ae.TokenOut),
 			interactedContractAddress: ae.ContractAddress,
 		}
+
+		fmt.Printf("====  Entry: %10s ->: %15p <-: %15p, hash: %s \n", entry.activityType, entry.amountOut, entry.amountIn, entry.transactions[0].Hash.TerminalString())
 
 		entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
 		entries = append(entries, entry)

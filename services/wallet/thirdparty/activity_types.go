@@ -73,5 +73,5 @@ type ActivityFetcher interface {
 }
 
 func (e ActivityEntry) String() string {
-	return fmt.Sprintf("%s %v ->%s <-%s", e.TxHash.TerminalString(), e.ActivityType, e.AmountOut.ToInt().String(), e.AmountIn.ToInt().String())
+	return fmt.Sprintf("%s %10v ->%15p <-%15p", e.TxHash.TerminalString(), e.ActivityType, e.AmountOut, e.AmountIn)
 }
