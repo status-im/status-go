@@ -143,10 +143,32 @@ class TestAddAccount:
         self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
         assert "error" not in add_account_response
 
-        # After adding the account check that the get accounts will retrieve the new account
+    def test_delete_account(self):
+        # Get keypairs to find the key-uid
+        keypairs_response = self.account.accounts_service.get_account_keypairs()
+        keypairs = keypairs_response.get("result", [])
+        assert len(keypairs) > 0
+        key_uid = keypairs[0]["key-uid"]
+
+        # Add new account for the existing key-uid
+        account_data = new_account_data_1
+        account_data["key-uid"] = key_uid
+        add_account_response = self.account.accounts_service.add_account(account_data)
+        self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
+        assert "error" not in add_account_response
+
         accounts_response = self.account.accounts_service.get_accounts()
         accounts = accounts_response.get("result", [])
-        self.check_new_account_was_created(accounts, account_data)
+        assert len(accounts) == 3
+
+        # Delete the account
+        delete_response = self.account.accounts_service.delete_account(account_data["address"])
+        assert "error" not in delete_response
+
+        accounts_response = self.account.accounts_service.get_accounts()
+        accounts = accounts_response.get("result", [])
+
+        assert len(accounts) == 2
 
     def check_new_account_was_created(self, accounts, account_data):
         mismatch_details = ""
