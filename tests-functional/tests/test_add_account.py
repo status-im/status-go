@@ -12,8 +12,6 @@ class TestAddAccount:
         self.account_data = copy.deepcopy(new_account_data_1)
 
     def test_add_account_for_valid_key_uid(self):
-        # Add new account for the existing key-uid
-
         self.account_data["key-uid"] = self.get_keypair_key_uid()
         add_account_response = self.account.accounts_service.add_account(self.account_data)
         self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
@@ -38,7 +36,6 @@ class TestAddAccount:
         assert "error" not in add_second_account_response
 
     def test_add_duplicate_account(self):
-
         self.account_data["key-uid"] = self.get_keypair_key_uid()
         add_account_response = self.account.accounts_service.add_account(self.account_data)
         assert "error" not in add_account_response
@@ -50,9 +47,6 @@ class TestAddAccount:
     def test_add_new_account_via_add_keypair(self):
         keypairs = self.get_account_keypairs()
         keypair = keypairs[0]
-
-        # Add new account for the existing key-uid
-
         self.account_data["key-uid"] = self.get_keypair_key_uid()
 
         # Add the new account to the keypair accounts
@@ -69,30 +63,23 @@ class TestAddAccount:
         self.check_new_account_was_created(accounts, self.account_data)
 
     def test_add_account_for_unknown_key_uid(self):
-
         self.account_data["key-uid"] = "0x3231d92c94548d14f097173765a50bebe28fbad8f2267c9e08cc4433a6f219a4"
         add_account_response = self.account.accounts_service.add_account(self.account_data, skip_validation=True)
         assert add_account_response.get("error", {}).get("message", "") == "cannot add an account for an unknown keypair"
 
     def test_add_account_for_empty_key_uid(self):
-
         self.account_data["key-uid"] = ""
         add_account_response = self.account.accounts_service.add_account(self.account_data, skip_validation=True)
         assert add_account_response.get("error", {}).get("message", "") == "`KeyUID` field of an account must be set"
 
     @pytest.mark.parametrize("key", ["wallet", "chat"])
     def test_add_account_with_key_set_on_true__(self, key):
-
         self.account_data["key-uid"] = self.get_keypair_key_uid()
-
         self.account_data[key] = True
-
         add_account_response = self.account.accounts_service.add_account(self.account_data, skip_validation=True)
         assert add_account_response.get("error", {}).get("message", "") == "default wallet and chat account cannot be added this way"
 
     def test_add_watch_account(self):
-        # Add new watch account. This one can have empty key-uid
-
         self.account_data["type"] = "watch"
         add_account_response = self.account.accounts_service.add_account(self.account_data)
         self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
@@ -104,7 +91,6 @@ class TestAddAccount:
         self.check_new_account_was_created(accounts, self.account_data)
 
     def test_add_seed_account(self):
-
         self.account_data["key-uid"] = self.get_keypair_key_uid()
         self.account_data["type"] = "seed"
         add_account_response = self.account.accounts_service.add_account(self.account_data)
@@ -112,7 +98,6 @@ class TestAddAccount:
         assert "error" not in add_account_response
 
     def test_delete_account(self):
-
         self.account_data["type"] = "watch"
         add_account_response = self.account.accounts_service.add_account(self.account_data)
         self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
