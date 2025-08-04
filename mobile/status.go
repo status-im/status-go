@@ -21,8 +21,6 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/api"
