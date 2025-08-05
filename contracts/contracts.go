@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/contracts/resolver"
 	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/contracts/stickers"
+	"github.com/status-im/status-go/contracts/namewrapper"
 	"github.com/status-im/status-go/rpc"
 )
 
@@ -216,4 +217,12 @@ func (c *ContractMaker) NewBalanceChecker(chainID uint64) (*balancechecker.Balan
 		contractAddr,
 		backend,
 	)
+}
+
+func (c *ContractMaker) NewNameWrapper(chainID uint64, address *common.Address) (*namewrapper.Namewrapper, error) {
+    backend, err := c.RPCClient.EthClient(chainID)
+    if err != nil {
+        return nil, err
+    }
+    return namewrapper.NewNamewrapper(*address, backend)
 }
