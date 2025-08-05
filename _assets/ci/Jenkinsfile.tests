@@ -143,7 +143,7 @@ pipeline {
           "--env=POSTGRES_HOST_AUTH_METHOD=trust",
           "--publish=${DB_PORT}:${DB_PORT}",
         ].join(' '), "-p ${DB_PORT}") { c ->
-          nwaku = docker.image('harbor.status.im/wakuorg/nwaku:v0.35.1').withRun([
+          nwaku = docker.image('wakuorg/nwaku:v0.36.0').withRun([
             "--name=${NWAKU_CONT}",
             "--publish=${NWAKU_TCP_PORT}:${NWAKU_TCP_PORT}/tcp",
             "--publish=${NWAKU_UDP_PORT}:${NWAKU_UDP_PORT}/udp",
@@ -152,6 +152,7 @@ pipeline {
             "--tcp-port=${NWAKU_TCP_PORT}",
             "--discv5-discovery=true",
             "--cluster-id=16",
+         // "--num-shards-in-network=0", // uncomment when switching to nwaku:v0.37.0
             "--shard=32",
             "--shard=64",
             "--nat=extip:${ipAddress}",
