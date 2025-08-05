@@ -282,7 +282,6 @@ class StatusBackend(RpcClient, SignalClient):
         self._set_display_name(**kwargs)
         method = "CreateAccountAndLogin"
         data = self._create_account_request(user, **kwargs)
-        self.created_account = data
         return self.api_valid_request(method, data)
 
     def restore_account_and_login(self, user=user_1, **kwargs):

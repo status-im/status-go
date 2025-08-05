@@ -22,7 +22,7 @@ class TestAddAccount:
         accounts = accounts_response.get("result", [])
         self.check_new_account_was_created(accounts, self.account_data)
 
-    def test_add_seconds_account_for_same_keypair(self):
+    def test_add_second_account_for_same_keypair(self):
         key_uid = self.get_keypair_key_uid()
 
         self.account_data["key-uid"] = key_uid
@@ -30,7 +30,7 @@ class TestAddAccount:
         assert "error" not in add_account_response
 
         # Add a second account
-        self.account_data = new_account_data_2
+        self.account_data = copy.deepcopy(new_account_data_2)
         self.account_data["key-uid"] = key_uid
         add_second_account_response = self.account.accounts_service.add_account(self.account_data)
         assert "error" not in add_second_account_response
@@ -53,7 +53,7 @@ class TestAddAccount:
         keypair["accounts"] = [self.account_data]
 
         # Call accounts_addKeypair with the new account
-        password = self.account.created_account.get("password")
+        password = self.account.password
         add_keypair_response = self.account.accounts_service.add_keypair(password, keypair)
         self.account.verify_json_schema(add_keypair_response, method="accounts_addKeypair")
 
@@ -134,12 +134,11 @@ class TestAddAccount:
                     mismatches.append(f"Missing key: {key}")
                     continue
                 actual_value = acc[key]
-                if key == "address":
-                    if value.lower() != actual_value.lower():
-                        mismatches.append(f"Mismatch in key '{key}': expected '{value}', got '{actual_value}'")
-                else:
-                    if value != actual_value:
-                        mismatches.append(f"Mismatch in key '{key}': expected '{value}', got '{actual_value}'")
+                if key == "address" and value.lower() == actual_value.lower():
+                    continue
+                if value == actual_value:
+                    continue
+                mismatches.append(f"Mismatch in key '{key}': expected '{value}', got '{actual_value}'")
             if not mismatches:
                 break
             else:
