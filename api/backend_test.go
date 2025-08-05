@@ -21,7 +21,11 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 
-	"github.com/status-im/status-go/accounts-management/keystore/geth"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
+	accsmanagementcommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/accounts-management/keystore"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -589,75 +593,80 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 	})
 
 	t.Run("PasswordDoesntMatch", func(t *testing.T) {
-		pkey, err := crypto.GenerateKey()
+		pkey, err := gethcrypto.GenerateKey()
 		require.NoError(t, err)
-		privateKeyHex := types.EncodeHex(crypto.FromECDSA(pkey))
-		address := crypto.PubkeyToAddress(pkey.PublicKey)
-		keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&pkey.PublicKey))
-		keyUID := types.EncodeHex(keyUIDHex[:])
+		privateKeyHex := types.EncodeHex(gethcrypto.FromECDSA(pkey))
+		address := gethcrypto.PubkeyToAddress(pkey.PublicKey)
 
-		db, err := accounts.NewDB(testContext.backend.appDB)
-		require.NoError(t, err)
-
-		_, err = testContext.backend.AccountsManager().CreateFromPrivateKeyAndStoreAccount(privateKeyHex, testPassword)
+		_, err = testContext.backend.AccountsManager().CreateKeypairFromPrivateKeyAndStore(privateKeyHex, testPassword, "private key keypair", &accsmanagementtypes.AccountCreationDetails{
+			Path: accsmanagementcommon.PathMaster,
+		}, 0)
 		require.NoError(t, err)
 
-		require.NoError(t, db.SaveOrUpdateKeypair(&accounts.Keypair{
-			KeyUID: keyUID,
-			Name:   "private key keypair",
-			Type:   accounts.KeypairTypeKey,
-			Accounts: []*accounts.Account{
-				{
-					Address: address,
-					KeyUID:  keyUID,
-				},
-			},
-		}))
 		key, err := testContext.backend.getVerifiedWalletAccount(address.String(), "wrong-password")
-		require.EqualError(t, err, geth.ErrDecrypt.Error())
+		require.EqualError(t, err, keystore.ErrDecrypt.Error())
 		require.Nil(t, key)
 	})
 
-	t.Run("PartialAccount", func(t *testing.T) {
+	t.Run("PartialAccount", func(t *testing.T) { // This is mobile app specific test and can be removed
 		// Create a derived wallet account without storing the keys
 		db, err := accounts.NewDB(testContext.backend.appDB)
 		require.NoError(t, err)
-		newPath := "m/0"
+
+		err = db.CreateSettings(testContext.settings, *testContext.config)
+		require.NoError(t, err)
+
 		walletRootAddress, err := db.GetWalletRootAddress()
 		require.NoError(t, err)
 
-		genAcc, err := testContext.backend.AccountsManager().LoadAccount(walletRootAddress, testPassword)
+		// Store keystore file for the wallet root address
+		masterAcc, derivedAccs, err := testContext.backend.AccountsManager().StoreKeystoreFilesForMnemonic(testContext.mnemonic, testPassword,
+			[]string{accscommon.PathWalletRoot})
 		require.NoError(t, err)
 
-		walletInfo := genAcc.ToIdentifiedAccountInfo()
+		walletRootGeneratedAccount := derivedAccs[accscommon.PathWalletRoot]
+		require.Equal(t, walletRootAddress, walletRootGeneratedAccount.Address())
 
-		derivedAcc, err := testContext.backend.AccountsManager().DeriveChildAccountForPathAndStore(walletRootAddress, newPath, testPassword)
+		// check the number of wallet addresses in the db
+		walletAddresses, err := db.GetWalletAddresses()
+		require.NoError(t, err)
+		require.Equal(t, 2, len(walletAddresses)) // should be 1, but because of the tests `Run` before this one it's 2
+
+		// Create a new wallet account and store it to db only, without storing the keystore file
+		derivedWalletAcc1, err := generator.DeriveChildFromAccount(masterAcc, accscommon.CustomWalletPath1)
 		require.NoError(t, err)
 
-		derivedInfo := derivedAcc.ToAccountInfo()
-
-		keypair := &accounts.Keypair{
-			KeyUID: walletInfo.KeyUID,
-			Name:   "profile keypair",
-			Type:   accounts.KeypairTypeProfile,
-			Accounts: []*accounts.Account{
-				{
-					Address:   types.HexToAddress(derivedInfo.Address),
-					KeyUID:    walletInfo.KeyUID,
-					Type:      accounts.AccountTypeGenerated,
-					PublicKey: types.Hex2Bytes(derivedInfo.PublicKey),
-					Path:      newPath,
-					Wallet:    false,
-					Name:      "PartialAccount",
-				},
+		err = db.SaveOrUpdateAccounts([]*accounts.Account{
+			{
+				Address: derivedWalletAcc1.Address(),
+				KeyUID:  masterAcc.KeyUID(),
+				Path:    accscommon.CustomWalletPath1,
 			},
-		}
-		require.NoError(t, db.SaveOrUpdateKeypair(keypair))
-
-		// With partial account we need to dynamically generate private key
-		acc, err := testContext.backend.getVerifiedWalletAccount(keypair.Accounts[0].Address.Hex(), testPassword)
+		}, false)
 		require.NoError(t, err)
-		require.Equal(t, keypair.Accounts[0].Address, acc.Address())
+
+		// check the number of wallet addresses in the db, to ensure that the account was saved
+		walletAddresses, err = db.GetWalletAddresses()
+		require.NoError(t, err)
+		require.Equal(t, 3, len(walletAddresses)) // should be 2, but because of the tests `Run` before this one it's 3
+
+		// try to load the account, it should fail because the account is not in the keystore, just in the db
+		loadedWalletAcc1, err := testContext.backend.AccountsManager().LoadAccount(derivedWalletAcc1.Address(), testPassword)
+		require.Error(t, err)
+		require.Equal(t, keystore.ErrNoMatch.Error(), err.Error())
+		require.Nil(t, loadedWalletAcc1)
+
+		// try to get verified wallet account, it should generate a keystore for the wallet account from the wallet root address
+		verifiedWalletAcc1, err := testContext.backend.AccountsManager().GetVerifiedWalletAccount(derivedWalletAcc1.Address(),
+			testPassword)
+		require.NoError(t, err)
+
+		loadedWalletAcc1, err = testContext.backend.AccountsManager().LoadAccount(derivedWalletAcc1.Address(), testPassword)
+		require.NoError(t, err)
+
+		// derive, verified and loaded wallet account should be the same
+		require.Equal(t, derivedWalletAcc1.Address(), verifiedWalletAcc1.Address())
+		require.Equal(t, derivedWalletAcc1.Address(), loadedWalletAcc1.Address())
 	})
 
 	t.Run("Success", func(t *testing.T) {
@@ -674,20 +683,16 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 			handleError(t, db.Close())
 		}()
 
-		_, err = testContext.backend.AccountsManager().CreateFromPrivateKeyAndStoreAccount(privateKeyHex, testPassword)
+		keypair, err := testContext.backend.AccountsManager().CreateKeypairFromPrivateKeyAndStore(privateKeyHex, testPassword,
+			"private key keypair", &accsmanagementtypes.AccountCreationDetails{
+				Path: accsmanagementcommon.PathMaster,
+			}, 0)
 		require.NoError(t, err)
 
-		require.NoError(t, db.SaveOrUpdateKeypair(&accounts.Keypair{
-			KeyUID: keyUID,
-			Name:   "private key keypair",
-			Type:   accounts.KeypairTypeKey,
-			Accounts: []*accounts.Account{
-				{
-					Address: address,
-					KeyUID:  keyUID,
-				},
-			},
-		}))
+		require.Equal(t, keypair.KeyUID, keyUID)
+		require.Len(t, keypair.Accounts, 1)
+		require.Equal(t, keypair.Accounts[0].Address, address)
+
 		acc, err := testContext.backend.getVerifiedWalletAccount(address.String(), testPassword)
 		require.NoError(t, err)
 		require.Equal(t, address, acc.Address())
@@ -724,7 +729,21 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 	err = testContext.backend.ensureDBsOpened(*testContext.multiAcc, testPassword)
 	require.NoError(t, err)
 
-	require.NoError(t, testContext.backend.StartNodeWithAccountAndInitialConfig(testContext.mnemonic, *testContext.multiAcc, testPassword, testContext.settings, newConf, testContext.profileKeypair, nil))
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.DataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
+	}
+
+	_, err = testContext.backend.StartNodeWithChatKeyOrMnemonic(
+		request,
+		testContext.mnemonic,
+		nil,
+		false,
+		false,
+	)
+	require.NoError(t, err)
+
 	require.NoError(t, testContext.backend.Logout())
 	require.NoError(t, testContext.backend.StopNode())
 
@@ -817,8 +836,21 @@ func TestVerifyDatabasePassword(t *testing.T) {
 
 	testContext := setupTestContext(t, testPassword, false, false, false)
 
-	require.NoError(t, testContext.backend.StartNodeWithAccountAndInitialConfig(testContext.mnemonic, *testContext.multiAcc, testPassword,
-		testContext.settings, testContext.config, testContext.profileKeypair, nil))
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.DataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
+	}
+
+	_, err := testContext.backend.StartNodeWithChatKeyOrMnemonic(
+		request,
+		testContext.mnemonic,
+		nil,
+		false,
+		false,
+	)
+	require.NoError(t, err)
+
 	require.NoError(t, testContext.backend.Logout())
 	require.NoError(t, testContext.backend.StopNode())
 
@@ -829,8 +861,19 @@ func TestVerifyDatabasePassword(t *testing.T) {
 func TestConvertAccount(t *testing.T) {
 	testContext := setupTestContext(t, testPassword, false, false, true)
 
-	err := testContext.backend.StartNodeWithAccountAndInitialConfig(testContext.mnemonic, *testContext.multiAcc, testPassword,
-		testContext.settings, testContext.config, testContext.profileKeypair, nil)
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.DataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
+	}
+
+	_, err := testContext.backend.StartNodeWithChatKeyOrMnemonic(
+		request,
+		testContext.mnemonic,
+		nil,
+		false,
+		false,
+	)
 	require.NoError(t, err)
 
 	multiaccounts, err := testContext.backend.GetAccounts()
@@ -1139,6 +1182,7 @@ func TestCreateWallet(t *testing.T) {
 	accountsAPI := accountsService.AccountsAPI()
 
 	err = accountsAPI.AddAccount(context.Background(), testPassword, &accounts.Account{
+		Address:   types.Address(derivedAddress[0].Address),
 		KeyUID:    account.KeyUID,
 		Type:      accounts.AccountTypeGenerated,
 		PublicKey: derivedAddress[0].PublicKey,

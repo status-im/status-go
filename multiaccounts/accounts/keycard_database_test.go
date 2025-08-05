@@ -12,10 +12,12 @@ func TestKeycards(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	kp1 := GetProfileKeypairForTest(true, true, true)
+	kp1, _, _, err := GetProfileKeypairForTest(true, true, true)
+	require.NoError(t, err)
 	keycard1 := GetProfileKeycardForTest()
 
-	kp2 := GetSeedImportedKeypair1ForTest()
+	kp2, _, _, err := GetSeedImportedKeypair1ForTest()
+	require.NoError(t, err)
 	keycard2 := GetKeycardForSeedImportedKeypair1ForTest()
 
 	keycard2Copy := GetKeycardForSeedImportedKeypair1ForTest()
@@ -24,7 +26,7 @@ func TestKeycards(t *testing.T) {
 	keycard2Copy.Position = keycard2Copy.Position + 1
 
 	// Pre-condition
-	err := db.SaveOrUpdateKeypair(kp1)
+	err = db.SaveOrUpdateKeypair(kp1)
 	require.NoError(t, err)
 	err = db.SaveOrUpdateKeypair(kp2)
 	require.NoError(t, err)
@@ -157,7 +159,8 @@ func TestKeycardsRemovalWhenDeletingKeypair(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	kp2 := GetSeedImportedKeypair1ForTest()
+	kp2, _, _, err := GetSeedImportedKeypair1ForTest()
+	require.NoError(t, err)
 	keycard2 := GetKeycardForSeedImportedKeypair1ForTest()
 
 	keycard2Copy := GetKeycardForSeedImportedKeypair1ForTest()
@@ -166,7 +169,7 @@ func TestKeycardsRemovalWhenDeletingKeypair(t *testing.T) {
 	keycard2Copy.Position = keycard2Copy.Position + 1
 
 	// Pre-condition
-	err := db.SaveOrUpdateKeypair(kp2)
+	err = db.SaveOrUpdateKeypair(kp2)
 	require.NoError(t, err)
 	dbKeypairs, err := db.GetActiveKeypairs()
 	require.NoError(t, err)

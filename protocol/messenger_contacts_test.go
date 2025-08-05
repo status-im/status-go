@@ -22,11 +22,12 @@ type MessengerContactsTestSuite struct {
 func (s *MessengerContactsTestSuite) Test_SelfContact() {
 	const timeout = 1 * time.Second
 
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
 
-	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
 	// Create values

@@ -101,3 +101,17 @@ func DeriveChildrenFromAccount(acc *Account, pathStrings []string) (map[string]*
 
 	return pathAccounts, nil
 }
+
+func CreateAndDeriveAccountsFromMnemonic(mnemonic string, paths []string, bip39Passphrase string) (*Account, map[string]*Account, error) {
+	account, err := CreateAccountFromMnemonic(mnemonic, bip39Passphrase)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	derivedAccounts, err := DeriveChildrenFromAccount(account, paths)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return account, derivedAccounts, nil
+}

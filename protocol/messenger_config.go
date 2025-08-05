@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/status-im/status-go/accounts-management/generator"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
@@ -13,7 +12,6 @@ import (
 
 	"go.uber.org/zap"
 
-	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/anonmetrics"
@@ -64,11 +62,6 @@ type MessengerSignalsHandler interface {
 	SendWakuBackedUpKeypair(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpWatchOnlyAccount(response *wakusync.WakuBackedUpDataResponse)
 	SendCuratedCommunitiesUpdate(response *communities.KnownCommunitiesResponse)
-}
-
-type AccountsManager interface {
-	GetVerifiedWalletAccount(address ethtypes.Address, password string) (*generator.Account, error)
-	DeleteAccount(address ethtypes.Address) error
 }
 
 type config struct {

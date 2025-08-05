@@ -181,10 +181,11 @@ func (s *MessengerPairingSuite) TestMessengerSyncFallback() {
 	alice2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alice2)
 
-	alice1ProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	alice1ProfileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	alice1ProfileKp.KeyUID = alice1.account.KeyUID
 	alice1ProfileKp.Accounts[0].KeyUID = alice1.account.KeyUID
-	err := alice1.settings.SaveOrUpdateKeypair(alice1ProfileKp)
+	err = alice1.settings.SaveOrUpdateKeypair(alice1ProfileKp)
 	s.Require().NoError(err)
 
 	expectedDisplayName := "alice1"

@@ -22,8 +22,8 @@ func (a *Adapter) find(address ethtypes.Address) (accounts.Account, error) {
 	return gethAccount, nil
 }
 
-func accountFrom(account accounts.Account) types.Account {
-	return types.Account{
+func keystoreAccountFrom(account accounts.Account) types.KeystoreAccount {
+	return types.KeystoreAccount{
 		Address: ethtypes.Address(account.Address),
 		URL:     account.URL.String(),
 	}
@@ -56,23 +56,23 @@ func encryptKeyAndStoreToKeystoreFile(ethKey *ethtypes.Key, path string, scryptN
 }
 
 func (a *Adapter) updateKeystoreFile(privateKey *ecdsa.PrivateKey, extKey *extkeys.ExtendedKey, scryptN int, scryptP int,
-	passphrase string) (types.Account, error) {
+	passphrase string) (types.KeystoreAccount, error) {
 	gethAccount, err := a.keystore.ImportECDSA(privateKey, passphrase)
 	if err != nil {
-		return types.Account{}, err
+		return types.KeystoreAccount{}, err
 	}
 
 	ethKey, err := readKeystoreFileAndDecryptedKey(gethAccount.URL.Path, passphrase)
 	if err != nil {
-		return types.Account{}, err
+		return types.KeystoreAccount{}, err
 	}
 
 	ethKey.ExtendedKey = extKey
 
 	err = encryptKeyAndStoreToKeystoreFile(ethKey, gethAccount.URL.Path, scryptN, scryptP, passphrase)
 	if err != nil {
-		return types.Account{}, err
+		return types.KeystoreAccount{}, err
 	}
 
-	return accountFrom(gethAccount), nil
+	return keystoreAccountFrom(gethAccount), nil
 }

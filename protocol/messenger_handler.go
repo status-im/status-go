@@ -3632,7 +3632,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		if kp.Removed ||
 			dbKeypair != nil && !dbKeypair.MigratedToKeycard() && syncKpMigratedToKeycard {
 			// delete all keystore files
-			err = m.deleteKeystoreFilesForKeypair(dbKeypair)
+			err = m.accountsManager.DeleteKeystoreFilesForKeypair(accounts.KeypairToAccountsManagerKeypair(dbKeypair))
 			if err != nil {
 				return nil, err
 			}
@@ -3653,7 +3653,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 					}
 				}
 				if removeAcc {
-					err = m.deleteKeystoreFileForAddress(dbAcc.Address)
+					err = m.accountsManager.DeleteKeystoreFileForAccount(dbAcc.Address)
 					if err != nil {
 						return nil, err
 					}

@@ -363,11 +363,12 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 
 func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	// Set Display name to pass shouldPublishChatIdentity check
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
 
-	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
 	err = s.m.SetDisplayName("bobby")
@@ -544,11 +545,12 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnenc
 	alice := s.m
 
 	// Set Display name to pass shouldPublishChatIdentity check
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = alice.account.KeyUID
 	profileKp.Accounts[0].KeyUID = alice.account.KeyUID
 
-	err := alice.settings.SaveOrUpdateKeypair(profileKp)
+	err = alice.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
 	err = alice.SetDisplayName("Alice")
@@ -611,11 +613,12 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 	alice := s.m
 
 	// Set Display name to pass shouldPublishChatIdentity check
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = alice.account.KeyUID
 	profileKp.Accounts[0].KeyUID = alice.account.KeyUID
 
-	err := alice.settings.SaveOrUpdateKeypair(profileKp)
+	err = alice.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
 	err = alice.SetDisplayName("Alice")
@@ -690,11 +693,12 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesGrantExpires(
 	alice := s.m
 
 	// Set Display name to pass shouldPublishChatIdentity check
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = alice.account.KeyUID
 	profileKp.Accounts[0].KeyUID = alice.account.KeyUID
 
-	err := alice.settings.SaveOrUpdateKeypair(profileKp)
+	err = alice.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
 	err = alice.SetDisplayName("Alice")
@@ -763,11 +767,12 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 	alice := s.m
 
 	// Set Display name to pass shouldPublishChatIdentity check
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = alice.account.KeyUID
 	profileKp.Accounts[0].KeyUID = alice.account.KeyUID
 
-	err := alice.settings.SaveOrUpdateKeypair(profileKp)
+	err = alice.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
 	err = alice.SetDisplayName("Alice")

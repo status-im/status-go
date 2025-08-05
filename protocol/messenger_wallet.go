@@ -3,13 +3,14 @@ package protocol
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	accsmanagement "github.com/status-im/status-go/accounts-management"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/constants"
 	"github.com/status-im/status-go/eth-node/types"
@@ -137,7 +138,15 @@ func (m *Messenger) resolveAndSetAccountPropsMaintainedByBackend(acc *accounts.A
 	return nil
 }
 
-func (m *Messenger) SaveOrUpdateKeypair(keypair *accounts.Keypair) error {
+func (m *Messenger) UpdateKeypair(keypair *accounts.Keypair) error {
+	_, err := m.settings.GetKeypairByKeyUID(keypair.KeyUID)
+	if err != nil {
+		if err == accounts.ErrDbKeypairNotFound {
+			return fmt.Errorf("cannot update non-existing keypair: %w", err)
+		}
+		return err
+	}
+
 	if keypair.KeyUID == m.account.KeyUID && keypair.Name != m.account.Name {
 		// profile keypair name must always follow profile display name
 		return ErrCannotChangeKeypairName
@@ -153,7 +162,7 @@ func (m *Messenger) SaveOrUpdateKeypair(keypair *accounts.Keypair) error {
 		}
 	}
 
-	err := m.settings.SaveOrUpdateKeypair(keypair)
+	err = m.settings.SaveOrUpdateKeypair(keypair)
 	if err != nil {
 		return err
 	}
@@ -161,11 +170,59 @@ func (m *Messenger) SaveOrUpdateKeypair(keypair *accounts.Keypair) error {
 	return m.resolveAndSyncKeypairOrJustWalletAccount(keypair.KeyUID, types.Address{}, keypair.Clock, m.dispatchMessage)
 }
 
-func (m *Messenger) SaveOrUpdateAccount(acc *accounts.Account) error {
+func (m *Messenger) AddKeypairViaSeedPhrase(mnemonic string, password string, name string,
+	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accounts.Keypair, error) {
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	keypair, err := m.accountsManager.CreateKeypairFromMnemonicAndStore(mnemonic, password, name, walletAccount, false, clock)
+	if err != nil {
+		return nil, err
+	}
+
+	return accounts.AccountsManagerKeypairToKeypair(keypair),
+		m.resolveAndSyncKeypairOrJustWalletAccount(keypair.KeyUID, types.Address{}, keypair.Clock, m.dispatchMessage)
+}
+
+func (m *Messenger) AddKeypairStoredToKeycard(keyUID string, masterAddress string, name string,
+	walletAccounts []*accounts.Account) (*accounts.Keypair, error) {
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	keypair, err := m.accountsManager.AddKeypairStoredToKeycard(keyUID, masterAddress, name,
+		accounts.AccountsToAccountsManagerAccounts(walletAccounts), clock)
+	if err != nil {
+		return nil, err
+	}
+
+	return accounts.AccountsManagerKeypairToKeypair(keypair),
+		m.resolveAndSyncKeypairOrJustWalletAccount(keypair.KeyUID, types.Address{}, keypair.Clock, m.dispatchMessage)
+}
+
+func (m *Messenger) AddKeypairViaPrivateKey(privateKey string, password string, name string,
+	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accounts.Keypair, error) {
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	keypair, err := m.accountsManager.CreateKeypairFromPrivateKeyAndStore(privateKey, password, name, walletAccount, clock)
+	if err != nil {
+		return nil, err
+	}
+
+	return accounts.AccountsManagerKeypairToKeypair(keypair),
+		m.resolveAndSyncKeypairOrJustWalletAccount(keypair.KeyUID, types.Address{}, keypair.Clock, m.dispatchMessage)
+}
+
+func (m *Messenger) UpdateAccount(acc *accounts.Account) error {
+	_, err := m.settings.GetAccountByAddress(acc.Address)
+	if err != nil {
+		if err == accounts.ErrDbAccountNotFound {
+			return fmt.Errorf("cannot update non-existing account: %w", err)
+		}
+		return err
+	}
+
 	clock, _ := m.getLastClockWithRelatedChat()
 	acc.Clock = clock
 
-	err := m.resolveAndSetAccountPropsMaintainedByBackend(acc)
+	err = m.resolveAndSetAccountPropsMaintainedByBackend(acc)
 	if err != nil {
 		return err
 	}
@@ -183,6 +240,38 @@ func (m *Messenger) SaveOrUpdateAccount(acc *accounts.Account) error {
 	return m.UpdateProfileShowcaseWalletAccount(acc)
 }
 
+func (m *Messenger) AddAccount(acc *accounts.Account, password string) error {
+	dbAcc, err := m.settings.GetAccountByAddress(acc.Address)
+	if err != nil && err != accounts.ErrDbAccountNotFound {
+		return err
+	}
+	if dbAcc != nil {
+		return errors.New("account already exists")
+	}
+
+	clock, _ := m.getLastClockWithRelatedChat()
+	acc.Clock = clock
+
+	err = m.resolveAndSetAccountPropsMaintainedByBackend(acc)
+	if err != nil {
+		return err
+	}
+
+	if acc.Type == accounts.AccountTypeWatch {
+		err = m.settings.SaveOrUpdateAccounts([]*accounts.Account{acc}, true)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = m.accountsManager.AddAccounts(acc.KeyUID, []*accsmanagementtypes.Account{accounts.AccountToAccountsManagerAccount(acc)}, password)
+		if err != nil {
+			return err
+		}
+	}
+
+	return m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, acc.Clock, m.dispatchMessage)
+}
+
 func (m *Messenger) MarkKeypairFullyOperable(keyUID string) error {
 	clock, _ := m.getLastClockWithRelatedChat()
 
@@ -194,101 +283,31 @@ func (m *Messenger) MarkKeypairFullyOperable(keyUID string) error {
 	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
 }
 
-func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
-	acc, err := m.settings.GetAccountByAddress(address)
+func (m *Messenger) MakeSeedPhraseKeypairFullyOperable(mnemonic string, password string) error {
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	keyUID, err := m.accountsManager.MakeSeedPhraseKeypairFullyOperable(mnemonic, password, clock)
 	if err != nil {
 		return err
 	}
 
-	if acc.Operable == accounts.AccountNonOperable || acc.Operable == accounts.AccountPartiallyOperable {
-		return nil
-	}
-
-	if acc.Type != accounts.AccountTypeWatch {
-		kp, err := m.settings.GetKeypairByKeyUID(acc.KeyUID)
-		if err != nil {
-			return err
-		}
-
-		if !kp.MigratedToKeycard() {
-			err = m.accountsManager.DeleteAccount(address)
-			var e *accsmanagement.ErrCannotLocateKeyFile
-			if err != nil && !errors.As(err, &e) {
-				return err
-			}
-
-			if acc.Type != accounts.AccountTypeKey {
-				lastAcccountOfKeypairWithTheSameKey := len(kp.Accounts) == 1
-				if lastAcccountOfKeypairWithTheSameKey {
-					err = m.accountsManager.DeleteAccount(types.Address(ethcommon.HexToAddress(kp.DerivedFrom)))
-					var e *accsmanagement.ErrCannotLocateKeyFile
-					if err != nil && !errors.As(err, &e) {
-						return err
-					}
-				}
-			}
-		}
-	}
-
-	return nil
+	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
 }
 
-func (m *Messenger) deleteKeystoreFilesForKeypair(keypair *accounts.Keypair) (err error) {
-	if m.accountsManager == nil || keypair == nil || keypair.MigratedToKeycard() {
-		return
+func (m *Messenger) MakePrivateKeyKeypairFullyOperable(privateKey string, password string) error {
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	keyUID, err := m.accountsManager.MakePrivateKeyKeypairFullyOperable(privateKey, password, clock)
+	if err != nil {
+		return err
 	}
 
-	anyAccountFullyOrPartiallyOperable := false
-	for _, acc := range keypair.Accounts {
-		if acc.Removed || acc.Operable == accounts.AccountNonOperable {
-			continue
-		}
-		if !anyAccountFullyOrPartiallyOperable {
-			anyAccountFullyOrPartiallyOperable = true
-		}
-		if acc.Operable == accounts.AccountPartiallyOperable {
-			continue
-		}
-		err = m.accountsManager.DeleteAccount(acc.Address)
-		var e *accsmanagement.ErrCannotLocateKeyFile
-		if err != nil && !errors.As(err, &e) {
-			return err
-		}
-	}
-
-	if anyAccountFullyOrPartiallyOperable && keypair.Type != accounts.KeypairTypeKey {
-		err = m.accountsManager.DeleteAccount(types.Address(ethcommon.HexToAddress(keypair.DerivedFrom)))
-		var e *accsmanagement.ErrCannotLocateKeyFile
-		if err != nil && !errors.As(err, &e) {
-			return err
-		}
-	}
-
-	return
+	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
 }
 
 func (m *Messenger) DeleteAccount(address types.Address) error {
-	acc, err := m.settings.GetAccountByAddress(address)
-	if err != nil {
-		return err
-	}
-
-	if acc.Chat {
-		return accounts.ErrCannotRemoveProfileAccount
-	}
-
-	if acc.Wallet {
-		return accounts.ErrCannotRemoveDefaultWalletAccount
-	}
-
-	err = m.deleteKeystoreFileForAddress(address)
-	if err != nil {
-		return err
-	}
-
 	clock, _ := m.getLastClockWithRelatedChat()
-
-	err = m.settings.RemoveAccount(address, clock)
+	acc, err := m.accountsManager.DeleteAccount(address, clock)
 	if err != nil {
 		return err
 	}
@@ -311,27 +330,12 @@ func (m *Messenger) DeleteAccount(address types.Address) error {
 		return err
 	}
 
-	return m.DeleteProfileShowcaseWalletAccount(acc)
+	return m.DeleteProfileShowcaseWalletAccount(accounts.AccountsManagerAccountToAccount(acc))
 }
 
 func (m *Messenger) DeleteKeypair(keyUID string) error {
-	kp, err := m.settings.GetKeypairByKeyUID(keyUID)
-	if err != nil {
-		return err
-	}
-
-	if kp.Type == accounts.KeypairTypeProfile {
-		return accounts.ErrCannotRemoveProfileKeypair
-	}
-
-	err = m.deleteKeystoreFilesForKeypair(kp)
-	if err != nil {
-		return err
-	}
-
 	clock, _ := m.getLastClockWithRelatedChat()
-
-	err = m.settings.RemoveKeypair(keyUID, clock)
+	kp, err := m.accountsManager.DeleteKeypair(keyUID, clock)
 	if err != nil {
 		return err
 	}

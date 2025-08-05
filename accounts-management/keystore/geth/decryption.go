@@ -18,6 +18,7 @@ import (
 
 	"github.com/status-im/extkeys"
 
+	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -160,7 +161,7 @@ func DecryptDataV3(cryptoJson CryptoJSON, auth string) ([]byte, error) {
 
 	calculatedMAC := crypto.Keccak256(derivedKey[16:32], cipherText)
 	if !bytes.Equal(calculatedMAC, mac) {
-		return nil, ErrDecrypt
+		return nil, keystore.ErrDecrypt
 	}
 
 	plainText, err := aesCTRXOR(derivedKey[:16], cipherText, iv)
@@ -215,7 +216,7 @@ func decryptKeyV1(keyProtected *encryptedKeyJSONV1, auth string) (keyBytes []byt
 
 	calculatedMAC := crypto.Keccak256(derivedKey[16:32], cipherText)
 	if !bytes.Equal(calculatedMAC, mac) {
-		return nil, nil, ErrDecrypt
+		return nil, nil, keystore.ErrDecrypt
 	}
 
 	plainText, err := aesCBCDecrypt(crypto.Keccak256(derivedKey[:16])[:16], cipherText, iv)
@@ -260,7 +261,7 @@ func decryptExtendedKey(keyProtected *EncryptedKeyJSONV3, auth string) (plainTex
 
 	calculatedMAC := crypto.Keccak256(derivedKey[16:32], cipherText)
 	if !bytes.Equal(calculatedMAC, mac) {
-		return nil, ErrDecrypt
+		return nil, keystore.ErrDecrypt
 	}
 
 	plainText, err = aesCTRXOR(derivedKey[:16], cipherText, iv)
@@ -330,7 +331,7 @@ func aesCBCDecrypt(key, cipherText, iv []byte) ([]byte, error) {
 	decrypter.CryptBlocks(paddedPlaintext, cipherText)
 	plaintext := pkcs7Unpad(paddedPlaintext)
 	if plaintext == nil {
-		return nil, ErrDecrypt
+		return nil, keystore.ErrDecrypt
 	}
 	return plaintext, err
 }

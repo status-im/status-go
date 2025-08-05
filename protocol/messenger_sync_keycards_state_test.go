@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
 )
 
 func TestMessengerSyncKeycardsStateSuite(t *testing.T) {
@@ -16,15 +18,24 @@ func TestMessengerSyncKeycardsStateSuite(t *testing.T) {
 
 type MessengerSyncKeycardsStateSuite struct {
 	MessengerBaseTestSuite
-	main  *Messenger // main instance of Messenger paired with `other`
-	other *Messenger
+	main                     *Messenger // main instance of Messenger paired with `other`
+	accountsManagerMock      *mock_protocol_accounts_manager.MockAccountsManager
+	other                    *Messenger
+	accountsManagerOtherMock *mock_protocol_accounts_manager.MockAccountsManager
 }
 
 func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	s.MessengerBaseTestSuite.SetupTest()
 
+	ctrl := gomock.NewController(s.T())
+
 	s.main = s.m
+	s.accountsManagerMock = mock_protocol_accounts_manager.NewMockAccountsManager(ctrl)
+	s.m.accountsManager = s.accountsManagerMock
+
 	s.other = s.anotherMessenger()
+	s.accountsManagerOtherMock = mock_protocol_accounts_manager.NewMockAccountsManager(ctrl)
+	s.other.accountsManager = s.accountsManagerOtherMock
 
 	// Pair devices (main and other)
 	imOther := &multidevice.InstallationMetadata{
@@ -49,9 +60,12 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	// Pre-condition - both sides have to know about keypairs migrated to a keycards
-	kp1 := accounts.GetProfileKeypairForTest(true, true, true)
-	kp2 := accounts.GetSeedImportedKeypair1ForTest()
-	kp3 := accounts.GetSeedImportedKeypair2ForTest()
+	kp1, _, _, err := accounts.GetProfileKeypairForTest(true, true, true)
+	s.Require().NoError(err)
+	kp2, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	s.Require().NoError(err)
+	kp3, _, _, err := accounts.GetSeedImportedKeypair2ForTest()
+	s.Require().NoError(err)
 	kp1.Clock = 1
 	kp2.Clock = 1
 	kp3.Clock = 1
@@ -113,6 +127,8 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNoKeycard
 	// Trigger's a sync between devices
 	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
 	s.Require().NoError(err)
+
+	s.accountsManagerOtherMock.EXPECT().DeleteKeystoreFilesForKeypair(gomock.Any()).Return(nil).AnyTimes()
 
 	// Wait for the response
 	_, err = WaitOnMessengerResponse(
@@ -233,6 +249,8 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverAndSenderHas
 	// Trigger's a sync between devices
 	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
 	s.Require().NoError(err)
+
+	s.accountsManagerOtherMock.EXPECT().DeleteKeystoreFilesForKeypair(gomock.Any()).Return(nil).AnyTimes()
 
 	// Wait for the response
 	_, err = WaitOnMessengerResponse(

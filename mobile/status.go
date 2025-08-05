@@ -35,7 +35,6 @@ import (
 	"github.com/status-im/status-go/logutils/requestlog"
 	m_requests "github.com/status-im/status-go/mobile/requests"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
@@ -567,7 +566,7 @@ func restoreAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	err = request.Validate()
+	err = request.Validate(request.Keycard != nil)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -589,55 +588,6 @@ func restoreAccountAndLogin(requestJSON string) string {
 		return statusBackend.SetupLogSettings()
 	})
 
-	return makeJSONResponse(nil)
-}
-
-// SaveAccountAndLogin saves account in status-go database.
-// Deprecated: Use CreateAccountAndLogin instead.
-func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subaccountData string) string {
-	var account multiaccounts.Account
-	err := json.Unmarshal([]byte(accountData), &account)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	var settings settings.Settings
-	err = json.Unmarshal([]byte(settingsJSON), &settings)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	if *settings.Mnemonic != "" {
-		settings.MnemonicWasNotShown = true
-	}
-
-	var conf params.NodeConfig
-	err = json.Unmarshal([]byte(configJSON), &conf)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	var subaccs []*accounts.Account
-	err = json.Unmarshal([]byte(subaccountData), &subaccs)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	keypair := &accounts.Keypair{
-		KeyUID: account.KeyUID,
-		Name:   settings.DisplayName,
-		Type:   accounts.KeypairTypeProfile,
-	}
-	keypair.Accounts = subaccs
-
-	api.RunAsync(func() error {
-		logutils.ZapLogger().Debug("starting a node, and saving account with configuration", zap.String("key-uid", account.KeyUID))
-		err := statusBackend.StartNodeWithAccountAndInitialConfig("", account, password, settings, &conf, keypair, nil)
-		if err != nil {
-			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
-			return err
-		}
-		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
-		return statusBackend.SetupLogSettings()
-	})
 	return makeJSONResponse(nil)
 }
 

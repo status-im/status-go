@@ -14,8 +14,8 @@ class AccountService(Service):
         response = self.rpc_request("getKeypairs")
         return response.json()
 
-    def add_account(self, account_data, skip_validation=False):
-        params = ["", account_data]
+    def add_account(self, password, account_data, skip_validation=False):
+        params = [password, account_data]
         response = self.rpc_request("addAccount", params, skip_validation=skip_validation)
         return response.json()
 
@@ -29,7 +29,12 @@ class AccountService(Service):
         response = self.rpc_request("importMnemonic", params)
         return response.json()
 
-    def add_keypair(self, password, keypair):
-        params = [password, keypair]
-        response = self.rpc_request("addKeypair", params)
+    def add_keypair_via_seed_phrase(self, mnemonic, password, name, wallet_account):
+        params = [mnemonic, password, name, wallet_account]
+        response = self.rpc_request("addKeypairViaSeedPhrase", params)
+        return response.json()
+
+    def add_keypair_via_private_key(self, private_key, password, name, wallet_account):
+        params = [private_key, password, name, wallet_account]
+        response = self.rpc_request("addKeypairViaPrivateKey", params)
         return response.json()

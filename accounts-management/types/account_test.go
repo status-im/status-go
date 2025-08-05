@@ -38,7 +38,7 @@ func TestAddressToAccount(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Equal(t, ErrInvalidAddress, err)
-				assert.Equal(t, Account{}, account)
+				assert.Equal(t, KeystoreAccount{}, account)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, types.HexToAddress(tt.address), account.Address)

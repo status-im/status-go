@@ -264,7 +264,7 @@ func (db *Database) deleteKeycardAccounts(tx *sql.Tx, kcUID string, accountAddre
 
 	inVector := strings.Repeat(",?", len(accountAddresses)-1)
 	//nolint: gosec
-	query := ` 
+	query := `
 		DELETE
 		FROM
 			keycards_accounts

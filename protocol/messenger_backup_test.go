@@ -114,11 +114,12 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	// Create bob1
 	bob1 := s.m
 
-	bobProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	bobProfileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	bobProfileKp.KeyUID = bob1.account.KeyUID
 	bobProfileKp.Accounts[0].KeyUID = bob1.account.KeyUID
 
-	err := bob1.settings.SaveOrUpdateKeypair(bobProfileKp)
+	err = bob1.settings.SaveOrUpdateKeypair(bobProfileKp)
 	s.Require().NoError(err)
 
 	err = bob1.SetDisplayName(bob1DisplayName)
@@ -860,11 +861,13 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	// Create bob1
 	bob1 := s.m
-	profileKp := accounts.GetProfileKeypairForTest(true, true, true)
-	seedKp := accounts.GetSeedImportedKeypair1ForTest()
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, true, true)
+	s.Require().NoError(err)
+	seedKp, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	s.Require().NoError(err)
 
 	// Create a main account on bob1
-	err := bob1.settings.SaveOrUpdateKeypair(profileKp)
+	err = bob1.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err, "profile keypair bob1")
 	err = bob1.settings.SaveOrUpdateKeypair(seedKp)
 	s.Require().NoError(err, "seed keypair bob1")
@@ -949,21 +952,24 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	// Create bob1
 	bob1 := s.m
 
-	kp1 := accounts.GetProfileKeypairForTest(true, true, true)
+	kp1, _, _, err := accounts.GetProfileKeypairForTest(true, true, true)
+	s.Require().NoError(err)
 	keycard1 := accounts.GetProfileKeycardForTest()
 
-	kp2 := accounts.GetSeedImportedKeypair1ForTest()
+	kp2, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	s.Require().NoError(err)
 	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
 
 	keycard2Copy := accounts.GetKeycardForSeedImportedKeypair1ForTest()
 	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
 	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
 
-	kp3 := accounts.GetSeedImportedKeypair2ForTest()
+	kp3, _, _, err := accounts.GetSeedImportedKeypair2ForTest()
+	s.Require().NoError(err)
 	keycard3 := accounts.GetKeycardForSeedImportedKeypair2ForTest()
 
 	// Pre-condition
-	err := bob1.settings.SaveOrUpdateKeypair(kp1)
+	err = bob1.settings.SaveOrUpdateKeypair(kp1)
 	s.Require().NoError(err)
 	err = bob1.settings.SaveOrUpdateKeypair(kp2)
 	s.Require().NoError(err)
