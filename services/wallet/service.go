@@ -537,7 +537,8 @@ func (s *Service) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*ac
 
 	if dbAccount != nil {
 		if message.Clock <= dbAccount.Clock {
-			return nil, ErrTryingToStoreOldWalletAccount
+			// ignore this old message
+			return nil, nil
 		}
 
 		if message.Removed {
