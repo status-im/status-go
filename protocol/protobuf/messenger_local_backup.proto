@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+import "pairing.proto";
+
+option go_package = "./;protobuf";
+package protobuf;
+
+
+message MessengerLocalBackup {
+  uint64 clock = 1;
+
+  repeated SyncInstallationContactV2 contacts = 2;
+  repeated SyncInstallationCommunity communities = 3;
+  repeated SyncChat chats = 4;
+  BackedUpProfile profile = 5;
+}

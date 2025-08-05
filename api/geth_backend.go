@@ -838,6 +838,11 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		}
 	}
 
+	if err = b.statusNode.StartLocalBackup(); err != nil {
+		b.logger.Error("failed to start local backup", zap.Error(err))
+		// we don't return the error to avoid login failure
+	}
+
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
 	if err != nil {
 		b.logger.Error("failed to update account")
@@ -955,6 +960,11 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		if err != nil {
 			return err
 		}
+	}
+
+	if err = b.statusNode.StartLocalBackup(); err != nil {
+		b.logger.Error("failed to start local backup", zap.Error(err))
+		// we don't return the error to avoid login failure
 	}
 
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
