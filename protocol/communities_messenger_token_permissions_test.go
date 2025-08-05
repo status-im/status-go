@@ -1017,17 +1017,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPerm
 			if channel == nil || len(channel.Members) != 0 {
 				return false
 			}
-			return c.IsMemberLikelyInChat(chat.CommunityChatID())
+			return c.IsMemberInChat(s.bob.IdentityPublicKey(), chat.CommunityChatID()) &&
+				c.IsMemberLikelyInChat(chat.CommunityChatID())
 		},
 		"no community that satisfies criteria",
 	)
 
 	s.Require().NoError(err)
-
-	// bob should be in the bloom filter list
-	community, err = s.bob.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.Require().True(community.IsMemberLikelyInChat(chat.CommunityChatID()))
 
 	// bob can't post
 	msg := &common.Message{
@@ -1881,7 +1877,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 
 	waitOnChannelKeyToBeDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
 		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
-		if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
+		if !ok || action.ActionType != communities.EncryptionKeyAdd {
 			return false
 		}
 
@@ -1893,7 +1889,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	s.Require().NoError(err)
 
 	// bob receives community changes
-	// channel members should not be empty,
+	// channel members should be empty,
 	// this info is available only to channel members with encryption key
 	_, err = WaitOnMessengerResponse(
 		s.bob,
@@ -2165,7 +2161,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		if !ok || action.ActionType != communities.EncryptionKeyAdd {
 			return false
 		}
-		return true
+		_, ok = action.Members[common.PubkeyToHex(&s.owner.identity.PublicKey)]
+		return ok
 	})
 
 	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {

@@ -86,11 +86,17 @@ func evaluateChannelLevelEncryptionKeyActions(origin, modified *Community, chang
 			membersRemoved = chatChanges.MembersRemoved
 		}
 
+		// Channel with 0 members is considered open
+		allMembers := modified.config.CommunityDescription.Chats[channelID].Members
+		if len(allMembers) == 0 {
+			allMembers = modified.config.CommunityDescription.Members
+		}
+
 		result[channelID] = *evaluateEncryptionKeyAction(
 			origin.ChannelEncrypted(channelID),
 			modified.ChannelEncrypted(channelID),
 			changes.ControlNodeChanged != nil,
-			modified.config.CommunityDescription.Chats[channelID].Members,
+			allMembers,
 			membersAdded,
 			membersRemoved,
 		)

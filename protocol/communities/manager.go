@@ -1318,7 +1318,7 @@ func (m *Manager) reevaluateMemberChannelsPermissions(community *Community, memb
 	for channelID := range community.Chats() {
 		channelPermissionsCheckResult, hasChannelPermission := channelPermissionsCheckResult[community.ChatID(channelID)]
 
-		// ensure member is added if channel has no permissions
+		// Permissionless channels are public - no need to check permissions
 		if !hasChannelPermission {
 			continue
 		}
