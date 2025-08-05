@@ -520,7 +520,7 @@ func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource comm
 	}
 }
 
-func createCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource) *Chat {
+func createCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource, populateMembers bool) *Chat {
 	color := orgChat.Identity.Color
 	if color == "" {
 		color = chatColors[rand.Intn(len(chatColors))] // nolint: gosec
@@ -530,12 +530,15 @@ func createCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 
 	// Populate community _channel_ members to _chat_ members
 	chatMembers := []ChatMember{}
-	for pubKey := range orgChat.Members {
-		chatMember := ChatMember{
-			ID:    pubKey,
-			Admin: false,
+	if populateMembers {
+		// Populate chat members from orgChat members
+		for pubKey := range orgChat.Members {
+			chatMember := ChatMember{
+				ID:    pubKey,
+				Admin: false,
+			}
+			chatMembers = append(chatMembers, chatMember)
 		}
-		chatMembers = append(chatMembers, chatMember)
 	}
 
 	return &Chat{
@@ -560,11 +563,9 @@ func createCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 
 func CreateCommunityChat(org *communities.Community, orgChat *protobuf.CommunityChat, chatID string, timesource common.TimeSource) *Chat {
 	orgID := org.IDString()
-	chat := createCommunityChat(orgID, chatID, orgChat, timesource)
-	// No need for members in public channels
-	if !org.ChannelEncrypted(chatID) {
-		chat.Members = []ChatMember{}
-	}
+	populateMembers := org.ChannelEncrypted(chatID)
+	chat := createCommunityChat(orgID, chatID, orgChat, timesource, populateMembers)
+
 	return chat
 }
 
