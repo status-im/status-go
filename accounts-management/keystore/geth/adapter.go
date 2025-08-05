@@ -7,7 +7,9 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/accounts"
+	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
@@ -17,7 +19,7 @@ type Adapter struct {
 	keystoreDir string
 	scryptN     int
 	scryptP     int
-	keystore    *keystore.KeyStore
+	keystore    *gethkeystore.KeyStore
 }
 
 func NewGethKeystoreAdapter(keystoreDir string, scryptN int, scryptP int) (*Adapter, error) {
@@ -36,7 +38,7 @@ func NewGethKeystoreAdapter(keystoreDir string, scryptN int, scryptP int) (*Adap
 		return nil, err
 	}
 
-	ks := keystore.NewKeyStore(keydir, scryptN, scryptP)
+	ks := gethkeystore.NewKeyStore(keydir, scryptN, scryptP)
 
 	return &Adapter{
 		keystoreDir: keydir,
@@ -46,82 +48,134 @@ func NewGethKeystoreAdapter(keystoreDir string, scryptN int, scryptP int) (*Adap
 	}, nil
 }
 
+func mapToKeystoreError(err error) error {
+	if errors.Is(err, gethkeystore.ErrNoMatch) {
+		return keystore.ErrNoMatch
+	}
+	if errors.Is(err, gethkeystore.ErrDecrypt) {
+		return keystore.ErrDecrypt
+	}
+	return err
+}
+
 // ImportECDSA imports an ECDSA private key
-func (a *Adapter) ImportECDSA(priv *ecdsa.PrivateKey, passphrase string) (types.Account, error) {
-	gethAccount, err := a.keystore.ImportECDSA(priv, passphrase)
-	return accountFrom(gethAccount), err
+func (a *Adapter) ImportECDSA(priv *ecdsa.PrivateKey, passphrase string) (account types.KeystoreAccount, err error) {
+	defer func() {
+		err = mapToKeystoreError(err)
+	}()
+
+	var gethAccount accounts.Account
+	gethAccount, err = a.keystore.ImportECDSA(priv, passphrase)
+	if err != nil {
+		return
+	}
+
+	account = keystoreAccountFrom(gethAccount)
+	return
 }
 
 // ImportSingleExtendedKey imports an extended key by converting it to ECDSA private key
-func (a *Adapter) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphrase string) (types.Account, error) {
+func (a *Adapter) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphrase string) (account types.KeystoreAccount, err error) {
+	defer func() {
+		err = mapToKeystoreError(err)
+	}()
+
 	privateKey := extKey.ToECDSA()
 	address := crypto.PubkeyToAddress(privateKey.PublicKey)
-	account, err := a.Find(address)
+	account, err = a.Find(address)
 	if err == nil {
-		return account, nil
+		return
 	}
 
-	return a.updateKeystoreFile(privateKey, extKey, a.scryptN, a.scryptP, passphrase)
+	account, err = a.updateKeystoreFile(privateKey, extKey, a.scryptN, a.scryptP, passphrase)
+	return
 }
 
 // AccountDecryptedKey gets the decrypted key for an account using standard go-ethereum functions
-func (a *Adapter) AccountDecryptedKey(address ethtypes.Address, passphrase string) (types.Account, *ecdsa.PrivateKey, *extkeys.ExtendedKey, error) {
-	gethAccount, err := a.find(address)
+func (a *Adapter) AccountDecryptedKey(address ethtypes.Address, passphrase string) (account types.KeystoreAccount, privateKey *ecdsa.PrivateKey, extendedKey *extkeys.ExtendedKey, err error) {
+	defer func() {
+		err = mapToKeystoreError(err)
+	}()
+
+	var gethAccount accounts.Account
+	gethAccount, err = a.find(address)
 	if err != nil {
-		return types.Account{}, nil, nil, err
+		return
 	}
 
 	ethKey, err := readKeystoreFileAndDecryptedKey(gethAccount.URL.Path, passphrase)
 	if err != nil {
-		return types.Account{}, nil, nil, err
+		return
 	}
 
-	return accountFrom(gethAccount), ethKey.PrivateKey, ethKey.ExtendedKey, nil
+	account = keystoreAccountFrom(gethAccount)
+	privateKey = ethKey.PrivateKey
+	extendedKey = ethKey.ExtendedKey
+	return
 }
 
-func (a *Adapter) Delete(address ethtypes.Address) error {
-	gethAccount, err := a.find(address)
+func (a *Adapter) Delete(address ethtypes.Address) (err error) {
+	defer func() {
+		err = mapToKeystoreError(err)
+	}()
+
+	var gethAccount accounts.Account
+	gethAccount, err = a.find(address)
 	if err != nil {
-		return err
+		return
 	}
 
 	// TODO: think about how to use `Delete` method from `keystore` package, not from our fork
 	// this is the only that depends on our fork for the account management part of the app.
-	return a.keystore.Delete(gethAccount)
+	err = a.keystore.Delete(gethAccount)
+	return
 }
 
-func (a *Adapter) Accounts() []types.Account {
+func (a *Adapter) Accounts() []types.KeystoreAccount {
 	gethAccounts := a.keystore.Accounts()
-	accounts := make([]types.Account, len(gethAccounts))
+	accounts := make([]types.KeystoreAccount, len(gethAccounts))
 	for i, acc := range gethAccounts {
-		accounts[i] = accountFrom(acc)
+		accounts[i] = keystoreAccountFrom(acc)
 	}
 	return accounts
 }
 
-func (a *Adapter) Find(address ethtypes.Address) (types.Account, error) {
-	gethAccount, err := a.find(address)
+func (a *Adapter) Find(address ethtypes.Address) (account types.KeystoreAccount, err error) {
+	defer func() {
+		err = mapToKeystoreError(err)
+	}()
+
+	var gethAccount accounts.Account
+	gethAccount, err = a.find(address)
 	if err != nil {
-		if errors.Is(err, keystore.ErrNoMatch) {
-			return types.Account{}, ErrNoMatch
-		}
-		return types.Account{}, err
+		return
 	}
-	return accountFrom(gethAccount), nil
+
+	account = keystoreAccountFrom(gethAccount)
+	return
 }
 
-func (a *Adapter) ReEncryptKeyStoreDir(oldPass, newPass string) error {
-	return reEncryptKeyStoreDir(a.keystoreDir, oldPass, newPass)
+func (a *Adapter) ReEncryptKeyStoreDir(oldPass, newPass string) (err error) {
+	defer func() {
+		err = mapToKeystoreError(err)
+	}()
+
+	err = reEncryptKeyStoreDir(a.keystoreDir, oldPass, newPass)
+	return
 }
 
-func (a *Adapter) MigrateKeyStoreDir(newDir string) error {
+func (a *Adapter) MigrateKeyStoreDir(newDir string) (err error) {
+	defer func() {
+		err = mapToKeystoreError(err)
+	}()
+
 	addresses := a.Accounts()
 	addressesStr := make([]string, len(addresses))
 	for i, address := range addresses {
 		addressesStr[i] = address.Address.Hex()
 	}
 
-	err := migrateKeyStoreDir(a.keystoreDir, newDir, addressesStr)
+	err = migrateKeyStoreDir(a.keystoreDir, newDir, addressesStr)
 	if err != nil {
 		return err
 	}

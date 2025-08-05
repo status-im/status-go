@@ -85,12 +85,13 @@ func (s *MessengerCommunitiesSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesSuite) setMessengerDisplayName(m *Messenger, name string) {
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = m.account.KeyUID
 	profileKp.Name = DefaultProfileDisplayName
 	profileKp.Accounts[0].KeyUID = m.account.KeyUID
 
-	err := m.settings.SaveOrUpdateKeypair(profileKp)
+	err = m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
 	err = m.SetDisplayName(name)
@@ -491,11 +492,12 @@ func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.
 
 func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	// add bob's profile keypair
-	bobProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	bobProfileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	bobProfileKp.KeyUID = s.bob.account.KeyUID
 	bobProfileKp.Accounts[0].KeyUID = s.bob.account.KeyUID
 
-	err := s.bob.settings.SaveOrUpdateKeypair(bobProfileKp)
+	err = s.bob.settings.SaveOrUpdateKeypair(bobProfileKp)
 	s.Require().NoError(err)
 
 	// create community and make bob and alice join to it

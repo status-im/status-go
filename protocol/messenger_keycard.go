@@ -46,7 +46,7 @@ func (m *Messenger) dispatchKeycardActivity(keyUID string, keycardUID string, ne
 // Keycard position is fully maintained by the backend.
 // If keycard is already stored, this function updates `KeycardName` and adds accounts which are not already added, in this case
 // `KeycardLocked` and `Position` remains as they were, they won't be changed.
-func (m *Messenger) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.Keycard) (err error) {
+func (m *Messenger) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.Keycard, removeKeystoreFiles bool) (err error) {
 	dbKeycard, err := m.settings.GetKeycardByKeycardUID(keycard.KeycardUID)
 	if err != nil && err != accounts.ErrNoKeycardForPassedKeycardUID {
 		return err
@@ -65,7 +65,7 @@ func (m *Messenger) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.K
 	}
 
 	return m.dispatchKeycardActivity(keycard.KeyUID, "", "", []types.Address{}, func(clock uint64) error {
-		return m.settings.SaveOrUpdateKeycard(*keycard, clock, true)
+		return m.accountsManager.SaveOrUpdateKeycard(accounts.KeycardToAccountsManagerKeycard(keycard), clock, removeKeystoreFiles)
 	})
 }
 
@@ -109,4 +109,15 @@ func (m *Messenger) UpdateKeycardUID(ctx context.Context, oldKeycardUID string, 
 	return m.dispatchKeycardActivity("", oldKeycardUID, newKeycardUID, []types.Address{}, func(clock uint64) error {
 		return m.settings.UpdateKeycardUID(oldKeycardUID, newKeycardUID, clock)
 	})
+}
+
+func (m *Messenger) MigrateNonProfileKeycardKeypairToApp(ctx context.Context, mnemonic string, password string) error {
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	keyUID, err := m.accountsManager.MigrateNonProfileKeycardKeypairToApp(mnemonic, password, clock)
+	if err != nil {
+		return err
+	}
+
+	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
 }

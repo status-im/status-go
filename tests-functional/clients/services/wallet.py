@@ -12,3 +12,7 @@ class WalletService(Service):
 
     def start_wallet(self):
         return self.rpc_request("startWallet")
+
+    def get_derived_addresses_for_mnemonic(self, mnemonic: str, paths: list):
+        params = [mnemonic, paths]
+        return self.rpc_request("getDerivedAddressesForMnemonic", params)

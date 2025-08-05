@@ -1863,6 +1863,10 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage messagingtyp
 			return rawMessage, err
 		}
 
+		if publicKey.Curve != m.identity.PublicKey.Curve {
+			return rawMessage, errors.New("public key curve does not match")
+		}
+
 		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
 		//message for sending to paired devices later
 		specCopyForPairedDevices := rawMessage

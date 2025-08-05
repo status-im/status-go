@@ -540,11 +540,12 @@ func (s *MessengerLinkPreviewsTestSuite) setProfileParameters(messenger *Messeng
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
 
-	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
 	// Set initial profile parameters

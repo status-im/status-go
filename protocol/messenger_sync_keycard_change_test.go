@@ -5,9 +5,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
+	"github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
 )
 
 func TestMessengerSyncKeycardChangeSuite(t *testing.T) {
@@ -16,8 +19,10 @@ func TestMessengerSyncKeycardChangeSuite(t *testing.T) {
 
 type MessengerSyncKeycardChangeSuite struct {
 	MessengerBaseTestSuite
-	main  *Messenger
-	other *Messenger
+	main                     *Messenger
+	accountsManagerMock      *mock_protocol_accounts_manager.MockAccountsManager
+	other                    *Messenger
+	accountsManagerOtherMock *mock_protocol_accounts_manager.MockAccountsManager
 }
 
 func (s *MessengerSyncKeycardChangeSuite) SetupTest() {
@@ -25,6 +30,13 @@ func (s *MessengerSyncKeycardChangeSuite) SetupTest() {
 
 	s.main = s.m
 	s.other = s.anotherMessenger()
+
+	ctrl := gomock.NewController(s.T())
+	s.accountsManagerMock = mock_protocol_accounts_manager.NewMockAccountsManager(ctrl)
+	s.m.accountsManager = s.accountsManagerMock
+
+	s.accountsManagerOtherMock = mock_protocol_accounts_manager.NewMockAccountsManager(ctrl)
+	s.other.accountsManager = s.accountsManagerOtherMock
 
 	// Pair devices (main and other)
 	imOther := &multidevice.InstallationMetadata{
@@ -49,9 +61,12 @@ func (s *MessengerSyncKeycardChangeSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	// Pre-condition - both sides have to know about keypairs migrated to a keycards
-	kp1 := accounts.GetProfileKeypairForTest(true, true, true)
-	kp2 := accounts.GetSeedImportedKeypair1ForTest()
-	// kp3 := accounts.GetSeedImportedKeypair2ForTest()
+	kp1, _, _, err := accounts.GetProfileKeypairForTest(true, true, true)
+	s.Require().NoError(err)
+	kp2, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	s.Require().NoError(err)
+	// kp3, _, _, err := accounts.GetSeedImportedKeypair2ForTest()
+	// s.Require().NoError(err)
 	kp1.Clock = 1
 	kp2.Clock = 1
 	// kp3.Clock = 1
@@ -94,10 +109,22 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingNewKeycards() {
 
 	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
 
-	err := s.main.SaveOrUpdateKeycard(context.Background(), keycard1)
+	s.accountsManagerMock.EXPECT().SaveOrUpdateKeycard(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(keycard *types.Keycard, clock uint64, removeKeystoreFiles bool) error {
+			kc := accounts.AccountsManagerKeycardToKeycard(keycard)
+			err := s.m.settings.SaveOrUpdateKeycard(*kc, clock, removeKeystoreFiles)
+			if err != nil {
+				return err
+			}
+			return nil
+		}).Times(2)
+
+	err := s.main.SaveOrUpdateKeycard(context.Background(), keycard1, false)
 	s.Require().NoError(err)
-	err = s.main.SaveOrUpdateKeycard(context.Background(), keycard2)
+	err = s.main.SaveOrUpdateKeycard(context.Background(), keycard2, false)
 	s.Require().NoError(err)
+
+	s.accountsManagerOtherMock.EXPECT().DeleteKeystoreFilesForKeypair(gomock.Any()).Return(nil).Times(2)
 
 	// Wait for the response
 	_, err = WaitOnMessengerResponse(
@@ -138,9 +165,21 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingAccountsToKeycard() {
 	err = dbOnReceiver.SaveOrUpdateKeycard(*keycard1, 0, false)
 	s.Require().NoError(err)
 
+	s.accountsManagerMock.EXPECT().SaveOrUpdateKeycard(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(keycard *types.Keycard, clock uint64, removeKeystoreFiles bool) error {
+			kc := accounts.AccountsManagerKeycardToKeycard(keycard)
+			err := s.m.settings.SaveOrUpdateKeycard(*kc, clock, removeKeystoreFiles)
+			if err != nil {
+				return err
+			}
+			return nil
+		}).Times(1)
+
 	// Add additional accounts to sender
-	err = s.main.SaveOrUpdateKeycard(context.Background(), keycard2)
+	err = s.main.SaveOrUpdateKeycard(context.Background(), keycard2, false)
 	s.Require().NoError(err)
+
+	s.accountsManagerOtherMock.EXPECT().DeleteKeystoreFilesForKeypair(gomock.Any()).Return(nil).Times(1)
 
 	// Wait for the response
 	_, err = WaitOnMessengerResponse(

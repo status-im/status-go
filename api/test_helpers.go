@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/common"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -64,6 +65,10 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 	data.chatPrivateKey = derivedAccs[accscommon.PathEIP1581Chat].PrivateKeyHex()
 
 	for path, acc := range derivedAccs {
+		if path != accscommon.PathEIP1581Chat && path != accscommon.PathDefaultWalletAccount {
+			continue
+		}
+
 		data.profileKeypair.Accounts = append(data.profileKeypair.Accounts, &accounts.Account{
 			Address:   acc.Address(),
 			KeyUID:    genMasterAcc.KeyUID(),
@@ -157,11 +162,13 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 		err = data.backend.ensureDBsOpened(*data.multiAcc, password)
 		require.NoError(t, err)
 
-		err = data.backend.saveKeypairAndSettings(data.settings, data.config, data.profileKeypair)
+		keypair, err := data.backend.AccountsManager().CreateKeypairFromMnemonicAndStore(data.mnemonic, password, "Test Keypair",
+			&accsmanagementtypes.AccountCreationDetails{
+				Path: accscommon.PathDefaultWalletAccount,
+			}, true, 0)
 		require.NoError(t, err)
 
-		_, _, err = data.backend.StoreAccount(data.mnemonic, password, accountsPaths, true)
-		require.NoError(t, err)
+		data.profileKeypair = accounts.AccountsManagerKeypairToKeypair(keypair)
 	}
 
 	return

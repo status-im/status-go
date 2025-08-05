@@ -264,7 +264,8 @@ func TestUpdateKeypairName(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	kp := GetProfileKeypairForTest(true, false, false)
+	kp, _, _, err := GetProfileKeypairForTest(true, false, false)
+	require.NoError(t, err)
 
 	// check the db
 	dbAccounts, err := db.GetActiveAccounts()
@@ -293,10 +294,18 @@ func TestUpdateKeypairName(t *testing.T) {
 }
 
 func TestKeypairs(t *testing.T) {
+	profileKp, _, _, err := GetProfileKeypairForTest(true, true, true)
+	require.NoError(t, err)
+	seedKp, _, _, err := GetSeedImportedKeypair1ForTest()
+	require.NoError(t, err)
+	privKeyKp := GetPrivKeyImportedKeypairForTest()
+	require.NoError(t, err)
+	// in this context (when testing db functions) there is not limitations for private key imported keypair
+	require.NoError(t, err)
 	keypairs := []*Keypair{
-		GetProfileKeypairForTest(true, true, true),
-		GetSeedImportedKeypair1ForTest(),
-		GetPrivKeyImportedKeypairForTest(), // in this context (when testing db functions) there is not limitations for private key imported keypair
+		profileKp,
+		seedKp,
+		privKeyKp,
 	}
 
 	for _, kp := range keypairs {
@@ -462,7 +471,8 @@ func TestKeypairs(t *testing.T) {
 }
 
 func TestResolvingSuggestedDerivationPath(t *testing.T) {
-	kp := GetProfileKeypairForTest(true, true, true)
+	kp, _, _, err := GetProfileKeypairForTest(true, true, true)
+	require.NoError(t, err)
 	totalNumOfAccounts := len(kp.Accounts)
 
 	db, stop := setupTestDB(t)

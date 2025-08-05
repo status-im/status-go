@@ -16,9 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -32,19 +30,11 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+
+	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
+
+	"go.uber.org/mock/gomock"
 )
-
-type AccountsManagerMock struct {
-	AccountsMap map[string]string
-}
-
-func (m *AccountsManagerMock) GetVerifiedWalletAccount(address ethtypes.Address, password string) (*generator.Account, error) {
-	return generator.NewAccount(nil, nil), nil
-}
-
-func (m *AccountsManagerMock) DeleteAccount(address types.Address) error {
-	return nil
-}
 
 type TokenManagerMock struct {
 	Balances *communities.BalancesByChain
@@ -313,11 +303,10 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 	err := config.complete()
 	s.Require().NoError(err)
 
-	accountsManagerMock := &AccountsManagerMock{}
-	accountsManagerMock.AccountsMap = make(map[string]string)
-	for _, walletAddress := range config.walletAddresses {
-		accountsManagerMock.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(config.password)))
-	}
+	ctrl := gomock.NewController(s.T())
+	accountsManagerMock := mock_protocol_accounts_manager.NewMockAccountsManager(ctrl)
+	accountsManagerMock.EXPECT().GetVerifiedWalletAccount(gomock.Any(), gomock.Any()).
+		Return(generator.NewAccount(nil, nil), nil).AnyTimes()
 
 	tokenManagerMock := &TokenManagerMock{
 		Balances: config.mockedBalances,
@@ -346,9 +335,10 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 
 	// add wallet account with keypair
 	for _, walletAddress := range config.walletAddresses {
-		kp := accounts.GetProfileKeypairForTest(false, true, false)
+		kp, _, _, err := accounts.GetProfileKeypairForTest(false, true, false)
+		s.Require().NoError(err)
 		kp.Accounts[0].Address = types.HexToAddress(walletAddress)
-		err := messenger.settings.SaveOrUpdateKeypair(kp)
+		err = messenger.settings.SaveOrUpdateKeypair(kp)
 		s.Require().NoError(err)
 	}
 

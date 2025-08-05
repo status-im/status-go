@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
-	"github.com/status-im/status-go/accounts-management/keystore/geth"
+	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
@@ -22,7 +22,7 @@ const (
 var errToCodeMap = map[error]int{
 	accsmanagement.ErrNoAccountSelected: codeErrNoAccountSelected,
 	wallettypes.ErrInvalidTxSender:      codeErrInvalidTxSender,
-	geth.ErrDecrypt:                     codeErrDecrypt,
+	keystore.ErrDecrypt:                 codeErrDecrypt,
 }
 
 type jsonrpcSuccessfulResponse struct {

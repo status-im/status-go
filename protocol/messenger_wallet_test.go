@@ -19,8 +19,10 @@ type WalletSuite struct {
 }
 
 func (s *WalletSuite) TestRemainingCapacity() {
-	profileKeypair := accounts.GetProfileKeypairForTest(true, true, true)
-	seedImportedKeypair := accounts.GetSeedImportedKeypair1ForTest()
+	profileKeypair, _, _, err := accounts.GetProfileKeypairForTest(true, true, true)
+	s.Require().NoError(err)
+	seedImportedKeypair, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	s.Require().NoError(err)
 	woAccounts := accounts.GetWatchOnlyAccountsForTest()
 
 	// Empty DB
@@ -37,7 +39,7 @@ func (s *WalletSuite) TestRemainingCapacity() {
 	s.Require().Equal(constants.MaxNumberOfWatchOnlyAccounts, capacity)
 
 	// profile keypair with chat account, default wallet account and 2 more derived accounts added
-	err = s.m.SaveOrUpdateKeypair(profileKeypair)
+	err = s.m.settings.SaveOrUpdateKeypair(profileKeypair)
 	s.Require().NoError(err)
 
 	capacity, err = s.m.RemainingAccountCapacity()
@@ -53,7 +55,7 @@ func (s *WalletSuite) TestRemainingCapacity() {
 	s.Require().Equal(constants.MaxNumberOfWatchOnlyAccounts, capacity)
 
 	// seed keypair with 2 derived accounts added
-	err = s.m.SaveOrUpdateKeypair(seedImportedKeypair)
+	err = s.m.settings.SaveOrUpdateKeypair(seedImportedKeypair)
 	s.Require().NoError(err)
 
 	capacity, err = s.m.RemainingAccountCapacity()
@@ -69,7 +71,7 @@ func (s *WalletSuite) TestRemainingCapacity() {
 	s.Require().Equal(constants.MaxNumberOfWatchOnlyAccounts, capacity)
 
 	// 1 Watch only accounts added
-	err = s.m.SaveOrUpdateAccount(woAccounts[0])
+	err = s.m.settings.SaveOrUpdateAccounts(woAccounts[:1], false)
 	s.Require().NoError(err)
 
 	capacity, err = s.m.RemainingAccountCapacity()
@@ -85,34 +87,37 @@ func (s *WalletSuite) TestRemainingCapacity() {
 	s.Require().Equal(constants.MaxNumberOfWatchOnlyAccounts-1, capacity)
 
 	// try to add 3 more keypairs
-	seedImportedKeypair2 := accounts.GetSeedImportedKeypair2ForTest()
+	seedImportedKeypair2, _, _, err := accounts.GetSeedImportedKeypair2ForTest()
+	s.Require().NoError(err)
 	seedImportedKeypair2.KeyUID = "0000000000000000000000000000000000000000000000000000000000000091"
 	seedImportedKeypair2.Accounts[0].Address = types.Address{0x91}
 	seedImportedKeypair2.Accounts[0].KeyUID = seedImportedKeypair2.KeyUID
 	seedImportedKeypair2.Accounts[1].Address = types.Address{0x92}
 	seedImportedKeypair2.Accounts[1].KeyUID = seedImportedKeypair2.KeyUID
 
-	err = s.m.SaveOrUpdateKeypair(seedImportedKeypair2)
+	err = s.m.settings.SaveOrUpdateKeypair(seedImportedKeypair2)
 	s.Require().NoError(err)
 
-	seedImportedKeypair3 := accounts.GetSeedImportedKeypair2ForTest()
+	seedImportedKeypair3, _, _, err := accounts.GetSeedImportedKeypair2ForTest()
+	s.Require().NoError(err)
 	seedImportedKeypair3.KeyUID = "0000000000000000000000000000000000000000000000000000000000000093"
 	seedImportedKeypair3.Accounts[0].Address = types.Address{0x93}
 	seedImportedKeypair3.Accounts[0].KeyUID = seedImportedKeypair3.KeyUID
 	seedImportedKeypair3.Accounts[1].Address = types.Address{0x94}
 	seedImportedKeypair3.Accounts[1].KeyUID = seedImportedKeypair3.KeyUID
 
-	err = s.m.SaveOrUpdateKeypair(seedImportedKeypair3)
+	err = s.m.settings.SaveOrUpdateKeypair(seedImportedKeypair3)
 	s.Require().NoError(err)
 
-	seedImportedKeypair4 := accounts.GetSeedImportedKeypair2ForTest()
+	seedImportedKeypair4, _, _, err := accounts.GetSeedImportedKeypair2ForTest()
+	s.Require().NoError(err)
 	seedImportedKeypair4.KeyUID = "0000000000000000000000000000000000000000000000000000000000000095"
 	seedImportedKeypair4.Accounts[0].Address = types.Address{0x95}
 	seedImportedKeypair4.Accounts[0].KeyUID = seedImportedKeypair4.KeyUID
 	seedImportedKeypair4.Accounts[1].Address = types.Address{0x96}
 	seedImportedKeypair4.Accounts[1].KeyUID = seedImportedKeypair4.KeyUID
 
-	err = s.m.SaveOrUpdateKeypair(seedImportedKeypair4)
+	err = s.m.settings.SaveOrUpdateKeypair(seedImportedKeypair4)
 	s.Require().NoError(err)
 
 	// check the capacity after adding 3 more keypairs
@@ -130,9 +135,9 @@ func (s *WalletSuite) TestRemainingCapacity() {
 	s.Require().Equal(constants.MaxNumberOfWatchOnlyAccounts-1, capacity)
 
 	// add 2 more watch only accounts
-	err = s.m.SaveOrUpdateAccount(woAccounts[1])
+	err = s.m.settings.SaveOrUpdateAccounts(woAccounts[1:2], false)
 	s.Require().NoError(err)
-	err = s.m.SaveOrUpdateAccount(woAccounts[2])
+	err = s.m.settings.SaveOrUpdateAccounts(woAccounts[2:3], false)
 	s.Require().NoError(err)
 
 	// check the capacity after adding 8 more watch only accounts
@@ -152,27 +157,27 @@ func (s *WalletSuite) TestRemainingCapacity() {
 
 	// add 6 accounts more
 	seedImportedKeypair4.Accounts[0].Address = types.Address{0x81}
-	err = s.m.SaveOrUpdateAccount(seedImportedKeypair4.Accounts[0])
+	err = s.m.settings.SaveOrUpdateAccounts(seedImportedKeypair4.Accounts[:1], false)
 	s.Require().NoError(err)
 
 	seedImportedKeypair4.Accounts[0].Address = types.Address{0x82}
-	err = s.m.SaveOrUpdateAccount(seedImportedKeypair4.Accounts[0])
+	err = s.m.settings.SaveOrUpdateAccounts(seedImportedKeypair4.Accounts[:1], false)
 	s.Require().NoError(err)
 
 	seedImportedKeypair4.Accounts[0].Address = types.Address{0x83}
-	err = s.m.SaveOrUpdateAccount(seedImportedKeypair4.Accounts[0])
+	err = s.m.settings.SaveOrUpdateAccounts(seedImportedKeypair4.Accounts[:1], false)
 	s.Require().NoError(err)
 
 	seedImportedKeypair4.Accounts[0].Address = types.Address{0x84}
-	err = s.m.SaveOrUpdateAccount(seedImportedKeypair4.Accounts[0])
+	err = s.m.settings.SaveOrUpdateAccounts(seedImportedKeypair4.Accounts[:1], false)
 	s.Require().NoError(err)
 
 	seedImportedKeypair4.Accounts[0].Address = types.Address{0x85}
-	err = s.m.SaveOrUpdateAccount(seedImportedKeypair4.Accounts[0])
+	err = s.m.settings.SaveOrUpdateAccounts(seedImportedKeypair4.Accounts[:1], false)
 	s.Require().NoError(err)
 
 	seedImportedKeypair4.Accounts[0].Address = types.Address{0x86}
-	err = s.m.SaveOrUpdateAccount(seedImportedKeypair4.Accounts[0])
+	err = s.m.settings.SaveOrUpdateAccounts(seedImportedKeypair4.Accounts[:1], false)
 	s.Require().NoError(err)
 
 	// check the capacity after adding 8 more watch only accounts

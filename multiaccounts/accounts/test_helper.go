@@ -1,8 +1,16 @@
 package accounts
 
 import (
+	accsmanagementcommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/common"
+)
+
+const (
+	testProfileMnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon"
+	testSeedMnemonic    = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	testSeed2Mnemonic   = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about abandon"
 )
 
 func GetWatchOnlyAccountsForTest() []*Account {
@@ -31,40 +39,51 @@ func GetWatchOnlyAccountsForTest() []*Account {
 	return []*Account{wo1, wo2, wo3}
 }
 
-func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccount bool, includeAdditionalAccounts bool) *Keypair {
-	kp := &Keypair{
-		KeyUID:      "0000000000000000000000000000000000000000000000000000000000000001",
+func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccount bool, includeAdditionalAccounts bool) (
+	keypair *Keypair, acc *generator.Account, derivedAccs map[string]*generator.Account, err error) {
+	acc, derivedAccs, err = generator.CreateAndDeriveAccountsFromMnemonic(testProfileMnemonic, []string{
+		accsmanagementcommon.PathEIP1581Chat,
+		accsmanagementcommon.PathDefaultWalletAccount,
+		accsmanagementcommon.CustomWalletPath1,
+		accsmanagementcommon.CustomWalletPath2,
+	}, "")
+	if err != nil {
+		return
+	}
+
+	keypair = &Keypair{
+		KeyUID:      acc.KeyUID(),
 		Name:        "Profile Name",
 		Type:        KeypairTypeProfile,
-		DerivedFrom: "0x0001",
+		DerivedFrom: acc.Address().Hex(),
 	}
 
 	if includeChatAccount {
 		profileAccount := &Account{
-			Address:               types.Address{0x01},
-			KeyUID:                kp.KeyUID,
+			Address:               derivedAccs[accsmanagementcommon.PathEIP1581Chat].Address(),
+			KeyUID:                keypair.KeyUID,
 			Wallet:                false,
 			Chat:                  true,
 			Type:                  AccountTypeGenerated,
-			Path:                  "m/43'/60'/1581'/0'/0",
-			PublicKey:             types.Hex2Bytes("0x000000001"),
+			Path:                  accsmanagementcommon.PathEIP1581Chat,
+			PublicKey:             types.Hex2Bytes(derivedAccs[accsmanagementcommon.PathEIP1581Chat].PublicKeyHex()),
 			Name:                  "Profile Name",
 			Operable:              AccountFullyOperable,
 			ProdPreferredChainIDs: "1",
 			TestPreferredChainIDs: "5",
 		}
-		kp.Accounts = append(kp.Accounts, profileAccount)
+		keypair.Accounts = append(keypair.Accounts, profileAccount)
 	}
 
 	if includeDefaultWalletAccount {
 		defaultWalletAccount := &Account{
-			Address:               types.Address{0x02},
-			KeyUID:                kp.KeyUID,
+			Address:               derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].Address(),
+			KeyUID:                keypair.KeyUID,
 			Wallet:                true,
 			Chat:                  false,
 			Type:                  AccountTypeGenerated,
-			Path:                  "m/44'/60'/0'/0/0",
-			PublicKey:             types.Hex2Bytes("0x000000002"),
+			Path:                  accsmanagementcommon.PathDefaultWalletAccount,
+			PublicKey:             types.Hex2Bytes(derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].PublicKeyHex()),
 			Name:                  "Generated Acc 1",
 			Emoji:                 "emoji-1",
 			ColorID:               common.CustomizationColorPrimary,
@@ -75,19 +94,19 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 			ProdPreferredChainIDs: "1",
 			TestPreferredChainIDs: "5",
 		}
-		kp.Accounts = append(kp.Accounts, defaultWalletAccount)
-		kp.LastUsedDerivationIndex = 0
+		keypair.Accounts = append(keypair.Accounts, defaultWalletAccount)
+		keypair.LastUsedDerivationIndex = 0
 	}
 
 	if includeAdditionalAccounts {
 		generatedWalletAccount1 := &Account{
-			Address:               types.Address{0x03},
-			KeyUID:                kp.KeyUID,
+			Address:               derivedAccs[accsmanagementcommon.CustomWalletPath1].Address(),
+			KeyUID:                keypair.KeyUID,
 			Wallet:                false,
 			Chat:                  false,
 			Type:                  AccountTypeGenerated,
-			Path:                  "m/44'/60'/0'/0/1",
-			PublicKey:             types.Hex2Bytes("0x000000003"),
+			Path:                  accsmanagementcommon.CustomWalletPath1,
+			PublicKey:             types.Hex2Bytes(derivedAccs[accsmanagementcommon.CustomWalletPath1].PublicKeyHex()),
 			Name:                  "Generated Acc 2",
 			Emoji:                 "emoji-2",
 			ColorID:               common.CustomizationColorPrimary,
@@ -98,17 +117,17 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 			ProdPreferredChainIDs: "1",
 			TestPreferredChainIDs: "5",
 		}
-		kp.Accounts = append(kp.Accounts, generatedWalletAccount1)
-		kp.LastUsedDerivationIndex = 1
+		keypair.Accounts = append(keypair.Accounts, generatedWalletAccount1)
+		keypair.LastUsedDerivationIndex = 1
 
 		generatedWalletAccount2 := &Account{
-			Address:               types.Address{0x04},
-			KeyUID:                kp.KeyUID,
+			Address:               derivedAccs[accsmanagementcommon.CustomWalletPath2].Address(),
+			KeyUID:                keypair.KeyUID,
 			Wallet:                false,
 			Chat:                  false,
 			Type:                  AccountTypeGenerated,
-			Path:                  "m/44'/60'/0'/0/2",
-			PublicKey:             types.Hex2Bytes("0x000000004"),
+			Path:                  accsmanagementcommon.CustomWalletPath2,
+			PublicKey:             types.Hex2Bytes(derivedAccs[accsmanagementcommon.CustomWalletPath2].PublicKeyHex()),
 			Name:                  "Generated Acc 3",
 			Emoji:                 "emoji-3",
 			ColorID:               common.CustomizationColorPrimary,
@@ -119,29 +138,37 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 			ProdPreferredChainIDs: "1",
 			TestPreferredChainIDs: "5",
 		}
-		kp.Accounts = append(kp.Accounts, generatedWalletAccount2)
-		kp.LastUsedDerivationIndex = 2
+		keypair.Accounts = append(keypair.Accounts, generatedWalletAccount2)
+		keypair.LastUsedDerivationIndex = 2
 	}
 
-	return kp
+	return
 }
 
-func GetSeedImportedKeypair1ForTest() *Keypair {
-	kp := &Keypair{
-		KeyUID:      "0000000000000000000000000000000000000000000000000000000000000002",
+func GetSeedImportedKeypair1ForTest() (keypair *Keypair, acc *generator.Account, derivedAccs map[string]*generator.Account, err error) {
+	acc, derivedAccs, err = generator.CreateAndDeriveAccountsFromMnemonic(testSeedMnemonic, []string{
+		accsmanagementcommon.PathDefaultWalletAccount,
+		accsmanagementcommon.CustomWalletPath1,
+	}, "")
+	if err != nil {
+		return
+	}
+
+	keypair = &Keypair{
+		KeyUID:      acc.KeyUID(),
 		Name:        "Seed Imported 1",
 		Type:        KeypairTypeSeed,
-		DerivedFrom: "0x0002",
+		DerivedFrom: acc.Address().Hex(),
 	}
 
 	seedGeneratedWalletAccount1 := &Account{
-		Address:   types.Address{0x21},
-		KeyUID:    kp.KeyUID,
+		Address:   derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].Address(),
+		KeyUID:    keypair.KeyUID,
 		Wallet:    false,
 		Chat:      false,
 		Type:      AccountTypeSeed,
-		Path:      "m/44'/60'/0'/0/0",
-		PublicKey: types.Hex2Bytes("0x000000021"),
+		Path:      accsmanagementcommon.PathDefaultWalletAccount,
+		PublicKey: types.Hex2Bytes(derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].PublicKeyHex()),
 		Name:      "Seed Impo 1 Acc 1",
 		Emoji:     "emoji-1",
 		ColorID:   common.CustomizationColorPrimary,
@@ -150,17 +177,17 @@ func GetSeedImportedKeypair1ForTest() *Keypair {
 		Removed:   false,
 		Operable:  AccountFullyOperable,
 	}
-	kp.Accounts = append(kp.Accounts, seedGeneratedWalletAccount1)
-	kp.LastUsedDerivationIndex = 0
+	keypair.Accounts = append(keypair.Accounts, seedGeneratedWalletAccount1)
+	keypair.LastUsedDerivationIndex = 0
 
 	seedGeneratedWalletAccount2 := &Account{
-		Address:   types.Address{0x22},
-		KeyUID:    kp.KeyUID,
+		Address:   derivedAccs[accsmanagementcommon.CustomWalletPath1].Address(),
+		KeyUID:    keypair.KeyUID,
 		Wallet:    false,
 		Chat:      false,
 		Type:      AccountTypeSeed,
-		Path:      "m/44'/60'/0'/0/1",
-		PublicKey: types.Hex2Bytes("0x000000022"),
+		Path:      accsmanagementcommon.CustomWalletPath1,
+		PublicKey: types.Hex2Bytes(derivedAccs[accsmanagementcommon.CustomWalletPath1].PublicKeyHex()),
 		Name:      "Seed Impo 1 Acc 2",
 		Emoji:     "emoji-2",
 		ColorID:   common.CustomizationColorPrimary,
@@ -169,28 +196,36 @@ func GetSeedImportedKeypair1ForTest() *Keypair {
 		Removed:   false,
 		Operable:  AccountFullyOperable,
 	}
-	kp.Accounts = append(kp.Accounts, seedGeneratedWalletAccount2)
-	kp.LastUsedDerivationIndex = 1
+	keypair.Accounts = append(keypair.Accounts, seedGeneratedWalletAccount2)
+	keypair.LastUsedDerivationIndex = 1
 
-	return kp
+	return
 }
 
-func GetSeedImportedKeypair2ForTest() *Keypair {
-	kp := &Keypair{
-		KeyUID:      "0000000000000000000000000000000000000000000000000000000000000003",
+func GetSeedImportedKeypair2ForTest() (keypair *Keypair, acc *generator.Account, derivedAccs map[string]*generator.Account, err error) {
+	acc, derivedAccs, err = generator.CreateAndDeriveAccountsFromMnemonic(testSeed2Mnemonic, []string{
+		accsmanagementcommon.PathDefaultWalletAccount,
+		accsmanagementcommon.CustomWalletPath1,
+	}, "")
+	if err != nil {
+		return
+	}
+
+	keypair = &Keypair{
+		KeyUID:      acc.KeyUID(),
 		Name:        "Seed Imported 2",
 		Type:        KeypairTypeSeed,
-		DerivedFrom: "0x0003",
+		DerivedFrom: acc.Address().Hex(),
 	}
 
 	seedGeneratedWalletAccount1 := &Account{
-		Address:   types.Address{0x31},
-		KeyUID:    kp.KeyUID,
+		Address:   derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].Address(),
+		KeyUID:    keypair.KeyUID,
 		Wallet:    false,
 		Chat:      false,
 		Type:      AccountTypeSeed,
-		Path:      "m/44'/60'/0'/0/0",
-		PublicKey: types.Hex2Bytes("0x000000031"),
+		Path:      accsmanagementcommon.PathDefaultWalletAccount,
+		PublicKey: types.Hex2Bytes(derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].PublicKeyHex()),
 		Name:      "Seed Impo 2 Acc 1",
 		Emoji:     "emoji-1",
 		ColorID:   common.CustomizationColorPrimary,
@@ -199,12 +234,12 @@ func GetSeedImportedKeypair2ForTest() *Keypair {
 		Removed:   false,
 		Operable:  AccountFullyOperable,
 	}
-	kp.Accounts = append(kp.Accounts, seedGeneratedWalletAccount1)
-	kp.LastUsedDerivationIndex = 0
+	keypair.Accounts = append(keypair.Accounts, seedGeneratedWalletAccount1)
+	keypair.LastUsedDerivationIndex = 0
 
 	seedGeneratedWalletAccount2 := &Account{
-		Address:   types.Address{0x32},
-		KeyUID:    kp.KeyUID,
+		Address:   derivedAccs[accsmanagementcommon.CustomWalletPath1].Address(),
+		KeyUID:    keypair.KeyUID,
 		Wallet:    false,
 		Chat:      false,
 		Type:      AccountTypeSeed,
@@ -218,10 +253,10 @@ func GetSeedImportedKeypair2ForTest() *Keypair {
 		Removed:   false,
 		Operable:  AccountFullyOperable,
 	}
-	kp.Accounts = append(kp.Accounts, seedGeneratedWalletAccount2)
-	kp.LastUsedDerivationIndex = 1
+	keypair.Accounts = append(keypair.Accounts, seedGeneratedWalletAccount2)
+	keypair.LastUsedDerivationIndex = 1
 
-	return kp
+	return
 }
 
 func GetPrivKeyImportedKeypairForTest() *Keypair {
@@ -254,7 +289,10 @@ func GetPrivKeyImportedKeypairForTest() *Keypair {
 }
 
 func GetProfileKeycardForTest() *Keycard {
-	profileKp := GetProfileKeypairForTest(true, true, true)
+	profileKp, _, _, err := GetProfileKeypairForTest(true, true, true)
+	if err != nil {
+		panic(err)
+	}
 	keycard1Addresses := []types.Address{}
 	for _, acc := range profileKp.Accounts {
 		keycard1Addresses = append(keycard1Addresses, acc.Address)
@@ -270,7 +308,10 @@ func GetProfileKeycardForTest() *Keycard {
 }
 
 func GetKeycardForSeedImportedKeypair1ForTest() *Keycard {
-	seed1Kp := GetSeedImportedKeypair1ForTest()
+	seed1Kp, _, _, err := GetSeedImportedKeypair1ForTest()
+	if err != nil {
+		panic(err)
+	}
 	keycard2Addresses := []types.Address{}
 	for _, acc := range seed1Kp.Accounts {
 		keycard2Addresses = append(keycard2Addresses, acc.Address)
@@ -286,7 +327,10 @@ func GetKeycardForSeedImportedKeypair1ForTest() *Keycard {
 }
 
 func GetKeycardForSeedImportedKeypair2ForTest() *Keycard {
-	seed2Kp := GetSeedImportedKeypair2ForTest()
+	seed2Kp, _, _, err := GetSeedImportedKeypair2ForTest()
+	if err != nil {
+		panic(err)
+	}
 	keycard4Addresses := []types.Address{}
 	for _, acc := range seed2Kp.Accounts {
 		keycard4Addresses = append(keycard4Addresses, acc.Address)

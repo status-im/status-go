@@ -50,12 +50,11 @@ import (
 
 // errors
 var (
-	ErrNodeRunning            = errors.New("node is already running")
-	ErrNoGethNode             = errors.New("geth node is not available")
-	ErrNoRunningNode          = errors.New("there is no running node")
-	ErrAccountKeyStoreMissing = errors.New("account key store is not set")
-	ErrServiceUnknown         = errors.New("service unknown")
-	ErrRPCMethodUnavailable   = `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"the method called does not exist/is not available"}}`
+	ErrNodeRunning          = errors.New("node is already running")
+	ErrNoGethNode           = errors.New("geth node is not available")
+	ErrNoRunningNode        = errors.New("there is no running node")
+	ErrServiceUnknown       = errors.New("service unknown")
+	ErrRPCMethodUnavailable = `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"the method called does not exist/is not available"}}`
 )
 
 // StatusNode abstracts contained geth node and provides helper methods to

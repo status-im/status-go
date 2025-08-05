@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -20,8 +21,20 @@ type StatusBackend interface {
 	StartNode(config *params.NodeConfig) error // NOTE: Only used in canary
 	StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, conf *params.NodeConfig) error
 	StartNodeWithAccount(acc multiaccounts.Account, password string, conf *params.NodeConfig, chatKey *ecdsa.PrivateKey) error
-	StartNodeWithAccountAndInitialConfig(mnemonic string, account multiaccounts.Account, password string, settings settings.Settings,
-		conf *params.NodeConfig, keypair *accounts.Keypair, chatKey *ecdsa.PrivateKey) error
+	StartNodeWithChatKeyOrMnemonic(
+		request *requests.CreateAccount,
+		mnemonic string, // empty mnemonic is used for keycard account, not empty for regular account
+		keycardData *requests.KeycardData, // nil for regular account, not nil for keycard account
+		restoreAccount bool,
+		fetchBackup bool,
+	) (*multiaccounts.Account, error)
+	StartNodeWithAccountAndInitialConfig(
+		multiAccount *multiaccounts.Account,
+		password string,
+		settings settings.Settings,
+		nodecfg *params.NodeConfig,
+		keypair *accounts.Keypair,
+		chatKey *ecdsa.PrivateKey) error
 	StopNode() error
 
 	GetNodeConfig() (*params.NodeConfig, error)

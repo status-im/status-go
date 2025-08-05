@@ -87,7 +87,7 @@ func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
 	if err != nil {
 		return nil, err
 	}
-	accountsManager.SetPersistence(accsDB)
+	accountsManager.SetPersistence(accounts.NewAccountsManagerPersistenceAdapter(accsDB))
 
 	statusNode := New(nil, accountsManager, tt.MustCreateTestLogger())
 
@@ -129,7 +129,7 @@ func createStatusNode() (*StatusNode, func() error, func() error, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	accountsManager.SetPersistence(accsDB)
+	accountsManager.SetPersistence(accounts.NewAccountsManagerPersistenceAdapter(accsDB))
 
 	statusNode := New(nil, accountsManager, tt.MustCreateTestLogger())
 	statusNode.SetAppDB(appDB)

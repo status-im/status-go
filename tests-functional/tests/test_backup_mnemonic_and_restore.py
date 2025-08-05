@@ -1,5 +1,6 @@
 import random
 import string
+import copy
 from clients.status_backend import StatusBackend
 from clients.signals import SignalType
 import pytest
@@ -50,7 +51,7 @@ class TestBackupMnemonicAndRestore:
         mnemonic = original_settings.get("mnemonic", None)
         assert mnemonic is not None
 
-        user = user_mnemonic_12
+        user = copy.deepcopy(user_mnemonic_12)
         user.passphrase = mnemonic
 
         # Restore account in a new container
@@ -148,7 +149,7 @@ class TestBackupMnemonicAndRestore:
         data = restored_account._create_account_request(user)
         data["mnemonic"] = ""
         restored_account_response = restored_account.api_request("RestoreAccountAndLogin", data)
-        assert restored_account_response.json().get("error") == "restore-account: no mnemonic or keycard is set"
+        assert restored_account_response.json().get("error") == "restore-account: mnemonic is not set"
 
     def test_restore_with_both_mnemonic_and_keycard(self):
         # Restore with both keycard and mnemonic isn't allowed
@@ -160,7 +161,7 @@ class TestBackupMnemonicAndRestore:
         data["mnemonic"] = user.passphrase
         data["keycard"] = user_keycard_1
         restored_account_response = restored_account.api_request("RestoreAccountAndLogin", data)
-        assert restored_account_response.json().get("error") == "restore-account: both mnemonic and keycard info are set"
+        assert restored_account_response.json().get("error") == "restore-account: mnemonic is set for keycard account"
 
     def test_restored_on_existing_restored_account_fails(self):
         user = user_mnemonic_12
@@ -170,4 +171,4 @@ class TestBackupMnemonicAndRestore:
         restored_account.wait_for_login()
         restored_account.restore_account_and_login(user=user)
         signal = restored_account.wait_for_signal(SignalType.NODE_LOGIN.value)
-        assert signal.get("event").get("error") == "UNIQUE constraint failed: settings.synthetic_id"
+        assert "keypair for the provided mnemonic was already added" in signal.get("event").get("error")

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/accounts-management/generator"
+	accsmanagementcommon "github.com/status-im/status-go/accounts-management/common"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/types"
@@ -109,46 +109,6 @@ func (s *SyncDeviceSuite) prepareBackendWithoutAccount(tmpdir string) *api.GethS
 	return backend
 }
 
-func (s *SyncDeviceSuite) getSeedPhraseKeypairForTest(backend *api.GethStatusBackend, mnemonic string, server bool) *accounts.Keypair {
-	generatedAccount, err := generator.CreateAccountFromMnemonic(mnemonic, "")
-	require.NoError(s.T(), err)
-	generatedDerivedAccs, err := generator.DeriveChildrenFromAccount(generatedAccount, []string{path0, path1})
-	require.NoError(s.T(), err)
-
-	genAccInfo := generatedAccount.ToGeneratedAccountInfo("")
-
-	seedPhraseKp := &accounts.Keypair{
-		KeyUID:      genAccInfo.KeyUID,
-		Name:        "SeedPhraseImported",
-		Type:        accounts.KeypairTypeSeed,
-		DerivedFrom: genAccInfo.Address,
-	}
-	i := 0
-	for path, ga := range generatedDerivedAccs {
-		derivAccInfo := ga.ToAccountInfo()
-		acc := &accounts.Account{
-			Address:   types.HexToAddress(derivAccInfo.Address),
-			KeyUID:    genAccInfo.KeyUID,
-			Wallet:    false,
-			Chat:      false,
-			Type:      accounts.AccountTypeSeed,
-			Path:      path,
-			PublicKey: types.HexBytes(derivAccInfo.PublicKey),
-			Name:      fmt.Sprintf("Acc_%d", i),
-			Operable:  accounts.AccountFullyOperable,
-			Emoji:     fmt.Sprintf("Emoji_%d", i),
-			ColorID:   "blue",
-		}
-		if !server {
-			acc.Operable = accounts.AccountNonOperable
-		}
-		seedPhraseKp.Accounts = append(seedPhraseKp.Accounts, acc)
-		i++
-	}
-
-	return seedPhraseKp
-}
-
 func containsKeystoreFile(directory, key string) bool {
 	files, err := os.ReadDir(directory)
 	if err != nil {
@@ -187,16 +147,18 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 
 	require.True(s.T(), serverActiveAccount.KeyUID == clientActiveAccount.KeyUID)
 
-	serverSeedPhraseKp := s.getSeedPhraseKeypairForTest(serverBackend, seedKeypairMnemonic, true)
 	serverAccountsAPI := serverBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
-	err = serverAccountsAPI.ImportMnemonic(ctx, seedKeypairMnemonic, s.password)
-	require.NoError(s.T(), err, "importing mnemonic for new keypair on server")
-	err = serverAccountsAPI.AddKeypair(ctx, s.password, serverSeedPhraseKp)
+	walletAccounts := &accsmanagementtypes.AccountCreationDetails{
+		Path:    accsmanagementcommon.PathDefaultWalletAccount,
+		Name:    "Default Wallet Account",
+		Emoji:   "💰",
+		ColorID: "primary",
+	}
+	serverSeedPhraseKp, err := serverAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic, s.password, "Seed Phrase Keypair", walletAccounts)
 	require.NoError(s.T(), err, "saving seed phrase keypair on server with keystore files created")
 
-	clientSeedPhraseKp := s.getSeedPhraseKeypairForTest(serverBackend, seedKeypairMnemonic, true)
 	clientAccountsAPI := clientBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
-	err = clientAccountsAPI.SaveKeypair(ctx, clientSeedPhraseKp)
+	clientSeedPhraseKp, err := clientAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic, s.password, "Seed Phrase Keypair", walletAccounts)
 	require.NoError(s.T(), err, "saving seed phrase keypair on client without keystore files")
 
 	// check server - server should contain keystore files for imported seed phrase
@@ -205,6 +167,11 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 	for _, acc := range serverSeedPhraseKp.Accounts {
 		require.True(s.T(), containsKeystoreFile(serverKeystorePath, acc.Address.String()[2:]))
 	}
+
+	accountsManager := clientBackend.AccountsManager()
+	// need to delete keystore files for keypair in order to simulate the case where the keypair was restored and keystore files were not created yet
+	err = accountsManager.DeleteKeystoreFilesForKeypair(accounts.KeypairToAccountsManagerKeypair(clientSeedPhraseKp))
+	require.NoError(s.T(), err)
 
 	// check client - client should not contain keystore files for imported seed phrase
 	clientKeystorePath := filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
@@ -246,7 +213,6 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 	require.NoError(s.T(), err)
 
 	// check client - client should contain keystore files for imported seed phrase
-	accountsManager := clientBackend.AccountsManager()
 	require.True(s.T(), containsKeystoreFile(clientKeystorePath, clientSeedPhraseKp.DerivedFrom[2:]))
 	for _, acc := range clientSeedPhraseKp.Accounts {
 		require.True(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
@@ -358,10 +324,13 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	//////////////////////////////////////////////////////////////////////////////
 	// Add new seed phrase keypair to server and sync it to client
 	//////////////////////////////////////////////////////////////////////////////
-	serverSeedPhraseKp := s.getSeedPhraseKeypairForTest(serverBackend, seedKeypairMnemonic1, true)
-	err = serverAccountsAPI.ImportMnemonic(ctx, seedKeypairMnemonic1, s.password)
-	require.NoError(s.T(), err, "importing mnemonic for new keypair on server")
-	err = serverAccountsAPI.AddKeypair(ctx, s.password, serverSeedPhraseKp)
+	walletAccounts := &accsmanagementtypes.AccountCreationDetails{
+		Path:    accsmanagementcommon.PathDefaultWalletAccount,
+		Name:    "Default Wallet Account",
+		Emoji:   "💰",
+		ColorID: "primary",
+	}
+	serverSeedPhraseKp, err := serverAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic1, s.password, "Seed Phrase Keypair", walletAccounts)
 	require.NoError(s.T(), err, "saving seed phrase keypair on server with keystore files created")
 
 	// Wait for sync messages to be received on client

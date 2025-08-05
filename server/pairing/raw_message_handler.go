@@ -130,7 +130,19 @@ func (s *SyncRawMessageHandler) HandleRawMessage(
 
 func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAccountRequest *requests.CreateAccount, rmp *RawMessagesPayload) error {
 	account := accountPayload.multiaccount
+
+	for _, acc := range rmp.profileKeypair.Accounts {
+		if acc.Chat {
+			err := api.EnrichMultiAccountByPublicKey(account, acc.PublicKey)
+			if err != nil {
+				return err
+			}
+			break
+		}
+	}
+
 	installationID := multidevice.GenerateInstallationID()
+
 	nodeConfig, err := api.DefaultNodeConfig(installationID, account.KeyUID, createAccountRequest)
 	if err != nil {
 		return err
@@ -157,8 +169,7 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 	rmp.setting.CurrentNetwork = api.DefaultCurrentNetwork
 
 	return s.backend.StartNodeWithAccountAndInitialConfig(
-		"",
-		*account,
+		account,
 		accountPayload.password,
 		*rmp.setting,
 		nodeConfig,
