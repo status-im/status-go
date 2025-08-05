@@ -390,6 +390,7 @@ func (m *Messenger) backupChats(ctx context.Context, clock uint64) []*protobuf.B
 					From:       membershipUpdate.From,
 					RawPayload: membershipUpdate.RawPayload,
 					Color:      membershipUpdate.Color,
+					Image:      membershipUpdate.Image,
 				}
 			}
 		}
