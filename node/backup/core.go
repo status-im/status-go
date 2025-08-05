@@ -3,6 +3,7 @@ package backup
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -78,17 +79,18 @@ func (b *core) exportBackup() (map[string][]byte, error) {
 }
 
 func (b *core) importBackup(data map[string][]byte) error {
+	var errs []error
 	for name, provider := range b.backupProviders {
 		raw, ok := data[name]
 		if !ok {
 			continue
 		}
 		if err := provider.ImportBackup(raw); err != nil {
-			return fmt.Errorf("importBackup %q failed: %w", name, err)
+			errs = append(errs, fmt.Errorf("importBackup %q failed: %w", name, err))
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 func marshal(data map[string][]byte) ([]byte, error) {
