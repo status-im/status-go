@@ -98,6 +98,8 @@ func (s SendType) ProcessZeroAmountInProcessor(amountIn *big.Int, amountOut *big
 			}
 		} else if s.IsCommunityRelatedTransfer() {
 			return true
+		} else if s == ENSSetPubKey {
+			return true
 		} else if s != ENSRelease {
 			return false
 		}
