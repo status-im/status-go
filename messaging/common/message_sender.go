@@ -1365,7 +1365,7 @@ func (s *MessageSender) wrapPayloadForSDS(payload []byte, communityID []byte) ([
 	return sdsWrappedPayload, nil
 }
 
-func (s *MessageSender) unwrapPayloadForSDS(msg *v1protocol.StatusMessage) error {
+func (s *MessageSender) unwrapPayloadForSDS(msg *messagingtypes.Message) error {
 	if len(msg.EncryptionLayer.Payload) > 0 {
 		unwrappedMessage, err := s.reliabilityManager.UnwrapReceivedMessage(msg.ApplicationLayer.Payload)
 		if err != nil {
