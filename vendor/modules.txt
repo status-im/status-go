@@ -959,7 +959,7 @@ github.com/spaolacci/murmur3
 # github.com/status-im/doubleratchet v3.0.0+incompatible
 ## explicit
 github.com/status-im/doubleratchet
-# github.com/status-im/extkeys v1.1.0
+# github.com/status-im/extkeys v1.2.0
 ## explicit; go 1.21
 github.com/status-im/extkeys
 # github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4
