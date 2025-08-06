@@ -838,7 +838,12 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		}
 	}
 
-	if err = b.statusNode.StartLocalBackup(); err != nil {
+	chatAccount, err := b.accountManager.SelectedChatAccount()
+	if err != nil {
+		return err
+	}
+
+	if err = b.statusNode.StartLocalBackup(chatAccount.AccountKey.PrivateKey); err != nil {
 		b.logger.Error("failed to start local backup", zap.Error(err))
 		// we don't return the error to avoid login failure
 	}
@@ -962,7 +967,12 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		}
 	}
 
-	if err = b.statusNode.StartLocalBackup(); err != nil {
+	chatAccount, err := b.accountManager.SelectedChatAccount()
+	if err != nil {
+		return err
+	}
+
+	if err = b.statusNode.StartLocalBackup(chatAccount.AccountKey.PrivateKey); err != nil {
 		b.logger.Error("failed to start local backup", zap.Error(err))
 		// we don't return the error to avoid login failure
 	}
@@ -2891,6 +2901,7 @@ func (b *GethStatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2
 
 // SignGroupMembership signs a piece of data containing membership information
 func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) {
+	fmt.Println("SignGroupMembership")
 	selectedChatAccount, err := b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return "", err

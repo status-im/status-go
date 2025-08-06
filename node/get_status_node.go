@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -223,17 +224,11 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 	return n.startWithDB(config, options.AccountsManager)
 }
 
-func (n *StatusNode) StartLocalBackup() error {
+func (n *StatusNode) StartLocalBackup(privateKey *ecdsa.PrivateKey) error {
 	if n.localBackup != nil {
 		return errors.New("local backup already started")
 	}
 
-	chatAccount, err := n.gethAccountManager.SelectedChatAccount()
-	if err != nil {
-		return err
-	}
-
-	privateKey := chatAccount.AccountKey.PrivateKey
 	filenameGetter := func() (string, error) {
 		accountIdentifier := common.PubkeyToHex(&privateKey.PublicKey)
 
@@ -251,6 +246,7 @@ func (n *StatusNode) StartLocalBackup() error {
 		return fullPath, nil
 	}
 
+	var err error
 	n.localBackup, err = backup.NewController(backup.BackupConfig{
 		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
 		FileNameGetter: filenameGetter,
