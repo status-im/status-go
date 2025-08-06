@@ -14,6 +14,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/base58"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 )
 
 // Implementation of the following BIPs:
@@ -219,7 +220,7 @@ func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 		parentKeyBigInt := new(big.Int).SetBytes(k.KeyData)
 		keyBigInt := new(big.Int).SetBytes(secretKey)
 		keyBigInt.Add(keyBigInt, parentKeyBigInt)
-		keyBigInt.Mod(keyBigInt, btcec.S256().N)
+		keyBigInt.Mod(keyBigInt, secp256k1.S256().N)
 
 		// Make sure that child.KeyData is 32 bytes of data even if the value is represented with less bytes.
 		// When we derive a child of this key, we call splitHMAC that does a sha512 of a seed that is:
@@ -242,7 +243,7 @@ func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 		// Case #3: childKey = serP(point(parse256(IL)) + parentKey)
 
 		// Calculate the corresponding intermediate public key for intermediate private key.
-		keyx, keyy := btcec.S256().ScalarBaseMult(secretKey)
+		keyx, keyy := secp256k1.S256().ScalarBaseMult(secretKey)
 		if keyx.Sign() == 0 || keyy.Sign() == 0 {
 			return nil, ErrInvalidKey
 		}
@@ -255,8 +256,8 @@ func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 		}
 
 		// childKey = serP(point(parse256(IL)) + parentKey)
-		childX, childY := btcec.S256().Add(keyx, keyy, pubKey.X, pubKey.Y)
-		pk := btcec.PublicKey{Curve: btcec.S256(), X: childX, Y: childY}
+		childX, childY := secp256k1.S256().Add(keyx, keyy, pubKey.X, pubKey.Y)
+		pk := btcec.PublicKey{Curve: secp256k1.S256(), X: childX, Y: childY}
 		child.KeyData = pk.SerializeCompressed()
 		child.Version = PublicKeyVersion
 	}
@@ -414,14 +415,14 @@ func (k *ExtendedKey) pubKeyBytes() []byte {
 		return k.KeyData
 	}
 
-	pkx, pky := btcec.S256().ScalarBaseMult(k.KeyData)
-	pubKey := btcec.PublicKey{Curve: btcec.S256(), X: pkx, Y: pky}
+	pkx, pky := secp256k1.S256().ScalarBaseMult(k.KeyData)
+	pubKey := btcec.PublicKey{Curve: secp256k1.S256(), X: pkx, Y: pky}
 	return pubKey.SerializeCompressed()
 }
 
 // ToECDSA returns the key data as ecdsa.PrivateKey
 func (k *ExtendedKey) ToECDSA() *ecdsa.PrivateKey {
-	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), k.KeyData)
+	privKey, _ := btcec.PrivKeyFromBytes(secp256k1.S256(), k.KeyData)
 	return privKey.ToECDSA()
 }
 
@@ -467,7 +468,7 @@ func NewKeyFromString(key string) (*ExtendedKey, error) {
 		// of the order of the secp256k1 curve and not be 0.
 		keyData = keyData[1:]
 		keyNum := new(big.Int).SetBytes(keyData)
-		if keyNum.Cmp(btcec.S256().N) >= 0 || keyNum.Sign() == 0 {
+		if keyNum.Cmp(secp256k1.S256().N) >= 0 || keyNum.Sign() == 0 {
 			return nil, ErrInvalidSeed
 		}
 	} else {
