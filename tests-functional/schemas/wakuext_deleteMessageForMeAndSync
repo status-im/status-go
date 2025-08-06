@@ -92,9 +92,6 @@
                                     "id": {
                                         "type": "string"
                                     },
-                                    "identicon": {
-                                        "type": "string"
-                                    },
                                     "lineCount": {
                                         "type": "integer"
                                     },
@@ -174,7 +171,6 @@
                                     "from",
                                     "gapParameters",
                                     "id",
-                                    "identicon",
                                     "lineCount",
                                     "localChatId",
                                     "messageType",
@@ -301,9 +297,6 @@
                             "id": {
                                 "type": "string"
                             },
-                            "identicon": {
-                                "type": "string"
-                            },
                             "lineCount": {
                                 "type": "integer"
                             },
@@ -383,7 +376,6 @@
                             "from",
                             "gapParameters",
                             "id",
-                            "identicon",
                             "lineCount",
                             "localChatId",
                             "messageType",

@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
@@ -3520,7 +3521,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 
 	messageState.CurrentMessageState.PublicKey = &s.alice.identity.PublicKey
 
-	statusMessage := v1protocol.StatusMessage{}
+	statusMessage := messagingtypes.Message{}
 	statusMessage.TransportLayer.Dst = community.PublicKey()
 	err = s.owner.HandleCommunityRequestToJoin(messageState, requestToJoinProto, &statusMessage)
 
@@ -3695,11 +3696,11 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	s.joinCommunity(community, s.owner, s.alice)
 
 	// Check keys in the database
-	communityKeys, err := s.owner.sender.GetKeysForGroup(community.ID())
+	communityKeys, err := s.owner.messaging.GetKeysForGroup(community.ID())
 	s.Require().NoError(err)
 	communityKeyCount := len(communityKeys)
 
-	channelKeys, err := s.owner.sender.GetKeysForGroup([]byte(chat.ID))
+	channelKeys, err := s.owner.messaging.GetKeysForGroup([]byte(chat.ID))
 	s.Require().NoError(err)
 	channelKeyCount := len(channelKeys)
 
@@ -3707,12 +3708,12 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	// This test could be flaky, as the rekey function may not be finished before RekeyInterval * 2 has passed
 	for i := 0; i < 5; i++ {
 		time.Sleep(s.owner.communitiesManager.RekeyInterval * 2)
-		communityKeys, err = s.owner.sender.GetKeysForGroup(community.ID())
+		communityKeys, err = s.owner.messaging.GetKeysForGroup(community.ID())
 		s.Require().NoError(err)
 		s.Require().Greater(len(communityKeys), communityKeyCount)
 		communityKeyCount = len(communityKeys)
 
-		channelKeys, err = s.owner.sender.GetKeysForGroup([]byte(chat.ID))
+		channelKeys, err = s.owner.messaging.GetKeysForGroup([]byte(chat.ID))
 		s.Require().NoError(err)
 		s.Require().Greater(len(channelKeys), channelKeyCount)
 		channelKeyCount = len(channelKeys)
@@ -3823,7 +3824,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibility() {
-	common.RekeyCompatibility = false
+	messaging.SetRekeyCompatibility(false)
 	s.owner.communitiesManager.RekeyInterval = 500 * time.Minute
 
 	// Create a new community
@@ -3995,7 +3996,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 
 	messageState.CurrentMessageState.PublicKey = &s.alice.identity.PublicKey
 
-	statusMessage := v1protocol.StatusMessage{}
+	statusMessage := messagingtypes.Message{}
 	statusMessage.TransportLayer.Dst = community.PublicKey()
 
 	requestToJoinProto := &protobuf.CommunityRequestToJoin{

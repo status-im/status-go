@@ -7,12 +7,13 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-type RawMessageHandler func(ctx context.Context, rawMessage common.RawMessage) (common.RawMessage, error)
+type RawMessageHandler func(ctx context.Context, rawMessage messagingtypes.RawMessage) (messagingtypes.RawMessage, error)
 
 func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) error {
 	state := m.buildMessageState()

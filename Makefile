@@ -164,10 +164,9 @@ $(LIBSDS):
 	@echo "Building libsds"
 	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/sds-go-bindings/sds SHELL=/bin/bash
 
-statusgo: ##@build Build status-go as statusd server
+statusgo: ##@build Build status-go as status-backend server
 statusgo: $(LIBSDS)
-statusgo: build/bin/statusd
-statusd: statusgo
+statusgo: build/bin/status-backend
 
 status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend
@@ -382,6 +381,10 @@ test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
 	@./_assets/scripts/run_functional_tests.sh
+
+benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
+benchmark:
+	@./_assets/scripts/run_benchmark.sh
 
 lint-panics: export GOFLAGS ?= -tags='$(BUILD_TAGS)'
 lint-panics: generate

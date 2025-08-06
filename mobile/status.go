@@ -21,10 +21,8 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/centralizedmetrics"
@@ -150,6 +148,12 @@ func initializeApplication(requestJSON string) string {
 		err = params.LoadPushFleetsFromFile(request.PushFleetsConfigFilePath)
 		if err != nil {
 			return makeJSONResponse(err)
+		}
+	}
+
+	for i, acc := range accs {
+		for j, images := range acc.Images {
+			accs[i].Images[j].LocalURL = statusBackend.StatusNode().HTTPServer().MakeAccountImageURL(acc.KeyUID, images.Name, images.Clock)
 		}
 	}
 
@@ -388,12 +392,12 @@ func callPrivateRPC(inputJSON string) string {
 }
 
 // Deprecated: Use VerifyAccountPasswordV2 instead
-func VerifyAccountPassword(keyStoreDir, address, password string) string {
-	return verifyAccountPassword(keyStoreDir, address, password)
+func VerifyAccountPassword(address, password string) string {
+	return verifyAccountPassword(address, password)
 }
 
 // verifyAccountPassword verifies account password.
-func verifyAccountPassword(keyStoreDir, address, password string) string {
+func verifyAccountPassword(address, password string) string {
 	_, err := statusBackend.AccountsManager().LoadAccount(types.HexToAddress(address), password)
 	return makeJSONResponse(err)
 }
@@ -675,97 +679,22 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 		return makeJSONResponse(err)
 	}
 
+	keypair := &accounts.Keypair{
+		KeyUID: account.KeyUID,
+		Name:   settings.DisplayName,
+		Type:   accounts.KeypairTypeProfile,
+	}
+	keypair.Accounts = subaccs
+
 	api.RunAsync(func() error {
 		logutils.ZapLogger().Debug("starting a node, and saving account with configuration", zap.String("key-uid", account.KeyUID))
-		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs, nil)
+		err := statusBackend.StartNodeWithAccountAndInitialConfig("", account, password, settings, &conf, keypair, nil)
 		if err != nil {
 			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
 		return statusBackend.SetupLogSettings()
-	})
-	return makeJSONResponse(nil)
-}
-
-// Deprecated: Use DeleteMultiaccountV2 instead
-func DeleteMultiaccount(keyUID, keyStoreDir string) string {
-	return callWithResponse(deleteMultiaccount, keyUID, keyStoreDir)
-}
-
-// deleteMultiaccount
-func deleteMultiaccount(keyUID, keyStoreDir string) string {
-	err := statusBackend.DeleteMultiaccount(keyUID, keyStoreDir)
-	return makeJSONResponse(err)
-}
-
-func DeleteMultiaccountV2(requestJSON string) string {
-	return callWithResponse(deleteMultiaccountV2, requestJSON)
-}
-
-func deleteMultiaccountV2(requestJSON string) string {
-	var request requests.DeleteMultiaccount
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = request.Validate()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = statusBackend.DeleteMultiaccount(request.KeyUID, request.KeyStoreDir)
-	return makeJSONResponse(err)
-}
-
-func InitKeystore(keydir string) string {
-	return callWithResponse(initKeystore, keydir)
-}
-
-// initKeystore initialize keystore before doing any operations with keys.
-func initKeystore(keydir string) string {
-	keystoreAdapter, err := geth.NewGethKeystoreAdapter(keydir, keystore.LightScryptN, keystore.LightScryptP)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	statusBackend.AccountsManager().SetKeystore(keystoreAdapter)
-	return makeJSONResponse(nil)
-}
-
-// SaveAccountAndLoginWithKeycard saves account in status-go database.
-// Deprecated: Use CreateAndAccountAndLogin with required keycard properties.
-func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJSON, subaccountData string, keyHex string) string {
-	var account multiaccounts.Account
-	err := json.Unmarshal([]byte(accountData), &account)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	var settings settings.Settings
-	err = json.Unmarshal([]byte(settingsJSON), &settings)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	var conf params.NodeConfig
-	err = json.Unmarshal([]byte(configJSON), &conf)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	var subaccs []*accounts.Account
-	err = json.Unmarshal([]byte(subaccountData), &subaccs)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	api.RunAsync(func() error {
-		logutils.ZapLogger().Debug("starting a node, and saving account with configuration", zap.String("key-uid", account.KeyUID))
-		err := statusBackend.SaveAccountAndStartNodeWithKey(account, password, settings, &conf, subaccs, keyHex)
-		if err != nil {
-			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
-			return err
-		}
-		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
-		return nil
 	})
 	return makeJSONResponse(nil)
 }

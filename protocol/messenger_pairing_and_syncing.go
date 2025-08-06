@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -136,11 +137,11 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, targetInstallation
 	if rawMessageHandler == nil {
 		rawMessageHandler = m.dispatchPairInstallationMessage
 	}
-	_, err = rawMessageHandler(ctx, common.RawMessage{
+	_, err = rawMessageHandler(ctx, messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_PAIR_INSTALLATION,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	})
 	if err != nil {
 		return nil, err
@@ -348,11 +349,11 @@ func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler, ide
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURES,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -410,11 +411,11 @@ func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID, c
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_CONTACT_REQUEST_DECISION,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)

@@ -36,9 +36,9 @@ def backend_factory(request):
     ipv6 = params.get("ipv6", USE_IPV6)
 
     # Store created backends for cleanup
-    created_backends = []
+    created_backends: list[StatusBackend] = []
 
-    def factory(name, *, start_messenger=True) -> StatusBackend:
+    def factory(name, **kwargs) -> StatusBackend:
         """
         Create a single backend with the given name.
 
@@ -49,18 +49,13 @@ def backend_factory(request):
         Returns:
             StatusBackend: Created backend instance
         """
+        test_name = request.cls.__name__ if hasattr(request, "cls") else "test"
         logging.debug(f"🔧 [SETUP] Creating {name} backend for {request.cls.__name__}")
+        logging.debug(f"🔧 [SETUP] Creating {name} backend for {test_name}")
         logging.debug(f"📋 [SETUP] Parameters: privileged={privileged}, ipv6={ipv6}")
 
         # Create backend
-        backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6)
-        # backend.init_status_backend()
-        # backend.create_account_and_login(waku_light_client=final_light_client)
-        # backend.wait_for_login()
-
-        # if start_messenger:
-        #     backend.wakuext_service.start_messenger()
-
+        backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6, **kwargs)
         created_backends.append(backend)
         logging.debug(f"✅ [SETUP] {name.capitalize()} backend created")
 
@@ -73,11 +68,7 @@ def backend_factory(request):
 
     for i, backend in enumerate(reversed(created_backends)):
         logging.debug(f"🧹 [TEARDOWN] Cleaning up backend {len(created_backends) - i}...")
-
-        if hasattr(backend, "container") and backend.container:
-            teardown_container(backend.container, log_prefix=f"🧹 [TEARDOWN] Cleaning up backend {len(created_backends) - i} container...")
-        else:
-            logging.debug(f"ℹ️ [TEARDOWN] Backend {len(created_backends) - i} has no container to cleanup")
+        backend.shutdown()
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -87,54 +78,44 @@ def waku_light_client(request) -> bool:
 
 @pytest.fixture(scope="function", autouse=False)
 def backend_new_profile(request, backend_factory):
-    def _backend_new_profile(name: str, waku_light_client: bool = False) -> StatusBackend:
+    backends: list[StatusBackend] = []
+
+    def _backend_new_profile(name: str, waku_light_client: bool = False, **kwargs) -> StatusBackend:
         logging.debug(f"📋 [SETUP] backend_new_profile parameters: wakuV2LightClient={waku_light_client}")
-        backend = backend_factory(name)
+        backend = backend_factory(name, **kwargs)
+        backends.append(backend)
+
         backend.init_status_backend()
-        backend.create_account_and_login(wakuV2LightClient=waku_light_client)
+        backend.create_account_and_login(waku_light_client=waku_light_client)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()
         return backend
 
     yield _backend_new_profile
-    # backend.logout()
+
+    for backend in backends:
+        backend.logout()
 
 
 @pytest.fixture(scope="function", autouse=False)
 def backend_recovered_profile(request, backend_factory):
+    backends: list[StatusBackend] = []
+
     def _backend_recovered_profile(name: str, user: object, waku_light_client: bool = False, **kwargs) -> StatusBackend:
         logging.debug(f"📋 [SETUP] backend_recovered_profile parameters: wakuV2LightClient={waku_light_client}")
-        backend = backend_factory(name)
+        backend = backend_factory(name, **kwargs)
+        backends.append(backend)
+
         backend.init_status_backend()
-        backend.restore_account_and_login(user=user, wakuV2LightClient=waku_light_client, **kwargs)
+        backend.restore_account_and_login(user=user, waku_light_client=waku_light_client, **kwargs)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()
         return backend
 
     yield _backend_recovered_profile
-    # backend.logout()
 
-
-def teardown_container(container, log_prefix=""):
-    """
-    Stops, saves logs, and removes a container with error handling.
-    Args:
-        container: The container object (should have stop, save_logs, remove methods)
-        log_prefix: Optional string for logging context
-    """
-    if not hasattr(container, "container") or not container.container:
-        logging.debug(f"{log_prefix}No container to cleanup.")
-        return
-    container.stop()  # pyright: ignore[reportAttributeAccessIssue]
-    try:
-        container.save_logs()  # pyright: ignore[reportAttributeAccessIssue]
-    except RuntimeError as e:
-        if "Container is not initialized" in str(e):
-            logging.warning(f"{log_prefix}Container already stopped, skipping log save: {e}")
-        else:
-            raise
-    container.remove()  # pyright: ignore[reportAttributeAccessIssue]
-    logging.debug(f"{log_prefix}Container stopped and removed.")
+    for backend in backends:
+        backend.logout()
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -178,7 +159,7 @@ def close_status_backend_containers(request):
     yield
     for container in StatusGoContainer.all_containers:
         try:
-            teardown_container(container, log_prefix="[close_status_backend_containers] ")
+            container.shutdown()  # pyright: ignore[reportAttributeAccessIssue]
         except Exception as e:
             logging.error(f"Error cleaning up container: {e}")
     StatusGoContainer.all_containers = []

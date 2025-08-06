@@ -83,9 +83,6 @@
                                     "id": {
                                         "type": "string"
                                     },
-                                    "identicon": {
-                                        "type": "string"
-                                    },
                                     "lineCount": {
                                         "type": "integer"
                                     },
@@ -163,7 +160,6 @@
                                     "ensName",
                                     "from",
                                     "id",
-                                    "identicon",
                                     "lineCount",
                                     "localChatId",
                                     "messageType",
@@ -344,9 +340,6 @@
                             "id": {
                                 "type": "string"
                             },
-                            "identicon": {
-                                "type": "string"
-                            },
                             "lineCount": {
                                 "type": "integer"
                             },
@@ -425,7 +418,6 @@
                             "from",
                             "gapParameters",
                             "id",
-                            "identicon",
                             "lineCount",
                             "localChatId",
                             "messageType",

@@ -290,7 +290,7 @@ func getMainnetRPCURL(networks []params.Network) string {
 	return ""
 }
 
-func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
+func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAccount) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.RootDataDir = request.RootDataDir
@@ -413,12 +413,6 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		overrideApiConfig(nodeConfig, request.APIConfig)
 	}
 
-	for _, opt := range opts {
-		if err := opt(nodeConfig); err != nil {
-			return nil, err
-		}
-	}
-
 	return nodeConfig, nil
 }
 
@@ -444,28 +438,4 @@ func buildSigningPhrase() (string, error) {
 	}
 
 	return dictionary[a.Int64()] + " " + dictionary[b.Int64()] + " " + dictionary[c.Int64()], nil
-}
-
-func randomWalletEmoji() (string, error) {
-	count := big.NewInt(int64(len(animalsAndNatureEmojis)))
-	index, err := rand.Int(rand.Reader, count)
-	if err != nil {
-		return "", err
-	}
-	return animalsAndNatureEmojis[index.Int64()], nil
-}
-
-var animalsAndNatureEmojis = []string{
-	"🐵", "🐒", "🦍", "🦧", "🦣", "🦏", "🦛", "🐪", "🐫", "🦙",
-	"🐃", "🐂", "🐄", "🐎", "🦄", "🦓", "🦌", "🐐", "🐏", "🐑",
-	"🦙", "🐘", "🦣", "🦛", "🦏", "🦒", "🐁", "🐀", "🐹", "🐰",
-	"🐇", "🐿️", "🦔", "🦇", "🐻", "🐻‍❄️", "🐨", "🐼", "🦥", "🦦",
-	"🦨", "🦘", "🦡", "🐾", "🐉", "🐲", "🌵", "🎄", "🌲", "🌳",
-	"🌴", "🌱", "🌿", "☘️", "🍀", "🎍", "🎋", "🍃", "🍂", "🍁",
-	"🍄", "🐚", "🪨", "🌾", "💐", "🌷", "🌹", "🥀", "🌺", "🌸",
-	"🌼", "🌻", "🌞", "🌝", "🌛", "🌜", "🌚", "🌕", "🌖", "🌗",
-	"🌘", "🌑", "🌒", "🌓", "🌔", "🌙", "🌎", "🌍", "🌏", "🪐",
-	"💫", "⭐", "🌟", "✨", "⚡", "☄️", "💥", "🔥", "🌪️", "🌈",
-	"☀️", "🌤️", "⛅", "🌥️", "☁️", "🌦️", "🌧️", "⛈️", "🌩️", "🌨️",
-	"❄️", "☃️", "⛄", "🌬️", "💨", "💧", "💦", "🌊",
 }

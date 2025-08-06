@@ -4,7 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/status-im/status-go/messaging"
+	"github.com/status-im/status-go/messaging/adapters"
+	"github.com/status-im/status-go/messaging/layers/transport"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/t/helpers"
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -20,7 +21,8 @@ import (
 	datasyncproto "github.com/status-im/mvds/protobuf"
 
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/datasync"
+	"github.com/status-im/status-go/messaging/datasync"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -83,23 +85,25 @@ func (s *MessageSenderSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
 
-	messaging, err := messaging.NewCore(
+	stubPersistence := NewStubPersistence()
+
+	transport, err := transport.NewTransport(
 		shh,
 		identity,
-		NewMessagingPersistence(database),
-		messaging.WithLogger(s.logger),
+		&adapters.KeysPersistence{P: stubPersistence},
+		&adapters.ProcessedMessageIDsCache{P: stubPersistence},
+		&transport.EnvelopesMonitorConfig{},
+		s.logger,
 	)
 	s.Require().NoError(err)
 
 	s.sender, err = NewMessageSender(
 		identity,
 		database,
-		messaging.API(),
+		stubPersistence,
+		transport,
 		encryptionProtocol,
 		s.logger,
-		FeatureFlags{
-			Datasync: true,
-		},
 	)
 	s.Require().NoError(err)
 }
@@ -315,7 +319,6 @@ func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
 	s.Require().NoError(err)
 
 	s.Require().Len(msgs, 0)
-
 }
 
 func (s *MessageSenderSuite) TestHandleSegmentMessages() {
@@ -367,7 +370,7 @@ func (s *MessageSenderSuite) TestGetEphemeralKey() {
 		key, err := s.sender.GetEphemeralKey()
 		s.Require().NoError(err)
 		s.Require().NotNil(key)
-		keyMap[PubkeyToHex(&key.PublicKey)] = true
+		keyMap[common.PubkeyToHex(&key.PublicKey)] = true
 	}
 	s.Require().Len(keyMap, maxMessageSenderEphemeralKeys)
 	// Add one more
@@ -375,5 +378,5 @@ func (s *MessageSenderSuite) TestGetEphemeralKey() {
 	s.Require().NoError(err)
 	s.Require().NotNil(key)
 
-	s.Require().True(keyMap[PubkeyToHex(&key.PublicKey)])
+	s.Require().True(keyMap[common.PubkeyToHex(&key.PublicKey)])
 }

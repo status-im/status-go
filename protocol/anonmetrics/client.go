@@ -3,7 +3,6 @@ package anonmetrics
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"sync"
 	"time"
 
@@ -13,7 +12,8 @@ import (
 	"github.com/status-im/status-go/appmetrics"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -31,8 +31,7 @@ type Client struct {
 	Identity *ecdsa.PrivateKey
 	Logger   *zap.Logger
 
-	//messageSender is a message processor used to send metric batch messages
-	messageSender *common.MessageSender
+	messaging *messaging.API
 
 	IntervalInc *FibonacciIntervalIncrementer
 
@@ -46,9 +45,9 @@ type Client struct {
 	DBLock sync.Mutex
 }
 
-func NewClient(sender *common.MessageSender) *Client {
+func NewClient(messaging *messaging.API) *Client {
 	return &Client{
-		messageSender: sender,
+		messaging: messaging,
 		IntervalInc: &FibonacciIntervalIncrementer{
 			Last:    0,
 			Current: 1,
@@ -96,7 +95,7 @@ func (c *Client) sendUnprocessedMetrics() {
 			c.Logger.Error("failed to marshal protobuf", zap.Error(err))
 			return
 		}
-		rawMessage := common.RawMessage{
+		rawMessage := messagingtypes.RawMessage{
 			Payload:             encodedMessage,
 			Sender:              ephemeralKey,
 			SkipEncryptionLayer: true,
@@ -107,7 +106,7 @@ func (c *Client) sendUnprocessedMetrics() {
 		c.Logger.Debug("rawMessage prepared from unprocessed anonymous metrics", zap.Reflect("rawMessage", rawMessage))
 
 		// Send the metrics batch
-		_, err = c.messageSender.SendPrivate(context.Background(), c.Config.SendAddress, &rawMessage)
+		_, err = c.messaging.SendPrivate(context.Background(), c.Config.SendAddress, &rawMessage)
 		if err != nil {
 			c.Logger.Error("failed to send metrics batch message", zap.Error(err))
 			return
@@ -199,11 +198,6 @@ func (c *Client) startDeleteLoop() {
 }
 
 func (c *Client) Start() error {
-	c.Logger.Debug("Main Start() triggered")
-	if c.messageSender == nil {
-		return errors.New("can't start, missing message processor")
-	}
-
 	c.startMainLoop()
 	c.startDeleteLoop()
 	return nil

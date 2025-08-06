@@ -13,9 +13,9 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/constants"
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -513,11 +513,11 @@ func (m *Messenger) syncTokenPreferences(rawMessageHandler RawMessageHandler) er
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_TOKEN_PREFERENCES,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -610,11 +610,11 @@ func (m *Messenger) syncCollectiblePreferences(rawMessageHandler RawMessageHandl
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_COLLECTIBLE_PREFERENCES,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -657,11 +657,11 @@ func (m *Messenger) syncAccountsPositions(rawMessageHandler RawMessageHandler) e
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACCOUNTS_POSITIONS,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -685,11 +685,11 @@ func (m *Messenger) syncWalletAccount(acc *accounts.Account, rawMessageHandler R
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACCOUNT,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -705,9 +705,9 @@ func (m *Messenger) syncKeypair(keypair *accounts.Keypair, rawMessageHandler Raw
 	defer cancel()
 
 	_, chat := m.getLastClockWithRelatedChat()
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_KEYPAIR,
 	}
 

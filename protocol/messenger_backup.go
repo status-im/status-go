@@ -8,10 +8,10 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -251,7 +251,7 @@ func (m *Messenger) encodeAndDispatchBackupMessage(ctx context.Context, message 
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID:         chatID,
 		Payload:             encodedMessage,
 		SkipEncryptionLayer: true,

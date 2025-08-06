@@ -11,6 +11,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/crypto"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -51,7 +52,7 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 		return nil, err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID:          chat.ID,
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_PIN_MESSAGE,

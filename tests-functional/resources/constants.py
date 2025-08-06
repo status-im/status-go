@@ -58,6 +58,19 @@ user_mnemonic_24 = Account(
     profile_data=mnemonic_24.profile_data,
 )
 
+user_keycard_1 = {
+    "keyUID": "5a0dd657-165a-4810-b800-6005452be42f",
+    "address": "0x1234567890abcdef1234567890abcdef12345678",
+    "whisperPrivateKey": "example-whisper-private-key",
+    "whisperPublicKey": "example-whisper-public-key",
+    "whisperAddress": "example-whisper-address",
+    "walletPublicKey": "example-wallet-public-key",
+    "walletAddress": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+    "walletRootAddress": "0xrootaddressrootaddressrootaddressrootaddr",
+    "eip1581Address": "0xeip1581address1234567890abcdef1234567890",
+    "encryptionPublicKey": "example-encryption-public-key",
+}
+
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 TESTS_DIR = os.path.join(PROJECT_ROOT, "tests-functional")
 SIGNALS_DIR = os.path.join(TESTS_DIR, "signals")

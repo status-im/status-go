@@ -32,10 +32,6 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 			return nil, fmt.Errorf("make node: make data directory: %v", err)
 		}
 
-		// make sure keys directory exists
-		if err := os.MkdirAll(filepath.Clean(config.KeyStoreDir), os.ModePerm); err != nil {
-			return nil, fmt.Errorf("make node: make keys directory: %v", err)
-		}
 	}
 
 	stackConfig, err := newGethNodeConfig(config)
@@ -55,7 +51,6 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 	nc := &node.Config{
 		DataDir:           config.DataDir,
-		KeyStoreDir:       config.KeyStoreDir,
 		UseLightweightKDF: true,
 		NoUSB:             true,
 		Name:              config.Name,

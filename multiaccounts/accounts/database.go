@@ -41,6 +41,7 @@ var (
 	ErrNotTheSameNumberOdAccountsToApplyReordering = errors.New("accounts: there is different number of accounts between received sync message and db accounts")
 	ErrNotTheSameAccountsToApplyReordering         = errors.New("accounts: there are differences between accounts in received sync message and db accounts")
 	ErrMovingAccountToWrongPosition                = errors.New("accounts: trying to move account to a wrong position")
+	ErrKeypairIsNil                                = errors.New("cannot store nil keypair")
 	ErrKeypairDifferentAccountsKeyUID              = errors.New("cannot store keypair with different accounts' key uid than keypair's key uid")
 	ErrKeypairWithoutAccounts                      = errors.New("cannot store keypair without accounts")
 )
@@ -253,13 +254,12 @@ func (a *Keypair) CopyKeypair() *Keypair {
 	return kp
 }
 
-func (a *Keypair) GetChatPublicKey() types.HexBytes {
+func (a *Keypair) GetChatAccount() *Account {
 	for _, acc := range a.Accounts {
 		if acc.Chat {
-			return acc.PublicKey
+			return acc
 		}
 	}
-
 	return nil
 }
 
@@ -1120,7 +1120,7 @@ func (db *Database) SaveOrUpdateAccounts(accounts []*Account, updateKeypairClock
 // are set or not.
 func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
 	if keypair == nil {
-		return errDbPassedParameterIsNil
+		return ErrKeypairIsNil
 	}
 
 	tx, err := db.db.Begin()

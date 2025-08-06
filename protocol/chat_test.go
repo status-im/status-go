@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 )
 
@@ -167,12 +168,12 @@ func (s *ChatTestSuite) TestDefaultResendType() {
 	testID := "some-id"
 	testCases := []struct {
 		Name               string
-		ExpectedResendType common.ResendType
+		ExpectedResendType messagingtypes.ResendType
 		Chat               Chat
 	}{
 		{
 			Name:               "one to one chat",
-			ExpectedResendType: common.ResendTypeDataSync,
+			ExpectedResendType: messagingtypes.ResendTypeDataSync,
 			Chat: Chat{
 				ID:       testID,
 				ChatType: ChatTypeOneToOne,
@@ -180,7 +181,7 @@ func (s *ChatTestSuite) TestDefaultResendType() {
 		},
 		{
 			Name:               "private group chat",
-			ExpectedResendType: common.ResendTypeDataSync,
+			ExpectedResendType: messagingtypes.ResendTypeDataSync,
 			Chat: Chat{
 				ID:       testID,
 				ChatType: ChatTypePrivateGroupChat,
@@ -188,7 +189,7 @@ func (s *ChatTestSuite) TestDefaultResendType() {
 		},
 		{
 			Name:               "community chat",
-			ExpectedResendType: common.ResendTypeRawMessage,
+			ExpectedResendType: messagingtypes.ResendTypeRawMessage,
 			Chat: Chat{
 				ID:       testID,
 				ChatType: ChatTypeCommunityChat,

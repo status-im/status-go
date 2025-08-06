@@ -12,10 +12,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
-
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -30,37 +29,10 @@ const (
 	segmentsReedsolomonMaxCount = 256
 )
 
-type SegmentMessage struct {
-	*protobuf.SegmentMessage
-}
-
-func (s *SegmentMessage) IsValid() bool {
-	// Check if the hash length is valid (32 bytes for Keccak256)
-	if len(s.EntireMessageHash) != 32 {
-		return false
-	}
-
-	// Check if the segment index is within the valid range
-	if s.SegmentsCount > 0 && s.Index >= s.SegmentsCount {
-		return false
-	}
-
-	// Check if the parity segment index is within the valid range
-	if s.ParitySegmentsCount > 0 && s.ParitySegmentIndex >= s.ParitySegmentsCount {
-		return false
-	}
-
-	return s.SegmentsCount >= 2 || s.ParitySegmentsCount > 0
-}
-
-func (s *SegmentMessage) IsParityMessage() bool {
-	return s.SegmentsCount == 0 && s.ParitySegmentsCount > 0
-}
-
 func (s *MessageSender) segmentMessage(newMessage *wakutypes.NewMessage) ([]*wakutypes.NewMessage, error) {
 	// We set the max message size to 3/4 of the allowed message size, to leave
 	// room for segment message metadata.
-	newMessages, err := segmentMessage(newMessage, int(s.messaging.MaxMessageSize()/4*3))
+	newMessages, err := segmentMessage(newMessage, int(s.transport.MaxMessageSize()/4*3))
 	s.logger.Debug("message segmented", zap.Int("segments", len(newMessages)))
 	return newMessages, err
 }
@@ -171,10 +143,10 @@ func segmentMessage(newMessage *wakutypes.NewMessage, segmentSize int) ([]*wakut
 
 // handleSegmentationLayer is capable of reconstructing the message from both complete and partial sets of data segments.
 // It has capability to perform forward error correction.
-func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessage) error {
-	logger := s.logger.Named("handleSegmentationLayer").With(zap.String("hash", types.HexBytes(message.TransportLayer.Hash).String()))
+func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
+	logger := s.logger.Named("handleSegmentationLayer").With(zap.String("hash", ethtypes.HexBytes(message.TransportLayer.Hash).String()))
 
-	segmentMessage := &SegmentMessage{
+	segmentMessage := &types.SegmentMessage{
 		SegmentMessage: &protobuf.SegmentMessage{},
 	}
 	err := proto.Unmarshal(message.TransportLayer.Payload, segmentMessage.SegmentMessage)
@@ -187,7 +159,7 @@ func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessag
 	}
 
 	logger.Debug("handling message segment",
-		zap.String("EntireMessageHash", types.HexBytes(segmentMessage.EntireMessageHash).String()),
+		zap.String("EntireMessageHash", ethtypes.HexBytes(segmentMessage.EntireMessageHash).String()),
 		zap.Uint32("Index", segmentMessage.Index),
 		zap.Uint32("SegmentsCount", segmentMessage.SegmentsCount),
 		zap.Uint32("ParitySegmentIndex", segmentMessage.ParitySegmentIndex),

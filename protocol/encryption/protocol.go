@@ -152,6 +152,10 @@ func (p *Protocol) Stop() error {
 	return nil
 }
 
+func (p *Protocol) Subscriptions() *Subscriptions {
+	return p.subscriptions
+}
+
 func (p *Protocol) addBundle(myIdentityKey *ecdsa.PrivateKey, msg *ProtocolMessage) error {
 	// Get a bundle
 	installations, err := p.multidevice.GetOurActiveInstallations(&myIdentityKey.PublicKey)

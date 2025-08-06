@@ -15,7 +15,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/wakuv2"
 )
 
@@ -84,7 +83,7 @@ func TestClient_PushReceivedMessages(t *testing.T) {
 	receivedMessages := ReceivedMessages{
 		Filter:     filter,
 		SHHMessage: shhMessage,
-		Messages:   []*v1protocol.StatusMessage{{}},
+		Messages:   []*messagingtypes.Message{{}},
 	}
 
 	client.PushReceivedMessages(receivedMessages)

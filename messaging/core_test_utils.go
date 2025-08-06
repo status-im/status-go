@@ -3,11 +3,13 @@ package messaging
 import (
 	"context"
 	"crypto/ecdsa"
+	"database/sql"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/protocol/encryption"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
 )
@@ -37,11 +39,13 @@ func (f *TestMessagingEnvironment) TearDown() error {
 	return f.waku.Stop()
 }
 
-func (f *TestMessagingEnvironment) NewTestCore(identity *ecdsa.PrivateKey, persistence types.Persistence, options ...Options) (*Core, error) {
+func (f *TestMessagingEnvironment) NewTestCore(identity *ecdsa.PrivateKey, db *sql.DB, persistence types.Persistence, encryptionProtocol *encryption.Protocol, options ...Options) (*Core, error) {
 	return NewCore(
 		f.waku,
 		identity,
+		db,
 		persistence,
+		encryptionProtocol,
 		options...,
 	)
 }
@@ -125,5 +129,5 @@ func newTestWakuWrapper() (*testWakuWrapper, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newTestWaku(w).(*testWakuWrapper), w.Start()
+	return newTestWaku(w).(*testWakuWrapper), nil
 }

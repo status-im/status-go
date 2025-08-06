@@ -128,3 +128,7 @@ func (a *Adapter) MigrateKeyStoreDir(newDir string) error {
 	a.keystoreDir = newDir
 	return nil
 }
+
+func (a *Adapter) KeystorePath() string {
+	return a.keystoreDir
+}

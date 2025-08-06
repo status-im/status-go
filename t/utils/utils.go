@@ -242,7 +242,6 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		"NetworkId": ` + strconv.Itoa(networkID) + `,
 		"RootDataDir": "` + testDir + `",
 		"DataDir": "` + testDir + `",
-		"KeyStoreDir": "` + path.Join(testDir, "keystore") + `",
 		"KeycardPairingDataFile": "` + path.Join(testDir, "keycard/pairings.json") + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
@@ -276,9 +275,6 @@ func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*par
 	}
 	cfg.NoDiscovery = true
 	cfg.LightEthConfig.Enabled = false
-	if dataDir != "" {
-		cfg.KeyStoreDir = path.Join(dataDir, "keystore")
-	}
 
 	// Only attempt to validate if a dataDir is specified, we only support in-memory DB for tests
 	if dataDir != "" {
@@ -291,6 +287,7 @@ func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*par
 }
 
 type account struct {
+	KeyUID        string
 	WalletAddress string
 	ChatAddress   string
 	Password      string

@@ -240,20 +240,6 @@ and expects a Python virtual environment to be in `./tests-functional/.venv`.
 
 # Known issues
 
-## ethclient_transactionByHash is not found when running transaction tests locally
-
-Some tests require access to private API endpoints that are not enabled by default in local builds (enabled on CI by default).  
-To run these tests locally, you **must build `status-go` with the `enable_private_api` build tag**.
-
-```sh
-docker build --file _assets/build/Dockerfile . \
-  --build-arg "build_flags=--cover" \
-  --build-arg "build_tags='gowaku_no_rln,enable_private_api'" \
-  --tag "statusgo-$(git rev-parse --short HEAD)"
-```
-
-- The key part is `--build-arg "build_tags='gowaku_no_rln,enable_private_api'"` which enables the private API for testing.
-
 ## Import issues
 
 If you see some import issues, make sure that you have all requirements installed from `requirements.txt`

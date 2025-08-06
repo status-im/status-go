@@ -229,9 +229,6 @@ type NodeConfig struct {
 	// DataDir is the file system folder the node should use for any data storage needs.
 	DataDir string `validate:"required"`
 
-	// KeyStoreDir is the file system folder that contains private keys.
-	KeyStoreDir string `validate:"required"`
-
 	// KeycardPairingDataFile is the file where we keep keycard pairings data.
 	// It's specified by clients (and not in status-go) when creating a new account,
 	// because this file is initialized by status-keycard-go and we need to use it before initializing the node.
@@ -774,10 +771,9 @@ func (c *NodeConfig) updatePeerLimits() {
 // NewNodeConfig creates new node configuration object with bare-minimum defaults.
 // Important: the returned config is not validated.
 func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
-	var keyStoreDir, keycardPairingDataFile, wakuV2Dir string
+	var keycardPairingDataFile, wakuV2Dir string
 
 	if dataDir != "" {
-		keyStoreDir = filepath.Join(dataDir, "keystore")
 		keycardPairingDataFile = filepath.Join(dataDir, "keycard", "pairings.json")
 
 		wakuV2Dir = filepath.Join(dataDir, "wakuv2")
@@ -787,7 +783,6 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		NetworkID:              networkID,
 		RootDataDir:            dataDir,
 		DataDir:                dataDir,
-		KeyStoreDir:            keyStoreDir,
 		KeycardPairingDataFile: keycardPairingDataFile,
 		Version:                version.Version(),
 		HTTPHost:               "localhost",

@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/images"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 
@@ -877,7 +878,7 @@ func (db sqlitePersistence) ExpiredMessagesIDs(maxSendCount int) ([]string, erro
 			(message_type IN (?, ?) OR resend_type=?) AND sent = ? AND send_count <= ?`,
 		protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
-		common.ResendTypeRawMessage,
+		messagingtypes.ResendTypeRawMessage,
 		false,
 		maxSendCount)
 	if err != nil {

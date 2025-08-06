@@ -7,7 +7,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -35,14 +35,14 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 		return nil, err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID:          chatID,
 		Payload:              encodedMessage,
 		SkipGroupMessageWrap: true,
 		MessageType:          protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		// Don't resend using datasync, that would create quite a lot
 		// of traffic if clicking too eagelry
-		ResendType: common.ResendTypeNone,
+		ResendType: messagingtypes.ResendTypeNone,
 	})
 	if err != nil {
 		return nil, err
@@ -120,14 +120,14 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	}
 
 	// Send the marshalled EmojiReactionRetraction protobuf
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID:          emojiR.GetChatId(),
 		Payload:              encodedMessage,
 		SkipGroupMessageWrap: true,
 		MessageType:          protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		// Don't resend using datasync, that would create quite a lot
 		// of traffic if clicking too eagelry
-		ResendType: common.ResendTypeNone,
+		ResendType: messagingtypes.ResendTypeNone,
 	})
 	if err != nil {
 		return nil, err

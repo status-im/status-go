@@ -1,7 +1,8 @@
-package common
+package types
 
 import (
 	"crypto/ecdsa"
+	"errors"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -86,3 +87,16 @@ type RawMessage struct {
 	ResendMethod          ResendMethod
 	Priority              *MessagePriority
 }
+
+type RawMessageConfirmation struct {
+	// DataSyncID is the ID of the datasync message sent
+	DataSyncID []byte
+	// MessageID is the message id of the message
+	MessageID []byte
+	// PublicKey is the compressed receiver public key
+	PublicKey []byte
+	// ConfirmedAt is the unix timestamp in seconds of when the message was confirmed
+	ConfirmedAt int64
+}
+
+var ErrModifiedRawMessage = errors.New("modified rawMessage")

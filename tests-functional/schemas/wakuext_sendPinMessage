@@ -86,9 +86,6 @@
                                     "id": {
                                         "type": "string"
                                     },
-                                    "identicon": {
-                                        "type": "string"
-                                    },
                                     "lineCount": {
                                         "type": "integer"
                                     },
@@ -166,7 +163,6 @@
                                     "ensName",
                                     "from",
                                     "id",
-                                    "identicon",
                                     "lineCount",
                                     "localChatId",
                                     "messageType",
@@ -288,9 +284,6 @@
                                 "type": "object"
                             },
                             "id": {
-                                "type": "string"
-                            },
-                            "identicon": {
                                 "type": "string"
                             },
                             "lineCount": {
@@ -435,7 +428,6 @@
                             "from",
                             "gapParameters",
                             "id",
-                            "identicon",
                             "lineCount",
                             "localChatId",
                             "messageType",
@@ -473,9 +465,6 @@
                             "id": {
                                 "type": "string"
                             },
-                            "identicon": {
-                                "type": "string"
-                            },
                             "localChatId": {
                                 "type": "string"
                             },
@@ -501,7 +490,6 @@
                             "clock",
                             "from",
                             "id",
-                            "identicon",
                             "localChatId",
                             "message_id",
                             "message_type",

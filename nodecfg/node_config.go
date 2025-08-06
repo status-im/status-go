@@ -44,7 +44,7 @@ func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig, includeConnector boo
 		 swarm_enabled, mailserver_registry_address`
 
 	args := []any{
-		c.NetworkID, c.DataDir, c.KeyStoreDir, c.NodeKey, c.NoDiscovery,
+		c.NetworkID, c.DataDir, "", c.NodeKey, c.NoDiscovery,
 		c.ListenAddr, c.AdvertiseAddr, c.Name, c.Version, c.APIModules,
 		c.TLSEnabled, c.MaxPeers, c.MaxPendingPeers,
 		c.EnableStatusService, true,
@@ -418,6 +418,7 @@ func migrateNodeConfig(tx *sql.Tx) error {
 func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	nodecfg := &params.NodeConfig{}
 
+	keystoreDir := "" // TODO: remove this from db
 	err := tx.QueryRow(`
 	SELECT
 		network_id, data_dir, keystore_dir, node_key, no_discovery,
@@ -427,7 +428,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		mailserver_registry_address, connector_enabled FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.NetworkID, &nodecfg.DataDir, &nodecfg.KeyStoreDir, &nodecfg.NodeKey, &nodecfg.NoDiscovery,
+		&nodecfg.NetworkID, &nodecfg.DataDir, &keystoreDir, &nodecfg.NodeKey, &nodecfg.NoDiscovery,
 		&nodecfg.ListenAddr, &nodecfg.AdvertiseAddr, &nodecfg.Name, &nodecfg.Version, &nodecfg.APIModules, &nodecfg.TLSEnabled, &nodecfg.MaxPeers, &nodecfg.MaxPendingPeers,
 		&nodecfg.EnableStatusService, &nodecfg.BridgeConfig.Enabled, &nodecfg.WalletConfig.Enabled, &nodecfg.LocalNotificationsConfig.Enabled,
 		&nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled, &nodecfg.MailserversConfig.Enabled, &nodecfg.SwarmConfig.Enabled,

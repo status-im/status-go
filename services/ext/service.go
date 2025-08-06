@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/messaging"
+	messagingevents "github.com/status-im/status-go/messaging/events"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/metrics/wakumetrics"
 	"github.com/status-im/status-go/multiaccounts"
@@ -43,6 +44,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
@@ -80,8 +82,9 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
-	messenger       *protocol.Messenger
 	waku            *wakuv2.Waku
+	messaging       *messaging.API
+	messenger       *protocol.Messenger
 	cancelMessenger chan struct{}
 	rpcClient       *rpc.Client
 	config          params.NodeConfig
@@ -261,16 +264,26 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		return err
 	}
 
+	// Initialize encryption layer.
+	encryptor := encryption.New(
+		params.AppDB,
+		s.config.ShhextConfig.InstallationID,
+		params.Logger,
+	)
+
 	messaging, err := messaging.NewCore(
 		s.waku,
 		params.Identity,
-		common.NewMessagingPersistence(params.AppDB),
+		params.AppDB,
+		protocol.NewMessagingPersistence(params.AppDB),
+		encryptor,
 		messaging.WithLogger(params.Logger.Named("messaging")),
 		messaging.WithEnvelopeEventsConfig(envelopeEventsConfig),
 	)
 	if err != nil {
 		return err
 	}
+	s.messaging = messaging.API()
 
 	options, err := buildMessengerOptions(s.config, params.Identity, params.AppDB, params.WalletDB, params.HTTPServer, s.rpcClient, s.multiAccountsDB, params.Account, envelopeEventsConfig, s.accountsDB, params.WalletService, params.CommunityTokensService, params.Logger, &MessengerSignalsHandler{}, params.AccountsManager, params.AccountsPublisher, ensVerifier)
 	if err != nil {
@@ -330,10 +343,10 @@ func (s *Service) startWakuMetrics() error {
 		retrievedMessagesSub, unsubRetrievedMessages := pubsub.Subscribe[protocol.RetrievedMessagesEvent](s.messenger.Publisher(), 100)
 		defer unsubRetrievedMessages()
 
-		sentMessagesSub, unsubSentMessages := pubsub.Subscribe[common.MessageEvent](s.messenger.MessageSender().Publisher(), 100)
+		sentMessagesSub, unsubSentMessages := pubsub.Subscribe[messagingevents.MessageEvent](s.messenger.Messaging().Publisher(), 100)
 		defer unsubSentMessages()
 
-		sentDatasyncSub, unsubSentDatasync := pubsub.Subscribe[protocol.DatasyncMessagesSentEvent](s.messenger.Publisher(), 100)
+		sentDatasyncSub, unsubSentDatasync := pubsub.Subscribe[messagingevents.DatasyncMessagesSentEvent](s.messenger.Messaging().Publisher(), 100)
 		defer unsubSentDatasync()
 
 		for {
@@ -346,7 +359,7 @@ func (s *Service) startWakuMetrics() error {
 				})
 
 			case sub := <-sentMessagesSub:
-				if sub.Type != common.RawMessageSent {
+				if sub.Type != messagingevents.RawMessageSent {
 					continue
 				}
 				msg := sub.RawMessage

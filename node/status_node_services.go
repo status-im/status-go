@@ -29,7 +29,6 @@ import (
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
@@ -110,8 +109,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		return err
 	}
 	services = append(services, lns)
-
-	services = append(services, b.ethService())
 
 	for i := range services {
 		b.RegisterLifecycle(services[i])
@@ -330,13 +327,6 @@ func (b *StatusNode) localNotificationsService(network uint64) (*localnotificati
 		}
 	}
 	return b.localNotificationsSrvc, nil
-}
-
-func (b *StatusNode) ethService() *eth.Service {
-	if b.ethSrvc == nil {
-		b.ethSrvc = eth.NewService(b.rpcClient)
-	}
-	return b.ethSrvc
 }
 
 func appendIf(condition bool, services []common.StatusService, service common.StatusService) []common.StatusService {

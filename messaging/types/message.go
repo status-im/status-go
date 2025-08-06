@@ -1,4 +1,4 @@
-package protocol
+package types
 
 import (
 	"crypto/ecdsa"
@@ -18,8 +18,6 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/protobuf"
-
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
 
 // TransportLayer is the lowest layer and represents waku message.
@@ -29,7 +27,7 @@ type TransportLayer struct {
 	Hash      []byte           `json:"-"`
 	SigPubKey *ecdsa.PublicKey `json:"-"`
 	Dst       *ecdsa.PublicKey
-	Message   *messagingtypes.ReceivedMessage `json:"message"`
+	Message   *ReceivedMessage `json:"message"`
 }
 
 // EncryptionLayer handles optional encryption.
@@ -52,8 +50,8 @@ type ApplicationLayer struct {
 	Type      protobuf.ApplicationMetadataMessage_Type `json:"-"`
 }
 
-// StatusMessage encapsulates all layers of the protocol
-type StatusMessage struct {
+// Message encapsulates all layers of the protocol
+type Message struct {
 	TransportLayer   TransportLayer   `json:"transportLayer"`
 	EncryptionLayer  EncryptionLayer  `json:"encryptionLayer"`
 	ApplicationLayer ApplicationLayer `json:"applicationLayer"`
@@ -61,7 +59,7 @@ type StatusMessage struct {
 
 // Temporary JSON marshaling for those messages that are not yet processed
 // by the go code
-func (m *StatusMessage) MarshalJSON() ([]byte, error) {
+func (m *Message) MarshalJSON() ([]byte, error) {
 	item := struct {
 		ID        types.HexBytes `json:"id"`
 		Payload   string         `json:"payload"`
@@ -77,7 +75,7 @@ func (m *StatusMessage) MarshalJSON() ([]byte, error) {
 }
 
 // SigPubKey returns the most important signature, from the application layer to transport
-func (m *StatusMessage) SigPubKey() *ecdsa.PublicKey {
+func (m *Message) SigPubKey() *ecdsa.PublicKey {
 	if m.ApplicationLayer.SigPubKey != nil {
 		return m.ApplicationLayer.SigPubKey
 	}
@@ -85,14 +83,14 @@ func (m *StatusMessage) SigPubKey() *ecdsa.PublicKey {
 	return m.TransportLayer.SigPubKey
 }
 
-func (m *StatusMessage) Clone() (*StatusMessage, error) {
-	copy := &StatusMessage{}
+func (m *Message) Clone() (*Message, error) {
+	copy := &Message{}
 
 	err := copier.Copy(&copy, m)
 	return copy, err
 }
 
-func (m *StatusMessage) HandleTransportLayer(msg *messagingtypes.ReceivedMessage) error {
+func (m *Message) HandleTransportLayer(msg *ReceivedMessage) error {
 	publicKey, err := crypto.UnmarshalPubkey(msg.Sig)
 	if err != nil {
 		return errors.Wrap(err, "failed to get signature")
@@ -114,7 +112,7 @@ func (m *StatusMessage) HandleTransportLayer(msg *messagingtypes.ReceivedMessage
 	return nil
 }
 
-func (m *StatusMessage) HandleEncryptionLayer(myKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, enc *encryption.Protocol, skipNegotiation bool) error {
+func (m *Message) HandleEncryptionLayer(myKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, enc *encryption.Protocol, skipNegotiation bool) error {
 	// As we handle non-encrypted messages, we make sure that DecryptPayload
 	// is set regardless of whether this step is successful
 	m.EncryptionLayer.Payload = m.TransportLayer.Payload
@@ -155,7 +153,13 @@ func (m *StatusMessage) HandleEncryptionLayer(myKey *ecdsa.PrivateKey, senderKey
 	return nil
 }
 
-func (m *StatusMessage) HandleApplicationLayer() error {
+func MessageID(author *ecdsa.PublicKey, data []byte) types.HexBytes {
+	keyBytes := crypto.FromECDSAPub(author)
+	return types.HexBytes(crypto.Keccak256(append(keyBytes, data...)))
+}
+
+// FIXME: move ApplicationLayer out of messaging
+func (m *Message) HandleApplicationLayer() error {
 	message, err := protobuf.Unmarshal(m.EncryptionLayer.Payload)
 	if err != nil {
 		return err
@@ -176,5 +180,4 @@ func (m *StatusMessage) HandleApplicationLayer() error {
 	m.ApplicationLayer.Payload = message.Payload
 	m.ApplicationLayer.Type = message.Type
 	return nil
-
 }
