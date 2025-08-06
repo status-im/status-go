@@ -631,8 +631,6 @@ func (b *GethStatusBackend) overridePartialWithOldNodeConfig(conf *params.NodeCo
 	conf.LogLevel = oldNodeConf.LogLevel
 	conf.DataDir = oldNodeConf.DataDir
 	conf.NodeKey = oldNodeConf.NodeKey
-	conf.RegisterTopics = oldNodeConf.RegisterTopics
-	conf.RequireTopics = oldNodeConf.RequireTopics
 }
 
 func (b *GethStatusBackend) convertLoginRequestToAccountRequest(loginRequest *requests.Login) *requests.CreateAccount {
@@ -2018,10 +2016,6 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 
 	// TODO: Consider removing the Enabled field from the config as WakuV1 has been removed.
 	conf.WakuV2Config.Enabled = true
-	// NodeConfig.Version should be taken from version.Version
-	// which is set at the compile time.
-	// What's cached is usually outdated so we overwrite it here.
-	conf.Version = version.Version()
 	conf.RootDataDir = b.rootDataDir
 	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
 
@@ -2138,23 +2132,6 @@ func (b *GethStatusBackend) RestartNode() error {
 		return err
 	}
 
-	return b.startNode(b.config)
-}
-
-// ResetChainData remove chain data from data directory.
-// Node is stopped, and new node is started, with clean data directory.
-func (b *GethStatusBackend) ResetChainData() error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if err := b.stopNode(); err != nil {
-		return err
-	}
-	// config is cleaned when node is stopped
-	if err := b.statusNode.ResetChainData(b.config); err != nil {
-		return err
-	}
-	signal.SendChainDataRemoved()
 	return b.startNode(b.config)
 }
 
@@ -2549,7 +2526,6 @@ func (b *GethStatusBackend) initProtocol() error {
 		return err
 	}
 	params := ext.InitProtocolParams{
-		NodeName:               b.statusNode.GethNode().Config().Name,
 		Identity:               identity,
 		AppDB:                  b.appDB,
 		WalletDB:               b.walletDB,

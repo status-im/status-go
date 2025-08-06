@@ -268,13 +268,6 @@ func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*par
 	if err != nil {
 		return nil, err
 	}
-	if name == "" {
-		cfg.Name = "test"
-	} else {
-		cfg.Name = name
-	}
-	cfg.NoDiscovery = true
-	cfg.LightEthConfig.Enabled = false
 
 	// Only attempt to validate if a dataDir is specified, we only support in-memory DB for tests
 	if dataDir != "" {

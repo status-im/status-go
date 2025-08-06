@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -394,26 +393,6 @@ func (n *StatusNode) stop() error {
 	n.appGeneralSrvc = nil
 	n.logger.Debug("status node stopped")
 	return nil
-}
-
-// ResetChainData removes chain data if node is not running.
-func (n *StatusNode) ResetChainData(config *params.NodeConfig) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if n.isRunning() {
-		return ErrNodeRunning
-	}
-
-	chainDataDir := filepath.Join(config.DataDir, config.Name, "lightchaindata")
-	if _, err := os.Stat(chainDataDir); os.IsNotExist(err) {
-		return err
-	}
-	err := os.RemoveAll(chainDataDir)
-	if err == nil {
-		n.logger.Info("Chain data has been removed", zap.String("dir", chainDataDir))
-	}
-	return err
 }
 
 // IsRunning confirm that node is running.
