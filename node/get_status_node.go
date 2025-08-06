@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 
 	"github.com/status-im/status-go/account"
+	devicescommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/ipfs"
@@ -240,7 +241,11 @@ func (n *StatusNode) StartLocalBackup(privateKey *ecdsa.PrivateKey) error {
 		if backupPath != "" {
 			backupDir = backupPath
 		} else {
-			backupDir = filepath.Join(n.config.RootDataDir, "backups")
+			if devicescommon.OperatingSystemIs(devicescommon.AndroidPlatform) {
+				backupDir = "/storage/emulated/0/Documents/Status/Backups"
+			} else {
+				backupDir = filepath.Join(n.config.RootDataDir, "backups")
+			}
 		}
 		fullPath := filepath.Join(backupDir, fmt.Sprintf("%x_user_data.bkp", accountIdentifier[:4]))
 		return fullPath, nil
@@ -251,7 +256,7 @@ func (n *StatusNode) StartLocalBackup(privateKey *ecdsa.PrivateKey) error {
 		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
 		FileNameGetter: filenameGetter,
 		BackupEnabled:  true,
-		Interval:       time.Minute * 30,
+		Interval:       time.Minute * 1,
 	}, n.logger.Named("LocalBackup"))
 	if err != nil {
 		return err
