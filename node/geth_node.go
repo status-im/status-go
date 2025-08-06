@@ -53,8 +53,6 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		DataDir:           config.DataDir,
 		UseLightweightKDF: true,
 		NoUSB:             true,
-		Name:              config.Name,
-		Version:           config.Version,
 		P2P: p2p.Config{
 			NoDiscovery: true,
 			NoDial:      true,

@@ -355,16 +355,6 @@ func validateNodeConfig(configJSON string) string {
 	return string(respJSON)
 }
 
-func ResetChainData() string {
-	return callWithResponse(resetChainData)
-}
-
-// resetChainData removes chain data from data directory.
-func resetChainData() string {
-	api.RunAsync(statusBackend.ResetChainData)
-	return makeJSONResponse(nil)
-}
-
 func CallRPC(inputJSON string) string {
 	return callRPC(inputJSON)
 }

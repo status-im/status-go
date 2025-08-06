@@ -40,7 +40,6 @@ type StatusBackend interface {
 	HashTransaction(sendArgs wallettypes.SendTxArgs) (wallettypes.SendTxArgs, types.Hash, error)
 	HashTypedData(typed typeddata.TypedData) (types.Hash, error)
 	HashTypedDataV4(typed signercore.TypedData) (types.Hash, error)
-	ResetChainData() error
 	SendTransaction(sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error)
 	SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error)
 	SendTransactionWithSignature(sendArgs wallettypes.SendTxArgs, sig []byte) (hash types.Hash, err error)

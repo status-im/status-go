@@ -188,7 +188,6 @@ func newWakuV2(identity *ecdsa.PrivateKey, nodeConfig *params.NodeConfig, appDB 
 }
 
 type InitProtocolParams struct {
-	NodeName               string
 	Identity               *ecdsa.PrivateKey
 	AppDB                  *sql.DB
 	WalletDB               *sql.DB

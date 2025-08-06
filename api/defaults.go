@@ -29,13 +29,9 @@ const (
 	DefaultKeystoreRelativePath   = "keystore"
 	DefaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
 	DefaultDataDir                = "/ethereum/mainnet_rpc"
-	DefaultNodeName               = "StatusIM"
 	DefaultAPILogFile             = "api.log"
 
 	DefaultLogLevel                   = "ERROR"
-	DefaultMaxPeers                   = 20
-	DefaultMaxPendingPeers            = 20
-	DefaultListenAddr                 = ":0"
 	DefaultMaxMessageDeliveryAttempts = 3
 	DefaultVerifyTransactionChainID   = 1
 	DefaultCurrentNetwork             = "mainnet_rpc"
@@ -325,19 +321,11 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.NetworkID = nodeConfig.Networks[0].ChainID
 	}
 
-	nodeConfig.Name = DefaultNodeName
-	nodeConfig.NoDiscovery = true
-	nodeConfig.MaxPeers = DefaultMaxPeers
-	nodeConfig.MaxPendingPeers = DefaultMaxPendingPeers
-
 	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
 
-	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
-
-	nodeConfig.ListenAddr = DefaultListenAddr
 
 	fleet := request.WakuV2Fleet
 	if fleet == "" {
