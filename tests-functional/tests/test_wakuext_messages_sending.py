@@ -18,7 +18,7 @@ class TestSendingChatMessages(MessengerSteps):
         self.receiver = backend_new_profile("receiver", waku_light_client=waku_light_client)
 
     def test_send_one_to_one_message(self):
-        sent_texts, responses = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
+        sent_texts, responses = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver, schema_check=True)
         chat = responses[0]["result"]["chats"][0]
         assert chat["id"] == self.receiver.public_key
         assert chat["lastMessage"]["displayName"] == self.sender.display_name
@@ -61,7 +61,9 @@ class TestSendingChatMessages(MessengerSteps):
             SendChatMessagePayload(chat_id=community_chat_id, text=f"test_message_{i}", content_type=MessageContentType.TEXT_PLAIN.value)
             for i in range(5)
         ]
-        self.sender.wakuext_service.send_chat_messages(payload, schema_check=True)
+        response = self.sender.wakuext_service.send_chat_messages(payload)
+        self.sender.verify_json_schema(response, method="wakuext_sendChatMessage")  # the same schema as for sendChatMessage
+
         response = self.sender.wakuext_service.chat_messages(community_chat_id)
         messages = response.get("result", {}).get("messages", [])
         assert len(payload) == 5

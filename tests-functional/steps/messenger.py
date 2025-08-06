@@ -236,14 +236,14 @@ class MessengerSteps(NetworkConditionsSteps):
 
         return responses
 
-    def send_multiple_one_to_one_messages(self, message_count=1, sender=None, receiver=None) -> tuple[list[str], list[dict]]:
+    def send_multiple_one_to_one_messages(self, message_count=1, sender=None, receiver=None, schema_check=False) -> tuple[list[str], list[dict]]:
         sent_texts = []
         responses = []
 
         for i in range(message_count):
             message_text = f"test_message_{i}_{uuid4()}"
             sent_texts.append(message_text)
-            response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text, schema_check=True)
+            response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text, schema_check=schema_check)
             responses.append(response)
 
         return sent_texts, responses

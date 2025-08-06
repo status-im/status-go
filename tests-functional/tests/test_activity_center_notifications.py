@@ -7,12 +7,15 @@ from steps.messenger import MessengerSteps
 
 
 def _get_activity_center_notifications(
-    backend_instance: StatusBackend, activity_types: list = [1, 2, 3, 4, 5, 7, 8, 9, 10, 23, 24], read_type: Union[int, None] = None
+    backend_instance: StatusBackend,
+    activity_types: list = [1, 2, 3, 4, 5, 7, 8, 9, 10, 23, 24],
+    read_type: Union[int, None] = None,
+    schema_check=False,
 ):
     params = {"cursor": "", "limit": 20, "activityTypes": activity_types}
     if read_type:
         params["readType"] = read_type
-    return backend_instance.wakuext_service.rpc_request(method="activityCenterNotifications", params=[params], schema_check=True).json()
+    return backend_instance.wakuext_service.rpc_request(method="activityCenterNotifications", params=[params], schema_check=schema_check).json()
 
 
 @pytest.mark.rpc
@@ -26,7 +29,7 @@ class TestActivityCenterNotifications(MessengerSteps):
 
     def test_activity_center_notifications(self):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = _get_activity_center_notifications(backend_instance=self.receiver, activity_types=[5], read_type=2)
+        response = _get_activity_center_notifications(backend_instance=self.receiver, activity_types=[5], read_type=2, schema_check=True)
         notification = response["result"]["notifications"][0]
         assert all(
             (
