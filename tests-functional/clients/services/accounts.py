@@ -6,30 +6,30 @@ class AccountService(Service):
     def __init__(self, client: RpcClient):
         super().__init__(client, "accounts")
 
-    def get_accounts(self):
-        response = self.rpc_request("getAccounts")
+    def get_accounts(self, **kwargs):
+        response = self.rpc_request("getAccounts", **kwargs)
         return response.json()
 
-    def get_account_keypairs(self):
-        response = self.rpc_request("getKeypairs")
+    def get_account_keypairs(self, **kwargs):
+        response = self.rpc_request("getKeypairs", **kwargs)
         return response.json()
 
-    def add_account(self, account_data, skip_validation=False):
+    def add_account(self, account_data, **kwargs):
         params = ["", account_data]
-        response = self.rpc_request("addAccount", params, skip_validation=skip_validation)
+        response = self.rpc_request("addAccount", params, **kwargs)
         return response.json()
 
-    def delete_account(self, account_address):
+    def delete_account(self, account_address, **kwargs):
         params = [account_address]
-        response = self.rpc_request("deleteAccount", params)
+        response = self.rpc_request("deleteAccount", params, **kwargs)
         return response.json()
 
-    def import_mnemonic(self, mnemonic, password):
+    def import_mnemonic(self, mnemonic, password, **kwargs):
         params = [mnemonic, password]
-        response = self.rpc_request("importMnemonic", params)
+        response = self.rpc_request("importMnemonic", params, **kwargs)
         return response.json()
 
-    def add_keypair(self, password, keypair):
+    def add_keypair(self, password, keypair, **kwargs):
         params = [password, keypair]
-        response = self.rpc_request("addKeypair", params)
+        response = self.rpc_request("addKeypair", params, **kwargs)
         return response.json()

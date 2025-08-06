@@ -24,13 +24,9 @@ class TestInteractingWithChatMessages(MessengerSteps):
             "pinned": True,
         }
 
-        response = self.sender.wakuext_service.send_pin_message(pin_message_payload)
-        self.sender.verify_json_schema(response, method="wakuext_sendPinMessage")
-
+        self.sender.wakuext_service.send_pin_message(pin_message_payload, schema_check=True)
         sender_chat_id = self.receiver.public_key
-        response = self.sender.wakuext_service.chat_pinned_messages(sender_chat_id)
-        self.sender.verify_json_schema(response, method="wakuext_chatPinnedMessages")
-
+        response = self.sender.wakuext_service.chat_pinned_messages(sender_chat_id, schema_check=True)
         pinned_messages = response.get("result", {}).get("pinnedMessages", [])
         assert len(pinned_messages) == 1
         actual_text = pinned_messages[0].get("message", {}).get("text", "")
@@ -87,9 +83,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         assert actual_text == sent_texts[0]
 
         new_text = "test_message_edited"
-        response = self.sender.wakuext_service.edit_message(message_id, new_text)
-        self.sender.verify_json_schema(response, method="wakuext_editMessage")
-
+        self.sender.wakuext_service.edit_message(message_id, new_text, schema_check=True)
         response = self.sender.wakuext_service.message_by_message_id(message_id)
         actual_text = response.get("result", {}).get("text", "")
         assert actual_text == new_text
@@ -101,9 +95,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         response = self.sender.wakuext_service.message_by_message_id(message_id)
         assert response.get("result", {}) != {}
 
-        response = self.sender.wakuext_service.delete_message(message_id)
-        self.sender.verify_json_schema(response, method="wakuext_deleteMessage")
-
+        self.sender.wakuext_service.delete_message(message_id, schema_check=True)
         response = self.sender.wakuext_service.message_by_message_id(message_id, skip_validation=True)
         error_code = response.get("error", {}).get("code", 0)
         error_message = response.get("error", {}).get("message", "")
@@ -117,8 +109,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         response = self.sender.wakuext_service.message_by_message_id(message_id)
         assert response.get("result", {}) != {}
 
-        response = self.sender.wakuext_service.delete_message_and_send(message_id)
-        self.sender.verify_json_schema(response, method="wakuext_deleteMessageAndSend")
+        response = self.sender.wakuext_service.delete_message_and_send(message_id, schema_check=True)
         removed_messages = response.get("result", {}).get("removedMessages", [])
         assert len(removed_messages) == 1
         assert removed_messages[0].get("messageId") == message_id
@@ -136,9 +127,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == 3
 
-        response = self.sender.wakuext_service.delete_messages_by_chat_id(sender_chat_id)
-        self.sender.verify_json_schema(response, method="wakuext_deleteMessagesByChatID")
-
+        self.sender.wakuext_service.delete_messages_by_chat_id(sender_chat_id, schema_check=True)
         response = self.sender.wakuext_service.chat_messages(sender_chat_id)
         messages = response.get("result", {}).get("messages", [])
         assert messages is None
@@ -151,9 +140,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         response = self.sender.wakuext_service.message_by_message_id(message_id)
         assert response.get("result", {}) != {}
 
-        response = self.sender.wakuext_service.delete_message_for_me_and_sync(local_chat_id, message_id)
-        self.sender.verify_json_schema(response, method="wakuext_deleteMessageForMeAndSync")
-
+        self.sender.wakuext_service.delete_message_for_me_and_sync(local_chat_id, message_id, schema_check=True)
         response = self.sender.wakuext_service.message_by_message_id(message_id)
         message = response.get("result", {})
         assert message.get("id", "") == message_id
@@ -166,9 +153,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
         new_status = "delivered"
 
-        response = self.sender.wakuext_service.update_message_outgoing_status(message_id, new_status)
-        self.sender.verify_json_schema(response, method="wakuext_updateMessageOutgoingStatus")
-
+        self.sender.wakuext_service.update_message_outgoing_status(message_id, new_status, schema_check=True)
         response = self.sender.wakuext_service.message_by_message_id(message_id)
         outgoing_status = response.get("result", {}).get("outgoingStatus", "")
         assert outgoing_status == new_status

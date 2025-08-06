@@ -83,6 +83,4 @@ class TestRpc:
     )
     def test_(self, method, params):
         _id = str(random.randint(1, 8888))
-
-        response = self.rpc_client.rpc_valid_request(method, params, _id)
-        self.rpc_client.verify_json_schema(response.json(), method)
+        self.rpc_client.rpc_valid_request(method, params, _id, schema_check=True)

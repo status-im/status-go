@@ -16,9 +16,7 @@ class TestContactRequests(MessengerSteps):
 
     def test_send_contact_request(self):
         message_text = "test_send_contact_request"
-        response = self.sender.wakuext_service.send_contact_request(self.receiver.public_key, message_text)
-        self.sender.verify_json_schema(response, "wakuext_sendContactRequest")
-
+        response = self.sender.wakuext_service.send_contact_request(self.receiver.public_key, message_text, schema_check=True)
         contacts = response.get("result", {}).get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
 
@@ -31,9 +29,7 @@ class TestContactRequests(MessengerSteps):
         assert sent_request_messages[0].get("text") == f"You sent a contact request to @{self.receiver.public_key}"
 
     def test_add_contact(self):
-        response = self.sender.wakuext_service.add_contact(self.receiver.public_key, self.receiver.display_name)
-        self.sender.verify_json_schema(response, "wakuext_addContact")
-
+        response = self.sender.wakuext_service.add_contact(self.receiver.public_key, self.receiver.display_name, schema_check=True)
         contacts = response.get("result", {}).get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.receiver.display_name
@@ -48,9 +44,7 @@ class TestContactRequests(MessengerSteps):
 
     def test_accept_contact_request(self):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = self.receiver.wakuext_service.accept_contact_request(message_id)
-        self.sender.verify_json_schema(response, "wakuext_acceptContactRequest")
-
+        response = self.receiver.wakuext_service.accept_contact_request(message_id, schema_check=True)
         contacts = response.get("result", {}).get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.sender.display_name
@@ -69,9 +63,7 @@ class TestContactRequests(MessengerSteps):
 
     def test_decline_contact_request(self):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = self.receiver.wakuext_service.decline_contact_request(message_id)
-        self.sender.verify_json_schema(response, "wakuext_declineContactRequest")
-
+        response = self.receiver.wakuext_service.decline_contact_request(message_id, schema_check=True)
         contacts = response.get("result", {}).get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.sender.display_name
@@ -82,9 +74,7 @@ class TestContactRequests(MessengerSteps):
 
     def test_accept_latest_contact_request_for_contact(self):
         self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = self.receiver.wakuext_service.accept_latest_contact_request_for_contact(self.sender.public_key)
-        self.sender.verify_json_schema(response, "wakuext_acceptLatestContactRequestForContact")
-
+        response = self.receiver.wakuext_service.accept_latest_contact_request_for_contact(self.sender.public_key, schema_check=True)
         contacts = response.get("result", {}).get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.sender.display_name
@@ -103,9 +93,7 @@ class TestContactRequests(MessengerSteps):
 
     def test_dismiss_latest_contact_request_for_contact(self):
         self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = self.receiver.wakuext_service.dismiss_latest_contact_request_for_contact(self.sender.public_key)
-        self.sender.verify_json_schema(response, "wakuext_dismissLatestContactRequestForContact")
-
+        response = self.receiver.wakuext_service.dismiss_latest_contact_request_for_contact(self.sender.public_key, schema_check=True)
         contacts = response.get("result", {}).get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.sender.display_name
@@ -116,18 +104,14 @@ class TestContactRequests(MessengerSteps):
 
     def test_get_latest_contact_request_for_contact(self):
         self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = self.receiver.wakuext_service.get_latest_contact_request_for_contact(self.sender.public_key)
-        self.sender.verify_json_schema(response, "wakuext_getLatestContactRequestForContact")
-
+        response = self.receiver.wakuext_service.get_latest_contact_request_for_contact(self.sender.public_key, schema_check=True)
         contact_request_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)
         assert len(contact_request_message) == 1, f"Expected one message with contentType {MessageContentType.CONTACT_REQUEST.value}"
         assert contact_request_message[0].get("text") == "contact_request"
 
     def test_retract_contact_request(self):
         self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = self.sender.wakuext_service.retract_contact_request(self.receiver.public_key)
-        self.sender.verify_json_schema(response, "wakuext_retractContactRequest")
-
+        response = self.sender.wakuext_service.retract_contact_request(self.receiver.public_key, schema_check=True)
         contacts = response.get("result", {}).get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
 
@@ -142,9 +126,7 @@ class TestContactRequests(MessengerSteps):
     def test_remove_contact(self):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
         self.accept_contact_request_and_wait_for_signal_to_be_received(message_id)
-        response = self.sender.wakuext_service.remove_contact(self.receiver.public_key)
-        self.sender.verify_json_schema(response, "wakuext_removeContact")
-
+        response = self.sender.wakuext_service.remove_contact(self.receiver.public_key, schema_check=True)
         contacts = response.get("result", {}).get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
 
@@ -160,9 +142,7 @@ class TestContactRequests(MessengerSteps):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
         self.accept_contact_request_and_wait_for_signal_to_be_received(message_id)
         nickname = str(uuid4())
-        response = self.sender.wakuext_service.set_contact_local_nickname(self.receiver.public_key, nickname)
-        self.sender.verify_json_schema(response, "wakuext_setContactLocalNickname")
-
+        response = self.sender.wakuext_service.set_contact_local_nickname(self.receiver.public_key, nickname, schema_check=True)
         contacts = response.get("result", {}).get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.receiver.display_name

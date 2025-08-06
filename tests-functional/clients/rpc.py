@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import jsonschema
 import requests
 from tenacity import retry, stop_after_delay, wait_fixed
@@ -44,7 +45,9 @@ class RpcClient:
         self._check_decode_and_key_errors_in_response(response, "error")
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.5), reraise=True)
-    def rpc_request(self, method, params=None, request_id=None, url=None, enable_logging=True):
+    def rpc_request(self, method, params=None, request_id=None, url=None, **kwargs):
+        enable_logging = kwargs.pop("enable_logging", True)
+
         if not request_id:
             request_id = self.request_counter
             self.request_counter += 1
@@ -68,9 +71,22 @@ class RpcClient:
                 logging.debug(f"Got response: {response.content}")
         return response
 
-    def rpc_valid_request(self, method, params=None, _id=None, url=None, skip_validation=False, enable_logging=True):
-        response = self.rpc_request(method, params, _id, url, enable_logging=enable_logging)
+    def rpc_valid_request(self, method, params=None, _id=None, url=None, **kwargs):
+        skip_validation = kwargs.pop("skip_validation", False)
+        schema_check = kwargs.pop("schema_check", False)
+
+        response = self.rpc_request(method, params, _id, url, **kwargs)
         self.verify_is_valid_json_rpc_response(response, _id, skip_validation=skip_validation)
+
+        if schema_check:
+            if os.path.exists(f"{Config.base_dir}/schemas/{method}"):
+                self.verify_json_schema(response.json(), method)
+            else:
+                from utils.schema_builder import CustomSchemaBuilder
+
+                CustomSchemaBuilder(method).create_schema(response.json())
+                self.verify_json_schema(response.json(), method)
+
         return response
 
     def verify_json_schema(self, response, method):

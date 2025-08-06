@@ -59,15 +59,11 @@ class TestSavedAddresses:
 
         # Step: Adding item in mainnet mode
         self.rpc_client.rpc_valid_request(method, params)
-        response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddresses", [])
-
-        # Step: Verifying the item is in the saved addresses list
-        self.rpc_client.verify_json_schema(response.json(), "wakuext_getSavedAddresses")
+        response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddresses", [], schema_check=True)
         assert any(params[0].items() <= item.items() for item in response.json()["result"]), f"{params[0]['name']} not found in getSavedAddresses"
 
         # Step: Checking if the item is listed under mainnet saved addresses
-        response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [False])
-        self.rpc_client.verify_json_schema(response.json(), "wakuext_getSavedAddressesPerMode")
+        response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [False], schema_check=True)
         assert any(
             params[0].items() <= item.items() for item in response.json()["result"]
         ), f"{params[0]['name']} not found in getSavedAddressesPerMode"

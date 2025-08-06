@@ -13,9 +13,7 @@ class TestAddAccount:
 
     def test_add_account_for_valid_key_uid(self):
         self.account_data["key-uid"] = self.get_keypair_key_uid()
-        add_account_response = self.account.accounts_service.add_account(self.account_data)
-        self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
-        assert "error" not in add_account_response
+        self.account.accounts_service.add_account(self.account_data, schema_check=True)
 
         # After adding the account check that the get accounts will retrieve the new account
         accounts_response = self.account.accounts_service.get_accounts()
@@ -26,19 +24,16 @@ class TestAddAccount:
         key_uid = self.get_keypair_key_uid()
 
         self.account_data["key-uid"] = key_uid
-        add_account_response = self.account.accounts_service.add_account(self.account_data)
-        assert "error" not in add_account_response
+        self.account.accounts_service.add_account(self.account_data)
 
         # Add a second account
         self.account_data = copy.deepcopy(new_account_data_2)
         self.account_data["key-uid"] = key_uid
-        add_second_account_response = self.account.accounts_service.add_account(self.account_data)
-        assert "error" not in add_second_account_response
+        self.account.accounts_service.add_account(self.account_data)
 
     def test_add_duplicate_account(self):
         self.account_data["key-uid"] = self.get_keypair_key_uid()
         add_account_response = self.account.accounts_service.add_account(self.account_data)
-        assert "error" not in add_account_response
 
         # Add same account again
         add_account_response = self.account.accounts_service.add_account(self.account_data, skip_validation=True)
@@ -54,8 +49,7 @@ class TestAddAccount:
 
         # Call accounts_addKeypair with the new account
         password = self.account.password
-        add_keypair_response = self.account.accounts_service.add_keypair(password, keypair)
-        self.account.verify_json_schema(add_keypair_response, method="accounts_addKeypair")
+        self.account.accounts_service.add_keypair(password, keypair, schema_check=True)
 
         # After adding the account check that the get accounts will retrieve the new account
         accounts_response = self.account.accounts_service.get_accounts()
@@ -81,9 +75,7 @@ class TestAddAccount:
 
     def test_add_watch_account(self):
         self.account_data["type"] = "watch"
-        add_account_response = self.account.accounts_service.add_account(self.account_data)
-        self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
-        assert "error" not in add_account_response
+        self.account.accounts_service.add_account(self.account_data, schema_check=True)
 
         # After adding the account check that the get accounts will retrieve the new account
         accounts_response = self.account.accounts_service.get_accounts()
@@ -93,23 +85,17 @@ class TestAddAccount:
     def test_add_seed_account(self):
         self.account_data["key-uid"] = self.get_keypair_key_uid()
         self.account_data["type"] = "seed"
-        add_account_response = self.account.accounts_service.add_account(self.account_data)
-        self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
-        assert "error" not in add_account_response
+        self.account.accounts_service.add_account(self.account_data, schema_check=True)
 
     def test_delete_account(self):
         self.account_data["type"] = "watch"
-        add_account_response = self.account.accounts_service.add_account(self.account_data)
-        self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
-        assert "error" not in add_account_response
+        self.account.accounts_service.add_account(self.account_data, schema_check=True)
 
         accounts_response = self.account.accounts_service.get_accounts()
         assert len(accounts_response.get("result", [])) == 3
 
         # Delete the account
-        delete_response = self.account.accounts_service.delete_account(self.account_data["address"])
-        assert "error" not in delete_response
-        self.account.verify_json_schema(delete_response, method="accounts_deleteAccount")
+        self.account.accounts_service.delete_account(self.account_data["address"], schema_check=True)
 
         accounts_response = self.account.accounts_service.get_accounts()
         assert len(accounts_response.get("result", [])) == 2

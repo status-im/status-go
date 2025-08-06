@@ -19,8 +19,6 @@ class TestSendingChatMessages(MessengerSteps):
 
     def test_send_one_to_one_message(self):
         sent_texts, responses = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
-        self.receiver.verify_json_schema(responses[0], method="wakuext_sendOneToOneMessage")
-
         chat = responses[0]["result"]["chats"][0]
         assert chat["id"] == self.receiver.public_key
         assert chat["lastMessage"]["displayName"] == self.sender.display_name
@@ -36,9 +34,7 @@ class TestSendingChatMessages(MessengerSteps):
         community_chat_id = self.join_community(member=self.receiver, admin=self.sender)
 
         text = "test_message"
-        response = self.sender.wakuext_service.send_chat_message(community_chat_id, text)
-        self.sender.verify_json_schema(response, method="wakuext_sendChatMessage")
-
+        self.sender.wakuext_service.send_chat_message(community_chat_id, text, schema_check=True)
         response = self.sender.wakuext_service.chat_messages(community_chat_id)
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == 1
@@ -65,9 +61,7 @@ class TestSendingChatMessages(MessengerSteps):
             SendChatMessagePayload(chat_id=community_chat_id, text=f"test_message_{i}", content_type=MessageContentType.TEXT_PLAIN.value)
             for i in range(5)
         ]
-        response = self.sender.wakuext_service.send_chat_messages(payload)
-        self.sender.verify_json_schema(response, method="wakuext_sendChatMessage")  # the same schema as for sendChatMessage
-
+        self.sender.wakuext_service.send_chat_messages(payload, schema_check=True)
         response = self.sender.wakuext_service.chat_messages(community_chat_id)
         messages = response.get("result", {}).get("messages", [])
         assert len(payload) == 5
@@ -102,9 +96,7 @@ class TestSendingChatMessages(MessengerSteps):
         private_group_id = self.join_private_group(admin=self.sender, member=self.receiver)
 
         text = "test_message_group"
-        response = self.sender.wakuext_service.send_group_chat_message(private_group_id, text)
-        self.sender.verify_json_schema(response, method="wakuext_sendGroupChatMessage")
-
+        self.sender.wakuext_service.send_group_chat_message(private_group_id, text, schema_check=True)
         response = self.sender.wakuext_service.chat_messages(private_group_id)
         expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         actual_text = expected_message.get("text", "")

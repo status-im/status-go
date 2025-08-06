@@ -22,8 +22,9 @@ class TestMessageReactions(MessengerSteps):
         message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id, sender_chat_id = message["id"], message["chatId"]
         receiver_chat_id = self.receiver.wakuext_service.rpc_request(method="chats").json()["result"][0]["id"]
-        response = self.receiver.wakuext_service.rpc_request(method="sendEmojiReaction", params=[receiver_chat_id, message_id, 1]).json()
-        self.sender.verify_json_schema(response, "wakuext_sendEmojiReaction")
+        response = self.receiver.wakuext_service.rpc_request(
+            method="sendEmojiReaction", params=[receiver_chat_id, message_id, 1], schema_check=True
+        ).json()
         self.sender.find_signal_containing_pattern(
             SignalType.MESSAGES_NEW.value,
             event_pattern="emojiReactions",
@@ -33,8 +34,8 @@ class TestMessageReactions(MessengerSteps):
         response = self.sender.wakuext_service.rpc_request(
             method="emojiReactionsByChatIDMessageID",
             params=[sender_chat_id, message_id],
+            schema_check=True,
         ).json()
-        self.sender.verify_json_schema(response, "wakuext_emojiReactionsByChatIDMessageID")
         result = response["result"]
         assert all(
             (
@@ -51,8 +52,8 @@ class TestMessageReactions(MessengerSteps):
             params=[
                 emoji_id,
             ],
+            schema_check=True,
         ).json()
-        self.sender.verify_json_schema(response, "wakuext_sendEmojiReactionRetraction")
         assert response["result"]["chats"][0]["id"] == receiver_chat_id
 
         self.sender.find_signal_containing_pattern(
@@ -88,8 +89,9 @@ class TestMessageReactions(MessengerSteps):
             timeout=60,
         )
         time.sleep(10)
-        response = self.sender.wakuext_service.rpc_request(method="emojiReactionsByChatID", params=[sender_chat_id, None, 20]).json()
-        self.sender.verify_json_schema(response, "wakuext_emojiReactionsByChatID")
+        response = self.sender.wakuext_service.rpc_request(
+            method="emojiReactionsByChatID", params=[sender_chat_id, None, 20], schema_check=True
+        ).json()
         result = response["result"]
         assert len(result) == 2
         for item in result:
