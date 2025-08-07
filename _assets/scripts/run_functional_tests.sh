@@ -40,7 +40,7 @@ docker ps -a --filter "name=status-go-func-tests-${identifier}" --filter "status
 
 # Build statusgo image
 echo -e "${GRN}Building status-go${RST}"
-docker build --file ./_assets/build/Dockerfile . \
+docker build . \
   --build-arg "build_flags=-cover" \
   --build-arg "build_tags='gowaku_no_rln'" \
   --build-arg "enable_go_cache=false" \
