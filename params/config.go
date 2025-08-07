@@ -276,10 +276,6 @@ type NodeConfig struct {
 	// PermissionsConfig extra configuration for permissions.Service.
 	PermissionsConfig PermissionsConfig
 
-	// MailserversConfig extra configuration for mailservers.Service
-	// (persistent storage of user's mailserver records).
-	MailserversConfig MailserversConfig
-
 	// ConnectorConfig extra configuration for connector.Service
 	ConnectorConfig ConnectorConfig
 
@@ -352,11 +348,6 @@ type BrowsersConfig struct {
 
 // PermissionsConfig extra configuration for permissions.Service.
 type PermissionsConfig struct {
-	Enabled bool
-}
-
-// MailserversConfig extra configuration for mailservers.Service.
-type MailserversConfig struct {
 	Enabled bool
 }
 

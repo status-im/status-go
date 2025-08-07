@@ -31,7 +31,6 @@ import (
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcstats"
@@ -72,7 +71,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accDB, mediaServer))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
-	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	services = appendIf(config.ConnectorConfig.Enabled, services, b.connectorService())
 	services = append(services, b.gifService(accDB))
 	services = append(services, b.ChatService(accDB))
@@ -266,14 +264,6 @@ func (b *StatusNode) permissionsService() *permissions.Service {
 		b.permissionsSrvc = permissions.NewService(permissions.NewDB(b.appDB))
 	}
 	return b.permissionsSrvc
-}
-
-func (b *StatusNode) mailserversService() *mailservers.Service {
-	if b.mailserversSrvc == nil {
-
-		b.mailserversSrvc = mailservers.NewService(mailservers.NewDB(b.appDB))
-	}
-	return b.mailserversSrvc
 }
 
 func (b *StatusNode) appmetricsService() common.StatusService {
