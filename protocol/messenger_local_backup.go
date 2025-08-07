@@ -233,6 +233,19 @@ func (m *Messenger) backupProfile(clock uint64) (*protobuf.Backup, error) {
 	return backupMessage, nil
 }
 
+func (m *Messenger) backupMessages() ([]*protobuf.BackedUpMessage, error) {
+	messagesBackupEnabled, err := m.settings.MessagesBackupEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	if !messagesBackupEnabled {
+		return nil, nil
+	}
+
+	return m.persistence.AllMessagesForBackup()
+}
+
 func (m *Messenger) ExportBackup() ([]byte, error) {
 	backup := &protobuf.MessengerLocalBackup{}
 
@@ -258,6 +271,13 @@ func (m *Messenger) ExportBackup() ([]byte, error) {
 	for _, d := range chatsToBackup {
 		backup.Chats = append(backup.Chats, d.Chats...)
 	}
+
+	backupMessages, err := m.backupMessages()
+	if err != nil {
+		return nil, err
+	}
+	backup.Messages = backupMessages
+
 	return proto.Marshal(backup)
 }
 
