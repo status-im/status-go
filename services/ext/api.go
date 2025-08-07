@@ -38,7 +38,6 @@ import (
 	"github.com/status-im/status-go/protocol/verification"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // PublicAPI extends whisper public API.
@@ -1283,12 +1282,8 @@ func (api *PublicAPI) DropPeer(peerID string) error {
 	return api.service.messenger.DropPeer(pID)
 }
 
-func (api *PublicAPI) Peers() wakutypes.PeerStats {
+func (api *PublicAPI) Peers() messagingtypes.PeerStats {
 	return api.service.messenger.Peers()
-}
-
-func (api *PublicAPI) RelayPeersByTopic(topic string) (*wakutypes.PeerList, error) {
-	return api.service.messenger.RelayPeersByTopic(topic)
 }
 
 func (api *PublicAPI) ListenAddresses() ([]multiaddr.Multiaddr, error) {

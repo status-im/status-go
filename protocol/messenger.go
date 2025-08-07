@@ -65,8 +65,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
-
 	_ "github.com/mmcdole/gofeed"
 )
 
@@ -2826,7 +2824,7 @@ func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {
 	localnotifications.PushMessages(notifications)
 }
 
-func (m *Messenger) GetStats() wakutypes.StatsSummary {
+func (m *Messenger) GetStats() messagingtypes.TransportStats {
 	return m.messaging.GetStats()
 }
 

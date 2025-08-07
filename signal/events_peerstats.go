@@ -1,6 +1,6 @@
 package signal
 
-import "github.com/status-im/status-go/waku/types"
+import messagingtypes "github.com/status-im/status-go/messaging/types"
 
 const (
 	// EventPeerStats is sent when peer is added or removed.
@@ -9,6 +9,6 @@ const (
 )
 
 // SendPeerStats sends discovery.summary signal.
-func SendPeerStats(peerStats types.ConnStatus) {
+func SendPeerStats(peerStats messagingtypes.ConnStatus) {
 	send(EventPeerStats, peerStats)
 }

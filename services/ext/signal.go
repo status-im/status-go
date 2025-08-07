@@ -2,13 +2,12 @@ package ext
 
 import (
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/signal"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // EnvelopeSignalHandler sends signals when envelope is sent or expired.
@@ -49,7 +48,7 @@ func (h PublisherSignalHandler) NewMessages(response *protocol.MessengerResponse
 	signal.SendNewMessages(response)
 }
 
-func (h PublisherSignalHandler) Stats(stats wakutypes.StatsSummary) {
+func (h PublisherSignalHandler) Stats(stats messagingtypes.TransportStats) {
 	signal.SendStats(stats)
 }
 
