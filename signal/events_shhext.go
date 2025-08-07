@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -121,7 +122,7 @@ type Filter struct {
 	// Identity is the public key of the other recipient for non-public chats
 	Identity string `json:"identity"`
 	// Topic is the whisper topic
-	Topic wakutypes.TopicType `json:"topic"`
+	Topic messagingtypes.ContentTopic `json:"topic"`
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
