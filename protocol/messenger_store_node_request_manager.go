@@ -501,7 +501,7 @@ func (r *storeNodeRequest) routine() {
 
 	communityID := r.requestID.getCommunityID()
 
-	if r.requestID.RequestType != storeNodeCommunityRequest || !r.manager.messenger.communityStorenodes.HasStorenodeSetup(communityID) {
+	if r.requestID.RequestType != storeNodeCommunityRequest {
 		ctx, cancel := context.WithTimeout(r.ctx, storeNodeAvailableTimeout)
 		defer cancel()
 		if !r.manager.messenger.messaging.WaitForAvailableStoreNode(ctx) {
@@ -509,8 +509,6 @@ func (r *storeNodeRequest) routine() {
 			return
 		}
 	}
-
-	storeNode := r.manager.messenger.getCommunityStorenode(communityID)
 
 	// Check if community already exists locally and get Clock.
 	if r.requestID.RequestType == storeNodeCommunityRequest {
@@ -523,6 +521,7 @@ func (r *storeNodeRequest) routine() {
 	// Start store node request
 	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
 
+	storeNode := r.manager.messenger.messaging.GetActiveStorenode()
 	_, err := r.manager.messenger.performStorenodeTask(func() (*MessengerResponse, error) {
 		batch := messagingtypes.StoreNodeBatch{
 			From:        from,
