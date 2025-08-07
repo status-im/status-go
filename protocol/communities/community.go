@@ -713,7 +713,7 @@ func (o *Community) getChatMember(pk *ecdsa.PublicKey, chatID string) *protobuf.
 	key := common.PubkeyToHex(pk)
 	member := chat.Members[key]
 
-	if member == nil && !channelEncrypted(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
+	if member == nil && !channelHasPermissions(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
 		// User is a member of the community, but not in the chat. The chat is public, so we return the community member.
 		return o.getMember(pk)
 	}
@@ -1697,18 +1697,6 @@ func dehydrateChannelsMembers(description *protobuf.CommunityDescription) {
 	for channelID, channel := range description.Chats {
 		if !channelHasPermissions(ChatID(description.ID, channelID), description.TokenPermissions) {
 			channel.Members = map[string]*protobuf.CommunityMember{} // clean members
-		} else if !channelEncrypted(ChatID(description.ID, channelID), description.TokenPermissions) {
-			// Has some permissions, but not encrypted. Everyone can view, only members can post.
-			membersToKeep := make(map[string]*protobuf.CommunityMember)
-			for id, member := range channel.Members {
-				isViewer := member.GetChannelRole() == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
-				if !isViewer {
-					// If the member is a viewer, we can remove them from the channel members
-					// as they are not allowed to post anyway.
-					membersToKeep[id] = member
-				}
-			}
-			channel.Members = membersToKeep // keep only members that can post
 		}
 	}
 }
@@ -2153,7 +2141,7 @@ func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) bool {
 		return false
 	}
 
-	if !channelEncrypted(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
+	if !channelHasPermissions(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
 		return true
 	}
 
