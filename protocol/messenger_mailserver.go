@@ -67,7 +67,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 
 	go func() {
 		defer gocommon.LogOnPanic()
-		peerInfo := m.getCommunityStorenode(chat.CommunityID)
+		peerInfo := m.messaging.GetActiveStorenode()
 		_, err = m.performStorenodeTask(func() (*MessengerResponse, error) {
 			response, err := m.syncChatWithFilters(peerInfo, chat.ID)
 
@@ -128,28 +128,23 @@ func (m *Messenger) scheduleSyncFilters(filters messagingtypes.ChatFilters) (boo
 
 	go func() {
 		defer gocommon.LogOnPanic()
-		// split filters by community store node so we can request the filters to the correct mailserver
-		filtersByMs := m.SplitFiltersByStoreNode(filters)
-		for communityID, filtersForMs := range filtersByMs {
-			peerInfo := m.getCommunityStorenode(communityID)
-			_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
-				response, err := m.syncFilters(peerInfo, filtersForMs)
+		peerInfo := m.messaging.GetActiveStorenode()
+		_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
+			response, err := m.syncFilters(peerInfo, filters)
 
-				if err != nil {
-					m.logger.Error("failed to sync filter", zap.Error(err))
-					return nil, err
-				}
-
-				if m.config.messengerSignalsHandler != nil {
-					m.config.messengerSignalsHandler.MessengerResponse(response)
-				}
-				return response, nil
-			}, history.WithPeerID(peerInfo.ID))
 			if err != nil {
-				m.logger.Error("failed to perform mailserver request", zap.Error(err))
+				m.logger.Error("failed to sync filter", zap.Error(err))
+				return nil, err
 			}
-		}
 
+			if m.config.messengerSignalsHandler != nil {
+				m.config.messengerSignalsHandler.MessengerResponse(response)
+			}
+			return response, nil
+		}, history.WithPeerID(peerInfo.ID))
+		if err != nil {
+			m.logger.Error("failed to perform mailserver request", zap.Error(err))
+		}
 	}()
 	return true, nil
 }
@@ -238,8 +233,7 @@ func (m *Messenger) syncBackup() error {
 	from, to := m.calculateMailserverTimeBounds(oneMonthDuration)
 
 	batch := messagingtypes.StoreNodeBatch{From: from, To: to, Topics: []messagingtypes.ContentTopic{filter.ContentTopic()}}
-	ms := m.getCommunityStorenode(filter.ChatID())
-	err = m.processMailserverBatch(ms, batch)
+	err = m.processMailserverBatch(m.messaging.GetActiveStorenode(), batch)
 	if err != nil {
 		return err
 	}
@@ -292,22 +286,6 @@ func (m *Messenger) resetFiltersPriority(filters messagingtypes.ChatFilters) err
 	return nil
 }
 
-func (m *Messenger) SplitFiltersByStoreNode(filters messagingtypes.ChatFilters) map[string]messagingtypes.ChatFilters {
-	// split filters by community store node so we can request the filters to the correct mailserver
-	filtersByMs := make(map[string]messagingtypes.ChatFilters, len(filters))
-	for _, f := range filters {
-		communityID := "" // none by default
-		if chat, ok := m.allChats.Load(f.ChatID()); ok && chat.CommunityChat() && m.communityStorenodes.HasStorenodeSetup(chat.CommunityID) {
-			communityID = chat.CommunityID
-		}
-		if _, exists := filtersByMs[communityID]; !exists {
-			filtersByMs[communityID] = make(messagingtypes.ChatFilters, 0, len(filters))
-		}
-		filtersByMs[communityID] = append(filtersByMs[communityID], f)
-	}
-	return filtersByMs
-}
-
 // RequestAllHistoricMessages requests all the historic messages for any topic
 func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries bool) (*MessengerResponse, error) {
 	shouldSync, err := m.shouldSync()
@@ -350,23 +328,12 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 		}
 	}()
 
-	filtersByMs := m.SplitFiltersByStoreNode(filters)
-	for communityID, filtersForMs := range filtersByMs {
-		peerInfo := m.getCommunityStorenode(communityID)
-		if withRetries {
-			response, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
-				return m.syncFilters(peerInfo, filtersForMs)
-			}, history.WithPeerID(peerInfo.ID))
-			if err != nil {
-				return nil, err
-			}
-			if response != nil {
-				allResponses.AddChats(response.Chats())
-				allResponses.AddMessages(response.Messages())
-			}
-			continue
-		}
-		response, err := m.syncFilters(peerInfo, filtersForMs)
+	peerInfo := m.messaging.GetActiveStorenode()
+
+	if withRetries {
+		response, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
+			return m.syncFilters(peerInfo, filters)
+		}, history.WithPeerID(peerInfo.ID))
 		if err != nil {
 			return nil, err
 		}
@@ -374,6 +341,16 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 			allResponses.AddChats(response.Chats())
 			allResponses.AddMessages(response.Messages())
 		}
+		return allResponses, nil
+	}
+
+	response, err := m.syncFilters(peerInfo, filters)
+	if err != nil {
+		return nil, err
+	}
+	if response != nil {
+		allResponses.AddChats(response.Chats())
+		allResponses.AddMessages(response.Messages())
 	}
 	return allResponses, nil
 }
@@ -401,15 +378,8 @@ func (m *Messenger) checkForMissingMessagesLoop() {
 		}
 
 		filters := m.messaging.ChatFilters()
-		filtersByMs := m.SplitFiltersByStoreNode(filters)
-		for communityID, filtersForMs := range filtersByMs {
-			peerInfo := m.getCommunityStorenode(communityID)
-			if peerInfo.ID == "" {
-				continue
-			}
-
-			m.messaging.SetCriteriaForMissingMessageVerification(peerInfo, filtersForMs)
-		}
+		peerInfo := m.messaging.GetActiveStorenode()
+		m.messaging.SetCriteriaForMissingMessageVerification(peerInfo, filters)
 	}
 }
 
@@ -700,7 +670,7 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 		return 0, ErrChatNotFound
 	}
 
-	peerInfo := m.getCommunityStorenode(chat.CommunityID)
+	peerInfo := m.messaging.GetActiveStorenode()
 	var from uint32
 	_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
 		canSync, err := m.canSyncWithStoreNodes()
@@ -763,7 +733,7 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		return err
 	}
 
-	chat, ok := m.allChats.Load(chatID)
+	_, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not existing")
 	}
@@ -801,7 +771,7 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 	}
 
-	peerID := m.getCommunityStorenode(chat.CommunityID)
+	peerID := m.messaging.GetActiveStorenode()
 	err = m.processMailserverBatch(peerID, batch)
 	if err != nil {
 		return err
@@ -853,7 +823,7 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 		return 0, ErrChatNotFound
 	}
 
-	peerInfo := m.getCommunityStorenode(chat.CommunityID)
+	peerInfo := m.messaging.GetActiveStorenode()
 	_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
 		canSync, err := m.canSyncWithStoreNodes()
 		if err != nil {
