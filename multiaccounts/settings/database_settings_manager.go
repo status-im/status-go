@@ -61,6 +61,7 @@ type DatabaseSettingsManager interface {
 	CanSyncOnMobileNetwork() (result bool, err error)
 	ShouldBroadcastUserStatus() (result bool, err error)
 	BackupPath() (result string, err error)
+	MessagesBackupEnabled() (result bool, err error)
 	AutoMessageEnabled() (result bool, err error)
 	ENSName() (string, error)
 	DeviceName() (string, error)

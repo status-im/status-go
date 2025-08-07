@@ -215,6 +215,7 @@ type Settings struct {
 	TelemetryServerURL                  string                        `json:"telemetry-server-url,omitempty"`
 	TelemetrySendPeriodMs               int                           `json:"telemetry-send-period-ms,omitempty"`
 	BackupPath                          string                        `json:"backup-path,omitempty"`
+	MessagesBackupEnabled               bool                          `json:"messages-backup-enabled?,omitempty"`
 	AutoMessageEnabled                  bool                          `json:"auto-message-enabled?,omitempty"`
 	GifAPIKey                           string                        `json:"gifs/api-key"`
 	TestNetworksEnabled                 bool                          `json:"test-networks-enabled?,omitempty"`
