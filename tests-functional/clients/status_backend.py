@@ -154,6 +154,7 @@ class StatusBackend(RpcClient, SignalClient):
             "apiLoggingEnabled": True,
             "wakuFleetsConfigFilePath": Config.waku_fleets_config,
             "pushFleetsConfigFilePath": Config.push_fleets_config,
+            "logToStderr": True,
         }
 
         return self.api_valid_request(method, data)

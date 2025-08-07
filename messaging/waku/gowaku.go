@@ -307,8 +307,16 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 		node.WithPrometheusRegisterer(prometheus.DefaultRegisterer),
 	}
 
+	logutils.ZapLogger().Info("<<< gowaku new 2")
+	logger.Warn("<<< gowaku new",
+		zap.Bool("EnableDiscV5", cfg.EnableDiscV5),
+	)
+
 	if cfg.EnableDiscV5 {
 		bootnodes, err := waku.getDiscV5BootstrapNodes(waku.ctx, cfg.DiscV5BootstrapNodes, false)
+		logger.Warn("<<< enabling discovery v5",
+			zap.Any("bootnodes", bootnodes),
+		)
 		if err != nil {
 			logger.Error("failed to get bootstrap nodes", zap.Error(err))
 			return nil, err
@@ -414,11 +422,16 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, 
 	}
 
 	for _, addrString := range addresses {
+		logutils.ZapLogger().Debug("<<< iterating bootstrap nodes",
+			zap.String("addr", addrString),
+		)
+
 		if addrString == "" {
 			continue
 		}
 
 		if strings.HasPrefix(addrString, "enrtree://") {
+			logutils.ZapLogger().Debug("<<< iterating enrtree address -> enrtree")
 			// Use DNS Discovery
 			wg.Add(1)
 			go func(addr string) {
@@ -435,8 +448,10 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, 
 				}
 			}(addrString)
 		} else {
+
 			// It's a normal enr
 			bootnode, err := enode.Parse(enode.ValidSchemes, addrString)
+			logutils.ZapLogger().Debug("<<< iterating enrtree address -> ENR", zap.Any("bootnode", bootnode), zap.Error(err))
 			if err != nil {
 				return nil, err
 			}

@@ -25,8 +25,11 @@ type InitializeApplication struct {
 	// Specify if enable Pre-Login Log
 	LogEnabled bool `json:"logEnabled"`
 	// Specify the Pre-Login log level
-	LogLevel          string `json:"logLevel"`
-	APILoggingEnabled bool   `json:"apiLoggingEnabled"`
+	LogLevel string `json:"logLevel"`
+	// Enables logging to stderr, works in parallel with logging to file
+	LogToStderr bool `json:"logToStderr"`
+
+	APILoggingEnabled bool `json:"apiLoggingEnabled"`
 
 	MetricsEnabled bool   `json:"metricsEnabled"`
 	MetricsAddress string `json:"metricsAddress"`

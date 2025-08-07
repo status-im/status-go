@@ -153,7 +153,11 @@ class StatusGoContainer:
                 if self._stop_perf_monitoring.is_set():
                     break
 
-            logging.debug(f"Performance monitoring stopped for container {self.name()}")
+            try:
+                logging.debug(f"Performance monitoring stopped for container {self.name()}")
+            except (ValueError, OSError):
+                # Logging system may be closed during shutdown, ignore the error
+                pass
 
         self._stop_perf_monitoring.clear()
         self.perf_monitor = threading.Thread(target=monitor_performance, daemon=True)

@@ -27,6 +27,7 @@ class SignalType(Enum):
     LOCAL_PAIRING = "localPairing"
     DB_REENCRYPTION_STARTED = "db.reEncryption.started"
     DB_REENCRYPTION_FINISHED = "db.reEncryption.finished"
+    WAKUV2_PEERSTATS = "wakuv2.peerstats"
 
 
 class WalletEventType(Enum):

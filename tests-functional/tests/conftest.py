@@ -26,7 +26,7 @@ def backend_factory(request):
     """
 
     # Get class-level configuration
-    await_signals = getattr(request.cls, "await_signals", ["messages.new", "message.delivered", "node.login", "node.logout"])
+    await_signals = getattr(request.cls, "await_signals", ["messages.new", "message.delivered", "node.login", "node.logout", "wakuv2.peerstats"])
 
     # Get parameters from request.param if available
     params = getattr(request, "param", {})
