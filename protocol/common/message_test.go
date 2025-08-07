@@ -3,7 +3,7 @@ package common
 import (
 	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 
@@ -22,7 +22,7 @@ func TestPrepareContentImage(t *testing.T) {
 	require.NoError(t, err)
 	defer file.Close()
 
-	payload, err := ioutil.ReadAll(file)
+	payload, err := io.ReadAll(file)
 	require.NoError(t, err)
 
 	message := NewMessage()
@@ -42,7 +42,7 @@ func TestPrepareContentAudio(t *testing.T) {
 	require.NoError(t, err)
 	defer file.Close()
 
-	payload, err := ioutil.ReadAll(file)
+	payload, err := io.ReadAll(file)
 	require.NoError(t, err)
 
 	message := NewMessage()

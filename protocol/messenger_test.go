@@ -2414,13 +2414,13 @@ func (s *MessengerSuite) TestResendExpiredEmojis() {
 
 func buildImageWithAlbumIDMessage(chat Chat, albumID string) (*common.Message, error) {
 	file, err := os.Open("../_assets/tests/test.jpg")
-	if err != err {
+	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
 	payload, err := io.ReadAll(file)
-	if err != err {
+	if err != nil {
 		return nil, err
 	}
 

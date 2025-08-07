@@ -12,6 +12,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/lib/pq"
 
+	"github.com/status-im/markdown"
+
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -120,6 +122,37 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		replied,
     	discord_message_id,
 		payment_requests`
+}
+
+func (db sqlitePersistence) tableUserMessagesProtobufFields() string {
+	return `
+			m1.id,
+    		m1.whisper_timestamp,
+    		m1.text,
+    		m1.source,
+			m1.response_to,
+    		m1.chat_id,
+    		m1.message_type,
+    		m1.content_type,
+
+			m1.sticker_pack,
+			m1.sticker_hash,
+
+			m1.image_payload,
+			m1.image_type,
+
+			COALESCE(m1.album_id, ""),
+			COALESCE(m1.album_images_count, 0),
+			COALESCE(m1.image_width, 0),
+			COALESCE(m1.image_height, 0),
+
+			m1.links,
+			m1.unfurled_links,
+			m1.unfurled_status_links,
+
+			m1.payment_requests,
+
+			pm.pinned_by`
 }
 
 // keep the same order as in tableUserMessagesScanAllFields
@@ -517,6 +550,91 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		message.Payload = &protobuf.ChatMessage_BridgeMessage{
 			BridgeMessage: bridgeMessage,
 		}
+	}
+
+	return nil
+}
+
+// keep the same order as in tableUserMessagesProtobufFields
+func (db sqlitePersistence) tableUserMessagesScanProtobufFields(row scanner, message *protobuf.BackedUpMessage, others ...interface{}) error {
+
+	sticker := &protobuf.StickerMessage{}
+	image := &protobuf.ImageMessage{}
+	var serializedLinks []byte
+	var serializedUnfurledLinks []byte
+	var serializedPaymentRequests []byte
+	var serializedUnfurledStatusLinks []byte
+	var pinnedBy sql.NullString
+
+	args := []interface{}{
+		&message.Id,
+		&message.Timestamp,
+		&message.Text,
+		&message.From, // source in table
+		&message.ResponseTo,
+		&message.ChatId,
+		&message.MessageType,
+		&message.ContentType,
+
+		&sticker.Pack,
+		&sticker.Hash,
+
+		&image.Payload,
+		&image.Format,
+
+		&image.AlbumId,
+		&image.AlbumImagesCount,
+		&image.Width,
+		&image.Height,
+
+		&serializedLinks,
+		&serializedUnfurledLinks,
+		&serializedUnfurledStatusLinks,
+
+		&serializedPaymentRequests,
+
+		&pinnedBy,
+	}
+	err := row.Scan(append(args, others...)...)
+	if err != nil {
+		return err
+	}
+
+	if serializedUnfurledLinks != nil {
+		err = json.Unmarshal(serializedUnfurledLinks, &message.UnfurledLinks)
+		if err != nil {
+			return err
+		}
+	}
+
+	if serializedUnfurledStatusLinks != nil {
+		// use proto.Marshal, because json.Marshal doesn't support `oneof` fields
+		var links protobuf.UnfurledStatusLinks
+		err = proto.Unmarshal(serializedUnfurledStatusLinks, &links)
+		if err != nil {
+			return err
+		}
+		message.UnfurledStatusLinks = &links
+	}
+
+	if serializedPaymentRequests != nil {
+		err := json.Unmarshal(serializedPaymentRequests, &message.PaymentRequests)
+		if err != nil {
+			return err
+		}
+	}
+
+	if pinnedBy.Valid {
+		message.PinnedBy = pinnedBy.String
+	}
+
+	switch message.ContentType {
+	case int64(protobuf.ChatMessage_STICKER):
+		message.Payload = &protobuf.BackedUpMessage_Sticker{Sticker: sticker}
+
+	case int64(protobuf.ChatMessage_IMAGE):
+		message.Payload = &protobuf.BackedUpMessage_Image{Image: image}
+
 	}
 
 	return nil
@@ -1329,6 +1447,229 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 		result = result[:limit]
 	}
 	return result, newCursor, nil
+}
+
+func (db sqlitePersistence) AllMessagesForBackup() ([]*protobuf.BackedUpMessage, error) {
+	where := "WHERE NOT(m1.hide)"
+	fields := db.tableUserMessagesProtobufFields()
+	selectQuery := `SELECT    %s
+				FROM      user_messages m1
+				LEFT JOIN pin_messages pm
+				ON 	      m1.id = pm.message_id AND pm.pinned = 1`
+	query := fmt.Sprintf(selectQuery, fields) + " " + where
+	rows, err := db.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*protobuf.BackedUpMessage
+	for rows.Next() {
+		message := &protobuf.BackedUpMessage{}
+		if err := db.tableUserMessagesScanProtobufFields(rows, message); err != nil {
+			return nil, err
+		}
+
+		messages = append(messages, message)
+	}
+
+	return messages, nil
+}
+
+func (db sqlitePersistence) saveBackedUpMessages(messages []*protobuf.BackedUpMessage) error {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	allFields := db.tableUserMessagesAllFields()
+	valuesVector := strings.Repeat("?, ", db.tableUserMessagesAllFieldsCount()-1) + "?"
+	query := "INSERT OR REPLACE INTO user_messages(" + allFields + ") VALUES (" + valuesVector + ")" //nolint: gosec
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, msg := range messages {
+		allValues, err := db.backedUpMessageToUserMessageValues(msg)
+		if err != nil {
+			return err
+		}
+
+		_, err = stmt.Exec(allValues...)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (db sqlitePersistence) saveBackedUpPinMessages(messages []*protobuf.BackedUpMessage) error {
+	pinMessages := make([]*common.PinMessage, 0)
+
+	for _, msg := range messages {
+		if msg.PinnedBy == "" {
+			continue
+		}
+
+		pinMessage := protobuf.PinMessage{
+			Clock:       msg.Timestamp,
+			MessageId:   msg.Id,
+			ChatId:      msg.ChatId,
+			MessageType: msg.MessageType,
+			Pinned:      true,
+		}
+		pinMessages = append(pinMessages, &common.PinMessage{
+			ID:               msg.Id, // TODO do we need a special ID?
+			From:             msg.PinnedBy,
+			PinMessage:       &pinMessage,
+			WhisperTimestamp: msg.Timestamp,
+		})
+	}
+
+	if len(pinMessages) == 0 {
+		return nil
+	}
+
+	return db.SavePinMessages(pinMessages)
+}
+
+func (db sqlitePersistence) SaveBackedUpMessages(messages []*protobuf.BackedUpMessage) error {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	err := db.saveBackedUpMessages(messages)
+	if err != nil {
+		return err
+	}
+
+	err = db.saveBackedUpPinMessages(messages)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db sqlitePersistence) backedUpMessageToUserMessageValues(message *protobuf.BackedUpMessage) ([]interface{}, error) {
+	parsedText := markdown.Parse([]byte(message.Text), nil)
+	jsonParsedText, err := json.Marshal(parsedText)
+	if err != nil {
+		return nil, err
+	}
+
+	sticker := message.GetSticker()
+	if sticker == nil {
+		sticker = &protobuf.StickerMessage{}
+	}
+
+	image := message.GetImage()
+	if image == nil {
+		image = &protobuf.ImageMessage{}
+	}
+
+	var serializedUnfurledLinks []byte
+	if links := message.GetUnfurledLinks(); len(links) > 0 {
+		serializedUnfurledLinks, err = json.Marshal(links)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var serializedUnfurledStatusLinks []byte
+	if links := message.GetUnfurledStatusLinks(); links != nil {
+		// use proto.Marshal, because json.Marshal doesn't support `oneof` fields
+		serializedUnfurledStatusLinks, err = proto.Marshal(links)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var serializedPaymentRequests []byte
+	if paymentRequests := message.GetPaymentRequests(); len(paymentRequests) > 0 {
+		serializedPaymentRequests, err = json.Marshal(paymentRequests)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Convert protobuf MessageType to the expected format
+	messageType := message.MessageType
+
+	return []interface{}{
+		message.GetId(),               // id
+		message.GetTimestamp(),        // whisper_timestamp
+		message.GetFrom(),             // source
+		message.GetText(),             // text
+		message.GetContentType(),      // content_type
+		"",                            // username (alias) - not available in BackedUpMessage
+		message.GetTimestamp(),        // timestamp
+		message.GetChatId(),           // chat_id
+		message.GetChatId(),           // local_chat_id (same as chat_id) // TODO this should be adapated if 1-1
+		messageType,                   // message_type
+		message.GetClock(),            // clock_value
+		false,                         // seen
+		"",                            // outgoing_status
+		jsonParsedText,                // parsed_text
+		sticker.GetPack(),             // sticker_pack
+		sticker.GetHash(),             // sticker_hash
+		image.GetPayload(),            // image_payload
+		int64(image.GetFormat()),      // image_type
+		image.GetAlbumId(),            // album_id
+		nil,                           // album_images
+		image.GetAlbumImagesCount(),   // album_images_count
+		image.GetWidth(),              // image_width
+		image.GetHeight(),             // image_height
+		"",                            // image_base64
+		nil,                           // audio_payload
+		0,                             // audio_type
+		0,                             // audio_duration_ms
+		"",                            // audio_base64
+		"",                            // community_id
+		nil,                           // mentions
+		nil,                           // links
+		serializedUnfurledLinks,       // unfurled_links
+		serializedUnfurledStatusLinks, // unfurled_status_links
+		"",                            // command_id
+		"",                            // command_value
+		"",                            // command_from
+		"",                            // command_address
+		"",                            // command_contract
+		"",                            // command_transaction_hash
+		0,                             // command_state
+		nil,                           // command_signature
+		"",                            // replace
+		int64(0),                      // edited_at
+		false,                         // deleted
+		"",                            // deleted_by
+		false,                         // deleted_for_me
+		false,                         // rtl
+		0,                             // line_count
+		message.GetResponseTo(),       // response_to
+		uint32(0),                     // gap_from
+		uint32(0),                     // gap_to
+		0,                             // contact_request_state
+		0,                             // contact_verification_state
+		false,                         // mentioned
+		false,                         // replied
+		"",                            // discord_message_id
+		serializedPaymentRequests,     // payment_requests
+	}, nil
 }
 
 func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []string) (map[string]uint64, error) {
