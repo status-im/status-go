@@ -1012,9 +1012,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPerm
 				return false
 			}
 			channel := c.Chats()[chat.CommunityChatID()]
-			// The channel is not encrypted. Should have no members
+			// The channel is not encrypted. Should have one member
 			// and bob should be a viewer
-			if channel == nil || len(channel.Members) != 0 {
+			if channel == nil || len(channel.Members) != 1 {
 				return false
 			}
 			return c.IsMemberInChat(s.bob.IdentityPublicKey(), chat.CommunityChatID()) &&
@@ -1038,6 +1038,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPerm
 	s.Require().Error(err)
 	s.Require().Contains(err.Error(), "can't post")
 
+	// owner can post
 	msg = s.sendChatMessage(s.owner, chat.ID, "hello on announcements channel")
 	// bob can read the message
 	response, err = WaitOnMessengerResponse(
@@ -1096,11 +1097,16 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPerm
 				return false
 			}
 			channel := c.Chats()[chat.CommunityChatID()]
-			// The channel is not encrypted. Should have no members
-			// and alice should be a poster
-			if channel == nil || len(channel.Members) == 0 {
+			// The channel is not encrypted, but has permissions. Should have 2 members
+			// Alice - poster, bob - viewer
+			if channel == nil || len(channel.Members) != 2 {
 				return false
 			}
+
+			if channel.Members[s.alice.IdentityPublicKeyString()].ChannelRole != protobuf.CommunityMember_CHANNEL_ROLE_POSTER {
+				return false
+			}
+
 			return c.IsMemberLikelyInChat(chat.CommunityChatID())
 		},
 		"no community that satisfies criteria",
@@ -1110,7 +1116,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPerm
 	s.Require().NoError(err)
 	chatID := strings.TrimPrefix(chat.ID, community.IDString())
 	members := community.Chats()[chatID].Members
-	s.Require().Len(members, 1)
+	s.Require().Len(members, 2)
 	// confirm that member is a viewer and not a poster
 	s.Require().Equal(protobuf.CommunityMember_CHANNEL_ROLE_POSTER, members[s.alice.IdentityPublicKeyString()].ChannelRole)
 

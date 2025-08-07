@@ -563,7 +563,7 @@ func createCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 
 func CreateCommunityChat(org *communities.Community, orgChat *protobuf.CommunityChat, chatID string, timesource common.TimeSource) *Chat {
 	orgID := org.IDString()
-	populateMembers := org.ChannelEncrypted(chatID)
+	populateMembers := org.ChannelHasPermissions(chatID)
 	chat := createCommunityChat(orgID, chatID, orgChat, timesource, populateMembers)
 
 	return chat
