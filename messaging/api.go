@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type API struct {
@@ -162,8 +161,8 @@ func (a *API) JoinGroupChat(publicKeys []*ecdsa.PublicKey) (types.ChatFilters, e
 	return adapters.FromTransportFilters(filters), nil
 }
 
-func (a *API) GetStats() wakutypes.StatsSummary {
-	return a.core.transport.GetStats()
+func (a *API) GetStats() types.TransportStats {
+	return adapters.FromWakuTransportStats(a.core.transport.GetStats())
 }
 
 func (a *API) RetrieveRawAll() (map[types.ChatFilter][]*types.ReceivedMessage, error) {
@@ -250,8 +249,8 @@ func (a *API) PeerCount() int {
 	return a.core.transport.PeerCount()
 }
 
-func (a *API) Peers() wakutypes.PeerStats {
-	return a.core.transport.Peers()
+func (a *API) Peers() types.PeerStats {
+	return adapters.FromWakuPeerStats(a.core.transport.Peers())
 }
 
 func (a *API) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
@@ -272,10 +271,6 @@ func (a *API) ClearProcessedMessageIDsCache() error {
 
 func (a *API) ListenAddresses() ([]multiaddr.Multiaddr, error) {
 	return a.core.transport.ListenAddresses()
-}
-
-func (a *API) RelayPeersByTopic(topic string) (*wakutypes.PeerList, error) {
-	return a.core.transport.RelayPeersByTopic(topic)
 }
 
 func (a *API) ENR() (*enode.Node, error) {

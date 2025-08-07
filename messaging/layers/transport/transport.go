@@ -478,10 +478,6 @@ func (t *Transport) ListenAddresses() ([]multiaddr.Multiaddr, error) {
 	return t.waku.ListenAddresses()
 }
 
-func (t *Transport) RelayPeersByTopic(topic string) (*wakutypes.PeerList, error) {
-	return t.waku.RelayPeersByTopic(topic)
-}
-
 func (t *Transport) ENR() (*enode.Node, error) {
 	return t.waku.ENR()
 }

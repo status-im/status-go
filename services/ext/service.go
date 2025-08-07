@@ -61,6 +61,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/timesource"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
@@ -167,7 +168,22 @@ func newWakuV2(identity *ecdsa.PrivateKey, nodeConfig *params.NodeConfig, appDB 
 		}
 	}
 
-	waku, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger(), appDB, ts, signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
+	// FIXME: remove once waku is entirely moved to messaging facade
+	sendPeerStats := func(s wakutypes.ConnStatus) {
+		status := messagingtypes.ConnStatus{
+			IsOnline: s.IsOnline,
+			Peers:    make(messagingtypes.PeerStats),
+		}
+		for id, peer := range s.Peers {
+			status.Peers[id] = messagingtypes.Peer{
+				Protocols: peer.Protocols,
+				Addresses: peer.Addresses,
+			}
+		}
+		signal.SendPeerStats(status)
+	}
+
+	waku, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger(), appDB, ts, signal.SendHistoricMessagesRequestFailed, sendPeerStats)
 	if err != nil {
 		return nil, err
 	}
