@@ -48,3 +48,12 @@ class AccountService(Service):
         params = [key_uid]
         response = self.rpc_request("resolveSuggestedPathForKeypair", params)
         return response.json()
+
+    def has_paired_devices(self):
+        response = self.rpc_request("hasPairedDevices", [])
+        return response.json()
+
+    def update_keypair_name(self, key_uid, name):
+        params = [key_uid, name]
+        response = self.rpc_request("updateKeypairName", params)
+        return response.json()
