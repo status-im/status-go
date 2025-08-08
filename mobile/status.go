@@ -11,10 +11,8 @@ import (
 	"time"
 	"unsafe"
 
-	"go.uber.org/zap"
-	"gopkg.in/go-playground/validator.v9"
-
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	"go.uber.org/zap"
 
 	"github.com/status-im/zxcvbn-go"
 	"github.com/status-im/zxcvbn-go/scoring"
@@ -302,52 +300,6 @@ func getNodeConfig() string {
 	}
 
 	respJSON, err := json.Marshal(conf)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(respJSON)
-}
-
-func ValidateNodeConfig(configJSON string) string {
-	return callWithResponse(validateNodeConfig, configJSON)
-}
-
-// validateNodeConfig validates config for the Status node.
-func validateNodeConfig(configJSON string) string {
-	var resp APIDetailedResponse
-
-	_, err := params.NewConfigFromJSON(configJSON)
-
-	// Convert errors to APIDetailedResponse
-	switch err := err.(type) {
-	case validator.ValidationErrors:
-		resp = APIDetailedResponse{
-			Message:     "validation: validation failed",
-			FieldErrors: make([]APIFieldError, len(err)),
-		}
-
-		for i, ve := range err {
-			resp.FieldErrors[i] = APIFieldError{
-				Parameter: ve.Namespace(),
-				Errors: []APIError{
-					{
-						Message: fmt.Sprintf("field validation failed on the '%s' tag", ve.Tag()),
-					},
-				},
-			}
-		}
-	case error:
-		resp = APIDetailedResponse{
-			Message: fmt.Sprintf("validation: %s", err.Error()),
-		}
-	case nil:
-		resp = APIDetailedResponse{
-			Status: true,
-		}
-	}
-
-	respJSON, err := json.Marshal(resp)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
