@@ -6,5 +6,5 @@ build/bin
 statusd-data
 wnode-data
 _assets/ci
-_assets/build
+Dockerfile
 **/*.test
