@@ -57,3 +57,8 @@ class AccountService(Service):
         params = [key_uid, name]
         response = self.rpc_request("updateKeypairName", params)
         return response.json()
+
+    def move_wallet_account(self, from_position, to_position):
+        params = [from_position, to_position]
+        response = self.rpc_request("moveWalletAccount", params)
+        return response.json()
