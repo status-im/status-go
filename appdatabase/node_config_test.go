@@ -19,99 +19,12 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 )
 
-func setupTestDB(t *testing.T) (*sql.DB, func()) {
+func setupTestDB(t *testing.T) *sql.DB {
 	db, cleanup, err := helpers.SetupTestSQLDB(DbInitializer{}, "settings-tests-")
 	require.NoError(t, err)
-	return db, func() { require.NoError(t, cleanup()) }
-}
 
-func TestGetNodeConfig(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-
-	nodeConfig := randomNodeConfig()
-	require.NoError(t, nodecfg.SaveNodeConfig(db, nodeConfig))
-
-	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
-	require.NoError(t, err)
-	require.Equal(t, nodeConfig, dbNodeConfig)
-}
-
-func TestSaveNodeConfig(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-
-	newNodeConfig := randomNodeConfig()
-
-	require.NoError(t, nodecfg.SaveNodeConfig(db, newNodeConfig))
-
-	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
-	require.NoError(t, err)
-	require.Equal(t, *newNodeConfig, *dbNodeConfig)
-}
-
-func TestMigrateNodeConfig(t *testing.T) {
-	// Migration will be run in setupTestDB. If there's an error, that function will fail
-	db, stop := setupTestDB(t)
-	defer stop()
-
-	// node_config column should be empty
-	var result string
-	err := db.QueryRow("SELECT COALESCE(NULL, 'empty')").Scan(&result)
-	require.NoError(t, err)
-	require.Equal(t, "empty", result)
-}
-
-func randomString() string {
-	b := make([]byte, 10)
-	_, _ = rand.Read(b)
-	return fmt.Sprintf("%x", b)[:10]
-}
-
-func randomBool() bool {
-	return randomInt(2) == 1
-}
-
-func randomInt(max int64) int {
-	r, _ := rand.Int(rand.Reader, big.NewInt(max))
-	return int(r.Int64())
-}
-
-func randomStringSlice() []string {
-	m := randomInt(7)
-	var result []string
-	for i := 0; i < m; i++ {
-		result = append(result, randomString())
-	}
-	sort.Strings(result)
-	return result
-}
-
-func randomTopicSlice() []discv5.Topic {
-	randomValues := randomStringSlice()
-	var result []discv5.Topic
-	for _, v := range randomValues {
-		result = append(result, discv5.Topic(v))
-	}
-	return result
-}
-
-func randomTopicLimits() map[discv5.Topic]params.Limits {
-	result := make(map[discv5.Topic]params.Limits)
-	m := randomInt(7) + 1
-	for i := 0; i < m; i++ {
-		result[discv5.Topic(fmt.Sprint(i))] = params.Limits{Min: randomInt(2), Max: randomInt(10)}
-	}
-	return result
-}
-
-func randomCustomNodes() map[string]string {
-	result := make(map[string]string)
-	m := randomInt(7)
-	for i := 0; i < m; i++ {
-		result[randomString()] = randomString()
-	}
-	return result
+	t.Cleanup(func() { require.NoError(t, cleanup()) })
+	return db
 }
 
 func randomNodeConfig() *params.NodeConfig {
@@ -123,7 +36,6 @@ func randomNodeConfig() *params.NodeConfig {
 		WalletConfig:       params.WalletConfig{Enabled: randomBool()},
 		BrowsersConfig:     params.BrowsersConfig{Enabled: randomBool()},
 		PermissionsConfig:  params.PermissionsConfig{Enabled: randomBool()},
-		MailserversConfig:  params.MailserversConfig{Enabled: randomBool()},
 		ConnectorConfig:    params.ConnectorConfig{Enabled: randomBool()},
 		HTTPEnabled:        randomBool(),
 		HTTPHost:           randomString(),
@@ -190,10 +102,94 @@ func randomNodeConfig() *params.NodeConfig {
 	}
 }
 
+func TestGetNodeConfig(t *testing.T) {
+	db := setupTestDB(t)
+
+	nodeConfig := randomNodeConfig()
+	require.NoError(t, nodecfg.SaveNodeConfig(db, nodeConfig))
+
+	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
+	require.NoError(t, err)
+	require.Equal(t, nodeConfig, dbNodeConfig)
+}
+
+func TestSaveNodeConfig(t *testing.T) {
+	db := setupTestDB(t)
+
+	nodeConfig := randomNodeConfig()
+	require.NoError(t, nodecfg.SaveNodeConfig(db, nodeConfig))
+
+	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
+	require.NoError(t, err)
+	require.Equal(t, *nodeConfig, *dbNodeConfig)
+}
+
+func TestMigrateNodeConfig(t *testing.T) {
+	// Migration will be run in setupTestDB. If there's an error, that function will fail
+	db := setupTestDB(t)
+
+	// node_config column should be empty
+	var result string
+	err := db.QueryRow("SELECT COALESCE(NULL, 'empty')").Scan(&result)
+	require.NoError(t, err)
+	require.Equal(t, "empty", result)
+}
+
+func randomString() string {
+	b := make([]byte, 10)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%x", b)[:10]
+}
+
+func randomBool() bool {
+	return randomInt(2) == 1
+}
+
+func randomInt(max int64) int {
+	r, _ := rand.Int(rand.Reader, big.NewInt(max))
+	return int(r.Int64())
+}
+
+func randomStringSlice() []string {
+	m := randomInt(7)
+	var result []string
+	for i := 0; i < m; i++ {
+		result = append(result, randomString())
+	}
+	sort.Strings(result)
+	return result
+}
+
+func randomTopicSlice() []discv5.Topic {
+	randomValues := randomStringSlice()
+	var result []discv5.Topic
+	for _, v := range randomValues {
+		result = append(result, discv5.Topic(v))
+	}
+	return result
+}
+
+func randomTopicLimits() map[discv5.Topic]params.Limits {
+	result := make(map[discv5.Topic]params.Limits)
+	m := randomInt(7) + 1
+	for i := 0; i < m; i++ {
+		result[discv5.Topic(fmt.Sprint(i))] = params.Limits{Min: randomInt(2), Max: randomInt(10)}
+	}
+	return result
+}
+
+func randomCustomNodes() map[string]string {
+	result := make(map[string]string)
+	m := randomInt(7)
+	for i := 0; i < m; i++ {
+		result[randomString()] = randomString()
+	}
+	return result
+}
+
 func TestConfigValidate(t *testing.T) {
 	// GIVEN
-	db, stop := setupTestDB(t)
-	defer stop()
+	db := setupTestDB(t)
 
 	tmpdir := t.TempDir()
 	nodeConfig, err := params.NewNodeConfig(tmpdir, 1777)
@@ -212,8 +208,7 @@ func TestConfigValidate(t *testing.T) {
 
 func TestRepairLoadedTorrentConfig(t *testing.T) {
 	// GIVEN
-	db, stop := setupTestDB(t)
-	defer stop()
+	db := setupTestDB(t)
 
 	tmpdir := t.TempDir()
 	nodeConfig, err := params.NewNodeConfig(tmpdir, 1777)

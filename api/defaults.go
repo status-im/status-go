@@ -325,7 +325,6 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
-	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
 
 	fleet := request.WakuV2Fleet
 	if fleet == "" {
