@@ -218,12 +218,6 @@ type NodeConfig struct {
 	// useless for custom HTTP clients.
 	HTTPCors []string
 
-	// IPCEnabled specifies whether IPC-RPC Server is enabled or not
-	IPCEnabled bool
-
-	// IPCFile is filename of exposed IPC RPC Server
-	IPCFile string
-
 	// LogEnabled enables the logger
 	LogEnabled bool `json:"LogEnabled"`
 
@@ -636,7 +630,6 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		HTTPPort:               8545,
 		HTTPVirtualHosts:       []string{"localhost"},
 		APIModules:             "eth,net,web3,peer,wallet",
-		IPCFile:                "geth.ipc",
 		LogFile:                "",
 		LogLevel:               "ERROR",
 		WakuV2Config: WakuV2Config{

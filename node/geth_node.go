@@ -59,15 +59,6 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		},
 	}
 
-	if config.IPCEnabled {
-		// use well-known defaults
-		if config.IPCFile == "" {
-			config.IPCFile = "geth.ipc"
-		}
-
-		nc.IPCPath = config.IPCFile
-	}
-
 	if config.HTTPEnabled {
 		nc.HTTPModules = config.FormatAPIModules()
 		nc.HTTPHost = config.HTTPHost

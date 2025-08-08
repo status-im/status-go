@@ -96,11 +96,6 @@ func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return insertLogConfigBase(tx, c, false)
 }
 
-func insertIPCConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`INSERT OR REPLACE INTO ipc_config (enabled, file, synthetic_id) VALUES (?, ?, 'id')`, c.IPCEnabled, c.IPCFile)
-	return err
-}
-
 func insertClusterConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`INSERT OR REPLACE INTO cluster_config (enabled, fleet, synthetic_id) VALUES (?, ?, 'id')`, c.ClusterConfig.Enabled, c.ClusterConfig.Fleet)
 	return err
@@ -236,7 +231,6 @@ func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
 func nodeConfigUpgradeInserts() []insertFn {
 	return []insertFn{
 		insertNodeConfig,
-		insertIPCConfig,
 		insertLogConfig,
 		insertClusterConfig,
 		insertClusterConfigNodes,
@@ -252,7 +246,6 @@ func nodeConfigNormalInserts() []insertFn {
 
 	return []insertFn{
 		insertNodeConfigWithConnector,
-		insertIPCConfig,
 		insertLogConfigWithNamespaces,
 		insertClusterConfig,
 		insertClusterConfigNodes,
@@ -337,11 +330,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		&nodecfg.WalletConfig.Enabled, &nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled,
 		&nodecfg.ConnectorConfig.Enabled,
 	)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	err = tx.QueryRow("SELECT enabled, file FROM ipc_config WHERE synthetic_id = 'id'").Scan(&nodecfg.IPCEnabled, &nodecfg.IPCFile)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}

@@ -40,7 +40,6 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.NotEmpty(t, c.ClusterConfig.PushNotificationsServers)
 	// assert other
 	assert.Equal(t, false, c.HTTPEnabled)
-	assert.Equal(t, false, c.IPCEnabled)
 
 	assert.Equal(t, "", c.RuntimeLogLevel)
 
