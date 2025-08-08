@@ -65,34 +65,6 @@ func insertNodeConfigWithConnector(tx *sql.Tx, c *params.NodeConfig) error {
 	return insertNodeConfigBase(tx, c, true)
 }
 
-func insertHTTPConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	if _, err := tx.Exec(`INSERT OR REPLACE INTO http_config (enabled, host, port, synthetic_id) VALUES (?, ?, ?, 'id')`, c.HTTPEnabled, c.HTTPHost, c.HTTPPort); err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(`DELETE FROM http_virtual_hosts WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for _, httpVirtualHost := range c.HTTPVirtualHosts {
-		if _, err := tx.Exec(`INSERT OR REPLACE INTO http_virtual_hosts (host, synthetic_id) VALUES (?, 'id')`, httpVirtualHost); err != nil {
-			return err
-		}
-	}
-
-	if _, err := tx.Exec(`DELETE FROM http_cors WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for _, httpCors := range c.HTTPCors {
-		if _, err := tx.Exec(`INSERT OR REPLACE INTO http_cors (cors, synthetic_id) VALUES (?, 'id')`, httpCors); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func insertLogConfigBase(tx *sql.Tx, c *params.NodeConfig, includeNamespaces bool) error {
 	query := `
 	INSERT OR REPLACE INTO log_config (
@@ -264,7 +236,6 @@ func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
 func nodeConfigUpgradeInserts() []insertFn {
 	return []insertFn{
 		insertNodeConfig,
-		insertHTTPConfig,
 		insertIPCConfig,
 		insertLogConfig,
 		insertClusterConfig,
@@ -281,7 +252,6 @@ func nodeConfigNormalInserts() []insertFn {
 
 	return []insertFn{
 		insertNodeConfigWithConnector,
-		insertHTTPConfig,
 		insertIPCConfig,
 		insertLogConfigWithNamespaces,
 		insertClusterConfig,
@@ -371,39 +341,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	err = tx.QueryRow(`SELECT enabled, host, port FROM http_config WHERE synthetic_id = 'id'`).Scan(&nodecfg.HTTPEnabled, &nodecfg.HTTPHost, &nodecfg.HTTPPort)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	rows, err := tx.Query("SELECT host FROM http_virtual_hosts WHERE synthetic_id = 'id' ORDER BY host ASC")
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var host string
-		err = rows.Scan(&host)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.HTTPVirtualHosts = append(nodecfg.HTTPVirtualHosts, host)
-	}
-
-	rows, err = tx.Query("SELECT cors FROM http_cors WHERE synthetic_id = 'id' ORDER BY cors ASC")
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var cors string
-		err = rows.Scan(&cors)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.HTTPCors = append(nodecfg.HTTPCors, cors)
-	}
-
 	err = tx.QueryRow("SELECT enabled, file FROM ipc_config WHERE synthetic_id = 'id'").Scan(&nodecfg.IPCEnabled, &nodecfg.IPCFile)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -415,7 +352,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	rows, err = tx.Query(`SELECT
+	rows, err := tx.Query(`SELECT
                 chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
                 native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name
         FROM networks ORDER BY chain_id ASC`)

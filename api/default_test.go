@@ -51,12 +51,3 @@ func TestOverrideApiConfig(t *testing.T) {
 	require.Equal(t, apiConfig.WSHost, newNodeConfig.WSHost)
 	require.Equal(t, apiConfig.WSPort, newNodeConfig.WSPort)
 }
-
-func TestOverrideApiConfigTest(t *testing.T) {
-	newNodeConfig, apiConfig := setupConfigs()
-	newNodeConfig.HTTPVirtualHosts = []string{"status-go"}
-	apiConfig.HTTPVirtualHosts = []string{"*"}
-	overrideApiConfigTest(newNodeConfig, apiConfig)
-
-	require.Equal(t, apiConfig.HTTPVirtualHosts, newNodeConfig.HTTPVirtualHosts)
-}
