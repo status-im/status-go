@@ -493,12 +493,6 @@ func TestStartStopMultipleTimes(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-
-	// doesn't have to be running. just any valid enode to bypass validation.
-	config.ClusterConfig.BootNodes = []string{
-		"enode://e8a7c03b58911e98bbd66accb2a55d57683f35b23bf9dfca89e5e244eb5cc3f25018b4112db507faca34fb69ffb44b362f79eda97a669a8df29c72e654416784@0.0.0.0:30404",
-	}
-	require.NoError(t, err)
 	require.NoError(t, backend.StartNode(config))
 	require.NoError(t, backend.StopNode())
 	require.NoError(t, backend.StartNode(config))

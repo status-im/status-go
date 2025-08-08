@@ -12,14 +12,6 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
-const StaticNodes = "static"
-const BootNodes = "boot"
-const TrustedMailServers = "trusted_mailserver"
-const PushNotificationsServers = "pushnotification"
-const RendezvousNodes = "rendezvous"
-const DiscV5BootstrapNodes = "discV5boot"
-const WakuNodes = "waku"
-
 func nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {
 	row := tx.QueryRow("SELECT exists(SELECT 1 FROM node_config)")
 	switch err := row.Scan(&migrated); err {
@@ -201,31 +193,6 @@ func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
-	if _, err := tx.Exec(`DELETE FROM cluster_nodes WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	nodeMap := make(map[string][]string)
-	nodeMap[StaticNodes] = c.ClusterConfig.StaticNodes
-	nodeMap[BootNodes] = c.ClusterConfig.BootNodes
-	nodeMap[TrustedMailServers] = c.ClusterConfig.TrustedMailServers
-	nodeMap[PushNotificationsServers] = c.ClusterConfig.PushNotificationsServers
-	nodeMap[DiscV5BootstrapNodes] = c.ClusterConfig.DiscV5BootstrapNodes
-	nodeMap[WakuNodes] = c.ClusterConfig.WakuNodes
-
-	for nodeType, nodes := range nodeMap {
-		for _, node := range nodes {
-			_, err := tx.Exec(`INSERT OR REPLACE INTO cluster_nodes (node, type, synthetic_id) VALUES (?, ?, 'id')`, node, nodeType)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 // List of inserts to be executed when upgrading a node
 // These INSERT queries should not be modified
 func nodeConfigUpgradeInserts() []insertFn {
@@ -233,7 +200,6 @@ func nodeConfigUpgradeInserts() []insertFn {
 		insertNodeConfig,
 		insertLogConfig,
 		insertClusterConfig,
-		insertClusterConfigNodes,
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 	}
@@ -248,7 +214,6 @@ func nodeConfigNormalInserts() []insertFn {
 		insertNodeConfigWithConnector,
 		insertLogConfigWithNamespaces,
 		insertClusterConfig,
-		insertClusterConfigNodes,
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 		insertTorrentConfig,
@@ -363,30 +328,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	err = tx.QueryRow("SELECT enabled, fleet, cluster_id FROM cluster_config WHERE synthetic_id = 'id'").Scan(&nodecfg.ClusterConfig.Enabled, &nodecfg.ClusterConfig.Fleet, &nodecfg.ClusterConfig.ClusterID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
-	}
-
-	nodeMap := make(map[string]*[]string)
-	nodeMap[StaticNodes] = &nodecfg.ClusterConfig.StaticNodes
-	nodeMap[BootNodes] = &nodecfg.ClusterConfig.BootNodes
-	nodeMap[TrustedMailServers] = &nodecfg.ClusterConfig.TrustedMailServers
-	nodeMap[PushNotificationsServers] = &nodecfg.ClusterConfig.PushNotificationsServers
-	nodeMap[WakuNodes] = &nodecfg.ClusterConfig.WakuNodes
-	nodeMap[DiscV5BootstrapNodes] = &nodecfg.ClusterConfig.DiscV5BootstrapNodes
-	rows, err = tx.Query(`SELECT node, type	FROM cluster_nodes WHERE synthetic_id = 'id' ORDER BY node ASC`)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var node string
-		var nodeType string
-		err = rows.Scan(&node, &nodeType)
-		if err != nil {
-			return nil, err
-		}
-		if nodeList, ok := nodeMap[nodeType]; ok {
-			*nodeList = append(*nodeList, node)
-		}
 	}
 
 	err = tx.QueryRow(`
@@ -550,11 +491,6 @@ func SetLogEnabled(db *sql.DB, enabled bool) error {
 
 func SetMaxLogBackups(db *sql.DB, maxLogBackups uint) error {
 	_, err := db.Exec(`UPDATE log_config SET max_backups = ?`, maxLogBackups)
-	return err
-}
-
-func SaveNewWakuNode(db *sql.DB, nodeAddress string) error {
-	_, err := db.Exec(`INSERT OR REPLACE INTO cluster_nodes (node, type, synthetic_id) VALUES (?, ?, 'id')`, nodeAddress, WakuNodes)
 	return err
 }
 

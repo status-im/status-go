@@ -112,22 +112,6 @@ type ClusterConfig struct {
 	// in `ClusterConfig`.
 	Fleet string
 
-	// StaticNodes is a list of static nodes.
-	// Deprecated: Not used in Waku V2
-	StaticNodes []string
-
-	// BootNodes is a list of bootnodes.
-	// Deprecated: Not used in Waku V2
-	BootNodes []string
-
-	// TrustedMailServers is a list of verified and trusted Mail Server nodes.
-	// Deprecated: Not used in Waku V2
-	TrustedMailServers []string
-
-	// PushNotificationsServers is a list of default push notification servers.
-	// Deprecated: Use ShhextConfig.DefaultPushNotificationsServers instead
-	PushNotificationsServers []string
-
 	// WakuNodes is a list of waku2 multiaddresses
 	WakuNodes []string
 
@@ -483,20 +467,6 @@ func WithLES() Option {
 func WithMailserver() Option {
 	return func(c *NodeConfig) error {
 		return loadConfigFromAsset("../config/cli/mailserver-enabled.json", c)
-	}
-}
-
-func WithDiscV5BootstrapNodes(nodes []string) Option {
-	return func(c *NodeConfig) error {
-		c.ClusterConfig.DiscV5BootstrapNodes = nodes
-		return nil
-	}
-}
-
-func WithWakuNodes(nodes []string) Option {
-	return func(c *NodeConfig) error {
-		c.ClusterConfig.WakuNodes = nodes
-		return nil
 	}
 }
 

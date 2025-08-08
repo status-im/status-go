@@ -35,9 +35,6 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.Equal(t, "/some/data/path/wakuv2", c.WakuV2Config.DataDir)
 	// assert cluster
 	assert.Equal(t, params.FleetProd, c.ClusterConfig.Fleet)
-	assert.NotEmpty(t, c.ClusterConfig.BootNodes)
-	assert.NotEmpty(t, c.ClusterConfig.StaticNodes)
-	assert.NotEmpty(t, c.ClusterConfig.PushNotificationsServers)
 	// assert other
 	assert.Equal(t, false, c.HTTPEnabled)
 

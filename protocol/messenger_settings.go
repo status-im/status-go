@@ -61,13 +61,6 @@ func (m *Messenger) SetCustomNodes(request *requests.SetCustomNodes) error {
 	return nodecfg.SetWakuV2CustomNodes(m.database, request.CustomNodes)
 }
 
-func (m *Messenger) SaveNewWakuNode(request *requests.SaveNewWakuNode) error {
-	if err := request.Validate(); err != nil {
-		return err
-	}
-	return nodecfg.SaveNewWakuNode(m.database, request.NodeAddress)
-}
-
 func (m *Messenger) SetCustomizationColor(ctx context.Context, request *requests.SetCustomizationColor) error {
 	if err := request.Validate(); err != nil {
 		return err
