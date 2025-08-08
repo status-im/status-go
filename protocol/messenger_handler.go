@@ -754,6 +754,10 @@ func (m *Messenger) HandleSyncInstallationContactV2(state *ReceivedMessageState,
 			state.Response.AddChat(chat)
 		}
 
+		if err = m.updateContactImagesURL(contact); err != nil {
+			return err
+		}
+
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 	}
