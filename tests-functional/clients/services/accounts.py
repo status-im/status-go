@@ -38,3 +38,13 @@ class AccountService(Service):
         params = [private_key, password, name, wallet_account]
         response = self.rpc_request("addKeypairViaPrivateKey", params)
         return response.json()
+
+    def verify_password(self, password):
+        params = [password]
+        response = self.rpc_request("verifyPassword", params)
+        return response.json()
+
+    def resolve_suggested_path_for_keypair(self, key_uid):
+        params = [key_uid]
+        response = self.rpc_request("resolveSuggestedPathForKeypair", params)
+        return response.json()
