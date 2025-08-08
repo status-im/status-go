@@ -1627,3 +1627,7 @@ func (api *PublicAPI) GetCommunityMemberAllMessages(request *requests.CommunityM
 func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
 }
+
+func (api *PublicAPI) PeerID() string {
+	return api.service.waku.PeerID().String()
+}

@@ -455,3 +455,8 @@ class WakuextService(Service):
 
         response = self.rpc_request(method="activityCenterNotifications", params=[params])
         return response.json()
+
+    def peer_id(self):
+        params = []
+        response = self.rpc_request("peerID", params)
+        return response.json()["result"]

@@ -193,7 +193,6 @@ class StatusGoContainer:
             log_prefix: Optional string for logging context
         """
         if not self.container:
-            logging.debug("No container to shutdown")
             return
 
         container_id = self.short_id()
@@ -334,6 +333,7 @@ class PushNotificationServerContainer(StatusGoContainer):
 
 class StatusBackendContainer(StatusGoContainer):
     def __init__(self, host_port: int, privileged=False, ipv6=False, **kwargs):
+        self.host_port = host_port
         container_port = 3333
         entrypoint = [
             "status-backend",
