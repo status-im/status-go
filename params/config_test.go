@@ -3,9 +3,7 @@ package params_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"path"
-	"path/filepath"
 	"testing"
 
 	"gopkg.in/go-playground/validator.v9"
@@ -16,7 +14,6 @@ import (
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/t/utils"
 )
 
 func TestNewConfigFromJSON(t *testing.T) {
@@ -42,22 +39,6 @@ func TestNewConfigFromJSON(t *testing.T) {
 	require.Equal(t, tmpDir+"/archivedata", c.TorrentConfig.DataDir)
 	require.Equal(t, tmpDir+"/torrents", c.TorrentConfig.TorrentDir)
 	require.Equal(t, "DEBUG", c.RuntimeLogLevel)
-}
-
-func TestConfigWriteRead(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", tmpDir, params.SepoliaNetworkID)
-	require.Nil(t, err, "cannot create new config object")
-
-	err = nodeConfig.Save()
-	require.Nil(t, err, "cannot persist configuration")
-
-	loadedConfigData, err := ioutil.ReadFile(filepath.Join(nodeConfig.DataDir, "config.json"))
-	require.Nil(t, err, "cannot read configuration from disk")
-	loadedConfig := string(loadedConfigData)
-	require.Contains(t, loadedConfig, fmt.Sprintf(`"NetworkId": %d`, params.SepoliaNetworkID))
-	require.Contains(t, loadedConfig, fmt.Sprintf(`"DataDir": "%s"`, tmpDir))
 }
 
 // TestNodeConfigValidate checks validation of individual fields.

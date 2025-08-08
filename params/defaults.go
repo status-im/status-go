@@ -22,9 +22,6 @@ const (
 	// allow us avoid syncing node.
 	MainnetEthereumNetworkURL = "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 
-	// SepoliaEthereumNetworkURL is an open RPC endpoint to Sepolia network
-	SepoliaEthereumNetworkURL = "https://sepolia.etherscan.io/"
-
 	// MainNetworkID is id of the main network
 	MainNetworkID = 1
 
@@ -33,9 +30,6 @@ const (
 
 	// StatusChainNetworkID is id of a test network (private chain)
 	StatusChainNetworkID = 777
-
-	// LESDiscoveryIdentifier is a prefix for topic used for LES peers discovery.
-	LESDiscoveryIdentifier = "LES2@"
 
 	// IpfsGatewayURL is the Gateway URL to use for IPFS
 	IpfsGatewayURL = "https://ipfs.status.im/"

@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,10 +12,7 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/ethereum/go-ethereum/params"
-
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/pkg/security"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
@@ -98,14 +93,6 @@ func (c *ClusterConfig) String() string {
 // Limits represent min and max amount of peers
 type Limits struct {
 	Min, Max int
-}
-
-// NewLimits creates new Limits config with given min and max values.
-func NewLimits(min, max int) Limits {
-	return Limits{
-		Min: min,
-		Max: max,
-	}
 }
 
 // ----------
@@ -408,10 +395,6 @@ func (c *ShhextConfig) Validate(validate *validator.Validate) error {
 	return nil
 }
 
-// Option is an additional setting when creating a NodeConfig
-// using NewNodeConfigWithDefaults.
-type Option func(*NodeConfig) error
-
 func (c *NodeConfig) setDefaultPushNotificationsServers() error {
 	if len(c.ShhextConfig.DefaultPushNotificationsServers) > 0 {
 		return nil
@@ -610,26 +593,6 @@ func (c *TorrentConfig) Validate(validate *validator.Validate) error {
 	return nil
 }
 
-// Save dumps configuration to the disk
-func (c *NodeConfig) Save() error {
-	data, err := json.MarshalIndent(c, "", "    ")
-	if err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(c.DataDir, os.ModePerm); err != nil {
-		return err
-	}
-
-	configFilePath := filepath.Join(c.DataDir, "config.json")
-	//nolint:gosec
-	if err := ioutil.WriteFile(configFilePath, data, os.ModePerm); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // String dumps config object as nicely indented JSON
 func (c *NodeConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ")
@@ -643,22 +606,6 @@ func (c *NodeConfig) FormatAPIModules() []string {
 	}
 
 	return strings.Split(c.APIModules, ",")
-}
-
-// AddAPIModule adds a mobule to APIModules
-func (c *NodeConfig) AddAPIModule(m string) {
-	c.APIModules = fmt.Sprintf("%s,%s", c.APIModules, m)
-}
-
-// LesTopic returns discovery v5 topic derived from genesis of the provided network.
-// 1 - mainnet
-func LesTopic(netid int) string {
-	switch netid {
-	case 1:
-		return LESDiscoveryIdentifier + types.Bytes2Hex(params.MainnetGenesisHash.Bytes()[:8])
-	default:
-		return ""
-	}
 }
 
 func (c *NodeConfig) LogFilePath() string {
