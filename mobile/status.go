@@ -11,8 +11,9 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"go.uber.org/zap"
+
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/zxcvbn-go"
 	"github.com/status-im/zxcvbn-go/scoring"
