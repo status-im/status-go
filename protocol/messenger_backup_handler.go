@@ -375,6 +375,13 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 			if err != nil {
 				return err
 			}
+
+			if m.httpServer != nil {
+				for j, image := range idImages {
+					idImages[j].LocalURL = m.httpServer.MakeAccountImageURL(message.KeyUid, image.Name, image.Clock)
+				}
+			}
+
 			response.SetImages(idImages)
 		}
 	}
