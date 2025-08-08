@@ -32,7 +32,6 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.Equal(t, "/some/data/path", c.DataDir)
 	// assert Whisper
 	assert.Equal(t, true, c.WakuV2Config.Enabled)
-	assert.Equal(t, "/some/data/path/wakuv2", c.WakuV2Config.DataDir)
 	// assert cluster
 	assert.Equal(t, params.FleetProd, c.ClusterConfig.Fleet)
 	// assert other

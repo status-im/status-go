@@ -130,7 +130,6 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	specifiedWakuV2Config := nodeConfig.WakuV2Config
 	nodeConfig.WakuV2Config = params.WakuV2Config{
 		Enabled:        true,
-		EnableDiscV5:   true,
 		DiscoveryLimit: 20,
 		Host:           "0.0.0.0",
 		AutoUpdate:     true,

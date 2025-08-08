@@ -42,48 +42,21 @@ type WakuV2Config struct {
 	// LightClient should be true if the node will not relay messages and only rely on lightpush/filter nodes
 	LightClient bool
 
-	// FullNode should be true if waku should always acta as a full node
-	FullNode bool
-
 	// DiscoveryLimit indicates the maximum number of peers to discover
 	DiscoveryLimit int
-
-	// DataDir is the file system folder Waku should use for any data storage needs.
-	// For instance, MailServer will use this directory to store its data.
-	DataDir string
 
 	// MaxMessageSize is a maximum size of a devp2p packet handled by the Waku protocol,
 	// not only the size of envelopes sent in that packet.
 	MaxMessageSize uint32
 
-	// EnableConfirmations when true, instructs that confirmation should be sent for received messages
-	EnableConfirmations bool
-
-	// PeerExchange determines whether WakuV2 Peer Exchange is enabled or not
-	// Deprecated: will be calculated based on LightClient
-	PeerExchange bool
-
 	// Nameserver determines which nameserver will be used for dns discovery
 	Nameserver string
-
-	// EnableDiscV5 indicates if DiscoveryV5 is enabled or not
-	// Deprecated: will be calculated based on LightClient
-	EnableDiscV5 bool
 
 	// UDPPort number to start discovery v5
 	UDPPort int
 
 	// AutoUpdate instructs the node to update their own ip address and port with the values seen by other nodes
 	AutoUpdate bool
-
-	// EnableStore indicates if WakuStore protocol should be enabled or not
-	EnableStore bool
-
-	// StoreCapacity indicates the max number of messages to store
-	StoreCapacity int
-
-	// StoreSeconds indicates the maximum number of seconds before a message is removed from the store
-	StoreSeconds int
 
 	// EnableMissingMessageVerification indicates whether the storenodes must be queried periodically to retrieve any missing message
 	EnableMissingMessageVerification bool
@@ -579,12 +552,10 @@ func NewNodeConfigWithDefaultsAndFiles(
 // NewNodeConfig creates new node configuration object with bare-minimum defaults.
 // Important: the returned config is not validated.
 func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
-	var keycardPairingDataFile, wakuV2Dir string
+	var keycardPairingDataFile string
 
 	if dataDir != "" {
 		keycardPairingDataFile = filepath.Join(dataDir, "keycard", "pairings.json")
-
-		wakuV2Dir = filepath.Join(dataDir, "wakuv2")
 	}
 
 	config := &NodeConfig{
@@ -601,7 +572,6 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		WakuV2Config: WakuV2Config{
 			Host:           "0.0.0.0",
 			Port:           0,
-			DataDir:        wakuV2Dir,
 			MaxMessageSize: wakuv2common.DefaultMaxMessageSize,
 		},
 		ShhextConfig: ShhextConfig{},
