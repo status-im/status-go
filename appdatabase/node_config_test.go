@@ -73,18 +73,7 @@ func randomNodeConfig() *params.NodeConfig {
 			BandwidthStatsEnabled:        randomBool(),
 		},
 		WakuV2Config: params.WakuV2Config{
-			Enabled:             randomBool(),
-			Host:                randomString(),
-			Port:                randomInt(math.MaxInt64),
-			LightClient:         randomBool(),
-			FullNode:            randomBool(),
-			DiscoveryLimit:      randomInt(math.MaxInt64),
-			DataDir:             randomString(),
-			MaxMessageSize:      uint32(randomInt(math.MaxInt64)),
-			EnableConfirmations: randomBool(),
-			EnableDiscV5:        randomBool(),
-			UDPPort:             randomInt(math.MaxInt64),
-			AutoUpdate:          randomBool(),
+			LightClient: randomBool(),
 		},
 	}
 }
