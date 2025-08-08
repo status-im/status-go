@@ -59,10 +59,6 @@ type WakuV2Config struct {
 	// EnableConfirmations when true, instructs that confirmation should be sent for received messages
 	EnableConfirmations bool
 
-	// A name->libp2p_addr map for Wakuv2 custom nodes
-	// Deprecated: simply unused
-	CustomNodes map[string]string
-
 	// PeerExchange determines whether WakuV2 Peer Exchange is enabled or not
 	// Deprecated: will be calculated based on LightClient
 	PeerExchange bool

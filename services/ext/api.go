@@ -1625,10 +1625,6 @@ func (api *PublicAPI) LogTest() {
 	_ = l1.Sync()
 }
 
-func (api *PublicAPI) SetCustomNodes(request *requests.SetCustomNodes) error {
-	return api.service.messenger.SetCustomNodes(request)
-}
-
 func (api *PublicAPI) SetCustomizationColor(ctx context.Context, request *requests.SetCustomizationColor) error {
 	return api.service.messenger.SetCustomizationColor(ctx, request)
 }

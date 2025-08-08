@@ -57,10 +57,6 @@ func (m *Messenger) SetMaxLogBackups(request *requests.SetMaxLogBackups) error {
 	return nodecfg.SetMaxLogBackups(m.database, request.MaxLogBackups)
 }
 
-func (m *Messenger) SetCustomNodes(request *requests.SetCustomNodes) error {
-	return nodecfg.SetWakuV2CustomNodes(m.database, request.CustomNodes)
-}
-
 func (m *Messenger) SetCustomizationColor(ctx context.Context, request *requests.SetCustomizationColor) error {
 	if err := request.Validate(); err != nil {
 		return err
