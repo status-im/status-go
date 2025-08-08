@@ -117,6 +117,3 @@ service: $(SERVICE_DIR)
 rm-service:
 	rm -f $(SERVICE_PATH)
 
-config:
-	@echo " * $(GRN)Generating '$(SERVICE_NAME)' config...$(RST)"
-	@$(GIT_ROOT)/_assets/scripts/gen_config.sh

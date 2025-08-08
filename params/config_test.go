@@ -12,41 +12,12 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/t/utils"
 )
-
-func TestNewNodeConfigWithDefaults(t *testing.T) {
-	c, err := params.NewNodeConfigWithDefaults(
-		"/some/data/path",
-		params.SepoliaNetworkID,
-		params.WithFleet(params.FleetProd),
-		params.WithLES(),
-		params.WithMailserver(),
-	)
-	require.NoError(t, err)
-	assert.Equal(t, "/some/data/path", c.DataDir)
-	// assert Whisper
-	assert.Equal(t, true, c.WakuV2Config.Enabled)
-	// assert cluster
-	assert.Equal(t, params.FleetProd, c.ClusterConfig.Fleet)
-	// assert other
-	assert.Equal(t, false, c.HTTPEnabled)
-
-	assert.Equal(t, "", c.RuntimeLogLevel)
-
-	assert.Equal(t, "/some/data/path/archivedata", c.TorrentConfig.DataDir)
-	assert.Equal(t, "/some/data/path/torrents", c.TorrentConfig.TorrentDir)
-	assert.Equal(t, 9025, c.TorrentConfig.Port)
-	assert.Equal(t, false, c.TorrentConfig.Enabled)
-
-	assert.NoError(t, c.UpdateWithDefaults())
-	assert.NotEmpty(t, c.ShhextConfig.DefaultPushNotificationsServers)
-}
 
 func TestNewConfigFromJSON(t *testing.T) {
 	tmpDir := t.TempDir()
