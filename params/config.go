@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/pkg/security"
-	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
 
 // ----------
@@ -473,9 +472,8 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		LogFile:                "",
 		LogLevel:               "ERROR",
 		WakuV2Config: WakuV2Config{
-			Host:           "0.0.0.0",
-			Port:           0,
-			MaxMessageSize: wakuv2common.DefaultMaxMessageSize,
+			Host: "0.0.0.0",
+			Port: 0,
 		},
 		ShhextConfig: ShhextConfig{},
 		TorrentConfig: TorrentConfig{

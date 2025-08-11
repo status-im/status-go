@@ -23,7 +23,7 @@ var (
 )
 
 func createTestClient(t *testing.T) *Client {
-	client, err := NewClient(WithPeerID("test-key"), WithDeviceType("test-node"), WithVersion("test-version"))
+	client, err := NewClient(WithPeerID("test-key"))
 	require.NoError(t, err)
 	require.NoError(t, client.RegisterWithRegistry())
 
@@ -31,7 +31,6 @@ func createTestClient(t *testing.T) *Client {
 		require.NoError(t, UnregisterMetrics())
 	})
 
-	client.SetDeviceType("test-node")
 	return client
 }
 

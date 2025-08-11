@@ -282,7 +282,7 @@ func (m *Messenger) backupFetchingTimeout() {
 	}
 
 	notification.UpdatedAt = m.GetCurrentTimeInMillis()
-	if m.backedUpFetchingStatus.dataProgress == nil || len(m.backedUpFetchingStatus.dataProgress) == 0 {
+	if len(m.backedUpFetchingStatus.dataProgress) == 0 {
 		notification.Type = ActivityCenterNotificationTypeBackupSyncingFailure
 	} else {
 		notification.Type = ActivityCenterNotificationTypeBackupSyncingPartialFailure

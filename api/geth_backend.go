@@ -2420,7 +2420,6 @@ func (b *GethStatusBackend) initProtocol() error {
 		RPCClient:              b.statusNode.RPCClient(),
 		WalletService:          b.statusNode.WalletService(),
 		CommunityTokensService: b.statusNode.CommunityTokensService(),
-		Logger:                 logutils.ZapLogger(),
 		AccountsPublisher:      b.statusNode.AccountsPublisher(),
 		TimeSource:             b.statusNode.TimeSource(),
 		MetricsEnabled:         b.prometheusMetrics != nil,
@@ -2637,7 +2636,7 @@ func (b *GethStatusBackend) wakuMetricsHandler() http.Handler {
 			return
 		}
 
-		wakuMetrics := b.StatusNode().WakuV2ExtService().Waku().Metrics()
+		wakuMetrics := b.StatusNode().WakuV2ExtService().Metrics()
 		if wakuMetrics != "" {
 			_, err := w.Write([]byte(wakuMetrics))
 

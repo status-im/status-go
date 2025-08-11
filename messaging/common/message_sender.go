@@ -976,7 +976,7 @@ func (s *MessageSender) fetchDecryptionKey(destination *ecdsa.PublicKey) (*ecdsa
 }
 
 func (s *MessageSender) handleEncryptionLayer(ctx context.Context, message *messagingtypes.Message) error {
-	logger := s.logger.With(zap.String("site", "handleEncryptionLayer"))
+	logger := s.logger.Named("handleEncryptionLayer")
 	publicKey := message.SigPubKey()
 
 	// if it's an ephemeral key, we don't negotiate a topic
@@ -991,7 +991,6 @@ func (s *MessageSender) handleEncryptionLayer(ctx context.Context, message *mess
 		}
 	}
 	if err != nil {
-		logger.Error("failed to handle an encrypted message", zap.Error(err))
 		return err
 	}
 

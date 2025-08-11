@@ -380,6 +380,16 @@ func (a *API) ResetDatasyncForPeer(publicKey *ecdsa.PublicKey, eventTime uint64)
 	a.core.resetDatasyncForPeer(publicKey, eventTime)
 }
 
+func (a *API) MetricsPushReceivedMessages(receivedMessages types.ReceivedMessages) {
+	if a.core.wakumetrics != nil {
+		a.core.wakumetrics.PushReceivedMessages(adapters.ToWakumetricsReceivedMessages(receivedMessages))
+	}
+}
+
+func (a *API) Metrics() string {
+	return a.core.metrics()
+}
+
 func ToContentTopic(s string) []byte {
 	return transport.ToTopic(s)
 }

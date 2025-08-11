@@ -27,7 +27,7 @@ pipeline {
     )
     booleanParam(
       name: 'UNIT_TEST_USE_DEVELOPMENT_LOGGER',
-      defaultValue: !isNightlyJob(),
+      defaultValue: false,
       description: 'Should the job use detailed logging for tests, potentially generating large logs?'
     )
     booleanParam(

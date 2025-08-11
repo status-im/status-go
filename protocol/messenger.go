@@ -34,9 +34,7 @@ import (
 	"github.com/status-im/status-go/internal/newsfeed"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/pkg/pubsub"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -192,8 +190,6 @@ type Messenger struct {
 	backedUpFetchingStatus *BackupFetchingStatus
 
 	newsFeedManager *newsfeed.NewsFeedManager
-
-	publisher *pubsub.Publisher
 }
 
 type EnvelopeEventsInterceptor struct {
@@ -496,28 +492,11 @@ func NewMessenger(
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			archiveManager.Stop,
-			wakumetrics.UnregisterMetrics,
-			func() error {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-				defer cancel()
-				err := messaging.ResetChatFilters(ctx)
-				if err != nil {
-					logger.Warn("could not reset filters", zap.Error(err))
-				}
-				// We don't want to thrown an error in this case, this is a soft
-				// fail
-				return nil
-			},
-			messaging.Stop,
-			// Currently this often fails, seems like it's safe to ignore them
-			// https://github.com/uber-go/zap/issues/328
-			func() error { _ = logger.Sync; return nil },
 			database.Close,
 		},
 		logger:                           logger,
 		savedAddressesManager:            savedAddressesManager,
 		retrievedMessagesIteratorFactory: NewDefaultMessagesIterator,
-		publisher:                        pubsub.NewPublisher(),
 	}
 
 	if c.rpcClient != nil {
@@ -667,11 +646,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	if err := m.communitiesManager.Start(); err != nil {
-		return nil, err
-	}
-
-	err = m.messaging.Start()
-	if err != nil {
 		return nil, err
 	}
 
@@ -1639,7 +1613,6 @@ func (m *Messenger) Shutdown() (err error) {
 	close(m.quit)
 	m.cancel()
 	m.shutdownWaitGroup.Wait()
-	m.publisher.Close()
 	for i, task := range m.shutdownTasks {
 		m.logger.Debug("running shutdown task", zap.Int("n", i))
 		if tErr := task(); tErr != nil {
@@ -3272,7 +3245,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 
 			statusMessages := handleMessagesResponse.StatusMessages
 
-			pubsub.Publish(m.publisher, RetrievedMessagesEvent{
+			m.messaging.MetricsPushReceivedMessages(messagingtypes.ReceivedMessages{
 				Filter:     filter,
 				SHHMessage: shhMessage,
 				Messages:   statusMessages,
@@ -5489,10 +5462,6 @@ func (m *Messenger) startCleanupLoop(name string, cleanupFunc func() error) {
 
 func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string) (string, error) {
 	return m.persistence.FindStatusMessageIDForBridgeMessageID(bridgeMessageID)
-}
-
-func (m *Messenger) Publisher() *pubsub.Publisher {
-	return m.publisher
 }
 
 func (m *Messenger) Messaging() *messaging.API {
