@@ -22,7 +22,7 @@ type Adapter struct {
 	keystore    *gethkeystore.KeyStore
 }
 
-func NewGethKeystoreAdapter(keystoreDir string, scryptN int, scryptP int) (*Adapter, error) {
+func NewGethKeystoreAdapter(keystoreDir string) (*Adapter, error) {
 	var (
 		keydir = keystoreDir
 		err    error
@@ -38,14 +38,16 @@ func NewGethKeystoreAdapter(keystoreDir string, scryptN int, scryptP int) (*Adap
 		return nil, err
 	}
 
-	ks := gethkeystore.NewKeyStore(keydir, scryptN, scryptP)
-
-	return &Adapter{
+	adapter := &Adapter{
 		keystoreDir: keydir,
-		scryptN:     scryptN,
-		scryptP:     scryptP,
-		keystore:    ks,
-	}, nil
+		scryptN:     gethkeystore.LightScryptN,
+		scryptP:     gethkeystore.LightScryptP,
+	}
+
+	ks := gethkeystore.NewKeyStore(keydir, adapter.scryptN, adapter.scryptP)
+	adapter.keystore = ks
+
+	return adapter, nil
 }
 
 func mapToKeystoreError(err error) error {
