@@ -59,10 +59,6 @@ type WakuV2Config struct {
 	// EnableConfirmations when true, instructs that confirmation should be sent for received messages
 	EnableConfirmations bool
 
-	// A name->libp2p_addr map for Wakuv2 custom nodes
-	// Deprecated: simply unused
-	CustomNodes map[string]string
-
 	// PeerExchange determines whether WakuV2 Peer Exchange is enabled or not
 	// Deprecated: will be calculated based on LightClient
 	PeerExchange bool
@@ -111,22 +107,6 @@ type ClusterConfig struct {
 	// from a file, namely `fleet-*.{{ .Fleet }}.json`. Nodes can be added to any list
 	// in `ClusterConfig`.
 	Fleet string
-
-	// StaticNodes is a list of static nodes.
-	// Deprecated: Not used in Waku V2
-	StaticNodes []string
-
-	// BootNodes is a list of bootnodes.
-	// Deprecated: Not used in Waku V2
-	BootNodes []string
-
-	// TrustedMailServers is a list of verified and trusted Mail Server nodes.
-	// Deprecated: Not used in Waku V2
-	TrustedMailServers []string
-
-	// PushNotificationsServers is a list of default push notification servers.
-	// Deprecated: Use ShhextConfig.DefaultPushNotificationsServers instead
-	PushNotificationsServers []string
 
 	// WakuNodes is a list of waku2 multiaddresses
 	WakuNodes []string
@@ -217,12 +197,6 @@ type NodeConfig struct {
 	// clients. Please be aware that CORS is a browser enforced security, it's fully
 	// useless for custom HTTP clients.
 	HTTPCors []string
-
-	// IPCEnabled specifies whether IPC-RPC Server is enabled or not
-	IPCEnabled bool
-
-	// IPCFile is filename of exposed IPC RPC Server
-	IPCFile string
 
 	// LogEnabled enables the logger
 	LogEnabled bool `json:"LogEnabled"`
@@ -492,20 +466,6 @@ func WithMailserver() Option {
 	}
 }
 
-func WithDiscV5BootstrapNodes(nodes []string) Option {
-	return func(c *NodeConfig) error {
-		c.ClusterConfig.DiscV5BootstrapNodes = nodes
-		return nil
-	}
-}
-
-func WithWakuNodes(nodes []string) Option {
-	return func(c *NodeConfig) error {
-		c.ClusterConfig.WakuNodes = nodes
-		return nil
-	}
-}
-
 // NewNodeConfigWithDefaults creates new node configuration object
 // with some defaults suitable for adhoc use.
 func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option) (*NodeConfig, error) {
@@ -636,7 +596,6 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		HTTPPort:               8545,
 		HTTPVirtualHosts:       []string{"localhost"},
 		APIModules:             "eth,net,web3,peer,wallet",
-		IPCFile:                "geth.ipc",
 		LogFile:                "",
 		LogLevel:               "ERROR",
 		WakuV2Config: WakuV2Config{

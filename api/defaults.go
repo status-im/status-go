@@ -41,8 +41,6 @@ var (
 	paths = []string{accscommon.PathWalletRoot, accscommon.PathEIP1581Root, accscommon.PathEIP1581Chat, accscommon.PathDefaultWalletAccount, accscommon.PathEIP1581Encryption}
 
 	DefaultFleet = params.FleetStatusProd
-
-	overrideApiConfig = overrideApiConfigProd
 )
 
 func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
@@ -256,7 +254,7 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	return walletConfig
 }
 
-func overrideApiConfigProd(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
+func overrideApiConfig(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
 	nodeConfig.APIModules = config.APIModules
 	nodeConfig.ConnectorConfig.Enabled = config.ConnectorEnabled
 

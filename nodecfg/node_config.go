@@ -12,14 +12,6 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
-const StaticNodes = "static"
-const BootNodes = "boot"
-const TrustedMailServers = "trusted_mailserver"
-const PushNotificationsServers = "pushnotification"
-const RendezvousNodes = "rendezvous"
-const DiscV5BootstrapNodes = "discV5boot"
-const WakuNodes = "waku"
-
 func nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {
 	row := tx.QueryRow("SELECT exists(SELECT 1 FROM node_config)")
 	switch err := row.Scan(&migrated); err {
@@ -65,34 +57,6 @@ func insertNodeConfigWithConnector(tx *sql.Tx, c *params.NodeConfig) error {
 	return insertNodeConfigBase(tx, c, true)
 }
 
-func insertHTTPConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	if _, err := tx.Exec(`INSERT OR REPLACE INTO http_config (enabled, host, port, synthetic_id) VALUES (?, ?, ?, 'id')`, c.HTTPEnabled, c.HTTPHost, c.HTTPPort); err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(`DELETE FROM http_virtual_hosts WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for _, httpVirtualHost := range c.HTTPVirtualHosts {
-		if _, err := tx.Exec(`INSERT OR REPLACE INTO http_virtual_hosts (host, synthetic_id) VALUES (?, 'id')`, httpVirtualHost); err != nil {
-			return err
-		}
-	}
-
-	if _, err := tx.Exec(`DELETE FROM http_cors WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for _, httpCors := range c.HTTPCors {
-		if _, err := tx.Exec(`INSERT OR REPLACE INTO http_cors (cors, synthetic_id) VALUES (?, 'id')`, httpCors); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func insertLogConfigBase(tx *sql.Tx, c *params.NodeConfig, includeNamespaces bool) error {
 	query := `
 	INSERT OR REPLACE INTO log_config (
@@ -122,11 +86,6 @@ func insertLogConfigWithNamespaces(tx *sql.Tx, c *params.NodeConfig) error {
 
 func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return insertLogConfigBase(tx, c, false)
-}
-
-func insertIPCConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`INSERT OR REPLACE INTO ipc_config (enabled, file, synthetic_id) VALUES (?, ?, 'id')`, c.IPCEnabled, c.IPCFile)
-	return err
 }
 
 func insertClusterConfig(tx *sql.Tx, c *params.NodeConfig) error {
@@ -189,21 +148,6 @@ func insertWakuV2ConfigPreMigration(tx *sql.Tx, c *params.NodeConfig) error {
 		return err
 	}
 
-	return setWakuV2CustomNodes(tx, c.WakuV2Config.CustomNodes)
-}
-
-func setWakuV2CustomNodes(tx *sql.Tx, customNodes map[string]string) error {
-	if _, err := tx.Exec(`DELETE FROM wakuv2_custom_nodes WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for name, multiaddress := range customNodes {
-		// NOTE: synthetic id is redundant, name is effectively the primary key
-		_, err := tx.Exec(`INSERT OR REPLACE INTO wakuv2_custom_nodes (name, multiaddress, synthetic_id) VALUES (?, ?, 'id')`, name, multiaddress)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -234,41 +178,13 @@ func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
-	if _, err := tx.Exec(`DELETE FROM cluster_nodes WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	nodeMap := make(map[string][]string)
-	nodeMap[StaticNodes] = c.ClusterConfig.StaticNodes
-	nodeMap[BootNodes] = c.ClusterConfig.BootNodes
-	nodeMap[TrustedMailServers] = c.ClusterConfig.TrustedMailServers
-	nodeMap[PushNotificationsServers] = c.ClusterConfig.PushNotificationsServers
-	nodeMap[DiscV5BootstrapNodes] = c.ClusterConfig.DiscV5BootstrapNodes
-	nodeMap[WakuNodes] = c.ClusterConfig.WakuNodes
-
-	for nodeType, nodes := range nodeMap {
-		for _, node := range nodes {
-			_, err := tx.Exec(`INSERT OR REPLACE INTO cluster_nodes (node, type, synthetic_id) VALUES (?, ?, 'id')`, node, nodeType)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 // List of inserts to be executed when upgrading a node
 // These INSERT queries should not be modified
 func nodeConfigUpgradeInserts() []insertFn {
 	return []insertFn{
 		insertNodeConfig,
-		insertHTTPConfig,
-		insertIPCConfig,
 		insertLogConfig,
 		insertClusterConfig,
-		insertClusterConfigNodes,
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 	}
@@ -281,11 +197,8 @@ func nodeConfigNormalInserts() []insertFn {
 
 	return []insertFn{
 		insertNodeConfigWithConnector,
-		insertHTTPConfig,
-		insertIPCConfig,
 		insertLogConfigWithNamespaces,
 		insertClusterConfig,
-		insertClusterConfigNodes,
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 		insertTorrentConfig,
@@ -371,51 +284,13 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	err = tx.QueryRow(`SELECT enabled, host, port FROM http_config WHERE synthetic_id = 'id'`).Scan(&nodecfg.HTTPEnabled, &nodecfg.HTTPHost, &nodecfg.HTTPPort)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	rows, err := tx.Query("SELECT host FROM http_virtual_hosts WHERE synthetic_id = 'id' ORDER BY host ASC")
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var host string
-		err = rows.Scan(&host)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.HTTPVirtualHosts = append(nodecfg.HTTPVirtualHosts, host)
-	}
-
-	rows, err = tx.Query("SELECT cors FROM http_cors WHERE synthetic_id = 'id' ORDER BY cors ASC")
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var cors string
-		err = rows.Scan(&cors)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.HTTPCors = append(nodecfg.HTTPCors, cors)
-	}
-
-	err = tx.QueryRow("SELECT enabled, file FROM ipc_config WHERE synthetic_id = 'id'").Scan(&nodecfg.IPCEnabled, &nodecfg.IPCFile)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
 	err = tx.QueryRow("SELECT enabled, log_dir, log_level, log_namespaces, file, max_backups, max_size, compress_rotated, log_to_stderr FROM log_config WHERE synthetic_id = 'id'").Scan(
 		&nodecfg.LogEnabled, &nodecfg.LogDir, &nodecfg.LogLevel, &nodecfg.LogNamespaces, &nodecfg.LogFile, &nodecfg.LogMaxBackups, &nodecfg.LogMaxSize, &nodecfg.LogCompressRotated, &nodecfg.LogToStderr)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 
-	rows, err = tx.Query(`SELECT
+	rows, err := tx.Query(`SELECT
                 chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
                 native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name
         FROM networks ORDER BY chain_id ASC`)
@@ -438,30 +313,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	err = tx.QueryRow("SELECT enabled, fleet, cluster_id FROM cluster_config WHERE synthetic_id = 'id'").Scan(&nodecfg.ClusterConfig.Enabled, &nodecfg.ClusterConfig.Fleet, &nodecfg.ClusterConfig.ClusterID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
-	}
-
-	nodeMap := make(map[string]*[]string)
-	nodeMap[StaticNodes] = &nodecfg.ClusterConfig.StaticNodes
-	nodeMap[BootNodes] = &nodecfg.ClusterConfig.BootNodes
-	nodeMap[TrustedMailServers] = &nodecfg.ClusterConfig.TrustedMailServers
-	nodeMap[PushNotificationsServers] = &nodecfg.ClusterConfig.PushNotificationsServers
-	nodeMap[WakuNodes] = &nodecfg.ClusterConfig.WakuNodes
-	nodeMap[DiscV5BootstrapNodes] = &nodecfg.ClusterConfig.DiscV5BootstrapNodes
-	rows, err = tx.Query(`SELECT node, type	FROM cluster_nodes WHERE synthetic_id = 'id' ORDER BY node ASC`)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var node string
-		var nodeType string
-		err = rows.Scan(&node, &nodeType)
-		if err != nil {
-			return nil, err
-		}
-		if nodeList, ok := nodeMap[nodeType]; ok {
-			*nodeList = append(*nodeList, node)
-		}
 	}
 
 	err = tx.QueryRow(`
@@ -532,22 +383,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
-	}
-
-	rows, err = tx.Query(`SELECT name, multiaddress FROM wakuv2_custom_nodes WHERE synthetic_id = 'id' ORDER BY name ASC`)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	nodecfg.WakuV2Config.CustomNodes = make(map[string]string)
-	for rows.Next() {
-		var name string
-		var multiaddress string
-		err = rows.Scan(&name, &multiaddress)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.WakuV2Config.CustomNodes[name] = multiaddress
 	}
 
 	return nodecfg, nil
@@ -626,26 +461,4 @@ func SetLogEnabled(db *sql.DB, enabled bool) error {
 func SetMaxLogBackups(db *sql.DB, maxLogBackups uint) error {
 	_, err := db.Exec(`UPDATE log_config SET max_backups = ?`, maxLogBackups)
 	return err
-}
-
-func SaveNewWakuNode(db *sql.DB, nodeAddress string) error {
-	_, err := db.Exec(`INSERT OR REPLACE INTO cluster_nodes (node, type, synthetic_id) VALUES (?, ?, 'id')`, nodeAddress, WakuNodes)
-	return err
-}
-
-func SetWakuV2CustomNodes(db *sql.DB, customNodes map[string]string) error {
-	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-	return setWakuV2CustomNodes(tx, customNodes)
 }

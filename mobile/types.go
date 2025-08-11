@@ -16,25 +16,6 @@ type APIKeyUIDResponse struct {
 	KeyUID string `json:"keyUID"`
 }
 
-// APIDetailedResponse represents a generic response
-// with possible errors.
-type APIDetailedResponse struct {
-	Status      bool            `json:"status"`
-	Message     string          `json:"message,omitempty"`
-	FieldErrors []APIFieldError `json:"field_errors,omitempty"`
-}
-
-// Error string representation of APIDetailedResponse.
-func (r APIDetailedResponse) Error() string {
-	buf := bytes.NewBufferString("")
-
-	for _, err := range r.FieldErrors {
-		buf.WriteString(err.Error() + "\n") // nolint: gas
-	}
-
-	return strings.TrimSpace(buf.String())
-}
-
 // APIFieldError represents a set of errors
 // related to a parameter.
 type APIFieldError struct {
