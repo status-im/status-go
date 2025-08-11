@@ -47,7 +47,7 @@ class TestTransactionsChatMessages(MessengerSteps):
     def test_request_transaction(self, transaction_data):
         self.make_contacts(sender=self.sender, receiver=self.receiver)
         response = self.sender.wakuext_service.request_transaction(
-            self.receiver.public_key, transaction_data["value"], transaction_data["contract"], transaction_data["address"], schema_check=True
+            self.receiver.public_key, transaction_data["value"], transaction_data["contract"], transaction_data["address"]
         )
         self.assert_transaction_command_response(
             response,
@@ -65,7 +65,7 @@ class TestTransactionsChatMessages(MessengerSteps):
 
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=self.REQUEST_TRANSACTION_TEXT, timeout=5)
 
-        response = self.receiver.wakuext_service.decline_request_transaction(message_id, schema_check=True)
+        response = self.receiver.wakuext_service.decline_request_transaction(message_id)
         self.assert_transaction_command_response(
             response,
             self.REQUEST_TRANSACTION_DECLINED_TEXT,
@@ -82,9 +82,7 @@ class TestTransactionsChatMessages(MessengerSteps):
 
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=self.REQUEST_TRANSACTION_TEXT, timeout=5)
 
-        response = self.receiver.wakuext_service.accept_request_transaction(
-            transaction_data["tx_hash"], message_id, transaction_data["signature"], schema_check=True
-        )
+        response = self.receiver.wakuext_service.accept_request_transaction(transaction_data["tx_hash"], message_id, transaction_data["signature"])
         self.assert_transaction_command_response(
             response,
             self.TRANSACTION_SENT_TEXT,
@@ -100,7 +98,7 @@ class TestTransactionsChatMessages(MessengerSteps):
     def test_request_address_for_transaction(self, transaction_data):
         self.make_contacts(sender=self.sender, receiver=self.receiver)
         response = self.sender.wakuext_service.request_address_for_transaction(
-            self.receiver.public_key, transaction_data["from"], transaction_data["value"], transaction_data["contract"], schema_check=True
+            self.receiver.public_key, transaction_data["from"], transaction_data["value"], transaction_data["contract"]
         )
         self.assert_transaction_command_response(
             response,
@@ -120,7 +118,7 @@ class TestTransactionsChatMessages(MessengerSteps):
             SignalType.MESSAGES_NEW.value, event_pattern=self.REQUEST_ADDRESS_FOR_TRANSACTION_TEXT, timeout=5
         )
 
-        response = self.receiver.wakuext_service.decline_request_address_for_transaction(message_id, schema_check=True)
+        response = self.receiver.wakuext_service.decline_request_address_for_transaction(message_id)
         self.assert_transaction_command_response(
             response,
             self.REQUEST_ADDRESS_FOR_TRANSACTION_DECLINED_TEXT,
@@ -139,7 +137,7 @@ class TestTransactionsChatMessages(MessengerSteps):
             SignalType.MESSAGES_NEW.value, event_pattern=self.REQUEST_ADDRESS_FOR_TRANSACTION_TEXT, timeout=5
         )
 
-        response = self.receiver.wakuext_service.accept_request_address_for_transaction(message_id, transaction_data["address"], schema_check=True)
+        response = self.receiver.wakuext_service.accept_request_address_for_transaction(message_id, transaction_data["address"])
         self.assert_transaction_command_response(
             response,
             self.REQUEST_ADDRESS_FOR_TRANSACTION_ACCEPTED_TEXT,
@@ -155,7 +153,6 @@ class TestTransactionsChatMessages(MessengerSteps):
             transaction_data["contract"],
             transaction_data["tx_hash"],
             transaction_data["signature"],
-            schema_check=True,
         )
         self.assert_transaction_command_response(
             response,

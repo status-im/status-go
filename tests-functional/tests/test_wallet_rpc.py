@@ -83,4 +83,4 @@ class TestRpc:
     )
     def test_(self, method, params):
         _id = str(random.randint(1, 8888))
-        self.rpc_client.rpc_valid_request(method, params, _id, schema_check=True)
+        self.rpc_client.rpc_valid_request(method, params, _id)

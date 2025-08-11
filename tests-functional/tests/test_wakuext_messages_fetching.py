@@ -17,7 +17,7 @@ class TestFetchingChatMessages(MessengerSteps):
         sent_texts, _ = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
 
         sender_chat_id = self.receiver.public_key
-        response = self.sender.wakuext_service.chat_messages(sender_chat_id, schema_check=True)
+        response = self.sender.wakuext_service.chat_messages(sender_chat_id)
 
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == 1
@@ -53,7 +53,7 @@ class TestFetchingChatMessages(MessengerSteps):
         sent_texts, responses = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
 
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
-        response = self.sender.wakuext_service.message_by_message_id(message_id, schema_check=True)
+        response = self.sender.wakuext_service.message_by_message_id(message_id)
         actual_text = response.get("result", {}).get("text", "")
         assert actual_text == sent_texts[0]
 
@@ -69,7 +69,7 @@ class TestFetchingChatMessages(MessengerSteps):
         self.send_multiple_one_to_one_messages(3, sender=self.sender, receiver=self.receiver)
         sender_chat_id = self.receiver.public_key
 
-        response = self.sender.wakuext_service.all_messages_from_chat_which_match_term(sender_chat_id, searchTerm, caseSensitive, schema_check=True)
+        response = self.sender.wakuext_service.all_messages_from_chat_which_match_term(sender_chat_id, searchTerm, caseSensitive)
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == expectedCount
 
@@ -91,7 +91,7 @@ class TestFetchingChatMessages(MessengerSteps):
         response = self.sender.wakuext_service.send_chat_message(community_chat_id, text_community)
 
         response = self.sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
-            [self.community_id], [one_to_one_chat_id, private_group_chat_id], "TEST_MESSAGE", False, schema_check=True
+            [self.community_id], [one_to_one_chat_id, private_group_chat_id], "TEST_MESSAGE", False
         )
         messages = response.get("result", {}).get("messages", [])
         actual_texts = [message.get("text", "") for message in messages]
@@ -127,7 +127,7 @@ class TestFetchingChatMessages(MessengerSteps):
         sender_chat_id = self.receiver.public_key
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
 
-        self.sender.wakuext_service.mark_message_as_unread(sender_chat_id, message_id, schema_check=True)
-        response = self.sender.wakuext_service.first_unseen_message_id(sender_chat_id, schema_check=True)
+        self.sender.wakuext_service.mark_message_as_unread(sender_chat_id, message_id)
+        response = self.sender.wakuext_service.first_unseen_message_id(sender_chat_id)
         result = response.get("result", "")
         assert result == message_id

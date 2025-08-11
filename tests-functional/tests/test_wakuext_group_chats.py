@@ -16,9 +16,7 @@ class TestCreatePrivateGroups(MessengerSteps):
 
     def test_create_group_chat_with_members(self):
         private_group_name = f"private_group_{uuid4()}"
-        create_group_response = self.sender.wakuext_service.create_group_chat_with_members(
-            [self.receiver.public_key], private_group_name, schema_check=True
-        )
+        create_group_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
         self.get_message_by_content_type(
             create_group_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
@@ -57,9 +55,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         group_id = create_group_response.get("result", {}).get("chats", [])[0].get("id")
 
         invitation_message = f"Please join {uuid4()}"
-        invite_response = self.sender.wakuext_service.send_group_chat_invitation_request(
-            group_id, third_node.public_key, invitation_message, schema_check=True
-        )
+        invite_response = self.sender.wakuext_service.send_group_chat_invitation_request(group_id, third_node.public_key, invitation_message)
         invitations = invite_response.get("result", {}).get("invitations", [])
         assert len(invitations) == 1
         assert invitations[0].get("chatId", "") == group_id
@@ -70,9 +66,7 @@ class TestCreatePrivateGroups(MessengerSteps):
     def test_create_group_chat_from_invitation(self):
         invitation_group = f"Group name {uuid4()}"
         group_id = str(uuid4())
-        create_from_inv = self.receiver.wakuext_service.create_group_chat_from_invitation(
-            invitation_group, group_id, self.sender.public_key, schema_check=True
-        )
+        create_from_inv = self.receiver.wakuext_service.create_group_chat_from_invitation(invitation_group, group_id, self.sender.public_key)
         chats = create_from_inv.get("result", {}).get("chats", [])
         assert len(chats) == 1
         assert chats[0].get("id", "") == group_id
@@ -86,7 +80,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"add_members_group_{uuid4()}")
         group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
 
-        add_members_response = self.sender.wakuext_service.add_members_to_group_chat(group_id, [third_node.public_key], schema_check=True)
+        add_members_response = self.sender.wakuext_service.add_members_to_group_chat(group_id, [third_node.public_key])
         self.get_message_by_content_type(
             add_members_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
@@ -97,7 +91,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"group_{uuid4()}")
         group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
 
-        remove_member_response = self.sender.wakuext_service.remove_member_from_group_chat(group_id, self.receiver.public_key, schema_check=True)
+        remove_member_response = self.sender.wakuext_service.remove_member_from_group_chat(group_id, self.receiver.public_key)
         self.get_message_by_content_type(
             remove_member_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
@@ -114,7 +108,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
 
         remove_members_response = self.sender.wakuext_service.remove_members_from_group_chat(
-            group_id, [self.receiver.public_key, third_node.public_key], schema_check=True
+            group_id, [self.receiver.public_key, third_node.public_key]
         )
         self.get_message_by_content_type(
             remove_members_response,
@@ -131,7 +125,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         create_response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], f"confirm_join_group_{uuid4()}")
         group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
 
-        confirm_response = self.sender.wakuext_service.confirm_joining_group(group_id, schema_check=True)
+        confirm_response = self.sender.wakuext_service.confirm_joining_group(group_id)
         chats = confirm_response.get("result", {}).get("chats", [])
         assert len(chats) == 1
         assert len(chats[0].get("members", [])) == 2
@@ -142,7 +136,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
 
         new_group_name = f"new_group_name_{uuid4()}"
-        change_name_response = self.sender.wakuext_service.change_group_chat_name(group_id, new_group_name, schema_check=True)
+        change_name_response = self.sender.wakuext_service.change_group_chat_name(group_id, new_group_name)
         self.get_message_by_content_type(
             change_name_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
@@ -161,7 +155,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         group_id = create_response.get("result", {}).get("chats", [])[0].get("id")
 
         self.sender.wakuext_service.send_group_chat_invitation_request(group_id, third_node.public_key, f"Please join {uuid4()}")
-        third_node.wakuext_service.get_group_chat_invitations(schema_check=True)
+        third_node.wakuext_service.get_group_chat_invitations()
 
     def test_send_group_chat_invitation_rejection(self, backend_new_profile):
         third_node = backend_new_profile("third_node")
@@ -174,7 +168,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         send_invitation_response = self.sender.wakuext_service.send_group_chat_invitation_request(group_id, third_node.public_key, invitation_message)
 
         invitation_id = send_invitation_response.get("result", {}).get("invitations", [])[0].get("id")
-        reject_response = self.sender.wakuext_service.send_group_chat_invitation_rejection(invitation_id, schema_check=True)
+        reject_response = self.sender.wakuext_service.send_group_chat_invitation_rejection(invitation_id)
         invitations = reject_response.get("result", {}).get("invitations", [])
         assert len(invitations) == 1
         assert invitations[0].get("chatId", "") == group_id

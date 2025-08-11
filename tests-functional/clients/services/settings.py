@@ -6,6 +6,6 @@ class SettingsService(Service):
     def __init__(self, client: RpcClient):
         super().__init__(client, "settings")
 
-    def get_settings(self, **kwargs):
-        response = self.rpc_request("getSettings", **kwargs)
+    def get_settings(self):
+        response = self.rpc_request("getSettings")
         return response.json()

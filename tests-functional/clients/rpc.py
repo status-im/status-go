@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import jsonschema
 import requests
 from tenacity import retry, stop_after_delay, wait_fixed
@@ -23,10 +22,7 @@ class RpcClient:
         except KeyError:
             raise AssertionError(f"Key '{key}' not found in the JSON response: {response.content}")
 
-    def verify_is_valid_json_rpc_response(self, response, _id=None, skip_validation=False):
-        if skip_validation:
-            return response
-
+    def verify_is_valid_json_rpc_response(self, response, _id=None):
         assert response.status_code == 200, f"Got response {response.content}, status code {response.status_code}"
         assert response.content
         self._check_decode_and_key_errors_in_response(response, "result")
@@ -73,19 +69,20 @@ class RpcClient:
 
     def rpc_valid_request(self, method, params=None, _id=None, url=None, **kwargs):
         skip_validation = kwargs.pop("skip_validation", False)
-        schema_check = kwargs.pop("schema_check", False)
+        schema_check = kwargs.pop("schema_check", True)
+        generate_schema = kwargs.pop("generate_schema", False)
 
         response = self.rpc_request(method, params, _id, url, **kwargs)
-        self.verify_is_valid_json_rpc_response(response, _id, skip_validation=skip_validation)
+        if not skip_validation:
+            self.verify_is_valid_json_rpc_response(response, _id)
+
+        if generate_schema:
+            from utils.schema_builder import CustomSchemaBuilder
+
+            CustomSchemaBuilder(method).create_schema(response.json())
 
         if schema_check:
-            if os.path.exists(f"{Config.base_dir}/schemas/{method}"):
-                self.verify_json_schema(response.json(), method)
-            else:
-                from utils.schema_builder import CustomSchemaBuilder
-
-                CustomSchemaBuilder(method).create_schema(response.json())
-                self.verify_json_schema(response.json(), method)
+            self.verify_json_schema(response.json(), method)
 
         return response
 

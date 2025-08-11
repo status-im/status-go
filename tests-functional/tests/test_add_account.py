@@ -13,7 +13,7 @@ class TestAddAccount:
 
     def test_add_account_for_valid_key_uid(self):
         self.account_data["key-uid"] = self.get_keypair_key_uid()
-        self.account.accounts_service.add_account(self.account_data, schema_check=True)
+        self.account.accounts_service.add_account(self.account_data)
 
         # After adding the account check that the get accounts will retrieve the new account
         accounts_response = self.account.accounts_service.get_accounts()
@@ -49,7 +49,7 @@ class TestAddAccount:
 
         # Call accounts_addKeypair with the new account
         password = self.account.password
-        self.account.accounts_service.add_keypair(password, keypair, schema_check=True)
+        self.account.accounts_service.add_keypair(password, keypair)
 
         # After adding the account check that the get accounts will retrieve the new account
         accounts_response = self.account.accounts_service.get_accounts()
@@ -75,7 +75,7 @@ class TestAddAccount:
 
     def test_add_watch_account(self):
         self.account_data["type"] = "watch"
-        self.account.accounts_service.add_account(self.account_data, schema_check=True)
+        self.account.accounts_service.add_account(self.account_data)
 
         # After adding the account check that the get accounts will retrieve the new account
         accounts_response = self.account.accounts_service.get_accounts()
@@ -85,17 +85,17 @@ class TestAddAccount:
     def test_add_seed_account(self):
         self.account_data["key-uid"] = self.get_keypair_key_uid()
         self.account_data["type"] = "seed"
-        self.account.accounts_service.add_account(self.account_data, schema_check=True)
+        self.account.accounts_service.add_account(self.account_data)
 
     def test_delete_account(self):
         self.account_data["type"] = "watch"
-        self.account.accounts_service.add_account(self.account_data, schema_check=True)
+        self.account.accounts_service.add_account(self.account_data)
 
         accounts_response = self.account.accounts_service.get_accounts()
         assert len(accounts_response.get("result", [])) == 3
 
         # Delete the account
-        self.account.accounts_service.delete_account(self.account_data["address"], schema_check=True)
+        self.account.accounts_service.delete_account(self.account_data["address"])
 
         accounts_response = self.account.accounts_service.get_accounts()
         assert len(accounts_response.get("result", [])) == 2

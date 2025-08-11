@@ -84,8 +84,8 @@ class WakuextService(Service):
     def __init__(self, client: RpcClient):
         super().__init__(client, "wakuext")
 
-    def start_messenger(self, **kwargs):
-        response = self.rpc_request("startMessenger", **kwargs)
+    def start_messenger(self):
+        response = self.rpc_request("startMessenger")
         json_response = response.json()
 
         if "error" in json_response:
@@ -93,58 +93,58 @@ class WakuextService(Service):
             assert json_response["error"]["message"] == "messenger already started"
             return
 
-    def send_contact_request(self, contact_id: str, message: str, **kwargs):
+    def send_contact_request(self, contact_id: str, message: str):
         params = [{"id": contact_id, "message": message}]
-        response = self.rpc_request("sendContactRequest", params, **kwargs)
+        response = self.rpc_request("sendContactRequest", params)
         return response.json()
 
-    def accept_contact_request(self, request_id: str, **kwargs):
+    def accept_contact_request(self, request_id: str):
         params = [{"id": request_id}]
-        response = self.rpc_request("acceptContactRequest", params, **kwargs)
+        response = self.rpc_request("acceptContactRequest", params)
         return response.json()
 
-    def accept_latest_contact_request_for_contact(self, request_id: str, **kwargs):
+    def accept_latest_contact_request_for_contact(self, request_id: str):
         params = [{"id": request_id}]
-        response = self.rpc_request("acceptLatestContactRequestForContact", params, **kwargs)
+        response = self.rpc_request("acceptLatestContactRequestForContact", params)
         return response.json()
 
-    def decline_contact_request(self, request_id: str, **kwargs):
+    def decline_contact_request(self, request_id: str):
         params = [{"id": request_id}]
-        response = self.rpc_request("declineContactRequest", params, **kwargs)
+        response = self.rpc_request("declineContactRequest", params)
         return response.json()
 
-    def dismiss_latest_contact_request_for_contact(self, request_id: str, **kwargs):
+    def dismiss_latest_contact_request_for_contact(self, request_id: str):
         params = [{"id": request_id}]
-        response = self.rpc_request("dismissLatestContactRequestForContact", params, **kwargs)
+        response = self.rpc_request("dismissLatestContactRequestForContact", params)
         return response.json()
 
-    def get_latest_contact_request_for_contact(self, request_id: str, **kwargs):
+    def get_latest_contact_request_for_contact(self, request_id: str):
         params = [request_id]
-        response = self.rpc_request("getLatestContactRequestForContact", params, **kwargs)
+        response = self.rpc_request("getLatestContactRequestForContact", params)
         return response.json()
 
-    def retract_contact_request(self, request_id: str, **kwargs):
+    def retract_contact_request(self, request_id: str):
         params = [{"id": request_id}]
-        response = self.rpc_request("retractContactRequest", params, **kwargs)
+        response = self.rpc_request("retractContactRequest", params)
         return response.json()
 
-    def remove_contact(self, request_id: str, **kwargs):
+    def remove_contact(self, request_id: str):
         params = [request_id]
-        response = self.rpc_request("removeContact", params, **kwargs)
+        response = self.rpc_request("removeContact", params)
         return response.json()
 
-    def set_contact_local_nickname(self, request_id: str, nickname: str, **kwargs):
+    def set_contact_local_nickname(self, request_id: str, nickname: str):
         params = [{"id": request_id, "nickname": nickname}]
-        response = self.rpc_request("setContactLocalNickname", params, **kwargs)
+        response = self.rpc_request("setContactLocalNickname", params)
         return response.json()
 
-    def get_contacts(self, **kwargs):
-        response = self.rpc_request("contacts", **kwargs)
+    def get_contacts(self):
+        response = self.rpc_request("contacts")
         return response.json()
 
-    def add_contact(self, contact_id: str, displayName: str, **kwargs):
+    def add_contact(self, contact_id: str, displayName: str):
         params = [{"id": contact_id, "nickname": "fake_nickname", "displayName": displayName, "ensName": ""}]
-        response = self.rpc_request("addContact", params, **kwargs)
+        response = self.rpc_request("addContact", params)
         return response.json()
 
     def send_one_to_one_message(self, contact_id: str, message: str, **kwargs):
@@ -152,108 +152,108 @@ class WakuextService(Service):
         response = self.rpc_request("sendOneToOneMessage", params, **kwargs)
         return response.json()
 
-    def create_group_chat_with_members(self, pubkey_list: list, group_chat_name: str, **kwargs):
+    def create_group_chat_with_members(self, pubkey_list: list, group_chat_name: str):
         params = [None, group_chat_name, pubkey_list]
-        response = self.rpc_request("createGroupChatWithMembers", params, **kwargs)
+        response = self.rpc_request("createGroupChatWithMembers", params)
         return response.json()
 
-    def send_group_chat_message(self, group_id: str, message: str, **kwargs):
+    def send_group_chat_message(self, group_id: str, message: str):
         params = [{"id": group_id, "message": message}]
-        response = self.rpc_request("sendGroupChatMessage", params, **kwargs)
+        response = self.rpc_request("sendGroupChatMessage", params)
         return response.json()
 
-    def leave_group_chat(self, chat_id: str, remove: bool, **kwargs):
+    def leave_group_chat(self, chat_id: str, remove: bool):
         params = [None, chat_id, remove]
-        response = self.rpc_request("leaveGroupChat", params, **kwargs)
+        response = self.rpc_request("leaveGroupChat", params)
         return response.json()
 
-    def create_group_chat_from_invitation(self, name: str, chat_id: str, admin_pk: str, **kwargs):
+    def create_group_chat_from_invitation(self, name: str, chat_id: str, admin_pk: str):
         params = [name, chat_id, admin_pk]
-        response = self.rpc_request("createGroupChatFromInvitation", params, **kwargs)
+        response = self.rpc_request("createGroupChatFromInvitation", params)
         return response.json()
 
-    def add_members_to_group_chat(self, chat_id: str, members: list, **kwargs):
+    def add_members_to_group_chat(self, chat_id: str, members: list):
         params = [None, chat_id, members]
-        response = self.rpc_request("addMembersToGroupChat", params, **kwargs)
+        response = self.rpc_request("addMembersToGroupChat", params)
         return response.json()
 
-    def remove_member_from_group_chat(self, chat_id: str, member: str, **kwargs):
+    def remove_member_from_group_chat(self, chat_id: str, member: str):
         params = [None, chat_id, member]
-        response = self.rpc_request("removeMemberFromGroupChat", params, **kwargs)
+        response = self.rpc_request("removeMemberFromGroupChat", params)
         return response.json()
 
-    def remove_members_from_group_chat(self, chat_id: str, members: list, **kwargs):
+    def remove_members_from_group_chat(self, chat_id: str, members: list):
         params = [None, chat_id, members]
-        response = self.rpc_request("removeMembersFromGroupChat", params, **kwargs)
+        response = self.rpc_request("removeMembersFromGroupChat", params)
         return response.json()
 
-    def confirm_joining_group(self, chat_id: str, **kwargs):
+    def confirm_joining_group(self, chat_id: str):
         params = [chat_id]
-        response = self.rpc_request("confirmJoiningGroup", params, **kwargs)
+        response = self.rpc_request("confirmJoiningGroup", params)
         return response.json()
 
-    def change_group_chat_name(self, chat_id: str, name: str, **kwargs):
+    def change_group_chat_name(self, chat_id: str, name: str):
         params = [None, chat_id, name]
-        response = self.rpc_request("changeGroupChatName", params, **kwargs)
+        response = self.rpc_request("changeGroupChatName", params)
         return response.json()
 
-    def send_group_chat_invitation_request(self, chat_id: str, admin_pk: str, message: str, **kwargs):
+    def send_group_chat_invitation_request(self, chat_id: str, admin_pk: str, message: str):
         params = [None, chat_id, admin_pk, message]
-        response = self.rpc_request("sendGroupChatInvitationRequest", params, **kwargs)
+        response = self.rpc_request("sendGroupChatInvitationRequest", params)
         return response.json()
 
-    def get_group_chat_invitations(self, **kwargs):
-        response = self.rpc_request("getGroupChatInvitations", **kwargs)
+    def get_group_chat_invitations(self):
+        response = self.rpc_request("getGroupChatInvitations")
         return response.json()
 
-    def send_group_chat_invitation_rejection(self, invitation_request_id: str, **kwargs):
+    def send_group_chat_invitation_rejection(self, invitation_request_id: str):
         params = [None, invitation_request_id]
-        response = self.rpc_request("sendGroupChatInvitationRejection", params, **kwargs)
+        response = self.rpc_request("sendGroupChatInvitationRejection", params)
         return response.json()
 
-    def create_community(self, name, color="#ffffff", membership=3, **kwargs):
+    def create_community(self, name, color="#ffffff", membership=3):
         params = [{"membership": membership, "name": name, "color": color, "description": name}]
-        response = self.rpc_request("createCommunity", params, **kwargs)
+        response = self.rpc_request("createCommunity", params)
         return response.json()
 
-    def fetch_community(self, community_key, **kwargs):
+    def fetch_community(self, community_key):
         params = [{"communityKey": community_key, "waitForResponse": True, "tryDatabase": True}]
-        response = self.rpc_request("fetchCommunity", params, **kwargs)
+        response = self.rpc_request("fetchCommunity", params)
         return response.json()
 
-    def request_to_join_community(self, community_id, address="fakeaddress", **kwargs):
+    def request_to_join_community(self, community_id, address="fakeaddress"):
         params = [{"communityId": community_id, "addressesToReveal": [address], "airdropAddress": address}]
-        response = self.rpc_request("requestToJoinCommunity", params, **kwargs)
+        response = self.rpc_request("requestToJoinCommunity", params)
         return response.json()
 
-    def accept_request_to_join_community(self, request_to_join_id, **kwargs):
+    def accept_request_to_join_community(self, request_to_join_id):
         params = [{"id": request_to_join_id}]
-        response = self.rpc_request("acceptRequestToJoinCommunity", params, **kwargs)
+        response = self.rpc_request("acceptRequestToJoinCommunity", params)
         return response.json()
 
-    def send_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value, **kwargs):
+    def send_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value):
         params = [{"chatId": chat_id, "text": message, "contentType": content_type}]
-        response = self.rpc_request("sendChatMessage", params, **kwargs)
+        response = self.rpc_request("sendChatMessage", params)
         return response.json()
 
-    def send_chat_messages(self, messages: list[SendChatMessagePayload], **kwargs):
+    def send_chat_messages(self, messages: list[SendChatMessagePayload]):
         params = [[{"chatId": m["chat_id"], "text": m["text"], "contentType": m["content_type"]} for m in messages]]
-        response = self.rpc_request("sendChatMessages", params, **kwargs)
+        response = self.rpc_request("sendChatMessages", params)
         return response.json()
 
-    def resend_chat_message(self, message_id: str, **kwargs):
+    def resend_chat_message(self, message_id: str):
         params = [message_id]
-        response = self.rpc_request("reSendChatMessage", params, **kwargs)
+        response = self.rpc_request("reSendChatMessage", params)
         return response.json()
 
-    def leave_community(self, community_id, **kwargs):
+    def leave_community(self, community_id):
         params = [community_id]
-        response = self.rpc_request("leaveCommunity", params, **kwargs)
+        response = self.rpc_request("leaveCommunity", params)
         return response.json()
 
-    def set_light_client(self, enabled=True, **kwargs):
+    def set_light_client(self, enabled=True):
         params = [{"enabled": enabled}]
-        response = self.rpc_request("setLightClient", params, **kwargs)
+        response = self.rpc_request("setLightClient", params)
         return response.json()
 
     def peers(self, **kwargs):
@@ -261,9 +261,9 @@ class WakuextService(Service):
         response = self.rpc_request("peers", params, **kwargs)
         return response.json()
 
-    def chat_messages(self, chat_id: str, cursor="", limit=10, **kwargs):
+    def chat_messages(self, chat_id: str, cursor="", limit=10):
         params = [chat_id, cursor, limit]
-        response = self.rpc_request("chatMessages", params, **kwargs)
+        response = self.rpc_request("chatMessages", params)
         return response.json()
 
     def message_by_message_id(self, message_id: str, **kwargs):
@@ -271,171 +271,171 @@ class WakuextService(Service):
         response = self.rpc_request("messageByMessageID", params, **kwargs)
         return response.json()
 
-    def all_messages_from_chat_which_match_term(self, chat_id: str, searchTerm: str, caseSensitive: bool, **kwargs):
+    def all_messages_from_chat_which_match_term(self, chat_id: str, searchTerm: str, caseSensitive: bool):
         params = [chat_id, searchTerm, caseSensitive]
-        response = self.rpc_request("allMessagesFromChatWhichMatchTerm", params, **kwargs)
+        response = self.rpc_request("allMessagesFromChatWhichMatchTerm", params)
         return response.json()
 
     def all_messages_from_chats_and_communities_which_match_term(
-        self, community_ids: list[str], chat_ids: list[str], searchTerm: str, caseSensitive: bool, **kwargs
+        self, community_ids: list[str], chat_ids: list[str], searchTerm: str, caseSensitive: bool
     ):
         params = [community_ids, chat_ids, searchTerm, caseSensitive]
-        response = self.rpc_request("allMessagesFromChatsAndCommunitiesWhichMatchTerm", params, **kwargs)
+        response = self.rpc_request("allMessagesFromChatsAndCommunitiesWhichMatchTerm", params)
         return response.json()
 
-    def send_pin_message(self, message: SendPinMessagePayload, **kwargs):
+    def send_pin_message(self, message: SendPinMessagePayload):
         params = [message]
-        response = self.rpc_request("sendPinMessage", params, **kwargs)
+        response = self.rpc_request("sendPinMessage", params)
         return response.json()
 
-    def chat_pinned_messages(self, chat_id: str, cursor="", limit=10, **kwargs):
+    def chat_pinned_messages(self, chat_id: str, cursor="", limit=10):
         params = [chat_id, cursor, limit]
-        response = self.rpc_request("chatPinnedMessages", params, **kwargs)
+        response = self.rpc_request("chatPinnedMessages", params)
         return response.json()
 
-    def set_user_status(self, new_status: int, custom_text="", **kwargs):
+    def set_user_status(self, new_status: int, custom_text=""):
         params = [new_status, custom_text]
-        response = self.rpc_request("setUserStatus", params, **kwargs)
+        response = self.rpc_request("setUserStatus", params)
         return response.json()
 
-    def status_updates(self, **kwargs):
+    def status_updates(self):
         params = []
-        response = self.rpc_request("statusUpdates", params, **kwargs)
+        response = self.rpc_request("statusUpdates", params)
         return response.json()
 
-    def edit_message(self, message_id: str, new_text: str, **kwargs):
+    def edit_message(self, message_id: str, new_text: str):
         params = [{"id": message_id, "text": new_text}]
-        response = self.rpc_request("editMessage", params, **kwargs)
+        response = self.rpc_request("editMessage", params)
         return response.json()
 
-    def delete_message(self, message_id: str, **kwargs):
+    def delete_message(self, message_id: str):
         params = [message_id]
-        response = self.rpc_request("deleteMessage", params, **kwargs)
+        response = self.rpc_request("deleteMessage", params)
         return response.json()
 
-    def delete_messages_by_chat_id(self, chat_id: str, **kwargs):
+    def delete_messages_by_chat_id(self, chat_id: str):
         params = [chat_id]
-        response = self.rpc_request("deleteMessagesByChatID", params, **kwargs)
+        response = self.rpc_request("deleteMessagesByChatID", params)
         return response.json()
 
-    def delete_message_and_send(self, message_id: str, **kwargs):
+    def delete_message_and_send(self, message_id: str):
         params = [message_id]
-        response = self.rpc_request("deleteMessageAndSend", params, **kwargs)
+        response = self.rpc_request("deleteMessageAndSend", params)
         return response.json()
 
-    def delete_message_for_me_and_sync(self, local_chat_id: str, message_id: str, **kwargs):
+    def delete_message_for_me_and_sync(self, local_chat_id: str, message_id: str):
         params = [local_chat_id, message_id]
-        response = self.rpc_request("deleteMessageForMeAndSync", params, **kwargs)
+        response = self.rpc_request("deleteMessageForMeAndSync", params)
         return response.json()
 
-    def mark_message_as_unread(self, chat_id: str, message_id: str, **kwargs):
+    def mark_message_as_unread(self, chat_id: str, message_id: str):
         params = [chat_id, message_id]
-        response = self.rpc_request("markMessageAsUnread", params, **kwargs)
+        response = self.rpc_request("markMessageAsUnread", params)
         return response.json()
 
-    def first_unseen_message_id(self, chat_id: str, **kwargs):
+    def first_unseen_message_id(self, chat_id: str):
         params = [chat_id]
-        response = self.rpc_request("firstUnseenMessageID", params, **kwargs)
+        response = self.rpc_request("firstUnseenMessageID", params)
         return response.json()
 
-    def update_message_outgoing_status(self, message_id: str, new_status: str, **kwargs):
+    def update_message_outgoing_status(self, message_id: str, new_status: str):
         params = [message_id, new_status]
-        response = self.rpc_request("updateMessageOutgoingStatus", params, **kwargs)
+        response = self.rpc_request("updateMessageOutgoingStatus", params)
         return response.json()
 
-    def request_transaction(self, chat_id: str, value: str, contract: str, address: str, **kwargs):
+    def request_transaction(self, chat_id: str, value: str, contract: str, address: str):
         params = [chat_id, value, contract, address]
-        response = self.rpc_request("requestTransaction", params, **kwargs)
+        response = self.rpc_request("requestTransaction", params)
         return response.json()
 
-    def decline_request_transaction(self, message_id: str, **kwargs):
+    def decline_request_transaction(self, message_id: str):
         params = [message_id]
-        response = self.rpc_request("declineRequestTransaction", params, **kwargs)
+        response = self.rpc_request("declineRequestTransaction", params)
         return response.json()
 
-    def accept_request_transaction(self, transactionHash: str, message_id: str, signature: str, **kwargs):
+    def accept_request_transaction(self, transactionHash: str, message_id: str, signature: str):
         params = [transactionHash, message_id, signature]
-        response = self.rpc_request("acceptRequestTransaction", params, **kwargs)
+        response = self.rpc_request("acceptRequestTransaction", params)
         return response.json()
 
-    def request_address_for_transaction(self, chat_id: str, address_from: str, value: str, contract: str, **kwargs):
+    def request_address_for_transaction(self, chat_id: str, address_from: str, value: str, contract: str):
         params = [chat_id, address_from, value, contract]
-        response = self.rpc_request("requestAddressForTransaction", params, **kwargs)
+        response = self.rpc_request("requestAddressForTransaction", params)
         return response.json()
 
-    def decline_request_address_for_transaction(self, message_id: str, **kwargs):
+    def decline_request_address_for_transaction(self, message_id: str):
         params = [message_id]
-        response = self.rpc_request("declineRequestAddressForTransaction", params, **kwargs)
+        response = self.rpc_request("declineRequestAddressForTransaction", params)
         return response.json()
 
-    def accept_request_address_for_transaction(self, message_id: str, address: str, **kwargs):
+    def accept_request_address_for_transaction(self, message_id: str, address: str):
         params = [message_id, address]
-        response = self.rpc_request("acceptRequestAddressForTransaction", params, **kwargs)
+        response = self.rpc_request("acceptRequestAddressForTransaction", params)
         return response.json()
 
-    def send_transaction(self, chat_id: str, value: str, contract: str, transactionHash: str, signature: str, **kwargs):
+    def send_transaction(self, chat_id: str, value: str, contract: str, transactionHash: str, signature: str):
         params = [chat_id, value, contract, transactionHash, signature]
-        response = self.rpc_request("sendTransaction", params, **kwargs)
+        response = self.rpc_request("sendTransaction", params)
         return response.json()
 
-    def chats(self, **kwargs):
+    def chats(self):
         params = []
-        response = self.rpc_request("chats", params, **kwargs)
+        response = self.rpc_request("chats", params)
         return response.json()
 
-    def chat(self, chat_id: str, **kwargs):
+    def chat(self, chat_id: str):
         params = [chat_id]
-        response = self.rpc_request("chat", params, **kwargs)
+        response = self.rpc_request("chat", params)
         return response.json()
 
-    def chats_preview(self, filter_type: int, **kwargs):
+    def chats_preview(self, filter_type: int):
         params = [filter_type]
-        response = self.rpc_request("chatsPreview", params, **kwargs)
+        response = self.rpc_request("chatsPreview", params)
         return response.json()
 
-    def active_chats(self, **kwargs):
+    def active_chats(self):
         params = []
-        response = self.rpc_request("activeChats", params, **kwargs)
+        response = self.rpc_request("activeChats", params)
         return response.json()
 
-    def mute_chat(self, chat_id: str, **kwargs):
+    def mute_chat(self, chat_id: str):
         params = [chat_id]
-        response = self.rpc_request("muteChat", params, **kwargs)
+        response = self.rpc_request("muteChat", params)
         return response.json()
 
-    def mute_chat_v2(self, chat_id: str, muted_type: int, **kwargs):
+    def mute_chat_v2(self, chat_id: str, muted_type: int):
         params = [{"ChatId": chat_id, "MutedType": muted_type}]
-        response = self.rpc_request("muteChatV2", params, **kwargs)
+        response = self.rpc_request("muteChatV2", params)
         return response.json()
 
-    def unmute_chat(self, chat_id: str, **kwargs):
+    def unmute_chat(self, chat_id: str):
         params = [chat_id]
-        response = self.rpc_request("unmuteChat", params, **kwargs)
+        response = self.rpc_request("unmuteChat", params)
         return response.json()
 
-    def clear_history(self, chat_id: str, **kwargs):
+    def clear_history(self, chat_id: str):
         params = [{"id": chat_id}]
-        response = self.rpc_request("clearHistory", params, **kwargs)
+        response = self.rpc_request("clearHistory", params)
         return response.json()
 
-    def deactivate_chat(self, chat_id: str, preserve_history: bool, **kwargs):
+    def deactivate_chat(self, chat_id: str, preserve_history: bool):
         params = [{"id": chat_id, "preserveHistory": preserve_history}]
-        response = self.rpc_request("deactivateChat", params, **kwargs)
+        response = self.rpc_request("deactivateChat", params)
         return response.json()
 
-    def save_chat(self, chat_id: str, active=True, **kwargs):
+    def save_chat(self, chat_id: str, active=True):
         params = [{"id": chat_id, "active": active}]
-        response = self.rpc_request("saveChat", params, **kwargs)
+        response = self.rpc_request("saveChat", params)
         return response.json()
 
-    def create_one_to_one_chat(self, chat_id: str, ens_name: str, **kwargs):
+    def create_one_to_one_chat(self, chat_id: str, ens_name: str):
         params = [{"id": chat_id, "ensName": ens_name}]
-        response = self.rpc_request("createOneToOneChat", params, **kwargs)
+        response = self.rpc_request("createOneToOneChat", params)
         return response.json()
 
-    def register_for_push_notifications(self, device_token: str, apnTopic: str, tokenType: PushNotificationRegistrationTokenType, **kwargs):
+    def register_for_push_notifications(self, device_token: str, apnTopic: str, tokenType: PushNotificationRegistrationTokenType):
         params = [device_token, apnTopic, tokenType.value]
-        response = self.rpc_request("registerForPushNotifications", params, **kwargs)
+        response = self.rpc_request("registerForPushNotifications", params)
         return response.json()
 
     def get_activity_center_notifications(
@@ -444,7 +444,6 @@ class WakuextService(Service):
         read_type: Union[ActivityCenterQueryParamsRead, None] = None,
         cursor: str = "",
         limit: int = 20,
-        **kwargs,
     ):
         params = {
             "activityTypes": [item.value for item in activity_types],
@@ -454,5 +453,5 @@ class WakuextService(Service):
         if read_type is not None:
             params["readType"] = read_type.value
 
-        response = self.rpc_request(method="activityCenterNotifications", params=[params], **kwargs)
+        response = self.rpc_request(method="activityCenterNotifications", params=[params])
         return response.json()

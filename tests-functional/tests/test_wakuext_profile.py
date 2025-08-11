@@ -148,14 +148,14 @@ class TestUserStatus(MessengerSteps):
         statuses = [[1, "text_1"], [2, "text_2"], [3, "text_3"], [4, "text_4"]]
 
         for new_status, custom_text in statuses:
-            response = self.sender.wakuext_service.set_user_status(new_status, custom_text, schema_check=True)
+            response = self.sender.wakuext_service.set_user_status(new_status, custom_text)
             self.receiver.find_signal_containing_pattern(
                 SignalType.MESSAGES_NEW.value,
                 event_pattern=custom_text,
                 timeout=10,
             )
 
-            response = self.receiver.wakuext_service.status_updates(schema_check=True)
+            response = self.receiver.wakuext_service.status_updates()
             statusUpdate = response.get("result", {}).get("statusUpdates", [])[0]
             assert statusUpdate.get("statusType", -1) == new_status
             assert statusUpdate.get("text", "") == custom_text
