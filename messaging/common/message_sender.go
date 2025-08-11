@@ -338,15 +338,6 @@ func (s *MessageSender) sendCommunity(
 		rawMessage.Sender = s.identity
 	}
 
-	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		s.logger.Debug("SDS: dispatchCommunityChatMessage with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
-		sdsWrappedPayload, err := s.wrapPayloadForSDS(rawMessage.Payload, rawMessage.CommunityID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
-		}
-		rawMessage.Payload = sdsWrappedPayload
-	}
-
 	messageID, err := s.getMessageID(rawMessage)
 	if err != nil {
 		return nil, err
@@ -395,6 +386,15 @@ func (s *MessageSender) sendCommunity(
 	wrappedMessage, err := s.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, err
+	}
+
+	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+		s.logger.Debug("SDS: sendCommunity with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
+		sdsWrappedPayload, err := s.wrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID, types.EncodeHex(messageID))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
+		}
+		wrappedMessage = sdsWrappedPayload
 	}
 
 	// If it's a chat message, we send it on the community chat topic
@@ -712,15 +712,6 @@ func (s *MessageSender) SendPublic(
 		rawMessage.Sender = s.identity
 	}
 
-	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		s.logger.Debug("SDS: SendPublic with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
-		sdsWrappedPayload, err := s.wrapPayloadForSDS(rawMessage.Payload, rawMessage.CommunityID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
-		}
-		rawMessage.Payload = sdsWrappedPayload
-	}
-
 	var wrappedMessage []byte
 	var err error
 	if rawMessage.SkipApplicationWrap {
@@ -730,6 +721,20 @@ func (s *MessageSender) SendPublic(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to wrap message")
 		}
+	}
+
+	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	if err = s.setMessageID(messageID, &rawMessage); err != nil {
+		return nil, err
+	}
+
+	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+		s.logger.Debug("SDS: SendPublic with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
+		sdsWrappedPayload, err := s.wrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID, types.EncodeHex(messageID))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
+		}
+		wrappedMessage = sdsWrappedPayload
 	}
 
 	var newMessage *wakutypes.NewMessage
@@ -779,12 +784,6 @@ func (s *MessageSender) SendPublic(
 	newMessage.Ephemeral = rawMessage.Ephemeral
 	newMessage.PubsubTopic = rawMessage.PubsubTopic
 	newMessage.Priority = rawMessage.Priority
-
-	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
-
-	if err = s.setMessageID(messageID, &rawMessage); err != nil {
-		return nil, err
-	}
 
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(&rawMessage); err != nil {
@@ -997,14 +996,15 @@ func (s *MessageSender) handleMessage(msg *messagingtypes.ReceivedMessage) (*han
 		}
 	}
 
+	err = s.unwrapPayloadForSDS(message)
+	if err != nil {
+		hlogger.Error("failed to unwrap payload for SDS", zap.Error(err))
+	}
+
 	for _, msg := range response.Messages() {
 		err := msg.HandleApplicationLayer()
 		if err != nil {
 			hlogger.Error("failed to handle application metadata layer message", zap.Error(err))
-		}
-		err = s.unwrapPayloadForSDS(msg)
-		if err != nil {
-			hlogger.Error("failed to unwrap payload for SDS", zap.Error(err))
 		}
 	}
 
@@ -1349,15 +1349,13 @@ func (s *MessageSender) CleanupHashRatchetEncryptedMessages() error {
 }
 
 // Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
-func (s *MessageSender) wrapPayloadForSDS(payload []byte, communityID []byte) ([]byte, error) {
-	sdsMessageID := crypto.Keccak256(payload)
-
+func (s *MessageSender) wrapPayloadForSDS(payload []byte, communityID []byte, messageID string) ([]byte, error) {
 	s.logger.Debug("SDS: original payload",
 		zap.String("channelId", types.EncodeHex(communityID)),
 		zap.Int("payload-length", len(payload)),
-		zap.String("messageId", types.EncodeHex(sdsMessageID)),
+		zap.String("messageId", messageID),
 	)
-	sdsWrappedPayload, err := s.reliabilityManager.WrapOutgoingMessage(payload, sds.MessageID(types.EncodeHex(sdsMessageID)), types.EncodeHex(communityID))
+	sdsWrappedPayload, err := s.reliabilityManager.WrapOutgoingMessage(payload, sds.MessageID(messageID), types.EncodeHex(communityID))
 	if err != nil {
 		return nil, errors.Wrap(err, "SDS: failed to wrap a community message")
 	}
@@ -1367,11 +1365,11 @@ func (s *MessageSender) wrapPayloadForSDS(payload []byte, communityID []byte) ([
 
 func (s *MessageSender) unwrapPayloadForSDS(msg *messagingtypes.Message) error {
 	if len(msg.EncryptionLayer.Payload) > 0 {
-		unwrappedMessage, err := s.reliabilityManager.UnwrapReceivedMessage(msg.ApplicationLayer.Payload)
+		unwrappedMessage, err := s.reliabilityManager.UnwrapReceivedMessage(msg.EncryptionLayer.Payload)
 		if err != nil {
 			s.logger.Error("SDS: failed to unwrap received message", zap.Error(err))
 		} else {
-			msg.ApplicationLayer.Payload = *unwrappedMessage.Message
+			msg.EncryptionLayer.Payload = *unwrappedMessage.Message
 			s.logger.Debug("SDS: missing deps",
 				zap.Any("missing-deps", *unwrappedMessage.MissingDeps),
 			)
