@@ -7,7 +7,6 @@ import (
 
 	"go.uber.org/zap"
 
-	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/accounts-management/keystore/geth"
@@ -128,7 +127,7 @@ func (m *AccountsManager) createKeystore(keyUID string) (keystore.KeyStore, erro
 		}
 	}
 
-	return geth.NewGethKeystoreAdapter(absoluteKeystorePath, gethkeystore.LightScryptN, gethkeystore.LightScryptP)
+	return geth.NewGethKeystoreAdapter(absoluteKeystorePath)
 }
 
 // deleteAccountFromKeystore deletes an account from the keystore
