@@ -2,6 +2,8 @@ package thirdparty
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -69,4 +71,9 @@ type ActivityEntryContainer ItemsContainer[ActivityEntry]
 type ActivityFetcher interface {
 	ActivityProvider
 	FetchActivity(ctx context.Context, chainID uint64, parameters ActivityFetchParameters, cursor string, limit int) (ActivityEntryContainer, error)
+	GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address common.Address) (*rpc.BlockNumber, *time.Time, error)
+}
+
+func (e ActivityEntry) String() string {
+	return fmt.Sprintf("%s %10v ->%15p <-%15p", e.TxHash.TerminalString(), e.ActivityType, e.AmountOut, e.AmountIn)
 }

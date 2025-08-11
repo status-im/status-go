@@ -8,7 +8,6 @@ import (
 
 	geth_common "github.com/ethereum/go-ethereum/common"
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/status-im/status-go/api"
 	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
@@ -18,6 +17,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 	"github.com/status-im/status-go/t/helpers"
 	t_common "github.com/status-im/status-go/tests-unit-network/common"
+	_ "github.com/waku-org/go-zerokit-rln-apple/rln"
 )
 
 func setupAlchemyActivityClient(t *testing.T) *alchemy.Client {

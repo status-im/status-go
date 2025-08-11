@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -65,13 +64,62 @@ func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, of
 	if f.version != V2 {
 		return nil, errors.New("unsupported version")
 	}
-	allAddresses := s.areAllAddresses(f.addresses)
 
-	entries, err := getActivityEntriesV2(ctx, s.getDeps(), f.addresses, allAddresses, f.chainIDs, f.filter, offset, count)
+	// Get fetched activities from Alchemy
+	fetchedEntries, err := getFetchedActivitiesEntries(ctx, s.getDeps(), f.addresses, f.chainIDs, offset, count)
 	if err != nil {
-		fmt.Println("error getting activity entries", err)
+		return nil, err
 	}
-	return entries, nil
+
+	// Extract transaction IDs from fetched entries
+	txIDs := make([]TransactionID, 0)
+	for _, entry := range fetchedEntries {
+		for _, tx := range entry.transactions {
+			txID := TransactionID{
+				ChainID: tx.ChainID,
+				Hash:    tx.Hash,
+			}
+			txIDs = append(txIDs, txID)
+		}
+	}
+
+	// Get saved transactions by hash
+	savedEntriesMap, err := getSentActivitiesByHash(ctx, s.getDeps(), f.addresses, f.chainIDs, txIDs)
+	if err != nil {
+		// Continue with fetched entries even if we can't get saved ones
+		savedEntriesMap = make(map[TransactionID]Entry)
+	}
+
+	// Build result array: use saved entry if exists, otherwise use fetched entry
+	resultEntries := make([]Entry, 0, len(fetchedEntries))
+
+	for _, fetchedEntry := range fetchedEntries {
+		// Check if we have a saved entry for this transaction
+		var entryToAdd Entry
+		foundSaved := false
+
+		for _, tx := range fetchedEntry.transactions {
+			txID := TransactionID{
+				ChainID: tx.ChainID,
+				Hash:    tx.Hash,
+			}
+			if savedEntry, exists := savedEntriesMap[txID]; exists {
+				if savedEntry.activityType == fetchedEntry.activityType {
+					entryToAdd = savedEntry
+					foundSaved = true
+				}
+				break
+			}
+		}
+
+		if !foundSaved {
+			entryToAdd = fetchedEntry
+		}
+
+		resultEntries = append(resultEntries, entryToAdd)
+	}
+
+	return resultEntries, nil
 }
 
 func (s *Service) internalFilter(f fullFilterParams, offset int, count int, processResults func(entries []Entry) (offsetOverride int)) {

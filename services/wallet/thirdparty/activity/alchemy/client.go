@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
 
@@ -20,6 +22,7 @@ const AlchemyID = "alchemy"
 type Client struct {
 	ethClientGetter  rpc.EthClientGetter
 	connectionStatus *connection.Status
+	persistence      *Persistence
 }
 
 func (c *Client) ID() string {
@@ -35,11 +38,16 @@ func (c *Client) IsChainSupported(chainID wc.ChainID) bool {
 	return err == nil && client != nil
 }
 
-func NewClient(ethClientGetter rpc.EthClientGetter) *Client {
+func NewClient(ethClientGetter rpc.EthClientGetter, persistence *Persistence) *Client {
 	return &Client{
 		ethClientGetter:  ethClientGetter,
 		connectionStatus: connection.NewStatus(),
+		persistence:      persistence,
 	}
+}
+
+func (c *Client) GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address common.Address) (*geth_rpc.BlockNumber, *time.Time, error) {
+	return c.persistence.GetLastFetchedBlockAndTimestamp(ctx, chainID, address)
 }
 
 func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, cursor string, limit int) (thirdparty.ActivityEntryContainer, error) {
@@ -48,6 +56,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 		PreviousCursor: cursor,
 		NextCursor:     cursor,
 	}
+
 	maxCount := MaxAssetTransfersCount
 	if limit > thirdparty.FetchNoLimit && limit < MaxAssetTransfersCount {
 		maxCount = limit
@@ -140,7 +149,9 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 			break
 		}
 	}
-	response.Items = TransfersToCommon(responseTransfers, chainID, parameters.Address)
+
+	c.persistence.SaveTransfers(responseTransfers, chainID, parameters.Address)
+	response.Items = TransfersToThirdpartyActivityEntries(responseTransfers, chainID, parameters.Address)
 
 	return response, nil
 }
