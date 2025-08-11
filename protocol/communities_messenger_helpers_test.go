@@ -348,6 +348,10 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 	for i := range config.walletAddresses {
 		s.Require().Equal(walletAccounts[i].Type, accounts.AccountTypeGenerated)
 	}
+
+	err = messenger.messaging.Start()
+	s.Require().NoError(err)
+
 	return messenger
 }
 

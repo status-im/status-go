@@ -131,18 +131,22 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 	)
 
 	messaging, err := messagingEnv.NewTestCore(
-		config.privateKey,
-		appDb,
-		NewMessagingPersistence(appDb),
-		encryptionProtocol,
-		messaging.WithLogger(config.logger))
+		messaging.CoreParams{
+			Identity:           config.privateKey,
+			DB:                 appDb,
+			Persistence:        NewMessagingPersistence(appDb),
+			EncryptionProtocol: encryptionProtocol,
+			TimeSource:         &testTimeSource{},
+		},
+		messaging.WithLogger(config.logger),
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	ensVerifier := ens.New(
 		config.logger,
-		messaging.API(), // timesource
+		&testTimeSource{},
 		appDb,
 		"",
 		"",
@@ -191,11 +195,6 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 		return nil, err
 	}
 
-	err = m.InitFilters()
-	if err != nil {
-		return nil, err
-	}
-
 	return m, nil
 }
 
@@ -206,6 +205,11 @@ func newRunningTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, c
 	}
 
 	m.EnableBackedupMessagesProcessing()
+
+	err = m.messaging.Start()
+	if err != nil {
+		return nil, err
+	}
 
 	_, err = m.Start()
 	if err != nil {

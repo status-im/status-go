@@ -85,8 +85,9 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/timesource"
+	ntptimesource "github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/status-im/status-go/wakuv2/persistence"
 
@@ -116,7 +117,6 @@ type ErrorSendingEnvelope struct {
 }
 
 type IMetricsHandler interface {
-	SetDeviceType(deviceType string)
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
 	PushPeerConnFailures(peerConnFailures map[string]int)
@@ -189,8 +189,7 @@ type Waku struct {
 
 	logger *zap.Logger
 
-	// NTP Synced timesource
-	timesource *timesource.NTPTimeSource
+	timesource timesource.TimeSource
 
 	// seededBootnodesForDiscV5 indicates whether we manage to retrieve discovery
 	// bootnodes successfully
@@ -226,7 +225,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts timesource.TimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -236,7 +235,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 	}
 
 	if ts == nil {
-		ts = timesource.Default()
+		ts = ntptimesource.Default()
 	}
 
 	cfg = setDefaults(cfg)
@@ -1420,8 +1419,8 @@ func (w *Waku) setupRelaySubscriptions() error {
 
 // Stops the background data propagation thread of the Waku protocol.
 func (w *Waku) Stop() error {
-	// Never started
-	if w.node == nil {
+	// never started || already stopped
+	if w.node == nil || w.cancel == nil {
 		return nil
 	}
 

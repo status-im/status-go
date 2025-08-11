@@ -2454,6 +2454,10 @@ func buildImageWithoutAlbumIDMessage(chat Chat) (*common.Message, error) {
 
 type testTimeSource struct{}
 
+func (t *testTimeSource) Now() time.Time {
+	return time.Now()
+}
+
 func (t *testTimeSource) GetCurrentTime() uint64 {
 	return uint64(time.Now().Unix())
 }

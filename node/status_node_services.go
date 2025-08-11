@@ -136,7 +136,7 @@ func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Ser
 		return nil, errors.New("geth node not initialized")
 	}
 	if b.wakuV2ExtSrvc == nil {
-		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.rpcClient)
+		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.rpcClient, b.logger.Named("protocol"))
 	}
 
 	return b.wakuV2ExtSrvc, nil

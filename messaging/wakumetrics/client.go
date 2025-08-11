@@ -21,8 +21,6 @@ type ReceivedMessages struct {
 
 type Client struct {
 	peerId               string
-	deviceType           string
-	version              string
 	lastPeerConnFailures map[string]int
 }
 
@@ -32,18 +30,6 @@ func WithPeerID(peerId string) TelemetryClientOption {
 	return func(c *Client) {
 		c.peerId = peerId
 		metrics.NodePeerId.WithLabelValues(peerId).Set(1)
-	}
-}
-
-func WithDeviceType(deviceType string) TelemetryClientOption {
-	return func(c *Client) {
-		c.deviceType = deviceType
-	}
-}
-
-func WithVersion(version string) TelemetryClientOption {
-	return func(c *Client) {
-		c.version = version
 	}
 }
 
@@ -65,10 +51,6 @@ func (c *Client) RegisterWithRegistry() error {
 		return fmt.Errorf("failed to register metrics: %v", err)
 	}
 	return nil
-}
-
-func (c *Client) SetDeviceType(deviceType string) {
-	c.deviceType = deviceType
 }
 
 func (c *Client) PushReceivedMessages(receivedMessages ReceivedMessages) {

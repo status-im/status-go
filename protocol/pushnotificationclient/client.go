@@ -728,8 +728,6 @@ func (c *Client) subscribeForMessageEvents() {
 					if err := c.handleMessageSent(&m); err != nil {
 						c.config.Logger.Error("failed to handle message", zap.Error(err))
 					}
-				default:
-					c.config.Logger.Warn("message event type not supported")
 				}
 			case <-c.quit:
 				return
