@@ -12,8 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ethereum/go-ethereum/p2p/discv5"
-
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
@@ -144,24 +142,6 @@ func randomStringSlice() []string {
 		result = append(result, randomString())
 	}
 	sort.Strings(result)
-	return result
-}
-
-func randomTopicSlice() []discv5.Topic {
-	randomValues := randomStringSlice()
-	var result []discv5.Topic
-	for _, v := range randomValues {
-		result = append(result, discv5.Topic(v))
-	}
-	return result
-}
-
-func randomTopicLimits() map[discv5.Topic]params.Limits {
-	result := make(map[discv5.Topic]params.Limits)
-	m := randomInt(7) + 1
-	for i := 0; i < m; i++ {
-		result[discv5.Topic(fmt.Sprint(i))] = params.Limits{Min: randomInt(2), Max: randomInt(10)}
-	}
 	return result
 }
 
