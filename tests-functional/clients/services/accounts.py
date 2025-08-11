@@ -62,3 +62,12 @@ class AccountService(Service):
         params = [from_position, to_position]
         response = self.rpc_request("moveWalletAccount", params)
         return response.json()
+
+    def update_token_preferences(self, preferences):
+        params = [preferences]
+        response = self.rpc_request("updateTokenPreferences", params)
+        return response.json()
+
+    def get_token_preferences(self):
+        response = self.rpc_request("getTokenPreferences", [])
+        return response.json()
