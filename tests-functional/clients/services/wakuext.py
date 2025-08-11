@@ -84,8 +84,8 @@ class WakuextService(Service):
     def __init__(self, client: RpcClient):
         super().__init__(client, "wakuext")
 
-    def start_messenger(self):
-        response = self.rpc_request("startMessenger")
+    def start_messenger(self, **kwargs):
+        response = self.rpc_request("startMessenger", **kwargs)
         json_response = response.json()
 
         if "error" in json_response:

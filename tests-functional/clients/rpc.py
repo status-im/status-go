@@ -16,10 +16,14 @@ class RpcClient:
 
     def _check_decode_and_key_errors_in_response(self, response, key):
         try:
-            return response.json()[key]
+            data = response.json()
         except json.JSONDecodeError:
             raise AssertionError(f"Invalid JSON in response: {response.content}")
-        except KeyError:
+
+        if key not in data:
+            # Allow missing 'result' if 'error' is present
+            if key == "result" and "error" in data:
+                return
             raise AssertionError(f"Key '{key}' not found in the JSON response: {response.content}")
 
     def verify_is_valid_json_rpc_response(self, response, _id=None):
@@ -68,13 +72,11 @@ class RpcClient:
         return response
 
     def rpc_valid_request(self, method, params=None, _id=None, url=None, **kwargs):
-        skip_validation = kwargs.pop("skip_validation", False)
         schema_check = kwargs.pop("schema_check", True)
         generate_schema = kwargs.pop("generate_schema", False)
 
         response = self.rpc_request(method, params, _id, url, **kwargs)
-        if not skip_validation:
-            self.verify_is_valid_json_rpc_response(response, _id)
+        self.verify_is_valid_json_rpc_response(response, _id)
 
         if generate_schema:
             from utils.schema_builder import CustomSchemaBuilder

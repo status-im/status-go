@@ -96,7 +96,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         assert response.get("result", {}) != {}
 
         self.sender.wakuext_service.delete_message(message_id)
-        response = self.sender.wakuext_service.message_by_message_id(message_id, skip_validation=True)
+        response = self.sender.wakuext_service.message_by_message_id(message_id)
         error_code = response.get("error", {}).get("code", 0)
         error_message = response.get("error", {}).get("message", "")
         assert error_code == -32000

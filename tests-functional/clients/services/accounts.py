@@ -10,8 +10,8 @@ class AccountService(Service):
         response = self.rpc_request("getAccounts")
         return response.json()
 
-    def get_account_keypairs(self):
-        response = self.rpc_request("getKeypairs")
+    def get_account_keypairs(self, **kwargs):
+        response = self.rpc_request("getKeypairs", **kwargs)
         return response.json()
 
     def add_account(self, account_data, **kwargs):

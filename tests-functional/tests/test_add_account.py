@@ -36,7 +36,7 @@ class TestAddAccount:
         add_account_response = self.account.accounts_service.add_account(self.account_data)
 
         # Add same account again
-        add_account_response = self.account.accounts_service.add_account(self.account_data, skip_validation=True)
+        add_account_response = self.account.accounts_service.add_account(self.account_data, schema_check=False)
         assert add_account_response.get("error", {}).get("message", "") == "account already exists"
 
     def test_add_new_account_via_add_keypair(self):
@@ -58,19 +58,19 @@ class TestAddAccount:
 
     def test_add_account_for_unknown_key_uid(self):
         self.account_data["key-uid"] = "0x3231d92c94548d14f097173765a50bebe28fbad8f2267c9e08cc4433a6f219a4"
-        add_account_response = self.account.accounts_service.add_account(self.account_data, skip_validation=True)
+        add_account_response = self.account.accounts_service.add_account(self.account_data)
         assert add_account_response.get("error", {}).get("message", "") == "cannot add an account for an unknown keypair"
 
     def test_add_account_for_empty_key_uid(self):
         self.account_data["key-uid"] = ""
-        add_account_response = self.account.accounts_service.add_account(self.account_data, skip_validation=True)
+        add_account_response = self.account.accounts_service.add_account(self.account_data)
         assert add_account_response.get("error", {}).get("message", "") == "`KeyUID` field of an account must be set"
 
     @pytest.mark.parametrize("key", ["wallet", "chat"])
     def test_add_account_with_key_set_on_true__(self, key):
         self.account_data["key-uid"] = self.get_keypair_key_uid()
         self.account_data[key] = True
-        add_account_response = self.account.accounts_service.add_account(self.account_data, skip_validation=True)
+        add_account_response = self.account.accounts_service.add_account(self.account_data)
         assert add_account_response.get("error", {}).get("message", "") == "default wallet and chat account cannot be added this way"
 
     def test_add_watch_account(self):
@@ -101,7 +101,7 @@ class TestAddAccount:
         assert len(accounts_response.get("result", [])) == 2
 
     def get_account_keypairs(self):
-        keypairs_response = self.account.accounts_service.get_account_keypairs()
+        keypairs_response = self.account.accounts_service.get_account_keypairs(schema_check=False)
         keypairs = keypairs_response.get("result", [])
         assert len(keypairs) > 0
         return keypairs

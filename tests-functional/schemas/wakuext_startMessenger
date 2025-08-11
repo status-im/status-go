@@ -1,0 +1,67 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "properties": {
+                "discordOldestMessageTimestamp": {
+                    "type": "integer"
+                },
+                "mailservers": {
+                    "items": {
+                        "properties": {
+                            "addr": {
+                                "type": "string"
+                            },
+                            "custom": {
+                                "type": "boolean"
+                            },
+                            "enr": {
+                                "type": "string"
+                            },
+                            "fleet": {
+                                "type": "string"
+                            },
+                            "id": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "addr",
+                            "custom",
+                            "enr",
+                            "fleet",
+                            "id",
+                            "name"
+                        ],
+                        "type": "object"
+                    },
+                    "type": "array"
+                },
+                "notifications": {
+                    "type": "null"
+                }
+            },
+            "required": [
+                "discordOldestMessageTimestamp",
+                "mailservers",
+                "notifications"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}
