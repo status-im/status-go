@@ -22,9 +22,6 @@
                     "color": {
                         "type": "string"
                     },
-                    "communityId": {
-                        "type": "string"
-                    },
                     "contentType": {
                         "type": "integer"
                     },
@@ -128,6 +125,7 @@
                     "description",
                     "emoji",
                     "from",
+                    "highlight",
                     "id",
                     "identicon",
                     "joined",

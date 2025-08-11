@@ -1,5 +1,5 @@
 {
-   "$schema": "http://json-schema.org/draft-07/schema",
+    "$schema": "http://json-schema.org/schema#",
     "properties": {
         "id": {
             "type": "string"
@@ -788,6 +788,25 @@
                     ],
                     "type": "object"
                 },
+                "DAI": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
                 "DJF": {
                     "properties": {
                         "displayDecimals": {
@@ -922,6 +941,25 @@
                     "type": "object"
                 },
                 "EUR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "EURC": {
                     "properties": {
                         "displayDecimals": {
                             "type": "integer"
@@ -1112,6 +1150,25 @@
                     "type": "object"
                 },
                 "GYD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "Gwei": {
                     "properties": {
                         "displayDecimals": {
                             "type": "integer"
@@ -2099,6 +2156,25 @@
                     ],
                     "type": "object"
                 },
+                "PAXG": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
                 "PEN": {
                     "properties": {
                         "displayDecimals": {
@@ -2290,6 +2366,25 @@
                     "type": "object"
                 },
                 "RWF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SAI": {
                     "properties": {
                         "displayDecimals": {
                             "type": "integer"
@@ -2612,6 +2707,63 @@
                     ],
                     "type": "object"
                 },
+                "TAUD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "TCAD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "TGBP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
                 "THB": {
                     "properties": {
                         "displayDecimals": {
@@ -2745,6 +2897,25 @@
                     ],
                     "type": "object"
                 },
+                "TUSD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
                 "TWD": {
                     "properties": {
                         "displayDecimals": {
@@ -2822,6 +2993,158 @@
                     "type": "object"
                 },
                 "USD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "USDC (BSC)": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "USDC (EVM)": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "USDD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "USDP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "USDS": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "USDSC": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "USDT (BSC)": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "USDT (EVM)": {
                     "properties": {
                         "displayDecimals": {
                             "type": "integer"
@@ -3428,6 +3751,44 @@
                         "symbol"
                     ],
                     "type": "object"
+                },
+                "aUSDC": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "sUSD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
                 }
             },
             "required": [
@@ -3472,6 +3833,7 @@
                 "CUP",
                 "CVE",
                 "CZK",
+                "DAI",
                 "DJF",
                 "DKK",
                 "DOP",
@@ -3480,6 +3842,7 @@
                 "ERN",
                 "ETB",
                 "EUR",
+                "EURC",
                 "FJD",
                 "FKP",
                 "GBP",
@@ -3490,6 +3853,7 @@
                 "GNF",
                 "GTQ",
                 "GYD",
+                "Gwei",
                 "HKD",
                 "HNL",
                 "HTG",
@@ -3541,6 +3905,7 @@
                 "NZD",
                 "OMR",
                 "PAB",
+                "PAXG",
                 "PEN",
                 "PGK",
                 "PHP",
@@ -3552,6 +3917,7 @@
                 "RSD",
                 "RUB",
                 "RWF",
+                "SAI",
                 "SAR",
                 "SBD",
                 "SCR",
@@ -3568,6 +3934,9 @@
                 "SVC",
                 "SYP",
                 "SZL",
+                "TAUD",
+                "TCAD",
+                "TGBP",
                 "THB",
                 "TJS",
                 "TMT",
@@ -3575,11 +3944,20 @@
                 "TOP",
                 "TRY",
                 "TTD",
+                "TUSD",
                 "TWD",
                 "TZS",
                 "UAH",
                 "UGX",
                 "USD",
+                "USDC (BSC)",
+                "USDC (EVM)",
+                "USDD",
+                "USDP",
+                "USDS",
+                "USDSC",
+                "USDT (BSC)",
+                "USDT (EVM)",
                 "USN",
                 "UYI",
                 "UYU",
@@ -3610,7 +3988,9 @@
                 "YER",
                 "ZAR",
                 "ZMW",
-                "ZWL"
+                "ZWL",
+                "aUSDC",
+                "sUSD"
             ],
             "type": "object"
         }

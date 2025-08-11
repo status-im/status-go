@@ -9,21 +9,6 @@
         },
         "result": {
             "properties": {
-                "activityCenterState": {
-                    "properties": {
-                        "hasSeen": {
-                            "type": "boolean"
-                        },
-                        "updatedAt": {
-                            "type": "integer"
-                        }
-                    },
-                    "required": [
-                        "hasSeen",
-                        "updatedAt"
-                    ],
-                    "type": "object"
-                },
                 "chats": {
                     "items": {
                         "properties": {
@@ -77,11 +62,47 @@
                                     "clock": {
                                         "type": "integer"
                                     },
+                                    "commandParameters": {
+                                        "properties": {
+                                            "address": {
+                                                "type": "string"
+                                            },
+                                            "commandState": {
+                                                "type": "integer"
+                                            },
+                                            "contract": {
+                                                "type": "string"
+                                            },
+                                            "from": {
+                                                "type": "string"
+                                            },
+                                            "id": {
+                                                "type": "string"
+                                            },
+                                            "signature": {
+                                                "type": "null"
+                                            },
+                                            "transactionHash": {
+                                                "type": "string"
+                                            },
+                                            "value": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "address",
+                                            "commandState",
+                                            "contract",
+                                            "from",
+                                            "id",
+                                            "signature",
+                                            "transactionHash",
+                                            "value"
+                                        ],
+                                        "type": "object"
+                                    },
                                     "compressedKey": {
                                         "type": "string"
-                                    },
-                                    "contactRequestState": {
-                                        "type": "integer"
                                     },
                                     "contentType": {
                                         "type": "integer"
@@ -101,6 +122,9 @@
                                     "from": {
                                         "type": "string"
                                     },
+                                    "gapParameters": {
+                                        "type": "object"
+                                    },
                                     "id": {
                                         "type": "string"
                                     },
@@ -113,8 +137,8 @@
                                     "messageType": {
                                         "type": "integer"
                                     },
-                                    "new": {
-                                        "type": "boolean"
+                                    "outgoingStatus": {
+                                        "type": "string"
                                     },
                                     "parsedText": {
                                         "items": {
@@ -174,18 +198,19 @@
                                     "alias",
                                     "chatId",
                                     "clock",
+                                    "commandParameters",
                                     "compressedKey",
-                                    "contactRequestState",
                                     "contentType",
                                     "displayName",
                                     "emojiHash",
                                     "ensName",
                                     "from",
+                                    "gapParameters",
                                     "id",
                                     "lineCount",
                                     "localChatId",
                                     "messageType",
-                                    "new",
+                                    "outgoingStatus",
                                     "parsedText",
                                     "quotedMessage",
                                     "replace",
@@ -258,14 +283,189 @@
                 "discordOldestMessageTimestamp": {
                     "type": "integer"
                 },
+                "messages": {
+                    "items": {
+                        "properties": {
+                            "alias": {
+                                "type": "string"
+                            },
+                            "chatId": {
+                                "type": "string"
+                            },
+                            "clock": {
+                                "type": "integer"
+                            },
+                            "commandParameters": {
+                                "properties": {
+                                    "address": {
+                                        "type": "string"
+                                    },
+                                    "commandState": {
+                                        "type": "integer"
+                                    },
+                                    "contract": {
+                                        "type": "string"
+                                    },
+                                    "from": {
+                                        "type": "string"
+                                    },
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "signature": {
+                                        "type": "null"
+                                    },
+                                    "transactionHash": {
+                                        "type": "string"
+                                    },
+                                    "value": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "address",
+                                    "commandState",
+                                    "contract",
+                                    "from",
+                                    "id",
+                                    "signature",
+                                    "transactionHash",
+                                    "value"
+                                ],
+                                "type": "object"
+                            },
+                            "compressedKey": {
+                                "type": "string"
+                            },
+                            "contentType": {
+                                "type": "integer"
+                            },
+                            "displayName": {
+                                "type": "string"
+                            },
+                            "emojiHash": {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            },
+                            "ensName": {
+                                "type": "string"
+                            },
+                            "from": {
+                                "type": "string"
+                            },
+                            "gapParameters": {
+                                "type": "object"
+                            },
+                            "id": {
+                                "type": "string"
+                            },
+                            "lineCount": {
+                                "type": "integer"
+                            },
+                            "localChatId": {
+                                "type": "string"
+                            },
+                            "messageType": {
+                                "type": "integer"
+                            },
+                            "outgoingStatus": {
+                                "type": "string"
+                            },
+                            "parsedText": {
+                                "items": {
+                                    "properties": {
+                                        "children": {
+                                            "items": {
+                                                "properties": {
+                                                    "literal": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "literal"
+                                                ],
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        },
+                                        "type": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "children",
+                                        "type"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            },
+                            "quotedMessage": {
+                                "type": "null"
+                            },
+                            "replace": {
+                                "type": "string"
+                            },
+                            "responseTo": {
+                                "type": "string"
+                            },
+                            "rtl": {
+                                "type": "boolean"
+                            },
+                            "seen": {
+                                "type": "boolean"
+                            },
+                            "text": {
+                                "type": "string"
+                            },
+                            "timestamp": {
+                                "type": "integer"
+                            },
+                            "whisperTimestamp": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "alias",
+                            "chatId",
+                            "clock",
+                            "commandParameters",
+                            "compressedKey",
+                            "contentType",
+                            "displayName",
+                            "emojiHash",
+                            "ensName",
+                            "from",
+                            "gapParameters",
+                            "id",
+                            "lineCount",
+                            "localChatId",
+                            "messageType",
+                            "outgoingStatus",
+                            "parsedText",
+                            "quotedMessage",
+                            "replace",
+                            "responseTo",
+                            "rtl",
+                            "seen",
+                            "text",
+                            "timestamp",
+                            "whisperTimestamp"
+                        ],
+                        "type": "object"
+                    },
+                    "type": "array"
+                },
                 "notifications": {
                     "type": "null"
                 }
             },
             "required": [
-                "activityCenterState",
                 "chats",
                 "discordOldestMessageTimestamp",
+                "messages",
                 "notifications"
             ],
             "type": "object"

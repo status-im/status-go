@@ -1,5 +1,5 @@
 {
-   "$schema": "http://json-schema.org/draft-07/schema",
+    "$schema": "http://json-schema.org/schema#",
     "properties": {
         "id": {
             "type": "string"
@@ -17,6 +17,9 @@
                         "type": "string"
                     },
                     "hostname": {
+                        "type": "string"
+                    },
+                    "id": {
                         "type": "string"
                     },
                     "logoUrl": {
@@ -39,18 +42,77 @@
                             "type": "integer"
                         },
                         "type": "array"
+                    },
+                    "supportedTokens": {
+                        "anyOf": [
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "items": {
+                                    "properties": {
+                                        "address": {
+                                            "type": "string"
+                                        },
+                                        "chainId": {
+                                            "type": "integer"
+                                        },
+                                        "decimals": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "pegSymbol": {
+                                            "type": "string"
+                                        },
+                                        "symbol": {
+                                            "type": "string"
+                                        },
+                                        "verified": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "address",
+                                        "chainId",
+                                        "decimals",
+                                        "name",
+                                        "pegSymbol",
+                                        "symbol",
+                                        "verified"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            }
+                        ]
+                    },
+                    "supportsRecurrentPurchase": {
+                        "type": "boolean"
+                    },
+                    "supportsSinglePurchase": {
+                        "type": "boolean"
+                    },
+                    "urlsNeedParameters": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
                     "description",
                     "fees",
                     "hostname",
+                    "id",
                     "logoUrl",
                     "name",
                     "params",
                     "recurrentSiteUrl",
                     "siteUrl",
-                    "supportedChainIds"
+                    "supportedChainIds",
+                    "supportedTokens",
+                    "supportsRecurrentPurchase",
+                    "supportsSinglePurchase",
+                    "urlsNeedParameters"
                 ],
                 "type": "object"
             },

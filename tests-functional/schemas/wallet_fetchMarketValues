@@ -1,21 +1,435 @@
 {
-    "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "$id": "http://example.com/example.json",
-    "type": "object",
-    "required": [
-        "jsonrpc",
-        "id",
-        "result"
-    ],
+    "$schema": "http://json-schema.org/schema#",
     "properties": {
-        "jsonrpc": {
-            "type": "string"
-        },
         "id": {
             "type": "string"
         },
+        "jsonrpc": {
+            "type": "string"
+        },
         "result": {
-            "type": "object",
+            "properties": {
+                "DAI": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "number"
+                        },
+                        "HIGHDAY": {
+                            "type": "number"
+                        },
+                        "LOWDAY": {
+                            "type": "number"
+                        },
+                        "MKTCAP": {
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                },
+                "ETH": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "number"
+                        },
+                        "HIGHDAY": {
+                            "type": "number"
+                        },
+                        "LOWDAY": {
+                            "type": "number"
+                        },
+                        "MKTCAP": {
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                },
+                "EUROC": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "integer"
+                        },
+                        "HIGHDAY": {
+                            "type": "integer"
+                        },
+                        "LOWDAY": {
+                            "type": "integer"
+                        },
+                        "MKTCAP": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                },
+                "STT": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "number"
+                        },
+                        "HIGHDAY": {
+                            "type": "number"
+                        },
+                        "LOWDAY": {
+                            "type": "number"
+                        },
+                        "MKTCAP": {
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                },
+                "UNI": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "number"
+                        },
+                        "HIGHDAY": {
+                            "type": "number"
+                        },
+                        "LOWDAY": {
+                            "type": "number"
+                        },
+                        "MKTCAP": {
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                },
+                "USDC": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "number"
+                        },
+                        "HIGHDAY": {
+                            "type": "number"
+                        },
+                        "LOWDAY": {
+                            "type": "number"
+                        },
+                        "MKTCAP": {
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                },
+                "WEENUS": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "integer"
+                        },
+                        "HIGHDAY": {
+                            "type": "integer"
+                        },
+                        "LOWDAY": {
+                            "type": "integer"
+                        },
+                        "MKTCAP": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                },
+                "WETH": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "number"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "number"
+                        },
+                        "HIGHDAY": {
+                            "type": "number"
+                        },
+                        "LOWDAY": {
+                            "type": "number"
+                        },
+                        "MKTCAP": {
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                },
+                "WETH9": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "integer"
+                        },
+                        "HIGHDAY": {
+                            "type": "integer"
+                        },
+                        "LOWDAY": {
+                            "type": "integer"
+                        },
+                        "MKTCAP": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                },
+                "XEENUS": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "integer"
+                        },
+                        "HIGHDAY": {
+                            "type": "integer"
+                        },
+                        "LOWDAY": {
+                            "type": "integer"
+                        },
+                        "MKTCAP": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                },
+                "YEENUS": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "integer"
+                        },
+                        "HIGHDAY": {
+                            "type": "integer"
+                        },
+                        "LOWDAY": {
+                            "type": "integer"
+                        },
+                        "MKTCAP": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                },
+                "ZEENUS": {
+                    "properties": {
+                        "CHANGE24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCT24HOUR": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTDAY": {
+                            "type": "integer"
+                        },
+                        "CHANGEPCTHOUR": {
+                            "type": "integer"
+                        },
+                        "HIGHDAY": {
+                            "type": "integer"
+                        },
+                        "LOWDAY": {
+                            "type": "integer"
+                        },
+                        "MKTCAP": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "CHANGE24HOUR",
+                        "CHANGEPCT24HOUR",
+                        "CHANGEPCTDAY",
+                        "CHANGEPCTHOUR",
+                        "HIGHDAY",
+                        "LOWDAY",
+                        "MKTCAP"
+                    ],
+                    "type": "object"
+                }
+            },
             "required": [
                 "DAI",
                 "ETH",
@@ -30,428 +444,13 @@
                 "YEENUS",
                 "ZEENUS"
             ],
-            "properties": {
-                "DAI": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "number"
-                        },
-                        "HIGHDAY": {
-                            "type": "number"
-                        },
-                        "LOWDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "number"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "number"
-                        }
-                    }
-                },
-                "ETH": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "number"
-                        },
-                        "HIGHDAY": {
-                            "type": "number"
-                        },
-                        "LOWDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "number"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "number"
-                        }
-                    }
-                },
-                "EUROC": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "integer"
-                        },
-                        "HIGHDAY": {
-                            "type": "integer"
-                        },
-                        "LOWDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "integer"
-                        }
-                    }
-                },
-                "STT": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "number"
-                        },
-                        "HIGHDAY": {
-                            "type": "number"
-                        },
-                        "LOWDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "number"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "number"
-                        }
-                    }
-                },
-                "UNI": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "number"
-                        },
-                        "HIGHDAY": {
-                            "type": "number"
-                        },
-                        "LOWDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "number"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "number"
-                        }
-                    }
-                },
-                "USDC": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "number"
-                        },
-                        "HIGHDAY": {
-                            "type": "number"
-                        },
-                        "LOWDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "number"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "number"
-                        }
-                    }
-                },
-                "WEENUS": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "integer"
-                        },
-                        "HIGHDAY": {
-                            "type": "integer"
-                        },
-                        "LOWDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "integer"
-                        }
-                    }
-                },
-                "WETH": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "number"
-                        },
-                        "HIGHDAY": {
-                            "type": "number"
-                        },
-                        "LOWDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "number"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "number"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "number"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "number"
-                        }
-                    }
-                },
-                "WETH9": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "integer"
-                        },
-                        "HIGHDAY": {
-                            "type": "integer"
-                        },
-                        "LOWDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "integer"
-                        }
-                    }
-                },
-                "XEENUS": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "integer"
-                        },
-                        "HIGHDAY": {
-                            "type": "integer"
-                        },
-                        "LOWDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "integer"
-                        }
-                    }
-                },
-                "YEENUS": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "integer"
-                        },
-                        "HIGHDAY": {
-                            "type": "integer"
-                        },
-                        "LOWDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "integer"
-                        }
-                    }
-                },
-                "ZEENUS": {
-                    "type": "object",
-                    "required": [
-                        "MKTCAP",
-                        "HIGHDAY",
-                        "LOWDAY",
-                        "CHANGEPCTHOUR",
-                        "CHANGEPCTDAY",
-                        "CHANGEPCT24HOUR",
-                        "CHANGE24HOUR"
-                    ],
-                    "properties": {
-                        "MKTCAP": {
-                            "type": "integer"
-                        },
-                        "HIGHDAY": {
-                            "type": "integer"
-                        },
-                        "LOWDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTHOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCTDAY": {
-                            "type": "integer"
-                        },
-                        "CHANGEPCT24HOUR": {
-                            "type": "integer"
-                        },
-                        "CHANGE24HOUR": {
-                            "type": "integer"
-                        }
-                    }
-                }
-            }
+            "type": "object"
         }
-    }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
 }

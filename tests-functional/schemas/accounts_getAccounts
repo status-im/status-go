@@ -1,44 +1,14 @@
 {
-    "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "$id": "http://example.com/example.json",
-    "type": "object",
-    "required": [
-        "id",
-        "jsonrpc",
-        "result"
-    ],
+    "$schema": "http://json-schema.org/schema#",
     "properties": {
         "id": {
-            "type": "string"
+            "type": "integer"
         },
         "jsonrpc": {
             "type": "string"
         },
         "result": {
-            "type": "array",
             "items": {
-                "type": "object",
-                "required": [
-                    "address",
-                    "chat",
-                    "clock",
-                    "colorId",
-                    "createdAt",
-                    "emoji",
-                    "hidden",
-                    "key-uid",
-                    "mixedcase-address",
-                    "name",
-                    "operable",
-                    "path",
-                    "position",
-                    "prodPreferredChainIds",
-                    "public-key",
-                    "removed",
-                    "testPreferredChainIds",
-                    "type",
-                    "wallet"
-                ],
                 "properties": {
                     "address": {
                         "type": "string"
@@ -97,8 +67,37 @@
                     "wallet": {
                         "type": "boolean"
                     }
-                }
-            }
+                },
+                "required": [
+                    "address",
+                    "chat",
+                    "clock",
+                    "colorId",
+                    "createdAt",
+                    "emoji",
+                    "hidden",
+                    "key-uid",
+                    "mixedcase-address",
+                    "name",
+                    "operable",
+                    "path",
+                    "position",
+                    "prodPreferredChainIds",
+                    "public-key",
+                    "removed",
+                    "testPreferredChainIds",
+                    "type",
+                    "wallet"
+                ],
+                "type": "object"
+            },
+            "type": "array"
         }
-    }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
 }

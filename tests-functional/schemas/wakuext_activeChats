@@ -8,12 +8,48 @@
             "type": "string"
         },
         "result": {
-            "properties": {
-                "cursor": {
-                    "type": "string"
-                },
-                "messages": {
-                    "items": {
+            "items": {
+                "properties": {
+                    "ReadMessagesAtClockValue": {
+                        "type": "integer"
+                    },
+                    "active": {
+                        "type": "boolean"
+                    },
+                    "alias": {
+                        "type": "string"
+                    },
+                    "chatType": {
+                        "type": "integer"
+                    },
+                    "color": {
+                        "type": "string"
+                    },
+                    "deletedAtClockValue": {
+                        "type": "integer"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "emoji": {
+                        "type": "string"
+                    },
+                    "highlight": {
+                        "type": "boolean"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "identicon": {
+                        "type": "string"
+                    },
+                    "joined": {
+                        "type": "integer"
+                    },
+                    "lastClockValue": {
+                        "type": "integer"
+                    },
+                    "lastMessage": {
                         "properties": {
                             "alias": {
                                 "type": "string"
@@ -26,9 +62,6 @@
                             },
                             "compressedKey": {
                                 "type": "string"
-                            },
-                            "contactRequestState": {
-                                "type": "integer"
                             },
                             "contentType": {
                                 "type": "integer"
@@ -48,9 +81,6 @@
                             "from": {
                                 "type": "string"
                             },
-                            "gapParameters": {
-                                "type": "object"
-                            },
                             "id": {
                                 "type": "string"
                             },
@@ -62,6 +92,9 @@
                             },
                             "messageType": {
                                 "type": "integer"
+                            },
+                            "outgoingStatus": {
+                                "type": "string"
                             },
                             "parsedText": {
                                 "items": {
@@ -127,11 +160,12 @@
                             "emojiHash",
                             "ensName",
                             "from",
-                            "gapParameters",
                             "id",
                             "lineCount",
                             "localChatId",
                             "messageType",
+                            "outgoingStatus",
+                            "parsedText",
                             "quotedMessage",
                             "replace",
                             "responseTo",
@@ -143,14 +177,62 @@
                         ],
                         "type": "object"
                     },
-                    "type": "array"
-                }
+                    "members": {
+                        "type": "null"
+                    },
+                    "membershipUpdateEvents": {
+                        "type": "null"
+                    },
+                    "muteTill": {
+                        "type": "string"
+                    },
+                    "muted": {
+                        "type": "boolean"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "integer"
+                    },
+                    "unviewedMentionsCount": {
+                        "type": "integer"
+                    },
+                    "unviewedMessagesCount": {
+                        "type": "integer"
+                    },
+                    "viewersCanPostReactions": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "ReadMessagesAtClockValue",
+                    "active",
+                    "alias",
+                    "chatType",
+                    "color",
+                    "deletedAtClockValue",
+                    "description",
+                    "emoji",
+                    "highlight",
+                    "id",
+                    "identicon",
+                    "joined",
+                    "lastClockValue",
+                    "lastMessage",
+                    "members",
+                    "membershipUpdateEvents",
+                    "muteTill",
+                    "muted",
+                    "name",
+                    "timestamp",
+                    "unviewedMentionsCount",
+                    "unviewedMessagesCount",
+                    "viewersCanPostReactions"
+                ],
+                "type": "object"
             },
-            "required": [
-                "cursor",
-                "messages"
-            ],
-            "type": "object"
+            "type": "array"
         }
     },
     "required": [

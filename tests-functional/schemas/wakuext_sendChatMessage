@@ -24,9 +24,6 @@
                             "color": {
                                 "type": "string"
                             },
-                            "communityId": {
-                                "type": "string"
-                            },
                             "deletedAtClockValue": {
                                 "type": "integer"
                             },
@@ -36,8 +33,8 @@
                             "emoji": {
                                 "type": "string"
                             },
-                            "firstMessageTimestamp": {
-                                "type": "integer"
+                            "highlight": {
+                                "type": "boolean"
                             },
                             "id": {
                                 "type": "string"
@@ -198,7 +195,50 @@
                                 "type": "array"
                             },
                             "membershipUpdateEvents": {
-                                "type": "null"
+                                "items": {
+                                    "properties": {
+                                        "chatId": {
+                                            "type": "string"
+                                        },
+                                        "clockValue": {
+                                            "type": "integer"
+                                        },
+                                        "color": {
+                                            "type": "string"
+                                        },
+                                        "from": {
+                                            "type": "string"
+                                        },
+                                        "members": {
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "type": "array"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "rawPayload": {
+                                            "type": "string"
+                                        },
+                                        "signature": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "chatId",
+                                        "clockValue",
+                                        "from",
+                                        "rawPayload",
+                                        "signature",
+                                        "type"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
                             },
                             "muteTill": {
                                 "type": "string"
@@ -208,6 +248,12 @@
                             },
                             "name": {
                                 "type": "string"
+                            },
+                            "syncedFrom": {
+                                "type": "integer"
+                            },
+                            "syncedTo": {
+                                "type": "integer"
                             },
                             "timestamp": {
                                 "type": "integer"
@@ -227,11 +273,10 @@
                             "active",
                             "chatType",
                             "color",
-                            "communityId",
                             "deletedAtClockValue",
                             "description",
                             "emoji",
-                            "firstMessageTimestamp",
+                            "highlight",
                             "id",
                             "identicon",
                             "joined",
@@ -242,673 +287,12 @@
                             "muteTill",
                             "muted",
                             "name",
+                            "syncedFrom",
+                            "syncedTo",
                             "timestamp",
                             "unviewedMentionsCount",
                             "unviewedMessagesCount",
                             "viewersCanPostReactions"
-                        ],
-                        "type": "object"
-                    },
-                    "type": "array"
-                },
-                "communities": {
-                    "items": {
-                        "properties": {
-                            "activeMembersCount": {
-                                "type": "integer"
-                            },
-                            "adminSettings": {
-                                "properties": {
-                                    "pinMessageAllMembersEnabled": {
-                                        "type": "boolean"
-                                    }
-                                },
-                                "required": [
-                                    "pinMessageAllMembersEnabled"
-                                ],
-                                "type": "object"
-                            },
-                            "canDeleteMessageForEveryone": {
-                                "type": "boolean"
-                            },
-                            "canJoin": {
-                                "type": "boolean"
-                            },
-                            "canManageUsers": {
-                                "type": "boolean"
-                            },
-                            "canRequestAccess": {
-                                "type": "boolean"
-                            },
-                            "categories": {
-                                "type": "object"
-                            },
-                            "chats": {
-                            "patternProperties": {
-                                    "^[a-zA-Z0-9-]+$": {
-                                        "properties": {
-                                            "canPost": {
-                                                "type": "boolean"
-                                            },
-                                            "canPostReactions": {
-                                                "type": "boolean"
-                                            },
-                                            "canView": {
-                                                "type": "boolean"
-                                            },
-                                            "categoryID": {
-                                                "type": "string"
-                                            },
-                                            "color": {
-                                                "type": "string"
-                                            },
-                                            "description": {
-                                                "type": "string"
-                                            },
-                                            "emoji": {
-                                                "type": "string"
-                                            },
-                                            "hideIfPermissionsNotMet": {
-                                                "type": "boolean"
-                                            },
-                                            "id": {
-                                                "type": "string"
-                                            },
-                                            "members": {
-                                                "type": "null"
-                                            },
-                                            "missingEncryptionKey": {
-                                                "type": "boolean"
-                                            },
-                                            "name": {
-                                                "type": "string"
-                                            },
-                                            "permissions": {
-                                                "properties": {
-                                                    "access": {
-                                                        "type": "integer"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "access"
-                                                ],
-                                                "type": "object"
-                                            },
-                                            "position": {
-                                                "type": "integer"
-                                            },
-                                            "tokenGated": {
-                                                "type": "boolean"
-                                            },
-                                            "viewersCanPostReactions": {
-                                                "type": "boolean"
-                                            }
-                                        },
-                                        "required": [
-                                            "canPost",
-                                            "canPostReactions",
-                                            "canView",
-                                            "categoryID",
-                                            "color",
-                                            "description",
-                                            "emoji",
-                                            "hideIfPermissionsNotMet",
-                                            "id",
-                                            "members",
-                                            "missingEncryptionKey",
-                                            "name",
-                                            "permissions",
-                                            "position",
-                                            "tokenGated",
-                                            "viewersCanPostReactions"
-                                        ],
-                                        "type": "object"
-                                    }
-                                },
-                                "type": "object"
-                            },
-                            "clock": {
-                                "type": "integer"
-                            },
-                            "color": {
-                                "type": "string"
-                            },
-                            "communityTokensMetadata": {
-                                "type": "null"
-                            },
-                            "description": {
-                                "type": "string"
-                            },
-                            "encrypted": {
-                                "type": "boolean"
-                            },
-                            "id": {
-                                "type": "string"
-                            },
-                            "images": {
-                                "type": "null"
-                            },
-                            "introMessage": {
-                                "type": "string"
-                            },
-                            "isControlNode": {
-                                "type": "boolean"
-                            },
-                            "isMember": {
-                                "type": "boolean"
-                            },
-                            "joined": {
-                                "type": "boolean"
-                            },
-                            "joinedAt": {
-                                "type": "integer"
-                            },
-                            "lastOpenedAt": {
-                                "type": "integer"
-                            },
-                            "memberRole": {
-                                "type": "integer"
-                            },
-                            "members": {
-                                "patternProperties": {
-                                    "^[a-zA-Z0-9-]+$": {
-                                        "properties": {
-                                            "last_update_clock": {
-                                                "type": "integer"
-                                            },
-                                            "roles": {
-                                                "items": {
-                                                    "type": "integer"
-                                                },
-                                                "type": "array"
-                                            }
-                                        },
-                                        "type": "object"
-                                    }
-                                },
-                                "type": "object"
-                            },
-                            "muteTill": {
-                                "type": "string"
-                            },
-                            "muted": {
-                                "type": "boolean"
-                            },
-                            "name": {
-                                "type": "string"
-                            },
-                            "outroMessage": {
-                                "type": "string"
-                            },
-                            "pendingAndBannedMembers": {
-                                "type": "object"
-                            },
-                            "permissions": {
-                                "properties": {
-                                    "access": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "required": [
-                                    "access"
-                                ],
-                                "type": "object"
-                            },
-                            "pubsubTopic": {
-                                "type": "string"
-                            },
-                            "pubsubTopicKey": {
-                                "type": "string"
-                            },
-                            "requestedAccessAt": {
-                                "type": "integer"
-                            },
-                            "shard": {
-                                "type": "null"
-                            },
-                            "spectated": {
-                                "type": "boolean"
-                            },
-                            "tags": {
-                                "type": "array"
-                            },
-                            "tokenPermissions": {
-                                "type": "object"
-                            },
-                            "verified": {
-                                "type": "boolean"
-                            }
-                        },
-                        "required": [
-                            "activeMembersCount",
-                            "adminSettings",
-                            "canDeleteMessageForEveryone",
-                            "canJoin",
-                            "canManageUsers",
-                            "canRequestAccess",
-                            "categories",
-                            "chats",
-                            "clock",
-                            "color",
-                            "communityTokensMetadata",
-                            "description",
-                            "encrypted",
-                            "id",
-                            "images",
-                            "introMessage",
-                            "isControlNode",
-                            "isMember",
-                            "joined",
-                            "joinedAt",
-                            "lastOpenedAt",
-                            "memberRole",
-                            "members",
-                            "muteTill",
-                            "muted",
-                            "name",
-                            "outroMessage",
-                            "pendingAndBannedMembers",
-                            "permissions",
-                            "pubsubTopic",
-                            "pubsubTopicKey",
-                            "requestedAccessAt",
-                            "shard",
-                            "spectated",
-                            "tags",
-                            "tokenPermissions",
-                            "verified"
-                        ],
-                        "type": "object"
-                    },
-                    "type": "array"
-                },
-                "communityChanges": {
-                    "items": {
-                        "properties": {
-                            "categoriesAdded": {
-                                "type": "object"
-                            },
-                            "categoriesModified": {
-                                "type": "object"
-                            },
-                            "categoriesRemoved": {
-                                "type": "array"
-                            },
-                            "chatsAdded": {
-                                "type": "object"
-                            },
-                            "chatsModified": {
-                                "properties": {
-                                    "66dbc222-c960-4857-bb68-3d06527eac65": {
-                                        "properties": {
-                                            "CategoryModified": {
-                                                "type": "string"
-                                            },
-                                            "ChatModified": {
-                                                "type": "null"
-                                            },
-                                            "FirstMessageTimestampModified": {
-                                                "type": "integer"
-                                            },
-                                            "MembersAdded": {
-                                                "type": "null"
-                                            },
-                                            "MembersRemoved": {
-                                                "type": "null"
-                                            },
-                                            "PositionModified": {
-                                                "type": "integer"
-                                            }
-                                        },
-                                        "required": [
-                                            "CategoryModified",
-                                            "ChatModified",
-                                            "FirstMessageTimestampModified",
-                                            "MembersAdded",
-                                            "MembersRemoved",
-                                            "PositionModified"
-                                        ],
-                                        "type": "object"
-                                    }
-                                },
-                                "type": "object"
-                            },
-                            "chatsRemoved": {
-                                "type": "object"
-                            },
-                            "community": {
-                                "properties": {
-                                    "activeMembersCount": {
-                                        "type": "integer"
-                                    },
-                                    "adminSettings": {
-                                        "properties": {
-                                            "pinMessageAllMembersEnabled": {
-                                                "type": "boolean"
-                                            }
-                                        },
-                                        "required": [
-                                            "pinMessageAllMembersEnabled"
-                                        ],
-                                        "type": "object"
-                                    },
-                                    "canDeleteMessageForEveryone": {
-                                        "type": "boolean"
-                                    },
-                                    "canJoin": {
-                                        "type": "boolean"
-                                    },
-                                    "canManageUsers": {
-                                        "type": "boolean"
-                                    },
-                                    "canRequestAccess": {
-                                        "type": "boolean"
-                                    },
-                                    "categories": {
-                                        "type": "object"
-                                    },
-                                    "chats": {
-                                        "patternProperties": {
-                                            "^[a-zA-Z0-9-]+$": {
-                                                "properties": {
-                                                    "canPost": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "canPostReactions": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "canView": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "categoryID": {
-                                                        "type": "string"
-                                                    },
-                                                    "color": {
-                                                        "type": "string"
-                                                    },
-                                                    "description": {
-                                                        "type": "string"
-                                                    },
-                                                    "emoji": {
-                                                        "type": "string"
-                                                    },
-                                                    "hideIfPermissionsNotMet": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "id": {
-                                                        "type": "string"
-                                                    },
-                                                    "members": {
-                                                        "type": "null"
-                                                    },
-                                                    "missingEncryptionKey": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "name": {
-                                                        "type": "string"
-                                                    },
-                                                    "permissions": {
-                                                        "properties": {
-                                                            "access": {
-                                                                "type": "integer"
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "access"
-                                                        ],
-                                                        "type": "object"
-                                                    },
-                                                    "position": {
-                                                        "type": "integer"
-                                                    },
-                                                    "tokenGated": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "viewersCanPostReactions": {
-                                                        "type": "boolean"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "canPost",
-                                                    "canPostReactions",
-                                                    "canView",
-                                                    "categoryID",
-                                                    "color",
-                                                    "description",
-                                                    "emoji",
-                                                    "hideIfPermissionsNotMet",
-                                                    "id",
-                                                    "members",
-                                                    "missingEncryptionKey",
-                                                    "name",
-                                                    "permissions",
-                                                    "position",
-                                                    "tokenGated",
-                                                    "viewersCanPostReactions"
-                                                ],
-                                                "type": "object"
-                                            }
-                                        },
-                                        "type": "object"
-                                    },
-                                    "clock": {
-                                        "type": "integer"
-                                    },
-                                    "color": {
-                                        "type": "string"
-                                    },
-                                    "communityTokensMetadata": {
-                                        "type": "null"
-                                    },
-                                    "description": {
-                                        "type": "string"
-                                    },
-                                    "encrypted": {
-                                        "type": "boolean"
-                                    },
-                                    "id": {
-                                        "type": "string"
-                                    },
-                                    "images": {
-                                        "type": "null"
-                                    },
-                                    "introMessage": {
-                                        "type": "string"
-                                    },
-                                    "isControlNode": {
-                                        "type": "boolean"
-                                    },
-                                    "isMember": {
-                                        "type": "boolean"
-                                    },
-                                    "joined": {
-                                        "type": "boolean"
-                                    },
-                                    "joinedAt": {
-                                        "type": "integer"
-                                    },
-                                    "lastOpenedAt": {
-                                        "type": "integer"
-                                    },
-                                    "memberRole": {
-                                        "type": "integer"
-                                    },
-                                    "members": {
-                                        "patternProperties": {
-                                            "^[a-zA-Z0-9-]+$": {
-                                                "properties": {
-                                                    "last_update_clock": {
-                                                        "type": "integer"
-                                                    },
-                                                    "roles": {
-                                                        "items": {
-                                                            "type": "integer"
-                                                        },
-                                                        "type": "array"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        },
-                                        "type": "object"
-                                    },
-                                    "muteTill": {
-                                        "type": "string"
-                                    },
-                                    "muted": {
-                                        "type": "boolean"
-                                    },
-                                    "name": {
-                                        "type": "string"
-                                    },
-                                    "outroMessage": {
-                                        "type": "string"
-                                    },
-                                    "pendingAndBannedMembers": {
-                                        "type": "object"
-                                    },
-                                    "permissions": {
-                                        "properties": {
-                                            "access": {
-                                                "type": "integer"
-                                            }
-                                        },
-                                        "required": [
-                                            "access"
-                                        ],
-                                        "type": "object"
-                                    },
-                                    "pubsubTopic": {
-                                        "type": "string"
-                                    },
-                                    "pubsubTopicKey": {
-                                        "type": "string"
-                                    },
-                                    "requestedAccessAt": {
-                                        "type": "integer"
-                                    },
-                                    "shard": {
-                                        "type": "null"
-                                    },
-                                    "spectated": {
-                                        "type": "boolean"
-                                    },
-                                    "tags": {
-                                        "type": "array"
-                                    },
-                                    "tokenPermissions": {
-                                        "type": "object"
-                                    },
-                                    "verified": {
-                                        "type": "boolean"
-                                    }
-                                },
-                                "required": [
-                                    "activeMembersCount",
-                                    "adminSettings",
-                                    "canDeleteMessageForEveryone",
-                                    "canJoin",
-                                    "canManageUsers",
-                                    "canRequestAccess",
-                                    "categories",
-                                    "chats",
-                                    "clock",
-                                    "color",
-                                    "communityTokensMetadata",
-                                    "description",
-                                    "encrypted",
-                                    "id",
-                                    "images",
-                                    "introMessage",
-                                    "isControlNode",
-                                    "isMember",
-                                    "joined",
-                                    "joinedAt",
-                                    "lastOpenedAt",
-                                    "memberRole",
-                                    "members",
-                                    "muteTill",
-                                    "muted",
-                                    "name",
-                                    "outroMessage",
-                                    "pendingAndBannedMembers",
-                                    "permissions",
-                                    "pubsubTopic",
-                                    "pubsubTopicKey",
-                                    "requestedAccessAt",
-                                    "shard",
-                                    "spectated",
-                                    "tags",
-                                    "tokenPermissions",
-                                    "verified"
-                                ],
-                                "type": "object"
-                            },
-                            "communityImageModified": {
-                                "type": "boolean"
-                            },
-                            "controlNodeChanged": {
-                                "type": "null"
-                            },
-                            "memberAdded": {
-                                "type": "boolean"
-                            },
-                            "memberRemoved": {
-                                "type": "boolean"
-                            },
-                            "memberSoftRemoved": {
-                                "type": "boolean"
-                            },
-                            "memberWalletsAdded": {
-                                "type": "object"
-                            },
-                            "memberWalletsRemoved": {
-                                "type": "array"
-                            },
-                            "membersAdded": {
-                                "type": "object"
-                            },
-                            "membersBanned": {
-                                "type": "object"
-                            },
-                            "membersRemoved": {
-                                "type": "object"
-                            },
-                            "membersUnbanned": {
-                                "type": "object"
-                            },
-                            "tokenPermissionsAdded": {
-                                "type": "object"
-                            },
-                            "tokenPermissionsModified": {
-                                "type": "object"
-                            },
-                            "tokenPermissionsRemoved": {
-                                "type": "object"
-                            }
-                        },
-                        "required": [
-                            "categoriesAdded",
-                            "categoriesModified",
-                            "categoriesRemoved",
-                            "chatsAdded",
-                            "chatsModified",
-                            "chatsRemoved",
-                            "community",
-                            "communityImageModified",
-                            "controlNodeChanged",
-                            "memberAdded",
-                            "memberRemoved",
-                            "memberSoftRemoved",
-                            "memberWalletsAdded",
-                            "memberWalletsRemoved",
-                            "membersAdded",
-                            "membersBanned",
-                            "membersRemoved",
-                            "membersUnbanned",
-                            "tokenPermissionsAdded",
-                            "tokenPermissionsModified",
-                            "tokenPermissionsRemoved"
                         ],
                         "type": "object"
                     },
@@ -1058,8 +442,6 @@
             },
             "required": [
                 "chats",
-                "communities",
-                "communityChanges",
                 "discordOldestMessageTimestamp",
                 "messages",
                 "notifications"

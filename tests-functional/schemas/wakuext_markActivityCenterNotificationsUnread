@@ -187,6 +187,24 @@
                             "name": {
                                 "type": "string"
                             },
+                            "newsContent": {
+                                "type": "string"
+                            },
+                            "newsDescription": {
+                                "type": "string"
+                            },
+                            "newsImageUrl": {
+                                "type": "string"
+                            },
+                            "newsLink": {
+                                "type": "string"
+                            },
+                            "newsLinkLabel": {
+                                "type": "string"
+                            },
+                            "newsTitle": {
+                                "type": "string"
+                            },
                             "read": {
                                 "type": "boolean"
                             },
@@ -221,6 +239,12 @@
                             "membershipStatus",
                             "message",
                             "name",
+                            "newsContent",
+                            "newsDescription",
+                            "newsImageUrl",
+                            "newsLink",
+                            "newsLinkLabel",
+                            "newsTitle",
                             "read",
                             "replyMessage",
                             "timestamp",

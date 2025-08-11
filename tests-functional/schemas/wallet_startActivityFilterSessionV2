@@ -8,7 +8,7 @@
             "type": "string"
         },
         "result": {
-            "type": "null"
+            "type": "integer"
         }
     },
     "required": [

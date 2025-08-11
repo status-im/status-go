@@ -1,0 +1,231 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "appearance": {
+                    "type": "integer"
+                },
+                "backup-enabled?": {
+                    "type": "boolean"
+                },
+                "bio": {
+                    "type": "string"
+                },
+                "compressedKey": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "current-user-status": {
+                    "properties": {
+                        "clock": {
+                            "type": "integer"
+                        },
+                        "publicKey": {
+                            "type": "string"
+                        },
+                        "statusType": {
+                            "type": "integer"
+                        },
+                        "text": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "clock",
+                        "publicKey",
+                        "statusType",
+                        "text"
+                    ],
+                    "type": "object"
+                },
+                "dapps-address": {
+                    "type": "string"
+                },
+                "default-sync-period": {
+                    "type": "integer"
+                },
+                "device-name": {
+                    "type": "string"
+                },
+                "display-assets-below-balance-threshold": {
+                    "type": "integer"
+                },
+                "display-name": {
+                    "type": "string"
+                },
+                "eip1581-address": {
+                    "type": "string"
+                },
+                "emojiHash": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "fleet": {
+                    "type": "string"
+                },
+                "gifs/api-key": {
+                    "type": "string"
+                },
+                "gifs/favorite-gifs": {
+                    "type": "null"
+                },
+                "gifs/recent-gifs": {
+                    "type": "null"
+                },
+                "installation-id": {
+                    "type": "string"
+                },
+                "key-uid": {
+                    "type": "string"
+                },
+                "last-backup": {
+                    "type": "integer"
+                },
+                "last-tokens-update": {
+                    "type": "string"
+                },
+                "latest-derived-path": {
+                    "type": "integer"
+                },
+                "link-preview-request-enabled": {
+                    "type": "boolean"
+                },
+                "messages-from-contacts-only": {
+                    "type": "boolean"
+                },
+                "mnemonic-removed?": {
+                    "type": "boolean"
+                },
+                "mutual-contact-enabled?": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "networks/current-network": {
+                    "type": "string"
+                },
+                "networks/networks": {
+                    "type": "array"
+                },
+                "news-feed-enabled?": {
+                    "type": "boolean"
+                },
+                "news-feed-last-fetched-timestamp": {
+                    "type": "string"
+                },
+                "news-rss-enabled?": {
+                    "type": "boolean"
+                },
+                "photo-path": {
+                    "type": "string"
+                },
+                "preferred-name": {
+                    "type": "string"
+                },
+                "preview-privacy?": {
+                    "type": "boolean"
+                },
+                "profile-pictures-show-to": {
+                    "type": "integer"
+                },
+                "profile-pictures-visibility": {
+                    "type": "integer"
+                },
+                "public-key": {
+                    "type": "string"
+                },
+                "send-push-notifications?": {
+                    "type": "boolean"
+                },
+                "send-status-updates?": {
+                    "type": "boolean"
+                },
+                "show-community-asset-when-sending-tokens?": {
+                    "type": "boolean"
+                },
+                "signing-phrase": {
+                    "type": "string"
+                },
+                "url-unfurling-mode": {
+                    "type": "integer"
+                },
+                "use-mailservers?": {
+                    "type": "boolean"
+                },
+                "wallet-root-address": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "address",
+                "appearance",
+                "backup-enabled?",
+                "bio",
+                "compressedKey",
+                "currency",
+                "current-user-status",
+                "dapps-address",
+                "default-sync-period",
+                "device-name",
+                "display-assets-below-balance-threshold",
+                "display-name",
+                "eip1581-address",
+                "emojiHash",
+                "fleet",
+                "gifs/api-key",
+                "gifs/favorite-gifs",
+                "gifs/recent-gifs",
+                "installation-id",
+                "key-uid",
+                "last-backup",
+                "last-tokens-update",
+                "latest-derived-path",
+                "link-preview-request-enabled",
+                "messages-from-contacts-only",
+                "mnemonic-removed?",
+                "mutual-contact-enabled?",
+                "name",
+                "networks/current-network",
+                "networks/networks",
+                "news-feed-enabled?",
+                "news-feed-last-fetched-timestamp",
+                "news-rss-enabled?",
+                "photo-path",
+                "preferred-name",
+                "preview-privacy?",
+                "profile-pictures-show-to",
+                "profile-pictures-visibility",
+                "public-key",
+                "send-push-notifications?",
+                "send-status-updates?",
+                "show-community-asset-when-sending-tokens?",
+                "signing-phrase",
+                "url-unfurling-mode",
+                "use-mailservers?",
+                "wallet-root-address"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

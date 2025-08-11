@@ -1,0 +1,63 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "items": {
+                "properties": {
+                    "clock": {
+                        "type": "integer"
+                    },
+                    "fileSize": {
+                        "type": "integer"
+                    },
+                    "height": {
+                        "type": "integer"
+                    },
+                    "keyUid": {
+                        "type": "string"
+                    },
+                    "localUrl": {
+                        "type": "string"
+                    },
+                    "resizeTarget": {
+                        "type": "integer"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "uri": {
+                        "type": "string"
+                    },
+                    "width": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "clock",
+                    "fileSize",
+                    "height",
+                    "keyUid",
+                    "localUrl",
+                    "resizeTarget",
+                    "type",
+                    "uri",
+                    "width"
+                ],
+                "type": "object"
+            },
+            "type": "array"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

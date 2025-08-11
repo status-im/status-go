@@ -50,217 +50,142 @@
                         "type": "integer"
                     },
                     "lastMessage": {
-                        "anyOf": [
-                            {
-                                "type": "null"
+                        "properties": {
+                            "alias": {
+                                "type": "string"
                             },
-                            {
-                                "properties": {
-                                    "alias": {
-                                        "type": "string"
-                                    },
-                                    "chatId": {
-                                        "type": "string"
-                                    },
-                                    "clock": {
-                                        "type": "integer"
-                                    },
-                                    "compressedKey": {
-                                        "type": "string"
-                                    },
-                                    "contentType": {
-                                        "type": "integer"
-                                    },
-                                    "displayName": {
-                                        "type": "string"
-                                    },
-                                    "emojiHash": {
-                                        "items": {
-                                            "type": "string"
-                                        },
-                                        "type": "array"
-                                    },
-                                    "ensName": {
-                                        "type": "string"
-                                    },
-                                    "from": {
-                                        "type": "string"
-                                    },
-                                    "id": {
-                                        "type": "string"
-                                    },
-                                    "lineCount": {
-                                        "type": "integer"
-                                    },
-                                    "localChatId": {
-                                        "type": "string"
-                                    },
-                                    "messageType": {
-                                        "type": "integer"
-                                    },
-                                    "outgoingStatus": {
-                                        "type": "string"
-                                    },
-                                    "parsedText": {
-                                        "items": {
-                                            "properties": {
-                                                "children": {
-                                                    "items": {
-                                                        "properties": {
-                                                            "literal": {
-                                                                "type": "string"
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "literal"
-                                                        ],
-                                                        "type": "object"
-                                                    },
-                                                    "type": "array"
-                                                },
-                                                "type": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "required": [
-                                                "children",
-                                                "type"
-                                            ],
-                                            "type": "object"
-                                        },
-                                        "type": "array"
-                                    },
-                                    "quotedMessage": {
-                                        "type": "null"
-                                    },
-                                    "replace": {
-                                        "type": "string"
-                                    },
-                                    "responseTo": {
-                                        "type": "string"
-                                    },
-                                    "rtl": {
-                                        "type": "boolean"
-                                    },
-                                    "seen": {
-                                        "type": "boolean"
-                                    },
-                                    "text": {
-                                        "type": "string"
-                                    },
-                                    "timestamp": {
-                                        "type": "integer"
-                                    },
-                                    "whisperTimestamp": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "required": [
-                                    "alias",
-                                    "chatId",
-                                    "clock",
-                                    "compressedKey",
-                                    "contentType",
-                                    "displayName",
-                                    "emojiHash",
-                                    "ensName",
-                                    "from",
-                                    "id",
-                                    "lineCount",
-                                    "localChatId",
-                                    "messageType",
-                                    "outgoingStatus",
-                                    "parsedText",
-                                    "quotedMessage",
-                                    "replace",
-                                    "responseTo",
-                                    "rtl",
-                                    "seen",
-                                    "text",
-                                    "timestamp",
-                                    "whisperTimestamp"
-                                ],
-                                "type": "object"
-                            }
-                        ]
-                    },
-                    "members": {
-                        "anyOf": [
-                            {
-                                "type": "null"
+                            "chatId": {
+                                "type": "string"
                             },
-                            {
+                            "clock": {
+                                "type": "integer"
+                            },
+                            "compressedKey": {
+                                "type": "string"
+                            },
+                            "contactRequestState": {
+                                "type": "integer"
+                            },
+                            "contentType": {
+                                "type": "integer"
+                            },
+                            "displayName": {
+                                "type": "string"
+                            },
+                            "emojiHash": {
                                 "items": {
-                                    "properties": {
-                                        "admin": {
-                                            "type": "boolean"
-                                        },
-                                        "id": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "required": [
-                                        "admin",
-                                        "id"
-                                    ],
-                                    "type": "object"
+                                    "type": "string"
                                 },
                                 "type": "array"
-                            }
-                        ]
-                    },
-                    "membershipUpdateEvents": {
-                        "anyOf": [
-                            {
-                                "type": "null"
                             },
-                            {
+                            "ensName": {
+                                "type": "string"
+                            },
+                            "from": {
+                                "type": "string"
+                            },
+                            "id": {
+                                "type": "string"
+                            },
+                            "lineCount": {
+                                "type": "integer"
+                            },
+                            "localChatId": {
+                                "type": "string"
+                            },
+                            "messageType": {
+                                "type": "integer"
+                            },
+                            "new": {
+                                "type": "boolean"
+                            },
+                            "parsedText": {
                                 "items": {
                                     "properties": {
-                                        "chatId": {
-                                            "type": "string"
-                                        },
-                                        "clockValue": {
-                                            "type": "integer"
-                                        },
-                                        "color": {
-                                            "type": "string"
-                                        },
-                                        "from": {
-                                            "type": "string"
-                                        },
-                                        "members": {
+                                        "children": {
                                             "items": {
-                                                "type": "string"
+                                                "properties": {
+                                                    "literal": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "literal"
+                                                ],
+                                                "type": "object"
                                             },
                                             "type": "array"
                                         },
-                                        "name": {
-                                            "type": "string"
-                                        },
-                                        "rawPayload": {
-                                            "type": "string"
-                                        },
-                                        "signature": {
-                                            "type": "string"
-                                        },
                                         "type": {
-                                            "type": "integer"
+                                            "type": "string"
                                         }
                                     },
                                     "required": [
-                                        "chatId",
-                                        "clockValue",
-                                        "from",
-                                        "rawPayload",
-                                        "signature",
+                                        "children",
                                         "type"
                                     ],
                                     "type": "object"
                                 },
                                 "type": "array"
+                            },
+                            "quotedMessage": {
+                                "type": "null"
+                            },
+                            "replace": {
+                                "type": "string"
+                            },
+                            "responseTo": {
+                                "type": "string"
+                            },
+                            "rtl": {
+                                "type": "boolean"
+                            },
+                            "seen": {
+                                "type": "boolean"
+                            },
+                            "text": {
+                                "type": "string"
+                            },
+                            "timestamp": {
+                                "type": "integer"
+                            },
+                            "whisperTimestamp": {
+                                "type": "integer"
                             }
-                        ]
+                        },
+                        "required": [
+                            "alias",
+                            "chatId",
+                            "clock",
+                            "compressedKey",
+                            "contactRequestState",
+                            "contentType",
+                            "displayName",
+                            "emojiHash",
+                            "ensName",
+                            "from",
+                            "id",
+                            "lineCount",
+                            "localChatId",
+                            "messageType",
+                            "new",
+                            "parsedText",
+                            "quotedMessage",
+                            "replace",
+                            "responseTo",
+                            "rtl",
+                            "seen",
+                            "text",
+                            "timestamp",
+                            "whisperTimestamp"
+                        ],
+                        "type": "object"
+                    },
+                    "members": {
+                        "type": "null"
+                    },
+                    "membershipUpdateEvents": {
+                        "type": "null"
                     },
                     "muteTill": {
                         "type": "string"
@@ -270,12 +195,6 @@
                     },
                     "name": {
                         "type": "string"
-                    },
-                    "syncedFrom": {
-                        "type": "integer"
-                    },
-                    "syncedTo": {
-                        "type": "integer"
                     },
                     "timestamp": {
                         "type": "integer"
@@ -293,6 +212,7 @@
                 "required": [
                     "ReadMessagesAtClockValue",
                     "active",
+                    "alias",
                     "chatType",
                     "color",
                     "deletedAtClockValue",

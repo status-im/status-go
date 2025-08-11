@@ -1,12 +1,5 @@
 {
-    "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "$id": "http://example.com/example.json",
-    "type": "object",
-    "required": [
-        "id",
-        "jsonrpc",
-        "result"
-    ],
+    "$schema": "http://json-schema.org/schema#",
     "properties": {
         "id": {
             "type": "string"
@@ -15,19 +8,7 @@
             "type": "string"
         },
         "result": {
-            "type": "array",
             "items": {
-                "type": "object",
-                "required": [
-                    "emoji",
-                    "id",
-                    "isPopular",
-                    "isToken",
-                    "name",
-                    "shortName",
-                    "symbol",
-                    "unicode"
-                ],
                 "properties": {
                     "emoji": {
                         "type": "string"
@@ -53,8 +34,26 @@
                     "unicode": {
                         "type": "string"
                     }
-                }
-            }
+                },
+                "required": [
+                    "emoji",
+                    "id",
+                    "isPopular",
+                    "isToken",
+                    "name",
+                    "shortName",
+                    "symbol",
+                    "unicode"
+                ],
+                "type": "object"
+            },
+            "type": "array"
         }
-    }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
 }

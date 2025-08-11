@@ -1,5 +1,5 @@
 {
-   "$schema": "http://json-schema.org/draft-07/schema",
+    "$schema": "http://json-schema.org/schema#",
     "properties": {
         "id": {
             "type": "string"
@@ -21,11 +21,29 @@
                             "chainName": {
                                 "type": "string"
                             },
+                            "defaultFallbackURL": {
+                                "type": "string"
+                            },
+                            "defaultFallbackURL2": {
+                                "type": "string"
+                            },
+                            "defaultRpcUrl": {
+                                "type": "string"
+                            },
+                            "eip1559Enabled": {
+                                "type": "boolean"
+                            },
                             "enabled": {
                                 "type": "boolean"
                             },
                             "fallbackURL": {
                                 "type": "string"
+                            },
+                            "isActive": {
+                                "type": "boolean"
+                            },
+                            "isDeactivatable": {
+                                "type": "boolean"
                             },
                             "isTest": {
                                 "type": "boolean"
@@ -36,6 +54,18 @@
                             "nativeCurrencyDecimals": {
                                 "type": "integer"
                             },
+                            "nativeCurrencyName": {
+                                "type": "string"
+                            },
+                            "nativeCurrencySymbol": {
+                                "type": "string"
+                            },
+                            "noBaseFee": {
+                                "type": "boolean"
+                            },
+                            "noPriorityFee": {
+                                "type": "boolean"
+                            },
                             "originalFallbackURL": {
                                 "type": "string"
                             },
@@ -44,6 +74,60 @@
                             },
                             "relatedChainId": {
                                 "type": "integer"
+                            },
+                            "rpcProviders": {
+                                "items": {
+                                    "properties": {
+                                        "authLogin": {
+                                            "type": "string"
+                                        },
+                                        "authPassword": {
+                                            "type": "string"
+                                        },
+                                        "authToken": {
+                                            "type": "string"
+                                        },
+                                        "authType": {
+                                            "type": "string"
+                                        },
+                                        "chainId": {
+                                            "type": "integer"
+                                        },
+                                        "enableRpsLimiter": {
+                                            "type": "boolean"
+                                        },
+                                        "enabled": {
+                                            "type": "boolean"
+                                        },
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string"
+                                        },
+                                        "url": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "authLogin",
+                                        "authPassword",
+                                        "authToken",
+                                        "authType",
+                                        "chainId",
+                                        "enableRpsLimiter",
+                                        "enabled",
+                                        "id",
+                                        "name",
+                                        "type",
+                                        "url"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
                             },
                             "rpcUrl": {
                                 "type": "string"
@@ -59,14 +143,25 @@
                             "chainColor",
                             "chainId",
                             "chainName",
+                            "defaultFallbackURL",
+                            "defaultFallbackURL2",
+                            "defaultRpcUrl",
+                            "eip1559Enabled",
                             "enabled",
                             "fallbackURL",
+                            "isActive",
+                            "isDeactivatable",
                             "isTest",
                             "layer",
                             "nativeCurrencyDecimals",
+                            "nativeCurrencyName",
+                            "nativeCurrencySymbol",
+                            "noBaseFee",
+                            "noPriorityFee",
                             "originalFallbackURL",
                             "originalRpcUrl",
                             "relatedChainId",
+                            "rpcProviders",
                             "rpcUrl",
                             "shortName",
                             "tokenOverrides"
@@ -74,7 +169,7 @@
                         "type": "object"
                     },
                     "Test": {
-                        "type": ["null", "object"]
+                        "type": "null"
                     }
                 },
                 "required": [
