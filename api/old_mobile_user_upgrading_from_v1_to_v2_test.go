@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	d_common "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/protocol/requests"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
@@ -186,7 +187,13 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 	b := NewGethStatusBackend(s.logger)
 	b.UpdateRootDataDir(s.tmpdir)
 	s.Require().NoError(b.OpenAccounts())
-	s.Require().NoError(b.Login(oldMobileUserKeyUID, oldMobileUserPasswd))
+
+	err := b.LoginAccount(&requests.Login{
+		KeyUID:   oldMobileUserKeyUID,
+		Password: oldMobileUserPasswd,
+	})
+	s.Require().NoError(err)
+
 	db, _ := accounts.NewDB(b.appDB)
 	walletRootAddress, err := db.GetWalletRootAddress()
 	s.Require().NoError(err)

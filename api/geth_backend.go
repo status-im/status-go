@@ -2014,8 +2014,6 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 		}
 	}
 
-	// TODO: Consider removing the Enabled field from the config as WakuV1 has been removed.
-	conf.WakuV2Config.Enabled = true
 	conf.RootDataDir = b.rootDataDir
 	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
 
