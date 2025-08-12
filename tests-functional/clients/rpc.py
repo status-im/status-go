@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import jsonschema
 import requests
 from tenacity import retry, stop_after_delay, wait_fixed
@@ -89,5 +90,13 @@ class RpcClient:
         return response
 
     def verify_json_schema(self, response, method):
-        with open(f"{Config.base_dir}/schemas/{method}", "r") as schema:
-            jsonschema.validate(instance=response, schema=json.load(schema))
+        schema_path = f"{Config.base_dir}/schemas/{method}"
+        # TODO: Delete the 3 lines bellow when a fullproof schema generation mechanism is implemented
+        if not os.path.exists(schema_path):
+            logging.warning(f"Schema doesn't exist: {schema_path}")
+            return
+        with open(schema_path, "r") as schema:
+            try:
+                jsonschema.validate(instance=response, schema=json.load(schema))
+            except Exception as ex:
+                raise AssertionError(f"{method} has validation errors: {str(ex)}")
