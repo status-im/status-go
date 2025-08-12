@@ -447,3 +447,6 @@ codecov-validate:
 pytest-lint:
 	$(MAKE) -C tests-functional lint
 
+generate-db: build/bin/generate-db
+generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL inspections
+	./build/bin/generate-db -out-dir build/db
