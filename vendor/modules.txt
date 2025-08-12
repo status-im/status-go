@@ -357,10 +357,6 @@ github.com/golang/groupcache/singleflight
 # github.com/golang/protobuf v1.5.3
 ## explicit; go 1.9
 github.com/golang/protobuf/proto
-github.com/golang/protobuf/ptypes
-github.com/golang/protobuf/ptypes/any
-github.com/golang/protobuf/ptypes/duration
-github.com/golang/protobuf/ptypes/timestamp
 # github.com/golang/snappy v0.0.4
 ## explicit
 github.com/golang/snappy
@@ -970,7 +966,6 @@ github.com/status-im/markdown/parser
 # github.com/status-im/migrate/v4 v4.6.2-status.3
 ## explicit; go 1.12
 github.com/status-im/migrate/v4
-github.com/status-im/migrate/v4/database/postgres
 github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/migrate/v4/internal/url
 github.com/status-im/migrate/v4/source/go_bindata
@@ -1419,8 +1414,6 @@ google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/descriptorpb
 google.golang.org/protobuf/types/dynamicpb
 google.golang.org/protobuf/types/gofeaturespb
-google.golang.org/protobuf/types/known/anypb
-google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/pluginpb
 # gopkg.in/go-playground/assert.v1 v1.2.1
