@@ -11,7 +11,6 @@ import (
 
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const (
@@ -105,7 +104,7 @@ type BundleAddedSignal struct {
 	InstallationID string `json:"installationID"`
 }
 
-type MailserverSignal struct {
+type StoreNodeSignal struct {
 	Address *multiaddr.Multiaddr `json:"address"`
 	ID      string               `json:"id"`
 }
@@ -222,8 +221,8 @@ func SendNewMessages(obj json.Marshaler) {
 	send(EventNewMessages, obj)
 }
 
-func sendMailserverSignal(ms *wakutypes.Mailserver, event string) {
-	msSignal := MailserverSignal{}
+func sendStoreNodeSignal(ms *messagingtypes.StoreNode, event string) {
+	msSignal := StoreNodeSignal{}
 	if ms != nil {
 		msSignal.Address = ms.Addr
 		msSignal.ID = ms.ID
@@ -231,14 +230,14 @@ func sendMailserverSignal(ms *wakutypes.Mailserver, event string) {
 	send(event, msSignal)
 }
 
-func SendMailserverAvailable(ms *wakutypes.Mailserver) {
-	sendMailserverSignal(ms, EventMailserverAvailable)
+func SendStoreNodeAvailable(ms *messagingtypes.StoreNode) {
+	sendStoreNodeSignal(ms, EventMailserverAvailable)
 }
 
-func SendMailserverChanged(ms *wakutypes.Mailserver) {
-	sendMailserverSignal(ms, EventMailserverChanged)
+func SendStoreNodeChanged(ms *messagingtypes.StoreNode) {
+	sendStoreNodeSignal(ms, EventMailserverChanged)
 }
 
-func SendMailserverNotWorking() {
-	sendMailserverSignal(nil, EventMailserverNotWorking)
+func SendStoreNodeNotWorking() {
+	sendStoreNodeSignal(nil, EventMailserverNotWorking)
 }

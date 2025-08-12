@@ -2,9 +2,7 @@ package types
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
@@ -45,22 +43,6 @@ type SyncMailRequest struct {
 type SyncEventResponse struct {
 	Cursor []byte
 	Error  string
-}
-
-func MustDecodeENR(enrStr string) *enode.Node {
-	node, err := enode.Parse(enode.ValidSchemes, enrStr)
-	if err != nil || node == nil {
-		panic("could not decode enr: " + enrStr)
-	}
-	return node
-}
-
-func MustDecodeMultiaddress(multiaddrsStr string) *multiaddr.Multiaddr {
-	maddr, err := multiaddr.NewMultiaddr(multiaddrsStr)
-	if err != nil || maddr == nil {
-		panic("could not decode multiaddr: " + multiaddrsStr)
-	}
-	return &maddr
 }
 
 type Mailserver struct {
@@ -118,43 +100,4 @@ func (m Mailserver) NullablePassword() (val sql.NullString) {
 		val.Valid = true
 	}
 	return
-}
-
-// UnmarshalJSON implements the custom JSON unmarshaling logic for Mailserver.
-// It supports ENR and Addr being saved as strings.
-func (m *Mailserver) UnmarshalJSON(data []byte) error {
-	type Alias Mailserver // Create an alias type to avoid infinite recursion
-	aux := struct {
-		Alias
-		ENR  string `json:"enr"`  // Temporary field to handle ENR as a string
-		Addr string `json:"addr"` // Temporary field to handle Addr as a string
-	}{}
-
-	// Unmarshal the data into the temporary struct
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-
-	// Set the basic fields
-	*m = Mailserver(aux.Alias)
-
-	// Decode the ENR if present
-	if aux.ENR != "" {
-		decodedENR, err := enode.Parse(enode.ValidSchemes, aux.ENR)
-		if err != nil {
-			return fmt.Errorf("invalid ENR: %w", err)
-		}
-		m.ENR = decodedENR
-	}
-
-	// Decode the Multiaddr if present
-	if aux.Addr != "" {
-		decodedAddr, err := multiaddr.NewMultiaddr(aux.Addr)
-		if err != nil {
-			return fmt.Errorf("invalid Addr: %w", err)
-		}
-		m.Addr = &decodedAddr
-	}
-
-	return nil
 }
