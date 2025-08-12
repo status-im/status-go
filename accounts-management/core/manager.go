@@ -3,11 +3,11 @@ package core
 import (
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
 	"sync"
 
 	"go.uber.org/zap"
 
+	accsmanagementerrors "github.com/status-im/status-go/accounts-management/errors"
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/accounts-management/persistence"
@@ -76,7 +76,9 @@ func (m *AccountsManager) VerifyAccountPassword(address ethtypes.Address, passwo
 	}
 
 	if account.Address() != address {
-		return false, fmt.Errorf("account mismatch: have %s, want %s", gocommon.TruncateWithDot(account.Address().Hex()), gocommon.TruncateWithDot(address.Hex()))
+		return false, ErrAccountMismatch.
+			WithContext("got", gocommon.TruncateWithDot(account.Address().Hex())).
+			WithContext("want", gocommon.TruncateWithDot(address.Hex()))
 	}
 
 	return true, nil
@@ -93,7 +95,7 @@ func (m *AccountsManager) LoadAccount(address ethtypes.Address, password string)
 
 func (m *AccountsManager) loadAccountInternally(address ethtypes.Address, password string) (*generator.Account, error) {
 	if m.keystore == nil {
-		return nil, ErrAccountKeyStoreMissing
+		return nil, ErrKeystoreMissing
 	}
 
 	_, privateKey, extendedKey, err := m.keystore.AccountDecryptedKey(address, password)
@@ -101,7 +103,7 @@ func (m *AccountsManager) loadAccountInternally(address ethtypes.Address, passwo
 		m.logger.Error("error loading account", zap.String("address", address.Hex()), zap.Error(err))
 		if errors.Is(err, keystore.ErrNoMatch) {
 			m.logger.Error("cannot locate account for address", zap.String("address", address.Hex()))
-			return nil, err
+			return nil, ErrKeystoreFileMissing.WithContext("address", address.Hex())
 		}
 		return nil, err
 	}
@@ -186,7 +188,7 @@ func (m *AccountsManager) Accounts() ([]ethtypes.Address, error) {
 	defer m.mu.RUnlock()
 
 	if m.keystore == nil {
-		return nil, ErrAccountKeyStoreMissing
+		return nil, ErrKeystoreMissing
 	}
 
 	ksAccounts := m.keystore.Accounts()
@@ -206,7 +208,7 @@ func (m *AccountsManager) GetVerifiedWalletAccount(address ethtypes.Address, pas
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return nil, ErrPersistenceIsMissing
+		return nil, ErrPersistenceMissing
 	}
 
 	exists, err := m.persistence.AddressExists(address)
@@ -215,19 +217,20 @@ func (m *AccountsManager) GetVerifiedWalletAccount(address ethtypes.Address, pas
 	}
 
 	if !exists {
-		return nil, ErrAccountDoesNotExist
+		return nil, ErrAccountDoesNotExist.WithContext("address", address.Hex())
 	}
 
 	account, err := m.loadAccountInternally(address, password)
-	if errors.Is(err, keystore.ErrNoMatch) {
-		account, err = m.generatePartialAccountKey(address, password)
-		if err != nil {
+	if err != nil {
+		var accountsErr *accsmanagementerrors.AccountsError
+		if errors.As(err, &accountsErr) && accountsErr.Is(ErrKeystoreFileMissing) {
+			account, err = m.generatePartialAccountKey(address, password)
+			if err != nil {
+				return nil, err
+			}
+		} else {
 			return nil, err
 		}
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	return account, nil

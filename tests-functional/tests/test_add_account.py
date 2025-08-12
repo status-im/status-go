@@ -86,16 +86,21 @@ class TestAddAccount:
     def test_add_account_for_empty_path(self):
         self.account_data["path"] = ""
         add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data, skip_validation=True)
-        assert (
-            add_account_response.get("error", {}).get("message", "") == "provided address does not match the address derived from the provided path"
-        )
+        expected_error = "[account] account mismatch"
+        expected_error_context = "address: " + self.account_data["address"]
+        error_message = add_account_response.get("error", {}).get("message", "")
+        assert expected_error in error_message
+        assert expected_error_context.lower() in error_message.lower()
 
     @pytest.mark.parametrize("key", ["wallet", "chat"])
     def test_add_account_with_key_set_on_true__(self, key):
         self.account_data["key-uid"] = self.account.key_uid
         self.account_data[key] = True
         add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data, skip_validation=True)
-        assert add_account_response.get("error", {}).get("message", "") == "default wallet and chat account cannot be added this way"
+        if key == "wallet":
+            assert add_account_response.get("error", {}).get("message", "") == "[database] cannot add default wallet account"
+        else:
+            assert add_account_response.get("error", {}).get("message", "") == "[database] cannot add default chat account"
 
     def test_add_watch_account(self):
         self.account_data["type"] = "watch"

@@ -1,6 +1,7 @@
 // Package accounts provides account management functionality.
 // It is split into subpackages:
 //   - core: main account manager implementation
+//   - errors: structured error handling system
 //   - keystore: cryptographic key storage operations
 //   - persistence: database operations for key pairs and accounts
 //   - generator: account creation and derivation
@@ -22,19 +23,11 @@ type AccountsManager = core.AccountsManager
 type KeyStore = keystore.KeyStore
 type Persistence = persistence.Persistence
 
-// Re-export error types
+// Re-export errors for convenience
 var (
-	ErrLoggerIsMissing                        = core.ErrLoggerIsMissing
-	ErrAccountKeyStoreMissing                 = core.ErrAccountKeyStoreMissing
-	ErrNoAccountSelected                      = core.ErrNoAccountSelected
-	ErrPersistenceIsMissing                   = core.ErrPersistenceIsMissing
-	ErrAccountDoesNotExist                    = core.ErrAccountDoesNotExist
-	ErrAddressAndPasswordOrPrivateKeyRequired = core.ErrAddressAndPasswordOrPrivateKeyRequired
-	ErrAccountIsNil                           = core.ErrAccountIsNil
-	ErrKeypairIsNil                           = core.ErrKeypairIsNil
-	ErrCannotRemoveChatAccount                = core.ErrCannotRemoveChatAccount
-	ErrCannotRemoveDefaultWalletAccount       = core.ErrCannotRemoveDefaultWalletAccount
-	ErrCannotRemoveProfileKeypair             = core.ErrCannotRemoveProfileKeypair
+	ErrNoAccountSelected   = core.ErrNoAccountSelected
+	ErrKeystoreFileMissing = core.ErrKeystoreFileMissing
+	ErrAccountDoesNotExist = core.ErrAccountDoesNotExist
 )
 
 // NewAccountsManager creates a new accounts manager instance

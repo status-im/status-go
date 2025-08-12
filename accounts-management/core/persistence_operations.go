@@ -1,8 +1,6 @@
 package core
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/status-im/status-go/accounts-management/common"
@@ -20,12 +18,14 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 	walletAccount *types.AccountCreationDetails, profile bool, clock uint64) (keypair *types.Keypair, err error) {
 
 	if walletAccount == nil {
-		err = errors.New("keypair must have a wallet account")
+		err = ErrKeypairDoesNotHaveWalletAccount
 		return
 	}
 
 	if !strings.HasPrefix(walletAccount.Path, common.WalletPath) {
-		err = fmt.Errorf("profile or seed imported key pair wallet account path must start with %s", common.WalletPath)
+		err = ErrUnsupportedWalletAccountPath.
+			WithContext("path", walletAccount.Path).
+			WithContext("expected path", common.WalletPath)
 		return
 	}
 
@@ -33,7 +33,7 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return nil, ErrPersistenceIsMissing
+		return nil, ErrPersistenceMissing
 	}
 
 	paths := []string{
@@ -58,7 +58,7 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 		}
 	}
 	if dbKeypair != nil {
-		err = fmt.Errorf("keypair for the provided mnemonic was already added: %w", err)
+		err = ErrKeypairAlreadyAdded.WithContext("keyuid", masterAccount.KeyUID())
 		return
 	}
 
@@ -97,7 +97,7 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 	if profile {
 		chatDerivedAccount, ok := derivedAccounts[common.PathEIP1581Chat]
 		if !ok {
-			return nil, fmt.Errorf("chat account not found in derived accounts")
+			return nil, ErrChatAccountNotFoundInDerivedAccounts
 		}
 		m.setChatAccountAndProfileKeyUID(chatDerivedAccount, masterAccount.KeyUID())
 	}
@@ -109,13 +109,15 @@ func (m *AccountsManager) AddKeypairStoredToKeycard(keyUID string, masterAddress
 	walletAccounts []*types.Account, clock uint64) (keypair *types.Keypair, err error) {
 
 	if len(walletAccounts) == 0 {
-		err = errors.New("keypair must have at least one wallet account")
+		err = ErrKeypairMustHaveAtLeastOneWalletAccount
 		return
 	}
 
 	for _, walletAccount := range walletAccounts {
 		if !strings.HasPrefix(walletAccount.Path, common.WalletPath) {
-			err = fmt.Errorf("wallet account path must start with %s", common.WalletPath)
+			err = ErrUnsupportedWalletAccountPath.
+				WithContext("path", walletAccount.Path).
+				WithContext("expected path", common.WalletPath)
 			return
 		}
 	}
@@ -124,7 +126,7 @@ func (m *AccountsManager) AddKeypairStoredToKeycard(keyUID string, masterAddress
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return nil, ErrPersistenceIsMissing
+		return nil, ErrPersistenceMissing
 	}
 
 	var dbKeypair *types.Keypair
@@ -135,7 +137,7 @@ func (m *AccountsManager) AddKeypairStoredToKeycard(keyUID string, masterAddress
 		}
 	}
 	if dbKeypair != nil {
-		err = fmt.Errorf("keypair for the provided keyuid was already added: %w", err)
+		err = ErrKeypairAlreadyAdded.WithContext("keyuid", keyUID)
 		return
 	}
 
@@ -230,19 +232,21 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 func (m *AccountsManager) CreateKeypairFromPrivateKeyAndStore(privateKey string, password string, keypairName string,
 	walletAccount *types.AccountCreationDetails, clock uint64) (keypair *types.Keypair, err error) {
 	if walletAccount == nil {
-		err = errors.New("keypair must have a wallet account")
+		err = ErrKeypairDoesNotHaveWalletAccount
 		return
 	}
 
 	if walletAccount.Path != common.PathMaster {
-		err = fmt.Errorf("private key imported key pair wallet account path must be %s", common.PathMaster)
+		err = ErrUnsupportedWalletAccountPath.
+			WithContext("path", walletAccount.Path).
+			WithContext("expected path", common.PathMaster)
 		return
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return nil, ErrPersistenceIsMissing
+		return nil, ErrPersistenceMissing
 	}
 
 	masterAccount, err := generator.CreateAccountFromPrivateKey(privateKey)
@@ -257,7 +261,7 @@ func (m *AccountsManager) CreateKeypairFromPrivateKeyAndStore(privateKey string,
 		}
 	}
 	if dbKeypair != nil {
-		err = fmt.Errorf("keypair for the provided mnemonic was already added: %w", err)
+		err = ErrKeypairAlreadyAdded.WithContext("keyuid", masterAccount.KeyUID())
 		return
 	}
 
@@ -296,7 +300,7 @@ func (m *AccountsManager) MakeSeedPhraseKeypairFullyOperable(mnemonic string, pa
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return "", ErrPersistenceIsMissing
+		return "", ErrPersistenceMissing
 	}
 
 	kp, err := m.persistence.GetKeypairByKeyUID(keyUID)
@@ -328,7 +332,7 @@ func (m *AccountsManager) MakePrivateKeyKeypairFullyOperable(privateKey string, 
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return "", ErrPersistenceIsMissing
+		return "", ErrPersistenceMissing
 	}
 
 	kp, err := m.persistence.GetKeypairByKeyUID(acc.KeyUID())
@@ -349,7 +353,7 @@ func (m *AccountsManager) MakePartiallyOperableAccoutsFullyOperable(password str
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return nil, ErrPersistenceIsMissing
+		return nil, ErrPersistenceMissing
 	}
 
 	keypairs, err := m.persistence.GetActiveKeypairs()
@@ -385,7 +389,7 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return ErrPersistenceIsMissing
+		return ErrPersistenceMissing
 	}
 
 	kp, err := m.persistence.GetKeypairByKeyUID(keyUID)
@@ -394,24 +398,29 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 	}
 
 	if kp.Type == types.KeypairTypeKey {
-		return errors.New("accounts cannot be added to key keypair")
+		return ErrCannotAddAccountsToKeypairImportedViaPrivateKey
 	}
 
 	if !kp.MigratedToKeycard() {
 		for _, acc := range accounts {
 			if acc.KeyUID != keyUID {
-				return errors.New("account keyUID mismatch")
+				return ErrAccountMismatch.
+					WithContext("keyuid", acc.KeyUID).
+					WithContext("expected keyuid", keyUID)
 			}
 
 			if kp.Type == types.KeypairTypeProfile {
-				if acc.Chat || acc.Wallet {
-					return errors.New("default wallet and chat account cannot be added this way")
+				if acc.Chat {
+					return ErrCannotAddDefaultChatAccount
+				}
+				if acc.Wallet {
+					return ErrCannotAddDefaultWalletAccount
 				}
 			}
 
 			for _, kpAcc := range kp.Accounts {
 				if acc.Address == kpAcc.Address {
-					return errors.New("account already added")
+					return ErrAccountAlreadyAdded
 				}
 			}
 
@@ -421,7 +430,9 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 			}
 
 			if childAccount.Address() != acc.Address {
-				return errors.New("provided address does not match the address derived from the provided path")
+				return ErrAccountMismatch.
+					WithContext("address", acc.Address.Hex()).
+					WithContext("derived address", childAccount.Address().Hex())
 			}
 		}
 	}
@@ -448,7 +459,7 @@ func (m *AccountsManager) RemoveAccounts(keyUID string, accounts []*types.Accoun
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return ErrPersistenceIsMissing
+		return ErrPersistenceMissing
 	}
 
 	kp, err := m.persistence.GetKeypairByKeyUID(keyUID)
@@ -474,7 +485,7 @@ func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, 
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return "", ErrPersistenceIsMissing
+		return "", ErrPersistenceMissing
 	}
 
 	acc, err := generator.CreateAccountFromMnemonic(mnemonic, "")
@@ -488,11 +499,11 @@ func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, 
 	}
 
 	if kp.Type == types.KeypairTypeProfile {
-		return "", errors.New("cannot migrate profile keypair")
+		return "", ErrCannotMigrateProfileKeypair
 	}
 
 	if !kp.MigratedToKeycard() {
-		return "", errors.New("keypair being migrated is not a keycard keypair")
+		return "", ErrKeypairIsNotKeycard
 	}
 
 	profileKeypair, err := m.persistence.GetProfileKeypair()
@@ -503,7 +514,7 @@ func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, 
 	if !profileKeypair.MigratedToKeycard() {
 		_, err = m.loadAccountInternally(ethtypes.HexToAddress(profileKeypair.DerivedFrom), password)
 		if err != nil {
-			return "", fmt.Errorf("wrong password provided: %w", err)
+			return "", ErrWrongPasswordProvided(err)
 		}
 	}
 
@@ -525,19 +536,19 @@ func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, 
 // In case of migration to a keycard, corresponding keystore files need to be deleted if the keypair being migrated is not already migrated.
 func (m *AccountsManager) SaveOrUpdateKeycard(keycard *types.Keycard, clock uint64, removeKeystoreFiles bool) error {
 	if len(keycard.AccountsAddresses) == 0 {
-		return errors.New("provided keycard does not have any accounts")
+		return ErrKeycardDoesNotHaveAnyAccounts
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return ErrPersistenceIsMissing
+		return ErrPersistenceMissing
 	}
 
 	kpDb, err := m.persistence.GetKeypairByKeyUID(keycard.KeyUID)
 	if err != nil {
-		return errors.New("provided keycard doesn't relate to any keypair " + err.Error())
+		return ErrKeycardDoesNotRelateToAnyKeypair(err)
 	}
 
 	err = m.persistence.SaveOrUpdateKeycard(keycard, clock, true)
@@ -580,7 +591,7 @@ func (m *AccountsManager) DeleteAccount(address ethtypes.Address, clock uint64) 
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return nil, ErrPersistenceIsMissing
+		return nil, ErrPersistenceMissing
 	}
 
 	account, err = m.persistence.GetAccountByAddress(address)
@@ -589,7 +600,7 @@ func (m *AccountsManager) DeleteAccount(address ethtypes.Address, clock uint64) 
 	}
 
 	if account.Chat {
-		err = ErrCannotRemoveChatAccount
+		err = ErrCannotRemoveDefaultChatAccount
 		return
 	}
 
@@ -612,7 +623,7 @@ func (m *AccountsManager) DeleteKeypair(keyUID string, clock uint64) (keypair *t
 	defer m.mu.Unlock()
 
 	if m.persistence == nil {
-		return nil, ErrPersistenceIsMissing
+		return nil, ErrPersistenceMissing
 	}
 
 	keypair, err = m.persistence.GetKeypairByKeyUID(keyUID)

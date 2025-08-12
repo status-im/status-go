@@ -1,7 +1,6 @@
 package generator
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/status-im/status-go/accounts-management/common"
@@ -13,7 +12,7 @@ import (
 func CreateAccountFromMnemonic(mnemonicPhrase string, bip39Passphrase string) (*Account, error) {
 	masterExtendedKey, err := common.CreateExtendedKeyFromMnemonic(mnemonicPhrase, bip39Passphrase)
 	if err != nil {
-		return nil, fmt.Errorf("can not create account from mnemonic: %v", err)
+		return nil, ErrAccountCreationFromMnemonicFailed(err)
 	}
 
 	return NewAccount(masterExtendedKey.ToECDSA(), masterExtendedKey), nil
@@ -24,7 +23,7 @@ func CreateAccountFromPrivateKey(privateKeyHex string) (*Account, error) {
 	privateKeyWithoutPrefix := strings.TrimPrefix(privateKeyHex, "0x")
 	privateKey, err := crypto.HexToECDSA(privateKeyWithoutPrefix)
 	if err != nil {
-		return nil, fmt.Errorf("can not create account from private key: %v", err)
+		return nil, ErrAccountCreationFromPrivateKeyFailed(err)
 	}
 
 	return NewAccount(privateKey, nil), nil
@@ -34,7 +33,7 @@ func CreateAccountFromPrivateKey(privateKeyHex string) (*Account, error) {
 func CreateAccountFromKey(key *types.Key) (*Account, error) {
 	account := NewAccount(key.PrivateKey, key.ExtendedKey)
 	if err := account.ValidateExtendedKey(); err != nil {
-		return nil, fmt.Errorf("can not create account from key: %v", err)
+		return nil, ErrAccountCreationFromKeyFailed(err)
 	}
 	return account, nil
 }
@@ -48,12 +47,12 @@ func CreateAccountsOfMnemonicLength(mnemonicPhraseLength int, n int, bip39Passph
 	for i := 0; i < n; i++ {
 		mnemonicPhrase, err := common.CreateRandomMnemonic(mnemonicPhraseLength)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create mnemonic seed: %w", err)
+			return nil, nil, ErrMnemonicCreationFailed(err)
 		}
 
 		acc, err := CreateAccountFromMnemonic(mnemonicPhrase, bip39Passphrase)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create account from mnemonic: %w", err)
+			return nil, nil, ErrAccountCreationFromMnemonicFailed(err)
 		}
 
 		accounts = append(accounts, acc)
@@ -67,7 +66,7 @@ func CreateAccountsOfMnemonicLength(mnemonicPhraseLength int, n int, bip39Passph
 func DeriveChildFromAccount(acc *Account, pathString string) (*Account, error) {
 	_, path, err := decodePath(pathString)
 	if err != nil {
-		return nil, fmt.Errorf("can not decode path: %v", err)
+		return nil, ErrPathDecodingFailed(err)
 	}
 
 	if acc.extendedKey.IsZeroed() && len(path) == 0 {
@@ -75,12 +74,12 @@ func DeriveChildFromAccount(acc *Account, pathString string) (*Account, error) {
 	}
 
 	if acc.extendedKey.IsZeroed() {
-		return nil, fmt.Errorf("can not derive child account from zeroed extended key")
+		return nil, ErrZeroedExtendedKey
 	}
 
 	childExtendedKey, err := acc.extendedKey.Derive(path)
 	if err != nil {
-		return nil, fmt.Errorf("can not derive child account from extended key: %v", err)
+		return nil, ErrExtendedKeyDerivationFailed(err)
 	}
 
 	return NewAccount(childExtendedKey.ToECDSA(), childExtendedKey), nil
@@ -93,7 +92,7 @@ func DeriveChildrenFromAccount(acc *Account, pathStrings []string) (map[string]*
 	for _, pathString := range pathStrings {
 		childAccount, err := DeriveChildFromAccount(acc, pathString)
 		if err != nil {
-			return pathAccounts, fmt.Errorf("can not derive child account from path: %v", err)
+			return pathAccounts, ErrChildAccountDerivationFailed(err)
 		}
 
 		pathAccounts[pathString] = childAccount
