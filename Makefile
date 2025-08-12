@@ -447,3 +447,6 @@ codecov-validate:
 pytest-lint:
 	$(MAKE) -C tests-functional lint
 
+
+generate-json-schemas: build/bin/generate-json-schemas
+	./build/bin/generate-json-schemas -out-dir tests-functional/schemas
