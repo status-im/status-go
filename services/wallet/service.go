@@ -10,6 +10,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -17,7 +18,6 @@ import (
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
@@ -213,11 +213,11 @@ func NewService(
 
 	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, db, feed)
 
-	alchemyEthClientGetter := rpc.NewProviderChainClientGetter(api_common.SmartProxyAlchemy, rpcClient)
-	activityFetcher := activityfetcher_alchemy.NewClient(alchemyEthClientGetter)
-	activityFetcherDb := activityfetcher.NewPersistence(db)
-	activityFetcherManager := activityfetcher.NewManager(activityFetcher, activityFetcherDb)
-	activityFetcherService := activityfetcher.NewService(activityFetcherManager, rpcClient.NetworkManager, networksFeed, accountsDB, accountFeed, activityFetcherDb, rpcClient)
+	alchemyEthClientGetter := rpc.NewProviderChainClientGetter(common.SmartProxyAlchemy, rpcClient)
+	alchemyFetcherDb := activityfetcher_alchemy.NewPersistence(db)
+	alchemyFetcherClient := activityfetcher_alchemy.NewClient(alchemyEthClientGetter, alchemyFetcherDb)
+	activityFetcherManager := activityfetcher.NewManager(alchemyFetcherClient)
+	activityFetcherService := activityfetcher.NewService(activityFetcherManager, rpcClient.GetNetworkManager(), accountsDB, accountsPublisher, rpcClient)
 
 	return &Service{
 		db:                     db,

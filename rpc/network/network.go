@@ -43,6 +43,7 @@ type GetterInterface interface {
 	GetCombinedNetworks() ([]*CombinedNetwork, error)
 	GetEmbeddedNetworks() []params.Network // Networks that are embedded in the app binary code
 	GetTestNetworksEnabled() (bool, error)
+	GetPublisher() *pubsub.Publisher
 }
 
 type CombinedNetwork struct {

@@ -101,6 +101,7 @@ require (
 	github.com/status-im/go-wallet-sdk v0.0.0-20250912130226-d334ec9bff18
 	github.com/waku-org/go-waku v0.8.1-0.20250825172353-0c3d6dc0a8cc
 	github.com/waku-org/waku-go-bindings v0.0.0-20250714110306-6feba5b0df4d
+	github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	go.lsp.dev/jsonrpc2 v0.10.0
 	go.lsp.dev/protocol v0.12.0
@@ -285,7 +286,6 @@ require (
 	github.com/waku-org/go-discover v0.0.0-20240506173252-4912704efdc5 // indirect
 	github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0 // indirect
 	github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 // indirect
-	github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b // indirect
 	github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065 // indirect
 	github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 // indirect
 	github.com/wk8/go-ordered-map v1.0.0 // indirect

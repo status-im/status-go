@@ -52,6 +52,32 @@ const (
 	UnknownAT
 )
 
+func (t Type) String() string {
+
+	switch t {
+	case SendAT:
+		return "Send"
+	case ReceiveAT:
+		return "Receive"
+	case BuyAT:
+		return "Buy"
+	case SwapAT:
+		return "Swap"
+	case BridgeAT:
+		return "Bridge"
+	case ContractDeploymentAT:
+		return "ContractDeployment"
+	case MintAT:
+		return "Mint"
+	case ApproveAT:
+		return "Approve"
+	case ContractInteractionAT:
+		return "ContractInteraction"
+	default:
+		return "Unknown"
+	}
+}
+
 // Status of an individual transaction
 type TxStatus = string
 

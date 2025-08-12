@@ -9,17 +9,14 @@ import (
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/rpc/network/networksevent"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 const (
@@ -36,25 +33,23 @@ type Service struct {
 	networksGetter         network.GetterInterface
 	accountsGetter         accounts.AccountsStorage
 	rpcClient              rpc.ClientInterface
-	persistence            PersistenceInterface
 
-	networkEventWatcher *networksevent.Watcher
-	accountEventWatcher *accountsevent.Watcher
-	checkRefetchCh      chan struct{}
+	networksPublisher *pubsub.Publisher
+	accountsPublisher *pubsub.Publisher
+	checkRefetchCh    chan struct{}
 
 	cancelFnMap      map[fetcherID]context.CancelFunc
 	cancelFnMapMutex sync.RWMutex
 
 	logger *zap.Logger
+	stopCh chan struct{}
 }
 
 func NewService(
 	activityFetcherManager ManagerIface,
 	networksGetter network.GetterInterface,
-	networksFeed *event.Feed,
 	accountsGetter accounts.AccountsStorage,
-	accountsFeed *event.Feed,
-	persistence PersistenceInterface,
+	accountsPublisher *pubsub.Publisher,
 	rpcClient rpc.ClientInterface,
 ) *Service {
 	logger := logutils.ZapLogger().Named("ActivityFetcher")
@@ -64,33 +59,85 @@ func NewService(
 		networksGetter:         networksGetter,
 		accountsGetter:         accountsGetter,
 		rpcClient:              rpcClient,
-		persistence:            persistence,
+		networksPublisher:      networksGetter.GetPublisher(),
+		accountsPublisher:      accountsPublisher,
 		checkRefetchCh:         make(chan struct{}),
 		cancelFnMap:            make(map[fetcherID]context.CancelFunc),
 		logger:                 logger,
 	}
 
-	networkEventCallbacks := networksevent.EventCallbacks{
-		ActiveNetworksChangeCb: func() {
-			service.triggerRefetch()
-		},
-	}
-
-	accountsChangeCb := func(changedAddresses []gethcommon.Address, eventType accountsevent.EventType, currentAddresses []gethcommon.Address) {
-		service.triggerRefetch()
-	}
-
-	service.networkEventWatcher = networksevent.NewWatcher(networksFeed, networkEventCallbacks)
-	service.accountEventWatcher = accountsevent.NewWatcher(accountsGetter, accountsFeed, accountsChangeCb)
-
 	return service
+}
+
+func (s *Service) startNetworkWatcher() {
+	if s.networksPublisher == nil {
+		return
+	}
+
+	chNetworkChange, unsubFnNetworkChange := pubsub.Subscribe[network.EventActiveNetworksChanged](s.networksPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubFnNetworkChange()
+		for {
+			select {
+			case <-s.stopCh:
+				return
+			case _, ok := <-chNetworkChange:
+				if !ok {
+					return
+				}
+				s.triggerRefetch()
+			}
+		}
+	}()
+}
+
+func (s *Service) startAccountWatcher() {
+	if s.accountsPublisher == nil {
+		return
+	}
+
+	chAdded, unsubFnAdded := pubsub.Subscribe[accountsevent.AccountsAddedEvent](s.accountsPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubFnAdded()
+		for {
+			select {
+			case <-s.stopCh:
+				return
+			case _, ok := <-chAdded:
+				if !ok {
+					return
+				}
+				s.triggerRefetch()
+			}
+		}
+	}()
+
+	chRemoved, unsubFnRemoved := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](s.accountsPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubFnRemoved()
+		for {
+			select {
+			case <-s.stopCh:
+				return
+			case _, ok := <-chRemoved:
+				if !ok {
+					return
+				}
+				s.triggerRefetch()
+			}
+		}
+	}()
 }
 
 func (s *Service) Start(ctx context.Context) {
 	s.logger.Info("Starting activity fetcher")
+	s.stopCh = make(chan struct{})
 
-	s.networkEventWatcher.Start()
-	s.accountEventWatcher.Start()
+	s.startNetworkWatcher()
+	s.startAccountWatcher()
 
 	go func() {
 		defer gocommon.LogOnPanic()
@@ -122,9 +169,12 @@ func (s *Service) triggerRefetch() {
 func (s *Service) stop() {
 	s.logger.Info("Stopping activity fetcher")
 
+	if s.stopCh != nil {
+		close(s.stopCh)
+		s.stopCh = nil
+	}
+
 	s.removeAllCancelFns()
-	s.networkEventWatcher.Stop()
-	s.accountEventWatcher.Stop()
 }
 
 func listDiff[T comparable](a, b []T) (onlyA, onlyB, both []T) {
@@ -256,7 +306,8 @@ func (s *Service) fetchActivityForAllAccountsAndChains(ctx context.Context, chec
 		}
 
 		if checkLastTimestamp {
-			_, lastFetchedTimestamp, err := s.persistence.GetLastFetchedBlockAndTimestamp(ctx, fetcherID.chainID, fetcherID.account)
+
+			_, lastFetchedTimestamp, err := s.activityFetcherManager.GetLastFetchedBlockAndTimestamp(ctx, fetcherID.chainID, fetcherID.account)
 			if err != nil {
 				s.logger.Error("Failed to get last fetched block and timestamp", zap.Error(err))
 				continue
@@ -330,17 +381,6 @@ func (s *Service) startFetchActivity(ctx context.Context, fetcherID fetcherID) {
 }
 
 func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account gethcommon.Address) {
-	parameters := thirdparty.ActivityFetchParameters{
-		Address:   account,
-		Order:     thirdparty.NewToOld,
-		Direction: thirdparty.Both,
-	}
-	// Get last fetched block
-	lastFetchedBlock, _, err := s.persistence.GetLastFetchedBlockAndTimestamp(ctx, chainID, account)
-	if err != nil {
-		s.logger.Error("Failed to get last fetched block", zap.Error(err))
-		return
-	}
 
 	// Get current block
 	rpcClient, err := s.rpcClient.EthClient(chainID)
@@ -353,39 +393,10 @@ func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account get
 		s.logger.Error("Failed to get current block", zap.Error(err))
 		return
 	}
-	toBlock := gethrpc.BlockNumber(currentBlock)
-	parameters.ToBlock = &toBlock
 
-	if lastFetchedBlock == nil {
-		fromBlock := gethrpc.EarliestBlockNumber
-		parameters.FromBlock = &fromBlock
-	} else if uint64(lastFetchedBlock.Int64()) >= currentBlock {
-		// Nothing to fetch
-		return
-	} else {
-		fromBlock := gethrpc.BlockNumber(*lastFetchedBlock + 1)
-		parameters.FromBlock = &fromBlock
-	}
-
-	startTime := time.Now()
-	s.logger.Debug("Fetching activity",
-		zap.String("account", account.Hex()),
-		zap.Uint64("chainID", chainID),
-		zap.Int64("fromBlock", int64(*parameters.FromBlock)),
-		zap.Int64("toBlock", int64(*parameters.ToBlock)),
-	)
-
-	_, err = s.activityFetcherManager.FetchActivity(ctx, chainID, parameters, "")
+	_, err = s.activityFetcherManager.FetchActivity(ctx, chainID, account, currentBlock)
 	if err != nil {
 		s.logger.Error("Failed to fetch activity", zap.Error(err))
 		return
 	}
-
-	duration := time.Since(startTime)
-	s.logger.Debug("Fetch activity completed",
-		zap.String("account", account.Hex()),
-		zap.Uint64("chainID", chainID),
-		zap.Int64("fromBlock", int64(*parameters.FromBlock)),
-		zap.Int64("toBlock", int64(*parameters.ToBlock)),
-		zap.Duration("duration", duration))
 }
