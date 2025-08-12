@@ -2,9 +2,7 @@ package utils
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -33,12 +31,6 @@ var (
 )
 
 var (
-	// ErrNoRemoteURL is returned when network id has no associated url.
-	ErrNoRemoteURL = errors.New("network id requires a remote URL")
-
-	// ErrTimeout is returned when test times out
-	ErrTimeout = errors.New("timeout")
-
 	// TestConfig defines the default config usable at package-level.
 	TestConfig *testConfig
 
@@ -96,73 +88,6 @@ func Init() {
 	}
 }
 
-// LoadFromFile is useful for loading test data, from testdata/filename into a variable
-// nolint: errcheck
-func LoadFromFile(filename string) string {
-	f, err := os.Open(filename)
-	if err != nil {
-		return ""
-	}
-
-	buf := bytes.NewBuffer(nil)
-	io.Copy(buf, f) // nolint: gas
-	f.Close()       // nolint: gas
-
-	return buf.String()
-}
-
-// EnsureSync waits until blockchain synchronization is complete and returns.
-type EnsureSync func(context.Context) error
-
-// EnsureNodeSync waits until node synchronzation is done to continue
-// with tests afterwards. Panics in case of an error or a timeout.
-func EnsureNodeSync(ensureSync EnsureSync) {
-	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
-	defer cancel()
-
-	if err := ensureSync(ctx); err != nil {
-		panic(err)
-	}
-}
-
-// GetRemoteURLFromNetworkID returns associated network url for giving network id.
-func GetRemoteURLFromNetworkID(id int) (url string, err error) {
-	switch id {
-	case params.MainNetworkID:
-		url = params.MainnetEthereumNetworkURL
-	case params.SepoliaNetworkID:
-		url = params.SepoliaEthereumNetworkURL
-	default:
-		err = ErrNoRemoteURL
-	}
-
-	return
-}
-
-// GetHeadHashFromNetworkID returns the hash associated with a given network id.
-func GetHeadHashFromNetworkID(id int) string {
-	switch id {
-	case params.MainNetworkID:
-		return "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
-	case params.StatusChainNetworkID:
-		return "0xe9d8920a99dc66a9557a87d51f9d14a34ec50aae04298e0f142187427d3c832e"
-	case params.SepoliaNetworkID:
-		return "0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9"
-	}
-	// Every other ID must break the test.
-	panic(fmt.Sprintf("invalid network id: %d", id))
-}
-
-// GetRemoteURL returns the url associated with a given network id.
-func GetRemoteURL() (string, error) {
-	return GetRemoteURLFromNetworkID(GetNetworkID())
-}
-
-// GetHeadHash returns the hash associated with a given network id.
-func GetHeadHash() string {
-	return GetHeadHashFromNetworkID(GetNetworkID())
-}
-
 // GetNetworkID returns appropriate network id for test based on
 // default or provided -network flag.
 func GetNetworkID() int {
@@ -176,17 +101,6 @@ func GetNetworkID() int {
 	}
 	// Every other selected network must break the test.
 	panic(fmt.Sprintf("invalid selected network: %q", *networkSelected))
-}
-
-// CheckTestSkipForNetworks checks if network for test is one of the
-// prohibited ones and skips the test in this case.
-func CheckTestSkipForNetworks(t *testing.T, networks ...int) {
-	id := GetNetworkID()
-	for _, network := range networks {
-		if network == id {
-			t.Skipf("skipping test for network %d", network)
-		}
-	}
 }
 
 // GetAccount1PKFile returns the filename for Account1 keystore based
@@ -207,18 +121,6 @@ func GetAccount2PKFile() string {
 		return "test-account2-status-chain.pk"
 	}
 	return "test-account2.pk"
-}
-
-// WaitClosed used to wait on a channel in tests
-func WaitClosed(c <-chan struct{}, d time.Duration) error {
-	timer := time.NewTimer(d)
-	defer timer.Stop()
-	select {
-	case <-c:
-		return nil
-	case <-timer.C:
-		return ErrTimeout
-	}
 }
 
 // MakeTestNodeConfig defines a function to return a params.NodeConfig

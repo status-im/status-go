@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,13 +12,9 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/ethereum/go-ethereum/params"
-
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/static"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
 
@@ -76,9 +70,8 @@ type ClusterConfig struct {
 	// Enabled flag specifies that nodes in this configuration are taken into account.
 	Enabled bool
 
-	// Fleet is a name of a selected fleet. If it has a value, nodes are loaded
-	// from a file, namely `fleet-*.{{ .Fleet }}.json`. Nodes can be added to any list
-	// in `ClusterConfig`.
+	// Fleet is a name of a selected fleet.
+	// An according fleet configuration is loaded from hard-coded lists.
 	Fleet string
 
 	// WakuNodes is a list of waku2 multiaddresses
@@ -100,14 +93,6 @@ func (c *ClusterConfig) String() string {
 // Limits represent min and max amount of peers
 type Limits struct {
 	Min, Max int
-}
-
-// NewLimits creates new Limits config with given min and max values.
-func NewLimits(min, max int) Limits {
-	return Limits{
-		Min: min,
-		Max: max,
-	}
 }
 
 // ----------
@@ -410,65 +395,6 @@ func (c *ShhextConfig) Validate(validate *validator.Validate) error {
 	return nil
 }
 
-// Option is an additional setting when creating a NodeConfig
-// using NewNodeConfigWithDefaults.
-type Option func(*NodeConfig) error
-
-// WithFleet loads one of the preconfigured Status fleets.
-func WithFleet(fleet string) Option {
-	return func(c *NodeConfig) error {
-		if fleet == FleetUndefined {
-			return nil
-		}
-		c.ClusterConfig.Enabled = true
-		return loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet), c)
-	}
-}
-
-// WithLES enabled LES protocol.
-func WithLES() Option {
-	return func(c *NodeConfig) error {
-		return loadConfigFromAsset("../config/cli/les-enabled.json", c)
-	}
-}
-
-// WithMailserver enables MailServer.
-func WithMailserver() Option {
-	return func(c *NodeConfig) error {
-		return loadConfigFromAsset("../config/cli/mailserver-enabled.json", c)
-	}
-}
-
-// NewNodeConfigWithDefaults creates new node configuration object
-// with some defaults suitable for adhoc use.
-func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option) (*NodeConfig, error) {
-	c, err := NewNodeConfig(dataDir, networkID)
-	if err != nil {
-		return nil, err
-	}
-
-	c.HTTPHost = ""
-	c.LogEnabled = true
-	c.LogLevel = "INFO"
-	c.LogMaxSize = 100
-	c.LogCompressRotated = true
-	c.LogMaxBackups = 3
-	c.LogToStderr = true
-	c.WakuV2Config.Enabled = true
-
-	for _, opt := range opts {
-		if err := opt(c); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := c.Validate(); err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
-
 func (c *NodeConfig) setDefaultPushNotificationsServers() error {
 	if len(c.ShhextConfig.DefaultPushNotificationsServers) > 0 {
 		return nil
@@ -526,29 +452,6 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 	return c.setDefaultPushNotificationsServers()
 }
 
-// NewNodeConfigWithDefaultsAndFiles creates new node configuration object
-// with some defaults suitable for adhoc use and applies config files on top.
-func NewNodeConfigWithDefaultsAndFiles(
-	dataDir string, networkID uint64, opts []Option, files []string,
-) (*NodeConfig, error) {
-	c, err := NewNodeConfigWithDefaults(dataDir, networkID, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, file := range files {
-		if err := loadConfigConfigFromFile(file, c); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := c.Validate(); err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
-
 // NewNodeConfig creates new node configuration object with bare-minimum defaults.
 // Important: the returned config is not validated.
 func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
@@ -604,37 +507,10 @@ func NewConfigFromJSON(configJSON string) (*NodeConfig, error) {
 	return config, nil
 }
 
-// Deprecated: `fleet-*.json` files are deprecated. Use params.GetSupportedFleets instead.
-func LoadClusterConfigFromFleet(fleet string) (*ClusterConfig, error) {
-	nodeConfig := &NodeConfig{}
-	err := loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet), nodeConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return &nodeConfig.ClusterConfig, nil
-}
-
 func loadConfigFromJSON(configJSON string, nodeConfig *NodeConfig) error {
 	decoder := json.NewDecoder(strings.NewReader(configJSON))
 	// override default configuration with values by JSON input
 	return decoder.Decode(&nodeConfig)
-}
-
-func loadConfigConfigFromFile(path string, config *NodeConfig) error {
-	jsonConfig, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	return loadConfigFromJSON(string(jsonConfig), config)
-}
-
-func loadConfigFromAsset(name string, config *NodeConfig) error {
-	data, err := static.Asset(name)
-	if err != nil {
-		return err
-	}
-	return loadConfigFromJSON(string(data), config)
 }
 
 // Validate checks if NodeConfig fields have valid values.
@@ -717,26 +593,6 @@ func (c *TorrentConfig) Validate(validate *validator.Validate) error {
 	return nil
 }
 
-// Save dumps configuration to the disk
-func (c *NodeConfig) Save() error {
-	data, err := json.MarshalIndent(c, "", "    ")
-	if err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(c.DataDir, os.ModePerm); err != nil {
-		return err
-	}
-
-	configFilePath := filepath.Join(c.DataDir, "config.json")
-	//nolint:gosec
-	if err := ioutil.WriteFile(configFilePath, data, os.ModePerm); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // String dumps config object as nicely indented JSON
 func (c *NodeConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ")
@@ -750,22 +606,6 @@ func (c *NodeConfig) FormatAPIModules() []string {
 	}
 
 	return strings.Split(c.APIModules, ",")
-}
-
-// AddAPIModule adds a mobule to APIModules
-func (c *NodeConfig) AddAPIModule(m string) {
-	c.APIModules = fmt.Sprintf("%s,%s", c.APIModules, m)
-}
-
-// LesTopic returns discovery v5 topic derived from genesis of the provided network.
-// 1 - mainnet
-func LesTopic(netid int) string {
-	switch netid {
-	case 1:
-		return LESDiscoveryIdentifier + types.Bytes2Hex(params.MainnetGenesisHash.Bytes()[:8])
-	default:
-		return ""
-	}
 }
 
 func (c *NodeConfig) LogFilePath() string {

@@ -29,7 +29,6 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/callog"
@@ -1076,29 +1075,6 @@ func SetSignalEventCallback(cb unsafe.Pointer) {
 // setSignalEventCallback setup geth callback to notify about new signal
 func setSignalEventCallback(cb unsafe.Pointer) {
 	signal.SetSignalEventCallback(cb)
-}
-
-// ExportNodeLogs reads current node log and returns content to a caller.
-//
-//export ExportNodeLogs
-func ExportNodeLogs() string {
-	return callWithResponse(exportNodeLogs)
-}
-
-func exportNodeLogs() string {
-	node := statusBackend.StatusNode()
-	if node == nil {
-		return makeJSONResponse(errors.New("node is not running"))
-	}
-	config := node.Config()
-	if config == nil {
-		return makeJSONResponse(errors.New("config and log file are not available"))
-	}
-	data, err := json.Marshal(exportlogs.ExportFromBaseFile(config.LogFilePath()))
-	if err != nil {
-		return makeJSONResponse(fmt.Errorf("error marshalling to json: %v", err))
-	}
-	return string(data)
 }
 
 func SignHash(hexEncodedHash string) string {

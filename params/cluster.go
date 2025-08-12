@@ -12,7 +12,6 @@ import (
 // Define available fleets.
 const (
 	FleetUndefined     = ""
-	FleetProd          = "eth.prod"
 	FleetStatusStaging = "status.staging"
 	FleetStatusProd    = "status.prod"
 	FleetWakuSandbox   = "waku.sandbox"
