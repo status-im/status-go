@@ -1,0 +1,11 @@
+ALTER TABLE node_config DROP COLUMN keystore_dir;
+ALTER TABLE shhext_config DROP COLUMN enable_connection_manager;
+ALTER TABLE shhext_config DROP COLUMN enable_last_used_monitor;
+ALTER TABLE shhext_config DROP COLUMN connection_target;
+ALTER TABLE shhext_config DROP COLUMN request_delay;
+ALTER TABLE shhext_config DROP COLUMN max_server_failures;
+ALTER TABLE shhext_config DROP COLUMN max_message_delivery_attempts;
+ALTER TABLE shhext_config DROP COLUMN whisper_cache_dir;
+ALTER TABLE shhext_config DROP COLUMN disable_generic_discovery_topic;
+ALTER TABLE shhext_config DROP COLUMN send_v1_messages;
+ALTER TABLE shhext_config DROP COLUMN data_sync_enabled;

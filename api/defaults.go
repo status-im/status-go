@@ -31,10 +31,11 @@ const (
 	DefaultDataDir                = "/ethereum/mainnet_rpc"
 	DefaultAPILogFile             = "api.log"
 
-	DefaultLogLevel                   = "ERROR"
+	DefaultLogLevel                 = "ERROR"
+	DefaultVerifyTransactionChainID = 1
+	DefaultCurrentNetwork           = "mainnet_rpc"
+
 	DefaultMaxMessageDeliveryAttempts = 3
-	DefaultVerifyTransactionChainID   = 1
-	DefaultCurrentNetwork             = "mainnet_rpc"
 )
 
 var (
@@ -351,8 +352,8 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		InstallationID:             installationID,
-		MaxMessageDeliveryAttempts: DefaultMaxMessageDeliveryAttempts,
 		MailServerConfirmations:    true,
+		MaxMessageDeliveryAttempts: DefaultMaxMessageDeliveryAttempts,
 		VerifyTransactionChainID:   DefaultVerifyTransactionChainID,
 		DataSyncEnabled:            true,
 		PFSEnabled:                 true,

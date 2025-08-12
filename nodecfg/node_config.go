@@ -27,12 +27,12 @@ type insertFn func(tx *sql.Tx, c *params.NodeConfig) error
 func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig, includeConnector bool) error {
 	query := `
 	INSERT OR REPLACE INTO node_config (
-		network_id, data_dir, keystore_dir, node_key,
+		network_id, data_dir, node_key,
 		api_modules, enable_ntp_sync, wallet_enabled,
 		browser_enabled, permissions_enabled`
 
 	args := []any{
-		c.NetworkID, c.DataDir, "", c.NodeKey, c.APIModules, true,
+		c.NetworkID, c.DataDir, c.NodeKey, c.APIModules, true,
 		c.WalletConfig.Enabled, c.BrowsersConfig.Enabled,
 		c.PermissionsConfig.Enabled,
 	}
@@ -96,15 +96,13 @@ func insertClusterConfig(tx *sql.Tx, c *params.NodeConfig) error {
 func insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO shhext_config (
-		pfs_enabled, installation_id, mailserver_confirmations, enable_connection_manager,
-		enable_last_used_monitor, connection_target, request_delay, max_server_failures, max_message_delivery_attempts,
-		whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url,
+		pfs_enabled, installation_id, mailserver_confirmations,
+		verify_transaction_url, 
 		verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled,
 		anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
-		c.ShhextConfig.PFSEnabled, c.ShhextConfig.InstallationID, c.ShhextConfig.MailServerConfirmations, c.ShhextConfig.EnableConnectionManager,
-		c.ShhextConfig.EnableLastUsedMonitor, c.ShhextConfig.ConnectionTarget, c.ShhextConfig.RequestsDelay, c.ShhextConfig.MaxServerFailures, c.ShhextConfig.MaxMessageDeliveryAttempts,
-		c.ShhextConfig.WhisperCacheDir, c.ShhextConfig.DisableGenericDiscoveryTopic, c.ShhextConfig.SendV1Messages, c.ShhextConfig.DataSyncEnabled, c.ShhextConfig.VerifyTransactionURL,
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		c.ShhextConfig.PFSEnabled, c.ShhextConfig.InstallationID, c.ShhextConfig.MailServerConfirmations,
+		c.ShhextConfig.VerifyTransactionURL,
 		c.ShhextConfig.VerifyENSURL, c.ShhextConfig.VerifyENSContractAddress, c.ShhextConfig.VerifyTransactionChainID, c.ShhextConfig.AnonMetricsServerEnabled,
 		c.ShhextConfig.AnonMetricsSendID, c.ShhextConfig.AnonMetricsServerPostgresURI, c.ShhextConfig.BandwidthStatsEnabled)
 	if err != nil {
@@ -264,15 +262,14 @@ func migrateNodeConfig(tx *sql.Tx) error {
 func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	nodecfg := &params.NodeConfig{}
 
-	keystoreDir := "" // TODO: remove this from db
 	err := tx.QueryRow(`
 	SELECT
-		network_id, data_dir, keystore_dir, node_key, api_modules,
+		network_id, data_dir, node_key, api_modules,
 		wallet_enabled, browser_enabled, permissions_enabled,
 		connector_enabled FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.NetworkID, &nodecfg.DataDir, &keystoreDir, &nodecfg.NodeKey, &nodecfg.APIModules,
+		&nodecfg.NetworkID, &nodecfg.DataDir, &nodecfg.NodeKey, &nodecfg.APIModules,
 		&nodecfg.WalletConfig.Enabled, &nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled,
 		&nodecfg.ConnectorConfig.Enabled,
 	)
@@ -287,7 +284,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	}
 
 	rows, err := tx.Query(`SELECT
-                chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
+                wrong_field, chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
                 native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name
         FROM networks ORDER BY chain_id ASC`)
 	if err != nil && err != sql.ErrNoRows {
@@ -312,15 +309,13 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	}
 
 	err = tx.QueryRow(`
-	SELECT pfs_enabled, installation_id, mailserver_confirmations, enable_connection_manager,
-	enable_last_used_monitor, connection_target, request_delay, max_server_failures, max_message_delivery_attempts,
-	whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url,
+	SELECT pfs_enabled, installation_id, mailserver_confirmations,
+	verify_transaction_url,
 	verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled,
 	anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled FROM shhext_config WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.ShhextConfig.PFSEnabled, &nodecfg.ShhextConfig.InstallationID, &nodecfg.ShhextConfig.MailServerConfirmations, &nodecfg.ShhextConfig.EnableConnectionManager,
-		&nodecfg.ShhextConfig.EnableLastUsedMonitor, &nodecfg.ShhextConfig.ConnectionTarget, &nodecfg.ShhextConfig.RequestsDelay, &nodecfg.ShhextConfig.MaxServerFailures, &nodecfg.ShhextConfig.MaxMessageDeliveryAttempts,
-		&nodecfg.ShhextConfig.WhisperCacheDir, &nodecfg.ShhextConfig.DisableGenericDiscoveryTopic, &nodecfg.ShhextConfig.SendV1Messages, &nodecfg.ShhextConfig.DataSyncEnabled, &nodecfg.ShhextConfig.VerifyTransactionURL,
+		&nodecfg.ShhextConfig.PFSEnabled, &nodecfg.ShhextConfig.InstallationID, &nodecfg.ShhextConfig.MailServerConfirmations,
+		&nodecfg.ShhextConfig.VerifyTransactionURL,
 		&nodecfg.ShhextConfig.VerifyENSURL, &nodecfg.ShhextConfig.VerifyENSContractAddress, &nodecfg.ShhextConfig.VerifyTransactionChainID, &nodecfg.ShhextConfig.AnonMetricsServerEnabled,
 		&nodecfg.ShhextConfig.AnonMetricsSendID, &nodecfg.ShhextConfig.AnonMetricsServerPostgresURI, &nodecfg.ShhextConfig.BandwidthStatsEnabled,
 	)

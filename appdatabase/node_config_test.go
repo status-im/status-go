@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -48,27 +47,19 @@ func randomNodeConfig() *params.NodeConfig {
 			Fleet:   randomString(),
 		},
 		ShhextConfig: params.ShhextConfig{
-			PFSEnabled:                   randomBool(),
-			InstallationID:               randomString(),
-			MailServerConfirmations:      randomBool(),
-			EnableConnectionManager:      randomBool(),
-			EnableLastUsedMonitor:        randomBool(),
-			ConnectionTarget:             randomInt(math.MaxInt64),
-			RequestsDelay:                time.Duration(randomInt(math.MaxInt64)),
-			MaxServerFailures:            randomInt(math.MaxInt64),
-			MaxMessageDeliveryAttempts:   randomInt(math.MaxInt64),
-			WhisperCacheDir:              randomString(),
-			DisableGenericDiscoveryTopic: randomBool(),
-			SendV1Messages:               randomBool(),
-			DataSyncEnabled:              randomBool(),
-			VerifyTransactionURL:         randomString(),
-			VerifyENSURL:                 randomString(),
-			VerifyENSContractAddress:     randomString(),
-			VerifyTransactionChainID:     int64(randomInt(math.MaxInt64)),
+			PFSEnabled:                 randomBool(),
+			InstallationID:             randomString(),
+			MailServerConfirmations:    randomBool(),
+			MaxMessageDeliveryAttempts: randomInt(math.MaxInt64),
+			DataSyncEnabled:            randomBool(),
+			VerifyTransactionURL:       randomString(),
+			VerifyENSURL:               randomString(),
+			VerifyENSContractAddress:   randomString(),
+			VerifyTransactionChainID:   int64(randomInt(math.MaxInt64)),
 			AnonMetricsSendID:            randomString(),
 			AnonMetricsServerEnabled:     randomBool(),
 			AnonMetricsServerPostgresURI: randomString(),
-			BandwidthStatsEnabled:        randomBool(),
+			BandwidthStatsEnabled:      randomBool(),
 		},
 		WakuV2Config: params.WakuV2Config{
 			LightClient: randomBool(),
