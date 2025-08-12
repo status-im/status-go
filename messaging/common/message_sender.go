@@ -84,8 +84,9 @@ func NewMessageSender(
 		return nil, errors.Wrap(err, "SDS: failed to create reliability manager")
 	}
 	callbacks := sds.EventCallbacks{
-		OnMessageSent: func(messageId sds.MessageID, channelId string) {
-			logger.Debug("SDS: message sent", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
+		OnMessageSent: func(messageID sds.MessageID, channelId string) {
+			logger.Debug("SDS: message sent", zap.String("messageId", string(messageID)), zap.String("channelId", channelId))
+			transport.ConfirmMessageSent(string(messageID))
 		},
 		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.MessageID, channelId string) {
 			logger.Debug("SDS: missing dependencies",

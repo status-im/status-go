@@ -547,6 +547,25 @@ func (t *Transport) ConfirmMessageDelivered(messageID string) {
 	t.waku.ConfirmMessageDelivered(commHashes)
 }
 
+func (t *Transport) ConfirmMessageSent(messageID string) {
+	if t.envelopesMonitor == nil {
+		return
+	}
+	hashes, ok := t.envelopesMonitor.messageEnvelopeHashes[messageID]
+	if !ok {
+		return
+	}
+
+	for _, h := range hashes {
+		event := wakutypes.EnvelopeEvent{
+			Hash:  h,
+			Event: wakutypes.EventEnvelopeSent,
+		}
+
+		t.envelopesMonitor.handleEvent(event)
+	}
+}
+
 func (t *Transport) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters []*Filter) {
 	topicMap := make(map[string]map[wakutypes.TopicType]struct{})
 	for _, f := range filters {
