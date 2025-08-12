@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,6 +21,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	gomock "go.uber.org/mock/gomock"
+
+	customerrors "github.com/status-im/status-go/accounts-management/errors"
 )
 
 const testPassword = "test-password"
@@ -62,7 +65,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 			utils.TestConfig.Account1.Password,
 			false,
 			false,
-			ErrAccountKeyStoreMissing,
+			ErrKeystoreMissing,
 		},
 		{
 			"correct address, correct password, empty key store (pk is not there)",
@@ -115,8 +118,20 @@ func TestVerifyAccountPassword(t *testing.T) {
 		}
 
 		ok, err := accManager.VerifyAccountPassword(ethtypes.HexToAddress(testCase.address), testCase.password)
-		if testCase.expectedError != nil && err != nil && testCase.expectedError.Error() != err.Error() ||
-			((testCase.expectedError == nil || err == nil) && testCase.expectedError != err) {
+		if testCase.expectedError != nil && err != nil {
+			if !errors.Is(err, testCase.expectedError) {
+				var accountsErr *customerrors.AccountsError
+				if errors.As(err, &accountsErr) {
+					if testCase.expectedError.Error() == "no key for given address or file" {
+						require.Contains(t, accountsErr.Error(), "keystore file is missing")
+					} else {
+						require.Equal(t, testCase.expectedError.Error(), accountsErr.Error())
+					}
+				} else {
+					require.Equal(t, testCase.expectedError.Error(), err.Error())
+				}
+			}
+		} else if (testCase.expectedError == nil || err == nil) && testCase.expectedError != err {
 			require.FailNow(t, fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))
 		}
 		if err == nil {
@@ -322,7 +337,22 @@ func (s *ManagerTestSuite) testSetChatAccount(chat ethtypes.Address, password st
 	).Times(1)
 
 	err := s.accManager.SetChatAccount(chat, password, nil)
-	s.Require().Equal(expErr, err)
+	if expErr != nil {
+		if !errors.Is(err, expErr) {
+			var accountsErr *customerrors.AccountsError
+			if errors.As(err, &accountsErr) {
+				if expErr.Error() == "no key for given address or file" {
+					s.Require().Contains(accountsErr.Error(), "keystore file is missing")
+				} else {
+					s.Require().Equal(expErr.Error(), accountsErr.Error())
+				}
+			} else {
+				s.Require().Equal(expErr, err)
+			}
+		}
+	} else {
+		s.Require().NoError(err)
+	}
 
 	selectedChatAccount, err := s.accManager.SelectedChatAccount()
 
@@ -381,7 +411,14 @@ func (s *ManagerTestSuite) TestAccounts() {
 	// Select the test account, when the profile keypair is not stored
 	err := s.accManager.SetChatAccount(s.chatAddress, s.password, nil)
 	s.Require().Error(err)
-	s.Equal(keystore.ErrNoMatch, err)
+	if !errors.Is(err, keystore.ErrNoMatch) {
+		var accountsErr *customerrors.AccountsError
+		if errors.As(err, &accountsErr) {
+			s.Contains(accountsErr.Error(), "keystore file is missing")
+		} else {
+			s.Equal(keystore.ErrNoMatch, err)
+		}
+	}
 
 	s.createAndStoreProfileKeypair()
 
@@ -410,7 +447,7 @@ func (s *ManagerTestSuite) TestAddressToAccountSuccess() {
 }
 
 func (s *ManagerTestSuite) TestAddressToAccountWrongAddress() {
-	s.testAddressToAccount(ethtypes.HexToAddress("0x0001"), s.password, keystore.ErrNoMatch)
+	s.testAddressToAccount(ethtypes.HexToAddress("0x0001"), s.password, ErrKeystoreFileMissing)
 }
 
 func (s *ManagerTestSuite) TestAddressToAccountWrongPassword() {
@@ -422,7 +459,14 @@ func (s *ManagerTestSuite) testAddressToAccount(wallet ethtypes.Address, passwor
 
 	key, err := s.accManager.LoadAccount(wallet, password)
 	if expErr != nil {
-		s.Equal(expErr, err)
+		if !errors.Is(err, expErr) {
+			var accountsErr *customerrors.AccountsError
+			if errors.As(err, &accountsErr) {
+				s.Equal(expErr.Error(), accountsErr.Error())
+			} else {
+				s.Equal(expErr, err)
+			}
+		}
 	} else {
 		s.Require().NoError(err)
 		s.Require().NotNil(key)

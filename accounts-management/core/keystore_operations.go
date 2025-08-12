@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -99,7 +98,7 @@ func (m *AccountsManager) storeKeystoreFilesForAccounts(account *generator.Accou
 
 func (m *AccountsManager) storeToKeystore(acc *generator.Account, password string) (err error) {
 	if m.keystore == nil {
-		return ErrAccountKeyStoreMissing
+		return ErrKeystoreMissing
 	}
 
 	if acc == nil {
@@ -125,7 +124,7 @@ func (m *AccountsManager) createKeystore(keyUID string) (keystore.KeyStore, erro
 
 	if _, err := os.Stat(absoluteKeystorePath); os.IsNotExist(err) {
 		if err := os.MkdirAll(filepath.Clean(absoluteKeystorePath), os.ModePerm); err != nil {
-			return nil, fmt.Errorf("make keystore directory: %w", err)
+			return nil, ErrKeystoreDirectoryError(err)
 		}
 	}
 
@@ -136,7 +135,7 @@ func (m *AccountsManager) createKeystore(keyUID string) (keystore.KeyStore, erro
 func (m *AccountsManager) deleteAccountFromKeystore(address ethtypes.Address) error {
 	if m.keystore == nil {
 		m.logger.Error("cannot delete account, keystore is missing", zap.String("address", address.Hex()))
-		return ErrAccountKeyStoreMissing
+		return ErrKeystoreMissing
 	}
 	m.logger.Info("deleting account", zap.String("address", address.Hex()))
 	return m.keystore.Delete(address)
@@ -157,7 +156,7 @@ func (m *AccountsManager) DeleteKeystoreFileForAccount(address ethtypes.Address)
 
 func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address ethtypes.Address) error {
 	if m.persistence == nil {
-		return ErrPersistenceIsMissing
+		return ErrPersistenceMissing
 	}
 
 	acc, err := m.persistence.GetAccountByAddress(address)
@@ -216,7 +215,7 @@ func (m *AccountsManager) deleteKeystoreFilesForKeypairInternally(keypair *types
 	}
 
 	if m.persistence == nil {
-		return ErrPersistenceIsMissing
+		return ErrPersistenceMissing
 	}
 
 	anyAccountFullyOrPartiallyOperable := false
@@ -252,7 +251,7 @@ func (m *AccountsManager) MigrateKeyStoreDir(newDir string) error {
 	defer m.mu.Unlock()
 
 	if m.keystore == nil {
-		return ErrAccountKeyStoreMissing
+		return ErrKeystoreMissing
 	}
 	m.logger.Info("migrating keystore directory", zap.String("new location", newDir))
 	return m.keystore.MigrateKeyStoreDir(newDir)
@@ -264,7 +263,7 @@ func (m *AccountsManager) ReEncryptKeyStoreDir(oldPass, newPass string) error {
 	defer m.mu.RUnlock()
 
 	if m.keystore == nil {
-		return ErrAccountKeyStoreMissing
+		return ErrKeystoreMissing
 	}
 	m.logger.Info("re-encrypting keystore directory")
 	return m.keystore.ReEncryptKeyStoreDir(oldPass, newPass)
@@ -272,7 +271,7 @@ func (m *AccountsManager) ReEncryptKeyStoreDir(oldPass, newPass string) error {
 
 func (m *AccountsManager) generatePartialAccountKey(address ethtypes.Address, password string) (*generator.Account, error) {
 	if m.persistence == nil {
-		return nil, ErrPersistenceIsMissing
+		return nil, ErrPersistenceMissing
 	}
 
 	rootAddress, err := m.persistence.GetWalletRootAddress()

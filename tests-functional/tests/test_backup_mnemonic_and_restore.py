@@ -171,4 +171,9 @@ class TestBackupMnemonicAndRestore:
         restored_account.wait_for_login()
         restored_account.restore_account_and_login(user=user)
         signal = restored_account.wait_for_signal(SignalType.NODE_LOGIN.value)
-        assert "keypair for the provided mnemonic was already added" in signal.get("event").get("error")
+
+        assert user.profile_data is not None, "User profile_data should not be None"
+        key_uid = user.profile_data.get("key-uid", "")
+        expected_error = f"[validation] keypair already added -  keyuid: {key_uid}"
+
+        assert expected_error in signal.get("event").get("error")

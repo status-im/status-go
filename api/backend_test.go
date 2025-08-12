@@ -21,6 +21,7 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	accsmanagementcommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
@@ -43,7 +44,6 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
@@ -588,7 +588,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, err)
 		address := gethcrypto.PubkeyToAddress(pkey.PublicKey)
 		key, err := testContext.backend.getVerifiedWalletAccount(address.String(), testPassword)
-		require.EqualError(t, err, wallettypes.ErrAccountDoesntExist.Error())
+		require.EqualError(t, err, accsmanagement.ErrAccountDoesNotExist.Error())
 		require.Nil(t, key)
 	})
 
@@ -653,7 +653,8 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		// try to load the account, it should fail because the account is not in the keystore, just in the db
 		loadedWalletAcc1, err := testContext.backend.AccountsManager().LoadAccount(derivedWalletAcc1.Address(), testPassword)
 		require.Error(t, err)
-		require.Equal(t, keystore.ErrNoMatch.Error(), err.Error())
+		// Check if the error contains the expected message (new structured error format includes context)
+		require.Contains(t, err.Error(), "keystore file is missing")
 		require.Nil(t, loadedWalletAcc1)
 
 		// try to get verified wallet account, it should generate a keystore for the wallet account from the wallet root address

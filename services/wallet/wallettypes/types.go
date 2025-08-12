@@ -29,8 +29,6 @@ var (
 	ErrUnexpectedArgs = errors.New("unexpected args")
 	//ErrInvalidTxSender is returned when selected account is different than From field.
 	ErrInvalidTxSender = errors.New("transaction can only be send by its creator")
-	//ErrAccountDoesntExist is sent when provided sub-account is not stored in database.
-	ErrAccountDoesntExist = errors.New("account doesn't exist")
 )
 
 // PendingNonceProvider provides information about nonces.

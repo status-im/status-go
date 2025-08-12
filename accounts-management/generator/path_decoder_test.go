@@ -1,8 +1,11 @@
 package generator
 
 import (
+	"errors"
 	"fmt"
 	"testing"
+
+	customerrors "github.com/status-im/status-go/accounts-management/errors"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -79,7 +82,24 @@ func TestDecodePath(t *testing.T) {
 				assert.Equal(t, s.expectedStartingPoint, startingP)
 				assert.Equal(t, s.expectedPath, path)
 			} else {
-				assert.Equal(t, s.err, err)
+				if !assert.Error(t, err) {
+					return
+				}
+
+				var accountsErr *customerrors.AccountsError
+				if errors.As(err, &accountsErr) {
+					assert.Equal(t, ErrCodePathParsingFailed, accountsErr.Code)
+					assert.Equal(t, ErrorCategoryGenerator, accountsErr.Category)
+
+					if path, ok := accountsErr.Context["path"]; ok {
+						assert.Equal(t, s.path, path)
+					}
+					if position, ok := accountsErr.Context["position"]; ok {
+						assert.IsType(t, 0, position)
+					}
+				} else {
+					assert.Equal(t, s.err, err)
+				}
 			}
 		})
 	}

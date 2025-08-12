@@ -11,10 +11,14 @@ accounts-management/
 ├── accounts.go           # Main package with public API and re-exports
 ├── core/                 # Main account manager implementation
 │   ├── manager.go        # AccountsManager and core business logic
-│   ├── errors.go         # Package-specific error definitions
 │   ├── keystore_operations.go  # Keystore-related operations
 │   ├── persistence_operations.go  # Database operations
 │   └── manager_test.go   # Test suite for core functionality
+├── errors/               # Structured error handling system
+│   ├── errors.go         # Error definitions, codes, and categories
+│   ├── errors_test.go    # Error system tests
+│   ├── errors_test_data.go # Test data for error tests
+│   └── README.md         # Error handling documentation
 ├── keystore/             # Cryptographic key storage operations
 │   ├── interface.go      # KeyStore interface definition
 │   └── geth/             # Geth-compatible keystore implementation
@@ -56,9 +60,18 @@ accounts-management/
 The main account management operations are in the `core` package:
 
 - **AccountsManager**: Main interface for account management operations including account creation, selection, and verification
-- **Error Handling**: Centralized error definitions for all account management operations
 - **Keystore Operations**: Methods for keystore management and account loading
 - **Persistence Operations**: Methods for database operations including keypair and account management
+
+### Errors Package
+
+A structured error handling system in the `errors` package:
+
+- **Structured Errors**: Rich error types with codes, categories, and context
+- **Error Codes**: Numeric error codes for programmatic error handling
+- **Error Categories**: Logical grouping for different error types
+- **Context Support**: Add key-value metadata to errors for debugging
+- **Helper Functions**: Pre-built error creation functions for common patterns
 
 ### Keystore Package
 
@@ -183,11 +196,51 @@ import (
     "github.com/status-im/status-go/accounts-management/core"
     "github.com/status-im/status-go/accounts-management/generator"
     "github.com/status-im/status-go/accounts-management/types"
+    "github.com/status-im/status-go/accounts-management/errors"
 )
 
 // Use specific types and functions
 account := generator.CreateAccountFromMnemonic(mnemonic, passphrase)
 keypair := &types.Keypair{...}
+
+// Use structured error handling
+if err != nil {
+    var accountsErr *errors.AccountsError
+    if errors.As(err, &accountsErr) {
+        switch accountsErr.Category {
+        case errors.ErrorCategoryAccount:
+            log.Printf("Account error: %s", accountsErr.Message)
+        case errors.ErrorCategoryValidation:
+            log.Printf("Validation error: %s", accountsErr.Message)
+        }
+    }
+}
+```
+
+### Error Handling
+
+The errors package provides a structured error handling system:
+
+```go
+import "github.com/status-im/status-go/accounts-management/errors"
+
+// Create structured errors
+err := errors.NewError(errors.ErrCodeLoggerMissing, "logger is missing", errors.getErrorCategory)
+
+// Add context to errors
+err = err.WithContext("function", "LoadAccount")
+
+// Wrap existing errors
+wrappedErr := errors.WrapError(errors.ErrCodeWrongPasswordProvided, "wrong password", originalErr, errors.getErrorCategory)
+
+// Use helper functions
+func ErrDerivingAddress(keyUID string, path string) *AccountsError {
+	return NewError(ErrCodeErrorDerivingAddress, "error deriving address from keypair", getErrorCategory).
+        WithContext("keyuid", keyUID).
+        WithContext("path", path)
+}
+
+err := errors.ErrDerivingAddress("0x123", "m/1'")
 ```
 
 ### Account Generation

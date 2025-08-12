@@ -5,17 +5,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/json"
-	"errors"
 
 	"github.com/status-im/extkeys"
 
 	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-)
-
-var (
-	ErrInvalidKeystoreExtendedKey = errors.New("PrivateKey and ExtendedKey are different")
 )
 
 type Account struct {
