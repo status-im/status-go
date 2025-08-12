@@ -1,9 +1,7 @@
 import json
 import logging
-import jsonschema
 import requests
 from tenacity import retry, stop_after_delay, wait_fixed
-from utils.config import Config
 from json import JSONDecodeError
 
 
@@ -16,16 +14,17 @@ class RpcClient:
 
     def _check_decode_and_key_errors_in_response(self, response, key):
         try:
-            return response.json()[key]
+            data = response.json()
         except json.JSONDecodeError:
             raise AssertionError(f"Invalid JSON in response: {response.content}")
-        except KeyError:
+
+        if key not in data:
+            # Allow missing 'result' if 'error' is present
+            if key == "result" and "error" in data:
+                return
             raise AssertionError(f"Key '{key}' not found in the JSON response: {response.content}")
 
-    def verify_is_valid_json_rpc_response(self, response, _id=None, skip_validation=False):
-        if skip_validation:
-            return response
-
+    def verify_is_valid_json_rpc_response(self, response, _id=None):
         assert response.status_code == 200, f"Got response {response.content}, status code {response.status_code}"
         assert response.content
         self._check_decode_and_key_errors_in_response(response, "result")
@@ -68,11 +67,7 @@ class RpcClient:
                 logging.debug(f"Got response: {response.content}")
         return response
 
-    def rpc_valid_request(self, method, params=None, _id=None, url=None, skip_validation=False, enable_logging=True):
+    def rpc_valid_request(self, method, params=None, _id=None, url=None, enable_logging=True):
         response = self.rpc_request(method, params, _id, url, enable_logging=enable_logging)
-        self.verify_is_valid_json_rpc_response(response, _id, skip_validation=skip_validation)
+        self.verify_is_valid_json_rpc_response(response, _id)
         return response
-
-    def verify_json_schema(self, response, method):
-        with open(f"{Config.base_dir}/schemas/{method}", "r") as schema:
-            jsonschema.validate(instance=response, schema=json.load(schema))

@@ -14,9 +14,9 @@ class AccountService(Service):
         response = self.rpc_request("getKeypairs")
         return response.json()
 
-    def add_account(self, password, account_data, skip_validation=False):
+    def add_account(self, password, account_data):
         params = [password, account_data]
-        response = self.rpc_request("addAccount", params, skip_validation=skip_validation)
+        response = self.rpc_request("addAccount", params)
         return response.json()
 
     def delete_account(self, account_address):

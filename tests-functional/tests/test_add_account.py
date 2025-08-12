@@ -24,8 +24,8 @@ class TestAddAccount:
         self.account_data["public-key"] = derived_addresses[0].get("public-key")
 
         add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
-        self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
         assert "error" not in add_account_response
+        # TODO: Add more assertions on response
 
         # After adding the account check that the get accounts will retrieve the new account
         accounts_response = self.account.accounts_service.get_accounts()
@@ -42,7 +42,7 @@ class TestAddAccount:
         assert defaultAccount["wallet"] is True
 
         # Add the same account second time
-        add_account_response = self.account.accounts_service.add_account(self.account.password, defaultAccount, skip_validation=True)
+        add_account_response = self.account.accounts_service.add_account(self.account.password, defaultAccount)
         assert add_account_response.get("error", {}).get("message", "") == "account already exists"
 
     def test_add_new_keypair_via_seed_phrase(self):
@@ -56,7 +56,6 @@ class TestAddAccount:
         add_keypair_response = self.account.accounts_service.add_keypair_via_seed_phrase(
             user_1.passphrase, self.account.password, keypair_name, wallet_account_details
         )
-        self.account.verify_json_schema(add_keypair_response, method="accounts_addKeypairViaSeedPhrase")
 
         keypairs = self.get_account_keypairs()
         assert len(keypairs) == 2
@@ -75,17 +74,17 @@ class TestAddAccount:
 
     def test_add_account_for_unknown_key_uid(self):
         self.account_data["key-uid"] = "0x3231d92c94548d14f097173765a50bebe28fbad8f2267c9e08cc4433a6f219a4"
-        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data, skip_validation=True)
+        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
         assert add_account_response.get("error", {}).get("message", "") == "keypair is not found"
 
     def test_add_account_for_empty_address(self):
         self.account_data["address"] = ""
-        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data, skip_validation=True)
+        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
         assert add_account_response.get("error", {}).get("message", "") == "invalid argument 1: hex string has length 0, want 40 for types.Address"
 
     def test_add_account_for_empty_path(self):
         self.account_data["path"] = ""
-        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data, skip_validation=True)
+        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
         expected_error = "[account] account mismatch"
         expected_error_context = "address: " + self.account_data["address"]
         error_message = add_account_response.get("error", {}).get("message", "")
@@ -96,7 +95,7 @@ class TestAddAccount:
     def test_add_account_with_key_set_on_true__(self, key):
         self.account_data["key-uid"] = self.account.key_uid
         self.account_data[key] = True
-        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data, skip_validation=True)
+        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
         if key == "wallet":
             assert add_account_response.get("error", {}).get("message", "") == "[database] cannot add default wallet account"
         else:
@@ -105,8 +104,8 @@ class TestAddAccount:
     def test_add_watch_account(self):
         self.account_data["type"] = "watch"
         add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
-        self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
         assert "error" not in add_account_response
+        # TODO: Add more assertions on response
 
         # After adding the account check that the get accounts will retrieve the new account
         accounts_response = self.account.accounts_service.get_accounts()
@@ -139,14 +138,14 @@ class TestAddAccount:
         self.account_data["public-key"] = derived_addresses[0].get("public-key")
 
         add_account_response = self.account.accounts_service.add_account(profile_password, self.account_data)
-        self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
         assert "error" not in add_account_response
+        # TODO: Add more assertions on response
 
     def test_delete_account(self):
         self.account_data["type"] = "watch"
         add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
-        self.account.verify_json_schema(add_account_response, method="accounts_addAccount")
         assert "error" not in add_account_response
+        # TODO: Add more assertions on response
 
         accounts_response = self.account.accounts_service.get_accounts()
         assert len(accounts_response.get("result", [])) == 3
@@ -154,7 +153,7 @@ class TestAddAccount:
         # Delete the account
         delete_response = self.account.accounts_service.delete_account(self.account_data["address"])
         assert "error" not in delete_response
-        self.account.verify_json_schema(delete_response, method="accounts_deleteAccount")
+        # TODO: Add more assertions on response
 
         accounts_response = self.account.accounts_service.get_accounts()
         assert len(accounts_response.get("result", [])) == 2

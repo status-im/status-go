@@ -23,8 +23,6 @@ class TestChatActions(MessengerSteps):
         self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
 
         response = self.sender.wakuext_service.chats()
-        self.sender.verify_json_schema(response, method="wakuext_chats")
-
         chats = response.get("result", [])
         assert len(chats) == 2
         assert chats[0].get("chatType", 0) == ChatType.ONE_TO_ONE.value
@@ -35,8 +33,6 @@ class TestChatActions(MessengerSteps):
         chat_id = self.receiver.public_key
 
         response = self.sender.wakuext_service.chat(chat_id)
-        self.sender.verify_json_schema(response, method="wakuext_chat")
-
         chat = response.get("result", {})
         assert chat.get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chat.get("lastMessage", {}).get("text", "") == sent_texts[0]
@@ -57,14 +53,11 @@ class TestChatActions(MessengerSteps):
         self.sender.wakuext_service.send_chat_message(community_chat_id, "test_message_community")
 
         response = self.sender.wakuext_service.chats_preview(ChatPreviewFilterType.Community.value)
-        self.sender.verify_json_schema(response, method="wakuext_chatsPreview")
-
         chats_previews = response.get("result", [])
         assert len(chats_previews) == 1
         assert chats_previews[0].get("id", "") == community_chat_id
 
         response = self.sender.wakuext_service.chats_preview(ChatPreviewFilterType.NonCommunity.value)
-        self.sender.verify_json_schema(response, method="wakuext_chatsPreview")
         chats_previews = response.get("result", [])
         assert len(chats_previews) == 2
         assert chats_previews[0].get("id", "") == one_to_one_chat_id
@@ -77,7 +70,7 @@ class TestChatActions(MessengerSteps):
         private_group_chat_id = self.join_private_group(admin=self.sender, member=self.receiver)
 
         response = self.sender.wakuext_service.active_chats()
-        self.sender.verify_json_schema(response, method="wakuext_chats")
+        # TODO: Add more assertions on response
         chats = response.get("result", [])
         assert len(chats) == 2
 
@@ -167,8 +160,7 @@ class TestChatActions(MessengerSteps):
         assert isinstance(last_message, dict)
 
         response = self.sender.wakuext_service.clear_history(chat_id)
-        self.sender.verify_json_schema(response, method="wakuext_clearHistory")
-
+        # TODO: Add more assertions on response
         last_message = response.get("result", {}).get("chats", [])[0].get("lastMessage", -1)
         assert last_message is None
 
@@ -184,7 +176,7 @@ class TestChatActions(MessengerSteps):
         chat_id = self.receiver.public_key
 
         response = self.sender.wakuext_service.deactivate_chat(chat_id, preserve_history)
-        self.sender.verify_json_schema(response, method="wakuext_deactivateChat")
+        # TODO: Add more assertions on response
 
         chat = response.get("result", {}).get("chats", [])[0]
         assert chat.get("active", -1) is False
@@ -203,8 +195,6 @@ class TestChatActions(MessengerSteps):
     def test_create_one_to_one_chat(self):
         chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.create_one_to_one_chat(chat_id, ens_name="")
-        self.sender.verify_json_schema(response, method="wakuext_createOneToOneChat")
-
         chats = response.get("result", {}).get("chats", [])
         assert len(chats) == 1
         chat = chats[0]

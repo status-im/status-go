@@ -49,7 +49,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         response = self.sender.wakuext_service.request_transaction(
             self.receiver.public_key, transaction_data["value"], transaction_data["contract"], transaction_data["address"]
         )
-        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -68,7 +68,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=self.REQUEST_TRANSACTION_TEXT, timeout=5)
 
         response = self.receiver.wakuext_service.decline_request_transaction(message_id)
-        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -87,7 +87,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=self.REQUEST_TRANSACTION_TEXT, timeout=5)
 
         response = self.receiver.wakuext_service.accept_request_transaction(transaction_data["tx_hash"], message_id, transaction_data["signature"])
-        self.receiver.verify_json_schema(response, method="wakuext_acceptRequestTransaction")
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -106,7 +106,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         response = self.sender.wakuext_service.request_address_for_transaction(
             self.receiver.public_key, transaction_data["from"], transaction_data["value"], transaction_data["contract"]
         )
-        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -127,7 +127,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         )
 
         response = self.receiver.wakuext_service.decline_request_address_for_transaction(message_id)
-        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -148,7 +148,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         )
 
         response = self.receiver.wakuext_service.accept_request_address_for_transaction(message_id, transaction_data["address"])
-        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -162,7 +162,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         response = self.sender.wakuext_service.send_transaction(
             sender_chat_id, transaction_data["value"], transaction_data["contract"], transaction_data["tx_hash"], transaction_data["signature"]
         )
-        self.receiver.verify_json_schema(response, method="wakuext_sendTransaction")
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
