@@ -631,7 +631,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	response := &MessengerResponse{}
 
-	response.Mailservers, err = m.AllMailservers()
+	response.StoreNodes, err = m.AllMailservers()
 	if err != nil {
 		return nil, err
 	}

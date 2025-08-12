@@ -6,7 +6,6 @@ import (
 	"golang.org/x/exp/maps"
 
 	ensservice "github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/waku/types"
 
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
@@ -46,7 +45,7 @@ type MessengerResponse struct {
 	Contacts                      []*Contact
 	Invitations                   []*GroupChatInvitation
 	CommunityChanges              []*communities.CommunityChanges
-	Mailservers                   []types.Mailserver
+	StoreNodes                    []messagingtypes.StoreNode
 	Bookmarks                     []*browsers.Bookmark
 	Settings                      []*settings.SyncSettingField
 	IdentityImages                []images.IdentityImage
@@ -105,7 +104,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Invitations             []*GroupChatInvitation              `json:"invitations,omitempty"`
 		CommunityChanges        []*communities.CommunityChanges     `json:"communityChanges,omitempty"`
 		RequestsToJoinCommunity []*communities.RequestToJoin        `json:"requestsToJoinCommunity,omitempty"`
-		Mailservers             []types.Mailserver                  `json:"mailservers,omitempty"`
+		StoreNodes              []messagingtypes.StoreNode          `json:"mailservers,omitempty"`
 		Bookmarks               []*browsers.Bookmark                `json:"bookmarks,omitempty"`
 		ClearedHistories        []*ClearedHistory                   `json:"clearedHistories,omitempty"`
 		VerificationRequests    []*verification.Request             `json:"verificationRequests,omitempty"`
@@ -142,7 +141,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Invitations:             r.Invitations,
 		CommunityChanges:        r.CommunityChanges,
 		RequestsToJoinCommunity: r.RequestsToJoinCommunity(),
-		Mailservers:             r.Mailservers,
+		StoreNodes:              r.StoreNodes,
 		Bookmarks:               r.Bookmarks,
 		CurrentStatus:           r.currentStatus,
 		Settings:                r.Settings,
@@ -311,7 +310,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.removedChats)+
 		len(r.removedMessages)+
 		len(r.deletedMessages)+
-		len(r.Mailservers)+
+		len(r.StoreNodes)+
 		len(r.IdentityImages)+
 		len(r.WatchOnlyAccounts)+
 		len(r.Keypairs)+
@@ -337,7 +336,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 // the existing Messages & Chats if they have the same ID
 func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	if len(response.Invitations)+
-		len(response.Mailservers)+
+		len(response.StoreNodes)+
 		len(response.clearedHistories)+
 		len(response.DiscordChannels)+
 		len(response.DiscordCategories) != 0 {
