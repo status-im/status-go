@@ -29,13 +29,9 @@ const (
 	DefaultKeystoreRelativePath   = "keystore"
 	DefaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
 	DefaultDataDir                = "/ethereum/mainnet_rpc"
-	DefaultNodeName               = "StatusIM"
 	DefaultAPILogFile             = "api.log"
 
 	DefaultLogLevel                   = "ERROR"
-	DefaultMaxPeers                   = 20
-	DefaultMaxPendingPeers            = 20
-	DefaultListenAddr                 = ":0"
 	DefaultMaxMessageDeliveryAttempts = 3
 	DefaultVerifyTransactionChainID   = 1
 	DefaultCurrentNetwork             = "mainnet_rpc"
@@ -45,8 +41,6 @@ var (
 	paths = []string{accscommon.PathWalletRoot, accscommon.PathEIP1581Root, accscommon.PathEIP1581Chat, accscommon.PathDefaultWalletAccount, accscommon.PathEIP1581Encryption}
 
 	DefaultFleet = params.FleetStatusProd
-
-	overrideApiConfig = overrideApiConfigProd
 )
 
 func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
@@ -136,7 +130,6 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	specifiedWakuV2Config := nodeConfig.WakuV2Config
 	nodeConfig.WakuV2Config = params.WakuV2Config{
 		Enabled:        true,
-		EnableDiscV5:   true,
 		DiscoveryLimit: 20,
 		Host:           "0.0.0.0",
 		AutoUpdate:     true,
@@ -260,7 +253,7 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	return walletConfig
 }
 
-func overrideApiConfigProd(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
+func overrideApiConfig(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
 	nodeConfig.APIModules = config.APIModules
 	nodeConfig.ConnectorConfig.Enabled = config.ConnectorEnabled
 
@@ -325,19 +318,10 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.NetworkID = nodeConfig.Networks[0].ChainID
 	}
 
-	nodeConfig.Name = DefaultNodeName
-	nodeConfig.NoDiscovery = true
-	nodeConfig.MaxPeers = DefaultMaxPeers
-	nodeConfig.MaxPendingPeers = DefaultMaxPendingPeers
-
 	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
 
-	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
-	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
-
-	nodeConfig.ListenAddr = DefaultListenAddr
 
 	fleet := request.WakuV2Fleet
 	if fleet == "" {

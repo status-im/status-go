@@ -286,11 +286,10 @@ func DefaultPushNotificationServers() []string {
 
 func DefaultClusterConfig(fleet string) ClusterConfig {
 	return ClusterConfig{
-		Enabled:                  true,
-		Fleet:                    fleet,
-		WakuNodes:                DefaultWakuNodes(fleet),
-		DiscV5BootstrapNodes:     DefaultDiscV5Nodes(fleet),
-		ClusterID:                DefaultClusterID(fleet),
-		PushNotificationsServers: DefaultPushNotificationServers(),
+		Enabled:              true,
+		Fleet:                fleet,
+		WakuNodes:            DefaultWakuNodes(fleet),
+		DiscV5BootstrapNodes: DefaultDiscV5Nodes(fleet),
+		ClusterID:            DefaultClusterID(fleet),
 	}
 }

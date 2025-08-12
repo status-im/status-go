@@ -166,13 +166,3 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 
 	return
 }
-
-// Only for tests
-func overrideApiConfigTest(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
-	overrideApiConfigProd(nodeConfig, config)
-	nodeConfig.HTTPVirtualHosts = config.HTTPVirtualHosts
-}
-
-func OverrideApiConfigTest() {
-	overrideApiConfig = overrideApiConfigTest
-}

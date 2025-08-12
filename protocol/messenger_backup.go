@@ -25,7 +25,7 @@ var backupTickerInterval = 120 * time.Second
 
 // backupIntervalSeconds is the amount of seconds we should allow between
 // backups
-var backupIntervalSeconds uint64 = 28800
+var backupIntervalSeconds uint64 = 57600
 
 type CommunitySet struct {
 	Joined  []*communities.Community
@@ -390,6 +390,7 @@ func (m *Messenger) backupChats(ctx context.Context, clock uint64) []*protobuf.B
 					From:       membershipUpdate.From,
 					RawPayload: membershipUpdate.RawPayload,
 					Color:      membershipUpdate.Color,
+					Image:      membershipUpdate.Image,
 				}
 			}
 		}

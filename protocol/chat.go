@@ -520,7 +520,7 @@ func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource comm
 	}
 }
 
-func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource) *Chat {
+func createCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource, populateMembers bool) *Chat {
 	color := orgChat.Identity.Color
 	if color == "" {
 		color = chatColors[rand.Intn(len(chatColors))] // nolint: gosec
@@ -530,12 +530,15 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 
 	// Populate community _channel_ members to _chat_ members
 	chatMembers := []ChatMember{}
-	for pubKey := range orgChat.Members {
-		chatMember := ChatMember{
-			ID:    pubKey,
-			Admin: false,
+	if populateMembers {
+		// Populate chat members from orgChat members
+		for pubKey := range orgChat.Members {
+			chatMember := ChatMember{
+				ID:    pubKey,
+				Admin: false,
+			}
+			chatMembers = append(chatMembers, chatMember)
 		}
-		chatMembers = append(chatMembers, chatMember)
 	}
 
 	return &Chat{
@@ -556,6 +559,14 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 		FirstMessageTimestamp:    orgChat.Identity.FirstMessageTimestamp,
 		ViewersCanPostReactions:  orgChat.ViewersCanPostReactions,
 	}
+}
+
+func CreateCommunityChat(org *communities.Community, orgChat *protobuf.CommunityChat, chatID string, timesource common.TimeSource) *Chat {
+	orgID := org.IDString()
+	populateMembers := org.ChannelHasPermissions(chatID)
+	chat := createCommunityChat(orgID, chatID, orgChat, timesource, populateMembers)
+
+	return chat
 }
 
 func (c *Chat) CommunityChannelID() string {
@@ -595,10 +606,9 @@ func (c *Chat) DeepLink() string {
 
 func CreateCommunityChats(org *communities.Community, timesource common.TimeSource) []*Chat {
 	var chats []*Chat
-	orgID := org.IDString()
-
 	for chatID, chat := range org.Chats() {
-		chats = append(chats, CreateCommunityChat(orgID, chatID, chat, timesource))
+		chat := CreateCommunityChat(org, chat, chatID, timesource)
+		chats = append(chats, chat)
 	}
 	return chats
 }

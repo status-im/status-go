@@ -3,8 +3,6 @@ package ext
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
-	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -43,110 +41,6 @@ import (
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
-const (
-	// defaultRequestTimeout is the default request timeout in seconds
-	defaultRequestTimeout = 10
-)
-
-var (
-	// ErrInvalidMailServerPeer is returned when it fails to parse enode from params.
-	ErrInvalidMailServerPeer = errors.New("invalid mailServerPeer value")
-	// ErrInvalidSymKeyID is returned when it fails to get a symmetric key.
-	ErrInvalidSymKeyID = errors.New("invalid symKeyID value")
-	// ErrInvalidPublicKey is returned when public key can't be extracted
-	// from MailServer's nodeID.
-	ErrInvalidPublicKey = errors.New("can't extract public key")
-	// ErrPFSNotEnabled is returned when an endpoint PFS only is called but
-	// PFS is disabled
-	ErrPFSNotEnabled = errors.New("pfs not enabled")
-)
-
-// -----
-// PAYLOADS
-// -----
-
-// MessagesRequest is a RequestMessages() request payload.
-type MessagesRequest struct {
-	// MailServerPeer is MailServer's enode address.
-	MailServerPeer string `json:"mailServerPeer"`
-
-	// From is a lower bound of time range (optional).
-	// Default is 24 hours back from now.
-	From uint32 `json:"from"`
-
-	// To is a upper bound of time range (optional).
-	// Default is now.
-	To uint32 `json:"to"`
-
-	// Limit determines the number of messages sent by the mail server
-	// for the current paginated request
-	Limit uint32 `json:"limit"`
-
-	// Cursor is used as starting point for paginated requests
-	Cursor string `json:"cursor"`
-
-	// StoreCursor is used as starting point for WAKUV2 paginatedRequests
-	StoreCursor *StoreRequestCursor `json:"storeCursor"`
-
-	// Topic is a regular Whisper topic.
-	// DEPRECATED
-	Topic wakutypes.TopicType `json:"topic"`
-
-	// Topics is a list of Whisper topics.
-	Topics []wakutypes.TopicType `json:"topics"`
-
-	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
-	// It's derived from MailServer password.
-	SymKeyID string `json:"symKeyID"`
-
-	// Timeout is the time to live of the request specified in seconds.
-	// Default is 10 seconds
-	Timeout time.Duration `json:"timeout"`
-
-	// Force ensures that requests will bypass enforced delay.
-	Force bool `json:"force"`
-}
-
-type StoreRequestCursor struct {
-	Digest       []byte  `json:"digest"`
-	ReceivedTime float64 `json:"receivedTime"`
-}
-
-func (r *MessagesRequest) SetDefaults(now time.Time) {
-	// set From and To defaults
-	if r.To == 0 {
-		r.To = uint32(now.UTC().Unix())
-	}
-
-	if r.From == 0 {
-		oneDay := uint32(86400) // -24 hours
-		if r.To < oneDay {
-			r.From = 0
-		} else {
-			r.From = r.To - oneDay
-		}
-	}
-
-	if r.Timeout == 0 {
-		r.Timeout = defaultRequestTimeout
-	}
-}
-
-// MessagesResponse is a response for requestMessages2 method.
-type MessagesResponse struct {
-	// Cursor from the response can be used to retrieve more messages
-	// for the previous request.
-	Cursor string `json:"cursor"`
-
-	// Error indicates that something wrong happened when sending messages
-	// to the requester.
-	Error error `json:"error"`
-}
-
-// -----
-// PUBLIC API
-// -----
-
 // PublicAPI extends whisper public API.
 type PublicAPI struct {
 	service *Service
@@ -159,54 +53,6 @@ func NewPublicAPI(s *Service) *PublicAPI {
 		service: s,
 		logger:  logutils.ZapLogger().Named("sshextService"),
 	}
-}
-
-// RetryConfig specifies configuration for retries with timeout and max amount of retries.
-type RetryConfig struct {
-	BaseTimeout time.Duration
-	// StepTimeout defines duration increase per each retry.
-	StepTimeout time.Duration
-	MaxRetries  int
-}
-
-func WaitForExpiredOrCompleted(requestID types.Hash, events chan wakutypes.EnvelopeEvent, timeout time.Duration) (*wakutypes.MailServerResponse, error) {
-	expired := fmt.Errorf("request %x expired", requestID)
-	after := time.NewTimer(timeout)
-	defer after.Stop()
-	for {
-		var ev wakutypes.EnvelopeEvent
-		select {
-		case ev = <-events:
-		case <-after.C:
-			return nil, expired
-		}
-		if ev.Hash != requestID {
-			continue
-		}
-		switch ev.Event {
-		case wakutypes.EventMailServerRequestCompleted:
-			data, ok := ev.Data.(*wakutypes.MailServerResponse)
-			if ok {
-				return data, nil
-			}
-			return nil, errors.New("invalid event data type")
-		case wakutypes.EventMailServerRequestExpired:
-			return nil, expired
-		}
-	}
-}
-
-type Author struct {
-	PublicKey types.HexBytes `json:"publicKey"`
-	Alias     string         `json:"alias"`
-	Identicon string         `json:"identicon"`
-}
-
-type Metadata struct {
-	DedupID      []byte         `json:"dedupId"`
-	EncryptionID types.HexBytes `json:"encryptionId"`
-	MessageID    types.HexBytes `json:"messageId"`
-	Author       Author         `json:"author"`
 }
 
 func (api *PublicAPI) LeaveGroupChat(ctx Context, chatID string, remove bool) (*protocol.MessengerResponse, error) {
@@ -439,16 +285,6 @@ func (api *PublicAPI) RemovePrivateKey(id types.HexBytes) (*protocol.MessengerRe
 // Sets the community shard for a community and updates all active filters for the community
 func (api *PublicAPI) SetCommunityShard(request *requests.SetCommunityShard) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SetCommunityShard(request)
-}
-
-// Sets the community storenodes for a community
-func (api *PublicAPI) SetCommunityStorenodes(request *requests.SetCommunityStorenodes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SetCommunityStorenodes(request)
-}
-
-// Gets the community storenodes for a community
-func (api *PublicAPI) GetCommunityStorenodes(id types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.GetCommunityStorenodes(id)
 }
 
 // ExportCommunity exports the private key of the community with given ID
@@ -1787,14 +1623,6 @@ func (api *PublicAPI) LogTest() {
 	}
 
 	_ = l1.Sync()
-}
-
-func (api *PublicAPI) SetCustomNodes(request *requests.SetCustomNodes) error {
-	return api.service.messenger.SetCustomNodes(request)
-}
-
-func (api *PublicAPI) SaveNewWakuNode(request *requests.SaveNewWakuNode) error {
-	return api.service.messenger.SaveNewWakuNode(request)
 }
 
 func (api *PublicAPI) SetCustomizationColor(ctx context.Context, request *requests.SetCustomizationColor) error {

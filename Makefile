@@ -268,7 +268,7 @@ docker-image: SHELL := /bin/sh
 docker-image: BUILD_TARGET ?= cmd
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
-	docker build --file _assets/build/Dockerfile . \
+	docker build . \
 		--build-arg 'build_tags=$(BUILD_TAGS)' \
 		--build-arg 'build_flags=$(BUILD_FLAGS)' \
 		--build-arg 'build_target=$(BUILD_TARGET)' \
@@ -394,7 +394,7 @@ lint: generate lint-panics
 	golangci-lint --build-tags '$(BUILD_TAGS)' run ./...
 
 clean: ##@other Cleanup
-	rm -fr build/bin/* mailserver-config.json
+	rm -fr build/bin/*
 
 git-clean:
 	git clean -xf
@@ -463,13 +463,6 @@ build-verif-proxy-wrapper:
 
 test-verif-proxy-wrapper:
 	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)
-
-run-anvil: SHELL := /bin/sh
-run-anvil:
-	@docker compose \
-		-f tests-functional/docker-compose.anvil.yml \
-		-f tests-functional/docker-compose.anvil.dev.yml \
-		up --remove-orphans
 
 codecov-validate: SHELL := /bin/sh
 codecov-validate:

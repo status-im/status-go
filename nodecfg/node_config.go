@@ -6,20 +6,11 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
 )
-
-const StaticNodes = "static"
-const BootNodes = "boot"
-const TrustedMailServers = "trusted_mailserver"
-const PushNotificationsServers = "pushnotification"
-const RendezvousNodes = "rendezvous"
-const DiscV5BootstrapNodes = "discV5boot"
-const WakuNodes = "waku"
 
 func nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {
 	row := tx.QueryRow("SELECT exists(SELECT 1 FROM node_config)")
@@ -36,21 +27,14 @@ type insertFn func(tx *sql.Tx, c *params.NodeConfig) error
 func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig, includeConnector bool) error {
 	query := `
 	INSERT OR REPLACE INTO node_config (
-		network_id, data_dir, keystore_dir, node_key, no_discovery,
-		listen_addr, advertise_addr, name, version, api_modules, tls_enabled,
-		max_peers, max_pending_peers, enable_status_service, enable_ntp_sync,
-		bridge_enabled, wallet_enabled, local_notifications_enabled,
-		 browser_enabled, permissions_enabled, mailservers_enabled,
-		 swarm_enabled, mailserver_registry_address`
+		network_id, data_dir, keystore_dir, node_key,
+		api_modules, enable_ntp_sync, wallet_enabled,
+		browser_enabled, permissions_enabled`
 
 	args := []any{
-		c.NetworkID, c.DataDir, "", c.NodeKey, c.NoDiscovery,
-		c.ListenAddr, c.AdvertiseAddr, c.Name, c.Version, c.APIModules,
-		c.TLSEnabled, c.MaxPeers, c.MaxPendingPeers,
-		c.EnableStatusService, true,
-		c.BridgeConfig.Enabled, c.WalletConfig.Enabled, c.LocalNotificationsConfig.Enabled,
-		c.BrowsersConfig.Enabled, c.PermissionsConfig.Enabled, c.MailserversConfig.Enabled,
-		c.SwarmConfig.Enabled, c.MailServerRegistryAddress,
+		c.NetworkID, c.DataDir, "", c.NodeKey, c.APIModules, true,
+		c.WalletConfig.Enabled, c.BrowsersConfig.Enabled,
+		c.PermissionsConfig.Enabled,
 	}
 
 	if includeConnector {
@@ -71,34 +55,6 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 
 func insertNodeConfigWithConnector(tx *sql.Tx, c *params.NodeConfig) error {
 	return insertNodeConfigBase(tx, c, true)
-}
-
-func insertHTTPConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	if _, err := tx.Exec(`INSERT OR REPLACE INTO http_config (enabled, host, port, synthetic_id) VALUES (?, ?, ?, 'id')`, c.HTTPEnabled, c.HTTPHost, c.HTTPPort); err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(`DELETE FROM http_virtual_hosts WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for _, httpVirtualHost := range c.HTTPVirtualHosts {
-		if _, err := tx.Exec(`INSERT OR REPLACE INTO http_virtual_hosts (host, synthetic_id) VALUES (?, 'id')`, httpVirtualHost); err != nil {
-			return err
-		}
-	}
-
-	if _, err := tx.Exec(`DELETE FROM http_cors WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for _, httpCors := range c.HTTPCors {
-		if _, err := tx.Exec(`INSERT OR REPLACE INTO http_cors (cors, synthetic_id) VALUES (?, 'id')`, httpCors); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func insertLogConfigBase(tx *sql.Tx, c *params.NodeConfig, includeNamespaces bool) error {
@@ -132,60 +88,8 @@ func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return insertLogConfigBase(tx, c, false)
 }
 
-func insertLightETHConfigTrustedNodes(tx *sql.Tx, c *params.NodeConfig) error {
-	if _, err := tx.Exec(`DELETE FROM light_eth_trusted_nodes WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for _, node := range c.LightEthConfig.TrustedNodes {
-		_, err := tx.Exec(`INSERT OR REPLACE INTO light_eth_trusted_nodes (node, synthetic_id) VALUES (?, 'id')`, node)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func insertRegisterTopics(tx *sql.Tx, c *params.NodeConfig) error {
-	if _, err := tx.Exec(`DELETE FROM register_topics WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for _, topic := range c.RegisterTopics {
-		_, err := tx.Exec(`INSERT OR REPLACE INTO register_topics (topic, synthetic_id) VALUES (?, 'id')`, topic)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func insertRequireTopics(tx *sql.Tx, c *params.NodeConfig) error {
-	if _, err := tx.Exec(`DELETE FROM require_topics WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for topic, limits := range c.RequireTopics {
-		_, err := tx.Exec(`INSERT OR REPLACE INTO require_topics (topic, min, max, synthetic_id) VALUES (?, ?, ?, 'id')`, topic, limits.Min, limits.Max)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func insertIPCConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`INSERT OR REPLACE INTO ipc_config (enabled, file, synthetic_id) VALUES (?, ?, 'id')`, c.IPCEnabled, c.IPCFile)
-	return err
-}
-
 func insertClusterConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`INSERT OR REPLACE INTO cluster_config (enabled, fleet, synthetic_id) VALUES (?, ?, 'id')`, c.ClusterConfig.Enabled, c.ClusterConfig.Fleet)
-	return err
-}
-
-func insertLightETHConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`INSERT OR REPLACE INTO light_eth_config (enabled, database_cache, min_trusted_fraction, synthetic_id) VALUES (?, ?, ?, 'id')`, c.LightEthConfig.Enabled, c.LightEthConfig.DatabaseCache, c.LightEthConfig.MinTrustedFraction)
 	return err
 }
 
@@ -234,45 +138,26 @@ func insertTorrentConfig(tx *sql.Tx, c *params.NodeConfig) error {
 func insertWakuV2ConfigPreMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO wakuv2_config (
-		enabled, host, port, light_client, full_node, discovery_limit, data_dir,
-		max_message_size, enable_confirmations, peer_exchange, enable_discv5, udp_port,  auto_update, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
-		c.WakuV2Config.Enabled, c.WakuV2Config.Host, c.WakuV2Config.Port, c.WakuV2Config.LightClient, c.WakuV2Config.FullNode, c.WakuV2Config.DiscoveryLimit, c.WakuV2Config.DataDir,
-		c.WakuV2Config.MaxMessageSize, c.WakuV2Config.EnableConfirmations, c.WakuV2Config.PeerExchange, c.WakuV2Config.EnableDiscV5, c.WakuV2Config.UDPPort, c.WakuV2Config.AutoUpdate,
+		light_client,
+		synthetic_id
+	) VALUES (?, 'id')`,
+		c.WakuV2Config.LightClient,
 	)
 	if err != nil {
 		return err
 	}
 
-	return setWakuV2CustomNodes(tx, c.WakuV2Config.CustomNodes)
-}
-
-func setWakuV2CustomNodes(tx *sql.Tx, customNodes map[string]string) error {
-	if _, err := tx.Exec(`DELETE FROM wakuv2_custom_nodes WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for name, multiaddress := range customNodes {
-		// NOTE: synthetic id is redundant, name is effectively the primary key
-		_, err := tx.Exec(`INSERT OR REPLACE INTO wakuv2_custom_nodes (name, multiaddress, synthetic_id) VALUES (?, ?, 'id')`, name, multiaddress)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
 func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	UPDATE wakuv2_config
-	SET enable_store = ?,
-		store_capacity = ?,
-		store_seconds = ?,
-		enable_missing_message_verification = ?,
+	SET enable_missing_message_verification = ?,
 		enable_store_confirmation_for_messages_sent = ?
 	WHERE synthetic_id = 'id'`,
-		c.WakuV2Config.EnableStore, c.WakuV2Config.StoreCapacity, c.WakuV2Config.StoreSeconds,
-		c.WakuV2Config.EnableMissingMessageVerification, c.WakuV2Config.EnableStoreConfirmationForMessagesSent,
+		c.WakuV2Config.EnableMissingMessageVerification,
+		c.WakuV2Config.EnableStoreConfirmationForMessagesSent,
 	)
 
 	if err != nil {
@@ -289,45 +174,13 @@ func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
-	if _, err := tx.Exec(`DELETE FROM cluster_nodes WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	nodeMap := make(map[string][]string)
-	nodeMap[StaticNodes] = c.ClusterConfig.StaticNodes
-	nodeMap[BootNodes] = c.ClusterConfig.BootNodes
-	nodeMap[TrustedMailServers] = c.ClusterConfig.TrustedMailServers
-	nodeMap[PushNotificationsServers] = c.ClusterConfig.PushNotificationsServers
-	nodeMap[DiscV5BootstrapNodes] = c.ClusterConfig.DiscV5BootstrapNodes
-	nodeMap[WakuNodes] = c.ClusterConfig.WakuNodes
-
-	for nodeType, nodes := range nodeMap {
-		for _, node := range nodes {
-			_, err := tx.Exec(`INSERT OR REPLACE INTO cluster_nodes (node, type, synthetic_id) VALUES (?, ?, 'id')`, node, nodeType)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 // List of inserts to be executed when upgrading a node
 // These INSERT queries should not be modified
 func nodeConfigUpgradeInserts() []insertFn {
 	return []insertFn{
 		insertNodeConfig,
-		insertHTTPConfig,
-		insertIPCConfig,
 		insertLogConfig,
 		insertClusterConfig,
-		insertClusterConfigNodes,
-		insertLightETHConfig,
-		insertLightETHConfigTrustedNodes,
-		insertRegisterTopics,
-		insertRequireTopics,
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 	}
@@ -340,15 +193,8 @@ func nodeConfigNormalInserts() []insertFn {
 
 	return []insertFn{
 		insertNodeConfigWithConnector,
-		insertHTTPConfig,
-		insertIPCConfig,
 		insertLogConfigWithNamespaces,
 		insertClusterConfig,
-		insertClusterConfigNodes,
-		insertLightETHConfig,
-		insertLightETHConfigTrustedNodes,
-		insertRegisterTopics,
-		insertRequireTopics,
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 		insertTorrentConfig,
@@ -421,57 +267,15 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	keystoreDir := "" // TODO: remove this from db
 	err := tx.QueryRow(`
 	SELECT
-		network_id, data_dir, keystore_dir, node_key, no_discovery,
-		listen_addr, advertise_addr, name, version, api_modules, tls_enabled, max_peers, max_pending_peers,
-		enable_status_service, bridge_enabled, wallet_enabled, local_notifications_enabled,
-		browser_enabled, permissions_enabled, mailservers_enabled, swarm_enabled,
-		mailserver_registry_address, connector_enabled FROM node_config
+		network_id, data_dir, keystore_dir, node_key, api_modules,
+		wallet_enabled, browser_enabled, permissions_enabled,
+		connector_enabled FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.NetworkID, &nodecfg.DataDir, &keystoreDir, &nodecfg.NodeKey, &nodecfg.NoDiscovery,
-		&nodecfg.ListenAddr, &nodecfg.AdvertiseAddr, &nodecfg.Name, &nodecfg.Version, &nodecfg.APIModules, &nodecfg.TLSEnabled, &nodecfg.MaxPeers, &nodecfg.MaxPendingPeers,
-		&nodecfg.EnableStatusService, &nodecfg.BridgeConfig.Enabled, &nodecfg.WalletConfig.Enabled, &nodecfg.LocalNotificationsConfig.Enabled,
-		&nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled, &nodecfg.MailserversConfig.Enabled, &nodecfg.SwarmConfig.Enabled,
-		&nodecfg.MailServerRegistryAddress, &nodecfg.ConnectorConfig.Enabled,
+		&nodecfg.NetworkID, &nodecfg.DataDir, &keystoreDir, &nodecfg.NodeKey, &nodecfg.APIModules,
+		&nodecfg.WalletConfig.Enabled, &nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled,
+		&nodecfg.ConnectorConfig.Enabled,
 	)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	err = tx.QueryRow(`SELECT enabled, host, port FROM http_config WHERE synthetic_id = 'id'`).Scan(&nodecfg.HTTPEnabled, &nodecfg.HTTPHost, &nodecfg.HTTPPort)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	rows, err := tx.Query("SELECT host FROM http_virtual_hosts WHERE synthetic_id = 'id' ORDER BY host ASC")
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var host string
-		err = rows.Scan(&host)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.HTTPVirtualHosts = append(nodecfg.HTTPVirtualHosts, host)
-	}
-
-	rows, err = tx.Query("SELECT cors FROM http_cors WHERE synthetic_id = 'id' ORDER BY cors ASC")
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var cors string
-		err = rows.Scan(&cors)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.HTTPCors = append(nodecfg.HTTPCors, cors)
-	}
-
-	err = tx.QueryRow("SELECT enabled, file FROM ipc_config WHERE synthetic_id = 'id'").Scan(&nodecfg.IPCEnabled, &nodecfg.IPCFile)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
@@ -482,7 +286,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	rows, err = tx.Query(`SELECT
+	rows, err := tx.Query(`SELECT
                 chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
                 native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name
         FROM networks ORDER BY chain_id ASC`)
@@ -505,79 +309,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	err = tx.QueryRow("SELECT enabled, fleet, cluster_id FROM cluster_config WHERE synthetic_id = 'id'").Scan(&nodecfg.ClusterConfig.Enabled, &nodecfg.ClusterConfig.Fleet, &nodecfg.ClusterConfig.ClusterID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
-	}
-
-	nodeMap := make(map[string]*[]string)
-	nodeMap[StaticNodes] = &nodecfg.ClusterConfig.StaticNodes
-	nodeMap[BootNodes] = &nodecfg.ClusterConfig.BootNodes
-	nodeMap[TrustedMailServers] = &nodecfg.ClusterConfig.TrustedMailServers
-	nodeMap[PushNotificationsServers] = &nodecfg.ClusterConfig.PushNotificationsServers
-	nodeMap[WakuNodes] = &nodecfg.ClusterConfig.WakuNodes
-	nodeMap[DiscV5BootstrapNodes] = &nodecfg.ClusterConfig.DiscV5BootstrapNodes
-	rows, err = tx.Query(`SELECT node, type	FROM cluster_nodes WHERE synthetic_id = 'id' ORDER BY node ASC`)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var node string
-		var nodeType string
-		err = rows.Scan(&node, &nodeType)
-		if err != nil {
-			return nil, err
-		}
-		if nodeList, ok := nodeMap[nodeType]; ok {
-			*nodeList = append(*nodeList, node)
-		}
-	}
-
-	err = tx.QueryRow("SELECT enabled, database_cache, min_trusted_fraction FROM light_eth_config WHERE synthetic_id = 'id'").Scan(&nodecfg.LightEthConfig.Enabled, &nodecfg.LightEthConfig.DatabaseCache, &nodecfg.LightEthConfig.MinTrustedFraction)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	rows, err = tx.Query(`SELECT node FROM light_eth_trusted_nodes WHERE synthetic_id = 'id' ORDER BY node ASC`)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var node string
-		err = rows.Scan(&node)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.LightEthConfig.TrustedNodes = append(nodecfg.LightEthConfig.TrustedNodes, node)
-	}
-
-	rows, err = tx.Query(`SELECT topic FROM register_topics WHERE synthetic_id = 'id' ORDER BY topic ASC`)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var topic discv5.Topic
-		err = rows.Scan(&topic)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.RegisterTopics = append(nodecfg.RegisterTopics, topic)
-	}
-
-	rows, err = tx.Query(`SELECT topic, min, max FROM require_topics WHERE synthetic_id = 'id' ORDER BY topic ASC`)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	nodecfg.RequireTopics = make(map[discv5.Topic]params.Limits)
-	for rows.Next() {
-		var topic discv5.Topic
-		var limit params.Limits
-		err = rows.Scan(&topic, &limit.Min, &limit.Max)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.RequireTopics[topic] = limit
 	}
 
 	err = tx.QueryRow(`
@@ -634,36 +365,17 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	}
 
 	err = tx.QueryRow(`
-	SELECT enabled, host, port, light_client, full_node, discovery_limit, data_dir,
-	max_message_size, enable_confirmations, peer_exchange, enable_discv5, udp_port, auto_update,
-	enable_store, store_capacity, store_seconds, enable_missing_message_verification,
-	enable_store_confirmation_for_messages_sent
+	SELECT light_client,
+	       enable_missing_message_verification,
+	       enable_store_confirmation_for_messages_sent
 	FROM wakuv2_config WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.WakuV2Config.Enabled, &nodecfg.WakuV2Config.Host, &nodecfg.WakuV2Config.Port, &nodecfg.WakuV2Config.LightClient, &nodecfg.WakuV2Config.FullNode,
-		&nodecfg.WakuV2Config.DiscoveryLimit, &nodecfg.WakuV2Config.DataDir, &nodecfg.WakuV2Config.MaxMessageSize, &nodecfg.WakuV2Config.EnableConfirmations,
-		&nodecfg.WakuV2Config.PeerExchange, &nodecfg.WakuV2Config.EnableDiscV5, &nodecfg.WakuV2Config.UDPPort, &nodecfg.WakuV2Config.AutoUpdate,
-		&nodecfg.WakuV2Config.EnableStore, &nodecfg.WakuV2Config.StoreCapacity, &nodecfg.WakuV2Config.StoreSeconds,
-		&nodecfg.WakuV2Config.EnableMissingMessageVerification, &nodecfg.WakuV2Config.EnableStoreConfirmationForMessagesSent,
+		&nodecfg.WakuV2Config.LightClient,
+		&nodecfg.WakuV2Config.EnableMissingMessageVerification,
+		&nodecfg.WakuV2Config.EnableStoreConfirmationForMessagesSent,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
-	}
-
-	rows, err = tx.Query(`SELECT name, multiaddress FROM wakuv2_custom_nodes WHERE synthetic_id = 'id' ORDER BY name ASC`)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	nodecfg.WakuV2Config.CustomNodes = make(map[string]string)
-	for rows.Next() {
-		var name string
-		var multiaddress string
-		err = rows.Scan(&name, &multiaddress)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.WakuV2Config.CustomNodes[name] = multiaddress
 	}
 
 	return nodecfg, nil
@@ -742,26 +454,4 @@ func SetLogEnabled(db *sql.DB, enabled bool) error {
 func SetMaxLogBackups(db *sql.DB, maxLogBackups uint) error {
 	_, err := db.Exec(`UPDATE log_config SET max_backups = ?`, maxLogBackups)
 	return err
-}
-
-func SaveNewWakuNode(db *sql.DB, nodeAddress string) error {
-	_, err := db.Exec(`INSERT OR REPLACE INTO cluster_nodes (node, type, synthetic_id) VALUES (?, ?, 'id')`, nodeAddress, WakuNodes)
-	return err
-}
-
-func SetWakuV2CustomNodes(db *sql.DB, customNodes map[string]string) error {
-	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-	return setWakuV2CustomNodes(tx, customNodes)
 }

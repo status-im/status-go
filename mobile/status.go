@@ -12,7 +12,6 @@ import (
 	"unsafe"
 
 	"go.uber.org/zap"
-	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 
@@ -307,62 +306,6 @@ func getNodeConfig() string {
 	}
 
 	return string(respJSON)
-}
-
-func ValidateNodeConfig(configJSON string) string {
-	return callWithResponse(validateNodeConfig, configJSON)
-}
-
-// validateNodeConfig validates config for the Status node.
-func validateNodeConfig(configJSON string) string {
-	var resp APIDetailedResponse
-
-	_, err := params.NewConfigFromJSON(configJSON)
-
-	// Convert errors to APIDetailedResponse
-	switch err := err.(type) {
-	case validator.ValidationErrors:
-		resp = APIDetailedResponse{
-			Message:     "validation: validation failed",
-			FieldErrors: make([]APIFieldError, len(err)),
-		}
-
-		for i, ve := range err {
-			resp.FieldErrors[i] = APIFieldError{
-				Parameter: ve.Namespace(),
-				Errors: []APIError{
-					{
-						Message: fmt.Sprintf("field validation failed on the '%s' tag", ve.Tag()),
-					},
-				},
-			}
-		}
-	case error:
-		resp = APIDetailedResponse{
-			Message: fmt.Sprintf("validation: %s", err.Error()),
-		}
-	case nil:
-		resp = APIDetailedResponse{
-			Status: true,
-		}
-	}
-
-	respJSON, err := json.Marshal(resp)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(respJSON)
-}
-
-func ResetChainData() string {
-	return callWithResponse(resetChainData)
-}
-
-// resetChainData removes chain data from data directory.
-func resetChainData() string {
-	api.RunAsync(statusBackend.ResetChainData)
-	return makeJSONResponse(nil)
 }
 
 func CallRPC(inputJSON string) string {

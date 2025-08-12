@@ -12,22 +12,72 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ethereum/go-ethereum/p2p/discv5"
-
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
 )
 
-func setupTestDB(t *testing.T) (*sql.DB, func()) {
+func setupTestDB(t *testing.T) *sql.DB {
 	db, cleanup, err := helpers.SetupTestSQLDB(DbInitializer{}, "settings-tests-")
 	require.NoError(t, err)
-	return db, func() { require.NoError(t, cleanup()) }
+
+	t.Cleanup(func() { require.NoError(t, cleanup()) })
+	return db
+}
+
+func randomNodeConfig() *params.NodeConfig {
+	return &params.NodeConfig{
+		NetworkID:          uint64(int64(randomInt(math.MaxInt64))),
+		DataDir:            randomString(),
+		NodeKey:            randomString(),
+		APIModules:         randomString(),
+		WalletConfig:       params.WalletConfig{Enabled: randomBool()},
+		BrowsersConfig:     params.BrowsersConfig{Enabled: randomBool()},
+		PermissionsConfig:  params.PermissionsConfig{Enabled: randomBool()},
+		ConnectorConfig:    params.ConnectorConfig{Enabled: randomBool()},
+		LogEnabled:         randomBool(),
+		LogDir:             randomString(),
+		LogFile:            randomString(),
+		LogLevel:           randomString(),
+		LogMaxBackups:      randomInt(math.MaxInt64),
+		LogMaxSize:         randomInt(math.MaxInt64),
+		LogCompressRotated: randomBool(),
+		LogToStderr:        randomBool(),
+		ClusterConfig: params.ClusterConfig{
+			Enabled: randomBool(),
+			Fleet:   randomString(),
+		},
+		ShhextConfig: params.ShhextConfig{
+			PFSEnabled:                   randomBool(),
+			InstallationID:               randomString(),
+			MailServerConfirmations:      randomBool(),
+			EnableConnectionManager:      randomBool(),
+			EnableLastUsedMonitor:        randomBool(),
+			ConnectionTarget:             randomInt(math.MaxInt64),
+			RequestsDelay:                time.Duration(randomInt(math.MaxInt64)),
+			MaxServerFailures:            randomInt(math.MaxInt64),
+			MaxMessageDeliveryAttempts:   randomInt(math.MaxInt64),
+			WhisperCacheDir:              randomString(),
+			DisableGenericDiscoveryTopic: randomBool(),
+			SendV1Messages:               randomBool(),
+			DataSyncEnabled:              randomBool(),
+			VerifyTransactionURL:         randomString(),
+			VerifyENSURL:                 randomString(),
+			VerifyENSContractAddress:     randomString(),
+			VerifyTransactionChainID:     int64(randomInt(math.MaxInt64)),
+			AnonMetricsSendID:            randomString(),
+			AnonMetricsServerEnabled:     randomBool(),
+			AnonMetricsServerPostgresURI: randomString(),
+			BandwidthStatsEnabled:        randomBool(),
+		},
+		WakuV2Config: params.WakuV2Config{
+			LightClient: randomBool(),
+		},
+	}
 }
 
 func TestGetNodeConfig(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
+	db := setupTestDB(t)
 
 	nodeConfig := randomNodeConfig()
 	require.NoError(t, nodecfg.SaveNodeConfig(db, nodeConfig))
@@ -38,22 +88,19 @@ func TestGetNodeConfig(t *testing.T) {
 }
 
 func TestSaveNodeConfig(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
+	db := setupTestDB(t)
 
-	newNodeConfig := randomNodeConfig()
-
-	require.NoError(t, nodecfg.SaveNodeConfig(db, newNodeConfig))
+	nodeConfig := randomNodeConfig()
+	require.NoError(t, nodecfg.SaveNodeConfig(db, nodeConfig))
 
 	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
 	require.NoError(t, err)
-	require.Equal(t, *newNodeConfig, *dbNodeConfig)
+	require.Equal(t, *nodeConfig, *dbNodeConfig)
 }
 
 func TestMigrateNodeConfig(t *testing.T) {
 	// Migration will be run in setupTestDB. If there's an error, that function will fail
-	db, stop := setupTestDB(t)
-	defer stop()
+	db := setupTestDB(t)
 
 	// node_config column should be empty
 	var result string
@@ -87,24 +134,6 @@ func randomStringSlice() []string {
 	return result
 }
 
-func randomTopicSlice() []discv5.Topic {
-	randomValues := randomStringSlice()
-	var result []discv5.Topic
-	for _, v := range randomValues {
-		result = append(result, discv5.Topic(v))
-	}
-	return result
-}
-
-func randomTopicLimits() map[discv5.Topic]params.Limits {
-	result := make(map[discv5.Topic]params.Limits)
-	m := randomInt(7) + 1
-	for i := 0; i < m; i++ {
-		result[discv5.Topic(fmt.Sprint(i))] = params.Limits{Min: randomInt(2), Max: randomInt(10)}
-	}
-	return result
-}
-
 func randomCustomNodes() map[string]string {
 	result := make(map[string]string)
 	m := randomInt(7)
@@ -114,107 +143,9 @@ func randomCustomNodes() map[string]string {
 	return result
 }
 
-func randomNodeConfig() *params.NodeConfig {
-	return &params.NodeConfig{
-		NetworkID:                 uint64(int64(randomInt(math.MaxInt64))),
-		DataDir:                   randomString(),
-		NodeKey:                   randomString(),
-		NoDiscovery:               randomBool(),
-		ListenAddr:                randomString(),
-		AdvertiseAddr:             randomString(),
-		Name:                      randomString(),
-		Version:                   randomString(),
-		APIModules:                randomString(),
-		TLSEnabled:                randomBool(),
-		MaxPeers:                  randomInt(math.MaxInt64),
-		MaxPendingPeers:           randomInt(math.MaxInt64),
-		EnableStatusService:       randomBool(),
-		BridgeConfig:              params.BridgeConfig{Enabled: randomBool()},
-		WalletConfig:              params.WalletConfig{Enabled: randomBool()},
-		LocalNotificationsConfig:  params.LocalNotificationsConfig{Enabled: randomBool()},
-		BrowsersConfig:            params.BrowsersConfig{Enabled: randomBool()},
-		PermissionsConfig:         params.PermissionsConfig{Enabled: randomBool()},
-		MailserversConfig:         params.MailserversConfig{Enabled: randomBool()},
-		ConnectorConfig:           params.ConnectorConfig{Enabled: randomBool()},
-		SwarmConfig:               params.SwarmConfig{Enabled: randomBool()},
-		MailServerRegistryAddress: randomString(),
-		HTTPEnabled:               randomBool(),
-		HTTPHost:                  randomString(),
-		HTTPPort:                  randomInt(math.MaxInt64),
-		HTTPVirtualHosts:          randomStringSlice(),
-		HTTPCors:                  randomStringSlice(),
-		WSEnabled:                 false, // NOTE: leaving ws field idle since we are moving away from the storing the whole config
-		WSHost:                    "",
-		WSPort:                    0,
-		IPCEnabled:                randomBool(),
-		IPCFile:                   randomString(),
-		LogEnabled:                randomBool(),
-		LogDir:                    randomString(),
-		LogFile:                   randomString(),
-		LogLevel:                  randomString(),
-		LogMaxBackups:             randomInt(math.MaxInt64),
-		LogMaxSize:                randomInt(math.MaxInt64),
-		LogCompressRotated:        randomBool(),
-		LogToStderr:               randomBool(),
-		ClusterConfig: params.ClusterConfig{
-			Enabled:     randomBool(),
-			Fleet:       randomString(),
-			StaticNodes: randomStringSlice(),
-			BootNodes:   randomStringSlice(),
-		},
-		LightEthConfig: params.LightEthConfig{
-			Enabled:            randomBool(),
-			DatabaseCache:      randomInt(math.MaxInt64),
-			TrustedNodes:       randomStringSlice(),
-			MinTrustedFraction: randomInt(math.MaxInt64),
-		},
-		RegisterTopics: randomTopicSlice(),
-		RequireTopics:  randomTopicLimits(),
-		ShhextConfig: params.ShhextConfig{
-			PFSEnabled:                   randomBool(),
-			InstallationID:               randomString(),
-			MailServerConfirmations:      randomBool(),
-			EnableConnectionManager:      randomBool(),
-			EnableLastUsedMonitor:        randomBool(),
-			ConnectionTarget:             randomInt(math.MaxInt64),
-			RequestsDelay:                time.Duration(randomInt(math.MaxInt64)),
-			MaxServerFailures:            randomInt(math.MaxInt64),
-			MaxMessageDeliveryAttempts:   randomInt(math.MaxInt64),
-			WhisperCacheDir:              randomString(),
-			DisableGenericDiscoveryTopic: randomBool(),
-			SendV1Messages:               randomBool(),
-			DataSyncEnabled:              randomBool(),
-			VerifyTransactionURL:         randomString(),
-			VerifyENSURL:                 randomString(),
-			VerifyENSContractAddress:     randomString(),
-			VerifyTransactionChainID:     int64(randomInt(math.MaxInt64)),
-			AnonMetricsSendID:            randomString(),
-			AnonMetricsServerEnabled:     randomBool(),
-			AnonMetricsServerPostgresURI: randomString(),
-			BandwidthStatsEnabled:        randomBool(),
-		},
-		WakuV2Config: params.WakuV2Config{
-			Enabled:             randomBool(),
-			Host:                randomString(),
-			Port:                randomInt(math.MaxInt64),
-			LightClient:         randomBool(),
-			FullNode:            randomBool(),
-			DiscoveryLimit:      randomInt(math.MaxInt64),
-			DataDir:             randomString(),
-			MaxMessageSize:      uint32(randomInt(math.MaxInt64)),
-			EnableConfirmations: randomBool(),
-			CustomNodes:         randomCustomNodes(),
-			EnableDiscV5:        randomBool(),
-			UDPPort:             randomInt(math.MaxInt64),
-			AutoUpdate:          randomBool(),
-		},
-	}
-}
-
 func TestConfigValidate(t *testing.T) {
 	// GIVEN
-	db, stop := setupTestDB(t)
-	defer stop()
+	db := setupTestDB(t)
 
 	tmpdir := t.TempDir()
 	nodeConfig, err := params.NewNodeConfig(tmpdir, 1777)
@@ -233,8 +164,7 @@ func TestConfigValidate(t *testing.T) {
 
 func TestRepairLoadedTorrentConfig(t *testing.T) {
 	// GIVEN
-	db, stop := setupTestDB(t)
-	defer stop()
+	db := setupTestDB(t)
 
 	tmpdir := t.TempDir()
 	nodeConfig, err := params.NewNodeConfig(tmpdir, 1777)

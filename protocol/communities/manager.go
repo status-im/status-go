@@ -1318,9 +1318,8 @@ func (m *Manager) reevaluateMemberChannelsPermissions(community *Community, memb
 	for channelID := range community.Chats() {
 		channelPermissionsCheckResult, hasChannelPermission := channelPermissionsCheckResult[community.ChatID(channelID)]
 
-		// ensure member is added if channel has no permissions
+		// Permissionless channels are public - no need to check permissions
 		if !hasChannelPermission {
-			addToChannels[channelID] = protobuf.CommunityMember_CHANNEL_ROLE_POSTER
 			continue
 		}
 
@@ -2307,9 +2306,6 @@ func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf
 	}
 
 	upgradeTokenPermissions(description)
-
-	// Workaround for https://github.com/status-im/status-desktop/issues/12188
-	hydrateChannelsMembers(description)
 
 	return response, description, m.persistence.SaveDecryptedCommunityDescription(id, response, description)
 }

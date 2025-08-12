@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -37,7 +36,6 @@ import (
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcstats"
@@ -91,7 +89,6 @@ type StatusNode struct {
 	accountsSrvc           *accountssvc.Service
 	browsersSrvc           *browsers.Service
 	permissionsSrvc        *permissions.Service
-	mailserversSrvc        *mailservers.Service
 	appMetricsSrvc         *appmetricsservice.Service
 	walletSrvc             *wallet.Service
 	localNotificationsSrvc *localnotifications.Service
@@ -228,9 +225,8 @@ func (n *StatusNode) StartLocalBackup() error {
 	n.localBackup, err = backup.NewController(backup.BackupConfig{
 		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
 		FileNameGetter: filenameGetter,
-		// TODO set to true to enable the local backup
-		BackupEnabled: false,
-		Interval:      time.Minute * 30,
+		BackupEnabled:  true,
+		Interval:       time.Minute * 30,
 	}, n.logger.Named("LocalBackup"))
 	if err != nil {
 		return err
@@ -379,7 +375,6 @@ func (n *StatusNode) stop() error {
 	n.accountsSrvc = nil
 	n.browsersSrvc = nil
 	n.permissionsSrvc = nil
-	n.mailserversSrvc = nil
 	n.appMetricsSrvc = nil
 	n.walletSrvc = nil
 	n.localNotificationsSrvc = nil
@@ -395,26 +390,6 @@ func (n *StatusNode) stop() error {
 	n.appGeneralSrvc = nil
 	n.logger.Debug("status node stopped")
 	return nil
-}
-
-// ResetChainData removes chain data if node is not running.
-func (n *StatusNode) ResetChainData(config *params.NodeConfig) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if n.isRunning() {
-		return ErrNodeRunning
-	}
-
-	chainDataDir := filepath.Join(config.DataDir, config.Name, "lightchaindata")
-	if _, err := os.Stat(chainDataDir); os.IsNotExist(err) {
-		return err
-	}
-	err := os.RemoveAll(chainDataDir)
-	if err == nil {
-		n.logger.Info("Chain data has been removed", zap.String("dir", chainDataDir))
-	}
-	return err
 }
 
 // IsRunning confirm that node is running.

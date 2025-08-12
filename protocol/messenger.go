@@ -53,7 +53,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/storenodes"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/server"
@@ -139,7 +138,6 @@ type Messenger struct {
 	allInstallations           *installationMap
 	modifiedInstallations      *stringBoolMap
 	installationID             string
-	communityStorenodes        *storenodes.CommunityStorenodes
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
 	settings                   *accounts.Database
@@ -483,7 +481,6 @@ func NewMessenger(
 		peersyncingRequests:     make(map[string]uint64),
 		verificationDatabase:    verification.NewPersistence(database),
 		mailserversDatabase:     c.mailserversDatabase,
-		communityStorenodes:     storenodes.NewCommunityStorenodes(storenodes.NewDB(database), logger),
 		account:                 c.account,
 		quit:                    make(chan struct{}),
 		ctx:                     ctx,
@@ -724,10 +721,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	m.messaging.SetStorenodeConfigProvider(m)
-
-	if err := m.communityStorenodes.ReloadFromDB(); err != nil {
-		return nil, err
-	}
 
 	go m.checkForMissingMessagesLoop()
 	go m.checkForStorenodeCycleSignals()
