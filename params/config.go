@@ -341,15 +341,6 @@ type ShhextConfig struct {
 	// DefaultPushNotificationsServers is the default-status run push notification servers
 	DefaultPushNotificationsServers []*PushNotificationServer
 
-	// AnonMetricsSendID is the public key used by a metrics node to decrypt metrics protobufs
-	AnonMetricsSendID string
-
-	// AnonMetricsServerEnabled indicates whether or not the
-	AnonMetricsServerEnabled bool
-
-	// AnonMetricsServerPostgresURI is the uri used to connect to a postgres db
-	AnonMetricsServerPostgresURI string
-
 	// BandwidthStatsEnabled indicates if a signal is going to be emitted to indicate the upload and download rate
 	BandwidthStatsEnabled bool
 }

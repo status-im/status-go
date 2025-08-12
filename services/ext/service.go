@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -40,7 +39,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
@@ -656,38 +654,6 @@ func buildMessengerOptions(
 	settings, err := accountsDB.GetSettings()
 	if err != sql.ErrNoRows && err != nil {
 		return nil, err
-	}
-
-	// Generate anon metrics client config
-	if settings.AnonMetricsShouldSend {
-		keyBytes, err := hex.DecodeString(config.ShhextConfig.AnonMetricsSendID)
-		if err != nil {
-			return nil, err
-		}
-
-		key, err := crypto.UnmarshalPubkey(keyBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		amcc := &anonmetrics.ClientConfig{
-			ShouldSend:  true,
-			SendAddress: key,
-		}
-		options = append(options, protocol.WithAnonMetricsClientConfig(amcc))
-	}
-
-	// Generate anon metrics server config
-	if config.ShhextConfig.AnonMetricsServerEnabled {
-		if len(config.ShhextConfig.AnonMetricsServerPostgresURI) == 0 {
-			return nil, errors.New("AnonMetricsServerPostgresURI must be set")
-		}
-
-		amsc := &anonmetrics.ServerConfig{
-			Enabled:     true,
-			PostgresURI: config.ShhextConfig.AnonMetricsServerPostgresURI,
-		}
-		options = append(options, protocol.WithAnonMetricsServerConfig(amsc))
 	}
 
 	var pushNotifServKey []*ecdsa.PublicKey

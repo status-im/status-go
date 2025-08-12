@@ -10,11 +10,6 @@ const (
 )
 
 var (
-	AnonMetricsShouldSend = SettingField{
-		reactFieldName: "anon-metrics/should-send?",
-		dBColumnName:   "anon_metrics_should_send",
-		valueHandler:   BoolHandler,
-	}
 	Appearance = SettingField{
 		reactFieldName: "appearance",
 		dBColumnName:   "appearance",
@@ -543,7 +538,6 @@ var (
 		valueHandler:   TimeHandler,
 	}
 	SettingFieldRegister = []SettingField{
-		AnonMetricsShouldSend,
 		Appearance,
 		AutoMessageEnabled,
 		BackupEnabled,

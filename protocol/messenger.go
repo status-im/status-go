@@ -23,7 +23,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/appmetrics"
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
@@ -41,7 +40,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption"
@@ -109,8 +107,6 @@ type Messenger struct {
 	persistence               *sqlitePersistence
 	encryptor                 *encryption.Protocol
 	ensVerifier               *ens.Verifier
-	anonMetricsClient         *anonmetrics.Client
-	anonMetricsServer         *anonmetrics.Server
 	pushNotificationClient    *pushnotificationclient.Client
 	pushNotificationServer    PushNotificationServer
 	communitiesManager        *communities.Manager
@@ -320,36 +316,6 @@ func NewMessenger(
 			return nil, err
 		}
 	}
-
-	// Initialise anon metrics client
-	var anonMetricsClient *anonmetrics.Client
-	if c.anonMetricsClientConfig != nil &&
-		c.anonMetricsClientConfig.ShouldSend &&
-		c.anonMetricsClientConfig.Active == anonmetrics.ActiveClientPhrase {
-
-		anonMetricsClient = anonmetrics.NewClient(messaging)
-		anonMetricsClient.Config = c.anonMetricsClientConfig
-		anonMetricsClient.Identity = identity
-		anonMetricsClient.DB = appmetrics.NewDB(database)
-		anonMetricsClient.Logger = logger
-	}
-
-	// Initialise anon metrics server
-	var anonMetricsServer *anonmetrics.Server
-	if c.anonMetricsServerConfig != nil &&
-		c.anonMetricsServerConfig.Enabled &&
-		c.anonMetricsServerConfig.Active == anonmetrics.ActiveServerPhrase {
-
-		server, err := anonmetrics.NewServer(c.anonMetricsServerConfig.PostgresURI)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create anonmetrics.Server")
-		}
-
-		anonMetricsServer = server
-		anonMetricsServer.Config = c.anonMetricsServerConfig
-		anonMetricsServer.Logger = logger
-	}
-
 	// Initialize push notification client
 	pushNotificationClientPersistence := pushnotificationclient.NewPersistence(database)
 	pushNotificationClientConfig := c.pushNotificationClientConfig
@@ -448,8 +414,6 @@ func NewMessenger(
 		messagingPersistence:       NewMessagingPersistence(database),
 		persistence:                sqlitePersistence,
 		encryptor:                  messaging.EncryptionProtocol(),
-		anonMetricsClient:          anonMetricsClient,
-		anonMetricsServer:          anonMetricsServer,
 		communityTokensService:     c.communityTokensService,
 		pushNotificationClient:     pushNotificationClient,
 		pushNotificationServer:     c.pushNotificationServer,
@@ -554,12 +518,6 @@ func NewMessenger(
 	if c.ensVerifier != nil {
 		messenger.shutdownTasks = append(messenger.shutdownTasks, c.ensVerifier.Stop)
 	}
-	if anonMetricsClient != nil {
-		messenger.shutdownTasks = append(messenger.shutdownTasks, anonMetricsClient.Stop)
-	}
-	if anonMetricsServer != nil {
-		messenger.shutdownTasks = append(messenger.shutdownTasks, anonMetricsServer.Stop)
-	}
 
 	if c.envelopeEventsConfig != nil {
 		interceptor := EnvelopeEventsInterceptor{c.envelopeEventsConfig.EnvelopeEventsHandler, messenger}
@@ -645,13 +603,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		m.handlePushNotificationClientRegistrations(m.pushNotificationClient.SubscribeToRegistrations())
 
 		if err := m.pushNotificationClient.Start(); err != nil {
-			return nil, err
-		}
-	}
-
-	// Start anonymous metrics client
-	if m.anonMetricsClient != nil {
-		if err := m.anonMetricsClient.Start(); err != nil {
 			return nil, err
 		}
 	}

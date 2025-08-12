@@ -14,7 +14,6 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -92,9 +91,6 @@ type config struct {
 
 	verifyTransactionClient EthClient
 	ensVerifier             *ens.Verifier
-
-	anonMetricsClientConfig *anonmetrics.ClientConfig
-	anonMetricsServerConfig *anonmetrics.ServerConfig
 
 	pushNotificationClientConfig *pushnotificationclient.Config
 	pushNotificationServer       PushNotificationServer
@@ -197,20 +193,6 @@ func WithAccount(acc *multiaccounts.Account) Option {
 func WithBrowserDatabase(bd *browsers.Database) Option {
 	return func(c *config) error {
 		c.browserDatabase = bd
-		return nil
-	}
-}
-
-func WithAnonMetricsClientConfig(anonMetricsClientConfig *anonmetrics.ClientConfig) Option {
-	return func(c *config) error {
-		c.anonMetricsClientConfig = anonMetricsClientConfig
-		return nil
-	}
-}
-
-func WithAnonMetricsServerConfig(anonMetricsServerConfig *anonmetrics.ServerConfig) Option {
-	return func(c *config) error {
-		c.anonMetricsServerConfig = anonMetricsServerConfig
 		return nil
 	}
 }

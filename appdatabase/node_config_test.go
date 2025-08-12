@@ -56,9 +56,6 @@ func randomNodeConfig() *params.NodeConfig {
 			VerifyENSURL:               randomString(),
 			VerifyENSContractAddress:   randomString(),
 			VerifyTransactionChainID:   int64(randomInt(math.MaxInt64)),
-			AnonMetricsSendID:            randomString(),
-			AnonMetricsServerEnabled:     randomBool(),
-			AnonMetricsServerPostgresURI: randomString(),
 			BandwidthStatsEnabled:      randomBool(),
 		},
 		WakuV2Config: params.WakuV2Config{

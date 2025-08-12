@@ -17,13 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appgeneral "github.com/status-im/status-go/services/app-general"
-	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
 	"github.com/status-im/status-go/services/communitytokens"
@@ -59,7 +57,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 
 	services := []common.StatusService{}
 	services = append(services, b.rpcStatsService())
-	services = append(services, b.appmetricsService())
 	services = append(services, b.appgeneralService())
 	services = append(services, b.personalService())
 	services = append(services, b.statusPublicService())
@@ -264,13 +261,6 @@ func (b *StatusNode) permissionsService() *permissions.Service {
 		b.permissionsSrvc = permissions.NewService(permissions.NewDB(b.appDB))
 	}
 	return b.permissionsSrvc
-}
-
-func (b *StatusNode) appmetricsService() common.StatusService {
-	if b.appMetricsSrvc == nil {
-		b.appMetricsSrvc = appmetricsservice.NewService(appmetrics.NewDB(b.appDB))
-	}
-	return b.appMetricsSrvc
 }
 
 func (b *StatusNode) appgeneralService() *appgeneral.Service {
