@@ -83,6 +83,7 @@ require (
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/gorilla/sessions v1.2.1
 	github.com/gorilla/websocket v1.5.3
+	github.com/invopop/jsonschema v0.13.0
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/jellydator/ttlcache/v3 v3.3.0
 	github.com/jmoiron/sqlx v1.3.5
@@ -97,7 +98,7 @@ require (
 	github.com/status-im/extkeys v1.1.0
 	github.com/waku-org/go-waku v0.8.1-0.20250411145637-900b98812a91
 	github.com/waku-org/waku-go-bindings v0.0.0-20250714110306-6feba5b0df4d
-	github.com/wk8/go-ordered-map/v2 v2.1.7
+	github.com/wk8/go-ordered-map/v2 v2.1.8
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
 	go.lsp.dev/jsonrpc2 v0.10.0

@@ -428,6 +428,9 @@ github.com/huin/goupnp/ssdp
 # github.com/imdario/mergo v0.3.12
 ## explicit; go 1.13
 github.com/imdario/mergo
+# github.com/invopop/jsonschema v0.13.0
+## explicit; go 1.18
+github.com/invopop/jsonschema
 # github.com/ipfs/go-cid v0.4.1
 ## explicit; go 1.19
 github.com/ipfs/go-cid
@@ -1141,7 +1144,7 @@ github.com/wealdtech/go-multicodec
 # github.com/wk8/go-ordered-map v1.0.0
 ## explicit; go 1.14
 github.com/wk8/go-ordered-map
-# github.com/wk8/go-ordered-map/v2 v2.1.7
+# github.com/wk8/go-ordered-map/v2 v2.1.8
 ## explicit; go 1.18
 github.com/wk8/go-ordered-map/v2
 # github.com/wlynxg/anet v0.0.4

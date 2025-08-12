@@ -11,6 +11,7 @@ It offers the following features:
 * allows iterating from newest or oldest keys indifferently, without memory copy, allowing to `break` the iteration, and in time linear to the number of keys iterated over rather than the total length of the ordered map
 * supports any generic types for both keys and values. If you're running go < 1.18, you can use [version 1](https://github.com/wk8/go-ordered-map/tree/v1) that takes and returns generic `interface{}`s instead of using generics
 * idiomatic API, akin to that of [`container/list`](https://golang.org/pkg/container/list)
+* support for JSON and YAML marshalling
 
 ## Documentation
 
@@ -128,6 +129,19 @@ data, err := json.Marshal(om)
 // deserialization
 om := orderedmap.New[string, string]() // or orderedmap.New[int, any](), or any type you expect
 err := json.Unmarshal(data, &om)
+...
+```
+
+Similarly, it also supports YAML serialization/deserialization using the yaml.v3 package, which also preserves order:
+
+```go
+// serialization
+data, err := yaml.Marshal(om)
+...
+
+// deserialization
+om := orderedmap.New[string, string]() // or orderedmap.New[int, any](), or any type you expect
+err := yaml.Unmarshal(data, &om)
 ...
 ```
 

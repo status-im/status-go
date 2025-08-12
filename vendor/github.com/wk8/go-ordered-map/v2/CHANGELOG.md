@@ -2,6 +2,10 @@
 
 [comment]: # (Changes since last release go here)
 
+## 2.1.8 - Jun 27th 2023
+
+* Added support for YAML serialization/deserialization
+
 ## 2.1.7 - Apr 13th 2023
 
 * Renamed test_utils.go to utils_test.go
