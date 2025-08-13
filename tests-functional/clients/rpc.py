@@ -18,11 +18,12 @@ class RpcClient:
         except json.JSONDecodeError:
             raise AssertionError(f"Invalid JSON in response: {response.content}")
 
-        if key not in data:
-            # Allow missing 'result' if 'error' is present
-            if key == "result" and "error" in data:
-                return
-            raise AssertionError(f"Key '{key}' not found in the JSON response: {response.content}")
+        if key in data:
+            return
+        # Allow missing 'result' if 'error' is present
+        if key == "result" and "error" in data:
+            return
+        raise AssertionError(f"Key '{key}' not found in the JSON response: {response.content}")
 
     def verify_is_valid_json_rpc_response(self, response, _id=None):
         assert response.status_code == 200, f"Got response {response.content}, status code {response.status_code}"
