@@ -12,6 +12,7 @@ package accountsmanagement
 import (
 	"github.com/status-im/status-go/accounts-management/core"
 	"github.com/status-im/status-go/accounts-management/keystore"
+	keystoretypes "github.com/status-im/status-go/accounts-management/keystore/types"
 	"github.com/status-im/status-go/accounts-management/persistence"
 	"github.com/status-im/status-go/accounts-management/types"
 
@@ -40,7 +41,7 @@ type (
 	Account                = types.Account
 	Keypair                = types.Keypair
 	Keycard                = types.Keycard
-	KeystoreAccount        = types.KeystoreAccount
+	KeystoreAccount        = keystoretypes.KeystoreAccount
 	AccountCreationDetails = types.AccountCreationDetails
 	KeypairType            = types.KeypairType
 	AccountType            = types.AccountType

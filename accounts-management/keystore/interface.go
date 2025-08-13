@@ -6,8 +6,8 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	"github.com/status-im/status-go/accounts-management/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/keystore/types"
+	cryptoypes "github.com/status-im/status-go/crypto/types"
 )
 
 var (
@@ -24,12 +24,12 @@ type KeyStore interface {
 	// and ExtendedKey is the extended key of the BIP44 key at index 1.
 	ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphrase string) (types.KeystoreAccount, error)
 	// AccountDecryptedKey returns decrypted key for account (provided that password is correct).
-	AccountDecryptedKey(address ethtypes.Address, passphrase string) (types.KeystoreAccount, *ecdsa.PrivateKey, *extkeys.ExtendedKey, error)
+	AccountDecryptedKey(address cryptoypes.Address, passphrase string) (types.KeystoreAccount, *ecdsa.PrivateKey, *extkeys.ExtendedKey, error)
 	// Delete deletes the key matched by account.
 	// If the account contains no filename, the address must match a unique key.
-	Delete(address ethtypes.Address) error
+	Delete(address cryptoypes.Address) error
 	// Find returns the account matched by address
-	Find(address ethtypes.Address) (types.KeystoreAccount, error)
+	Find(address cryptoypes.Address) (types.KeystoreAccount, error)
 	// Accounts returns all accounts in the keystore
 	Accounts() []types.KeystoreAccount
 	// ReEncryptKeyStoreDir re-encrypts all keys in the keystore directory.

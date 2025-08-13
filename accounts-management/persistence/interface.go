@@ -4,18 +4,18 @@ package persistence
 
 import (
 	"github.com/status-im/status-go/accounts-management/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
 
 type Persistence interface {
 	// AddressExists checks if the address exists in the persistence
-	AddressExists(address ethtypes.Address) (bool, error)
+	AddressExists(address cryptotypes.Address) (bool, error)
 	// GetProfileKeypair returns the profile keypair
 	GetProfileKeypair() (*types.Keypair, error)
 	// GetWalletRootAddress returns the root address of the wallet
-	GetWalletRootAddress() (ethtypes.Address, error)
+	GetWalletRootAddress() (cryptotypes.Address, error)
 	// GetPath returns the derivation path of the address
-	GetPath(address ethtypes.Address) (string, error)
+	GetPath(address cryptotypes.Address) (string, error)
 	// GetKeypairByKeyUID returns a keypair by its keyUID
 	GetKeypairByKeyUID(keyUID string) (*types.Keypair, error)
 	// GetActiveKeypairs returns all active keypairs
@@ -29,15 +29,15 @@ type Persistence interface {
 	// MarkKeypairFullyOperable marks a keypair as fully operable
 	MarkKeypairFullyOperable(keyUID string, clock uint64, updateKeypairClock bool) (err error)
 	// MarkAccountFullyOperable marks an account as fully operable
-	MarkAccountFullyOperable(address ethtypes.Address) (err error)
+	MarkAccountFullyOperable(address cryptotypes.Address) (err error)
 	// DeleteAllKeycardsWithKeyUID deletes all keycards with a given keyUID
 	DeleteAllKeycardsWithKeyUID(keyUID string, clock uint64) (err error)
 	// GetPositionForNextNewAccount returns the position for the next new account
 	GetPositionForNextNewAccount() (int64, error)
 	// GetAccountByAddress returns an account by its address
-	GetAccountByAddress(address ethtypes.Address) (*types.Account, error)
+	GetAccountByAddress(address cryptotypes.Address) (*types.Account, error)
 	// RemoveAccount removes an account
-	RemoveAccount(address ethtypes.Address, clock uint64) error
+	RemoveAccount(address cryptotypes.Address, clock uint64) error
 	// RemoveKeypair removes a keypair
 	RemoveKeypair(keyUID string, clock uint64) error
 }

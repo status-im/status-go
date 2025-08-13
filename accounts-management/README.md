@@ -1,6 +1,6 @@
 # Accounts Management Package
 
-The Accounts Management package provides a comprehensive solution for Status chat and wallet accounts creation, storage, and management within the Status application. It handles account generation, keystore operations, and secure storage of private keys.
+The Accounts Management package provides a comprehensive solution for Status chat and wallet accounts creation, storage, and management within the Status application. It handles account generation, keystore operations, and secure storage of private keys. For cryptographic operations, see the separate `crypto` package.
 
 ## Package Structure
 
@@ -14,6 +14,7 @@ accounts-management/
 │   ├── keystore_operations.go  # Keystore-related operations
 │   ├── persistence_operations.go  # Database operations
 │   └── manager_test.go   # Test suite for core functionality
+
 ├── errors/               # Structured error handling system
 │   ├── errors.go         # Error definitions, codes, and categories
 │   ├── errors_test.go    # Error system tests
@@ -37,8 +38,9 @@ accounts-management/
 │   ├── path_decoder.go   # BIP32 path parsing
 │   ├── README.md         # Generator-specific documentation
 │   └── *_test.go         # Generator tests
-├── types/                # Type definitions
+├── types/                # Core type definitions
 │   ├── types.go          # Core type definitions
+│   ├── key.go            # Key type structure
 │   ├── account.go        # Account-related types
 │   ├── keypair.go        # Keypair-related types
 │   └── *_test.go         # Type tests
@@ -107,6 +109,8 @@ Core data structures:
 - **AccountCreationDetails**: Contains account creation information including path and name
 - **AccountType/KeypairType**: Type enumerations for accounts and keypairs
 - **AccountOperable**: Enumeration for account operability status (fully, partially, non-operable)
+
+
 
 ### Common Package
 
@@ -215,7 +219,13 @@ if err != nil {
         }
     }
 }
+
+// Use account management functions
+account := generator.CreateAccountFromMnemonic(mnemonic, passphrase)
+keypair := &types.Keypair{...}
 ```
+
+
 
 ### Error Handling
 
@@ -314,14 +324,16 @@ type AccountsManager struct {
 }
 ```
 
+
+
 ### KeyStore Interface
 
 Defines keystore operations:
 
 ```go
 type KeyStore interface {
-    AccountDecryptedKey(address ethtypes.Address, password string) ([]byte, *ecdsa.PrivateKey, *hdwallet.ExtendedKey, error)
-    ImportECDSA(priv *ecdsa.PrivateKey, password string) (ethtypes.Address, error)
+    AccountDecryptedKey(address types.Address, password string) (types.KeystoreAccount, *ecdsa.PrivateKey, *extkeys.ExtendedKey, error)
+    ImportECDSA(priv *ecdsa.PrivateKey, password string) (types.KeystoreAccount, error)
     // ... other keystore operations
 }
 ```
@@ -411,3 +423,4 @@ When contributing to this package:
 6. Place new code in the appropriate subpackage based on its responsibility
 7. Maintain backward compatibility for the main package exports
 8. Use the mock implementations for testing new functionality
+9. Use interfaces for external dependencies

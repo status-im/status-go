@@ -10,11 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/accounts-management/keystore"
-	"github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/eth-node/crypto"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/keystore/types"
+	"github.com/status-im/status-go/crypto"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
 
+// Adapter implements the KeyStore interface using go-ethereum
 type Adapter struct {
 	keystoreDir string
 	scryptN     int
@@ -94,7 +95,7 @@ func (a *Adapter) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphras
 }
 
 // AccountDecryptedKey gets the decrypted key for an account using standard go-ethereum functions
-func (a *Adapter) AccountDecryptedKey(address ethtypes.Address, passphrase string) (account types.KeystoreAccount, privateKey *ecdsa.PrivateKey, extendedKey *extkeys.ExtendedKey, err error) {
+func (a *Adapter) AccountDecryptedKey(address cryptotypes.Address, passphrase string) (account types.KeystoreAccount, privateKey *ecdsa.PrivateKey, extendedKey *extkeys.ExtendedKey, err error) {
 	defer func() {
 		err = mapToKeystoreError(err)
 	}()
@@ -116,7 +117,7 @@ func (a *Adapter) AccountDecryptedKey(address ethtypes.Address, passphrase strin
 	return
 }
 
-func (a *Adapter) Delete(address ethtypes.Address) (err error) {
+func (a *Adapter) Delete(address cryptotypes.Address) (err error) {
 	defer func() {
 		err = mapToKeystoreError(err)
 	}()
@@ -142,7 +143,7 @@ func (a *Adapter) Accounts() []types.KeystoreAccount {
 	return accounts
 }
 
-func (a *Adapter) Find(address ethtypes.Address) (account types.KeystoreAccount, err error) {
+func (a *Adapter) Find(address cryptotypes.Address) (account types.KeystoreAccount, err error) {
 	defer func() {
 		err = mapToKeystoreError(err)
 	}()

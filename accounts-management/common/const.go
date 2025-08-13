@@ -2,12 +2,6 @@ package common
 
 const WalletAccountDefaultName = "Account 1"
 
-// AddressBytesLength is the expected length of the address in bytes
-const AddressBytesLength = 20
-
-// AddressHexLength is the expected length of the address in hex (with 0x prefix)
-const AddressHexLength = 2*AddressBytesLength + 2
-
 const PathMaster = "m"
 
 const PathEIP1581Root = "m/43'/60'/1581'"

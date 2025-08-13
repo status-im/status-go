@@ -3,9 +3,9 @@ package types
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/status-im/status-go/crypto/types"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAddressToAccount(t *testing.T) {

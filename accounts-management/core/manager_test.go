@@ -13,8 +13,8 @@ import (
 	"github.com/status-im/status-go/accounts-management/keystore"
 	mock_persistence "github.com/status-im/status-go/accounts-management/mock"
 	"github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/eth-node/crypto"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/utils"
 
@@ -117,7 +117,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 			accManager.setKeystore(nil)
 		}
 
-		ok, err := accManager.VerifyAccountPassword(ethtypes.HexToAddress(testCase.address), testCase.password)
+		ok, err := accManager.VerifyAccountPassword(cryptotypes.HexToAddress(testCase.address), testCase.password)
 		if testCase.expectedError != nil && err != nil {
 			if !errors.Is(err, testCase.expectedError) {
 				var accountsErr *customerrors.AccountsError
@@ -179,10 +179,10 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	).Times(1)
 
 	// Set the chat account, this will create a new keystore
-	err = accManager.SetChatAccount(ethtypes.HexToAddress(utils.TestConfig.Account3.ChatAddress), utils.TestConfig.Account3.Password, nil)
+	err = accManager.SetChatAccount(cryptotypes.HexToAddress(utils.TestConfig.Account3.ChatAddress), utils.TestConfig.Account3.Password, nil)
 	require.NoError(t, err)
 
-	address := ethtypes.HexToAddress(utils.TestConfig.Account3.ChatAddress)
+	address := cryptotypes.HexToAddress(utils.TestConfig.Account3.ChatAddress)
 	ok, err := accManager.VerifyAccountPassword(address, utils.TestConfig.Account3.Password)
 	require.NoError(t, err)
 	require.True(t, ok)
@@ -202,9 +202,9 @@ type ManagerTestSuite struct {
 
 type testAccount struct {
 	password      string
-	walletAddress ethtypes.Address
+	walletAddress cryptotypes.Address
 	walletPubKey  string
-	chatAddress   ethtypes.Address
+	chatAddress   cryptotypes.Address
 	chatPubKey    string
 	mnemonic      string
 	masterAccount *generator.Account
@@ -249,7 +249,7 @@ func (s *ManagerTestSuite) getKeyDir() string {
 	return fmt.Sprintf("%s/keystore/%s", s.rootDataDir, s.masterAccount.KeyUID())
 }
 
-func (s *ManagerTestSuite) createAndStoreProfileKeypair() {
+func (s *ManagerTestSuite) createAndStoreProfileKeypair() *types.Keypair {
 	s.persistence.EXPECT().GetKeypairByKeyUID(s.masterAccount.KeyUID()).Return(
 		nil, types.ErrDbKeypairNotFound,
 	).Times(1)
@@ -283,7 +283,7 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() {
 		if kpAcc.Chat {
 			chatAccountOk = kpAcc.Path == common.PathEIP1581Chat &&
 				kpAcc.Address == s.chatAddress &&
-				bytes.Equal(kpAcc.PublicKey, ethtypes.Hex2Bytes(s.chatPubKey)) &&
+				bytes.Equal(kpAcc.PublicKey, cryptotypes.Hex2Bytes(s.chatPubKey)) &&
 				kpAcc.KeyUID == keypair.KeyUID &&
 				!kpAcc.Removed &&
 				kpAcc.Clock == 0 &&
@@ -295,7 +295,7 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() {
 		if kpAcc.Wallet {
 			walletAccountOk = kpAcc.Path == common.PathDefaultWalletAccount &&
 				kpAcc.Address == s.walletAddress &&
-				bytes.Equal(kpAcc.PublicKey, ethtypes.Hex2Bytes(s.walletPubKey)) &&
+				bytes.Equal(kpAcc.PublicKey, cryptotypes.Hex2Bytes(s.walletPubKey)) &&
 				kpAcc.KeyUID == keypair.KeyUID &&
 				!kpAcc.Removed &&
 				kpAcc.Clock == 0 &&
@@ -307,6 +307,8 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() {
 	}
 	s.Require().True(chatAccountOk)
 	s.Require().True(walletAccountOk)
+
+	return keypair
 }
 
 func (s *ManagerTestSuite) TestRecoverAccount() {
@@ -318,14 +320,14 @@ func (s *ManagerTestSuite) TestSetChatAccountSuccess() {
 }
 
 func (s *ManagerTestSuite) TestSetChatAccountWrongAddress() {
-	s.testSetChatAccount(ethtypes.HexToAddress("0x0000000000000000000000000000000000000001"), s.testAccount.password, keystore.ErrNoMatch)
+	s.testSetChatAccount(cryptotypes.HexToAddress("0x0000000000000000000000000000000000000001"), s.testAccount.password, keystore.ErrNoMatch)
 }
 
 func (s *ManagerTestSuite) TestSetChatAccountWrongPassword() {
 	s.testSetChatAccount(s.testAccount.chatAddress, "wrong", keystore.ErrDecrypt)
 }
 
-func (s *ManagerTestSuite) testSetChatAccount(chat ethtypes.Address, password string, expErr error) {
+func (s *ManagerTestSuite) testSetChatAccount(chat cryptotypes.Address, password string, expErr error) {
 	s.createAndStoreProfileKeypair()
 	s.accManager.setChatAccountAndProfileKeyUID(nil, "") // clear the chat account set by `createAndStoreProfileKeypair`
 
@@ -434,7 +436,7 @@ func (s *ManagerTestSuite) TestAccounts() {
 	s.NoError(err)
 	s.Len(accs, 3)
 
-	checkAccount := func(address ethtypes.Address) bool {
+	checkAccount := func(address cryptotypes.Address) bool {
 		return address == s.chatAddress || address == s.walletAddress || address == s.masterAccount.Address()
 	}
 	s.True(checkAccount(accs[0]))
@@ -447,14 +449,14 @@ func (s *ManagerTestSuite) TestAddressToAccountSuccess() {
 }
 
 func (s *ManagerTestSuite) TestAddressToAccountWrongAddress() {
-	s.testAddressToAccount(ethtypes.HexToAddress("0x0001"), s.password, ErrKeystoreFileMissing)
+	s.testAddressToAccount(cryptotypes.HexToAddress("0x0001"), s.password, ErrKeystoreFileMissing)
 }
 
 func (s *ManagerTestSuite) TestAddressToAccountWrongPassword() {
 	s.testAddressToAccount(s.walletAddress, "wrong", keystore.ErrDecrypt)
 }
 
-func (s *ManagerTestSuite) testAddressToAccount(wallet ethtypes.Address, password string, expErr error) {
+func (s *ManagerTestSuite) testAddressToAccount(wallet cryptotypes.Address, password string, expErr error) {
 	s.createAndStoreProfileKeypair()
 
 	key, err := s.accManager.LoadAccount(wallet, password)
@@ -493,34 +495,23 @@ func (s *ManagerTestSuite) TestMigrateKeyStoreDir() {
 }
 
 func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
-	s.createAndStoreProfileKeypair()
-
-	keyDir := s.getKeyDir()
+	keypair := s.createAndStoreProfileKeypair()
 
 	err := s.accManager.ReEncryptKeyStoreDir(testPassword, newTestPassword)
 	s.Require().NoError(err)
 
-	err = filepath.Walk(keyDir, func(path string, fileInfo os.FileInfo, err error) error {
-		if fileInfo.IsDir() {
-			return nil
-		}
+	accountsToCheck := []string{keypair.DerivedFrom}
+	for _, acc := range keypair.Accounts {
+		accountsToCheck = append(accountsToCheck, acc.Address.Hex())
+	}
 
-		// walk should not throw callback errors
+	for _, acc := range accountsToCheck {
+		account, err := s.accManager.LoadAccount(cryptotypes.HexToAddress(acc), testPassword)
+		s.Require().Error(err)
+		s.Require().Nil(account)
+
+		account, err = s.accManager.LoadAccount(cryptotypes.HexToAddress(acc), newTestPassword)
 		s.Require().NoError(err)
-
-		rawKeyFile, err := os.ReadFile(path)
-		s.Require().NoError(err)
-
-		// should not decrypt with old password
-		_, decryptError := common.DecryptKey(rawKeyFile, testPassword)
-		s.Require().Error(decryptError)
-
-		// should decrypt with new password
-		_, decryptError = common.DecryptKey(rawKeyFile, newTestPassword)
-		s.Require().NoError(decryptError)
-
-		return nil
-	})
-
-	s.Require().NoError(err)
+		s.Require().NotNil(account)
+	}
 }

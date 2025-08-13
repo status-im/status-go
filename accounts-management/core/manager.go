@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/accounts-management/persistence"
 	gocommon "github.com/status-im/status-go/common"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
 
 // AccountsManager represents the default account manager implementation
@@ -64,12 +64,12 @@ func (m *AccountsManager) setChatAccountAndProfileKeyUID(account *generator.Acco
 	m.profileKeyUID = profileKeyUID
 }
 
-func (m *AccountsManager) isChatAccountSet(address ethtypes.Address) bool {
+func (m *AccountsManager) isChatAccountSet(address cryptotypes.Address) bool {
 	return m.selectedChatAccount != nil && m.selectedChatAccount.Address() == address
 }
 
 // VerifyAccountPassword verifies if the account key for a given address and password is correct.
-func (m *AccountsManager) VerifyAccountPassword(address ethtypes.Address, password string) (bool, error) {
+func (m *AccountsManager) VerifyAccountPassword(address cryptotypes.Address, password string) (bool, error) {
 	account, err := m.LoadAccount(address, password)
 	if err != nil {
 		return false, err
@@ -86,14 +86,14 @@ func (m *AccountsManager) VerifyAccountPassword(address ethtypes.Address, passwo
 
 // LoadAccount loads an account key from the keystore for a given address and password.
 // If either address or password is incorrect, an error is returned.
-func (m *AccountsManager) LoadAccount(address ethtypes.Address, password string) (*generator.Account, error) {
+func (m *AccountsManager) LoadAccount(address cryptotypes.Address, password string) (*generator.Account, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	return m.loadAccountInternally(address, password)
 }
 
-func (m *AccountsManager) loadAccountInternally(address ethtypes.Address, password string) (*generator.Account, error) {
+func (m *AccountsManager) loadAccountInternally(address cryptotypes.Address, password string) (*generator.Account, error) {
 	if m.keystore == nil {
 		return nil, ErrKeystoreMissing
 	}
@@ -119,8 +119,8 @@ func (m *AccountsManager) loadAccountInternally(address ethtypes.Address, passwo
 }
 
 // SetChatAccount sets the chat account and keystore either by address and password or by private key
-func (m *AccountsManager) SetChatAccount(address ethtypes.Address, password string, privateKey *ecdsa.PrivateKey) error {
-	if address == ethtypes.ZeroAddress() && privateKey == nil {
+func (m *AccountsManager) SetChatAccount(address cryptotypes.Address, password string, privateKey *ecdsa.PrivateKey) error {
+	if address == cryptotypes.ZeroAddress() && privateKey == nil {
 		return ErrAddressAndPasswordOrPrivateKeyRequired
 	}
 
@@ -183,7 +183,7 @@ func (m *AccountsManager) Logout() {
 }
 
 // Accounts returns list of addresses for selected account, including subaccounts.
-func (m *AccountsManager) Accounts() ([]ethtypes.Address, error) {
+func (m *AccountsManager) Accounts() ([]cryptotypes.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -192,7 +192,7 @@ func (m *AccountsManager) Accounts() ([]ethtypes.Address, error) {
 	}
 
 	ksAccounts := m.keystore.Accounts()
-	addresses := make([]ethtypes.Address, 0, len(ksAccounts))
+	addresses := make([]cryptotypes.Address, 0, len(ksAccounts))
 	for _, account := range ksAccounts {
 		addresses = append(addresses, account.Address)
 	}
@@ -203,7 +203,7 @@ func (m *AccountsManager) Accounts() ([]ethtypes.Address, error) {
 // GetVerifiedWalletAccount gets a verified wallet account by address and password
 // If the account is not found, it tries to generate the account if there is an account this account can be derived from
 // TODO: need to check it that's needed at all, cause `generatePartialAccountKey` was used for the old mobile app - maybe we should remove it
-func (m *AccountsManager) GetVerifiedWalletAccount(address ethtypes.Address, password string) (*generator.Account, error) {
+func (m *AccountsManager) GetVerifiedWalletAccount(address cryptotypes.Address, password string) (*generator.Account, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
