@@ -27,12 +27,12 @@ type insertFn func(tx *sql.Tx, c *params.NodeConfig) error
 func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig, includeConnector bool) error {
 	query := `
 	INSERT OR REPLACE INTO node_config (
-		network_id, data_dir, node_key,
+		network_id, data_dir, keystore_dir, node_key,
 		api_modules, enable_ntp_sync, wallet_enabled,
 		browser_enabled, permissions_enabled`
 
 	args := []any{
-		c.NetworkID, c.DataDir, c.NodeKey, c.APIModules, true,
+		c.NetworkID, c.DataDir, "", c.NodeKey, c.APIModules, true,
 		c.WalletConfig.Enabled, c.BrowsersConfig.Enabled,
 		c.PermissionsConfig.Enabled,
 	}

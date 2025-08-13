@@ -1,4 +1,3 @@
-ALTER TABLE node_config DROP COLUMN keystore_dir;
 ALTER TABLE shhext_config DROP COLUMN enable_connection_manager;
 ALTER TABLE shhext_config DROP COLUMN enable_last_used_monitor;
 ALTER TABLE shhext_config DROP COLUMN connection_target;
