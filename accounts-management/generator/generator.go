@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/crypto"
 )
 
 // CreateAccountFromMnemonic creates an account from a mnemonic phrase.

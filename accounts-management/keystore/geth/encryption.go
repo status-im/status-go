@@ -15,8 +15,8 @@ import (
 	"github.com/status-im/extkeys"
 
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/status-im/status-go/eth-node/crypto"
-	types "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/crypto"
 )
 
 // Encryptdata encrypts the data given as 'data' with the password 'auth'.

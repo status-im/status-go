@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/accounts-management/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
 
 // ReloadKeystore reloads the keystore for the selected chat account
@@ -131,7 +131,7 @@ func (m *AccountsManager) createKeystore(keyUID string) (keystore.KeyStore, erro
 }
 
 // deleteAccountFromKeystore deletes an account from the keystore
-func (m *AccountsManager) deleteAccountFromKeystore(address ethtypes.Address) error {
+func (m *AccountsManager) deleteAccountFromKeystore(address cryptotypes.Address) error {
 	if m.keystore == nil {
 		m.logger.Error("cannot delete account, keystore is missing", zap.String("address", address.Hex()))
 		return ErrKeystoreMissing
@@ -146,14 +146,14 @@ func (m *AccountsManager) deleteAccountFromKeystore(address ethtypes.Address) er
 // if the account is a key account, it deletes the keystore file for the account
 // if the account is a key account and it is the last account of the keypair, it deletes the master account keystore file
 // trying to delete a non-existent keystore file for an account does not result in an error
-func (m *AccountsManager) DeleteKeystoreFileForAccount(address ethtypes.Address) error {
+func (m *AccountsManager) DeleteKeystoreFileForAccount(address cryptotypes.Address) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	return m.deleteKeystoreFileForAccountInternally(address)
 }
 
-func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address ethtypes.Address) error {
+func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address cryptotypes.Address) error {
 	if m.persistence == nil {
 		return ErrPersistenceMissing
 	}
@@ -182,7 +182,7 @@ func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address ethtype
 			if acc.Type != types.AccountTypeKey {
 				lastAcccountOfKeypairWithTheSameKey := len(kp.Accounts) == 1
 				if lastAcccountOfKeypairWithTheSameKey {
-					err = m.deleteAccountFromKeystore(ethtypes.HexToAddress(kp.DerivedFrom))
+					err = m.deleteAccountFromKeystore(cryptotypes.HexToAddress(kp.DerivedFrom))
 					if err != nil {
 						return err
 					}
@@ -235,7 +235,7 @@ func (m *AccountsManager) deleteKeystoreFilesForKeypairInternally(keypair *types
 	}
 
 	if anyAccountFullyOrPartiallyOperable && keypair.Type != types.KeypairTypeKey {
-		err = m.deleteAccountFromKeystore(ethtypes.HexToAddress(keypair.DerivedFrom))
+		err = m.deleteAccountFromKeystore(cryptotypes.HexToAddress(keypair.DerivedFrom))
 		if err != nil {
 			return err
 		}
@@ -268,7 +268,7 @@ func (m *AccountsManager) ReEncryptKeyStoreDir(oldPass, newPass string) error {
 	return m.keystore.ReEncryptKeyStoreDir(oldPass, newPass)
 }
 
-func (m *AccountsManager) generatePartialAccountKey(address ethtypes.Address, password string) (*generator.Account, error) {
+func (m *AccountsManager) generatePartialAccountKey(address cryptotypes.Address, password string) (*generator.Account, error) {
 	if m.persistence == nil {
 		return nil, ErrPersistenceMissing
 	}
@@ -292,7 +292,7 @@ func (m *AccountsManager) generatePartialAccountKey(address ethtypes.Address, pa
 	return m.deriveChildAccountForPathAndStore(rootAddress, path, password)
 }
 
-func (m *AccountsManager) deriveChildAccountForPath(deriveFrom ethtypes.Address, path string, password string) (*generator.Account, error) {
+func (m *AccountsManager) deriveChildAccountForPath(deriveFrom cryptotypes.Address, path string, password string) (*generator.Account, error) {
 	account, err := m.loadAccountInternally(deriveFrom, password)
 	if err != nil {
 		return nil, err
@@ -301,7 +301,7 @@ func (m *AccountsManager) deriveChildAccountForPath(deriveFrom ethtypes.Address,
 	return generator.DeriveChildFromAccount(account, path)
 }
 
-func (m *AccountsManager) deriveChildAccountForPathAndStore(deriveFrom ethtypes.Address, path string, password string) (*generator.Account, error) {
+func (m *AccountsManager) deriveChildAccountForPathAndStore(deriveFrom cryptotypes.Address, path string, password string) (*generator.Account, error) {
 	childAccount, err := m.deriveChildAccountForPath(deriveFrom, path, password)
 	if err != nil {
 		return nil, err

@@ -19,8 +19,8 @@ import (
 	"github.com/status-im/extkeys"
 
 	"github.com/status-im/status-go/accounts-management/keystore"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/crypto"
 )
 
 const (
