@@ -110,10 +110,8 @@ sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
 
 - Functional tests are implemented in `./tests-functional/tests` based on [pytest](https://docs.pytest.org/en/8.2.x/)
 - Backend fixtures and test infrastructure are defined in `./tests-functional/tests/conftest.py`
-- Every test has two types of verifications:
-    - `verify_is_valid_json_rpc_response()` checks for status code 200, non-empty response, JSON-RPC structure, presence of the `result` field, and expected ID.
-    - `jsonschema.validate()` is used to check that the response contains expected data, including required fields and types. Schemas are stored in `/schemas/wallet_MethodName`
-    - New schemas can be generated using `./tests-functional/utils/schema_builder.py` by passing a response to the `CustomSchemaBuilder(schema_name).create_schema(response.json())` method, should be used only on test creation phase, please search `how to create schema:` to see an example in a test
+- Every test has the following verifications:
+    - `verify_is_valid_json_rpc_response()` checks for status code 200, non-empty response, JSON-RPC structure, presence of the `result` / `error` field, and expected ID.
 
 ### Backend Setup and Cleanup with Pytest Fixtures
 

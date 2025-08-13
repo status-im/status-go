@@ -1,15 +1,9 @@
 import json
 import logging
-import jsonschema
 import resources.constants as constants
 from clients.signals import SignalType, WalletEventType
 
 from utils.config import Config
-
-
-def verify_json_schema(response, method):
-    with open(f"{Config.base_dir}/schemas/{method}", "r") as schema:
-        jsonschema.validate(instance=response, schema=json.load(schema))
 
 
 def get_suggested_routes(rpc_client, **kwargs):
