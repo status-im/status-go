@@ -55,23 +55,6 @@ linters:
       - path: (.+)\.go$
         text: SA1019
 
-issues:
-  exclude:
-    - "composite literal uses unkeyed fields" # govet
-    - "G304: Potential file inclusion via variable" # gosec
-    - "G104: Errors unhandled." #gosec
-    - "lib._Ctype_char, which can be annoying to use" # golint
-    - "SA1019" # staticcheck
-  exclude-rules:
-    - path: protocol/message_handler\.go
-      text: "make it a constant"
-      linters:
-        - goconst
-    - path: protocol/.*_test\.go
-      text: "make it a constant"
-      linters:
-        - goconst
-
 formatters:
   enable:
     - goimports
