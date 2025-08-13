@@ -16,6 +16,8 @@ rm -rf "${benchmark_results_path}"
 
 mkdir -p "${test_results_path}"
 mkdir -p "${benchmark_results_path}"
+# Create coverage directory as jenkins user
+mkdir -p "${GIT_ROOT}/coverage/binary"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.waku.yml"
 identifier=${BUILD_ID:-$(git rev-parse --short HEAD)}
