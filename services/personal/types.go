@@ -3,7 +3,7 @@ package personal
 import (
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 )
 
 // SignParams required to sign messages
@@ -14,7 +14,7 @@ type SignParams struct {
 }
 
 func (sp *SignParams) Validate(checkPassword bool) error {
-	if len(sp.Address) != 2*types.AddressLength+2 {
+	if len(sp.Address) != 2*types.AddressBytesLength+2 {
 		return errors.New("address has to be provided")
 	}
 

@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/snt"
 	stickersContracts "github.com/status-im/status-go/contracts/stickers"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"

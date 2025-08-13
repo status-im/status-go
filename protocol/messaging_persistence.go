@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -322,7 +322,7 @@ func (c *messagingPersistence) RemoveMessageSegmentsCompletedOlderThan(timestamp
 // the messageIDs that can be considered confirmed.
 // If atLeastOne is set it will return messageid if at least once of the messages
 // sent has been confirmed
-func (c *messagingPersistence) MarkAsConfirmed(dataSyncID []byte, atLeastOne bool) (messageID ethtypes.HexBytes, err error) {
+func (c *messagingPersistence) MarkAsConfirmed(dataSyncID []byte, atLeastOne bool) (messageID cryptotypes.HexBytes, err error) {
 	tx, err := c.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return nil, err

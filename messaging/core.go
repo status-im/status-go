@@ -17,6 +17,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
@@ -221,7 +222,7 @@ func (c *Core) sendDataSync(receiver state.PeerID, payload *datasyncproto.Payloa
 		return err
 	}
 
-	c.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.Strings("hashes", ethtypes.EncodeHexes(hashes)))
+	c.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)))
 	c.transport.TrackMany(messageIDs, hashes, newMessages)
 
 	pubsub.Publish(c.publisher, events.DatasyncMessagesSentEvent{

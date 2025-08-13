@@ -28,8 +28,9 @@ import (
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/accounts-management/generator"
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
@@ -89,9 +90,9 @@ var (
 )
 
 type MessageSigner interface {
-	Recover(rpcParams personal.RecoverParams) (addr types.Address, err error)
-	CanRecover(rpcParams personal.RecoverParams, revealedAddress types.Address) (bool, error)
-	Sign(rpcParams personal.SignParams, verifiedAccount *generator.Account) (result types.HexBytes, err error)
+	Recover(rpcParams personal.RecoverParams) (addr cryptotypes.Address, err error)
+	CanRecover(rpcParams personal.RecoverParams, revealedAddress cryptotypes.Address) (bool, error)
+	Sign(rpcParams personal.SignParams, verifiedAccount *generator.Account) (result cryptotypes.HexBytes, err error)
 }
 
 type Manager struct {
@@ -3143,7 +3144,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 				Signature: types.EncodeHex(revealedAccount.Signature),
 			}
 
-			matching, err := m.signer.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
+			matching, err := m.signer.CanRecover(recoverParams, cryptotypes.HexToAddress(revealedAccount.Address))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -3230,7 +3231,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 			Signature: types.EncodeHex(revealedAccount.Signature),
 		}
 
-		matching, err := m.signer.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
+		matching, err := m.signer.CanRecover(recoverParams, cryptotypes.HexToAddress(revealedAccount.Address))
 		if err != nil {
 			return err
 		}

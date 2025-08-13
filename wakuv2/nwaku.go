@@ -56,7 +56,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku/types"
@@ -1227,7 +1227,7 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 }
 
 // HasEnvelope returns true if the envelope with the given hash is present in the cache.
-func (w *Waku) HasEnvelope(hash ethtypes.Hash) bool {
+func (w *Waku) HasEnvelope(hash cryptotypes.Hash) bool {
 	w.poolMu.RLock()
 	defer w.poolMu.RUnlock()
 

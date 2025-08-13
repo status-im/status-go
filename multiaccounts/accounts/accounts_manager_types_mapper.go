@@ -2,7 +2,7 @@ package accounts
 
 import (
 	"github.com/status-im/status-go/accounts-management/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/common"
 )
 
@@ -137,9 +137,9 @@ func KeycardToAccountsManagerKeycard(keycard *Keycard) *types.Keycard {
 		KeycardLocked: keycard.KeycardLocked,
 	}
 
-	accountsManagerKeycard.AccountsAddresses = make([]ethtypes.Address, len(keycard.AccountsAddresses))
+	accountsManagerKeycard.AccountsAddresses = make([]cryptotypes.Address, len(keycard.AccountsAddresses))
 	for i, accountAddress := range keycard.AccountsAddresses {
-		accountsManagerKeycard.AccountsAddresses[i] = ethtypes.HexToAddress(accountAddress.Hex())
+		accountsManagerKeycard.AccountsAddresses[i] = cryptotypes.HexToAddress(accountAddress.Hex())
 	}
 
 	return accountsManagerKeycard
@@ -154,9 +154,9 @@ func AccountsManagerKeycardToKeycard(keycard *types.Keycard) *Keycard {
 		KeycardLocked: keycard.KeycardLocked,
 	}
 
-	dbKeycard.AccountsAddresses = make([]ethtypes.Address, len(keycard.AccountsAddresses))
+	dbKeycard.AccountsAddresses = make([]cryptotypes.Address, len(keycard.AccountsAddresses))
 	for i, accountAddress := range keycard.AccountsAddresses {
-		dbKeycard.AccountsAddresses[i] = ethtypes.HexToAddress(accountAddress.Hex())
+		dbKeycard.AccountsAddresses[i] = cryptotypes.HexToAddress(accountAddress.Hex())
 	}
 
 	return dbKeycard

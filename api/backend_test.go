@@ -29,8 +29,8 @@ import (
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -1183,7 +1183,7 @@ func TestCreateWallet(t *testing.T) {
 	accountsAPI := accountsService.AccountsAPI()
 
 	err = accountsAPI.AddAccount(context.Background(), testPassword, &accounts.Account{
-		Address:   types.Address(derivedAddress[0].Address),
+		Address:   derivedAddress[0].Address,
 		KeyUID:    account.KeyUID,
 		Type:      accounts.AccountTypeGenerated,
 		PublicKey: derivedAddress[0].PublicKey,

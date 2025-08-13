@@ -21,7 +21,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
-	eth_node_types "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -397,7 +397,7 @@ func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *tokenTyp
 	if err != nil {
 		return
 	}
-	communityID := eth_node_types.EncodeHex(communityIDHex)
+	communityID := cryptotypes.EncodeHex(communityIDHex)
 
 	token.CommunityData = &community.Data{
 		ID: communityID,

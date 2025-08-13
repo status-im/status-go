@@ -7,7 +7,7 @@ import (
 	"github.com/mmcdole/gofeed"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/signal"
 )

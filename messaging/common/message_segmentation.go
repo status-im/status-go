@@ -11,8 +11,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -144,7 +144,7 @@ func segmentMessage(newMessage *wakutypes.NewMessage, segmentSize int) ([]*wakut
 // handleSegmentationLayer is capable of reconstructing the message from both complete and partial sets of data segments.
 // It has capability to perform forward error correction.
 func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
-	logger := s.logger.Named("handleSegmentationLayer").With(zap.String("hash", ethtypes.HexBytes(message.TransportLayer.Hash).String()))
+	logger := s.logger.Named("handleSegmentationLayer").With(zap.String("hash", cryptotypes.HexBytes(message.TransportLayer.Hash).String()))
 
 	segmentMessage := &types.SegmentMessage{
 		SegmentMessage: &protobuf.SegmentMessage{},
@@ -159,7 +159,7 @@ func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
 	}
 
 	logger.Debug("handling message segment",
-		zap.String("EntireMessageHash", ethtypes.HexBytes(segmentMessage.EntireMessageHash).String()),
+		zap.String("EntireMessageHash", cryptotypes.HexBytes(segmentMessage.EntireMessageHash).String()),
 		zap.Uint32("Index", segmentMessage.Index),
 		zap.Uint32("SegmentsCount", segmentMessage.SegmentsCount),
 		zap.Uint32("ParitySegmentIndex", segmentMessage.ParitySegmentIndex),

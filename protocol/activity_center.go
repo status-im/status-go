@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
