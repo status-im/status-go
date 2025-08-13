@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
 
-	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -47,7 +46,6 @@ type MessengerResponse struct {
 	Contacts                      []*Contact
 	Invitations                   []*GroupChatInvitation
 	CommunityChanges              []*communities.CommunityChanges
-	AnonymousMetrics              []*appmetrics.AppMetric
 	Mailservers                   []types.Mailserver
 	Bookmarks                     []*browsers.Bookmark
 	Settings                      []*settings.SyncSettingField

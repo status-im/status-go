@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"go.uber.org/zap"
 	"gopkg.in/go-playground/validator.v9"
@@ -317,29 +316,9 @@ type ShhextConfig struct {
 	InstallationID string
 	// MailServerConfirmations should be true if client wants to receive confirmatons only from a selected mail servers.
 	MailServerConfirmations bool
-	// EnableConnectionManager turns on management of the mail server connections if true.
-	EnableConnectionManager bool
-	// EnableLastUsedMonitor guarantees that last used mail server will be tracked and persisted into the storage.
-	EnableLastUsedMonitor bool
-	// ConnectionTarget will be used by connection manager. It will ensure that we connected with configured number of servers.
-	ConnectionTarget int
-	// RequestsDelay used to ensure that no similar requests are sent within short periods of time.
-	RequestsDelay time.Duration
-	// MaxServerFailures defines maximum allowed expired requests before server will be swapped to another one.
-	MaxServerFailures int
 
 	// MaxMessageDeliveryAttempts defines how many times we will try to deliver not-acknowledged envelopes.
 	MaxMessageDeliveryAttempts int
-
-	// WhisperCacheDir is a folder where whisper filters may persist messages before delivering them
-	// to a client.
-	WhisperCacheDir string
-
-	// DisableGenericDiscoveryTopic indicates whether we should be listening on the old discovery
-	DisableGenericDiscoveryTopic bool
-
-	// SendV1Messages indicates whether we should be sending v1-compatible only messages
-	SendV1Messages bool
 
 	// DatasyncEnabled indicates whether we should enable dataasync
 	DataSyncEnabled bool
@@ -360,15 +339,6 @@ type ShhextConfig struct {
 
 	// DefaultPushNotificationsServers is the default-status run push notification servers
 	DefaultPushNotificationsServers []*PushNotificationServer
-
-	// AnonMetricsSendID is the public key used by a metrics node to decrypt metrics protobufs
-	AnonMetricsSendID string
-
-	// AnonMetricsServerEnabled indicates whether or not the
-	AnonMetricsServerEnabled bool
-
-	// AnonMetricsServerPostgresURI is the uri used to connect to a postgres db
-	AnonMetricsServerPostgresURI string
 
 	// BandwidthStatsEnabled indicates if a signal is going to be emitted to indicate the upload and download rate
 	BandwidthStatsEnabled bool

@@ -125,7 +125,6 @@ func (s SettingField) Equals(other SettingField) bool {
 type Settings struct {
 	// required
 	Address                   types.Address    `json:"address"`
-	AnonMetricsShouldSend     bool             `json:"anon-metrics/should-send?,omitempty"`
 	ChaosMode                 bool             `json:"chaos-mode?,omitempty"`
 	Currency                  string           `json:"currency,omitempty"`
 	CurrentNetwork            string           `json:"networks/current-network"`

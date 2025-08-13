@@ -28,7 +28,6 @@ import (
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appgeneral "github.com/status-im/status-go/services/app-general"
-	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
 	"github.com/status-im/status-go/services/communitytokens"
@@ -88,7 +87,6 @@ type StatusNode struct {
 	accountsSrvc           *accountssvc.Service
 	browsersSrvc           *browsers.Service
 	permissionsSrvc        *permissions.Service
-	appMetricsSrvc         *appmetricsservice.Service
 	walletSrvc             *wallet.Service
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
@@ -374,7 +372,6 @@ func (n *StatusNode) stop() error {
 	n.accountsSrvc = nil
 	n.browsersSrvc = nil
 	n.permissionsSrvc = nil
-	n.appMetricsSrvc = nil
 	n.walletSrvc = nil
 	n.localNotificationsSrvc = nil
 	n.personalSrvc = nil
