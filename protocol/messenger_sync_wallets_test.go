@@ -9,7 +9,7 @@ import (
 	gomock "go.uber.org/mock/gomock"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"

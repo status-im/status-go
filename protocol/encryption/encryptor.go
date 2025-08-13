@@ -11,9 +11,8 @@ import (
 	dr "github.com/status-im/doubleratchet"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/crypto/ecies"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 )
@@ -189,20 +188,6 @@ func (s *encryptor) CreateBundle(privateKey *ecdsa.PrivateKey, installations []*
 	return s.CreateBundle(privateKey, installations)
 }
 
-// DecryptWithDH decrypts message sent with a DH key exchange, and throws away the key after decryption
-func (s *encryptor) DecryptWithDH(myIdentityKey *ecdsa.PrivateKey, theirEphemeralKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
-	key, err := PerformDH(
-		ecies.ImportECDSA(myIdentityKey),
-		ecies.ImportECDSAPublic(theirEphemeralKey),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return crypto.DecryptSymmetric(key, payload)
-
-}
-
 // keyFromPassiveX3DH decrypts message sent with a X3DH key exchange, storing the key for future exchanges
 func (s *encryptor) keyFromPassiveX3DH(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirEphemeralKey *ecdsa.PublicKey, ourBundleID []byte) ([]byte, error) {
 	bundlePrivateKey, err := s.persistence.GetPrivateKeyBundle(ourBundleID)
@@ -332,7 +317,7 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 		if err != nil {
 			return nil, err
 		}
-		return s.DecryptWithDH(myIdentityKey, decompressedKey, payload)
+		return crypto.DecryptWithDH(myIdentityKey, decompressedKey, payload)
 	}
 
 	// Try Hash Ratchet

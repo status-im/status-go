@@ -5,8 +5,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/eth-node/crypto"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +24,7 @@ func generateMessageToSign(t *testing.T) string {
 	identityPublicKeyCompressedBytes, err := hexutil.Decode(identityPublicKeyCompressed)
 	require.NoError(t, err)
 
-	return ethtypes.EncodeHex(crypto.Keccak256(identityPublicKeyCompressedBytes, communityIDBytes, requestIDBytes))
+	return types.EncodeHex(crypto.Keccak256(identityPublicKeyCompressedBytes, communityIDBytes, requestIDBytes))
 }
 
 func generateAccountForSigning(t *testing.T) *generator.Account {

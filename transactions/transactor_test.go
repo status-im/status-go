@@ -27,8 +27,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -252,7 +252,7 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	key, _ := gethcrypto.GenerateKey()
 	selectedAccount := &accstypes.SelectedExtKey{
 		Address:    types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
-		AccountKey: &types.Key{PrivateKey: key},
+		AccountKey: &accstypes.Key{PrivateKey: key},
 	}
 
 	chainID := s.nodeConfig.NetworkID

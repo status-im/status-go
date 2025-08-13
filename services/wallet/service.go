@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 
 	"github.com/ethereum/go-ethereum/event"

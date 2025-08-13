@@ -3,17 +3,17 @@ package protocol
 import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
 
 //go:generate mockgen -package=mock_protocol_accounts_manager -source=accounts_manager_interface.go -destination=mock/messenger_accounts_manager.go
 
 // AccountsManager interface for mocking purposes
 type AccountsManager interface {
-	GetVerifiedWalletAccount(address ethtypes.Address, password string) (*generator.Account, error)
-	DeleteAccount(address ethtypes.Address, clock uint64) (account *types.Account, err error)
+	GetVerifiedWalletAccount(address cryptotypes.Address, password string) (*generator.Account, error)
+	DeleteAccount(address cryptotypes.Address, clock uint64) (account *types.Account, err error)
 	DeleteKeypair(keyUID string, clock uint64) (keypair *types.Keypair, err error)
-	DeleteKeystoreFileForAccount(address ethtypes.Address) error
+	DeleteKeystoreFileForAccount(address cryptotypes.Address) error
 	DeleteKeystoreFilesForKeypair(keypair *types.Keypair) (err error)
 	MakeSeedPhraseKeypairFullyOperable(mnemonic string, password string, clock uint64) (string, error)
 	MakePrivateKeyKeypairFullyOperable(privateKey string, password string, clock uint64) (string, error)

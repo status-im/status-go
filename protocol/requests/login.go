@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 )
 
 var (

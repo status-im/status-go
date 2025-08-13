@@ -17,13 +17,13 @@ import (
 
 	"github.com/status-im/status-go/appdatabase/migrations"
 	migrationsprevnodecfg "github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/sqlite"
 
-	e_types "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
 
 const nodeCfgMigrationDate = 1640111208
@@ -119,8 +119,8 @@ func FixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var address e_types.Address
-		var pubkey e_types.HexBytes
+		var address cryptotypes.Address
+		var pubkey cryptotypes.HexBytes
 		err = rows.Scan(&address, &pubkey)
 		if err != nil {
 			logutils.ZapLogger().Error("Migrating accounts: failed to scan records", zap.Error(err))
@@ -140,7 +140,7 @@ func FixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 		}
 	}
 
-	var walletRootAddress e_types.Address
+	var walletRootAddress cryptotypes.Address
 	err = sqlTx.QueryRow(`SELECT wallet_root_address FROM settings WHERE synthetic_id='id'`).Scan(&walletRootAddress)
 	if err == sql.ErrNoRows {
 		// we shouldn't reach here, but if we do, it probably happened from the test

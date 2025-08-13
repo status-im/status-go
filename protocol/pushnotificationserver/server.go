@@ -11,9 +11,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/crypto/ecies"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -221,11 +220,7 @@ func (s *Server) verifyGrantSignature(clientPublicKey *ecdsa.PublicKey, accessTo
 }
 
 func (s *Server) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
-	return ecies.ImportECDSA(s.config.Identity).GenerateShared(
-		ecies.ImportECDSAPublic(publicKey),
-		encryptedPayloadKeyLength,
-		encryptedPayloadKeyLength,
-	)
+	return crypto.GenerateSharedKey(s.config.Identity, publicKey)
 }
 
 func (s *Server) validateUUID(u string) error {

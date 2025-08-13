@@ -2,7 +2,7 @@ package accounts
 
 import (
 	"github.com/status-im/status-go/accounts-management/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
 
 type AccountsManagerPersistenceAdapter struct {
@@ -13,18 +13,18 @@ func NewAccountsManagerPersistenceAdapter(db *Database) *AccountsManagerPersiste
 	return &AccountsManagerPersistenceAdapter{db: db}
 }
 
-func (a *AccountsManagerPersistenceAdapter) AddressExists(address ethtypes.Address) (bool, error) {
+func (a *AccountsManagerPersistenceAdapter) AddressExists(address cryptotypes.Address) (bool, error) {
 	return a.db.AddressExists(address)
 }
 
-func (a *AccountsManagerPersistenceAdapter) GetPath(address ethtypes.Address) (string, error) {
+func (a *AccountsManagerPersistenceAdapter) GetPath(address cryptotypes.Address) (string, error) {
 	return a.db.GetPath(address)
 }
 
-func (a *AccountsManagerPersistenceAdapter) GetWalletRootAddress() (ethtypes.Address, error) {
+func (a *AccountsManagerPersistenceAdapter) GetWalletRootAddress() (cryptotypes.Address, error) {
 	address, err := a.db.GetWalletRootAddress()
 	if err != nil {
-		return ethtypes.ZeroAddress(), err
+		return cryptotypes.ZeroAddress(), err
 	}
 	return address, nil
 }
@@ -70,7 +70,7 @@ func (a *AccountsManagerPersistenceAdapter) MarkKeypairFullyOperable(keyUID stri
 	return a.db.MarkKeypairFullyOperable(keyUID, clock, updateKeypairClock)
 }
 
-func (a *AccountsManagerPersistenceAdapter) MarkAccountFullyOperable(address ethtypes.Address) (err error) {
+func (a *AccountsManagerPersistenceAdapter) MarkAccountFullyOperable(address cryptotypes.Address) (err error) {
 	return a.db.MarkAccountFullyOperable(address)
 }
 
@@ -87,7 +87,7 @@ func (a *AccountsManagerPersistenceAdapter) GetPositionForNextNewAccount() (int6
 	return a.db.GetPositionForNextNewAccount()
 }
 
-func (a *AccountsManagerPersistenceAdapter) GetAccountByAddress(address ethtypes.Address) (*types.Account, error) {
+func (a *AccountsManagerPersistenceAdapter) GetAccountByAddress(address cryptotypes.Address) (*types.Account, error) {
 	dbAccount, err := a.db.GetAccountByAddress(address)
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func (a *AccountsManagerPersistenceAdapter) GetAccountByAddress(address ethtypes
 	return AccountToAccountsManagerAccount(dbAccount), nil
 }
 
-func (a *AccountsManagerPersistenceAdapter) RemoveAccount(address ethtypes.Address, clock uint64) error {
+func (a *AccountsManagerPersistenceAdapter) RemoveAccount(address cryptotypes.Address, clock uint64) error {
 	return a.db.RemoveAccount(address, clock)
 }
 

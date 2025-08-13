@@ -14,7 +14,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"

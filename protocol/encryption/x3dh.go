@@ -7,8 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/crypto/ecies"
+	"github.com/status-im/status-go/crypto"
 )
 
 const (
@@ -116,15 +115,6 @@ func ExtractIdentity(bundle *Bundle) (*ecdsa.PublicKey, error) {
 	return recoveredKey, nil
 }
 
-// PerformDH generates a shared key given a private and a public key
-func PerformDH(privateKey *ecies.PrivateKey, publicKey *ecies.PublicKey) ([]byte, error) {
-	return privateKey.GenerateShared(
-		publicKey,
-		sskLen,
-		sskLen,
-	)
-}
-
 func getSharedSecret(dh1 []byte, dh2 []byte, dh3 []byte) []byte {
 	secretInput := append(append(dh1, dh2...), dh3...)
 
@@ -133,23 +123,23 @@ func getSharedSecret(dh1 []byte, dh2 []byte, dh3 []byte) []byte {
 
 // x3dhActive handles initiating an X3DH session
 func x3dhActive(
-	myIdentityKey *ecies.PrivateKey,
-	theirSignedPreKey *ecies.PublicKey,
-	myEphemeralKey *ecies.PrivateKey,
-	theirIdentityKey *ecies.PublicKey,
+	myIdentityKey *ecdsa.PrivateKey,
+	theirSignedPreKey *ecdsa.PublicKey,
+	myEphemeralKey *ecdsa.PrivateKey,
+	theirIdentityKey *ecdsa.PublicKey,
 ) ([]byte, error) {
 	var dh1, dh2, dh3 []byte
 	var err error
 
-	if dh1, err = PerformDH(myIdentityKey, theirSignedPreKey); err != nil {
+	if dh1, err = crypto.GenerateSharedKey(myIdentityKey, theirSignedPreKey); err != nil {
 		return nil, err
 	}
 
-	if dh2, err = PerformDH(myEphemeralKey, theirIdentityKey); err != nil {
+	if dh2, err = crypto.GenerateSharedKey(myEphemeralKey, theirIdentityKey); err != nil {
 		return nil, err
 	}
 
-	if dh3, err = PerformDH(myEphemeralKey, theirSignedPreKey); err != nil {
+	if dh3, err = crypto.GenerateSharedKey(myEphemeralKey, theirSignedPreKey); err != nil {
 		return nil, err
 	}
 
@@ -158,23 +148,23 @@ func x3dhActive(
 
 // x3dhPassive handles the response to an initiated X3DH session
 func x3dhPassive(
-	theirIdentityKey *ecies.PublicKey,
-	mySignedPreKey *ecies.PrivateKey,
-	theirEphemeralKey *ecies.PublicKey,
-	myIdentityKey *ecies.PrivateKey,
+	theirIdentityKey *ecdsa.PublicKey,
+	mySignedPreKey *ecdsa.PrivateKey,
+	theirEphemeralKey *ecdsa.PublicKey,
+	myIdentityKey *ecdsa.PrivateKey,
 ) ([]byte, error) {
 	var dh1, dh2, dh3 []byte
 	var err error
 
-	if dh1, err = PerformDH(mySignedPreKey, theirIdentityKey); err != nil {
+	if dh1, err = crypto.GenerateSharedKey(mySignedPreKey, theirIdentityKey); err != nil {
 		return nil, err
 	}
 
-	if dh2, err = PerformDH(myIdentityKey, theirEphemeralKey); err != nil {
+	if dh2, err = crypto.GenerateSharedKey(myIdentityKey, theirEphemeralKey); err != nil {
 		return nil, err
 	}
 
-	if dh3, err = PerformDH(mySignedPreKey, theirEphemeralKey); err != nil {
+	if dh3, err = crypto.GenerateSharedKey(mySignedPreKey, theirEphemeralKey); err != nil {
 		return nil, err
 	}
 
@@ -189,10 +179,7 @@ func PerformActiveDH(publicKey *ecdsa.PublicKey) ([]byte, *ecdsa.PublicKey, erro
 		return nil, nil, err
 	}
 
-	key, err := PerformDH(
-		ecies.ImportECDSA(ephemeralKey),
-		ecies.ImportECDSAPublic(publicKey),
-	)
+	key, err := crypto.GenerateSharedKey(ephemeralKey, publicKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -219,10 +206,10 @@ func PerformActiveX3DH(identity []byte, signedPreKey []byte, prv *ecdsa.PrivateK
 	}
 
 	sharedSecret, err := x3dhActive(
-		ecies.ImportECDSA(prv),
-		ecies.ImportECDSAPublic(bundleSignedPreKey),
-		ecies.ImportECDSA(ephemeralKey),
-		ecies.ImportECDSAPublic(bundleIdentityKey),
+		prv,
+		bundleSignedPreKey,
+		ephemeralKey,
+		bundleIdentityKey,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -236,10 +223,10 @@ func PerformActiveX3DH(identity []byte, signedPreKey []byte, prv *ecdsa.PrivateK
 // we loaded our identity key and the correct signedPreKey and we perform X3DH
 func PerformPassiveX3DH(theirIdentityKey *ecdsa.PublicKey, mySignedPreKey *ecdsa.PrivateKey, theirEphemeralKey *ecdsa.PublicKey, myPrivateKey *ecdsa.PrivateKey) ([]byte, error) {
 	sharedSecret, err := x3dhPassive(
-		ecies.ImportECDSAPublic(theirIdentityKey),
-		ecies.ImportECDSA(mySignedPreKey),
-		ecies.ImportECDSAPublic(theirEphemeralKey),
-		ecies.ImportECDSA(myPrivateKey),
+		theirIdentityKey,
+		mySignedPreKey,
+		theirEphemeralKey,
+		myPrivateKey,
 	)
 	if err != nil {
 		return nil, err

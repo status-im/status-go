@@ -20,7 +20,7 @@ import (
 
 	datasyncproto "github.com/status-im/mvds/protobuf"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging/datasync"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption"

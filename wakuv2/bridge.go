@@ -2,6 +2,7 @@ package wakuv2
 
 import (
 	"github.com/ethereum/go-ethereum/event"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2/common"
@@ -23,8 +24,8 @@ func NewWakuV2EnvelopeEventWrapper(envelopeEvent *common.EnvelopeEvent) *types.E
 	}
 	return &types.EnvelopeEvent{
 		Event: types.EventType(envelopeEvent.Event),
-		Hash:  ethtypes.Hash(envelopeEvent.Hash),
-		Batch: ethtypes.Hash(envelopeEvent.Batch),
+		Hash:  cryptotypes.Hash(envelopeEvent.Hash),
+		Batch: cryptotypes.Hash(envelopeEvent.Batch),
 		Peer:  ethtypes.EnodeID(envelopeEvent.Peer),
 		Data:  wrappedData,
 	}
@@ -37,7 +38,7 @@ func NewWakuV2EnvelopeErrorWrapper(envelopeError *common.EnvelopeError) *types.E
 	}
 
 	return &types.EnvelopeError{
-		Hash:        ethtypes.Hash(envelopeError.Hash),
+		Hash:        cryptotypes.Hash(envelopeError.Hash),
 		Code:        mapGethErrorCode(envelopeError.Code),
 		Description: envelopeError.Description,
 	}

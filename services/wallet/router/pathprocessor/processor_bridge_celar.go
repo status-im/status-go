@@ -21,7 +21,7 @@ import (
 
 	statuscommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts/celer"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/utils"
@@ -429,7 +429,7 @@ func (s *CelerBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, s
 func (s *CelerBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (types.Hash, uint64, error) {
 	tx, err := s.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.ChainID, sendArgs.CbridgeTx.From, verifiedAccount.PrivateKey()), lastUsedNonce)
 	if err != nil {
-		return types.HexToHash(""), 0, createBridgeCellerErrorResponse(err)
+		return types.Hash{}, 0, createBridgeCellerErrorResponse(err)
 	}
 
 	return types.Hash(tx.Hash()), tx.Nonce(), nil

@@ -13,9 +13,9 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 )
 
@@ -82,7 +82,7 @@ func (t *TransactionValidator) verifyTransactionSignature(ctx context.Context, f
 	// We take a copy as EcRecover modifies the byte slice
 	signatureCopy := make([]byte, len(signature))
 	copy(signatureCopy, signature)
-	extractedAddress, err := crypto.EcRecover(ctx, signatureMaterial, signatureCopy)
+	extractedAddress, err := crypto.EcRecover(signatureMaterial, signatureCopy)
 	if err != nil {
 		return err
 	}

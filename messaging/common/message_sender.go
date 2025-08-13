@@ -15,8 +15,8 @@ import (
 	"github.com/status-im/mvds/state"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/datasync"
 	datasyncpeer "github.com/status-im/status-go/messaging/datasync/peer"
