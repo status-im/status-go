@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/status-im/status-go/crypto/types"
@@ -53,15 +54,6 @@ func (kp *Keycard) FromSyncKeycard(kc *protobuf.SyncKeycard) {
 	}
 }
 
-func containsAddress(addresses []types.Address, address types.Address) bool {
-	for _, addr := range addresses {
-		if addr == address {
-			return true
-		}
-	}
-	return false
-}
-
 func (db *Database) processResult(rows *sql.Rows) ([]*Keycard, error) {
 	keycards := []*Keycard{}
 	for rows.Next() {
@@ -89,7 +81,7 @@ func (db *Database) processResult(rows *sql.Rows) ([]*Keycard, error) {
 			keycard.AccountsAddresses = append(keycard.AccountsAddresses, addr)
 			keycards = append(keycards, keycard)
 		} else {
-			if containsAddress(keycards[foundAtIndex].AccountsAddresses, addr) {
+			if slices.Contains(keycards[foundAtIndex].AccountsAddresses, addr) {
 				continue
 			}
 			keycards[foundAtIndex].AccountsAddresses = append(keycards[foundAtIndex].AccountsAddresses, addr)

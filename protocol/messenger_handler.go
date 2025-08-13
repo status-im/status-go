@@ -3308,13 +3308,13 @@ func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability a
 	}
 }
 
-func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, recoverinrecoveringFromWakuInitiatedByKeycard bool,
+func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, recoveringFromWakuInitiatedByKeycard bool,
 	syncKpMigratedToKeycard bool, dbKpMigratedToKeycard bool, accountReceivedFromLocalPairing bool) (accounts.AccountOperable, error) {
 	if accountReceivedFromLocalPairing {
 		return accounts.AccountOperable(syncAcc.Operable), nil
 	}
 
-	if syncKpMigratedToKeycard || recoverinrecoveringFromWakuInitiatedByKeycard && m.account.KeyUID == syncAcc.KeyUid {
+	if syncKpMigratedToKeycard || recoveringFromWakuInitiatedByKeycard && m.account.KeyUID == syncAcc.KeyUid {
 		return accounts.AccountFullyOperable, nil
 	}
 
@@ -3593,6 +3593,8 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		Removed:                 message.Removed,
 	}
 
+	oldAddresses := make(map[types.Address]bool)
+
 	if dbKeypair != nil {
 		if dbKeypair.Clock >= kp.Clock {
 			return nil, ErrTryingToStoreOldKeypair
@@ -3604,6 +3606,9 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		if dbKeypair.SyncedFrom != accounts.SyncedFromBackup {
 			kp.SyncedFrom = dbKeypair.SyncedFrom
 		}
+		for _, acc := range dbKeypair.Accounts {
+			oldAddresses[acc.Address] = !acc.Removed
+		}
 	}
 
 	syncKpMigratedToKeycard := len(message.Keycards) > 0
@@ -3613,10 +3618,10 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 	if err != nil {
 		return nil, err
 	}
-	recoverinrecoveringFromWakuInitiatedByKeycard := recoveringFromWaku && multiAcc != nil && multiAcc.RefersToKeycard()
+	recoveringFromWakuInitiatedByKeycard := recoveringFromWaku && multiAcc != nil && multiAcc.RefersToKeycard()
 	for _, sAcc := range message.Accounts {
 		accountOperability, err := m.resolveAccountOperability(sAcc,
-			recoverinrecoveringFromWakuInitiatedByKeycard,
+			recoveringFromWakuInitiatedByKeycard,
 			syncKpMigratedToKeycard,
 			dbKeypair != nil && dbKeypair.MigratedToKeycard(),
 			fromLocalPairing)
@@ -3628,7 +3633,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		kp.Accounts = append(kp.Accounts, acc)
 	}
 
-	if !fromLocalPairing && !recoverinrecoveringFromWakuInitiatedByKeycard {
+	if !fromLocalPairing && !recoveringFromWakuInitiatedByKeycard {
 		if kp.Removed ||
 			dbKeypair != nil && !dbKeypair.MigratedToKeycard() && syncKpMigratedToKeycard {
 			// delete all keystore files
@@ -3731,24 +3736,27 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 				if acc.Chat {
 					continue
 				}
-				if acc.Removed {
+				// We call the signals only if there is a change in the account list
+				// i.e. an account is unknown (not part of the Accounts list before)
+				// or an account was removed and is now back (Removed flag changed)
+				stillPresent, ok := oldAddresses[acc.Address]
+				if acc.Removed && (!ok || stillPresent) {
 					removedAddresses = append(removedAddresses, gethcommon.Address(acc.Address))
-				} else {
+				} else if !ok || !stillPresent {
 					addedAddresses = append(addedAddresses, gethcommon.Address(acc.Address))
 				}
 			}
 		}
-		if m.config.accountsPublisher != nil {
-			if len(addedAddresses) > 0 {
-				pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsAddedEvent{
-					Accounts: addedAddresses,
-				})
-			}
-			if len(removedAddresses) > 0 {
-				pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsRemovedEvent{
-					Accounts: removedAddresses,
-				})
-			}
+
+		if len(addedAddresses) > 0 {
+			pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsAddedEvent{
+				Accounts: addedAddresses,
+			})
+		}
+		if len(removedAddresses) > 0 {
+			pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsRemovedEvent{
+				Accounts: removedAddresses,
+			})
 		}
 	}
 
