@@ -63,8 +63,8 @@ pipeline {
       script {
         sh '''
           docker ps -a --filter "name=status-go-func-tests-${BUILD_ID}" -q | xargs -r docker rm -f
-          make git-clean
         '''
+        cleanWs(disableDeferredWipeout: true, deleteDirs: true)
       }
     }
   } // post
