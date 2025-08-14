@@ -1172,7 +1172,7 @@ func (w *Waku) Start() error {
 		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
 			missing.NewDefaultStorenodeRequestor(w.node.Store()),
 			w,
-			w.node.Timesource(),
+			w.timesource.(timesource.TimeSource),
 			w.logger)
 
 		w.missingMsgVerifier.Start(w.ctx)
@@ -1331,7 +1331,7 @@ func (w *Waku) startMessageSender() error {
 	if w.cfg.EnableStoreConfirmationForMessagesSent {
 		msgStoredChan := make(chan gethcommon.Hash, 1000)
 		msgExpiredChan := make(chan gethcommon.Hash, 1000)
-		messageSentCheck := publish.NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), w.StorenodeCycle, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
+		messageSentCheck := publish.NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), w.StorenodeCycle, w.timesource.(timesource.TimeSource), msgStoredChan, msgExpiredChan, w.logger)
 		sender.WithMessageSentCheck(messageSentCheck)
 
 		w.wg.Add(1)

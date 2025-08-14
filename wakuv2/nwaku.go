@@ -57,8 +57,9 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/timesource"
+	ntptimesource "github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/status-im/status-go/wakuv2/persistence"
@@ -162,7 +163,7 @@ type Waku struct {
 	logger *zap.Logger
 
 	// NTP Synced timesource
-	timesource *timesource.NTPTimeSource
+	timesource timesource.TimeSource
 
 	// seededBootnodesForDiscV5 indicates whether we manage to retrieve discovery
 	// bootnodes successfully
@@ -198,7 +199,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts timesource.TimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -208,7 +209,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 	}
 
 	if ts == nil {
-		ts = timesource.Default()
+		ts = ntptimesource.Default()
 	}
 
 	cfg = setDefaults(cfg)
@@ -840,7 +841,7 @@ func (w *Waku) Start() error {
 		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
 			newStorenodeRequestor(w.node, w.logger),
 			w,
-			w.timesource,
+			w.node.Timesource(),
 			w.logger)
 
 		w.missingMsgVerifier.Start(w.ctx)
@@ -961,7 +962,7 @@ func (w *Waku) startMessageSender() error {
 	if w.cfg.EnableStoreConfirmationForMessagesSent {
 		msgStoredChan := make(chan gethcommon.Hash, 1000)
 		msgExpiredChan := make(chan gethcommon.Hash, 1000)
-		messageSentCheck := publish.NewMessageSentCheck(w.ctx, newStorenodeMessageVerifier(w.node), w.StorenodeCycle, w.timesource, msgStoredChan, msgExpiredChan, w.logger)
+		messageSentCheck := publish.NewMessageSentCheck(w.ctx, newStorenodeMessageVerifier(w.node), w.StorenodeCycle, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
 		sender.WithMessageSentCheck(messageSentCheck)
 
 		w.wg.Add(1)
