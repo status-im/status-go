@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"errors"
 	"fmt"
 	"math/big"
 	"os"
