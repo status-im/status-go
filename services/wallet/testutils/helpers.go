@@ -100,8 +100,8 @@ func (m *Uint64SliceMatcher) Matches(x interface{}) bool {
 	copy(expectedCopy, m.expected)
 	copy(actualCopy, actual)
 
-	sort.Slice(expectedCopy, func(i, j int) bool { return expectedCopy[i] < expectedCopy[j] })
-	sort.Slice(actualCopy, func(i, j int) bool { return actualCopy[i] < actualCopy[j] })
+	slices.Sort(expectedCopy)
+	slices.Sort(actualCopy)
 
 	return slices.Equal(expectedCopy, actualCopy)
 }

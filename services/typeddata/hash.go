@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sort"
+	"slices"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -55,9 +55,7 @@ func deps(target string, types Types) []string {
 		visited = visited[1:]
 		deps = append(deps, current)
 	}
-	sort.Slice(deps[1:], func(i, j int) bool {
-		return deps[1:][i] < deps[1:][j]
-	})
+	slices.Sort(deps[1:])
 	return deps
 }
 
