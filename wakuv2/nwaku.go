@@ -50,6 +50,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	gowakutimesource "github.com/waku-org/go-waku/waku/v2/timesource"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
@@ -57,8 +58,9 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/timesource"
+	ntptimesource "github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/status-im/status-go/wakuv2/persistence"
@@ -91,7 +93,6 @@ type ErrorSendingEnvelope struct {
 
 // Waku node metrics will be collected by the node and not by status-go
 type IMetricsHandler interface {
-	SetDeviceType(deviceType string)
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
 	PushMessageCheckSuccess()
@@ -161,8 +162,7 @@ type Waku struct {
 
 	logger *zap.Logger
 
-	// NTP Synced timesource
-	timesource *timesource.NTPTimeSource
+	timesource gowakutimesource.Timesource
 
 	// seededBootnodesForDiscV5 indicates whether we manage to retrieve discovery
 	// bootnodes successfully
@@ -182,6 +182,15 @@ type Waku struct {
 	defaultShardInfo protocol.RelayShards
 }
 
+// timesource provided in constructor is managed by status-go; go-waku must not invoke Start or Stop.
+// The adapter only fulfills the required interface; Start and Stop are no-ops.
+type timesourceAdapter struct {
+	timesource.TimeSource
+}
+
+func (t timesourceAdapter) Start(ctx context.Context) error { return nil }
+func (t timesourceAdapter) Stop()                           {}
+
 var _ types.Waku = (*Waku)(nil)
 
 func (w *Waku) SetMetricsHandler(client IMetricsHandler) {
@@ -198,7 +207,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts timesource.TimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -207,8 +216,11 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 		}
 	}
 
-	if ts == nil {
-		ts = timesource.Default()
+	var timesource gowakutimesource.Timesource
+	if ts != nil {
+		timesource = timesourceAdapter{ts}
+	} else {
+		timesource = ntptimesource.Default()
 	}
 
 	cfg = setDefaults(cfg)
@@ -261,7 +273,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 		dnsAddressCacheLock:             &sync.RWMutex{},
 		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
 		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
-		timesource:                      ts,
+		timesource:                      timesource,
 		storeMsgIDsMu:                   sync.RWMutex{},
 		logger:                          logger,
 		discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,
