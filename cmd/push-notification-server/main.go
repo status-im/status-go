@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
@@ -65,9 +64,8 @@ const (
 func init() {
 	flag.Parse()
 	logSettings := logutils.LogSettings{
-		Enabled:   true,
-		Level:     *logLevel,
-		Colorized: !*logNoColors && terminal.IsTerminal(int(os.Stdin.Fd())),
+		Enabled: true,
+		Level:   *logLevel,
 	}
 	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
 		panic(err)
