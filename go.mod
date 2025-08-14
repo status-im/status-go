@@ -93,7 +93,6 @@ require (
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
 	github.com/prometheus/client_model v0.6.1
 	github.com/schollz/peerdiscovery v1.7.0
-	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 	github.com/status-im/extkeys v1.2.0
 	github.com/waku-org/go-waku v0.8.1-0.20250411145637-900b98812a91
 	github.com/waku-org/waku-go-bindings v0.0.0-20250714110306-6feba5b0df4d
@@ -113,7 +112,6 @@ require (
 )
 
 require (
-	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/RoaringBitmap/roaring v0.9.4 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
