@@ -203,7 +203,6 @@ class TestLocalPairing(MessengerSteps):
 
         # Check that contact is synced
         response = bob_second_device.wakuext_service.get_contacts()
-        assert "error" not in response
 
         contacts = response["result"]
         assert len(contacts) == 1
@@ -241,7 +240,6 @@ class TestLocalPairing(MessengerSteps):
 
         # Check that contact is synced
         response = bob_second_device.wakuext_service.get_contacts()
-        assert "error" not in response
 
         contacts = response["result"]
         assert len(contacts) == 1
@@ -279,7 +277,6 @@ class TestLocalPairing(MessengerSteps):
         # Check that contacts and notifications are synced on all devices
         for bob_another_device in [bob2, bob3]:
             response = bob_another_device.wakuext_service.get_contacts()
-            assert "error" not in response
             contacts = response["result"]
             assert len(contacts) == 3
             contacts_dict = {contact["id"]: contact for contact in contacts}

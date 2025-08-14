@@ -20,7 +20,7 @@ class TestMoveWalletAccount:
         self.account_data["path"] = path
         self.account_data["address"] = derived_addresses[0].get("address")
         self.account_data["public-key"] = derived_addresses[0].get("public-key")
-        self.account.accounts_service.add_account(self.account_data)
+        self.account.accounts_service.add_account(self.account.password, self.account_data)
 
         # Get all accounts to determine positions
         accounts_response = self.account.accounts_service.get_accounts()
@@ -28,7 +28,11 @@ class TestMoveWalletAccount:
         assert len(accounts_before) >= 3, "Need at least two accounts to test move"
 
         # Move wallet account from position 1 to position 2
-        self.account.accounts_service.move_wallet_account(accounts_before[0].get("position"), accounts_before[2].get("position"))
+        move_accounts_response = self.account.accounts_service.move_wallet_account(
+            accounts_before[1].get("position"), accounts_before[2].get("position")
+        )
+        assert "result" in move_accounts_response
+        assert move_accounts_response.get("result") is None
 
         # Fetch the accounts again
         accounts_response_after = self.account.accounts_service.get_accounts()
@@ -47,4 +51,7 @@ class TestMoveWalletAccount:
         assert len(accounts_before) >= 2, "Need at least two accounts to test move"
 
         # Move wallet account from position 0 to position 1
-        self.account.accounts_service.move_wallet_account(accounts_before[0].get("position"), accounts_before[1].get("position"))
+        move_accounts_response = self.account.accounts_service.move_wallet_account(
+            accounts_before[0].get("position"), accounts_before[1].get("position")
+        )
+        assert move_accounts_response.get("error").get("message") == "accounts: trying to move account to a wrong position"
