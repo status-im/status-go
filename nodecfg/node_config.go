@@ -5,9 +5,6 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
-	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
 )
@@ -107,17 +104,6 @@ func insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 		return err
 	}
 
-	if _, err := tx.Exec(`DELETE FROM shhext_default_push_notification_servers WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for _, pushNotifServ := range c.ShhextConfig.DefaultPushNotificationsServers {
-		hexpubk := hexutil.Encode(crypto.FromECDSAPub(pushNotifServ.PublicKey))
-		_, err := tx.Exec(`INSERT OR REPLACE INTO shhext_default_push_notification_servers (public_key, synthetic_id) VALUES (?, 'id')`, hexpubk)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -319,32 +305,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
-	}
-
-	rows, err = tx.Query(`SELECT public_key FROM shhext_default_push_notification_servers WHERE synthetic_id = 'id' ORDER BY public_key ASC`)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var pubKeyStr string
-		err = rows.Scan(&pubKeyStr)
-		if err != nil {
-			return nil, err
-		}
-
-		if pubKeyStr != "" {
-			b, err := hexutil.Decode(pubKeyStr)
-			if err != nil {
-				return nil, err
-			}
-
-			pubKey, err := crypto.UnmarshalPubkey(b)
-			if err != nil {
-				return nil, err
-			}
-			nodecfg.ShhextConfig.DefaultPushNotificationsServers = append(nodecfg.ShhextConfig.DefaultPushNotificationsServers, &params.PushNotificationServer{PublicKey: pubKey})
-		}
 	}
 
 	err = tx.QueryRow(`

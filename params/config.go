@@ -2,13 +2,11 @@ package params
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
 
-	"go.uber.org/zap"
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/crypto"
@@ -286,29 +284,6 @@ type ConnectorConfig struct {
 	Enabled bool
 }
 
-type PushNotificationServer struct {
-	*ecdsa.PublicKey
-}
-
-func (p *PushNotificationServer) MarshalText() ([]byte, error) {
-	return []byte(hex.EncodeToString(crypto.FromECDSAPub(p.PublicKey))), nil
-}
-
-func (p *PushNotificationServer) UnmarshalText(data []byte) error {
-	pubKeyBytes, err := hex.DecodeString(string(data))
-	if err != nil {
-		return err
-	}
-
-	pk, err := crypto.UnmarshalPubkey(pubKeyBytes)
-	if err != nil {
-		return err
-	}
-
-	p.PublicKey = pk
-	return nil
-}
-
 // ShhextConfig defines options used by shhext service.
 type ShhextConfig struct {
 	PFSEnabled bool
@@ -337,8 +312,8 @@ type ShhextConfig struct {
 
 	VerifyTransactionChainID int64
 
-	// DefaultPushNotificationsServers is the default-status run push notification servers
-	DefaultPushNotificationsServers []*PushNotificationServer
+	// PushNotificationsServers is the default-status run push notification servers
+	PushNotificationsServers []*ecdsa.PublicKey
 
 	// BandwidthStatsEnabled indicates if a signal is going to be emitted to indicate the upload and download rate
 	BandwidthStatsEnabled bool
@@ -365,33 +340,11 @@ func (c *ShhextConfig) Validate(validate *validator.Validate) error {
 }
 
 func (c *NodeConfig) setDefaultPushNotificationsServers() error {
-	if len(c.ShhextConfig.DefaultPushNotificationsServers) > 0 {
+	if len(c.ShhextConfig.PushNotificationsServers) > 0 {
 		return nil
 	}
 
-	servers := DefaultPushNotificationServers()
-
-	// If empty set the default servers
-	logutils.ZapLogger().Debug("setting default push notification servers",
-		zap.Strings("servers", servers))
-
-	for _, pk := range servers {
-		keyBytes, err := hex.DecodeString("04" + pk)
-		if err != nil {
-			return err
-		}
-
-		key, err := crypto.UnmarshalPubkey(keyBytes)
-		if err != nil {
-			return err
-		}
-
-		c.ShhextConfig.DefaultPushNotificationsServers = append(
-			c.ShhextConfig.DefaultPushNotificationsServers,
-			&PushNotificationServer{PublicKey: key},
-		)
-	}
-
+	c.ShhextConfig.PushNotificationsServers = DefaultPushNotificationServers()
 	return nil
 }
 

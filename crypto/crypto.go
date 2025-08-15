@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/status-im/status-go/crypto/geth"
 	"github.com/status-im/status-go/crypto/types"
 )
@@ -114,6 +116,28 @@ func CompressPubkey(pubkey *ecdsa.PublicKey) []byte {
 
 func UnmarshalPubkey(pub []byte) (*ecdsa.PublicKey, error) {
 	return defaultProvider.UnmarshalPubkey(pub)
+}
+
+func DecodePubkeyString(pubkey string) (*ecdsa.PublicKey, error) {
+	keyBytes, err := hex.DecodeString(pubkey)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := crypto.UnmarshalPubkey(keyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
+}
+
+func MustDecodePubkeyString(pubkey string) *ecdsa.PublicKey {
+	pk, err := DecodePubkeyString(pubkey)
+	if err != nil {
+		panic(err)
+	}
+	return pk
 }
 
 func VerifySignatures(signaturePairs [][3]string) error {
