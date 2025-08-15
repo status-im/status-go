@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 )
@@ -32,7 +32,7 @@ func (s *MessengerPairingSuite) TestEnableNonExistingInstallation() {
 	s.Require().NoError(err)
 
 	s.Require().Len(installations, 2)
-	var theirInstallation *multidevice.Installation
+	var theirInstallation *messagingtypes.Installation
 	for _, i := range installations {
 		if i.ID == installationID {
 			theirInstallation = i
@@ -44,7 +44,7 @@ func (s *MessengerPairingSuite) TestEnableNonExistingInstallation() {
 	s.Require().NotNil(theirInstallation)
 	s.Require().True(theirInstallation.Enabled)
 
-	installationsFromDB, err := s.m.encryptor.GetOurActiveInstallations(&s.m.identity.PublicKey)
+	installationsFromDB, err := s.m.messaging.GetOurActiveInstallations(&s.m.identity.PublicKey)
 	s.Require().NoError(err)
 	s.Require().Len(installationsFromDB, 2)
 	for _, i := range installationsFromDB {

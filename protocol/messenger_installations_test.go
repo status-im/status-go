@@ -9,18 +9,17 @@ import (
 	"runtime"
 	"testing"
 
-	userimage "github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/services/browsers"
-
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	userimage "github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/browsers"
 )
 
 const statusChatID = "status"
@@ -38,7 +37,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	theirMessenger := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -236,7 +235,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	err = theirMessenger.SaveChat(chat2)
 	s.Require().NoError(err)
 
-	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -357,7 +356,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 	alice := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, alice)
 
-	err := bob2.SetInstallationMetadata(bob2.installationID, &multidevice.InstallationMetadata{
+	err := bob2.SetInstallationMetadata(bob2.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})

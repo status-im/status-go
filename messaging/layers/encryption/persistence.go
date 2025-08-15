@@ -11,7 +11,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/messaging/layers/encryption/multidevice"
 )
 
 // RatchetInfo holds the current ratchet state.

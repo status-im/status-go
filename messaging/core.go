@@ -24,13 +24,13 @@ import (
 	"github.com/status-im/status-go/messaging/common"
 	datasyncpeer "github.com/status-im/status-go/messaging/datasync/peer"
 	"github.com/status-im/status-go/messaging/events"
+	"github.com/status-im/status-go/messaging/layers/encryption"
+	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/messaging/wakumetrics"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
@@ -63,7 +63,8 @@ type Core struct {
 }
 
 type CoreParams struct {
-	Identity *ecdsa.PrivateKey
+	Identity       *ecdsa.PrivateKey
+	InstallationID string
 
 	DB          *sql.DB // FIXME: This should be removed once the database is not needed in the sender
 	Persistence types.Persistence
@@ -72,8 +73,7 @@ type CoreParams struct {
 	WakuConfig    params.WakuV2Config
 	ClusterConfig params.ClusterConfig
 
-	EncryptionProtocol *encryption.Protocol
-	TimeSource         timesource.TimeSource
+	TimeSource timesource.TimeSource
 }
 
 func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, error) {
@@ -89,12 +89,18 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		return nil, errors.Wrap(err, "failed to create transport instance")
 	}
 
+	encryptor := encryption.New(
+		params.DB,
+		params.InstallationID,
+		config.logger,
+	)
+
 	sender, err := common.NewMessageSender(
 		params.Identity,
 		params.DB,
 		params.Persistence,
 		transport,
-		params.EncryptionProtocol,
+		encryptor,
 		config.logger,
 	)
 	if err != nil {
@@ -108,7 +114,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		waku:                  waku,
 		transport:             transport,
 		sender:                sender,
-		encryptor:             params.EncryptionProtocol,
+		encryptor:             encryptor,
 		quit:                  make(chan struct{}),
 		mvdsStatusChangeEvent: make(chan datasyncnode.PeerStatusChangeEvent, 5),
 		publisher:             pubsub.NewPublisher(),
@@ -160,7 +166,9 @@ func (c *Core) start() error {
 	}
 
 	// set shared secret handles
-	c.sender.SetHandleSharedSecrets(c.API().HandleSharedSecrets)
+	c.sender.SetHandleSharedSecrets(func(s []*sharedsecret.Secret) error {
+		return c.API().HandleSharedSecrets(adapters.FromEncryptionSharedSecrets(s))
+	})
 	err = c.sender.StartDatasync(c.mvdsStatusChangeEvent, c.sendDataSync)
 	if err != nil {
 		return err
@@ -172,7 +180,7 @@ func (c *Core) start() error {
 	}
 
 	// handle stored shared secrets
-	err = c.API().HandleSharedSecrets(subscriptions.SharedSecrets)
+	err = c.API().HandleSharedSecrets(adapters.FromEncryptionSharedSecrets(subscriptions.SharedSecrets))
 	if err != nil {
 		return err
 	}
@@ -283,7 +291,7 @@ func (c *Core) sendDataSync(receiver state.PeerID, payload *datasyncproto.Payloa
 
 	// The shared secret needs to be handle before we send a message
 	// otherwise the topic might not be set up before we receive a message
-	err = c.API().HandleSharedSecrets([]*sharedsecret.Secret{messageSpec.SharedSecret})
+	err = c.API().HandleSharedSecrets([]*types.SharedSecret{adapters.FromEncryptionSharedSecret(messageSpec.SharedSecret)})
 	if err != nil {
 		return err
 	}
@@ -509,4 +517,70 @@ func (c *Core) startWakuMetrics() error {
 func (c *Core) metrics() string {
 	// TODO: Remove type assertion once Waku metrics are fully integrated into the Messaging module.
 	return c.waku.(*wakuv2.Waku).Metrics()
+}
+
+func (c *Core) generateHashRatchetKey(groupID []byte) error {
+	key, err := c.encryptor.GenerateHashRatchetKey(groupID)
+	if err != nil {
+		return err
+	}
+
+	keyID, err := key.GetKeyID()
+	if err != nil {
+		return err
+	}
+
+	c.logger.Info("generate hash ratchet key",
+		zap.String("group-id", cryptotypes.Bytes2Hex(groupID)),
+		zap.String("key-id", cryptotypes.Bytes2Hex(keyID)),
+	)
+
+	return nil
+}
+
+func (c *Core) encryptWithHashRatchet(groupID []byte, payload []byte) ([]byte, []byte, uint32, error) {
+	encryptedPayload, ratchet, newSeqNo, err := c.encryptor.EncryptWithHashRatchet(groupID, payload)
+	if err == encryption.ErrNoEncryptionKey {
+		_, err := c.encryptor.GenerateHashRatchetKey(groupID)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		encryptedPayload, ratchet, newSeqNo, err = c.encryptor.EncryptWithHashRatchet(groupID, payload)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+
+	} else if err != nil {
+		return nil, nil, 0, err
+	}
+
+	keyID, err := ratchet.GetKeyID()
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	return encryptedPayload, keyID, newSeqNo, nil
+}
+
+func (c *Core) buildHashRatchetMessage(groupID []byte, payload []byte) ([]byte, error) {
+	messageSpec, err := c.encryptor.BuildHashRatchetMessage(groupID, payload)
+	if err != nil {
+		return nil, err
+	}
+	return proto.Marshal(messageSpec.Message)
+}
+
+func (c *Core) decryptMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, data []byte) ([]byte, error) {
+	var encryptionMessage encryption.ProtocolMessage
+	err := proto.Unmarshal(data, &encryptionMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	decrypted, err := c.encryptor.HandleMessage(myIdentityKey, theirPublicKey, &encryptionMessage, make([]byte, 0))
+	if err != nil {
+		return nil, err
+	}
+
+	return decrypted.DecryptedMessage, nil
 }

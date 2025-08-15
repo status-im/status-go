@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -65,14 +64,14 @@ func (m *Messenger) EnableInstallationAndPair(request InstallationIDProvider) (*
 	timestamp := time.Now().UnixNano()
 	installationID := request.GetInstallationID()
 
-	installation := &multidevice.Installation{
+	installation := &messagingtypes.Installation{
 		ID:        installationID,
 		Enabled:   true,
 		Version:   2,
 		Timestamp: timestamp,
 	}
 
-	_, err := m.encryptor.AddInstallation(myIdentity, timestamp, installation, true)
+	_, err := m.messaging.AddInstallation(myIdentity, timestamp, installation, true)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +451,7 @@ func (m *Messenger) syncProfilePicturesFromDatabase(rawMessageHandler RawMessage
 }
 
 func (m *Messenger) InitInstallations() error {
-	installations, err := m.encryptor.GetOurInstallations(&m.identity.PublicKey)
+	installations, err := m.messaging.GetOurInstallations(&m.identity.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -469,11 +468,11 @@ func (m *Messenger) InitInstallations() error {
 	return nil
 }
 
-func (m *Messenger) Installations() []*multidevice.Installation {
-	installations := make([]*multidevice.Installation, m.allInstallations.Len())
+func (m *Messenger) Installations() []*messagingtypes.Installation {
+	installations := make([]*messagingtypes.Installation, m.allInstallations.Len())
 
 	var i = 0
-	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
+	m.allInstallations.Range(func(installationID string, installation *messagingtypes.Installation) (shouldContinue bool) {
 		installations[i] = installation
 		i++
 		return true
@@ -481,17 +480,17 @@ func (m *Messenger) Installations() []*multidevice.Installation {
 	return installations
 }
 
-func (m *Messenger) setInstallationMetadata(id string, data *multidevice.InstallationMetadata) error {
+func (m *Messenger) setInstallationMetadata(id string, data *messagingtypes.InstallationMetadata) error {
 	installation, ok := m.allInstallations.Load(id)
 	if !ok {
 		return errors.New("no installation found")
 	}
 
 	installation.InstallationMetadata = data
-	return m.encryptor.SetInstallationMetadata(m.IdentityPublicKey(), id, data)
+	return m.messaging.SetInstallationMetadata(m.IdentityPublicKey(), id, data)
 }
 
-func (m *Messenger) SetInstallationMetadata(id string, data *multidevice.InstallationMetadata) error {
+func (m *Messenger) SetInstallationMetadata(id string, data *messagingtypes.InstallationMetadata) error {
 	return m.setInstallationMetadata(id, data)
 }
 
@@ -502,17 +501,17 @@ func (m *Messenger) SetInstallationName(id string, name string) error {
 	}
 
 	installation.InstallationMetadata.Name = name
-	return m.encryptor.SetInstallationName(m.IdentityPublicKey(), id, name)
+	return m.messaging.SetInstallationName(m.IdentityPublicKey(), id, name)
 }
 
 // EnableInstallation enables an installation and returns the installation
-func (m *Messenger) EnableInstallation(id string) (*multidevice.Installation, error) {
+func (m *Messenger) EnableInstallation(id string) (*messagingtypes.Installation, error) {
 	installation, ok := m.allInstallations.Load(id)
 	if !ok {
 		return nil, errors.New("no installation found")
 	}
 
-	err := m.encryptor.EnableInstallation(&m.identity.PublicKey, id)
+	err := m.messaging.EnableInstallation(&m.identity.PublicKey, id)
 	if err != nil {
 		return nil, err
 	}
@@ -528,7 +527,7 @@ func (m *Messenger) DisableInstallation(id string) error {
 		return errors.New("no installation found")
 	}
 
-	err := m.encryptor.DisableInstallation(&m.identity.PublicKey, id)
+	err := m.messaging.DisableInstallation(&m.identity.PublicKey, id)
 	if err != nil {
 		return err
 	}

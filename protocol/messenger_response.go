@@ -12,13 +12,13 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 
 	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/verification"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -63,7 +63,7 @@ type MessengerResponse struct {
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
-	installations                    map[string]*multidevice.Installation
+	installations                    map[string]*messagingtypes.Installation
 	notifications                    map[string]*localnotifications.Notification
 	requestsToJoinCommunity          map[string]*communities.RequestToJoin
 	chats                            map[string]*Chat
@@ -99,7 +99,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DeletedMessages         map[string][]string                 `json:"deletedMessages,omitempty"`
 		Messages                []*common.Message                   `json:"messages,omitempty"`
 		Contacts                []*Contact                          `json:"contacts,omitempty"`
-		Installations           []*multidevice.Installation         `json:"installations,omitempty"`
+		Installations           []*messagingtypes.Installation      `json:"installations,omitempty"`
 		PinMessages             []*common.PinMessage                `json:"pinMessages,omitempty"`
 		EmojiReactions          []*EmojiReaction                    `json:"emojiReactions,omitempty"`
 		Invitations             []*GroupChatInvitation              `json:"invitations,omitempty"`
@@ -190,8 +190,8 @@ func (r *MessengerResponse) Chats() []*Chat {
 	return chats
 }
 
-func (r *MessengerResponse) Installations() []*multidevice.Installation {
-	var is []*multidevice.Installation
+func (r *MessengerResponse) Installations() []*messagingtypes.Installation {
+	var is []*messagingtypes.Installation
 	for _, i := range r.installations {
 		is = append(is, i)
 	}
@@ -795,14 +795,14 @@ func (r *MessengerResponse) AddContacts(contacts []*Contact) {
 	}
 }
 
-func (r *MessengerResponse) AddInstallation(i *multidevice.Installation) {
+func (r *MessengerResponse) AddInstallation(i *messagingtypes.Installation) {
 	if len(r.installations) == 0 {
-		r.installations = make(map[string]*multidevice.Installation)
+		r.installations = make(map[string]*messagingtypes.Installation)
 	}
 	r.installations[i.UniqueKey()] = i
 }
 
-func (r *MessengerResponse) AddInstallations(installations []*multidevice.Installation) {
+func (r *MessengerResponse) AddInstallations(installations []*messagingtypes.Installation) {
 	for idx := range installations {
 		r.AddInstallation(installations[idx])
 	}

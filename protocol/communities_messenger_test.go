@@ -33,7 +33,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -2400,7 +2399,7 @@ func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger 
 	s.Len(tcs, 0, "Must have 0 communities")
 
 	// Pair devices
-	metadata := &multidevice.InstallationMetadata{
+	metadata := &messagingtypes.InstallationMetadata{
 		Name:       "other-device",
 		DeviceType: "other-device-type",
 	}
@@ -2686,17 +2685,15 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
 	}
 
 	getKeysCount := func(m *Messenger) (communityKeysCount int, channelKeysCount int) {
-		keys, err := m.encryptor.GetAllHRKeys(community.ID())
-		s.Require().NoError(err)
-		if keys != nil {
-			communityKeysCount = len(keys.Keys)
-		}
+		mtu := messaging.TestUtils{API: m.messaging}
 
-		channelKeys, err := m.encryptor.GetAllHRKeys([]byte(community.IDString() + chat.CommunityChatID()))
+		var err error
+		communityKeysCount, err = mtu.GetAllHRKeysCount(community.ID())
 		s.Require().NoError(err)
-		if channelKeys != nil {
-			channelKeysCount = len(channelKeys.Keys)
-		}
+
+		channelKeysCount, err = mtu.GetAllHRKeysCount([]byte(community.IDString() + chat.CommunityChatID()))
+		s.Require().NoError(err)
+
 		return
 	}
 
@@ -2718,7 +2715,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
 // makes a request to join a community
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	// Set Alice's installation metadata
-	aim := &multidevice.InstallationMetadata{
+	aim := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-device",
 		DeviceType: "alice's-device-type",
 	}
@@ -2946,7 +2943,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Join() {
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	// Set Alice's installation metadata
-	aim := &multidevice.InstallationMetadata{
+	aim := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-device",
 		DeviceType: "alice's-device-type",
 	}
@@ -3781,8 +3778,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	// Make sure at least one key makes it to alice
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
-			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) != 1 {
+			keysCount, err := messaging.TestUtils{API: s.alice.messaging}.GetKeysForGroupCount(response.Communities()[0].ID())
+			if err != nil || keysCount != 1 {
 				return false
 			}
 			return true
@@ -3813,8 +3810,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
-			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) < 2 {
+			keysCount, err := messaging.TestUtils{API: s.alice.messaging}.GetKeysForGroupCount(response.Communities()[0].ID())
+			if err != nil || keysCount < 2 {
 				return false
 			}
 			return true
@@ -3884,8 +3881,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 	// Make sure at least one key makes it to alice
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
-			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) != 1 {
+			keysCount, err := messaging.TestUtils{API: s.alice.messaging}.GetKeysForGroupCount(response.Communities()[0].ID())
+			if err != nil || keysCount != 1 {
 				return false
 			}
 			return true
@@ -3916,8 +3913,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
-			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) < 2 {
+			keysCount, err := messaging.TestUtils{API: s.alice.messaging}.GetKeysForGroupCount(response.Communities()[0].ID())
+			if err != nil || keysCount < 2 {
 				return false
 			}
 			return true

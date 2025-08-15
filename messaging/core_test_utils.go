@@ -2,6 +2,7 @@ package messaging
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -147,4 +148,37 @@ func newTestWakuWrapper() (*testWakuWrapper, error) {
 			PublicWakuAPI: wakuv2.NewPublicWakuAPI(w),
 		},
 	}, nil
+}
+
+type TestUtils struct {
+	API *API
+}
+
+func (t TestUtils) GetAllHRKeysCount(groupID []byte) (int, error) {
+	keys, err := t.API.core.encryptor.GetAllHRKeys(groupID)
+	if err != nil {
+		return 0, err
+	}
+	if keys == nil {
+		return 0, nil
+	}
+	return len(keys.Keys), nil
+}
+
+func (t TestUtils) GetKeysForGroupCount(groupID []byte) (int, error) {
+	keys, err := t.API.core.encryptor.GetKeysForGroup(groupID)
+	if err != nil {
+		return 0, err
+	}
+	return len(keys), nil
+}
+
+func (t TestUtils) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, theirAPI *API, theirIdentityKey *ecdsa.PrivateKey) error {
+	theirBundle, err := theirAPI.core.encryptor.GetBundle(theirIdentityKey)
+	if err != nil {
+		return err
+	}
+
+	_, err = t.API.core.encryptor.ProcessPublicBundle(myIdentityKey, theirBundle)
+	return err
 }

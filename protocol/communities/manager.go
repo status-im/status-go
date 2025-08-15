@@ -38,7 +38,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -97,7 +96,6 @@ type MessageSigner interface {
 
 type Manager struct {
 	persistence              *Persistence
-	encryptor                *encryption.Protocol
 	ensSubscription          chan []*ens.VerificationRecord
 	subscriptions            []chan *Subscription
 	ensVerifier              *ens.Verifier
@@ -221,7 +219,6 @@ type ArchiveManagerConfig struct {
 	Persistence   *Persistence
 	Messaging     *messaging.API
 	Identity      *ecdsa.PrivateKey
-	Encryptor     *encryption.Protocol
 	Publisher     Publisher
 }
 
@@ -392,7 +389,6 @@ func NewManager(
 	identity *ecdsa.PrivateKey,
 	installationID string,
 	db *sql.DB,
-	encryptor *encryption.Protocol,
 	logger *zap.Logger,
 	ensverifier *ens.Verifier,
 	ownerVerifier OwnerVerifier,
@@ -424,7 +420,6 @@ func NewManager(
 
 	manager := &Manager{
 		logger:                 logger,
-		encryptor:              encryptor,
 		identity:               identity,
 		installationID:         installationID,
 		ownerVerifier:          ownerVerifier,
@@ -912,7 +907,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	}
 
 	var descriptionEncryptor DescriptionEncryptor
-	if m.encryptor != nil {
+	if m.messaging != nil {
 		descriptionEncryptor = m
 	}
 	community, err := New(config, m.timesource, descriptionEncryptor, m.mediaServer)
@@ -966,16 +961,11 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 
 	// ensure key is generated before marshaling,
 	// as it requires key to encrypt description
-	if community.IsControlNode() && m.encryptor != nil {
-		key, err := m.encryptor.GenerateHashRatchetKey(community.ID())
+	if community.IsControlNode() && m.messaging != nil {
+		err := m.messaging.GenerateHashRatchetKey(community.ID())
 		if err != nil {
 			return nil, nil, err
 		}
-		keyID, err := key.GetKeyID()
-		if err != nil {
-			return nil, nil, err
-		}
-		m.logger.Info("generate key for token", zap.String("group-id", types.Bytes2Hex(community.ID())), zap.String("key-id", types.Bytes2Hex(keyID)))
 	}
 
 	community, changes, err := m.createCommunityTokenPermission(request, community)
@@ -1794,7 +1784,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 		}
 
 		var descriptionEncryptor DescriptionEncryptor
-		if m.encryptor != nil {
+		if m.messaging != nil {
 			descriptionEncryptor = m
 		}
 		community, err = New(config, m.timesource, descriptionEncryptor, m.mediaServer)
@@ -2232,7 +2222,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		}
 
 		var descriptionEncryptor DescriptionEncryptor
-		if m.encryptor != nil {
+		if m.messaging != nil {
 			descriptionEncryptor = m
 		}
 		community, err = New(config, m.timesource, descriptionEncryptor, m.mediaServer)
@@ -2285,7 +2275,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	return r, nil
 }
 
-func (m *Manager) NewHashRatchetKeys(keys []*encryption.HashRatchetInfo) error {
+func (m *Manager) NewHashRatchetKeys(keys []*messagingtypes.HashRatchetInfo) error {
 	return m.persistence.InvalidateDecryptedCommunityCacheForKeys(keys)
 }
 
@@ -3936,7 +3926,7 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 
 func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Community, error) {
 	var descriptionEncryptor DescriptionEncryptor
-	if m.encryptor != nil {
+	if m.messaging != nil {
 		descriptionEncryptor = m
 	}
 
@@ -5121,22 +5111,7 @@ func (m *Manager) encryptCommunityDescriptionImpl(groupID []byte, d *protobuf.Co
 		return "", nil, err
 	}
 
-	encryptedPayload, ratchet, newSeqNo, err := m.encryptor.EncryptWithHashRatchet(groupID, payload)
-	if err == encryption.ErrNoEncryptionKey {
-		_, err := m.encryptor.GenerateHashRatchetKey(groupID)
-		if err != nil {
-			return "", nil, err
-		}
-		encryptedPayload, ratchet, newSeqNo, err = m.encryptor.EncryptWithHashRatchet(groupID, payload)
-		if err != nil {
-			return "", nil, err
-		}
-
-	} else if err != nil {
-		return "", nil, err
-	}
-
-	keyID, err := ratchet.GetKeyID()
+	encryptedPayload, keyID, newSeqNo, err := m.messaging.EncryptWithHashRatchet(groupID, payload)
 	if err != nil {
 		return "", nil, err
 	}
@@ -5187,8 +5162,8 @@ func (m *Manager) decryptCommunityDescription(keyIDSeqNo string, d []byte) (*Dec
 		return nil, err
 	}
 
-	decryptedPayload, err := m.encryptor.DecryptWithHashRatchet(keyID, uint32(seqNo), d)
-	if err == encryption.ErrNoRatchetKey {
+	decryptedPayload, err := m.messaging.DecryptWithHashRatchet(keyID, uint32(seqNo), d)
+	if err == messagingtypes.ErrNoRatchetKey {
 		return &DecryptCommunityResponse{
 			KeyID: keyID,
 		}, err

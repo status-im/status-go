@@ -30,7 +30,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
@@ -204,12 +203,12 @@ func (api *PublicAPI) DisableInstallation(installationID string) error {
 }
 
 // GetOurInstallations returns all the installations available given an identity
-func (api *PublicAPI) GetOurInstallations() []*multidevice.Installation {
+func (api *PublicAPI) GetOurInstallations() []*messagingtypes.Installation {
 	return api.service.messenger.Installations()
 }
 
 // SetInstallationMetadata sets the metadata for our own installation
-func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multidevice.InstallationMetadata) error {
+func (api *PublicAPI) SetInstallationMetadata(installationID string, data *messagingtypes.InstallationMetadata) error {
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
 }
 

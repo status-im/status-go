@@ -15,9 +15,9 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/encryption/publisher"
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
+	"github.com/status-im/status-go/messaging/layers/encryption/multidevice"
+	"github.com/status-im/status-go/messaging/layers/encryption/publisher"
+	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
 )
 
 //go:generate protoc --go_out=. ./protocol_message.proto
@@ -546,6 +546,10 @@ func (p *Protocol) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *
 
 func (p *Protocol) AddInstallation(identity []byte, timestamp int64, installation *multidevice.Installation, enabled bool) ([]*multidevice.Installation, error) {
 	return p.multidevice.AddInstallations(identity, timestamp, []*multidevice.Installation{installation}, enabled)
+}
+
+func (p *Protocol) AddInstallations(identity []byte, timestamp int64, installations []*multidevice.Installation, defaultEnabled bool) ([]*multidevice.Installation, error) {
+	return p.multidevice.AddInstallations(identity, timestamp, installations, defaultEnabled)
 }
 
 func (p *Protocol) GetMultiDevice() *multidevice.Multidevice {
