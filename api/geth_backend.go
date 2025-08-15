@@ -1296,7 +1296,6 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		mnemonic,
 		nil,
 		false,
-		false,
 	)
 }
 
@@ -1311,7 +1310,6 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 		request.Mnemonic,
 		nil,
 		true,
-		request.FetchBackup,
 	)
 }
 
@@ -1325,7 +1323,6 @@ func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.Rest
 		request.Mnemonic,
 		request.Keycard,
 		true,
-		request.FetchBackup,
 	)
 }
 
@@ -1424,7 +1421,7 @@ func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, keyUID
 }
 
 func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, mnemonic string, keyUID string, masterAddress string,
-	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool, fetchBackup bool) (*settings.Settings, error) {
+	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (*settings.Settings, error) {
 	s, err := defaultSettings(keyUID, masterAddress, derivedAddresses)
 	if err != nil {
 		return nil, err
@@ -1441,11 +1438,6 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, mne
 		s.MnemonicWasNotShown = true
 	}
 
-	if !fetchBackup {
-		// This is an account created from scratch, we can mark the BackupFetched as true
-		s.BackupFetched = true
-	}
-
 	if request.WakuV2Fleet != "" {
 		s.Fleet = &request.WakuV2Fleet
 	}
@@ -1453,12 +1445,11 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, mne
 	return s, nil
 }
 
-func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, keyUID string, installationID string, fetchBackup bool) (*params.NodeConfig, error) {
+func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, keyUID string, installationID string) (*params.NodeConfig, error) {
 	nodeConfig, err := DefaultNodeConfig(installationID, keyUID, request)
 	if err != nil {
 		return nil, err
 	}
-	nodeConfig.ProcessBackedupMessages = fetchBackup
 
 	return nodeConfig, nil
 }
@@ -1675,7 +1666,6 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 	mnemonic string, // empty mnemonic is used for keycard account, not empty for regular account
 	keycardData *requests.KeycardData, // nil for regular account, not nil for account with already set keycard
 	restoreAccount bool,
-	fetchBackup bool,
 ) (*multiaccounts.Account, error) {
 	// very important to update root data dir here
 	b.UpdateRootDataDir(request.RootDataDir)
@@ -1758,8 +1748,7 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 		chatPublicKey = types.Hex2Bytes(derivedAddresses[accscommon.PathEIP1581Chat].PublicKey)
 	}
 
-	settings, err := b.prepareSettings(request, mnemonic, keyUID, masterAddress, derivedAddresses, restoreAccount,
-		fetchBackup)
+	settings, err := b.prepareSettings(request, mnemonic, keyUID, masterAddress, derivedAddresses, restoreAccount)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to prepare settings")
 	}
@@ -1778,7 +1767,7 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 		return nil, err
 	}
 
-	nodeConfig, err := b.prepareConfig(request, keyUID, settings.InstallationID, fetchBackup)
+	nodeConfig, err := b.prepareConfig(request, keyUID, settings.InstallationID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to prepare node config")
 	}
@@ -1859,15 +1848,6 @@ func (b *GethStatusBackend) saveKeypairAndSettings(settings settings.Settings, n
 		return err
 	}
 	err = accdb.CreateSettings(settings, *nodecfg)
-	if err != nil {
-		return err
-	}
-
-	// In case of setting up new account either way (creating new, importing seed phrase, keycard account...) we should not
-	// back up any data after login, as it was the case before, that's the reason why we're setting last backup time to the time
-	// when an account was created.
-	now := time.Now().Unix()
-	err = accdb.SetLastBackup(uint64(now))
 	if err != nil {
 		return err
 	}

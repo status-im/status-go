@@ -42,10 +42,10 @@ const (
 	ActivityCenterNotificationTypeCommunityUnbanned
 	ActivityCenterNotificationTypeNewInstallationReceived
 	ActivityCenterNotificationTypeNewInstallationCreated
-	ActivityCenterNotificationTypeBackupSyncingFetching
-	ActivityCenterNotificationTypeBackupSyncingSuccess
-	ActivityCenterNotificationTypeBackupSyncingPartialFailure
-	ActivityCenterNotificationTypeBackupSyncingFailure
+	ActivityCenterNotificationTypeBackupSyncingFetching       // Deprecated
+	ActivityCenterNotificationTypeBackupSyncingSuccess        // Deprecated
+	ActivityCenterNotificationTypeBackupSyncingPartialFailure // Deprecated
+	ActivityCenterNotificationTypeBackupSyncingFailure        // Deprecated
 	ActivityCenterNotificationTypeNews
 )
 

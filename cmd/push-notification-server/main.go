@@ -217,7 +217,7 @@ func main() {
 		case <-time.After(10 * time.Second):
 		}
 		logger.Info("requesting history")
-		response, err := messenger.RequestAllHistoricMessages(false, false)
+		response, err := messenger.RequestAllHistoricMessages(false)
 		if err != nil {
 			logger.Error("failed to request history", zap.Error(err))
 			return

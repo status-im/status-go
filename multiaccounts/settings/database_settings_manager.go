@@ -45,8 +45,6 @@ type DatabaseSettingsManager interface {
 
 	SetSettingsNotifier(n Notifier)
 	SetSettingLastSynced(setting SettingField, clock uint64) error
-	SetLastBackup(time uint64) error
-	SetBackupFetched(fetched bool) error
 	SetPinnedMailservers(mailservers map[string]string) error
 	SetUseMailservers(value bool) error
 	SetTokenGroupByCommunity(value bool) error
@@ -61,11 +59,8 @@ type DatabaseSettingsManager interface {
 	CanUseMailservers() (result bool, err error)
 	CanSyncOnMobileNetwork() (result bool, err error)
 	ShouldBroadcastUserStatus() (result bool, err error)
-	BackupEnabled() (result bool, err error)
 	BackupPath() (result string, err error)
 	AutoMessageEnabled() (result bool, err error)
-	LastBackup() (result uint64, err error)
-	BackupFetched() (result bool, err error)
 	ENSName() (string, error)
 	DeviceName() (string, error)
 	DisplayName() (string, error)

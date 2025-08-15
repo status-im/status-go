@@ -19,16 +19,6 @@ var (
 		dBColumnName:   "auto_message_enabled",
 		valueHandler:   BoolHandler,
 	}
-	BackupEnabled = SettingField{
-		reactFieldName: "backup-enabled?",
-		dBColumnName:   "backup_enabled",
-		valueHandler:   BoolHandler,
-	}
-	BackupFetched = SettingField{
-		reactFieldName: "backup-fetched?",
-		dBColumnName:   "backup_fetched",
-		valueHandler:   BoolHandler,
-	}
 	BackupPath = SettingField{
 		reactFieldName: "backup-path",
 		dBColumnName:   "backup_path",
@@ -153,10 +143,6 @@ var (
 	KeycardPairing = SettingField{
 		reactFieldName: "keycard-pairing",
 		dBColumnName:   "keycard_pairing",
-	}
-	LastBackup = SettingField{
-		reactFieldName: "last-backup",
-		dBColumnName:   "last_backup",
 	}
 	LastUpdated = SettingField{
 		reactFieldName: "last-updated",
@@ -540,8 +526,6 @@ var (
 	SettingFieldRegister = []SettingField{
 		Appearance,
 		AutoMessageEnabled,
-		BackupEnabled,
-		BackupFetched,
 		BackupPath,
 		Bio,
 		ChaosMode,
@@ -566,7 +550,6 @@ var (
 		KeycardInstanceUID,
 		KeycardPairedOn,
 		KeycardPairing,
-		LastBackup,
 		LastUpdated,
 		LatestDerivedPath,
 		LinkPreviewRequestEnabled,

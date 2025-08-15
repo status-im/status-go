@@ -23,7 +23,6 @@ import (
 	"github.com/google/uuid"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
@@ -1228,7 +1227,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message *pr
 		return ErrMessageNotAllowed
 	}
 
-	if err = utils.ValidateDisplayName(&message.DisplayName); err != nil {
+	if err = gocommon.ValidateDisplayName(&message.DisplayName); err != nil {
 		return err
 	}
 
@@ -3082,7 +3081,7 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf
 	}
 
 	if clockChanged {
-		if err = utils.ValidateDisplayName(&ci.DisplayName); err != nil {
+		if err = gocommon.ValidateDisplayName(&ci.DisplayName); err != nil {
 			return err
 		}
 
@@ -3308,13 +3307,13 @@ func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability a
 	}
 }
 
-func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, recoveringFromWakuInitiatedByKeycard bool,
+func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount,
 	syncKpMigratedToKeycard bool, dbKpMigratedToKeycard bool, accountReceivedFromLocalPairing bool) (accsmanagementtypes.AccountOperable, error) {
 	if accountReceivedFromLocalPairing {
 		return accsmanagementtypes.AccountOperable(syncAcc.Operable), nil
 	}
 
-	if syncKpMigratedToKeycard || recoveringFromWakuInitiatedByKeycard && m.account.KeyUID == syncAcc.KeyUid {
+	if syncKpMigratedToKeycard && m.account.KeyUID == syncAcc.KeyUid {
 		return accsmanagementtypes.AccountFullyOperable, nil
 	}
 
@@ -3364,7 +3363,7 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, rec
 	return accountsOperability, nil
 }
 
-func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount, fromBackup bool) (*accsmanagementtypes.Account, error) {
+func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*accsmanagementtypes.Account, error) {
 	if message.KeyUid != "" {
 		return nil, ErrNotWatchOnlyAccount
 	}
@@ -3387,12 +3386,10 @@ func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount, fr
 			if err != nil {
 				return nil, err
 			}
-			// if keypair is retrieved from backed up data, no need for resolving accounts positions
-			if !fromBackup {
-				err = m.settings.ResolveAccountsPositions(message.Clock)
-				if err != nil {
-					return nil, err
-				}
+
+			err = m.settings.ResolveAccountsPositions(message.Clock)
+			if err != nil {
+				return nil, err
 			}
 			dbAccount.Removed = true
 			return dbAccount, nil
@@ -3603,25 +3600,16 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		// but in case if keypair on this device came from the backup (e.g. device A recovered from waku, then device B paired with the device A
 		// via local pairing, before device A made its keypairs fully operable) we need to update syncedFrom when user on this device when that
 		// keypair becomes operable on any of other paired devices
-		if dbKeypair.SyncedFrom != accounts.SyncedFromBackup {
-			kp.SyncedFrom = dbKeypair.SyncedFrom
-		}
+		kp.SyncedFrom = dbKeypair.SyncedFrom
 		for _, acc := range dbKeypair.Accounts {
 			oldAddresses[acc.Address] = !acc.Removed
 		}
 	}
 
 	syncKpMigratedToKeycard := len(message.Keycards) > 0
-	recoveringFromWaku := message.SyncedFrom == accounts.SyncedFromBackup
 
-	multiAcc, err := m.multiAccounts.GetAccount(kp.KeyUID)
-	if err != nil {
-		return nil, err
-	}
-	recoveringFromWakuInitiatedByKeycard := recoveringFromWaku && multiAcc != nil && multiAcc.RefersToKeycard()
 	for _, sAcc := range message.Accounts {
 		accountOperability, err := m.resolveAccountOperability(sAcc,
-			recoveringFromWakuInitiatedByKeycard,
 			syncKpMigratedToKeycard,
 			dbKeypair != nil && dbKeypair.MigratedToKeycard(),
 			fromLocalPairing)
@@ -3634,7 +3622,6 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 	}
 
 	if !fromLocalPairing &&
-		!recoveringFromWakuInitiatedByKeycard &&
 		dbKeypair != nil &&
 		!dbKeypair.MigratedToKeycard() &&
 		syncKpMigratedToKeycard {
@@ -3652,12 +3639,9 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 
 	// if entire keypair was removed and keypair is already in db, there is no point to continue
 	if kp.Removed && dbKeypair != nil {
-		// if keypair is retrieved from backed up data, no need for resolving accounts positions
-		if message.SyncedFrom != accounts.SyncedFromBackup {
-			err = m.settings.ResolveAccountsPositions(message.Clock)
-			if err != nil {
-				return nil, err
-			}
+		err = m.settings.ResolveAccountsPositions(message.Clock)
+		if err != nil {
+			return nil, err
 		}
 		return kp, nil
 	}
@@ -3668,21 +3652,18 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		return nil, err
 	}
 
-	// if keypair is retrieved from backed up data, no need for resolving accounts positions
-	if message.SyncedFrom != accounts.SyncedFromBackup {
-		// then resolve accounts positions, cause some accounts might be removed
-		err = m.settings.ResolveAccountsPositions(message.Clock)
-		if err != nil {
-			return nil, err
-		}
+	// then resolve accounts positions, cause some accounts might be removed
+	err = m.settings.ResolveAccountsPositions(message.Clock)
+	if err != nil {
+		return nil, err
+	}
 
-		// if keypair is coming from paired device (means not from backup) and it's not among known, active keypairs,
-		// we need to add an activity center notification
-		if !kp.Removed && dbKeypair == nil {
-			defer func() {
-				err = acNofificationCallback()
-			}()
-		}
+	// if keypair is coming from paired device (means not from backup) and it's not among known, active keypairs,
+	// we need to add an activity center notification
+	if !kp.Removed && dbKeypair == nil {
+		defer func() {
+			err = acNofificationCallback()
+		}()
 	}
 
 	for _, sKc := range message.Keycards {
@@ -3789,7 +3770,7 @@ func (m *Messenger) HandleSyncCollectiblePreferences(state *ReceivedMessageState
 }
 
 func (m *Messenger) HandleSyncAccount(state *ReceivedMessageState, message *protobuf.SyncAccount, statusMessage *messagingtypes.Message) error {
-	acc, err := m.handleSyncWatchOnlyAccount(message, false)
+	acc, err := m.handleSyncWatchOnlyAccount(message)
 	if err != nil {
 		if err == ErrTryingToStoreOldWalletAccount {
 			return nil
