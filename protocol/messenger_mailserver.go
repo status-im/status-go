@@ -216,30 +216,6 @@ func (m *Messenger) syncChatWithFilters(peerInfo peer.AddrInfo, chatID string) (
 	return m.syncFilters(peerInfo, filters)
 }
 
-func (m *Messenger) syncBackup() error {
-
-	filter := m.messaging.PersonalTopicFilter()
-	if filter == nil {
-		return errors.New("personal topic filter not loaded")
-	}
-	canSync, err := m.canSyncWithStoreNodes()
-	if err != nil {
-		return err
-	}
-	if !canSync {
-		return nil
-	}
-
-	from, to := m.calculateMailserverTimeBounds(oneMonthDuration)
-
-	batch := messagingtypes.StoreNodeBatch{From: from, To: to, Topics: []messagingtypes.ContentTopic{filter.ContentTopic()}}
-	err = m.processMailserverBatch(m.messaging.GetActiveStorenode(), batch)
-	if err != nil {
-		return err
-	}
-	return m.settings.SetBackupFetched(true)
-}
-
 func (m *Messenger) defaultSyncPeriodFromNow() (uint32, error) {
 	defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
 	if err != nil {
@@ -287,7 +263,7 @@ func (m *Messenger) resetFiltersPriority(filters messagingtypes.ChatFilters) err
 }
 
 // RequestAllHistoricMessages requests all the historic messages for any topic
-func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries bool) (*MessengerResponse, error) {
+func (m *Messenger) RequestAllHistoricMessages(withRetries bool) (*MessengerResponse, error) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
 		return nil, err
@@ -297,24 +273,11 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 		return nil, nil
 	}
 
-	backupFetched, err := m.settings.BackupFetched()
-	if err != nil {
-		return nil, err
-	}
-
 	if m.mailserversDatabase == nil {
 		return nil, nil
 	}
 
 	allResponses := &MessengerResponse{}
-	if forceFetchingBackup || !backupFetched {
-		m.logger.Info("fetching backup")
-		err := m.syncBackup()
-		if err != nil {
-			return nil, err
-		}
-		m.logger.Info("backup fetched")
-	}
 
 	filters := m.messaging.ChatFilters()
 	err = m.updateFiltersPriority(filters)

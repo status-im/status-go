@@ -209,9 +209,6 @@ type Settings struct {
 	GifRecents                          *json.RawMessage              `json:"gifs/recent-gifs"`
 	GifFavorites                        *json.RawMessage              `json:"gifs/favorite-gifs"`
 	OpenseaEnabled                      bool                          `json:"opensea-enabled?,omitempty"`
-	LastBackup                          uint64                        `json:"last-backup,omitempty"`
-	BackupEnabled                       bool                          `json:"backup-enabled?,omitempty"`
-	BackupFetched                       bool                          `json:"backup-fetched?,omitempty"`
 	BackupPath                          string                        `json:"backup-path,omitempty"`
 	AutoMessageEnabled                  bool                          `json:"auto-message-enabled?,omitempty"`
 	GifAPIKey                           string                        `json:"gifs/api-key"`

@@ -42,8 +42,3 @@ message SyncSetting {
     AUTO_REFRESH_TOKENS_ENABLED = 22;
   }
 }
-
-/* TODOs
-LastBackup uint64
-BackupEnabled bool
- */

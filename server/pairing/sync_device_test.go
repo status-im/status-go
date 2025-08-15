@@ -89,7 +89,6 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *ap
 	} else {
 		_, err = backend.RestoreAccountAndLogin(&requests.RestoreAccount{
 			Mnemonic:      mnemonic,
-			FetchBackup:   false,
 			CreateAccount: createAccount,
 		})
 	}

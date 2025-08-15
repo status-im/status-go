@@ -52,7 +52,6 @@ profile_data = {
     "use-mailservers?": True,
     "wallet-root-address": "0x1846a7930d0ab03e5a120ebdd46eff3fe0365824",
     "send-status-updates?": True,
-    "backup-enabled?": True,
     "show-community-asset-when-sending-tokens?": True,
     "display-assets-below-balance-threshold": 100000000,
     "url-unfurling-mode": 1,

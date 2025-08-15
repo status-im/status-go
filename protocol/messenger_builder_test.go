@@ -196,8 +196,6 @@ func newRunningTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, c
 		return nil, err
 	}
 
-	m.EnableBackedupMessagesProcessing()
-
 	err = m.messaging.Start()
 	if err != nil {
 		return nil, err

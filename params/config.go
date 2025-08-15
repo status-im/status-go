@@ -210,9 +210,6 @@ type NodeConfig struct {
 	TorrentConfig TorrentConfig
 
 	OutputMessageCSVEnabled bool
-
-	// ProcessBackedupMessages should be set to true when user follows recovery (using seed phrase or keycard) onboarding flow
-	ProcessBackedupMessages bool
 }
 
 // WalletConfig extra configuration for wallet.Service.

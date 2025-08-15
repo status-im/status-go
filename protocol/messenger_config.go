@@ -34,7 +34,6 @@ type MessengerSignalsHandler interface {
 	HistoryRequestStarted(numBatches int)
 	HistoryRequestCompleted()
 
-	BackupPerformed(uint64)
 	HistoryArchivesProtocolEnabled()
 	HistoryArchivesProtocolDisabled()
 	CreatingHistoryArchives(communityID string)
@@ -221,13 +220,6 @@ func WithPushNotifications() func(c *config) error {
 func WithPushNotificationServer(server PushNotificationServer) func(c *config) error {
 	return func(c *config) error {
 		c.pushNotificationServer = server
-		return nil
-	}
-}
-
-func WithCheckingForBackupDisabled() func(c *config) error {
-	return func(c *config) error {
-		c.featureFlags.DisableCheckingForBackup = true
 		return nil
 	}
 }

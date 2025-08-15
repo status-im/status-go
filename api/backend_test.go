@@ -741,7 +741,6 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 		testContext.mnemonic,
 		nil,
 		false,
-		false,
 	)
 	require.NoError(t, err)
 
@@ -800,12 +799,6 @@ func TestLoginAccount(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, nameserver, testContext.backend.config.WakuV2Config.Nameserver)
 
-	accountsDB, err := testContext.backend.accountsDB()
-	require.NoError(t, err)
-	backupFecthed, err := accountsDB.BackupFetched()
-	require.NoError(t, err)
-	require.True(t, backupFecthed)
-
 	require.True(t, acc.HasAcceptedTerms)
 
 	waitForLogin(c)
@@ -848,7 +841,6 @@ func TestVerifyDatabasePassword(t *testing.T) {
 		testContext.mnemonic,
 		nil,
 		false,
-		false,
 	)
 	require.NoError(t, err)
 
@@ -872,7 +864,6 @@ func TestConvertAccount(t *testing.T) {
 		request,
 		testContext.mnemonic,
 		nil,
-		false,
 		false,
 	)
 	require.NoError(t, err)
@@ -1399,8 +1390,7 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 
 	// Test case 1: Valid restore account request
 	restoreRequest := &requests.RestoreAccount{
-		Mnemonic:    "test test test test test test test test test test test test",
-		FetchBackup: false,
+		Mnemonic: "test test test test test test test test test test test test",
 		CreateAccount: requests.CreateAccount{
 			DisplayName:        "Account1",
 			DeviceName:         "StatusIM",
@@ -1434,8 +1424,7 @@ func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
 
 	// Test case: Valid restore account request without DisplayName
 	restoreRequest := &requests.RestoreAccount{
-		Mnemonic:    "test test test test test test test test test test test test",
-		FetchBackup: false,
+		Mnemonic: "test test test test test test test test test test test test",
 		CreateAccount: requests.CreateAccount{
 			DeviceName:         "StatusIM",
 			Password:           "password",
@@ -1562,8 +1551,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	}
 
 	exampleRequest := map[string]interface{}{
-		"mnemonic":    "",
-		"fetchBackup": true,
+		"mnemonic": "",
 		"createAccountRequest": map[string]interface{}{
 			"rootDataDir":   tmpdir,
 			"kdfIterations": 256000,

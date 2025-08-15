@@ -60,11 +60,6 @@ func (m *MessengerSignalsHandler) MessageDelivered(chatID string, messageID stri
 	signal.SendMessageDelivered(chatID, messageID)
 }
 
-// BackupPerformed passes information that a backup was performed
-func (m *MessengerSignalsHandler) BackupPerformed(lastBackup uint64) {
-	signal.SendBackupPerformed(lastBackup)
-}
-
 // CommunityInfoFound passes info about community that was requested before
 func (m *MessengerSignalsHandler) CommunityInfoFound(community *communities.Community) {
 	signal.SendCommunityInfoFound(community)
