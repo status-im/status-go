@@ -13,9 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 
 	"github.com/pkg/errors"
 
@@ -31,16 +30,21 @@ type Server struct {
 	connections map[*websocket.Conn]struct{}
 	address     string
 	config      *Config
+	logger      *zap.Logger
 }
 
-func NewServer(options ...Option) *Server {
+func NewServer(logger *zap.Logger, options ...Option) *Server {
 	config := defaultConfig()
 	for _, option := range options {
 		option(config)
 	}
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	return &Server{
 		connections: make(map[*websocket.Conn]struct{}, 1),
 		config:      config,
+		logger:      logger,
 	}
 }
 
@@ -68,21 +72,21 @@ func (s *Server) signalHandler(data []byte) {
 		delete(s.connections, connection)
 		err := connection.Close()
 		if err != nil {
-			log.Error("failed to close connection", "error", err)
+			s.logger.Error("failed to close connection", zap.Error(err))
 		}
 	}
 
 	for connection := range s.connections {
 		err := connection.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		if err != nil {
-			log.Error("failed to set write deadline", "error", err)
+			s.logger.Error("failed to set write deadline", zap.Error(err))
 			deleteConnection(connection)
 			continue
 		}
 
 		err = connection.WriteMessage(websocket.TextMessage, data)
 		if err != nil {
-			log.Error("failed to write signal message", "error", err)
+			s.logger.Error("failed to write signal message", zap.Error(err))
 			deleteConnection(connection)
 		}
 	}
@@ -134,7 +138,7 @@ func (s *Server) Listen(address string) error {
 func (s *Server) Serve() {
 	err := s.server.Serve(s.listener)
 	if !errors.Is(err, http.ErrServerClosed) {
-		log.Error("signals server closed with error: %w", err)
+		s.logger.Error("signals server closed with error: %w", zap.Error(err))
 	}
 }
 
@@ -142,14 +146,14 @@ func (s *Server) Stop(ctx context.Context) {
 	for connection := range s.connections {
 		err := connection.Close()
 		if err != nil {
-			log.Error("failed to close connection: %w", err)
+			s.logger.Error("failed to close connection: %w", zap.Error(err))
 		}
 		delete(s.connections, connection)
 	}
 
 	err := s.server.Shutdown(ctx)
 	if err != nil {
-		log.Error("failed to shutdown signals server: %w", err)
+		s.logger.Error("failed to shutdown signals server: %w", zap.Error(err))
 	}
 
 	s.server = nil
@@ -168,20 +172,20 @@ func (s *Server) signals(w http.ResponseWriter, r *http.Request) {
 
 	connection, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Error("failed to upgrade connection: %w", err)
+		s.logger.Error("failed to upgrade connection: %w", zap.Error(err))
 		return
 	}
-	log.Debug("new websocket connection")
+	s.logger.Debug("new websocket connection")
 
 	s.connections[connection] = struct{}{}
 }
 
 func (s *Server) addEndpointWithResponse(name string, handler func(string) string) {
-	log.Debug("adding endpoint", "name", name)
+	s.logger.Debug("adding endpoint", zap.String("name", name))
 	s.mux.HandleFunc(name, func(w http.ResponseWriter, r *http.Request) {
 		request, err := io.ReadAll(r.Body)
 		if err != nil {
-			log.Error("failed to read request: %w", err)
+			s.logger.Error("failed to read request: %w", zap.Error(err))
 			return
 		}
 
@@ -191,13 +195,13 @@ func (s *Server) addEndpointWithResponse(name string, handler func(string) strin
 
 		_, err = w.Write([]byte(response))
 		if err != nil {
-			log.Error("failed to write response: %w", err)
+			s.logger.Error("failed to write response: %w", zap.Error(err))
 		}
 	})
 }
 
 func (s *Server) addEndpointNoRequest(name string, handler func() string) {
-	log.Debug("adding endpoint", "name", name)
+	s.logger.Debug("adding endpoint", zap.String("name", name))
 	s.mux.HandleFunc(name, func(w http.ResponseWriter, r *http.Request) {
 		response := handler()
 
@@ -205,13 +209,13 @@ func (s *Server) addEndpointNoRequest(name string, handler func() string) {
 
 		_, err := w.Write([]byte(response))
 		if err != nil {
-			log.Error("failed to write response: %w", err)
+			s.logger.Error("failed to write response: %w", zap.Error(err))
 		}
 	})
 }
 
 func (s *Server) addUnsupportedEndpoint(name string) {
-	log.Debug("marking unsupported endpoint", "name", name)
+	s.logger.Debug("marking unsupported endpoint", zap.String("name", name))
 	s.mux.HandleFunc(name, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotImplemented)
 	})

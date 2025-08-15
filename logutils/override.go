@@ -17,7 +17,6 @@ type LogSettings struct {
 	MaxSize         int    `json:"MaxSize"`
 	MaxBackups      int    `json:"MaxBackups"`
 	CompressRotated bool   `json:"CompressRotated"`
-	Colorized       bool   `json:"Colorized"` // FIXME: doesn't take effect
 	LogToStderr     bool   `json:"LogToStderr"`
 }
 
