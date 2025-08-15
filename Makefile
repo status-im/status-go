@@ -426,19 +426,6 @@ migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
 migration-protocol:
 	touch $(DEFAULT_PROTOCOL_PATH)/$$(date +%s)_$(D).up.sql
 
-PROXY_WRAPPER_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
--include $(PROXY_WRAPPER_PATH)/Makefile.vars
-
-#export VERIF_PROXY_OUT_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
-build-verif-proxy:
-	$(MAKE) -C $(NIMBUS_ETH1_PATH) libverifproxy
-
-build-verif-proxy-wrapper:
-	$(MAKE) -C $(VERIF_PROXY_OUT_PATH) build-verif-proxy-wrapper
-
-test-verif-proxy-wrapper:
-	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)
-
 codecov-validate: SHELL := /bin/sh
 codecov-validate:
 	curl -X POST --data-binary @.codecov.yml https://codecov.io/validate
