@@ -214,9 +214,6 @@ type Settings struct {
 	OpenseaEnabled                      bool                          `json:"opensea-enabled?,omitempty"`
 	TelemetryServerURL                  string                        `json:"telemetry-server-url,omitempty"`
 	TelemetrySendPeriodMs               int                           `json:"telemetry-send-period-ms,omitempty"`
-	LastBackup                          uint64                        `json:"last-backup,omitempty"`
-	BackupEnabled                       bool                          `json:"backup-enabled?,omitempty"`
-	BackupFetched                       bool                          `json:"backup-fetched?,omitempty"`
 	BackupPath                          string                        `json:"backup-path,omitempty"`
 	AutoMessageEnabled                  bool                          `json:"auto-message-enabled?,omitempty"`
 	GifAPIKey                           string                        `json:"gifs/api-key"`

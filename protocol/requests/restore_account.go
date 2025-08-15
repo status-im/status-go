@@ -16,8 +16,6 @@ type RestoreAccount struct {
 	// This is to log in using a keycard with existing account.
 	Keycard *KeycardData `json:"keycard"`
 
-	FetchBackup bool `json:"fetchBackup"`
-
 	CreateAccount
 }
 

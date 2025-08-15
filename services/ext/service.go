@@ -153,9 +153,6 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		return err
 	}
 	s.messenger = messenger
-	if s.config.ProcessBackedupMessages {
-		s.messenger.EnableBackedupMessagesProcessing()
-	}
 
 	// Be mindful of adding more initialization code, as it can easily
 	// impact login times for mobile users. For example, we avoid calling

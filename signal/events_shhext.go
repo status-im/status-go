@@ -192,11 +192,6 @@ type EnodeDiscoveredSignal struct {
 	Topic string `json:"topic"`
 }
 
-// BackupPerformedSignal signals that a backup has been performed
-type BackupPerformedSignal struct {
-	LastBackup uint64 `json:"lastBackup"`
-}
-
 // SendEnodeDiscovered tiggered when an enode is discovered.
 // finds a new enode.
 func SendEnodeDiscovered(enode, topic string) {
@@ -206,9 +201,6 @@ func SendEnodeDiscovered(enode, topic string) {
 	})
 }
 
-func SendBackupPerformed(lastBackup uint64) {
-	send(EventBackupPerformed, BackupPerformedSignal{lastBackup})
-}
 func SendDecryptMessageFailed(sender string) {
 	send(EventDecryptMessageFailed, DecryptMessageFailedSignal{sender})
 }

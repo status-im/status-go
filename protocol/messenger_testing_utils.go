@@ -69,7 +69,6 @@ func (m *MessengerSignalsHandlerMock) SendWakuBackedUpKeypair(*wakusync.WakuBack
 func (m *MessengerSignalsHandlerMock) SendWakuBackedUpWatchOnlyAccount(*wakusync.WakuBackedUpDataResponse) {
 }
 
-func (m *MessengerSignalsHandlerMock) BackupPerformed(uint64)                    {}
 func (m *MessengerSignalsHandlerMock) HistoryArchivesProtocolEnabled()           {}
 func (m *MessengerSignalsHandlerMock) HistoryArchivesProtocolDisabled()          {}
 func (m *MessengerSignalsHandlerMock) CreatingHistoryArchives(string)            {}

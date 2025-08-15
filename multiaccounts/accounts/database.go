@@ -21,7 +21,6 @@ const (
 	statusChatPath           = "m/43'/60'/1581'/0'/0"
 	statusWalletRootPath     = "m/44'/60'/0'/0/"
 	zeroAddress              = "0x0000000000000000000000000000000000000000"
-	SyncedFromBackup         = "backup" // means a keypair is coming from backed up data
 	ThirtyDaysInMilliseconds = 30 * 24 * 60 * 60 * 1000
 
 	maxNumOfGeneratedAddresses            = uint64(100)

@@ -57,7 +57,6 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
 	s := &settings.Settings{}
-	s.BackupEnabled = true
 	logLevel := "INFO"
 	s.LogLevel = &logLevel
 	s.ProfilePicturesShowTo = settings.ProfilePicturesShowToEveryone
@@ -303,7 +302,6 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = DefaultLogLevel
 	nodeConfig.DataDir = DefaultDataDir
-	nodeConfig.ProcessBackedupMessages = false
 	nodeConfig.KeycardPairingDataFile = DefaultKeycardPairingDataFile
 	if request.KeycardPairingDataFile != nil {
 		nodeConfig.KeycardPairingDataFile = *request.KeycardPairingDataFile

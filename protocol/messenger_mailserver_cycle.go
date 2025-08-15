@@ -66,7 +66,7 @@ func (m *Messenger) asyncRequestAllHistoricMessages() {
 
 	go func() {
 		defer gocommon.LogOnPanic()
-		_, err := m.RequestAllHistoricMessages(false, true)
+		_, err := m.RequestAllHistoricMessages(true)
 		if err != nil {
 			m.logger.Error("failed to request historic messages", zap.Error(err))
 		}

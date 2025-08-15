@@ -20,11 +20,9 @@ type BrowserSuite struct {
 
 func (s *BrowserSuite) SetupTest() {
 	s.MessengerBaseTestSuite.SetupTest()
-	_, err := s.m.Start()
-	s.Require().NoError(err)
 }
 
-func (s *MessengerBackupSuite) TestBrowsersOrderedNewestFirst() {
+func (s *BrowserSuite) TestBrowsersOrderedNewestFirst() {
 	testBrowsers := []*browsers.Browser{
 		{
 			ID:        "1",
@@ -60,7 +58,7 @@ func (s *MessengerBackupSuite) TestBrowsersOrderedNewestFirst() {
 	s.Require().Equal(testBrowsers, rst)
 }
 
-func (s *MessengerBackupSuite) TestBrowsersHistoryIncluded() {
+func (s *BrowserSuite) TestBrowsersHistoryIncluded() {
 	browser := &browsers.Browser{
 		ID:           "1",
 		Name:         "first",
@@ -76,7 +74,7 @@ func (s *MessengerBackupSuite) TestBrowsersHistoryIncluded() {
 	s.Require().Equal(browser, rst[0])
 }
 
-func (s *MessengerBackupSuite) TestBrowsersReplaceOnUpdate() {
+func (s *BrowserSuite) TestBrowsersReplaceOnUpdate() {
 	browser := &browsers.Browser{
 		ID:        "1",
 		Name:      "first",
@@ -95,7 +93,7 @@ func (s *MessengerBackupSuite) TestBrowsersReplaceOnUpdate() {
 	s.Require().Equal(browser, rst[0])
 }
 
-func (s *MessengerBackupSuite) TestDeleteBrowser() {
+func (s *BrowserSuite) TestDeleteBrowser() {
 	browser := &browsers.Browser{
 		ID:        "1",
 		Name:      "first",

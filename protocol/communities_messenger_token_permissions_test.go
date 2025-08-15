@@ -20,8 +20,8 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
@@ -31,9 +31,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/wakuv2"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const testChainID1 = 1
@@ -136,16 +133,11 @@ func TestMessengerCommunitiesTokenPermissionsSuite(t *testing.T) {
 }
 
 type MessengerCommunitiesTokenPermissionsSuite struct {
-	suite.Suite
+	MessengerBaseTestSuite
+
 	owner *Messenger
 	bob   *Messenger
 	alice *Messenger
-
-	ownerWaku wakutypes.Waku
-	bobWaku   wakutypes.Waku
-	aliceWaku wakutypes.Waku
-
-	logger *zap.Logger
 
 	mockedBalances          communities.BalancesByChain
 	mockedCollectibles      communities.CollectiblesByChain
@@ -156,13 +148,7 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
-	// Initialize with nil to avoid panics in TearDownTest
-	s.owner = nil
-	s.bob = nil
-	s.alice = nil
-	s.ownerWaku = nil
-	s.bobWaku = nil
-	s.aliceWaku = nil
+	s.MessengerBaseTestSuite.setupMessaging()
 
 	s.accountsTestData = make(map[string][]string)
 	s.accountsPasswords = make(map[string]string)
@@ -173,19 +159,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	}
 	s.resetMockedBalances()
 
-	s.logger = tt.MustCreateTestLogger()
+	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, "owner", []Option{})
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
+	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, "bob", []Option{})
 
-	s.ownerWaku = wakuNodes[0]
-	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, "owner", []Option{})
-
-	s.bobWaku = wakuNodes[1]
-	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, "bob", []Option{})
-	s.bob.EnableBackedupMessagesProcessing()
-
-	s.aliceWaku = wakuNodes[2]
-	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, s.aliceWaku, "alice", []Option{})
+	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{})
 
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
@@ -199,27 +177,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.owner)
 	TearDownMessenger(&s.Suite, s.bob)
 	TearDownMessenger(&s.Suite, s.alice)
-	if s.ownerWaku != nil {
-		s.Require().NoError(s.ownerWaku.Stop())
-	}
-	if s.bobWaku != nil {
-		s.Require().NoError(s.bobWaku.Stop())
-	}
-	if s.aliceWaku != nil {
-		s.Require().NoError(s.aliceWaku.Stop())
-	}
-	_ = s.logger.Sync()
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku wakutypes.Waku, name string, extraOptions []Option) *Messenger {
+func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, name string, extraOptions []Option) *Messenger {
 	communityManagerOptions := []communities.ManagerOption{
 		communities.WithAllowForcingCommunityMembersReevaluation(true),
 	}
 	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
 
-	messenger := newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
+	messenger := newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
-			logger:       s.logger.Named(name),
 			extraOptions: extraOptions,
 		},
 		password:            password,
@@ -479,57 +447,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 	}
 }
 
-// NOTE(cammellos): Disabling for now as flaky, for some reason does not pass on CI, but passes locally
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
-	s.T().Skip("flaky test")
-
-	// Create a store node
-	// This is needed to fetch the messages after rejoining the community
-	var err error
-
-	cfg := testWakuV2Config{
-		logger:      s.logger.Named("store-node-waku"),
-		enableStore: false,
-		clusterID:   wakuv2.MainStatusShardCluster,
-	}
-	wakuStoreNode := NewTestWakuV2(&s.Suite, cfg)
-
-	storeNodeListenAddresses, err := wakuStoreNode.ListenAddresses()
-	s.Require().NoError(err)
-	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
-
-	storeNodeAddress := storeNodeListenAddresses[0]
-	s.logger.Info("store node ready", zap.Stringer("address", storeNodeAddress))
-
-	// Create messengers
-
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob"})
-	s.ownerWaku = wakuNodes[0]
-	s.bobWaku = wakuNodes[1]
-
-	options := []Option{
-		WithTestStoreNode(&s.Suite, localMailserverID, storeNodeAddress, localFleet, s.collectiblesServiceMock),
-	}
-
-	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, "owner", options)
-	s.Require().NoError(err)
-
-	_, err = s.owner.Start()
-	s.Require().NoError(err)
-
-	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, "bob", options)
-	s.Require().NoError(err)
-
-	_, err = s.bob.Start()
-	s.Require().NoError(err)
-
-	// Force the owner to use the store node as relay peer
-
-	err = s.owner.DialPeer(storeNodeAddress)
-	s.Require().NoError(err)
-
 	// Create a community
-
 	community, chat := s.createCommunity()
 
 	// bob joins the community
@@ -544,7 +463,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 
 	// send message to the channel
 	msg := s.sendChatMessage(s.owner, chat.ID, messages[0])
-	s.logger.Debug("owner sent a message",
+	s.T().Log("owner sent a message",
 		zap.String("messageText", msg.Text),
 		zap.String("messageID", msg.ID),
 	)
@@ -576,11 +495,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 		CommunityID: community.ID(),
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
+			{
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
-				Amount:            "100",
+				AmountInWei:       "100000000000000000000",
 				Decimals:          uint64(18),
 			},
 		},
@@ -615,23 +534,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	)
 	s.Require().NoError(err)
 
-	// We are not member of the community anymore, so we need to refetch
-	// the data, since we would not be pulling it anymore
-	_, err = WaitOnMessengerResponse(
-		s.bob,
-		func(r *MessengerResponse) bool {
-			_, err := s.bob.FetchCommunity(&FetchCommunityRequest{WaitForResponse: true, TryDatabase: false, CommunityKey: community.IDString()})
-			if err != nil {
-				return false
-			}
-			c, err := s.bob.communitiesManager.GetByID(community.ID())
-			return err == nil && c != nil && len(c.TokenPermissions()) > 0 && !c.Joined()
-		},
-		"no token permissions",
-	)
-
-	s.Require().NoError(err)
-
 	// bob tries to join, but he doesn't satisfy so the request isn't sent
 	request := s.createRequestToJoinCommunity(community.ID(), s.bob)
 	_, err = s.bob.RequestToJoinCommunity(request)
@@ -662,7 +564,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 
 	// send message to channel
 	msg = s.sendChatMessage(s.owner, chat.ID, messages[2])
-	s.logger.Debug("owner sent a message",
+	s.T().Log("owner sent a message",
 		zap.String("messageText", msg.Text),
 		zap.String("messageID", msg.ID),
 	)
@@ -909,7 +811,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 
 	waitOnBobToBeKickedFromChannel := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		channel, ok := sub.Community.Chats()[chat.CommunityChatID()]
-		return ok && len(channel.Members) == 1
+		return ok && len(channel.Members) == 0
 	})
 	waitOnChannelToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
 		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
@@ -936,6 +838,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
+	s.Require().True(response.Communities()[0].ChannelHasPermissions(chat.CommunityChatID()))
 
 	err = <-waitOnBobToBeKickedFromChannel
 	s.Require().NoError(err)
@@ -956,6 +859,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 			if c == nil {
 				return false
 			}
+			if !c.ChannelEncrypted(chat.CommunityChatID()) {
+				return false
+			}
 			channel := c.Chats()[chat.CommunityChatID()]
 			return channel != nil && len(channel.Members) == 0
 		},
@@ -965,6 +871,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 
 	// bob should not be in the bloom filter list
 	community, err = s.bob.communitiesManager.GetByID(community.ID())
+	s.Require().True(s.bob.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
+	s.Require().True(community.ChannelHasPermissions(chat.CommunityChatID()))
 	s.Require().NoError(err)
 	s.Require().False(community.IsMemberLikelyInChat(chat.CommunityChatID()))
 
@@ -1078,6 +986,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPerm
 	response, err := s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().True(response.Communities()[0].ChannelHasPermissions(chat.CommunityChatID()))
 	s.Require().False(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
 
 	// bob should be in the bloom filter list since everyone has access to readonly channels
@@ -1094,29 +1003,26 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPerm
 	_, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			c, err := s.bob.GetCommunityByID(community.ID())
-			if err != nil {
+			if len(r.Communities()) == 0 || !r.Communities()[0].ChannelHasPermissions(chat.CommunityChatID()) {
 				return false
 			}
+			c := r.Communities()[0]
 			if c == nil {
 				return false
 			}
 			channel := c.Chats()[chat.CommunityChatID()]
-
-			if channel == nil || len(channel.Members) != 2 {
+			// The channel is not encrypted. Should have one member
+			// and bob should be a viewer
+			if channel == nil || len(channel.Members) != 1 {
 				return false
 			}
-			member := channel.Members[s.bob.IdentityPublicKeyString()]
-			return member != nil && member.ChannelRole == protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
+			return c.IsMemberInChat(s.bob.IdentityPublicKey(), chat.CommunityChatID()) &&
+				c.IsMemberLikelyInChat(chat.CommunityChatID())
 		},
 		"no community that satisfies criteria",
 	)
-	s.Require().NoError(err)
 
-	// bob should be in the bloom filter list
-	community, err = s.bob.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
-	s.Require().True(community.IsMemberLikelyInChat(chat.CommunityChatID()))
 
 	// bob can't post
 	msg := &common.Message{
@@ -1130,6 +1036,139 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPerm
 	_, err = s.bob.SendChatMessage(context.Background(), msg)
 	s.Require().Error(err)
 	s.Require().Contains(err.Error(), "can't post")
+
+	// owner can post
+	msg = s.sendChatMessage(s.owner, chat.ID, "hello on announcements channel")
+	// bob can read the message
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[msg.ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	// alice joins the community
+	s.advertiseCommunityTo(community, s.alice)
+	s.joinCommunity(community, s.alice)
+
+	// setup view and post channel permission
+	channelPermissionRequest = requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+		ChatIds:     []string{chat.ID},
+		TokenCriteria: []*protobuf.TokenCriteria{
+			{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
+				Symbol:            "TEST2",
+				AmountInWei:       "200000000000000000000",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	response, err = s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(response.Communities()[0].ChannelHasPermissions(chat.CommunityChatID()))
+	s.Require().False(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
+
+	// make alice satisfy channel criteria
+	s.makeAddressSatisfyTheCriteria(testChainID1, aliceAddress1, channelPermissionRequest.TokenCriteria[0])
+	// force owner to reevaluate channel members
+	// in production it will happen automatically, by periodic check
+	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
+
+	// alice receives community changes
+	_, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			if len(r.Communities()) == 0 || !r.Communities()[0].ChannelHasPermissions(chat.CommunityChatID()) {
+				return false
+			}
+			c := r.Communities()[0]
+			if c == nil {
+				return false
+			}
+			channel := c.Chats()[chat.CommunityChatID()]
+			// The channel is not encrypted, but has permissions. Should have 2 members
+			// Alice - poster, bob - viewer
+			if channel == nil || len(channel.Members) != 2 {
+				return false
+			}
+
+			if channel.Members[s.alice.IdentityPublicKeyString()].ChannelRole != protobuf.CommunityMember_CHANNEL_ROLE_POSTER {
+				return false
+			}
+
+			return c.IsMemberLikelyInChat(chat.CommunityChatID())
+		},
+		"no community that satisfies criteria",
+	)
+
+	community, err = s.alice.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	chatID := strings.TrimPrefix(chat.ID, community.IDString())
+	members := community.Chats()[chatID].Members
+	s.Require().Len(members, 2)
+	// confirm that member is a viewer and not a poster
+	s.Require().Equal(protobuf.CommunityMember_CHANNEL_ROLE_POSTER, members[s.alice.IdentityPublicKeyString()].ChannelRole)
+
+	// bob can't post
+	msg = &common.Message{
+		ChatMessage: &protobuf.ChatMessage{
+			ChatId:      chat.ID,
+			ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+			Text:        "I can't post on read-only channel",
+		},
+	}
+
+	_, err = s.bob.SendChatMessage(context.Background(), msg)
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "can't post")
+
+	// alice can post
+	msg = &common.Message{
+		ChatMessage: &protobuf.ChatMessage{
+			ChatId:      chat.ID,
+			ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+			Text:        "I can post on read-only channel",
+		},
+	}
+
+	_, err = s.alice.SendChatMessage(context.Background(), msg)
+	s.Require().NoError(err)
+
+	// owner can read the message
+	response, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[msg.ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	// bob can read the message
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[msg.ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestSearchMessageinPermissionedChannel() {
@@ -1196,7 +1235,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestSearchMessageinPermissio
 
 	waitOnBobToBeKickedFromChannel := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		channel, ok := sub.Community.Chats()[chat.CommunityChatID()]
-		return ok && len(channel.Members) == 1
+		return ok && len(channel.Members) == 0
 	})
 	waitOnChannelToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
 		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
@@ -1241,6 +1280,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestSearchMessageinPermissio
 				return false
 			}
 			if c == nil {
+				return false
+			}
+			if !c.ChannelEncrypted(chat.CommunityChatID()) {
 				return false
 			}
 			channel := c.Chats()[chat.CommunityChatID()]
@@ -1285,9 +1327,15 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
 
+	community, err = s.bob.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.Chats(), 1)
+	s.Require().Len(community.Chats()[chat.CommunityChatID()].Members, 0)
+	s.Require().True(community.IsMemberInChat(community.MemberIdentity(), chat.CommunityChatID()))
+
 	waitOnBobToBeKickedFromChannel := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		channel, ok := sub.Community.Chats()[chat.CommunityChatID()]
-		return ok && len(channel.Members) == 1
+		return ok && len(channel.Members) == 0 && !sub.Community.IsMemberInChat(community.MemberIdentity(), chat.CommunityChatID())
 	})
 	waitOnChannelToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
 		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
@@ -1315,6 +1363,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.CommunityChanges[0].TokenPermissionsAdded, 1)
 	s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
+	s.Require().True(response.Communities()[0].ChannelHasPermissions(chat.CommunityChatID()))
 
 	err = <-waitOnBobToBeKickedFromChannel
 	s.Require().NoError(err)
@@ -1336,7 +1385,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 				return false
 			}
 			channel := c.Chats()[chat.CommunityChatID()]
-			return channel != nil && len(channel.Members) == 0
+			return channel != nil && len(channel.Members) == 0 && !c.IsMemberInChat(c.MemberIdentity(), chat.CommunityChatID())
 		},
 		"no community that satisfies criteria",
 	)
@@ -1367,7 +1416,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	s.Require().NoError(err)
 	chatID := strings.TrimPrefix(chat.ID, community.IDString())
 	members := community.Chats()[chatID].Members
-	s.Require().Len(members, 2)
+	s.Require().Len(members, 1)
 	// confirm that member is a viewer and not a poster
 	s.Require().Equal(protobuf.CommunityMember_CHANNEL_ROLE_VIEWER, members[s.bob.IdentityPublicKeyString()].ChannelRole)
 
@@ -1430,7 +1479,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	s.Require().NoError(err)
 
 	members = community.Chats()[chatID].Members
-	s.Require().Len(members, 2)
+	s.Require().Len(members, 1)
 	// confirm that member is now a poster
 	s.Require().Equal(protobuf.CommunityMember_CHANNEL_ROLE_POSTER, members[s.bob.IdentityPublicKeyString()].ChannelRole)
 
@@ -1451,7 +1500,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 				return false
 			}
 			members = chats[chat.ID].Members
-			return len(members) == 2 && members[s.bob.myHexIdentity()] != nil && members[s.bob.myHexIdentity()].ChannelRole == protobuf.CommunityMember_CHANNEL_ROLE_POSTER
+			return len(members) == 1 && members[s.bob.myHexIdentity()] != nil && members[s.bob.myHexIdentity()].ChannelRole == protobuf.CommunityMember_CHANNEL_ROLE_POSTER
 		},
 		"bob never got post permissions",
 	)
@@ -1845,7 +1894,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	s.Require().NoError(err)
 
 	// bob receives community changes
-	// channel members should not be empty,
+	// channel members should be empty,
 	// this info is available only to channel members with encryption key
 	_, err = WaitOnMessengerResponse(
 		s.bob,
@@ -1857,8 +1906,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 			if c == nil {
 				return false
 			}
+
+			if !c.ChannelEncrypted(chat.CommunityChatID()) {
+				return false
+			}
+
 			channel := c.Chats()[chat.CommunityChatID()]
-			if channel != nil && len(channel.Members) < 2 {
+			if channel != nil && len(channel.Members) == 0 {
 				return false
 			}
 
@@ -1894,12 +1948,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	backupMessage, err := s.bob.backupCommunity(community, clock)
 	s.Require().NoError(err)
 
-	err = s.bob.HandleBackup(s.bob.buildMessageState(), backupMessage, nil)
-	s.Require().NoError(err)
+	errs := s.bob.handleLocalBackupCommunities(s.bob.buildMessageState(), backupMessage.Communities)
+	s.Require().Len(errs, 0, fmt.Sprintf("expected no errors while handling backup communities. Errors: %v", errs))
 
 	// regenerate key for the channel in order to check that owner will send keys
 	// on bob request from `HandleBackup`
-	_, err = s.owner.encryptor.GenerateHashRatchetKey([]byte(community.IDString() + chat.CommunityChatID()))
+	err = s.owner.messaging.GenerateHashRatchetKey([]byte(community.IDString() + chat.CommunityChatID()))
 	s.Require().NoError(err)
 
 	testCommunitiesKeyDistributor, ok := s.owner.communitiesKeyDistributor.(*TestCommunitiesKeyDistributor)

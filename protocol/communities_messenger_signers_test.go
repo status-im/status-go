@@ -609,7 +609,7 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 	// Create communities backup
 
 	clock, _ := s.alice.getLastClockWithRelatedChat()
-	communitiesBackup, err := s.alice.backupCommunities(context.Background(), clock)
+	communitiesBackup, err := s.alice.backupCommunities(clock)
 	s.Require().NoError(err)
 
 	// Find wanted communities in the backup
