@@ -27,7 +27,7 @@ type KeyStore interface {
 	AccountDecryptedKey(address cryptoypes.Address, passphrase string) (types.KeystoreAccount, *ecdsa.PrivateKey, *extkeys.ExtendedKey, error)
 	// Delete deletes the key matched by account.
 	// If the account contains no filename, the address must match a unique key.
-	Delete(address cryptoypes.Address) error
+	Delete(address cryptoypes.Address, passphrase string) error
 	// Find returns the account matched by address
 	Find(address cryptoypes.Address) (types.KeystoreAccount, error)
 	// Accounts returns all accounts in the keystore

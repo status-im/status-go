@@ -183,8 +183,8 @@ func (api *API) GetKeypairByKeyUID(ctx context.Context, keyUID string) (*account
 	return api.db.GetKeypairByKeyUID(keyUID)
 }
 
-func (api *API) DeleteAccount(ctx context.Context, address types.Address) error {
-	err := (*api.messenger).DeleteAccount(address)
+func (api *API) DeleteAccount(ctx context.Context, address types.Address, password string) error {
+	err := (*api.messenger).DeleteAccount(address, password)
 	if err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 	return nil
 }
 
-func (api *API) DeleteKeypair(ctx context.Context, keyUID string) error {
+func (api *API) DeleteKeypair(ctx context.Context, keyUID string, password string) error {
 	keypair, err := api.db.GetKeypairByKeyUID(keyUID)
 	if err != nil {
 		return err
@@ -204,7 +204,7 @@ func (api *API) DeleteKeypair(ctx context.Context, keyUID string) error {
 		return accounts.ErrCannotRemoveProfileKeypair
 	}
 
-	err = (*api.messenger).DeleteKeypair(keyUID)
+	err = (*api.messenger).DeleteKeypair(keyUID, password)
 	if err != nil {
 		return err
 	}
@@ -232,6 +232,14 @@ func (api *API) RemainingWatchOnlyAccountCapacity(ctx context.Context) (int, err
 // Creates all keystore files for a keypair and mark it in db as fully operable.
 func (api *API) MakePrivateKeyKeypairFullyOperable(ctx context.Context, privateKey string, password string) error {
 	return (*api.messenger).MakePrivateKeyKeypairFullyOperable(privateKey, password)
+}
+
+// CleanKeystoreFiles cleans the keystore files for all keypairs
+// if the keypair is already migrated to keycard or removed, it cleans all accounts of the keypair, including the master account
+// if the keypair is not migrated to keycard and not removed, it cleans the keystore files for removed accounts of the keypair,
+// the master account is not cleaned if the keypair is not removed/migrated to keycard
+func (api *API) CleanKeystoreFiles(ctx context.Context, password string) error {
+	return api.manager.CleanKeystoreFiles(password)
 }
 
 func (api *API) MakePartiallyOperableAccoutsFullyOperable(ctx context.Context, password string) (addresses []types.Address, err error) {
@@ -269,11 +277,10 @@ func (api *API) MigrateNonProfileKeycardKeypairToApp(ctx context.Context, mnemon
 	return (*api.messenger).MigrateNonProfileKeycardKeypairToApp(ctx, mnemonicNoExtraSpaces, password)
 }
 
-// If keypair is migrated from keycard to app, then `accountsComingFromKeycard` should be set to true, otherwise false.
 // If keycard is new `Position` will be determined and set by the backend and `KeycardLocked` will be set to false.
 // If keycard is already added, `Position` and `KeycardLocked` will be unchanged.
-func (api *API) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.Keycard, accountsComingFromKeycard bool) error {
-	return (*api.messenger).SaveOrUpdateKeycard(ctx, keycard, !accountsComingFromKeycard)
+func (api *API) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.Keycard, password string) error {
+	return (*api.messenger).SaveOrUpdateKeycard(ctx, keycard, password)
 }
 
 func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*accounts.Keycard, error) {

@@ -1264,7 +1264,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	for _, acc := range keypair.Accounts {
 		kc.AccountsAddresses = append(kc.AccountsAddresses, acc.Address)
 	}
-	err = messenger.SaveOrUpdateKeycard(context.Background(), &kc, true)
+	err = messenger.SaveOrUpdateKeycard(context.Background(), &kc, oldPassword)
 	if err != nil {
 		return err
 	}

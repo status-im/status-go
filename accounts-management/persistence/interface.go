@@ -20,6 +20,8 @@ type Persistence interface {
 	GetKeypairByKeyUID(keyUID string) (*types.Keypair, error)
 	// GetActiveKeypairs returns all active keypairs
 	GetActiveKeypairs() ([]*types.Keypair, error)
+	// GetAllKeypairs returns all keypairs
+	GetAllKeypairs() ([]*types.Keypair, error)
 	// SaveOrUpdateKeypair saves or updates a keypair and its accounts
 	SaveOrUpdateKeypair(keypair *types.Keypair) error
 	// SaveOrUpdateAccounts saves or updates accounts

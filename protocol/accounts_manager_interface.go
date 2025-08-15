@@ -11,13 +11,11 @@ import (
 // AccountsManager interface for mocking purposes
 type AccountsManager interface {
 	GetVerifiedWalletAccount(address cryptotypes.Address, password string) (*generator.Account, error)
-	DeleteAccount(address cryptotypes.Address, clock uint64) (account *types.Account, err error)
-	DeleteKeypair(keyUID string, clock uint64) (keypair *types.Keypair, err error)
-	DeleteKeystoreFileForAccount(address cryptotypes.Address) error
-	DeleteKeystoreFilesForKeypair(keypair *types.Keypair) (err error)
+	DeleteAccount(address cryptotypes.Address, password string, clock uint64) (account *types.Account, err error)
+	DeleteKeypair(keyUID string, password string, clock uint64) (keypair *types.Keypair, err error)
 	MakeSeedPhraseKeypairFullyOperable(mnemonic string, password string, clock uint64) (string, error)
 	MakePrivateKeyKeypairFullyOperable(privateKey string, password string, clock uint64) (string, error)
-	SaveOrUpdateKeycard(keycard *types.Keycard, clock uint64, removeKeystoreFiles bool) error
+	SaveOrUpdateKeycard(keycard *types.Keycard, password string, clock uint64) error
 	AddAccounts(keyUID string, accounts []*types.Account, password string) error
 	CreateKeypairFromMnemonicAndStore(mnemonic string, password string, keypairName string,
 		walletAccount *types.AccountCreationDetails, profile bool, clock uint64) (keypair *types.Keypair, err error)

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,8 +118,8 @@ func (m *AccountsManager) storeToKeystore(acc *generator.Account, password strin
 
 func (m *AccountsManager) createKeystore(keyUID string) (keystore.KeyStore, error) {
 	// prepare keystore path
-	const DefaultKeystoreRelativePath = "keystore"
-	relativePath := filepath.Join(DefaultKeystoreRelativePath, keyUID)
+	const defaultKeystoreRelativePath = "keystore"
+	relativePath := filepath.Join(defaultKeystoreRelativePath, keyUID)
 	absoluteKeystorePath := filepath.Join(m.rootDataDir, relativePath)
 
 	if _, err := os.Stat(absoluteKeystorePath); os.IsNotExist(err) {
@@ -130,30 +131,27 @@ func (m *AccountsManager) createKeystore(keyUID string) (keystore.KeyStore, erro
 	return geth.NewGethKeystoreAdapter(absoluteKeystorePath)
 }
 
-// deleteAccountFromKeystore deletes an account from the keystore
-func (m *AccountsManager) deleteAccountFromKeystore(address cryptotypes.Address) error {
+// deleteAccountFromKeystoreIfExists deletes an account from the keystore if it exists, if not returns no error
+func (m *AccountsManager) deleteAccountFromKeystoreIfExists(address cryptotypes.Address, password string) error {
 	if m.keystore == nil {
 		m.logger.Error("cannot delete account, keystore is missing", zap.String("address", address.Hex()))
 		return ErrKeystoreMissing
 	}
 	m.logger.Info("deleting account", zap.String("address", address.Hex()))
-	return m.keystore.Delete(address)
+	err := m.keystore.Delete(address, password)
+	if errors.Is(err, keystore.ErrNoMatch) {
+		return nil
+	}
+	return err
 }
 
-// DeleteKeystoreFileForAccount deletes the keystore file for an account
+// deleteKeystoreFileForAccountIfExists deletes the keystore file for an account if it exists
+// if the account is a watch only account, it does nothing
 // if the account is non-operable or partially operable, it does nothing
-// if the account is a watch account, it does nothing
-// if the account is a key account, it deletes the keystore file for the account
-// if the account is a key account and it is the last account of the keypair, it deletes the master account keystore file
-// trying to delete a non-existent keystore file for an account does not result in an error
-func (m *AccountsManager) DeleteKeystoreFileForAccount(address cryptotypes.Address) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	return m.deleteKeystoreFileForAccountInternally(address)
-}
-
-func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address cryptotypes.Address) error {
+// if the account belongs to regular, not keycard migrated keypair:
+// - it deletes the keystore file for the account if the keystore file exists
+// - if it is the last account of the keypair, it deletes the master account keystore file
+func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address cryptotypes.Address, password string) error {
 	if m.persistence == nil {
 		return ErrPersistenceMissing
 	}
@@ -168,13 +166,17 @@ func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address cryptot
 	}
 
 	if acc.Type != types.AccountTypeWatch {
+		if password == "" {
+			return ErrNoPasswordProvided
+		}
+
 		kp, err := m.persistence.GetKeypairByKeyUID(acc.KeyUID)
 		if err != nil {
 			return err
 		}
 
 		if !kp.MigratedToKeycard() {
-			err = m.deleteAccountFromKeystore(address)
+			err = m.deleteAccountFromKeystoreIfExists(address, password)
 			if err != nil {
 				return err
 			}
@@ -182,7 +184,7 @@ func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address cryptot
 			if acc.Type != types.AccountTypeKey {
 				lastAcccountOfKeypairWithTheSameKey := len(kp.Accounts) == 1
 				if lastAcccountOfKeypairWithTheSameKey {
-					err = m.deleteAccountFromKeystore(cryptotypes.HexToAddress(kp.DerivedFrom))
+					err = m.deleteAccountFromKeystoreIfExists(cryptotypes.HexToAddress(kp.DerivedFrom), password)
 					if err != nil {
 						return err
 					}
@@ -194,17 +196,14 @@ func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address cryptot
 	return nil
 }
 
-// DeleteKeystoreFilesForKeypair deletes the keystore files for a keypair
+// deleteKeystoreFilesForKeypairInternally deletes the keystore files for a keypair
 // if the keypair is already migrated to keycard, it does nothing
 // trying to delete a non-existent keystore file does not result in an error
-func (m *AccountsManager) DeleteKeystoreFilesForKeypair(keypair *types.Keypair) (err error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (m *AccountsManager) deleteKeystoreFilesForKeypairInternally(keypair *types.Keypair, password string) (err error) {
+	if password == "" {
+		return ErrNoPasswordProvided
+	}
 
-	return m.deleteKeystoreFilesForKeypairInternally(keypair)
-}
-
-func (m *AccountsManager) deleteKeystoreFilesForKeypairInternally(keypair *types.Keypair) (err error) {
 	if keypair == nil {
 		return ErrKeypairIsNil
 	}
@@ -228,20 +227,72 @@ func (m *AccountsManager) deleteKeystoreFilesForKeypairInternally(keypair *types
 		if acc.Operable == types.AccountPartiallyOperable {
 			continue
 		}
-		err = m.deleteAccountFromKeystore(acc.Address)
+		err = m.deleteAccountFromKeystoreIfExists(acc.Address, password)
 		if err != nil {
 			return err
 		}
 	}
 
 	if anyAccountFullyOrPartiallyOperable && keypair.Type != types.KeypairTypeKey {
-		err = m.deleteAccountFromKeystore(cryptotypes.HexToAddress(keypair.DerivedFrom))
+		err = m.deleteAccountFromKeystoreIfExists(cryptotypes.HexToAddress(keypair.DerivedFrom), password)
 		if err != nil {
 			return err
 		}
 	}
 
 	return
+}
+
+// CleanKeystoreFiles cleans the keystore files for all keypairs
+// if the keypair is already migrated to keycard or removed, it cleans all accounts of the keypair, including the master account
+// if the keypair is not migrated to keycard and not removed, it cleans the keystore files for removed accounts of the keypair,
+// the master account is not cleaned if the keypair is not removed/migrated to keycard
+func (m *AccountsManager) CleanKeystoreFiles(password string) error {
+	if password == "" {
+		return ErrNoPasswordProvided
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.persistence == nil {
+		return ErrPersistenceMissing
+	}
+
+	keypairs, err := m.persistence.GetAllKeypairs()
+	if err != nil {
+		return err
+	}
+
+	for _, kp := range keypairs {
+		if kp.MigratedToKeycard() || kp.Removed {
+			for _, acc := range kp.Accounts {
+				err = m.deleteAccountFromKeystoreIfExists(acc.Address, password)
+				if err != nil {
+					return err
+				}
+			}
+
+			err = m.deleteAccountFromKeystoreIfExists(cryptotypes.HexToAddress(kp.DerivedFrom), password)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		for _, acc := range kp.Accounts {
+			if !acc.Removed {
+				continue
+			}
+
+			err = m.deleteAccountFromKeystoreIfExists(acc.Address, password)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // MigrateKeyStoreDir migrates the keystore directory from the current location to the provided new location

@@ -56,6 +56,14 @@ func (a *AccountsManagerPersistenceAdapter) GetActiveKeypairs() ([]*types.Keypai
 	return KeypairsToAccountsManagerKeypairs(dbKeypairs), nil
 }
 
+func (a *AccountsManagerPersistenceAdapter) GetAllKeypairs() ([]*types.Keypair, error) {
+	dbKeypairs, err := a.db.GetAllKeypairs()
+	if err != nil {
+		return nil, err
+	}
+	return KeypairsToAccountsManagerKeypairs(dbKeypairs), nil
+}
+
 func (a *AccountsManagerPersistenceAdapter) SaveOrUpdateKeypair(keypair *types.Keypair) error {
 	dbKeypair := AccountsManagerKeypairToKeypair(keypair)
 	return a.db.SaveOrUpdateKeypair(dbKeypair)

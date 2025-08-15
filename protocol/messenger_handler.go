@@ -3632,37 +3632,14 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		kp.Accounts = append(kp.Accounts, acc)
 	}
 
-	if !fromLocalPairing && !recoveringFromWakuInitiatedByKeycard {
-		if kp.Removed ||
-			dbKeypair != nil && !dbKeypair.MigratedToKeycard() && syncKpMigratedToKeycard {
-			// delete all keystore files
-			err = m.accountsManager.DeleteKeystoreFilesForKeypair(accounts.KeypairToAccountsManagerKeypair(dbKeypair))
-			if err != nil {
-				return nil, err
-			}
-
-			if syncKpMigratedToKeycard {
-				err = m.settings.MarkKeypairFullyOperable(dbKeypair.KeyUID, 0, false)
-				if err != nil {
-					return nil, err
-				}
-			}
-		} else if dbKeypair != nil {
-			for _, dbAcc := range dbKeypair.Accounts {
-				removeAcc := false
-				for _, acc := range kp.Accounts {
-					if dbAcc.Address == acc.Address && acc.Removed && !dbAcc.Removed {
-						removeAcc = true
-						break
-					}
-				}
-				if removeAcc {
-					err = m.accountsManager.DeleteKeystoreFileForAccount(dbAcc.Address)
-					if err != nil {
-						return nil, err
-					}
-				}
-			}
+	if !fromLocalPairing &&
+		!recoveringFromWakuInitiatedByKeycard &&
+		dbKeypair != nil &&
+		!dbKeypair.MigratedToKeycard() &&
+		syncKpMigratedToKeycard {
+		err = m.settings.MarkKeypairFullyOperable(dbKeypair.KeyUID, 0, false)
+		if err != nil {
+			return nil, err
 		}
 	}
 
