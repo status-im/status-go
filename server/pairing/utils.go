@@ -1,8 +1,8 @@
 package pairing
 
 import (
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 )
 
 func GetMessengerInstallationsMap(m *protocol.Messenger) map[string]struct{} {
@@ -13,7 +13,7 @@ func GetMessengerInstallationsMap(m *protocol.Messenger) map[string]struct{} {
 	return ids
 }
 
-func FindNewInstallations(m *protocol.Messenger, prevInstallationIds map[string]struct{}) *multidevice.Installation {
+func FindNewInstallations(m *protocol.Messenger, prevInstallationIds map[string]struct{}) *messagingtypes.Installation {
 	for _, installation := range m.Installations() {
 		if _, ok := prevInstallationIds[installation.ID]; !ok {
 			return installation

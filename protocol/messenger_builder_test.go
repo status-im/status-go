@@ -19,7 +19,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -123,20 +122,13 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 
 	installationID := uuid.New().String()
 
-	// Initialize encryption layer.
-	encryptionProtocol := encryption.New(
-		appDb,
-		installationID,
-		config.logger,
-	)
-
 	messaging, err := messagingEnv.NewTestCore(
 		messaging.CoreParams{
-			Identity:           config.privateKey,
-			DB:                 appDb,
-			Persistence:        NewMessagingPersistence(appDb),
-			EncryptionProtocol: encryptionProtocol,
-			TimeSource:         &testTimeSource{},
+			Identity:       config.privateKey,
+			DB:             appDb,
+			Persistence:    NewMessagingPersistence(appDb),
+			InstallationID: installationID,
+			TimeSource:     &testTimeSource{},
 		},
 		messaging.WithLogger(config.logger),
 	)

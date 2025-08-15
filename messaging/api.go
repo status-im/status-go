@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
@@ -17,11 +18,10 @@ import (
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
+	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 )
 
 type API struct {
@@ -127,7 +127,7 @@ func (a *API) ProcessNegotiatedSecret(secret ethtypes.NegotiatedSecret) (*types.
 	return adapters.FromTransportFilter(filter), nil
 }
 
-func (a *API) HandleSharedSecrets(secrets []*sharedsecret.Secret) error {
+func (a *API) HandleSharedSecrets(secrets []*types.SharedSecret) error {
 	for _, secret := range secrets {
 		fSecret := ethtypes.NegotiatedSecret{
 			PublicKey: secret.Identity,
@@ -386,6 +386,111 @@ func (a *API) MetricsPushReceivedMessages(receivedMessages types.ReceivedMessage
 	}
 }
 
+func (a *API) GenerateHashRatchetKey(groupID []byte) error {
+	return a.core.generateHashRatchetKey(groupID)
+}
+
+func (a *API) EncryptionSubscriptions() *types.EncryptionSubscriptions {
+	return adapters.FromEncryptionSubscriptions(a.core.encryptor.Subscriptions())
+}
+
+func (a *API) GetAllHRKeysMarshaledV1(groupID []byte) ([]byte, error) {
+	return a.core.encryptor.GetAllHRKeysMarshaledV1(groupID)
+}
+
+func (a *API) GetAllHRKeysMarshaledV2(groupID []byte) ([]byte, error) {
+	return a.core.encryptor.GetAllHRKeysMarshaledV2(groupID)
+}
+
+func (a *API) EncryptWithHashRatchet(groupID []byte, payload []byte) ([]byte, []byte, uint32, error) {
+	return a.core.encryptWithHashRatchet(groupID, payload)
+}
+
+func (a *API) DecryptWithHashRatchet(keyID []byte, seqNo uint32, payload []byte) ([]byte, error) {
+	data, err := a.core.encryptor.DecryptWithHashRatchet(keyID, seqNo, payload)
+	if err == encryption.ErrNoRatchetKey {
+		return nil, types.ErrNoRatchetKey
+	}
+	return data, err
+}
+
+func (a *API) BuildHashRatchetMessage(groupID []byte, payload []byte) ([]byte, error) {
+	return a.core.buildHashRatchetMessage(groupID, payload)
+}
+
+func (a *API) DecryptMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, data []byte) ([]byte, error) {
+	data, err := a.core.decryptMessage(myIdentityKey, theirPublicKey, data)
+	if err == encryption.ErrHashRatchetGroupIDNotFound {
+		return nil, types.ErrHashRatchetGroupIDNotFound
+	}
+	return data, err
+}
+
+func (a *API) EncryptCommunityGrants(privateKey *ecdsa.PrivateKey, recipientGrants map[*ecdsa.PublicKey][]byte) (map[uint32][]byte, error) {
+	return a.core.encryptor.EncryptCommunityGrants(privateKey, recipientGrants)
+}
+
+func (a *API) DecryptCommunityGrant(myIdentityKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, grants map[uint32][]byte) ([]byte, error) {
+	return a.core.encryptor.DecryptCommunityGrant(myIdentityKey, senderKey, grants)
+}
+
+func (a *API) HandleHashRatchetKeysPayload(groupID, encodedKeys []byte, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) error {
+	_, err := a.core.encryptor.HandleHashRatchetKeysPayload(groupID, encodedKeys, myIdentityKey, theirIdentityKey)
+	return err
+}
+
+func (a *API) HandleHashRatchetHeadersPayload(encodedHeaders [][]byte) error {
+	return a.core.encryptor.HandleHashRatchetHeadersPayload(encodedHeaders)
+}
+
+func (a *API) AddInstallation(identity []byte, timestamp int64, installation *types.Installation, enabled bool) ([]*types.Installation, error) {
+	allInstallations, err := a.core.encryptor.AddInstallation(identity, timestamp, adapters.ToEncryptionInstallation(installation), enabled)
+	if err != nil {
+		return nil, err
+	}
+	return adapters.FromEncryptionInstallations(allInstallations), nil
+}
+
+func (a *API) AddInstallations(identity []byte, timestamp int64, installations []*types.Installation, enabled bool) ([]*types.Installation, error) {
+	allInstallations, err := a.core.encryptor.AddInstallations(identity, timestamp, adapters.ToEncryptionInstallations(installations), enabled)
+	if err != nil {
+		return nil, err
+	}
+	return adapters.FromEncryptionInstallations(allInstallations), nil
+}
+
+func (a *API) GetOurInstallations(myIdentityKey *ecdsa.PublicKey) ([]*types.Installation, error) {
+	installations, err := a.core.encryptor.GetOurInstallations(myIdentityKey)
+	if err != nil {
+		return nil, err
+	}
+	return adapters.FromEncryptionInstallations(installations), nil
+}
+
+func (a *API) GetOurActiveInstallations(myIdentityKey *ecdsa.PublicKey) ([]*types.Installation, error) {
+	installations, err := a.core.encryptor.GetOurActiveInstallations(myIdentityKey)
+	if err != nil {
+		return nil, err
+	}
+	return adapters.FromEncryptionInstallations(installations), nil
+}
+
+func (a *API) SetInstallationMetadata(myIdentityKey *ecdsa.PublicKey, installationID string, data *types.InstallationMetadata) error {
+	return a.core.encryptor.SetInstallationMetadata(myIdentityKey, installationID, adapters.ToEncryptionInstallationMetadata(data))
+}
+
+func (a *API) SetInstallationName(myIdentityKey *ecdsa.PublicKey, installationID string, name string) error {
+	return a.core.encryptor.SetInstallationName(myIdentityKey, installationID, name)
+}
+
+func (a *API) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	return a.core.encryptor.EnableInstallation(myIdentityKey, installationID)
+}
+
+func (a *API) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	return a.core.encryptor.DisableInstallation(myIdentityKey, installationID)
+}
+
 func (a *API) Metrics() string {
 	return a.core.metrics()
 }
@@ -412,4 +517,8 @@ func CommunityShardInfoTopicPrefix() string {
 
 func SetRekeyCompatibility(compatibility bool) {
 	common.RekeyCompatibility = compatibility
+}
+
+func GenerateInstallationID() string {
+	return uuid.New().String()
 }

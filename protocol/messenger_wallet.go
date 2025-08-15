@@ -17,7 +17,6 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -377,7 +376,7 @@ func (m *Messenger) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.S
 	}
 }
 
-func (m *Messenger) getMyInstallationMetadata() (*multidevice.InstallationMetadata, error) {
+func (m *Messenger) getMyInstallationMetadata() (*messagingtypes.InstallationMetadata, error) {
 	installation, ok := m.allInstallations.Load(m.installationID)
 	if !ok {
 		return nil, errors.New("no installation found")

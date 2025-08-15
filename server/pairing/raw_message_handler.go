@@ -9,9 +9,9 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/signal"
@@ -141,7 +141,7 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 		}
 	}
 
-	installationID := multidevice.GenerateInstallationID()
+	installationID := messaging.GenerateInstallationID()
 
 	nodeConfig, err := api.DefaultNodeConfig(installationID, account.KeyUID, createAccountRequest)
 	if err != nil {

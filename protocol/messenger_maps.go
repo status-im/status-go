@@ -5,7 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -152,7 +152,7 @@ func (smtm *systemMessageTranslationsMap) Delete(eventType protobuf.MembershipUp
 | installationMap
 |--------------------------------------------------------------------------
 |
-| A sync.Map wrapper for the specific mapping of map[string]*multidevice.Installation
+| A sync.Map wrapper for the specific mapping of map[string]*messagingtypes.Installation
 |
 */
 
@@ -160,21 +160,21 @@ type installationMap struct {
 	sm sync.Map
 }
 
-func (im *installationMap) Load(installationID string) (*multidevice.Installation, bool) {
+func (im *installationMap) Load(installationID string) (*messagingtypes.Installation, bool) {
 	installation, ok := im.sm.Load(installationID)
 	if installation == nil {
 		return nil, ok
 	}
-	return installation.(*multidevice.Installation), ok
+	return installation.(*messagingtypes.Installation), ok
 }
 
-func (im *installationMap) Store(installationID string, installation *multidevice.Installation) {
+func (im *installationMap) Store(installationID string, installation *messagingtypes.Installation) {
 	im.sm.Store(installationID, installation)
 }
 
-func (im *installationMap) Range(f func(installationID string, installation *multidevice.Installation) (shouldContinue bool)) {
+func (im *installationMap) Range(f func(installationID string, installation *messagingtypes.Installation) (shouldContinue bool)) {
 	nf := func(key, value interface{}) (shouldContinue bool) {
-		return f(key.(string), value.(*multidevice.Installation))
+		return f(key.(string), value.(*messagingtypes.Installation))
 	}
 	im.sm.Range(nf)
 }
@@ -185,7 +185,7 @@ func (im *installationMap) Delete(installationID string) {
 
 func (im *installationMap) Empty() bool {
 	count := 0
-	im.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
+	im.Range(func(installationID string, installation *messagingtypes.Installation) (shouldContinue bool) {
 		count++
 		return false
 	})
@@ -195,7 +195,7 @@ func (im *installationMap) Empty() bool {
 
 func (im *installationMap) Len() int {
 	count := 0
-	im.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
+	im.Range(func(installationID string, installation *messagingtypes.Installation) (shouldContinue bool) {
 		count++
 		return true
 	})

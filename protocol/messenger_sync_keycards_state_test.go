@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
 )
 
@@ -38,7 +38,7 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	s.other.accountsManager = s.accountsManagerOtherMock
 
 	// Pair devices (main and other)
-	imOther := &multidevice.InstallationMetadata{
+	imOther := &messagingtypes.InstallationMetadata{
 		Name:       "other-device",
 		DeviceType: "other-device-type",
 	}

@@ -1954,7 +1954,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 
 	// regenerate key for the channel in order to check that owner will send keys
 	// on bob request from `HandleBackup`
-	_, err = s.owner.encryptor.GenerateHashRatchetKey([]byte(community.IDString() + chat.CommunityChatID()))
+	err = s.owner.messaging.GenerateHashRatchetKey([]byte(community.IDString() + chat.CommunityChatID()))
 	s.Require().NoError(err)
 
 	testCommunitiesKeyDistributor, ok := s.owner.communitiesKeyDistributor.(*TestCommunitiesKeyDistributor)

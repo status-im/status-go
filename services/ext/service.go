@@ -39,7 +39,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
@@ -152,13 +151,6 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		return err
 	}
 
-	// Initialize encryption layer.
-	encryptor := encryption.New(
-		params.AppDB,
-		s.config.ShhextConfig.InstallationID,
-		s.logger,
-	)
-
 	nodeKey, err := obtainNodeKey(&s.config)
 	if err != nil {
 		return err
@@ -172,14 +164,14 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 
 	messaging, err := messaging.NewCore(
 		messaging.CoreParams{
-			Identity:           params.Identity,
-			DB:                 params.AppDB,
-			Persistence:        protocol.NewMessagingPersistence(params.AppDB),
-			NodeKey:            nodeKey,
-			WakuConfig:         s.config.WakuV2Config,
-			ClusterConfig:      s.config.ClusterConfig,
-			EncryptionProtocol: encryptor,
-			TimeSource:         params.TimeSource,
+			Identity:       params.Identity,
+			DB:             params.AppDB,
+			Persistence:    protocol.NewMessagingPersistence(params.AppDB),
+			NodeKey:        nodeKey,
+			WakuConfig:     s.config.WakuV2Config,
+			ClusterConfig:  s.config.ClusterConfig,
+			InstallationID: s.config.ShhextConfig.InstallationID,
+			TimeSource:     params.TimeSource,
 		},
 		messaging.WithLogger(s.logger),
 		messaging.WithEnvelopeEventsConfig(envelopeEventsConfig),

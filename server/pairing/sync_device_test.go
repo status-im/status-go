@@ -19,10 +19,10 @@ import (
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	accservice "github.com/status-im/status-go/services/accounts"
@@ -259,7 +259,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	}()
 
 	// Pair server and client
-	im1 := &multidevice.InstallationMetadata{
+	im1 := &messagingtypes.InstallationMetadata{
 		Name:       "client-device",
 		DeviceType: "client-device-type",
 	}

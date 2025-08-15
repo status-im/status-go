@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	utils "github.com/status-im/status-go/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 
 	"github.com/stretchr/testify/suite"
@@ -114,7 +114,7 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 	s.Require().True(accounts.SameKeypairs(profileKpOtherDevice, dbProfileKp2))
 
 	// Pair devices
-	im1 := &multidevice.InstallationMetadata{
+	im1 := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}

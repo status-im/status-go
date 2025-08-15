@@ -3,8 +3,8 @@ package events
 import (
 	"crypto/ecdsa"
 
+	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/encryption"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
