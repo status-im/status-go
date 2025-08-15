@@ -170,8 +170,23 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 
 	accountsManager := clientBackend.AccountsManager()
 	// need to delete keystore files for keypair in order to simulate the case where the keypair was restored and keystore files were not created yet
-	err = accountsManager.DeleteKeystoreFilesForKeypair(accounts.KeypairToAccountsManagerKeypair(clientSeedPhraseKp))
+	clientKeystoreDir := filepath.Join(clientTmpDir, "keystore", clientActiveAccount.KeyUID)
+	files, err := os.ReadDir(clientKeystoreDir)
 	require.NoError(s.T(), err)
+
+	for _, file := range files {
+		if strings.Contains(strings.ToLower(file.Name()), strings.ToLower(clientSeedPhraseKp.DerivedFrom[2:])) {
+			require.NoError(s.T(), os.RemoveAll(filepath.Join(clientKeystoreDir, file.Name())))
+			continue
+		}
+
+		for _, acc := range clientSeedPhraseKp.Accounts {
+			if !strings.Contains(strings.ToLower(file.Name()), strings.ToLower(acc.Address.String()[2:])) {
+				continue
+			}
+			require.NoError(s.T(), os.RemoveAll(filepath.Join(clientKeystoreDir, file.Name())))
+		}
+	}
 
 	// check client - client should not contain keystore files for imported seed phrase
 	clientKeystorePath := filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
@@ -387,7 +402,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 		KeycardName:       "new-keycard",
 		KeyUID:            serverKp.KeyUID,
 		AccountsAddresses: []types.Address{serverKp.Accounts[0].Address, serverKp.Accounts[1].Address},
-	}, false)
+	}, s.password)
 	s.Require().NoError(err)
 
 	// Wait for sync messages to be received on client

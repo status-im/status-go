@@ -19,8 +19,8 @@ class AccountService(Service):
         response = self.rpc_request("addAccount", params)
         return response.json()
 
-    def delete_account(self, account_address):
-        params = [account_address]
+    def delete_account(self, account_address, password):
+        params = [account_address, password]
         response = self.rpc_request("deleteAccount", params)
         return response.json()
 

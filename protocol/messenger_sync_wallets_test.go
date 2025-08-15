@@ -594,8 +594,8 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	// Delete keypair related account on alice's primary device
 	accToDelete := seedPhraseKp.Accounts[1]
 
-	s.accountsManagerMock.EXPECT().DeleteAccount(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(address types.Address, clock uint64) (*accsmanagementtypes.Account, error) {
+	s.accountsManagerMock.EXPECT().DeleteAccount(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(address types.Address, password string, clock uint64) (*accsmanagementtypes.Account, error) {
 			err := s.m.settings.RemoveAccount(address, clock)
 			if err != nil {
 				return nil, err
@@ -603,7 +603,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 			return accounts.AccountToAccountsManagerAccount(accToDelete), nil
 		}).Times(1)
 
-	err = s.m.DeleteAccount(accToDelete.Address)
+	err = s.m.DeleteAccount(accToDelete.Address, "")
 	s.Require().NoError(err, "delete account on alice primary device")
 
 	totalNumOfAccounts-- //one acc less
@@ -611,8 +611,6 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	dbAccounts1, err = s.m.settings.GetActiveAccounts()
 	s.Require().NoError(err)
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
-
-	accountsManagerAnotherMock.EXPECT().DeleteKeystoreFileForAccount(accToDelete.Address).Return(nil).Times(1)
 
 	err = tt.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
@@ -636,8 +634,8 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	// Delete watch only account on alice's primary device
 	accToDelete = woAccounts[1]
 
-	s.accountsManagerMock.EXPECT().DeleteAccount(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(address types.Address, clock uint64) (*accsmanagementtypes.Account, error) {
+	s.accountsManagerMock.EXPECT().DeleteAccount(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(address types.Address, password string, clock uint64) (*accsmanagementtypes.Account, error) {
 			err := s.m.settings.RemoveAccount(address, clock)
 			if err != nil {
 				return nil, err
@@ -645,7 +643,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 			return accounts.AccountToAccountsManagerAccount(accToDelete), nil
 		}).Times(1)
 
-	err = s.m.DeleteAccount(accToDelete.Address)
+	err = s.m.DeleteAccount(accToDelete.Address, "")
 	s.Require().NoError(err, "delete account on alice primary device")
 
 	totalNumOfAccounts-- //one acc less

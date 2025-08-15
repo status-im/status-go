@@ -39,6 +39,7 @@ const (
 	ErrCodeKeycardDoesNotHaveAnyAccounts
 	ErrCodeKeycardDoesNotRelateToAnyKeypair
 	ErrCodeCannotRemoveProfileKeypair
+	ErrCodeNoPasswordProvided
 )
 
 var (
@@ -67,6 +68,7 @@ var (
 	ErrKeypairIsNotKeycard                             = errors.NewError(ErrCodeKeypairIsNotKeycard, "keypair is not a keycard keypair", getErrorCategory)
 	ErrKeycardDoesNotHaveAnyAccounts                   = errors.NewError(ErrCodeKeycardDoesNotHaveAnyAccounts, "keycard does not have any accounts", getErrorCategory)
 	ErrCannotRemoveProfileKeypair                      = errors.NewError(ErrCodeCannotRemoveProfileKeypair, "cannot remove profile keypair", getErrorCategory)
+	ErrNoPasswordProvided                              = errors.NewError(ErrCodeNoPasswordProvided, "no password provided", getErrorCategory)
 )
 
 func ErrKeystoreDirectoryError(err error) *errors.AccountsError {
@@ -93,7 +95,7 @@ func getErrorCategory(code errors.ErrorCode) errors.ErrorCategory {
 		ErrCodeKeypairAlreadyAdded, ErrCodeAccountAlreadyAdded, ErrCodeChatAccountNotFoundInDerivedAccounts,
 		ErrCodeKeypairMustHaveAtLeastOneWalletAccount, ErrCodeCannotAddAccountsToKeypairImportedViaPrivateKey,
 		ErrCodeCannotMigrateProfileKeypair, ErrCodeKeypairIsNotKeycard, ErrCodeWrongPasswordProvided, ErrCodeKeycardDoesNotHaveAnyAccounts,
-		ErrCodeKeycardDoesNotRelateToAnyKeypair:
+		ErrCodeKeycardDoesNotRelateToAnyKeypair, ErrCodeNoPasswordProvided:
 		return ErrorCategoryValidation
 	case ErrCodeCannotAddDefaultWalletAccount, ErrCodeCannotAddDefaultChatAccount, ErrCodeCannotRemoveDefaultWalletAccount,
 		ErrCodeCannotRemoveDefaultChatAccount, ErrCodeCannotRemoveProfileKeypair:

@@ -304,9 +304,9 @@ func (m *Messenger) MakePrivateKeyKeypairFullyOperable(privateKey string, passwo
 	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
 }
 
-func (m *Messenger) DeleteAccount(address types.Address) error {
+func (m *Messenger) DeleteAccount(address types.Address, password string) error {
 	clock, _ := m.getLastClockWithRelatedChat()
-	acc, err := m.accountsManager.DeleteAccount(address, clock)
+	acc, err := m.accountsManager.DeleteAccount(address, password, clock)
 	if err != nil {
 		return err
 	}
@@ -332,9 +332,9 @@ func (m *Messenger) DeleteAccount(address types.Address) error {
 	return m.DeleteProfileShowcaseWalletAccount(accounts.AccountsManagerAccountToAccount(acc))
 }
 
-func (m *Messenger) DeleteKeypair(keyUID string) error {
+func (m *Messenger) DeleteKeypair(keyUID string, password string) error {
 	clock, _ := m.getLastClockWithRelatedChat()
-	kp, err := m.accountsManager.DeleteKeypair(keyUID, clock)
+	kp, err := m.accountsManager.DeleteKeypair(keyUID, password, clock)
 	if err != nil {
 		return err
 	}

@@ -117,7 +117,7 @@ func (a *Adapter) AccountDecryptedKey(address cryptotypes.Address, passphrase st
 	return
 }
 
-func (a *Adapter) Delete(address cryptotypes.Address) (err error) {
+func (a *Adapter) Delete(address cryptotypes.Address, passphrase string) (err error) {
 	defer func() {
 		err = mapToKeystoreError(err)
 	}()
@@ -128,9 +128,7 @@ func (a *Adapter) Delete(address cryptotypes.Address) (err error) {
 		return
 	}
 
-	// TODO: think about how to use `Delete` method from `keystore` package, not from our fork
-	// this is the only that depends on our fork for the account management part of the app.
-	err = a.keystore.Delete(gethAccount)
+	err = a.keystore.Delete(gethAccount, passphrase)
 	return
 }
 

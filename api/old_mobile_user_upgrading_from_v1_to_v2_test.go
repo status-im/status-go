@@ -242,7 +242,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 	s.Require().NoError(err)
 	// need retry since there's a possible of getting "no key for given address or file" error
 	err = tt.RetryWithBackOff(func() error {
-		return accountsAPI.DeleteAccount(context.Background(), derivedAddress)
+		return accountsAPI.DeleteAccount(context.Background(), derivedAddress, oldMobileUserPasswd)
 	})
 	s.Require().NoError(err)
 	s.Require().NoError(b.Logout())

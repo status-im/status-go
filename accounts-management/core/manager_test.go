@@ -515,3 +515,154 @@ func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
 		s.Require().NotNil(account)
 	}
 }
+
+func (s *ManagerTestSuite) TestDeleteAccount() {
+	keypair := s.createAndStoreProfileKeypair()
+
+	walletAccount := keypair.Accounts[1]
+	walletAccount.Wallet = false
+
+	// check if keystore file exists
+	account, err := s.accManager.LoadAccount(walletAccount.Address, testPassword)
+	s.Require().NoError(err)
+	s.Require().NotNil(account)
+
+	s.persistence.EXPECT().GetAccountByAddress(s.walletAddress).Return(
+		walletAccount,
+		nil,
+	).Times(2)
+
+	s.persistence.EXPECT().GetKeypairByKeyUID(walletAccount.KeyUID).Return(
+		keypair,
+		nil,
+	).Times(1)
+
+	s.persistence.EXPECT().RemoveAccount(walletAccount.Address, uint64(0)).Return(nil).Times(1)
+
+	acc, err := s.accManager.DeleteAccount(s.walletAddress, s.password, 0)
+	s.Require().NoError(err)
+	s.Require().NotNil(acc)
+	s.Require().Equal(walletAccount.Address.Hex(), acc.Address.Hex())
+
+	// check if keystore file exists
+	account, err = s.accManager.LoadAccount(walletAccount.Address, testPassword)
+	s.Require().Error(err)
+	s.Require().Nil(account)
+
+	files, _ := os.ReadDir(s.getKeyDir())
+	s.Equal(2, len(files))
+}
+
+func (s *ManagerTestSuite) TestDeleteKeypair() {
+	keypair := s.createAndStoreProfileKeypair()
+
+	keypair.Type = types.KeypairTypeSeed
+
+	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(
+		keypair,
+		nil,
+	).Times(1)
+
+	s.persistence.EXPECT().RemoveKeypair(keypair.KeyUID, uint64(0)).Return(nil).Times(1)
+
+	deletedKp, err := s.accManager.DeleteKeypair(keypair.KeyUID, s.password, 0)
+	s.Require().NoError(err)
+	s.Require().NotNil(deletedKp)
+	s.Require().Equal(keypair.KeyUID, deletedKp.KeyUID)
+
+	files, _ := os.ReadDir(s.getKeyDir())
+	s.Equal(0, len(files))
+}
+
+func (s *ManagerTestSuite) TestCleanKeystoreFiles() {
+	testCases := []struct {
+		name                     string
+		keypairRemoved           bool
+		keypairMigratedToKeycard bool
+		oneAccountRemoved        bool
+		allAccountsRemoved       bool
+	}{
+		{
+			"clean keystore files for removed keypair",
+			true,
+			false,
+			false,
+			false,
+		},
+		{
+			"clean keystore files for migrated to keycard keypair",
+			false,
+			true,
+			false,
+			false,
+		},
+		{
+			"clean keystore files for not removed keypair but one account removed",
+			false,
+			false,
+			true,
+			false,
+		},
+		{
+			"clean keystore files for not removed keypair but all accounts removed",
+			false,
+			false,
+			false,
+			true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		s.Run(testCase.name, func() {
+
+			keypair := s.createAndStoreProfileKeypair()
+
+			files, _ := os.ReadDir(s.getKeyDir())
+			s.Equal(3, len(files))
+
+			keypair.Type = types.KeypairTypeSeed
+			keypair.Removed = testCase.keypairRemoved
+
+			if testCase.keypairMigratedToKeycard {
+				keypair.Keycards = []*types.Keycard{
+					{
+						KeyUID:        keypair.KeyUID,
+						KeycardUID:    "keycard-uid",
+						KeycardName:   "keycard-name",
+						KeycardLocked: false,
+						AccountsAddresses: []cryptotypes.Address{
+							keypair.Accounts[0].Address,
+							keypair.Accounts[1].Address,
+						},
+					},
+				}
+			}
+
+			if testCase.oneAccountRemoved {
+				keypair.Accounts[0].Removed = true
+			}
+
+			if testCase.allAccountsRemoved {
+				keypair.Accounts[0].Removed = true
+				keypair.Accounts[1].Removed = true
+			}
+
+			s.persistence.EXPECT().GetAllKeypairs().Return(
+				[]*types.Keypair{keypair},
+				nil,
+			).Times(1)
+
+			err := s.accManager.CleanKeystoreFiles(s.password)
+			s.Require().NoError(err)
+
+			files, _ = os.ReadDir(s.getKeyDir())
+			if testCase.keypairRemoved || testCase.keypairMigratedToKeycard {
+				s.Equal(0, len(files))
+			} else if testCase.oneAccountRemoved {
+				s.Equal(2, len(files))
+			} else if testCase.allAccountsRemoved {
+				s.Equal(1, len(files)) // only the master account is left
+			}
+		})
+	}
+}
