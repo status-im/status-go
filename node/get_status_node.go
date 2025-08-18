@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"sync"
 	"time"
 
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -68,6 +70,10 @@ type StatusNode struct {
 	config    *params.NodeConfig // Status node configuration
 	gethNode  *node.Node         // reference to Geth P2P stack/node
 	rpcClient *rpc.Client        // reference to an RPC client
+
+	rpcServer             *gethrpc.Server
+	rpcClientLocal        *gethrpc.Client
+	statusConnectorServer *http.Server
 
 	downloader *ipfs.Downloader
 
@@ -302,6 +308,9 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 
 // startGethNode starts current StatusNode, will fail if it's already started.
 func (n *StatusNode) startGethNode() error {
+	n.rpcServer.WebsocketHandler()
+	n.rpcServer.ServeHTTP()
+	n.rpcClientLocal = gethrpc.DialInProc(n.rpcServer)
 	return n.gethNode.Start()
 }
 

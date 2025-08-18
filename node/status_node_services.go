@@ -106,13 +106,24 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, lns)
 
 	for i := range services {
-		b.RegisterLifecycle(services[i])
+		err = b.RegisterLifecycle(services[i])
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (b *StatusNode) RegisterLifecycle(s common.StatusService) {
+func (b *StatusNode) RegisterLifecycle(s common.StatusService) error {
+	for _, api := range s.APIs() {
+		err := b.rpcServer.RegisterName(api.Namespace, api.Service)
+		if err != nil {
+			b.logger.Error("Failed to register API", zap.String("namespace", api.Namespace), zap.Error(err))
+			return err
+		}
+	}
+
 	b.addPublicMethods(s.APIs())
 	b.gethNode.RegisterAPIs(s.APIs())
 	b.gethNode.RegisterLifecycle(s)
