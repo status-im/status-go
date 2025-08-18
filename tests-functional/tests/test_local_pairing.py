@@ -245,6 +245,12 @@ class TestLocalPairing(MessengerSteps):
         assert len(contacts) == 1
         assert contacts[0]["id"] == alice.public_key
 
+        # Checking the paired devices using accounts_hasPairedDevices method
+        alice_response = alice.accounts_service.has_paired_devices()
+        assert alice_response.get("result") is False
+        bob_response = bob.accounts_service.has_paired_devices()
+        assert bob_response.get("result") is True
+
     def test_pairing_three_devices(self):
         # Create users
         bob1 = self.initialize_backend(self.await_signals, False)

@@ -38,9 +38,18 @@ class TestMoveWalletAccount:
         accounts_response_after = self.account.accounts_service.get_accounts()
         accounts_after = [acc for acc in accounts_response_after.get("result", [])]
 
-        # Make the positions equal so we can verify that accounts match after move
+        # Checking the positions are still incremental after move
+        assert accounts_before[0]["position"] == -1
+        assert accounts_before[1]["position"] == 0
+        assert accounts_before[2]["position"] == 1
+        assert accounts_after[0]["position"] == -1
+        assert accounts_after[1]["position"] == 0
+        assert accounts_after[2]["position"] == 1
+
+        # Make the positions equal so we can verify that entire account objects match after move
         # Ex Account at position 1 becomes position 2
         accounts_before[1]["position"] = accounts_before[2]["position"] = accounts_after[1]["position"] = accounts_after[2]["position"] = 0
+
         assert accounts_before[1] == accounts_after[2]
         assert accounts_before[2] == accounts_after[1]
 
