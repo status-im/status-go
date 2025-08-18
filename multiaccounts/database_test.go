@@ -139,7 +139,7 @@ func TestDatabase_GetIdentityImages(t *testing.T) {
 	defer stop()
 	seedTestDBWithIdentityImages(t, db, keyUID)
 
-	expected := `[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}]`
+	expected := `[{"keyUid":"0xdeadbeef","type":"large","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0xdeadbeef","type":"thumbnail","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}]`
 
 	oiis, err := db.GetIdentityImages(keyUID)
 	require.NoError(t, err)
@@ -167,12 +167,12 @@ func TestDatabase_GetIdentityImage(t *testing.T) {
 		{
 			keyUID,
 			images.SmallDimName,
-			`{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}`,
+			`{"keyUid":"0xdeadbeef","type":"thumbnail","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}`,
 		},
 		{
 			keyUID,
 			images.LargeDimName,
-			`{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0}`,
+			`{"keyUid":"0xdeadbeef","type":"large","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0}`,
 		},
 		{
 			keyUID2,
@@ -253,7 +253,6 @@ func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 			{
 				"keyUid": "0xdeadbeef",
 				"type": "large",
-				"uri": "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
 				"width": 240,
 				"height": 300,
 				"fileSize": 1024,
@@ -263,7 +262,6 @@ func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 			{
 				"keyUid": "0xdeadbeef",
 				"type": "thumbnail",
-				"uri": "data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=",
 				"width": 80,
 				"height": 80,
 				"fileSize": 256,
@@ -310,7 +308,6 @@ func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 			{
 				"keyUid": "0x1337beef3",
 				"type": "large",
-				"uri": "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
 				"width": 240,
 				"height": 300,
 				"fileSize": 1024,
@@ -320,7 +317,6 @@ func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 			{
 				"keyUid": "0x1337beef3",
 				"type": "thumbnail",
-				"uri": "data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=",
 				"width": 80,
 				"height": 80,
 				"fileSize": 256,
