@@ -85,3 +85,8 @@ class AccountService(Service):
         params = [address]
         response = self.rpc_request("getAccountByAddress", params)
         return response.json()
+
+    def get_keypair_by_key_uid(self, key_uid):
+        params = [key_uid]
+        response = self.rpc_request("getKeypairByKeyUID", params)
+        return response.json()
