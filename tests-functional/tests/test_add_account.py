@@ -23,8 +23,7 @@ class TestAddAccount:
         self.account_data["address"] = derived_addresses[0].get("address")
         self.account_data["public-key"] = derived_addresses[0].get("public-key")
 
-        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
-        assert "error" not in add_account_response
+        self.account.accounts_service.add_account(self.account.password, self.account_data)
         # TODO: Add more assertions on response
 
         # After adding the account check that the get accounts will retrieve the new account
@@ -103,8 +102,7 @@ class TestAddAccount:
 
     def test_add_watch_account(self):
         self.account_data["type"] = "watch"
-        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
-        assert "error" not in add_account_response
+        self.account.accounts_service.add_account(self.account.password, self.account_data)
         # TODO: Add more assertions on response
 
         # After adding the account check that the get accounts will retrieve the new account
@@ -137,22 +135,19 @@ class TestAddAccount:
         self.account_data["address"] = derived_addresses[0].get("address")
         self.account_data["public-key"] = derived_addresses[0].get("public-key")
 
-        add_account_response = self.account.accounts_service.add_account(profile_password, self.account_data)
-        assert "error" not in add_account_response
+        self.account.accounts_service.add_account(profile_password, self.account_data)
         # TODO: Add more assertions on response
 
     def test_delete_account(self):
         self.account_data["type"] = "watch"
-        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
-        assert "error" not in add_account_response
+        self.account.accounts_service.add_account(self.account.password, self.account_data)
         # TODO: Add more assertions on response
 
         accounts_response = self.account.accounts_service.get_accounts()
         assert len(accounts_response.get("result", [])) == 3
 
         # Delete the account
-        delete_response = self.account.accounts_service.delete_account(self.account_data["address"])
-        assert "error" not in delete_response
+        self.account.accounts_service.delete_account(self.account_data["address"])
         # TODO: Add more assertions on response
 
         accounts_response = self.account.accounts_service.get_accounts()

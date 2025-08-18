@@ -38,3 +38,36 @@ class AccountService(Service):
         params = [private_key, password, name, wallet_account]
         response = self.rpc_request("addKeypairViaPrivateKey", params)
         return response.json()
+
+    def verify_password(self, password):
+        params = [password]
+        response = self.rpc_request("verifyPassword", params)
+        return response.json()
+
+    def resolve_suggested_path_for_keypair(self, key_uid):
+        params = [key_uid]
+        response = self.rpc_request("resolveSuggestedPathForKeypair", params)
+        return response.json()
+
+    def has_paired_devices(self):
+        response = self.rpc_request("hasPairedDevices", [])
+        return response.json()
+
+    def update_keypair_name(self, key_uid, name):
+        params = [key_uid, name]
+        response = self.rpc_request("updateKeypairName", params)
+        return response.json()
+
+    def move_wallet_account(self, from_position, to_position):
+        params = [from_position, to_position]
+        response = self.rpc_request("moveWalletAccount", params)
+        return response.json()
+
+    def update_token_preferences(self, preferences):
+        params = [preferences]
+        response = self.rpc_request("updateTokenPreferences", params)
+        return response.json()
+
+    def get_token_preferences(self):
+        response = self.rpc_request("getTokenPreferences", [])
+        return response.json()

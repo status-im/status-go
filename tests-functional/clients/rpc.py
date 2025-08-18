@@ -19,7 +19,11 @@ class RpcClient:
             raise AssertionError(f"Invalid JSON in response: {response.content}")
 
         if key in data:
+            # If 'result' is present, 'error' must NOT be present
+            if key == "result" and "error" in data:
+                raise AssertionError(f"Invalid structure: both 'result' and 'error' present in response: {data}")
             return
+
         # Allow missing 'result' if 'error' is present
         if key == "result" and "error" in data:
             return
