@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/collectibles/ownership"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/t/helpers"
@@ -31,7 +32,7 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 	db, close := setupTestFilterDB(t)
 	defer close()
 
-	oDB := NewOwnershipDB(db)
+	oDB := ownership.NewOwnershipDB(db)
 	cDB := NewCollectibleDataDB(db)
 
 	const nData = 50

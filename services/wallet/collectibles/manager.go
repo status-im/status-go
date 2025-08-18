@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/collectibles/ownership"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/connection"
@@ -64,7 +65,7 @@ type Manager struct {
 	collectiblesDataDB CollectibleDataStorage
 	collectionsDataDB  CollectionDataStorage
 	communityManager   community.CommunityManagerInterface
-	ownershipDB        OwnershipStorage
+	ownershipDB        ownership.OwnershipStorage
 
 	mediaServer *server.MediaServer
 
@@ -82,11 +83,11 @@ func NewManager(
 	mediaServer *server.MediaServer,
 	feed *event.Feed) *Manager {
 
-	var ownershipDB OwnershipStorage
+	var ownershipDB ownership.OwnershipStorage
 	var statuses *sync.Map
 	var statusNotifier *connection.StatusNotifier
 	if db != nil {
-		ownershipDB = NewOwnershipDB(db)
+		ownershipDB = ownership.NewOwnershipDB(db)
 		statuses = initStatuses(ownershipDB)
 		statusNotifier = createStatusNotifier(statuses, feed)
 	}
@@ -1222,7 +1223,7 @@ func (o *Manager) updateStatusNotifier() {
 	o.statusNotifier = createStatusNotifier(o.statuses, o.feed)
 }
 
-func initStatuses(ownershipDB OwnershipStorage) *sync.Map {
+func initStatuses(ownershipDB ownership.OwnershipStorage) *sync.Map {
 	statuses := &sync.Map{}
 	for _, chainID := range walletCommon.AllChainIDs() {
 		status := connection.NewStatus()

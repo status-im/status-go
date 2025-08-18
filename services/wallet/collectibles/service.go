@@ -6,13 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"sync"
 	"time"
 
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -20,6 +23,7 @@ import (
 
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/collectibles/ownership"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -92,15 +96,22 @@ var (
 )
 
 type Service struct {
-	manager          *Manager
-	controller       *Controller
-	db               *sql.DB
-	ownershipDB      OwnershipStorage
-	transferDB       *transfer.Database
-	communityManager *community.Manager
-	walletFeed       *event.Feed
-	scheduler        *async.MultiClientScheduler
-	group            *async.Group
+	manager             *Manager
+	ownershipController *ownership.Controller
+	db                  *sql.DB
+	ownershipDB         ownership.OwnershipStorage
+	transferDB          *transfer.Database
+	communityManager    *community.Manager
+	walletFeed          *event.Feed
+	scheduler           *async.MultiClientScheduler
+	group               *async.Group
+	publisher           *pubsub.Publisher
+
+	walletEventsWatcher *walletevent.Watcher
+
+	closeCh chan struct{}
+
+	logger *zap.Logger
 }
 
 func NewService(
@@ -111,19 +122,34 @@ func NewService(
 	communityManager *community.Manager,
 	networkManager *network.Manager,
 	manager *Manager) *Service {
+
+	publisher := pubsub.NewPublisher()
+	ownershipDB := ownership.NewOwnershipDB(db)
+
+	logger := logutils.ZapLogger().Named("Collectibles")
+
 	s := &Service{
-		manager:          manager,
-		controller:       NewController(db, walletFeed, accountsDB, accountsPublisher, networkManager, manager),
+		manager: manager,
+		ownershipController: ownership.NewController(
+			ownershipDB,
+			walletFeed,
+			accountsDB,
+			accountsPublisher,
+			networkManager,
+			manager,
+			publisher,
+			logger,
+		),
 		db:               db,
-		ownershipDB:      NewOwnershipDB(db),
+		ownershipDB:      ownershipDB,
 		transferDB:       transfer.NewDB(db),
 		communityManager: communityManager,
 		walletFeed:       walletFeed,
 		scheduler:        async.NewMultiClientScheduler(),
 		group:            async.NewGroup(context.Background()),
+		publisher:        publisher,
+		logger:           logger.Named("Service"),
 	}
-	s.controller.SetOwnedCollectiblesChangeCb(s.onOwnedCollectiblesChange)
-	s.controller.SetCollectiblesTransferCb(s.onCollectiblesTransfer)
 	return s
 }
 
@@ -136,8 +162,8 @@ const (
 )
 
 type OwnershipStatus struct {
-	State     OwnershipState `json:"state"`
-	Timestamp int64          `json:"timestamp"`
+	State     ownership.LoaderState `json:"state"`
+	Timestamp int64                 `json:"timestamp"`
 }
 
 type OwnershipStatusPerChainID = map[walletCommon.ChainID]OwnershipStatus
@@ -216,7 +242,7 @@ func (s *Service) needsToFetch(chainID walletCommon.ChainID, address common.Addr
 		if err != nil {
 			return false, err
 		}
-		if timestamp == InvalidTimestamp ||
+		if timestamp == ownership.InvalidTimestamp ||
 			(fetchCriteria.FetchType == FetchTypeFetchIfCacheOld && timestamp+fetchCriteria.MaxCacheAgeSeconds < time.Now().Unix()) {
 			mustFetch = true
 		}
@@ -229,7 +255,8 @@ func (s *Service) fetchOwnedCollectiblesIfNeeded(ctx context.Context, chainIDs [
 		return nil
 	}
 
-	group := async.NewGroup(ctx)
+	wg := sync.WaitGroup{}
+	wgErr := atomic.NewError(nil)
 	for _, address := range addresses {
 		for _, chainID := range chainIDs {
 			mustFetch, err := s.needsToFetch(chainID, address, fetchCriteria)
@@ -237,17 +264,21 @@ func (s *Service) fetchOwnedCollectiblesIfNeeded(ctx context.Context, chainIDs [
 				return err
 			}
 			if mustFetch {
-				command := newLoadOwnedCollectiblesCommand(s.manager, s.ownershipDB, s.walletFeed, chainID, address, nil)
-				group.Add(command.Command())
+				wg.Add(1)
+				go func() {
+					defer gocommon.LogOnPanic()
+					defer wg.Done()
+					err := s.ownershipController.TriggerLoad(ctx, chainID, address)
+					if err != nil {
+						wgErr.Store(err)
+					}
+				}()
 			}
 		}
 	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-group.WaitAsync():
-		return nil
-	}
+
+	wg.Wait()
+	return wgErr.Load()
 }
 
 // GetOwnedCollectiblesAsync allows only one filter task to run at a time
@@ -273,14 +304,11 @@ func (s *Service) GetOwnedCollectiblesAsync(
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
 			fnRet := result.(*GetOwnedCollectiblesReturnType)
-
-			if err == nil {
-				res.Collectibles = fnRet.collectibles
-				res.Offset = offset
-				res.HasMore = fnRet.hasMore
-				res.OwnershipStatus = fnRet.ownershipStatus
-				res.ErrorCode = ErrorCodeSuccess
-			}
+			res.Collectibles = fnRet.collectibles
+			res.Offset = offset
+			res.HasMore = fnRet.hasMore
+			res.OwnershipStatus = fnRet.ownershipStatus
+			res.ErrorCode = ErrorCodeSuccess
 		}
 
 		s.sendResponseEvent(&requestID, EventOwnedCollectiblesFilteringDone, res, err)
@@ -315,11 +343,8 @@ func (s *Service) GetCollectiblesByUniqueIDAsync(
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
 			fnRet := result.(*GetCollectiblesByUniqueIDReturnType)
-
-			if err == nil {
-				res.Collectibles = fnRet.collectibles
-				res.ErrorCode = ErrorCodeSuccess
-			}
+			res.Collectibles = fnRet.collectibles
+			res.ErrorCode = ErrorCodeSuccess
 		}
 
 		s.sendResponseEvent(&requestID, EventGetCollectiblesDetailsDone, res, err)
@@ -327,28 +352,43 @@ func (s *Service) GetCollectiblesByUniqueIDAsync(
 }
 
 func (s *Service) RefetchOwnedCollectibles() {
-	s.controller.RefetchOwnedCollectibles()
+	s.manager.ResetConnectionStatus()
+	s.ownershipController.RefetchOwnedCollectibles()
 }
 
 func (s *Service) Start(ctx context.Context) {
-	s.controller.Start()
+	if s.closeCh != nil {
+		return
+	}
+	s.closeCh = make(chan struct{})
+
+	s.ownershipController.Start()
+	s.startWalletEventsWatcher()
+	s.startOwnershipLoadWatcher()
 }
 
 func (s *Service) Stop() {
-	s.controller.Stop()
+	if s.closeCh == nil {
+		return
+	}
+
+	close(s.closeCh)
+	s.closeCh = nil
 
 	s.scheduler.Stop()
+	s.ownershipController.Stop()
+	s.stopWalletEventsWatcher()
 }
 
 func (s *Service) sendResponseEvent(requestID *int32, eventType walletevent.EventType, payloadObj interface{}, resErr error) {
 	payload, err := json.Marshal(payloadObj)
 	if err != nil {
-		logutils.ZapLogger().Error("Error marshaling", zap.NamedError("response", err), zap.NamedError("result", resErr))
+		s.logger.Error("Error marshaling", zap.NamedError("response", err), zap.NamedError("result", resErr))
 	} else {
 		err = resErr
 	}
 
-	logutils.ZapLogger().Debug("wallet.api.collectibles.Service RESPONSE",
+	s.logger.Debug("RESPONSE",
 		zap.Any("requestID", requestID),
 		zap.String("eventType", string(eventType)),
 		zap.Int("payload.len", len(payload)),
@@ -398,7 +438,7 @@ func (s *Service) GetOwnershipStatus(chainIDs []walletCommon.ChainID, owners []c
 				return nil, err
 			}
 			ret[address][chainID] = OwnershipStatus{
-				State:     s.controller.GetCommandState(chainID, address),
+				State:     s.ownershipController.GetLoaderState(chainID, address),
 				Timestamp: timestamp,
 			}
 		}
@@ -428,13 +468,11 @@ func (s *Service) collectibleIDsToDataType(ctx context.Context, ids []thirdparty
 	return nil, errors.New("unknown data type")
 }
 
-func (s *Service) onOwnedCollectiblesChange(ownedCollectiblesChange OwnedCollectiblesChange) {
+func (s *Service) onOwnedCollectiblesChanged(account common.Address, chainID walletCommon.ChainID, newOrUpdated []thirdparty.CollectibleUniqueID) {
 	// Try to find a matching transfer for newly added/updated collectibles
-	switch ownedCollectiblesChange.changeType {
-	case OwnedCollectiblesChangeTypeAdded, OwnedCollectiblesChangeTypeUpdated:
-		// For recently added/updated collectibles, try to find a matching transfer
-		hashMap := s.lookupTransferForCollectibles(ownedCollectiblesChange.ownedCollectibles)
-		s.notifyCommunityCollectiblesReceived(ownedCollectiblesChange.ownedCollectibles, hashMap)
+	if len(newOrUpdated) > 0 {
+		hashMap := s.lookupTransferForCollectibles(account, newOrUpdated)
+		s.notifyCommunityCollectiblesReceived(account, chainID, newOrUpdated, hashMap)
 	}
 }
 
@@ -450,12 +488,12 @@ func (s *Service) onCollectiblesTransfer(account common.Address, chainID walletC
 		}
 		err := s.manager.SetCollectibleTransferID(account, id, transfer.ID, true)
 		if err != nil {
-			logutils.ZapLogger().Error("Error setting transfer ID for collectible", zap.Error(err))
+			s.logger.Error("Error setting transfer ID for collectible", zap.Error(err))
 		}
 	}
 }
 
-func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectibles) map[thirdparty.CollectibleUniqueID]TxHashData {
+func (s *Service) lookupTransferForCollectibles(account common.Address, collectibles []thirdparty.CollectibleUniqueID) map[thirdparty.CollectibleUniqueID]TxHashData {
 	// There are some limitations to this approach:
 	// - Collectibles ownership and transfers are not in sync and might represent the state at different moments.
 	// - We have no way of knowing if the latest collectible transfer we've detected is actually the latest one, so the timestamp we
@@ -466,10 +504,10 @@ func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectib
 
 	result := make(map[thirdparty.CollectibleUniqueID]TxHashData)
 
-	for _, id := range ownedCollectibles.ids {
-		transfer, err := s.transferDB.GetLatestCollectibleTransfer(ownedCollectibles.account, id)
+	for _, id := range collectibles {
+		transfer, err := s.transferDB.GetLatestCollectibleTransfer(account, id)
 		if err != nil {
-			logutils.ZapLogger().Error("Error fetching latest collectible transfer", zap.Error(err))
+			s.logger.Error("Error fetching latest collectible transfer", zap.Error(err))
 			continue
 		}
 		if transfer != nil {
@@ -477,26 +515,26 @@ func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectib
 				Hash: transfer.Transaction.Hash(),
 				TxID: transfer.ID,
 			}
-			err = s.manager.SetCollectibleTransferID(ownedCollectibles.account, id, transfer.ID, false)
+			err = s.manager.SetCollectibleTransferID(account, id, transfer.ID, false)
 			if err != nil {
-				logutils.ZapLogger().Error("Error setting transfer ID for collectible", zap.Error(err))
+				s.logger.Error("Error setting transfer ID for collectible", zap.Error(err))
 			}
 		}
 	}
 	return result
 }
 
-func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCollectibles, hashMap map[thirdparty.CollectibleUniqueID]TxHashData) {
+func (s *Service) notifyCommunityCollectiblesReceived(account common.Address, chainID walletCommon.ChainID, collectibles []thirdparty.CollectibleUniqueID, hashMap map[thirdparty.CollectibleUniqueID]TxHashData) {
 	ctx := context.Background()
 
-	firstCollectibles, err := s.ownershipDB.GetIsFirstOfCollection(ownedCollectibles.account, ownedCollectibles.ids)
+	firstCollectibles, err := s.ownershipDB.GetIsFirstOfCollection(account, collectibles)
 	if err != nil {
 		return
 	}
 
-	collectiblesData, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, ownedCollectibles.ids, false)
+	collectiblesData, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, collectibles, false)
 	if err != nil {
-		logutils.ZapLogger().Error("Error fetching collectibles data", zap.Error(err))
+		s.logger.Error("Error fetching collectibles data", zap.Error(err))
 		return
 	}
 
@@ -555,10 +593,112 @@ func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCol
 
 	s.walletFeed.Send(walletevent.Event{
 		Type:    EventCommunityCollectiblesReceived,
-		ChainID: uint64(ownedCollectibles.chainID),
+		ChainID: uint64(chainID),
 		Accounts: []common.Address{
-			ownedCollectibles.account,
+			account,
 		},
 		Message: string(encodedMessage),
+	})
+}
+
+func (s *Service) startWalletEventsWatcher() {
+	if s.walletEventsWatcher != nil {
+		return
+	}
+
+	if s.walletFeed == nil {
+		return
+	}
+
+	walletEventCb := func(event walletevent.Event) {
+		if event.Type != transfer.EventInternalERC721TransferDetected &&
+			event.Type != transfer.EventInternalERC1155TransferDetected {
+			return
+		}
+
+		chainID := walletCommon.ChainID(event.ChainID)
+		for _, account := range event.Accounts {
+			s.onCollectiblesTransfer(account, chainID, event.EventParams.([]transfer.Transfer))
+		}
+	}
+
+	s.walletEventsWatcher = walletevent.NewWatcher(s.walletFeed, walletEventCb)
+
+	s.walletEventsWatcher.Start()
+}
+
+func (s *Service) stopWalletEventsWatcher() {
+	if s.walletEventsWatcher != nil {
+		s.walletEventsWatcher.Stop()
+		s.walletEventsWatcher = nil
+	}
+}
+
+func (s *Service) startOwnershipLoadWatcher() {
+	if s.publisher == nil {
+		return
+	}
+
+	loadStartCh, loadStartUnsub := pubsub.Subscribe[ownership.EventOwnedCollectiblesLoadStarted](s.publisher, 100)
+	loadPartialCh, loadPartialUnsub := pubsub.Subscribe[ownership.EventOwnedCollectiblesLoadPartial](s.publisher, 100)
+	loadFinishedCh, loadFinishedUnsub := pubsub.Subscribe[ownership.EventOwnedCollectiblesLoadFinished](s.publisher, 100)
+	loadErrorCh, loadErrorUnsub := pubsub.Subscribe[ownership.EventOwnedCollectiblesLoadError](s.publisher, 100)
+
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer loadStartUnsub()
+		defer loadPartialUnsub()
+		defer loadFinishedUnsub()
+		defer loadErrorUnsub()
+		for {
+			select {
+			case event := <-loadStartCh:
+				// Send WalletEvent to the client
+				s.triggerWalletEvent(EventCollectiblesOwnershipUpdateStarted, event.ChainID, event.Account, "")
+			case event := <-loadPartialCh:
+				s.onOwnedCollectiblesChanged(event.Account, event.ChainID, event.Added)
+				// Send WalletEvent to the client
+				updateMessage := OwnershipUpdateMessage{
+					Added: event.Added,
+				}
+				encodedMessage, err := json.Marshal(updateMessage)
+				if err != nil {
+					s.logger.Error("Error marshaling", zap.NamedError("response", err))
+				}
+				s.triggerWalletEvent(EventCollectiblesOwnershipUpdatePartial, event.ChainID, event.Account, string(encodedMessage))
+			case event := <-loadFinishedCh:
+				addedOrUpdated := make([]thirdparty.CollectibleUniqueID, 0, len(event.Added)+len(event.Updated))
+				addedOrUpdated = append(addedOrUpdated, event.Added...)
+				addedOrUpdated = append(addedOrUpdated, event.Updated...)
+				s.onOwnedCollectiblesChanged(event.Account, event.ChainID, addedOrUpdated)
+				// Send WalletEvent to the client
+				updateMessage := OwnershipUpdateMessage{
+					Added:   event.Added,
+					Updated: event.Updated,
+					Removed: event.Removed,
+				}
+				encodedMessage, err := json.Marshal(updateMessage)
+				if err != nil {
+					s.logger.Error("Error marshaling", zap.NamedError("response", err))
+				}
+				s.triggerWalletEvent(EventCollectiblesOwnershipUpdateFinished, event.ChainID, event.Account, string(encodedMessage))
+			case event := <-loadErrorCh:
+				// Send WalletEvent to the client
+				s.triggerWalletEvent(EventCollectiblesOwnershipUpdateFinishedWithError, event.ChainID, event.Account, event.Error.Error())
+			case <-s.closeCh:
+				return
+			}
+		}
+	}()
+}
+
+func (s *Service) triggerWalletEvent(eventType walletevent.EventType, chainID walletCommon.ChainID, account common.Address, message string) {
+	s.walletFeed.Send(walletevent.Event{
+		Type:    eventType,
+		ChainID: uint64(chainID),
+		Accounts: []common.Address{
+			account,
+		},
+		Message: message,
 	})
 }
