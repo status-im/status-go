@@ -71,3 +71,12 @@ class AccountService(Service):
     def get_token_preferences(self):
         response = self.rpc_request("getTokenPreferences", [])
         return response.json()
+
+    def update_collectible_preferences(self, preferences):
+        params = [preferences]
+        response = self.rpc_request("updateCollectiblePreferences", params)
+        return response.json()
+
+    def get_collectible_preferences(self):
+        response = self.rpc_request("getCollectiblePreferences", [])
+        return response.json()
