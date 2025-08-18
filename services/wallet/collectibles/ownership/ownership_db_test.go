@@ -1,4 +1,4 @@
-package collectibles
+package ownership
 
 import (
 	"math/big"
