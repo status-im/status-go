@@ -80,3 +80,8 @@ class AccountService(Service):
     def get_collectible_preferences(self):
         response = self.rpc_request("getCollectiblePreferences", [])
         return response.json()
+
+    def get_account_by_address(self, address):
+        params = [address]
+        response = self.rpc_request("getAccountByAddress", params)
+        return response.json()
