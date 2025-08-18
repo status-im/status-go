@@ -82,7 +82,7 @@ type ClusterConfig struct {
 
 // String dumps config object as nicely indented JSON
 func (c *ClusterConfig) String() string {
-	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
+	data, _ := json.MarshalIndent(c, "", "    ")
 	return string(data)
 }
 

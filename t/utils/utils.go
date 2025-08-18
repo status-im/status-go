@@ -239,7 +239,7 @@ func loadTestConfig() (*testConfig, error) {
 func ImportTestAccount(keystoreDir, accountFile string) error {
 	// make sure that keystore folder exists
 	if _, err := os.Stat(keystoreDir); os.IsNotExist(err) {
-		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck, gas
+		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck
 	}
 
 	var (

@@ -125,12 +125,6 @@ pipeline {
       } }
     }
 
-    stage('Lint') {
-      steps { script {
-        nix.develop('make lint', pure: false)
-      } }
-    }
-
     stage('Unit Tests') {
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"

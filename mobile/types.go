@@ -32,7 +32,7 @@ func (e APIFieldError) Error() string {
 	buf := bytes.NewBufferString(fmt.Sprintf("Parameter: %s\n", e.Parameter))
 
 	for _, err := range e.Errors {
-		buf.WriteString(err.Error() + "\n") // nolint: gas
+		buf.WriteString(err.Error() + "\n")
 	}
 
 	return strings.TrimSpace(buf.String())
