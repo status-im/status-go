@@ -20,6 +20,7 @@ func (s *sqlitePersistence) GetActiveInstallations(maxInstallations int, identit
 	if err != nil {
 		return nil, err
 	}
+	defer stmt.Close()
 
 	var installations []*Installation
 	rows, err := stmt.Query(identity, maxInstallations)
@@ -234,6 +235,7 @@ func (s *sqlitePersistence) EnableInstallation(identity []byte, installationID s
 	if err != nil {
 		return err
 	}
+	defer stmt.Close()
 
 	_, err = stmt.Exec(identity, installationID)
 	return err
@@ -248,7 +250,7 @@ func (s *sqlitePersistence) DisableInstallation(identity []byte, installationID 
 	if err != nil {
 		return err
 	}
-
+	defer stmt.Close()
 	_, err = stmt.Exec(identity, installationID)
 	return err
 }
@@ -259,6 +261,7 @@ func (s *sqlitePersistence) SetInstallationMetadata(identity []byte, installatio
 	if err != nil {
 		return err
 	}
+	defer stmt.Close()
 
 	_, err = stmt.Exec(metadata.Name, metadata.DeviceType, metadata.FCMToken, identity, installationID)
 	return err
@@ -272,6 +275,7 @@ func (s *sqlitePersistence) SetInstallationName(identity []byte, installationID 
 	if err != nil {
 		return err
 	}
+	defer stmt.Close()
 
 	_, err = stmt.Exec(name, identity, installationID)
 	return err

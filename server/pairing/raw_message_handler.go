@@ -130,18 +130,25 @@ func (s *SyncRawMessageHandler) HandleRawMessage(
 
 func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAccountRequest *requests.CreateAccount, rmp *RawMessagesPayload) error {
 	account := accountPayload.multiaccount
+
+	for _, acc := range rmp.profileKeypair.Accounts {
+		if acc.Chat {
+			err := api.EnrichMultiAccountByPublicKey(account, acc.PublicKey)
+			if err != nil {
+				return err
+			}
+			break
+		}
+	}
+
 	installationID := multidevice.GenerateInstallationID()
+
 	nodeConfig, err := api.DefaultNodeConfig(installationID, account.KeyUID, createAccountRequest)
 	if err != nil {
 		return err
 	}
 
-	keystoreRelativePath, err := s.backend.InitKeyStoreDirWithAccount(nodeConfig.RootDataDir, account.KeyUID)
-	nodeConfig.KeyStoreDir = keystoreRelativePath
-
-	if err != nil {
-		return err
-	}
+	s.backend.UpdateRootDataDir(nodeConfig.RootDataDir)
 
 	var chatKey *ecdsa.PrivateKey
 	if accountPayload.chatKey != "" {
@@ -162,11 +169,11 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 	rmp.setting.CurrentNetwork = api.DefaultCurrentNetwork
 
 	return s.backend.StartNodeWithAccountAndInitialConfig(
-		*account,
+		account,
 		accountPayload.password,
 		*rmp.setting,
 		nodeConfig,
-		rmp.profileKeypair.Accounts,
+		rmp.profileKeypair,
 		chatKey,
 	)
 }

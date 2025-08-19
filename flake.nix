@@ -14,7 +14,8 @@
 
   inputs = {
     # We are pinning the commit because ultimately we want to use same commit across different projects.
-    nixpkgs.url = "github:NixOS/nixpkgs/df27247e6f3e636c119e2610bf12d38b5e98cc79";
+    # A commit from nixpkgs 24.11 release : https://github.com/NixOS/nixpkgs/tree/release-24.11
+    nixpkgs.url = "github:NixOS/nixpkgs/3939f5f357444b182817a65b86019dbcb16bdb65";
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
     nwaku.url = "git+https://github.com/waku-org/nwaku?submodules=1&rev=e755fd834f5f3d6fba216b09469316f0328b3b6f";
   };

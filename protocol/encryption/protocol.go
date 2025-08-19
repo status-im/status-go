@@ -12,8 +12,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/publisher"
@@ -150,6 +150,10 @@ func (p *Protocol) Stop() error {
 		close(p.subscriptions.Quit)
 	}
 	return nil
+}
+
+func (p *Protocol) Subscriptions() *Subscriptions {
+	return p.subscriptions
 }
 
 func (p *Protocol) addBundle(myIdentityKey *ecdsa.PrivateKey, msg *ProtocolMessage) error {
@@ -427,7 +431,7 @@ func (p *Protocol) EncryptCommunityGrants(privateKey *ecdsa.PrivateKey, recipien
 	grants := make(map[uint32][]byte)
 
 	for recipientKey, grant := range recipientGrants {
-		sharedKey, err := GenerateSharedKey(privateKey, recipientKey)
+		sharedKey, err := crypto.GenerateSharedKey(privateKey, recipientKey)
 		if err != nil {
 			return nil, err
 		}
@@ -452,7 +456,7 @@ func (p *Protocol) DecryptCommunityGrant(myIdentityKey *ecdsa.PrivateKey, sender
 		return nil, errors.New("can't find related grant in the map")
 	}
 
-	sharedKey, err := GenerateSharedKey(myIdentityKey, senderKey)
+	sharedKey, err := crypto.GenerateSharedKey(myIdentityKey, senderKey)
 	if err != nil {
 		return nil, err
 	}

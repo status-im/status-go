@@ -8,11 +8,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/crypto/ecies"
+	"github.com/status-im/status-go/crypto"
 )
-
-const sskLen = 16
 
 type Secret struct {
 	Identity *ecdsa.PublicKey
@@ -40,11 +37,7 @@ func New(db *sql.DB, logger *zap.Logger) *SharedSecret {
 }
 
 func (s *SharedSecret) generate(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, installationID string) (*Secret, error) {
-	sharedKey, err := ecies.ImportECDSA(myPrivateKey).GenerateShared(
-		ecies.ImportECDSAPublic(theirPublicKey),
-		sskLen,
-		sskLen,
-	)
+	sharedKey, err := crypto.GenerateSharedKey(myPrivateKey, theirPublicKey)
 	if err != nil {
 		return nil, err
 	}

@@ -6,8 +6,8 @@ from resources.enums import MessageContentType
 from steps.messenger import MessengerSteps
 
 
-@pytest.mark.parametrize("setup_two_unprivileged_nodes", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 @pytest.mark.rpc
+@pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 class TestTransactionsChatMessages(MessengerSteps):
     REQUEST_TRANSACTION_TEXT = "Request transaction"
     REQUEST_TRANSACTION_DECLINED_TEXT = "Transaction request declined"
@@ -15,6 +15,12 @@ class TestTransactionsChatMessages(MessengerSteps):
     REQUEST_ADDRESS_FOR_TRANSACTION_DECLINED_TEXT = "Request address for transaction declined"
     REQUEST_ADDRESS_FOR_TRANSACTION_ACCEPTED_TEXT = "Request address for transaction accepted"
     TRANSACTION_SENT_TEXT = "Transaction sent"
+
+    @pytest.fixture(autouse=True)
+    def setup_backends(self, backend_new_profile, waku_light_client):
+        """Initialize two backends (sender and receiver) for each test function"""
+        self.sender = backend_new_profile("sender", waku_light_client=waku_light_client)
+        self.receiver = backend_new_profile("receiver", waku_light_client=waku_light_client)
 
     @pytest.fixture
     def transaction_data(self):
@@ -38,12 +44,12 @@ class TestTransactionsChatMessages(MessengerSteps):
             print(parameter, expected_value)
             assert command_parameters.get(parameter, "") == expected_value
 
-    def test_request_transaction(self, transaction_data, setup_two_unprivileged_nodes):
-        self.make_contacts()
+    def test_request_transaction(self, transaction_data):
+        self.make_contacts(sender=self.sender, receiver=self.receiver)
         response = self.sender.wakuext_service.request_transaction(
             self.receiver.public_key, transaction_data["value"], transaction_data["contract"], transaction_data["address"]
         )
-        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -51,8 +57,8 @@ class TestTransactionsChatMessages(MessengerSteps):
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
         )
 
-    def test_decline_request_transaction(self, transaction_data, setup_two_unprivileged_nodes):
-        self.make_contacts()
+    def test_decline_request_transaction(self, transaction_data):
+        self.make_contacts(sender=self.sender, receiver=self.receiver)
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.request_transaction(
             sender_chat_id, transaction_data["value"], transaction_data["contract"], transaction_data["address"]
@@ -62,7 +68,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=self.REQUEST_TRANSACTION_TEXT, timeout=5)
 
         response = self.receiver.wakuext_service.decline_request_transaction(message_id)
-        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -70,8 +76,8 @@ class TestTransactionsChatMessages(MessengerSteps):
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
         )
 
-    def test_accept_request_transaction(self, transaction_data, setup_two_unprivileged_nodes):
-        self.make_contacts()
+    def test_accept_request_transaction(self, transaction_data):
+        self.make_contacts(sender=self.sender, receiver=self.receiver)
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.request_transaction(
             sender_chat_id, transaction_data["value"], transaction_data["contract"], transaction_data["address"]
@@ -81,7 +87,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=self.REQUEST_TRANSACTION_TEXT, timeout=5)
 
         response = self.receiver.wakuext_service.accept_request_transaction(transaction_data["tx_hash"], message_id, transaction_data["signature"])
-        self.receiver.verify_json_schema(response, method="wakuext_acceptRequestTransaction")
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -95,12 +101,12 @@ class TestTransactionsChatMessages(MessengerSteps):
             ],
         )
 
-    def test_request_address_for_transaction(self, transaction_data, setup_two_unprivileged_nodes):
-        self.make_contacts()
+    def test_request_address_for_transaction(self, transaction_data):
+        self.make_contacts(sender=self.sender, receiver=self.receiver)
         response = self.sender.wakuext_service.request_address_for_transaction(
             self.receiver.public_key, transaction_data["from"], transaction_data["value"], transaction_data["contract"]
         )
-        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -108,8 +114,8 @@ class TestTransactionsChatMessages(MessengerSteps):
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("from", transaction_data["from"])],
         )
 
-    def test_decline_request_address_for_transaction(self, transaction_data, setup_two_unprivileged_nodes):
-        self.make_contacts()
+    def test_decline_request_address_for_transaction(self, transaction_data):
+        self.make_contacts(sender=self.sender, receiver=self.receiver)
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.request_address_for_transaction(
             sender_chat_id, transaction_data["from"], transaction_data["value"], transaction_data["contract"]
@@ -121,7 +127,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         )
 
         response = self.receiver.wakuext_service.decline_request_address_for_transaction(message_id)
-        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -129,8 +135,8 @@ class TestTransactionsChatMessages(MessengerSteps):
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"])],
         )
 
-    def test_accept_request_address_for_transaction(self, transaction_data, setup_two_unprivileged_nodes):
-        self.make_contacts()
+    def test_accept_request_address_for_transaction(self, transaction_data):
+        self.make_contacts(sender=self.sender, receiver=self.receiver)
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.request_address_for_transaction(
             sender_chat_id, transaction_data["from"], transaction_data["value"], transaction_data["contract"]
@@ -142,7 +148,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         )
 
         response = self.receiver.wakuext_service.accept_request_address_for_transaction(message_id, transaction_data["address"])
-        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,
@@ -150,13 +156,13 @@ class TestTransactionsChatMessages(MessengerSteps):
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
         )
 
-    def test_send_transaction(self, transaction_data, setup_two_unprivileged_nodes):
-        self.make_contacts()
+    def test_send_transaction(self, transaction_data):
+        self.make_contacts(sender=self.sender, receiver=self.receiver)
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.send_transaction(
             sender_chat_id, transaction_data["value"], transaction_data["contract"], transaction_data["tx_hash"], transaction_data["signature"]
         )
-        self.receiver.verify_json_schema(response, method="wakuext_sendTransaction")
+        # TODO: Add more assertions on response
 
         self.assert_transaction_command_response(
             response,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/wealdtech/go-ens/v3"
@@ -83,15 +84,49 @@ func (e *EnsResolver) OwnerOf(ctx context.Context, chainID uint64, username stri
 		return nil, err
 	}
 
+	nameHash := walletCommon.NameHash(username)
+
 	registry, err := e.contractMaker.NewRegistry(chainID)
 	if err != nil {
 		return nil, err
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	owner, err := registry.Owner(callOpts, walletCommon.NameHash(username))
+	owner, err := registry.Owner(callOpts, nameHash)
 	if err != nil {
 		return nil, err
+	}
+
+	// Get the NameWrapper contract address for the given chain ID
+	nameWrapperAddress, err := NameWrapperContractAddress(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	if owner != nameWrapperAddress {
+		return &owner, nil
+	}
+
+	// If the owner is the NameWrapper contract, resolve the true owner
+	return e.resolveWrappedOwner(ctx, chainID, nameHash, nameWrapperAddress)
+}
+
+// resolveWrappedOwner resolves the actual ENS owner from the NameWrapper contract
+// for wrapped names (those owned by the wrapper itself in the ENS registry).
+func (e *EnsResolver) resolveWrappedOwner(ctx context.Context, chainID uint64, nameHash common.Hash, wrapperAddr common.Address) (*common.Address, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+
+	nameWrapper, err := e.contractMaker.NewNameWrapper(chainID, &wrapperAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert the namehash to tokenId (uint256)
+	tokenId := new(big.Int).SetBytes(nameHash.Bytes())
+
+	owner, err := nameWrapper.OwnerOf(callOpts, tokenId)
+	if err != nil {
+		return nil, nil // treat as unowned
 	}
 
 	return &owner, nil

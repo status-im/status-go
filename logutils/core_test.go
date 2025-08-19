@@ -17,8 +17,11 @@ func TestCore(t *testing.T) {
 	buffer1 := bytes.NewBuffer(nil)
 	buffer2 := bytes.NewBuffer(nil)
 
+	cfg := zap.NewDevelopmentEncoderConfig()
+	cfg.TimeKey = ""
+
 	core := NewCore(
-		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.NewConsoleEncoder(cfg),
 		zapcore.AddSync(buffer1),
 		level,
 	)

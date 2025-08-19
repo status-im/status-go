@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
 
-	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -21,7 +20,6 @@ import (
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/protocol/verification"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 )
@@ -48,9 +46,7 @@ type MessengerResponse struct {
 	Contacts                      []*Contact
 	Invitations                   []*GroupChatInvitation
 	CommunityChanges              []*communities.CommunityChanges
-	AnonymousMetrics              []*appmetrics.AppMetric
 	Mailservers                   []types.Mailserver
-	CommunityStorenodes           []storenodes.Storenode
 	Bookmarks                     []*browsers.Bookmark
 	Settings                      []*settings.SyncSettingField
 	IdentityImages                []images.IdentityImage
@@ -110,7 +106,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CommunityChanges        []*communities.CommunityChanges     `json:"communityChanges,omitempty"`
 		RequestsToJoinCommunity []*communities.RequestToJoin        `json:"requestsToJoinCommunity,omitempty"`
 		Mailservers             []types.Mailserver                  `json:"mailservers,omitempty"`
-		CommunityStorenodes     []storenodes.Storenode              `json:"communityStorenodes,omitempty"`
 		Bookmarks               []*browsers.Bookmark                `json:"bookmarks,omitempty"`
 		ClearedHistories        []*ClearedHistory                   `json:"clearedHistories,omitempty"`
 		VerificationRequests    []*verification.Request             `json:"verificationRequests,omitempty"`
@@ -148,7 +143,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CommunityChanges:        r.CommunityChanges,
 		RequestsToJoinCommunity: r.RequestsToJoinCommunity(),
 		Mailservers:             r.Mailservers,
-		CommunityStorenodes:     r.CommunityStorenodes,
 		Bookmarks:               r.Bookmarks,
 		CurrentStatus:           r.currentStatus,
 		Settings:                r.Settings,
@@ -318,7 +312,6 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.removedMessages)+
 		len(r.deletedMessages)+
 		len(r.Mailservers)+
-		len(r.CommunityStorenodes)+
 		len(r.IdentityImages)+
 		len(r.WatchOnlyAccounts)+
 		len(r.Keypairs)+

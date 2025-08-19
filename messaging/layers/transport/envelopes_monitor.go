@@ -10,7 +10,8 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -31,7 +32,7 @@ type EnvelopesMonitorConfig struct {
 	EnvelopeEventsHandler            EnvelopeEventsHandler
 	MaxAttempts                      int
 	AwaitOnlyMailServerConfirmations bool
-	IsMailserver                     func(types.EnodeID) bool
+	IsMailserver                     func(ethtypes.EnodeID) bool
 	Logger                           *zap.Logger
 }
 
@@ -103,7 +104,7 @@ type EnvelopesMonitor struct {
 
 	wg           sync.WaitGroup
 	quit         chan struct{}
-	isMailserver func(peer types.EnodeID) bool
+	isMailserver func(peer ethtypes.EnodeID) bool
 
 	logger *zap.Logger
 }

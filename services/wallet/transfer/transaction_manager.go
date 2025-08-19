@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"time"
@@ -10,9 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
@@ -31,7 +32,7 @@ type TransactionDescription struct {
 
 type TransactionManager struct {
 	storage        MultiTransactionStorage
-	gethManager    *account.GethManager
+	gethManager    *accsmanagement.AccountsManager
 	transactor     transactions.TransactorIface
 	config         *params.NodeConfig
 	accountsDB     accounts.AccountsStorage
@@ -56,7 +57,7 @@ type MultiTransactionStorage interface {
 
 func NewTransactionManager(
 	storage MultiTransactionStorage,
-	gethManager *account.GethManager,
+	gethManager *accsmanagement.AccountsManager,
 	transactor transactions.TransactorIface,
 	config *params.NodeConfig,
 	accountsDB accounts.AccountsStorage,
@@ -155,12 +156,12 @@ func NewMultiTransaction(timestamp uint64, fromNetworkID, toNetworkID uint64, fr
 	}
 }
 
-func (tm *TransactionManager) SignMessage(message types.HexBytes, account *types.Key) (string, error) {
-	if account == nil || account.PrivateKey == nil {
+func (tm *TransactionManager) SignMessage(message types.HexBytes, privateKey *ecdsa.PrivateKey) (string, error) {
+	if privateKey == nil {
 		return "", fmt.Errorf("account or private key is nil")
 	}
 
-	signature, err := crypto.Sign(message[:], account.PrivateKey)
+	signature, err := crypto.Sign(message[:], privateKey)
 
 	return types.EncodeHex(signature), err
 }

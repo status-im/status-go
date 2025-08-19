@@ -3,9 +3,9 @@ package testutil
 import (
 	"github.com/stretchr/testify/require"
 
-	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/services/wallet/common"
 )
 
 // Helper function to create a provider
@@ -39,7 +39,7 @@ func CreateNetwork(chainID uint64, chainName string, providers []params.RpcProvi
 		Enabled:                true,
 		ChainColor:             "#E90101",
 		ShortName:              "eth",
-		RelatedChainID:         api_common.OptimismSepoliaChainID,
+		RelatedChainID:         common.OptimismSepolia,
 		RpcProviders:           providers,
 		IsActive:               true,
 		IsDeactivatable:        true,

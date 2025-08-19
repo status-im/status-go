@@ -19,10 +19,9 @@
 package wakuv2
 
 import (
+	"maps"
 	"testing"
 	"time"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2/common"

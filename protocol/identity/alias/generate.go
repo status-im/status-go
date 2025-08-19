@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 )
 
 const poly uint64 = 0xB8

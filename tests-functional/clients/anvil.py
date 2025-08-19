@@ -2,16 +2,18 @@ import logging
 import time
 import docker
 
-from conftest import option
+from utils.config import Config
 from tenacity import retry, wait_fixed, stop_after_attempt
 from web3 import Web3
+from web3.types import TxData, TxReceipt
+from eth_typing.encoding import HexStr
 
 
 class Anvil(Web3):
 
     def __init__(self):
         self.docker_client = docker.from_env()
-        self.docker_project_name = option.docker_project_name
+        self.docker_project_name = Config.docker_project_name
         self.network_name = f"{self.docker_project_name}_default"
 
         container_name_prefix = f"{self.docker_project_name}-anvil"
@@ -50,3 +52,9 @@ class Anvil(Web3):
             else:
                 time.sleep(0.1)
         raise TimeoutError(f"Anvil was not healthy after {timeout} seconds")
+
+    def get_transaction(self, tx_hash: str) -> TxData:
+        return self.eth.get_transaction(HexStr(tx_hash))
+
+    def transaction_receipt(self, tx_hash: str) -> TxReceipt:
+        return self.eth.get_transaction_receipt(HexStr(tx_hash))

@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 )
 
 const (

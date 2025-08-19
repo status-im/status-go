@@ -16,10 +16,10 @@ import (
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/deprecation"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
@@ -1416,7 +1416,7 @@ func (s *MessengerSuite) TestContactPersistence() {
 }
 
 func (s *MessengerSuite) TestSharedSecretHandler() {
-	err := s.m.handleSharedSecrets(nil)
+	err := s.m.messaging.HandleSharedSecrets(nil)
 	s.NoError(err)
 }
 
@@ -2169,7 +2169,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // relevant logic now
 // func (s *MessengerSuite) TestShouldResendEmoji() {
 // 	// shouldn't try to resend non-emoji messages.
-// 	ok, err := s.m.shouldResendMessage(&common.RawMessage{
+// 	ok, err := s.m.shouldResendMessage(&messagingtypes.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_CONTACT_UPDATE,
 // 		Sent:        false,
 // 		SendCount:   2,
@@ -2178,7 +2178,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.False(ok)
 
 // 	// shouldn't try to resend already sent message
-// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        true,
 // 		SendCount:   1,
@@ -2187,7 +2187,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.False(ok)
 
 // 	// messages that already sent to many times shouldn't be resend
-// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        false,
 // 		SendCount:   s.m.config.messageResendMaxCount + 1,
@@ -2196,7 +2196,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.False(ok)
 
 // 	// message sent one time CAN'T be resend in 15 seconds (only after 30)
-// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        false,
 // 		SendCount:   1,
@@ -2206,7 +2206,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.False(ok)
 
 // 	// message sent one time CAN be resend in 35 seconds
-// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        false,
 // 		SendCount:   1,
@@ -2216,7 +2216,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.True(ok)
 
 // 	// message sent three times CAN'T be resend in 100 seconds (only after 120)
-// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        false,
 // 		SendCount:   3,
@@ -2226,7 +2226,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.False(ok)
 
 // 	// message sent tow times CAN be resend in 65 seconds
-// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        false,
 // 		SendCount:   3,
@@ -2454,6 +2454,10 @@ func buildImageWithoutAlbumIDMessage(chat Chat) (*common.Message, error) {
 
 type testTimeSource struct{}
 
+func (t *testTimeSource) Now() time.Time {
+	return time.Now()
+}
+
 func (t *testTimeSource) GetCurrentTime() uint64 {
 	return uint64(time.Now().Unix())
 }
@@ -2603,4 +2607,9 @@ func (s *MessengerSuite) TestFilterCommunityChats() {
 func getTimeWithAllowedFutureDrift() uint64 {
 	currentTime := timesource.GetCurrentTimeInMillis()
 	return currentTime + MaxWhisperFutureDriftMs/2
+}
+
+func (s *MessengerSuite) TestStats() {
+	stats := s.m.GetStats()
+	s.Require().NotNil(stats)
 }

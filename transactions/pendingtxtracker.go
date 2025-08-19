@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	ethTypes "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
@@ -343,7 +343,7 @@ func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.C
 	return res, nil
 }
 
-func (tm *PendingTxTracker) updateTxDetails(txDetails *TxDetails, chainID uint64, txHash ethTypes.Hash) {
+func (tm *PendingTxTracker) updateTxDetails(txDetails *TxDetails, chainID uint64, txHash cryptotypes.Hash) {
 	if txDetails == nil {
 		txDetails = &TxDetails{}
 	}
@@ -385,7 +385,7 @@ func (tm *PendingTxTracker) emitNotifications(chainID common.ChainID, changes []
 				Status: change.Status,
 			}
 
-			tm.updateTxDetails(&payload.TxDetails, chainID.ToUint(), ethTypes.Hash(change.hash))
+			tm.updateTxDetails(&payload.TxDetails, chainID.ToUint(), cryptotypes.Hash(change.hash))
 
 			jsonPayload, err := json.Marshal(payload)
 			if err != nil {
@@ -704,7 +704,7 @@ func (tm *PendingTxTracker) addPendingAndNotify(transaction *PendingTransaction)
 }
 
 func (tm *PendingTxTracker) notifyPendingTransactionListeners(payload PendingTxUpdatePayload, addresses []eth.Address, timestamp uint64) {
-	tm.updateTxDetails(&payload.TxDetails, payload.ChainID.ToUint(), ethTypes.Hash(payload.Hash))
+	tm.updateTxDetails(&payload.TxDetails, payload.ChainID.ToUint(), cryptotypes.Hash(payload.Hash))
 
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {

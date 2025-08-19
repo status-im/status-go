@@ -15,6 +15,7 @@ import (
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc/network"
 
 	"github.com/status-im/status-go/services/wallet/async"
@@ -106,14 +107,13 @@ func NewService(
 	db *sql.DB,
 	walletFeed *event.Feed,
 	accountsDB *accounts.Database,
-	accountsFeed *event.Feed,
-	networksFeed *event.Feed,
+	accountsPublisher *pubsub.Publisher,
 	communityManager *community.Manager,
 	networkManager *network.Manager,
 	manager *Manager) *Service {
 	s := &Service{
 		manager:          manager,
-		controller:       NewController(db, walletFeed, accountsDB, accountsFeed, networksFeed, networkManager, manager),
+		controller:       NewController(db, walletFeed, accountsDB, accountsPublisher, networkManager, manager),
 		db:               db,
 		ownershipDB:      NewOwnershipDB(db),
 		transferDB:       transfer.NewDB(db),

@@ -6,9 +6,6 @@ import (
 
 // VerifyAccountPassword represents a request to verify an account password.
 type VerifyAccountPassword struct {
-	// KeyStoreDir is the directory where the keystore files are located.
-	KeyStoreDir string `json:"keyStoreDir" validate:"required"`
-
 	// Address is the Ethereum address for the account.
 	Address string `json:"address" validate:"required"`
 

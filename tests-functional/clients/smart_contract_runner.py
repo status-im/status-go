@@ -8,7 +8,7 @@ import docker
 import docker.errors
 import os
 
-from conftest import option
+from utils.config import Config
 from resources.constants import user_1, ANVIL_NETWORK_ID
 from tenacity import retry, wait_fixed, stop_after_attempt
 
@@ -19,7 +19,7 @@ class SmartContractRunner:
 
     def __init__(self):
         self.docker_client = docker.from_env()
-        self.docker_project_name = option.docker_project_name
+        self.docker_project_name = Config.docker_project_name
         self.network_name = f"{self.docker_project_name}_default"
 
         container_name_prefix = f"{self.docker_project_name}-foundry"

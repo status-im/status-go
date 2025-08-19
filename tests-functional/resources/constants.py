@@ -1,5 +1,8 @@
+# Main constants file for tests
 from dataclasses import dataclass
 import os
+from typing import Optional, List, Dict, Any
+from resources.test_data import mnemonic_12, mnemonic_15, mnemonic_24
 
 
 @dataclass
@@ -8,6 +11,8 @@ class Account:
     private_key: str
     password: str
     passphrase: str
+    accounts: Optional[List[Dict[str, Any]]] = None  # Optional list of accounts
+    profile_data: Optional[Dict[str, Any]] = None  # Optional profile data
 
 
 user_1 = Account(
@@ -22,6 +27,76 @@ user_2 = Account(
     password="Strong12345",
     passphrase="test test test test test test test test test test nest junk",
 )
+
+user_mnemonic_12 = Account(
+    address="0xC43f4Ab94eC965a3EE9815C5Df07383057d261A8",
+    private_key="",
+    password="Strong12345",
+    passphrase="exhibit soldier miracle series edge atom daring alter absorb decide orphan addict",
+    accounts=mnemonic_12.accounts,
+    profile_data=mnemonic_12.profile_data,
+)
+
+user_mnemonic_15 = Account(
+    address="0x685d7ec8e08769ca7020a6b65709887e38e68e6d",
+    private_key="",
+    password="Strong12345",
+    passphrase="category two chapter fame hunt horse huge rotate inner monkey affair champion mixed tail final",
+    accounts=mnemonic_15.accounts,
+    profile_data=mnemonic_15.profile_data,
+)
+
+user_mnemonic_24 = Account(
+    address="0xf2d58ae5aa880f7c3f65d769296b1061c61e0955",
+    private_key="",
+    password="Strong12345",
+    passphrase=(
+        "border cabbage grape stage return enable bamboo main only voyage glad race patient stool drum sort "
+        "army abandon elegant grit cinnamon endless rail drink"
+    ),
+    accounts=mnemonic_24.accounts,
+    profile_data=mnemonic_24.profile_data,
+)
+
+new_account_data_1 = {
+    "address": "0x1234567890abcdef1234567890abcdef12345678",
+    "key-uid": "",
+    "wallet": False,
+    "chat": False,
+    "type": "generated",
+    "path": "m/44'/60'/0'/0/0",
+    "public-key": "0xabcdef",
+    "name": "account1",
+    "emoji": "🔑",
+    "colorId": "blue",
+}
+
+new_account_data_2 = {
+    "address": "0xf2d58ae5aa880f7c3f65d769296b1061c61e0955",
+    "key-uid": "",
+    "wallet": False,
+    "chat": False,
+    "type": "generated",
+    "path": "m/44'/60'/0'/0/1",
+    "public-key": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+    "name": "account2",
+    "emoji": "🔑",
+    "colorId": "blue",
+}
+
+user_keycard_1 = {
+    "keyUID": "5a0dd657-165a-4810-b800-6005452be42f",
+    "address": "0x1234567890abcdef1234567890abcdef12345678",
+    "whisperPrivateKey": "example-whisper-private-key",
+    "whisperPublicKey": "example-whisper-public-key",
+    "whisperAddress": "example-whisper-address",
+    "walletPublicKey": "example-wallet-public-key",
+    "walletAddress": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+    "walletRootAddress": "0xrootaddressrootaddressrootaddressrootaddr",
+    "eip1581Address": "0xeip1581address1234567890abcdef1234567890",
+    "encryptionPublicKey": "example-encryption-public-key",
+}
+
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 TESTS_DIR = os.path.join(PROJECT_ROOT, "tests-functional")
 SIGNALS_DIR = os.path.join(TESTS_DIR, "signals")

@@ -4,16 +4,15 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"slices"
 	"time"
 
 	"go.uber.org/zap"
-	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain"
 	w_common "github.com/status-im/status-go/services/wallet/common"

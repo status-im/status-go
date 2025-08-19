@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.20'
+library 'status-jenkins-lib@v1.9.26'
 
 pipeline {
   agent { label 'linux && x86_64 && nix-2.24' }
@@ -15,6 +15,11 @@ pipeline {
       defaultValue: true,
       description: 'Should the job report test coverage to Codecov?'
     )
+    choice(
+      name: 'FUNCTIONAL_TESTS_LOG_LEVEL',
+      choices: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+      description: 'pytest log level'
+    )
   }
 
   options {
@@ -22,6 +27,7 @@ pipeline {
     /* Prevent Jenkins jobs from running forever */
     timeout(time: 50, unit: 'MINUTES')
     disableConcurrentBuilds()
+    disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: getAmountToKeep(),
@@ -35,8 +41,9 @@ pipeline {
     PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
     /* Hack-fix for params not being set in env on first job run. */
-    BRANCH =                           "${params.BRANCH}"
+    BRANCH =                          "${params.BRANCH}"
     FUNCTIONAL_TESTS_REPORT_CODECOV = "${params.FUNCTIONAL_TESTS_REPORT_CODECOV}"
+    FUNCTIONAL_TESTS_LOG_LEVEL =      "${params.FUNCTIONAL_TESTS_LOG_LEVEL}"
   }
 
   stages {
@@ -63,7 +70,7 @@ pipeline {
     always {
       script {
         archiveArtifacts(
-          artifacts: 'tests-functional/reports/*.xml, tests-functional/*.log, tests-functional/coverage/coverage.html',
+          artifacts: 'tests-functional/reports/*.xml, tests-functional/logs/*.log, tests-functional/coverage/coverage.html',
           allowEmptyArchive: true,
         )
         junit(

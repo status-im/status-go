@@ -1,9 +1,10 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.20'
+// vim: ft=groovy
+library 'status-jenkins-lib@v1.9.26'
 
 pipeline {
   /* This way we run the same Jenkinsfile on different platforms. */
-  agent { label "${params.AGENT_LABEL}" }
+  agent { label "${params.AGENT_LABEL} && go-1.23" }
 
   parameters {
     string(
@@ -14,12 +15,17 @@ pipeline {
     string(
       name: 'AGENT_LABEL',
       description: 'Label for targetted CI slave host.',
-      defaultValue: params.AGENT_LABEL ?: getAgentLabel(),
+      defaultValue: params.AGENT_LABEL ?: jenkins.getAgentLabelFromJob(),
     )
     booleanParam(
       name: 'RELEASE',
       defaultValue: false,
       description: 'Enable to create build for release.',
+    )
+    booleanParam(
+      name: 'USE_NWAKU',
+      description: 'Whether to build with nwaku or not',
+      defaultValue: params.USE_NWAKU ?: getNWakuMode(),
     )
   }
 
@@ -27,8 +33,9 @@ pipeline {
     timestamps()
     ansiColor('xterm')
     /* Prevent Jenkins jobs from running forever */
-    timeout(time: 15, unit: 'MINUTES')
+    timeout(time: 30, unit: 'MINUTES')
     disableConcurrentBuilds()
+    disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: '5',
@@ -38,7 +45,7 @@ pipeline {
   }
 
   environment {
-    PLATFORM = getPlatformFromLabel(params.AGENT_LABEL)
+    PLATFORM = "${getPlatformFromLabel()}/${params.USE_NWAKU ? 'nwaku' : 'status-go'}"
     TMPDIR   = "${WORKSPACE_TMP}"
     GOPATH   = "${WORKSPACE_TMP}/go"
     GOCACHE  = "${WORKSPACE_TMP}/gocache"
@@ -53,13 +60,15 @@ pipeline {
     )
     /* prevent sharing cache dir across different jobs */
     GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
+    /* Ensure env var is set on first run. */
+    USE_NWAKU = "${params.USE_NWAKU}"
   }
 
   stages {
     stage('Setup') {
         steps {
           script {
-            if (env.PLATFORM != 'windows') {
+            if (!env.PLATFORM.startsWith('windows')) {
                 sh "mkdir -p \$(dirname ${REPO_SRC})"
                 sh "ln -s ${WORKSPACE} ${REPO_SRC}"
               }
@@ -121,23 +130,8 @@ pipeline {
   } // post
 } // pipeline
 
-/* This allows us to use one Jenkinsfile and run
- * jobs on different platforms based on job name. */
-def getAgentLabel() {
-    if (params.AGENT_LABEL) { return params.AGENT_LABEL }
-    /* We extract the name of the job from currentThread because
-     * before an agent is picket env is not available. */
-    def tokens = Thread.currentThread().getName().split('/')
-    def labels = []
-    /* Check if the job path contains any of the valid labels. */
-    ['linux', 'macos', 'windows', 'x86_64', 'aarch64', 'arm64'].each {
-        if (tokens.contains(it)) { labels.add(it) }
-    }
-    return labels.join(' && ')
-}
-
 /* This function extracts the platform from the AGENT_LABEL */
-def getPlatformFromLabel(label) {
+def getPlatformFromLabel(String label = params.AGENT_LABEL) {
     for (platform in ['linux', 'macos', 'windows']) {
         if (label.contains(platform)) {
             return platform
@@ -146,7 +140,7 @@ def getPlatformFromLabel(label) {
 }
 
 def shell(cmd) {
-    if (env.PLATFORM == 'windows') {
+    if (env.PLATFORM.startsWith('windows')) {
         sh "${cmd} SHELL=/bin/sh"
     } else {
         nix.develop(cmd, pure: false) // Use nix.develop for Linux/macOS
@@ -155,7 +149,17 @@ def shell(cmd) {
 
 def cleanTmp() {
     /* Fails on windows due to Durable Task plugin failure. */
-    if (env.PLATFORM != 'windows') {
+    if (!env.PLATFORM.startsWith('windows')) {
         dir("${env.WORKSPACE}@tmp") { deleteDir() }
     }
+}
+
+/* We extract the name of the job from currentThread because
+ * before an agent is picked env is not available. */
+def getJobPathTokens() {
+    return Thread.currentThread().getName().split('/')
+}
+
+def getNWakuMode() {
+    return getJobPathTokens().contains('nwaku')
 }

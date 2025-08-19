@@ -3,21 +3,20 @@ package pairing
 import (
 	"context"
 
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
-
-	"github.com/status-im/status-go/protocol/common"
 )
 
 type RawMessageCollector struct {
-	rawMessages []*common.RawMessage
+	rawMessages []*messagingtypes.RawMessage
 }
 
-func (r *RawMessageCollector) dispatchMessage(_ context.Context, rawMessage common.RawMessage) (common.RawMessage, error) {
+func (r *RawMessageCollector) dispatchMessage(_ context.Context, rawMessage messagingtypes.RawMessage) (messagingtypes.RawMessage, error) {
 	r.rawMessages = append(r.rawMessages, &rawMessage)
 	return rawMessage, nil
 }
 
-func (r *RawMessageCollector) getRawMessages() []*common.RawMessage {
+func (r *RawMessageCollector) getRawMessages() []*messagingtypes.RawMessage {
 	return r.rawMessages
 }
 

@@ -1,0 +1,44 @@
+run:
+  timeout: 5m
+
+  build-tags: []
+  exclude-dirs:
+    - .git/
+  include:
+    - "*.go"
+  packages:
+    - "."
+  allow-parallel-runners: false
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosec
+    - goimports
+    - govet
+    - ineffassign
+    - misspell
+    - goconst
+
+linters-settings:
+  errcheck:
+    check-type-assertions: false
+    check-blank: false
+  govet:
+    disable:
+      - shadow
+  goconst:
+    min-len: 3
+    min-occurrences: 2
+  gosec:
+    excludes:
+      - G115
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - goconst
+  max-issues-per-linter: 0
+  max-same-issues: 0

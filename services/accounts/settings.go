@@ -6,13 +6,16 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 )
 
 func NewSettingsAPI(messenger **protocol.Messenger, db *accounts.Database, config *params.NodeConfig) *SettingsAPI {
-	return &SettingsAPI{messenger, db, config}
+	return &SettingsAPI{
+		messenger: messenger,
+		db:        db,
+		config:    config,
+	}
 }
 
 // SettingsAPI is class with methods available over RPC.
@@ -45,11 +48,6 @@ func (api *SettingsAPI) NodeConfig(ctx context.Context) (*params.NodeConfig, err
 	return api.config, nil
 }
 
-// Saves the nodeconfig in the database. The node must be restarted for the changes to be applied
-func (api *SettingsAPI) SaveNodeConfig(ctx context.Context, n *params.NodeConfig) error {
-	return nodecfg.SaveNodeConfig(api.db.DB(), n)
-}
-
 // News Settings
 func (api *SettingsAPI) NewsFeedEnabled() (bool, error) {
 	return api.db.NewsFeedEnabled()
@@ -61,6 +59,11 @@ func (api *SettingsAPI) NewsNotificationsEnabled() (bool, error) {
 
 func (api *SettingsAPI) NewsRSSEnabled() (bool, error) {
 	return api.db.NewsRSSEnabled()
+}
+
+// Backup Settings
+func (api *SettingsAPI) BackupPath() (string, error) {
+	return api.db.BackupPath()
 }
 
 // Notifications Settings

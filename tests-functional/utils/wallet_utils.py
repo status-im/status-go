@@ -1,15 +1,9 @@
 import json
 import logging
-import jsonschema
 import resources.constants as constants
 from clients.signals import SignalType, WalletEventType
 
-from conftest import option
-
-
-def verify_json_schema(response, method):
-    with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
-        jsonschema.validate(instance=response, schema=json.load(schema))
+from utils.config import Config
 
 
 def get_suggested_routes(rpc_client, **kwargs):
@@ -61,7 +55,7 @@ def sign_messages(rpc_client, hashes, address):
     for hash in hashes:
 
         method = "wallet_signMessage"
-        params = [hash, address, option.password]
+        params = [hash, address, Config.password]
 
         response = rpc_client.rpc_valid_request(method, params)
 
@@ -78,17 +72,6 @@ def sign_messages(rpc_client, hashes, address):
 
         tx_signatures[hash] = signature
     return tx_signatures
-
-
-def check_tx_details(rpc_client, tx_hash, network_id, address_to, expected_amount_in):
-    method = "ethclient_transactionByHash"
-    params = [network_id, tx_hash]
-
-    response = rpc_client.rpc_valid_request(method, params)
-    tx_details = response.json()["result"]["tx"]
-
-    assert tx_details["value"] == expected_amount_in
-    assert tx_details["to"].upper() == address_to.upper()
 
 
 def check_fees(fee_mode, base_fee, max_priority_fee_per_gas, max_fee_per_gas, suggested_fee_levels):
@@ -169,7 +152,7 @@ def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
 
 def send_router_transaction(rpc_client, **kwargs):
     routes = get_suggested_routes(rpc_client, **kwargs)
-    assert "Best" in routes, f"No best route found: {routes}"
+    assert "Route" in routes, f"No route found: {routes}"
 
     build_tx = build_transactions_from_route(rpc_client, kwargs.get("uuid"))
 

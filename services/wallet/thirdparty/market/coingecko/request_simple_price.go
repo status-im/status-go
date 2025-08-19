@@ -10,8 +10,10 @@ import (
 
 const simplePriceURL = "%s/simple/price"
 
+type CurrencyPriceMap map[string]float64
+
 // SymbolPriceMap represents a map of symbols with price per currency for each.
-type SymbolPriceMap map[string]map[string]float64
+type SymbolPriceMap map[string]CurrencyPriceMap
 
 func (c *Client) FetchSimplePrice(ctx context.Context, ids []string, currencies []string) (SymbolPriceMap, error) {
 
@@ -19,7 +21,7 @@ func (c *Client) FetchSimplePrice(ctx context.Context, ids []string, currencies 
 	params.Add("ids", strings.Join(ids, ","))
 	params.Add("vs_currencies", strings.Join(currencies, ","))
 	url := fmt.Sprintf(simplePriceURL, c.baseURL)
-	response, err := c.httpClient.DoGetRequest(ctx, url, params)
+	response, err := c.doGetRequestWithOptionalAuth(ctx, url, params)
 	if err != nil {
 		return nil, err
 	}

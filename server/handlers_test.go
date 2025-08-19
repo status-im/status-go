@@ -12,7 +12,7 @@ import (
 
 	"github.com/status-im/status-go/images"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/multiaccounts"
@@ -80,6 +80,7 @@ func (s *HandlersSuite) saveUserMessage(msg *common.Message) {
 	`)
 
 	s.Require().NoError(err)
+	defer stmt.Close()
 
 	links := []byte{}
 	statusLinks := []byte{}

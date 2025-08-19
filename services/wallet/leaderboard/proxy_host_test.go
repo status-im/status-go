@@ -71,7 +71,7 @@ func TestGetMarketProxyHost(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getMarketProxyHost(tt.customUrl, tt.stageName)
+			result := GetMarketProxyHost(tt.customUrl, tt.stageName)
 			require.Equal(t, tt.expectedUrl, result)
 		})
 	}

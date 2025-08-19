@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"os"
+	"fmt"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -14,47 +15,45 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
 
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/connection"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/node/backup"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appgeneral "github.com/status-im/status-go/services/app-general"
-	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
-	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 // errors
 var (
-	ErrNodeRunning            = errors.New("node is already running")
-	ErrNoGethNode             = errors.New("geth node is not available")
-	ErrNoRunningNode          = errors.New("there is no running node")
-	ErrAccountKeyStoreMissing = errors.New("account key store is not set")
-	ErrServiceUnknown         = errors.New("service unknown")
-	ErrRPCMethodUnavailable   = `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"the method called does not exist/is not available"}}`
+	ErrNodeRunning          = errors.New("node is already running")
+	ErrNoGethNode           = errors.New("geth node is not available")
+	ErrNoRunningNode        = errors.New("there is no running node")
+	ErrServiceUnknown       = errors.New("service unknown")
+	ErrRPCMethodUnavailable = `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"the method called does not exist/is not available"}}`
 )
 
 // StatusNode abstracts contained geth node and provides helper methods to
@@ -77,25 +76,21 @@ type StatusNode struct {
 
 	logger *zap.Logger
 
-	gethAccountManager *account.GethManager
-	transactor         *transactions.Transactor
+	gethAccountsManager *accsmanagement.AccountsManager
+	transactor          *transactions.Transactor
 
 	publicMethods map[string]bool
 	// we explicitly list every service, we could use interfaces
 	// and store them in a nicer way and user reflection, but for now stupid is good
-	subscriptionsSrvc      *subscriptions.Service
 	rpcStatsSrvc           *rpcstats.Service
 	statusPublicSrvc       *status.Service
 	accountsSrvc           *accountssvc.Service
 	browsersSrvc           *browsers.Service
 	permissionsSrvc        *permissions.Service
-	mailserversSrvc        *mailservers.Service
-	appMetricsSrvc         *appmetricsservice.Service
 	walletSrvc             *wallet.Service
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         *timesource.NTPTimeSource
-	wakuV2Srvc             *wakuv2.Waku
 	wakuV2ExtSrvc          *wakuv2ext.Service
 	ensSrvc                *ens.Service
 	communityTokensSrvc    *communitytokens.Service
@@ -106,22 +101,22 @@ type StatusNode struct {
 	pendingTracker         *transactions.PendingTxTracker
 	connectorSrvc          *connector.Service
 	appGeneralSrvc         *appgeneral.Service
-	ethSrvc                *eth.Service
 
-	accountsFeed event.Feed
-	walletFeed   event.Feed
-	networksFeed event.Feed
-	settingsFeed event.Feed
+	walletFeed        event.Feed
+	accountsPublisher *pubsub.Publisher
+
+	localBackup *backup.Controller
 }
 
 // New makes new instance of StatusNode.
-func New(transactor *transactions.Transactor, gethAccountManager *account.GethManager, logger *zap.Logger) *StatusNode {
+func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagement.AccountsManager, logger *zap.Logger) *StatusNode {
 	logger = logger.Named("StatusNode")
 	return &StatusNode{
-		transactor:         transactor,
-		gethAccountManager: gethAccountManager,
-		logger:             logger,
-		publicMethods:      make(map[string]bool),
+		transactor:          transactor,
+		gethAccountsManager: gethAccountsManager,
+		logger:              logger,
+		publicMethods:       make(map[string]bool),
+		accountsPublisher:   pubsub.NewPublisher(),
 	}
 }
 
@@ -196,6 +191,69 @@ func (n *StatusNode) Start(config *params.NodeConfig) error {
 	return n.startWithDB(config)
 }
 
+func (n *StatusNode) StartLocalBackup() error {
+	if n.localBackup != nil {
+		return errors.New("local backup already started")
+	}
+
+	chatAccount, err := n.gethAccountsManager.SelectedChatAccount()
+	if err != nil {
+		return err
+	}
+
+	privateKey := chatAccount.PrivateKey()
+	filenameGetter := func() (string, error) {
+		accountIdentifier := common.PubkeyToHex(&privateKey.PublicKey)
+
+		backupPath, err := n.accountsSrvc.GetBackupPath()
+		if err != nil {
+			return "", err
+		}
+		var backupDir string
+		if backupPath != "" {
+			backupDir = backupPath
+		} else {
+			backupDir = filepath.Join(n.config.RootDataDir, "backups")
+		}
+		fullPath := filepath.Join(backupDir, fmt.Sprintf("%x_user_data.bkp", accountIdentifier[:4]))
+		return fullPath, nil
+	}
+
+	n.localBackup, err = backup.NewController(backup.BackupConfig{
+		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
+		FileNameGetter: filenameGetter,
+		BackupEnabled:  true,
+		Interval:       time.Minute * 30,
+	}, n.logger.Named("LocalBackup"))
+	if err != nil {
+		return err
+	}
+
+	if n.accountsSrvc != nil {
+		n.localBackup.Register("settings", n.accountsSrvc)
+	}
+
+	if n.walletSrvc != nil {
+		n.localBackup.Register("wallet", n.walletSrvc)
+	}
+
+	if n.statusPublicSrvc != nil {
+		n.localBackup.Register("messenger", n.statusPublicSrvc.Messenger())
+	}
+
+	n.localBackup.Start()
+
+	return nil
+}
+
+func (n *StatusNode) PerformLocalBackup() (string, error) {
+	return n.localBackup.PerformBackup()
+}
+
+func (n *StatusNode) LoadLocalBackup(filePath string) error {
+	return n.localBackup.LoadBackup(filePath)
+}
+
 func (n *StatusNode) SetMediaServerEnableTLS(enableTLS *bool) {
 	n.mediaServerEnableTLS = enableTLS
 }
@@ -255,14 +313,11 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	}
 
 	config := rpc.ClientConfig{
-		Client:          gethNodeClient,
-		UpstreamChainID: n.config.NetworkID,
-		Networks:        n.config.Networks,
-		DB:              n.appDB,
-		AccountsFeed:    &n.accountsFeed,
-		WalletFeed:      &n.walletFeed,
-		SettingsFeed:    &n.settingsFeed,
-		NetworksFeed:    &n.networksFeed,
+		Client:            gethNodeClient,
+		UpstreamChainID:   n.config.NetworkID,
+		Networks:          n.config.Networks,
+		DB:                n.appDB,
+		AccountsPublisher: n.accountsPublisher,
 	}
 	n.rpcClient, err = rpc.NewClient(config)
 	if err != nil {
@@ -281,6 +336,11 @@ func (n *StatusNode) Stop() error {
 		return ErrNoRunningNode
 	}
 
+	if n.localBackup != nil {
+		n.localBackup.Stop()
+		n.localBackup = nil
+	}
+
 	return n.stop()
 }
 
@@ -289,6 +349,8 @@ func (n *StatusNode) stop() error {
 	if err := n.gethNode.Close(); err != nil {
 		return err
 	}
+
+	n.accountsPublisher.Close()
 
 	n.rpcClient.Stop()
 	n.rpcClient = nil
@@ -306,18 +368,14 @@ func (n *StatusNode) stop() error {
 	n.downloader.Stop()
 	n.downloader = nil
 
-	n.subscriptionsSrvc = nil
 	n.rpcStatsSrvc = nil
 	n.accountsSrvc = nil
 	n.browsersSrvc = nil
 	n.permissionsSrvc = nil
-	n.mailserversSrvc = nil
-	n.appMetricsSrvc = nil
 	n.walletSrvc = nil
 	n.localNotificationsSrvc = nil
 	n.personalSrvc = nil
 	n.timeSourceSrvc = nil
-	n.wakuV2Srvc = nil
 	n.wakuV2ExtSrvc = nil
 	n.ensSrvc = nil
 	n.communityTokensSrvc = nil
@@ -328,26 +386,6 @@ func (n *StatusNode) stop() error {
 	n.appGeneralSrvc = nil
 	n.logger.Debug("status node stopped")
 	return nil
-}
-
-// ResetChainData removes chain data if node is not running.
-func (n *StatusNode) ResetChainData(config *params.NodeConfig) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if n.isRunning() {
-		return ErrNodeRunning
-	}
-
-	chainDataDir := filepath.Join(config.DataDir, config.Name, "lightchaindata")
-	if _, err := os.Stat(chainDataDir); os.IsNotExist(err) {
-		return err
-	}
-	err := os.RemoveAll(chainDataDir)
-	if err == nil {
-		n.logger.Info("Chain data has been removed", zap.String("dir", chainDataDir))
-	}
-	return err
 }
 
 // IsRunning confirm that node is running.
@@ -368,8 +406,8 @@ func (n *StatusNode) ConnectionChanged(state connection.State) {
 	}
 }
 
-// AccountManager exposes reference to node's accounts manager
-func (n *StatusNode) AccountManager() (*accounts.Manager, error) {
+// AccountsManager exposes reference to node's accounts manager
+func (n *StatusNode) AccountsManager() (*accounts.Manager, error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 

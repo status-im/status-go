@@ -2,20 +2,15 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerDeleteMessageForMeSuite(t *testing.T) {
@@ -23,63 +18,27 @@ func TestMessengerDeleteMessageForMeSuite(t *testing.T) {
 }
 
 type MessengerDeleteMessageForMeSuite struct {
-	suite.Suite
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-	alice1     *Messenger
-	alice2     *Messenger
-	// If one wants to send messages between different instances of Messenger,
-	// a single waku service should be shared.
-	shh    wakutypes.Waku
-	logger *zap.Logger
-}
-
-func (s *MessengerDeleteMessageForMeSuite) newMessenger() *Messenger {
-	if s.privateKey == nil {
-		privateKey, err := crypto.GenerateKey()
-		s.Require().NoError(err)
-
-		s.privateKey = privateKey
-	}
-
-	messenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
-}
-
-func (s *MessengerDeleteMessageForMeSuite) otherNewMessenger() *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
+	MessengerBaseTestSuite
+	m2 *Messenger
 }
 
 func (s *MessengerDeleteMessageForMeSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	shh, err := newTestWakuNode(s.logger)
-	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
-	s.shh = shh
-
-	s.alice1 = s.newMessenger()
-	s.alice2 = s.newMessenger()
+	s.MessengerBaseTestSuite.SetupTest()
+	s.m2 = s.anotherMessenger()
 }
 
 func (s *MessengerDeleteMessageForMeSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.alice1)
-	TearDownMessenger(&s.Suite, s.alice2)
-	_ = s.logger.Sync()
+	TearDownMessenger(&s.Suite, s.m2)
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func (s *MessengerDeleteMessageForMeSuite) Pair() {
-	err := s.alice2.SetInstallationMetadata(s.alice2.installationID, &multidevice.InstallationMetadata{
+	err := s.m2.SetInstallationMetadata(s.m2.installationID, &multidevice.InstallationMetadata{
 		Name:       "alice2",
 		DeviceType: "alice2",
 	})
 	s.Require().NoError(err)
-	response, err := s.alice2.SendPairInstallation(context.Background(), "", nil)
+	response, err := s.m2.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
@@ -87,32 +46,32 @@ func (s *MessengerDeleteMessageForMeSuite) Pair() {
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
-		s.alice1,
+		s.m,
 		func(r *MessengerResponse) bool { return len(r.Installations()) > 0 },
 		"installation not received",
 	)
 
 	s.Require().NoError(err)
 	actualInstallation := response.Installations()[0]
-	s.Require().Equal(s.alice2.installationID, actualInstallation.ID)
+	s.Require().Equal(s.m2.installationID, actualInstallation.ID)
 	s.Require().NotNil(actualInstallation.InstallationMetadata)
 	s.Require().Equal("alice2", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("alice2", actualInstallation.InstallationMetadata.DeviceType)
 
-	_, err = s.alice1.EnableInstallation(s.alice2.installationID)
+	_, err = s.m.EnableInstallation(s.m2.installationID)
 	s.Require().NoError(err)
 }
 
 func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Pair()
 	chatID := "foobarsynctest"
-	_, err := s.alice1.createPublicChat(chatID, &MessengerResponse{})
+	_, err := s.m.createPublicChat(chatID, &MessengerResponse{})
 	s.Require().NoError(err)
 
-	_, err = s.alice2.createPublicChat(chatID, &MessengerResponse{})
+	_, err = s.m2.createPublicChat(chatID, &MessengerResponse{})
 	s.Require().NoError(err)
 
-	otherMessenger := s.otherNewMessenger()
+	otherMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, otherMessenger)
 
 	_, err = otherMessenger.createPublicChat(chatID, &MessengerResponse{})
@@ -129,7 +88,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	var alice1ReceivedMessage, alice2ReceivedMessage bool
 	var notReceivedMessageError = errors.New("not received all messages")
 	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice1.RetrieveAll()
+		response, err = s.m.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -137,7 +96,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 			alice1ReceivedMessage = true
 		}
 
-		response, err = s.alice2.RetrieveAll()
+		response, err = s.m2.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -161,18 +120,18 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Require().False(receivedPubChatMessage.DeletedForMe)
 
 	// message synced to alice1
-	alice1Msg, err := s.alice1.MessageByID(messageID)
+	alice1Msg, err := s.m.MessageByID(messageID)
 	s.Require().NoError(err)
 	s.Require().False(alice1Msg.DeletedForMe)
 
-	response, err = s.alice1.DeleteMessageForMeAndSync(context.Background(), chatID, messageID)
+	response, err = s.m.DeleteMessageForMeAndSync(context.Background(), chatID, messageID)
 	s.Require().NoError(err)
 	s.Require().True(response.Messages()[0].DeletedForMe)
 	s.Require().Equal(response.Chats()[0].LastMessage.ID, messageID)
 	s.Require().Equal(response.Chats()[0].LastMessage.DeletedForMe, true)
 
 	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice2.RetrieveAll()
+		response, err = s.m2.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -185,7 +144,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	})
 	s.Require().NoError(err)
 
-	deletedForMeMessage, err := s.alice2.MessageByID(messageID)
+	deletedForMeMessage, err := s.m2.MessageByID(messageID)
 	s.Require().NoError(err)
 	s.Require().True(deletedForMeMessage.DeletedForMe)
 
@@ -210,10 +169,10 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 
 func (s *MessengerDeleteMessageForMeSuite) TestDeleteImageMessageFromReceiverSide() {
 
-	alice := s.otherNewMessenger()
+	alice := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, alice)
 
-	bob := s.otherNewMessenger()
+	bob := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, bob)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, alice.getTimesource())

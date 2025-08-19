@@ -20,45 +20,35 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
-	datasyncnode "github.com/status-im/mvds/node"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/appmetrics"
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/newsfeed"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
-	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/protocol/storenodes"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/server"
@@ -71,10 +61,14 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
-
 	_ "github.com/mmcdole/gofeed"
 )
+
+type PushNotificationServer interface {
+	HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, messageID []byte, query *protobuf.PushNotificationQuery) error
+	HandlePushNotificationRequest(publicKey *ecdsa.PublicKey, messageID []byte, request *protobuf.PushNotificationRequest) error
+	HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) error
+}
 
 const (
 	PubKeyStringLength = 132
@@ -107,18 +101,16 @@ type Messenger struct {
 	identity                  *ecdsa.PrivateKey
 	signer                    communities.MessageSigner
 	messaging                 *messaging.API
+	messagingPersistence      *messagingPersistence
 	persistence               *sqlitePersistence
 	encryptor                 *encryption.Protocol
-	sender                    *common.MessageSender
 	ensVerifier               *ens.Verifier
-	anonMetricsClient         *anonmetrics.Client
-	anonMetricsServer         *anonmetrics.Server
 	pushNotificationClient    *pushnotificationclient.Client
-	pushNotificationServer    *pushnotificationserver.Server
+	pushNotificationServer    PushNotificationServer
 	communitiesManager        *communities.Manager
 	archiveManager            communities.ArchiveService
 	communitiesKeyDistributor communities.KeyDistributor
-	accountsManager           account.Manager
+	accountsManager           AccountsManager
 	mentionsManager           *MentionManager
 	storeNodeRequestsManager  *StoreNodeRequestManager
 	logger                    *zap.Logger
@@ -138,7 +130,6 @@ type Messenger struct {
 	allInstallations           *installationMap
 	modifiedInstallations      *stringBoolMap
 	installationID             string
-	communityStorenodes        *storenodes.CommunityStorenodes
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
 	settings                   *accounts.Database
@@ -162,7 +153,6 @@ type Messenger struct {
 	}
 
 	connectionState       connection.State
-	wakuMetricsHandler    *wakumetrics.Client
 	contractMaker         *contracts.ContractMaker
 	verificationDatabase  *verification.Persistence
 	savedAddressesManager *wallet.SavedAddressesManager
@@ -181,10 +171,10 @@ type Messenger struct {
 	communityTokensService communities.CommunityTokensServiceInterface
 
 	// used to track dispatched messages
-	dispatchMessageTestCallback func(common.RawMessage)
+	dispatchMessageTestCallback func(messagingtypes.RawMessage)
 
 	// used to track unhandled messages
-	unhandledMessagesTracker func(*v1protocol.StatusMessage, error)
+	unhandledMessagesTracker func(*messagingtypes.Message, error)
 
 	// enables control over chat messages iteration
 	retrievedMessagesIteratorFactory func(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) MessagesIterator
@@ -192,8 +182,6 @@ type Messenger struct {
 	peersyncing         *peersyncing.PeerSyncing
 	peersyncingOffers   map[string]uint64
 	peersyncingRequests map[string]uint64
-
-	mvdsStatusChangeEvent chan datasyncnode.PeerStatusChangeEvent
 
 	backedUpFetchingStatus *BackupFetchingStatus
 
@@ -286,7 +274,7 @@ func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash types
 
 func NewMessenger(
 	identity *ecdsa.PrivateKey,
-	waku wakutypes.Waku,
+	messaging *messaging.API,
 	installationID string,
 	opts ...Option,
 ) (*Messenger, error) {
@@ -324,80 +312,6 @@ func NewMessenger(
 			return nil, err
 		}
 	}
-
-	// Apply migrations for all components.
-	err := sqlite.Migrate(database)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to apply migrations")
-	}
-
-	messaging, err := messaging.NewCore(
-		waku,
-		identity,
-		common.NewMessagingPersistence(database),
-		messaging.WithLogger(logger),
-		messaging.WithEnvelopeEventsConfig(c.envelopeEventsConfig),
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create  messaging core")
-	}
-
-	// Initialize encryption layer.
-	encryptionProtocol := encryption.New(
-		database,
-		installationID,
-		logger,
-	)
-
-	sender, err := common.NewMessageSender(
-		identity,
-		database,
-		messaging.API(),
-		encryptionProtocol,
-		logger,
-		c.featureFlags,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create messageSender")
-	}
-
-	// Initialise anon metrics client
-	var anonMetricsClient *anonmetrics.Client
-	if c.anonMetricsClientConfig != nil &&
-		c.anonMetricsClientConfig.ShouldSend &&
-		c.anonMetricsClientConfig.Active == anonmetrics.ActiveClientPhrase {
-
-		anonMetricsClient = anonmetrics.NewClient(sender)
-		anonMetricsClient.Config = c.anonMetricsClientConfig
-		anonMetricsClient.Identity = identity
-		anonMetricsClient.DB = appmetrics.NewDB(database)
-		anonMetricsClient.Logger = logger
-	}
-
-	// Initialise anon metrics server
-	var anonMetricsServer *anonmetrics.Server
-	if c.anonMetricsServerConfig != nil &&
-		c.anonMetricsServerConfig.Enabled &&
-		c.anonMetricsServerConfig.Active == anonmetrics.ActiveServerPhrase {
-
-		server, err := anonmetrics.NewServer(c.anonMetricsServerConfig.PostgresURI)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create anonmetrics.Server")
-		}
-
-		anonMetricsServer = server
-		anonMetricsServer.Config = c.anonMetricsServerConfig
-		anonMetricsServer.Logger = logger
-	}
-
-	// Initialize push notification server
-	var pushNotificationServer *pushnotificationserver.Server
-	if c.pushNotificationServerConfig != nil && c.pushNotificationServerConfig.Enabled {
-		c.pushNotificationServerConfig.Identity = identity
-		pushNotificationServerPersistence := pushnotificationserver.NewSQLitePersistence(database)
-		pushNotificationServer = pushnotificationserver.New(c.pushNotificationServerConfig, pushNotificationServerPersistence, sender)
-	}
-
 	// Initialize push notification client
 	pushNotificationClientPersistence := pushnotificationclient.NewPersistence(database)
 	pushNotificationClientConfig := c.pushNotificationClientConfig
@@ -411,7 +325,7 @@ func NewMessenger(
 	pushNotificationClientConfig.Logger = logger
 	pushNotificationClientConfig.InstallationID = installationID
 
-	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, sender, sqlitePersistence)
+	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, messaging, sqlitePersistence)
 
 	managerOptions := []communities.ManagerOption{
 		communities.WithMessageSigner(c.signer),
@@ -428,12 +342,8 @@ func NewMessenger(
 	if c.tokenManager != nil {
 		managerOptions = append(managerOptions, communities.WithTokenManager(c.tokenManager))
 	} else if c.rpcClient != nil {
-		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, community.NewManager(database, c.httpServer, nil), c.rpcClient.NetworkManager, database, c.httpServer, nil, nil, nil, token.NewPersistence(c.walletDb))
-		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager, c.rpcClient.NetworkManager)))
-	}
-
-	if c.walletConfig != nil {
-		managerOptions = append(managerOptions, communities.WithWalletConfig(c.walletConfig))
+		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, community.NewManager(database, c.httpServer, nil), c.rpcClient.GetNetworkManager(), database, c.httpServer, nil, nil, nil, token.NewPersistence(c.walletDb))
+		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager, c.rpcClient.GetNetworkManager())))
 	}
 
 	if c.communityTokensService != nil {
@@ -443,20 +353,20 @@ func NewMessenger(
 	managerOptions = append(managerOptions, c.communityManagerOptions...)
 
 	communitiesKeyDistributor := &CommunitiesKeyDistributorImpl{
-		sender:    sender,
-		encryptor: encryptionProtocol,
+		messaging: messaging,
+		encryptor: messaging.EncryptionProtocol(),
 	}
 
 	communitiesManager, err := communities.NewManager(
 		identity,
 		installationID,
 		database,
-		encryptionProtocol,
+		messaging.EncryptionProtocol(),
 		logger,
 		c.ensVerifier,
 		c.communityTokensService,
-		messaging.API(),
-		messaging.API(),
+		messaging,
+		messaging,
 		communitiesKeyDistributor,
 		c.httpServer,
 		managerOptions...,
@@ -469,9 +379,9 @@ func NewMessenger(
 		TorrentConfig: c.torrentConfig,
 		Logger:        logger,
 		Persistence:   communitiesManager.GetPersistence(),
-		Messaging:     messaging.API(),
+		Messaging:     messaging,
 		Identity:      identity,
-		Encryptor:     encryptionProtocol,
+		Encryptor:     messaging.EncryptionProtocol(),
 		Publisher:     communitiesManager,
 	}
 
@@ -479,9 +389,6 @@ func NewMessenger(
 	// "communities/manager_archive.go" version of this function based on the build instructions for those files.
 	// See those file for more details.
 	archiveManager := communities.NewArchiveManager(amc)
-	if err != nil {
-		return nil, err
-	}
 
 	settings, err := accounts.NewDB(database)
 	if err != nil {
@@ -495,39 +402,17 @@ func NewMessenger(
 		return nil, fmt.Errorf("failed to build contact of ourself: %w", err)
 	}
 
-	var wakuMetricsHandler *wakumetrics.Client
-	if c.telemetryServerURL != "" {
-		options := []wakumetrics.TelemetryClientOption{
-			wakumetrics.WithPeerID(waku.PeerID().String()),
-		}
-		wakuMetricsHandler, err = wakumetrics.NewClient(options...)
-		if err != nil {
-			return nil, err
-		}
-		if c.wakuService != nil {
-			c.wakuService.SetMetricsHandler(wakuMetricsHandler)
-		}
-		sender.SetMetricsHandler(wakuMetricsHandler)
-		err = wakuMetricsHandler.RegisterWithRegistry()
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	messenger = &Messenger{
 		config:                     &c,
 		identity:                   identity,
-		messaging:                  messaging.API(),
+		messaging:                  messaging,
+		messagingPersistence:       NewMessagingPersistence(database),
 		persistence:                sqlitePersistence,
-		encryptor:                  encryptionProtocol,
-		sender:                     sender,
-		anonMetricsClient:          anonMetricsClient,
-		anonMetricsServer:          anonMetricsServer,
-		wakuMetricsHandler:         wakuMetricsHandler,
+		encryptor:                  messaging.EncryptionProtocol(),
 		communityTokensService:     c.communityTokensService,
 		pushNotificationClient:     pushNotificationClient,
-		pushNotificationServer:     pushNotificationServer,
+		pushNotificationServer:     c.pushNotificationServer,
 		communitiesManager:         communitiesManager,
 		communitiesKeyDistributor:  communitiesKeyDistributor,
 		archiveManager:             archiveManager,
@@ -549,13 +434,11 @@ func NewMessenger(
 		database:                database,
 		multiAccounts:           c.multiAccount,
 		settings:                settings,
-		peersyncing:             peersyncing.New(peersyncing.Config{Database: database, Timesource: messaging.API()}),
+		peersyncing:             peersyncing.New(peersyncing.Config{Database: database, Timesource: messaging}),
 		peersyncingOffers:       make(map[string]uint64),
 		peersyncingRequests:     make(map[string]uint64),
-		mvdsStatusChangeEvent:   make(chan datasyncnode.PeerStatusChangeEvent, 5),
 		verificationDatabase:    verification.NewPersistence(database),
 		mailserversDatabase:     c.mailserversDatabase,
-		communityStorenodes:     storenodes.NewCommunityStorenodes(storenodes.NewDB(database), logger),
 		account:                 c.account,
 		quit:                    make(chan struct{}),
 		ctx:                     ctx,
@@ -570,28 +453,9 @@ func NewMessenger(
 		browserDatabase: c.browserDatabase,
 		httpServer:      c.httpServer,
 		shutdownTasks: []func() error{
-			c.ensVerifier.Stop,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			archiveManager.Stop,
-			encryptionProtocol.Stop,
-			wakumetrics.UnregisterMetrics,
-			func() error {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-				defer cancel()
-				err := messaging.API().ResetChatFilters(ctx)
-				if err != nil {
-					logger.Warn("could not reset filters", zap.Error(err))
-				}
-				// We don't want to thrown an error in this case, this is a soft
-				// fail
-				return nil
-			},
-			messaging.API().Stop,
-			func() error { sender.Stop(); return nil },
-			// Currently this often fails, seems like it's safe to ignore them
-			// https://github.com/uber-go/zap/issues/328
-			func() error { _ = logger.Sync; return nil },
 			database.Close,
 		},
 		logger:                           logger,
@@ -630,11 +494,8 @@ func NewMessenger(
 		messenger.shutdownTasks = append(messenger.shutdownTasks, csvFile.Close)
 	}
 
-	if anonMetricsClient != nil {
-		messenger.shutdownTasks = append(messenger.shutdownTasks, anonMetricsClient.Stop)
-	}
-	if anonMetricsServer != nil {
-		messenger.shutdownTasks = append(messenger.shutdownTasks, anonMetricsServer.Stop)
+	if c.ensVerifier != nil {
+		messenger.shutdownTasks = append(messenger.shutdownTasks, c.ensVerifier.Stop)
 	}
 
 	if c.envelopeEventsConfig != nil {
@@ -661,7 +522,7 @@ func (m *Messenger) processSentMessage(id string) error {
 	// If we have no raw message, we create a temporary one, so that
 	// the sent status is preserved
 	if err == sql.ErrNoRows || rawMessage == nil {
-		rawMessage = &common.RawMessage{
+		rawMessage = &messagingtypes.RawMessage{
 			ID:          id,
 			MessageType: protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		}
@@ -715,25 +576,12 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	m.logger.Info("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
-	// Start push notification server
-	if m.pushNotificationServer != nil {
-		if err := m.pushNotificationServer.Start(); err != nil {
-			return nil, err
-		}
-	}
 
 	// Start push notification client
 	if m.pushNotificationClient != nil {
 		m.handlePushNotificationClientRegistrations(m.pushNotificationClient.SubscribeToRegistrations())
 
 		if err := m.pushNotificationClient.Start(); err != nil {
-			return nil, err
-		}
-	}
-
-	// Start anonymous metrics client
-	if m.anonMetricsClient != nil {
-		if err := m.anonMetricsClient.Start(); err != nil {
 			return nil, err
 		}
 	}
@@ -752,24 +600,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	// set shared secret handles
-	m.sender.SetHandleSharedSecrets(m.handleSharedSecrets)
-	if err := m.sender.StartDatasync(m.mvdsStatusChangeEvent, m.sendDataSync); err != nil {
-		return nil, err
-	}
-
-	subscriptions, err := m.encryptor.Start(m.identity)
-	if err != nil {
-		return nil, err
-	}
-
-	// handle stored shared secrets
-	err = m.handleSharedSecrets(subscriptions.SharedSecrets)
-	if err != nil {
-		return nil, err
-	}
-
-	m.handleEncryptionLayerSubscriptions(subscriptions)
+	m.handleEncryptionLayerSubscriptions(m.encryptor.Subscriptions())
 	m.handleCommunitiesSubscription(m.communitiesManager.Subscribe())
 	m.handleCommunitiesHistoryArchivesSubscription(m.communitiesManager.Subscribe())
 	m.updateCommunitiesActiveMembersPeriodically()
@@ -800,8 +631,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if m.config.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled {
 		m.startCuratedCommunitiesUpdateLoop()
 	}
-	m.startMessageSegmentsCleanupLoop()
-	m.startHashRatchetEncryptedMessagesCleanupLoop()
 	m.startRequestMissingCommunityChannelsHRKeysLoop()
 
 	if err := m.cleanTopics(); err != nil {
@@ -815,10 +644,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	m.messaging.SetStorenodeConfigProvider(m)
-
-	if err := m.communityStorenodes.ReloadFromDB(); err != nil {
-		return nil, err
-	}
 
 	go m.checkForMissingMessagesLoop()
 	go m.checkForStorenodeCycleSignals()
@@ -974,7 +799,7 @@ func (m *Messenger) cleanTopics() error {
 	}
 	var filters messagingtypes.ChatFilters
 	for _, f := range m.messaging.ChatFilters() {
-		if f.Listen && !f.Ephemeral {
+		if f.IsListening() && !f.IsEphemeral() {
 			filters = append(filters, f)
 		}
 	}
@@ -1020,6 +845,10 @@ func (m *Messenger) handleConnectionChange(online bool) {
 }
 
 func (m *Messenger) Online() bool {
+	if !m.started {
+		return false
+	}
+
 	if m.config.onlineChecker != nil {
 		return m.config.onlineChecker()
 	}
@@ -1075,16 +904,16 @@ func (m *Messenger) publishContactCode() error {
 	}
 
 	contactCodeTopic := messaging.ContactCodeTopic(&m.identity.PublicKey)
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: contactCodeTopic,
 		MessageType: protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT,
 		Payload:     payload,
-		Priority:    &common.LowPriority,
+		Priority:    &messagingtypes.LowPriority,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err = m.sender.SendPublic(ctx, contactCodeTopic, rawMessage)
+	_, err = m.messaging.SendPublic(ctx, contactCodeTopic, rawMessage)
 	if err != nil {
 		m.logger.Warn("failed to send a contact code", zap.Error(err))
 	}
@@ -1096,7 +925,7 @@ func (m *Messenger) publishContactCode() error {
 	for _, community := range joinedCommunities {
 		rawMessage.LocalChatID = community.MemberUpdateChannelID()
 		rawMessage.PubsubTopic = community.PubsubTopic()
-		_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
+		_, err = m.messaging.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 		if err != nil {
 			return err
 		}
@@ -1182,16 +1011,16 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		MessageType: protobuf.ApplicationMetadataMessage_CHAT_IDENTITY,
 		Payload:     payload,
-		Priority:    &common.LowPriority,
+		Priority:    &messagingtypes.LowPriority,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if chat.ChatType == ChatTypePublic {
-		_, err = m.sender.SendPublic(ctx, chat.ID, rawMessage)
+		_, err = m.messaging.SendPublic(ctx, chat.ID, rawMessage)
 		if err != nil {
 			return err
 		}
@@ -1200,7 +1029,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		if err != nil {
 			return err
 		}
-		_, err = m.sender.SendPrivate(ctx, pk, &rawMessage)
+		_, err = m.messaging.SendPrivate(ctx, pk, &rawMessage)
 		if err != nil {
 			return err
 		}
@@ -1405,21 +1234,6 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 		}
 	}
 
-	return nil
-}
-
-// handleSharedSecrets process the negotiated secrets received from the encryption layer
-func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) error {
-	for _, secret := range secrets {
-		fSecret := types.NegotiatedSecret{
-			PublicKey: secret.Identity,
-			Key:       secret.Key,
-		}
-		_, err := m.messaging.ProcessNegotiatedSecret(fSecret)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -1735,7 +1549,7 @@ func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 
 // Shutdown takes care of ensuring a clean shutdown of Messenger
 func (m *Messenger) Shutdown() (err error) {
-	if m == nil {
+	if m == nil || !m.started {
 		return nil
 	}
 
@@ -1764,6 +1578,8 @@ func (m *Messenger) Shutdown() (err error) {
 			}
 		}
 	}
+	m.started = false
+	_ = m.logger.Sync()
 	return
 }
 
@@ -1920,11 +1736,11 @@ func (m *Messenger) HasPairedDevices() bool {
 }
 
 // sendToPairedDevices will check if we have any paired devices and send to them if necessary
-func (m *Messenger) sendToPairedDevices(ctx context.Context, spec common.RawMessage) error {
+func (m *Messenger) sendToPairedDevices(ctx context.Context, spec messagingtypes.RawMessage) error {
 	hasPairedDevices := m.hasPairedDevices()
 	// We send a message to any paired device
 	if hasPairedDevices {
-		_, err := m.sender.SendPrivate(ctx, &m.identity.PublicKey, &spec)
+		_, err := m.messaging.SendPrivate(ctx, &m.identity.PublicKey, &spec)
 		if err != nil {
 			return err
 		}
@@ -1932,11 +1748,11 @@ func (m *Messenger) sendToPairedDevices(ctx context.Context, spec common.RawMess
 	return nil
 }
 
-func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec common.RawMessage) (common.RawMessage, error) {
+func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec messagingtypes.RawMessage) (messagingtypes.RawMessage, error) {
 	var err error
 	var id []byte
 
-	id, err = m.sender.SendPairInstallation(ctx, &m.identity.PublicKey, spec)
+	id, err = m.messaging.SendPairInstallation(ctx, &m.identity.PublicKey, spec)
 
 	if err != nil {
 		return spec, err
@@ -1951,7 +1767,7 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec co
 	return spec, nil
 }
 
-func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMessage) (common.RawMessage, error) {
+func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage messagingtypes.RawMessage) (messagingtypes.RawMessage, error) {
 	if rawMessage.ContentTopic == "" {
 		rawMessage.ContentTopic = rawMessage.LocalChatID
 	}
@@ -1971,11 +1787,15 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, err
 		}
 
+		if publicKey.Curve != m.identity.PublicKey.Curve {
+			return rawMessage, errors.New("public key curve does not match")
+		}
+
 		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
 		//message for sending to paired devices later
 		specCopyForPairedDevices := rawMessage
 		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || rawMessage.SkipEncryptionLayer {
-			id, err = m.sender.SendPrivate(ctx, publicKey, &rawMessage)
+			id, err = m.messaging.SendPrivate(ctx, publicKey, &rawMessage)
 
 			if err != nil {
 				return rawMessage, err
@@ -1990,7 +1810,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 
 	case ChatTypePublic, ChatTypeProfile:
 		logger.Debug("sending public message", zap.String("chatName", chat.Name))
-		id, err = m.sender.SendPublic(ctx, rawMessage.ContentTopic, rawMessage)
+		id, err = m.messaging.SendPublic(ctx, rawMessage.ContentTopic, rawMessage)
 		if err != nil {
 			return rawMessage, err
 		}
@@ -2030,7 +1850,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		}
 		isEncrypted := isCommunityEncrypted || isChannelEncrypted
 		if !isEncrypted {
-			id, err = m.sender.SendPublic(ctx, rawMessage.ContentTopic, rawMessage)
+			id, err = m.messaging.SendPublic(ctx, rawMessage.ContentTopic, rawMessage)
 			if err != nil {
 				return rawMessage, err
 			}
@@ -2046,7 +1866,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 				rawMessage.HashRatchetGroupID = rawMessage.CommunityID
 			}
 
-			id, err = m.sender.SendCommunityMessage(ctx, &rawMessage)
+			id, err = m.messaging.SendCommunityMessage(ctx, &rawMessage)
 			if err != nil {
 				return rawMessage, err
 			}
@@ -2085,7 +1905,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			rawMessage.MessageType = protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE
 		}
 
-		id, err = m.sender.SendGroup(ctx, rawMessage.Recipients, rawMessage)
+		id, err = m.messaging.SendGroup(ctx, rawMessage.Recipients, rawMessage)
 		if err != nil {
 			return rawMessage, err
 		}
@@ -2239,7 +2059,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID:          chat.ID,
 		SendPushNotification: m.featureFlags.PushNotifications,
 		Payload:              encodedMessage,
@@ -2252,7 +2072,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	// This is not the best solution, probably it would be better to split
 	// the sent status in a different table and join on query for messages,
 	// but that's a much larger change and it would require an expensive migration of clients
-	rawMessage.BeforeDispatch = func(rawMessage *common.RawMessage) error {
+	rawMessage.BeforeDispatch = func(rawMessage *messagingtypes.RawMessage) error {
 
 		if rawMessage.Sent {
 			message.OutgoingStatus = common.OutgoingStatusSent
@@ -2470,11 +2290,11 @@ func (m *Messenger) syncChat(ctx context.Context, chatToSync *Chat, rawMessageHa
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_CHAT,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -2503,11 +2323,11 @@ func (m *Messenger) syncClearHistory(ctx context.Context, publicChat *Chat, rawM
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_CLEAR_HISTORY,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -2535,11 +2355,11 @@ func (m *Messenger) syncChatRemoving(ctx context.Context, id string, rawMessageH
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_CHAT_REMOVED,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -2569,11 +2389,11 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact, rawMessag
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT_V2,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -2660,11 +2480,11 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_COMMUNITY,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -2697,11 +2517,11 @@ func (m *Messenger) SyncBookmark(ctx context.Context, bookmark *browsers.Bookmar
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_BOOKMARK,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 	_, err = rawMessageHandler(ctx, rawMessage)
 	if err != nil {
@@ -2748,7 +2568,7 @@ func (m *Messenger) saveEnsUsernameDetailProto(syncMessage *protobuf.SyncEnsUser
 	return ud, nil
 }
 
-func (m *Messenger) HandleSyncEnsUsernameDetail(state *ReceivedMessageState, syncMessage *protobuf.SyncEnsUsernameDetail, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleSyncEnsUsernameDetail(state *ReceivedMessageState, syncMessage *protobuf.SyncEnsUsernameDetail, statusMessage *messagingtypes.Message) error {
 	ud, err := m.saveEnsUsernameDetailProto(syncMessage)
 	if err != nil {
 		return err
@@ -2770,11 +2590,11 @@ func (m *Messenger) syncEnsUsernameDetail(ctx context.Context, usernameDetail *e
 	}
 
 	_, chat := m.getLastClockWithRelatedChat()
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -2799,11 +2619,11 @@ func (m *Messenger) syncAccountCustomizationColor(ctx context.Context, acc *mult
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACCOUNT_CUSTOMIZATION_COLOR,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = m.dispatchMessage(ctx, rawMessage)
@@ -2827,11 +2647,11 @@ func (m *Messenger) SyncTrustedUser(ctx context.Context, publicKey string, ts ve
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_TRUSTED_USER,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -2866,11 +2686,11 @@ func (m *Messenger) SyncVerificationRequest(ctx context.Context, vr *verificatio
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_VERIFICATION_REQUEST,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -2932,7 +2752,7 @@ func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {
 	localnotifications.PushMessages(notifications)
 }
 
-func (m *Messenger) GetStats() wakutypes.StatsSummary {
+func (m *Messenger) GetStats() messagingtypes.TransportStats {
 	return m.messaging.GetStats()
 }
 
@@ -2948,7 +2768,7 @@ type CurrentMessageState struct {
 	// PublicKey is the public key of the author of the message
 	PublicKey *ecdsa.PublicKey
 
-	StatusMessage *v1protocol.StatusMessage
+	StatusMessage *messagingtypes.Message
 }
 
 type ReceivedMessageState struct {
@@ -3190,7 +3010,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.C
 	for filter, messages := range messagesToHandle {
 		for _, shhMessage := range messages {
 
-			handleMessageResponse, err := m.sender.HandleMessages(shhMessage)
+			handleMessageResponse, err := m.messaging.HandleReceivedMessages(shhMessage)
 			if err != nil {
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
@@ -3356,7 +3176,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
 
-			if controlledCommunitiesChatIDs[filter.ChatID] && storeWakuMessages {
+			if controlledCommunitiesChatIDs[filter.ChatID()] && storeWakuMessages {
 				logger.Debug("storing waku message")
 				err := m.communitiesManager.StoreWakuMessage(shhMessage)
 				if err != nil {
@@ -3364,7 +3184,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 				}
 			}
 
-			handleMessagesResponse, err := m.sender.HandleMessages(shhMessage)
+			handleMessagesResponse, err := m.messaging.HandleReceivedMessages(shhMessage)
 			if err != nil {
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
@@ -3376,13 +3196,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 
 			statusMessages := handleMessagesResponse.StatusMessages
 
-			if m.wakuMetricsHandler != nil {
-				m.wakuMetricsHandler.PushReceivedMessages(wakumetrics.ReceivedMessages{
-					Filter:     filter,
-					SHHMessage: shhMessage,
-					Messages:   statusMessages,
-				})
-			}
+			m.messaging.MetricsPushReceivedMessages(messagingtypes.ReceivedMessages{
+				Filter:     filter,
+				SHHMessage: shhMessage,
+				Messages:   statusMessages,
+			})
 
 			err = m.handleDatasyncMetadata(handleMessagesResponse)
 			if err != nil {
@@ -3397,7 +3215,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 				publicKey := msg.SigPubKey()
 
 				m.handleInstallations(msg.EncryptionLayer.Installations)
-				err := m.handleSharedSecrets(msg.EncryptionLayer.SharedSecrets)
+				err := m.messaging.HandleSharedSecrets(msg.EncryptionLayer.SharedSecrets)
 				if err != nil {
 					// log and continue, non-critical error
 					logger.Warn("failed to handle shared secrets")
@@ -3527,6 +3345,13 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 		if ok {
 			contactsToSave = append(contactsToSave, contact)
 			messageState.Response.AddContact(contact)
+
+			_, ok := m.allContacts.Load(id)
+			if !ok {
+				// If the contact is not in the allContacts map, it means it's a new contact
+				// and we need to add it to the allContacts map.
+				m.allContacts.Store(id, contact)
+			}
 		}
 		return true
 	})
@@ -4156,11 +3981,11 @@ func (m *Messenger) syncChatMessagesRead(ctx context.Context, chatID string, clo
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_CHAT_MESSAGES_READ,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -4451,11 +4276,11 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 	if err != nil {
 		return nil, err
 	}
-	resendType := common.ResendTypeRawMessage
+	resendType := messagingtypes.ResendTypeRawMessage
 	if chat.ChatType == ChatTypeOneToOne {
-		resendType = common.ResendTypeDataSync
+		resendType = messagingtypes.ResendTypeDataSync
 	}
-	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_REQUEST_TRANSACTION,
@@ -4529,11 +4354,11 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 		return nil, err
 	}
 
-	resendType := common.ResendTypeRawMessage
+	resendType := messagingtypes.ResendTypeRawMessage
 	if chat.ChatType == ChatTypeOneToOne {
-		resendType = common.ResendTypeDataSync
+		resendType = messagingtypes.ResendTypeDataSync
 	}
-	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_REQUEST_ADDRESS_FOR_TRANSACTION,
@@ -4632,11 +4457,11 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 		return nil, err
 	}
 
-	resendType := common.ResendTypeRawMessage
+	resendType := messagingtypes.ResendTypeRawMessage
 	if chat.ChatType == ChatTypeOneToOne {
-		resendType = common.ResendTypeDataSync
+		resendType = messagingtypes.ResendTypeDataSync
 	}
-	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_ACCEPT_REQUEST_ADDRESS_FOR_TRANSACTION,
@@ -4716,11 +4541,11 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 		return nil, err
 	}
 
-	resendType := common.ResendTypeRawMessage
+	resendType := messagingtypes.ResendTypeRawMessage
 	if chat.ChatType == ChatTypeOneToOne {
-		resendType = common.ResendTypeDataSync
+		resendType = messagingtypes.ResendTypeDataSync
 	}
-	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_TRANSACTION,
@@ -4799,11 +4624,11 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 		return nil, err
 	}
 
-	resendType := common.ResendTypeRawMessage
+	resendType := messagingtypes.ResendTypeRawMessage
 	if chat.ChatType == ChatTypeOneToOne {
-		resendType = common.ResendTypeDataSync
+		resendType = messagingtypes.ResendTypeDataSync
 	}
-	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_ADDRESS_FOR_TRANSACTION,
@@ -4897,11 +4722,11 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 		return nil, err
 	}
 
-	resendType := common.ResendTypeRawMessage
+	resendType := messagingtypes.ResendTypeRawMessage
 	if chat.ChatType == ChatTypeOneToOne {
-		resendType = common.ResendTypeDataSync
+		resendType = messagingtypes.ResendTypeDataSync
 	}
-	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SEND_TRANSACTION,
@@ -4975,11 +4800,11 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, err
 	}
 
-	resendType := common.ResendTypeRawMessage
+	resendType := messagingtypes.ResendTypeRawMessage
 	if chat.ChatType == ChatTypeOneToOne {
-		resendType = common.ResendTypeDataSync
+		resendType = messagingtypes.ResendTypeDataSync
 	}
-	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SEND_TRANSACTION,
@@ -5334,27 +5159,6 @@ func (m *Messenger) GetPushNotificationsServers() ([]*pushnotificationclient.Pus
 	return m.pushNotificationClient.GetServers()
 }
 
-// StartPushNotificationsServer initialize and start a push notification server, using the current messenger identity key
-func (m *Messenger) StartPushNotificationsServer() error {
-	if m.pushNotificationServer == nil {
-		pushNotificationServerPersistence := pushnotificationserver.NewSQLitePersistence(m.database)
-		config := &pushnotificationserver.Config{
-			Enabled:  true,
-			Logger:   m.logger,
-			Identity: m.identity,
-		}
-		m.pushNotificationServer = pushnotificationserver.New(config, pushNotificationServerPersistence, m.sender)
-	}
-
-	return m.pushNotificationServer.Start()
-}
-
-// StopPushNotificationServer stops the push notification server if running
-func (m *Messenger) StopPushNotificationsServer() error {
-	m.pushNotificationServer = nil
-	return nil
-}
-
 func generateAliasAndIdenticon(pk string) (string, string, error) {
 	identicon, err := identicon.GenerateBase64(pk)
 	if err != nil {
@@ -5369,7 +5173,7 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 
 }
 
-func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]byte, error) {
+func (m *Messenger) encodeChatEntity(chat *Chat, message messagingtypes.ChatEntity) ([]byte, error) {
 	var encodedMessage []byte
 	var err error
 	l := m.logger.With(zap.String("site", "Send"), zap.String("chatID", chat.ID))
@@ -5417,7 +5221,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 			// NOTE(cammellos): Disabling for now since the optimiziation is not
 			// applicable anymore after we changed group rules to allow
 			// anyone to change group details
-			encodedMessage, err = m.sender.EncodeMembershipUpdate(group, message)
+			encodedMessage, err = encodeMembershipUpdate(group, message)
 			if err != nil {
 				return nil, err
 			}
@@ -5475,7 +5279,7 @@ func ToVerificationRequest(message *protobuf.SyncVerificationRequest) *verificat
 	}
 }
 
-func (m *Messenger) HandleSyncVerificationRequest(state *ReceivedMessageState, message *protobuf.SyncVerificationRequest, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleSyncVerificationRequest(state *ReceivedMessageState, message *protobuf.SyncVerificationRequest, statusMessage *messagingtypes.Message) error {
 	verificationRequest := ToVerificationRequest(message)
 
 	err := m.verificationDatabase.SaveVerificationRequest(verificationRequest)
@@ -5563,11 +5367,11 @@ func (m *Messenger) syncDeleteForMeMessage(ctx context.Context, rawMessageDispat
 			if err2 != nil {
 				return err2
 			}
-			rawMessage := common.RawMessage{
+			rawMessage := messagingtypes.RawMessage{
 				LocalChatID: chatID,
 				Payload:     encodedMessage,
 				MessageType: protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE,
-				ResendType:  common.ResendTypeDataSync,
+				ResendType:  messagingtypes.ResendTypeDataSync,
 			}
 			_, err2 = rawMessageDispatcher(ctx, rawMessage)
 			if err2 != nil {
@@ -5607,14 +5411,10 @@ func (m *Messenger) startCleanupLoop(name string, cleanupFunc func() error) {
 	}()
 }
 
-func (m *Messenger) startMessageSegmentsCleanupLoop() {
-	m.startCleanupLoop("messageSegmentsCleanupLoop", m.sender.CleanupSegments)
-}
-
-func (m *Messenger) startHashRatchetEncryptedMessagesCleanupLoop() {
-	m.startCleanupLoop("hashRatchetEncryptedMessagesCleanupLoop", m.sender.CleanupHashRatchetEncryptedMessages)
-}
-
 func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string) (string, error) {
 	return m.persistence.FindStatusMessageIDForBridgeMessageID(bridgeMessageID)
+}
+
+func (m *Messenger) Messaging() *messaging.API {
+	return m.messaging
 }

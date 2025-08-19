@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -26,18 +26,15 @@ type MessengerEmojiSuite struct {
 func (s *MessengerEmojiSuite) TestSendEmoji() {
 	alice := s.m
 	alice.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
-	key, err := crypto.GenerateKey()
-	s.Require().NoError(err)
 
-	bob, err := newMessengerWithKey(s.shh, key, s.logger, nil)
-	s.Require().NoError(err)
+	bob := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, bob)
 
 	chatID := statusChatID
 
 	chat := CreatePublicChat(chatID, alice.getTimesource())
 
-	err = alice.SaveChat(chat)
+	err := alice.SaveChat(chat)
 	s.Require().NoError(err)
 
 	_, err = alice.Join(chat)

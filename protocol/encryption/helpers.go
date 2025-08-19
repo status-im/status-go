@@ -10,8 +10,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/crypto/ecies"
+	"github.com/status-im/status-go/crypto"
 )
 
 const keyBumpValue = uint64(10)
@@ -66,17 +65,6 @@ func encrypt(plaintext []byte, key []byte, reader io.Reader) ([]byte, error) {
 	return gcm.Seal(nonce, nonce, plaintext, nil), nil
 }
 
-func GenerateSharedKey(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) ([]byte, error) {
-
-	const encryptedPayloadKeyLength = 16
-
-	return ecies.ImportECDSA(privateKey).GenerateShared(
-		ecies.ImportECDSAPublic(publicKey),
-		encryptedPayloadKeyLength,
-		encryptedPayloadKeyLength,
-	)
-}
-
 func buildGroupRekeyMessage(privateKey *ecdsa.PrivateKey, groupID []byte, timestamp uint64, keyMaterial []byte, keys []*ecdsa.PublicKey) (*RekeyGroup, error) {
 
 	message := &RekeyGroup{
@@ -87,7 +75,7 @@ func buildGroupRekeyMessage(privateKey *ecdsa.PrivateKey, groupID []byte, timest
 
 	for _, k := range keys {
 
-		sharedKey, err := GenerateSharedKey(privateKey, k)
+		sharedKey, err := crypto.GenerateSharedKey(privateKey, k)
 		if err != nil {
 			return nil, err
 		}
@@ -138,7 +126,7 @@ func decryptGroupRekeyMessage(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.Pub
 		return nil, nil
 	}
 
-	sharedKey, err := GenerateSharedKey(privateKey, publicKey)
+	sharedKey, err := crypto.GenerateSharedKey(privateKey, publicKey)
 	if err != nil {
 		return nil, err
 	}

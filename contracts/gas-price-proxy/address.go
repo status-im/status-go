@@ -14,6 +14,8 @@ var ErrorNotAvailableOnChainID = errors.New("not available for chainID")
 var contractAddressByChainID = map[uint64]common.Address{
 	wallet_common.OptimismMainnet: common.HexToAddress("0x420000000000000000000000000000000000000F"),
 	wallet_common.OptimismSepolia: common.HexToAddress("0x420000000000000000000000000000000000000F"),
+	wallet_common.BaseMainnet:     common.HexToAddress("0x420000000000000000000000000000000000000F"),
+	wallet_common.BaseSepolia:     common.HexToAddress("0x420000000000000000000000000000000000000F"),
 }
 
 func ContractAddress(chainID uint64) (common.Address, error) {

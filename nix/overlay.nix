@@ -25,20 +25,20 @@ in rec {
 
   openjdk = prev.openjdk17_headless;
 
-  go = prev.go_1_22;
-  buildGoModule = prev.buildGo122Module;
-  buildGoPackage = prev.buildGo122Package;
+  go = prev.go_1_23;
+  buildGoModule = prev.buildGo123Module;
+  buildGoPackage = prev.buildGo123Package;
 
   golangci-lint = prev.golangci-lint.override {
-    buildGoModule = args: prev.buildGo122Module ( args // rec {
-      version = "1.59.1";
+    buildGoModule = args: prev.buildGo123Module ( args // rec {
+      version = "2.3.1";
       src = prev.fetchFromGitHub {
         owner = "golangci";
         repo = "golangci-lint";
         rev = "v${version}";
-        hash = "sha256-VFU/qGyKBMYr0wtHXyaMjS5fXKAHWe99wDZuSyH8opg=";
+        sha256 = "sha256-TuMIDKs8g1oYT4nQoUjwW0wEMaGxN+3YyWsbWTGy+tE=";
       };
-      vendorHash = "sha256-yYwYISK1wM/mSlAcDSIwYRo8sRWgw2u+SsvgjH+Z/7M=";
+      vendorHash = "sha256-1jnunHTVtqeDoljOC6JVq1pOxtZ/njqIRyQHRzctxgI=";
     });
   };
 

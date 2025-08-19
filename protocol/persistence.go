@@ -14,10 +14,11 @@ import (
 
 	"github.com/mat/besticon/besticon"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/images"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 
@@ -877,7 +878,7 @@ func (db sqlitePersistence) ExpiredMessagesIDs(maxSendCount int) ([]string, erro
 			(message_type IN (?, ?) OR resend_type=?) AND sent = ? AND send_count <= ?`,
 		protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
-		common.ResendTypeRawMessage,
+		messagingtypes.ResendTypeRawMessage,
 		false,
 		maxSendCount)
 	if err != nil {
@@ -1259,6 +1260,8 @@ func (db *sqlitePersistence) AddBookmark(bookmark browsers.Bookmark) (browsers.B
 		return bookmark, err
 	}
 
+	defer insert.Close()
+
 	// Get the right icon
 	finder := besticon.IconFinder{}
 	icons, iconError := finder.FetchIcons(bookmark.URL)
@@ -1457,6 +1460,8 @@ func (db *sqlitePersistence) UpdateBookmark(oldURL string, bookmark browsers.Boo
 	if err != nil {
 		return err
 	}
+	defer insert.Close()
+
 	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock, bookmark.DeletedAt, oldURL)
 	return err
 }

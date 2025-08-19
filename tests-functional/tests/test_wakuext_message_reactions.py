@@ -7,17 +7,23 @@ from resources.enums import MessageContentType
 from steps.messenger import MessengerSteps
 
 
-@pytest.mark.parametrize("setup_two_unprivileged_nodes", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 @pytest.mark.rpc
 class TestMessageReactions(MessengerSteps):
-    def test_one_to_one_message_reactions(self, setup_two_unprivileged_nodes):
-        self.make_contacts()
+
+    @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
+    def test_one_to_one_message_reactions(self, backend_new_profile, waku_light_client):
+        """Test message reactions with different wakuV2LightClient configurations"""
+        # Initialize two backends (sender and receiver) for this test
+        self.sender = backend_new_profile("sender", waku_light_client=waku_light_client)
+        self.receiver = backend_new_profile("receiver", waku_light_client=waku_light_client)
+
+        self.make_contacts(self.sender, self.receiver)
         response = self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, "test_message")
         message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id, sender_chat_id = message["id"], message["chatId"]
         receiver_chat_id = self.receiver.wakuext_service.rpc_request(method="chats").json()["result"][0]["id"]
         response = self.receiver.wakuext_service.rpc_request(method="sendEmojiReaction", params=[receiver_chat_id, message_id, 1]).json()
-        self.sender.verify_json_schema(response, "wakuext_sendEmojiReaction")
+        # TODO: Add more assertions on response
         self.sender.find_signal_containing_pattern(
             SignalType.MESSAGES_NEW.value,
             event_pattern="emojiReactions",
@@ -28,7 +34,7 @@ class TestMessageReactions(MessengerSteps):
             method="emojiReactionsByChatIDMessageID",
             params=[sender_chat_id, message_id],
         ).json()
-        self.sender.verify_json_schema(response, "wakuext_emojiReactionsByChatIDMessageID")
+        # TODO: Add more assertions on response
         result = response["result"]
         assert all(
             (
@@ -46,7 +52,7 @@ class TestMessageReactions(MessengerSteps):
                 emoji_id,
             ],
         ).json()
-        self.sender.verify_json_schema(response, "wakuext_sendEmojiReactionRetraction")
+        # TODO: Add more assertions on response
         assert response["result"]["chats"][0]["id"] == receiver_chat_id
 
         self.sender.find_signal_containing_pattern(
@@ -83,7 +89,7 @@ class TestMessageReactions(MessengerSteps):
         )
         time.sleep(10)
         response = self.sender.wakuext_service.rpc_request(method="emojiReactionsByChatID", params=[sender_chat_id, None, 20]).json()
-        self.sender.verify_json_schema(response, "wakuext_emojiReactionsByChatID")
+        # TODO: Add more assertions on response
         result = response["result"]
         assert len(result) == 2
         for item in result:

@@ -6,7 +6,6 @@ import (
 )
 
 type Connectable interface {
-	SetIsConnected(bool)
 	IsConnected() bool
 }
 

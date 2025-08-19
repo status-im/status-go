@@ -2,22 +2,16 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"reflect"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerSyncSavedAddressesSuite(t *testing.T) {
@@ -25,39 +19,23 @@ func TestMessengerSyncSavedAddressesSuite(t *testing.T) {
 }
 
 type MessengerSyncSavedAddressesSuite struct {
-	suite.Suite
-	main       *Messenger // main instance of Messenger paired with `other`
-	other      *Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh wakutypes.Waku
-
-	logger *zap.Logger
+	MessengerBaseTestSuite
+	main  *Messenger
+	other *Messenger
 }
 
 func (s *MessengerSyncSavedAddressesSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.MessengerBaseTestSuite.SetupTest()
 
-	shh, err := newTestWakuNode(s.logger)
-	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
-	s.shh = shh
-
-	s.main = s.newMessenger(s.logger.Named("main"))
-	s.privateKey = s.main.identity
-
-	// Create new device and add main account to
-	s.other, err = newMessengerWithKey(s.shh, s.main.identity, s.logger.Named("other"), nil)
-	s.Require().NoError(err)
+	s.main = s.m
+	s.other = s.anotherMessenger()
 
 	// Pair devices (main and other)
 	imOther := &multidevice.InstallationMetadata{
 		Name:       "other-device",
 		DeviceType: "other-device-type",
 	}
-	err = s.other.SetInstallationMetadata(s.other.installationID, imOther)
+	err := s.other.SetInstallationMetadata(s.other.installationID, imOther)
 	s.Require().NoError(err)
 	response, err := s.other.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
@@ -76,17 +54,8 @@ func (s *MessengerSyncSavedAddressesSuite) SetupTest() {
 }
 
 func (s *MessengerSyncSavedAddressesSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.main)
-}
-
-func (s *MessengerSyncSavedAddressesSuite) newMessenger(logger *zap.Logger) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, logger, nil)
-	s.Require().NoError(err)
-
-	return messenger
+	TearDownMessenger(&s.Suite, s.other)
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 // Helpers duplicate of wallet test. Could not import it from saved_addresses_test.go

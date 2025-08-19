@@ -132,8 +132,6 @@ func (s *ClientWithFallbackSuite) TestContextCanceledDoesNotMarkChainDown() {
 	hash := common.HexToHash("0x1234")
 
 	// WHEN
-	s.mockEthClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, context.Canceled).Times(1)
-
 	_, err := s.client.BlockByHash(ctx, hash)
 	require.Error(s.T(), err)
 	require.True(s.T(), errors.Is(err, context.Canceled))

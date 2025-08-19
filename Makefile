@@ -82,8 +82,6 @@ GO_CMD_PATHS := $(filter-out library, $(wildcard cmd/*))
 GO_CMD_NAMES := $(notdir $(GO_CMD_PATHS))
 GO_CMD_BUILDS := $(addprefix build/bin/, $(GO_CMD_NAMES))
 
-# Our custom config is located in nix/nix.conf
-export NIX_USER_CONF_FILES = $(PWD)/nix/nix.conf
 # Location of symlinks to derivations that should not be garbage collected
 export _NIX_GCROOTS = ./.nix-gcroots
 
@@ -145,9 +143,9 @@ $(GO_CMD_BUILDS): generate
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
-		-o ./$@ ./cmd/$(notdir $@) ;\
-	echo "Compilation done." ;\
-	echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
+		-o ./$@ ./cmd/$(notdir $@)
+	@echo "Compilation done."
+	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
 LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(LIBWAKU_EXT)
 $(LIBWAKU):
@@ -156,12 +154,8 @@ ifeq ($(USE_NWAKU),true)
 	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
 endif
 
-statusgo: ##@build Build status-go as statusd server
-statusgo: build/bin/statusd
-statusd: statusgo
-
-status-cli: ##@build Build status-cli to send messages
-status-cli: build/bin/status-cli
+statusgo: ##@build Build status-go as status-backend server
+statusgo: build/bin/status-backend
 
 status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend
@@ -171,13 +165,19 @@ run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	go run ./cmd/status-backend --address localhost:${PORT}
 
+push-notification-server: ##@build Build push-notification-server
+push-notification-server: build/bin/push-notification-server
+
+cmd: ##@build Build all public apps in ./cmd
+cmd: status-backend push-notification-server
+
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld build/bin/statusgo-*
 
 status-go-deps:
-	go clean -cache
-	go clean -modcache
+	go clean -cache || true
+	go clean -modcache || true
 	go install go.uber.org/mock/mockgen@v0.4.0
 	go install github.com/kevinburke/go-bindata/v4/...@v4.0.2
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
@@ -185,10 +185,12 @@ status-go-deps:
 statusgo-android: generate
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
-	export GO111MODULE=off; \
+	mkdir -p build/bin \
+	export GO111MODULE=on; \
+	export GOFLAGS="-mod=mod"; \
 	gomobile init; \
 	gomobile bind -v \
-		-target=android -ldflags="-s -w" \
+		-target=android -ldflags="-s -w -checklinkname=0" \
 		-tags '$(BUILD_TAGS) disable_torrent' \
 		$(BUILD_FLAGS_MOBILE) \
 		--androidapi="23" \
@@ -199,7 +201,8 @@ statusgo-android: ##@cross-compile Build status-go for Android
 statusgo-ios: generate
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
-	export GO111MODULE=off; \
+	export GO111MODULE=on; \
+	export GOFLAGS="-mod=mod"; \
 	gomobile init; \
 	gomobile bind -v \
 		-target=ios -ldflags="-s -w" \
@@ -249,10 +252,10 @@ endif
 	@ls -la build/bin/libstatus.*
 
 docker-image: SHELL := /bin/sh
-docker-image: BUILD_TARGET ?= statusd
+docker-image: BUILD_TARGET ?= cmd
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
-	docker build --file _assets/build/Dockerfile . \
+	docker build . \
 		--build-arg 'build_tags=$(BUILD_TAGS)' \
 		--build-arg 'build_flags=$(BUILD_FLAGS)' \
 		--build-arg 'build_target=$(BUILD_TARGET)' \
@@ -360,15 +363,19 @@ test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
 	@./_assets/scripts/run_functional_tests.sh
 
+benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
+benchmark:
+	@./_assets/scripts/run_benchmark.sh
+
 lint-panics: export GOFLAGS ?= -tags='$(BUILD_TAGS)'
 lint-panics: generate
-	go run ./cmd/lint-panics -root="$(call sh, pwd)" -skip=./cmd -test=false ./...
+	go run ./cmd/lint-panics -root="$(PWD)" -skip=./cmd -test=false ./...
 
 lint: generate lint-panics
 	golangci-lint --build-tags '$(BUILD_TAGS)' run ./...
 
 clean: ##@other Cleanup
-	rm -fr build/bin/* mailserver-config.json
+	rm -fr build/bin/*
 
 git-clean:
 	git clean -xf
@@ -384,12 +391,6 @@ vendor: generate
 	go mod vendor
 	modvendor -copy="**/*.c **/*.h" -v
 .PHONY: vendor
-
-update-fleet-config: ##@other Update fleets configuration from fleets.status.im
-	./_assets/scripts/update-fleet-config.sh
-	@echo "Updating static assets..."
-	@go generate ./static
-	@echo "Done"
 
 migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
 migration:
@@ -425,31 +426,14 @@ migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
 migration-protocol:
 	touch $(DEFAULT_PROTOCOL_PATH)/$$(date +%s)_$(D).up.sql
 
-PROXY_WRAPPER_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
--include $(PROXY_WRAPPER_PATH)/Makefile.vars
-
-#export VERIF_PROXY_OUT_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
-build-verif-proxy:
-	$(MAKE) -C $(NIMBUS_ETH1_PATH) libverifproxy
-
-build-verif-proxy-wrapper:
-	$(MAKE) -C $(VERIF_PROXY_OUT_PATH) build-verif-proxy-wrapper
-
-test-verif-proxy-wrapper:
-	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)
-
-run-anvil: SHELL := /bin/sh
-run-anvil:
-	@docker compose \
-		-f tests-functional/docker-compose.anvil.yml \
-		-f tests-functional/docker-compose.anvil.dev.yml \
-		up --remove-orphans
-
 codecov-validate: SHELL := /bin/sh
 codecov-validate:
 	curl -X POST --data-binary @.codecov.yml https://codecov.io/validate
 
 .PHONY: pytest-lint
 pytest-lint:
-	@echo "Running python linting on all files..."
-	pre-commit run --all-files --verbose --config tests-functional/.pre-commit-config.yaml
+	$(MAKE) -C tests-functional lint
+
+generate-db: build/bin/generate-db
+generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL inspections
+	./build/bin/generate-db -out-dir build/db

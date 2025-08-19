@@ -35,8 +35,8 @@ func (s *MessengerSyncVerificationRequests) TestSyncVerificationRequests() {
 	s.Require().NoError(err)
 
 	// pair
-	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	theirMessenger := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
@@ -90,8 +90,6 @@ func (s *MessengerSyncVerificationRequests) TestSyncVerificationRequests() {
 	requests, err := theirMessenger.verificationDatabase.GetVerificationRequests()
 	s.Require().NoError(err)
 	s.Require().Len(requests, 1)
-
-	s.Require().NoError(theirMessenger.Shutdown())
 }
 
 func (s *MessengerSyncVerificationRequests) TestSyncTrust() {
@@ -99,8 +97,8 @@ func (s *MessengerSyncVerificationRequests) TestSyncTrust() {
 	s.Require().NoError(err)
 
 	// pair
-	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	theirMessenger := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
@@ -153,6 +151,4 @@ func (s *MessengerSyncVerificationRequests) TestSyncTrust() {
 	trustLevel, err := theirMessenger.verificationDatabase.GetTrustStatus("0x01")
 	s.Require().NoError(err)
 	s.Require().Equal(verification.TrustStatusTRUSTED, trustLevel)
-
-	s.Require().NoError(theirMessenger.Shutdown())
 }

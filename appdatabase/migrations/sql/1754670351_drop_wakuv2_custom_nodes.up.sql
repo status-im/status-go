@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS wakuv2_custom_nodes;

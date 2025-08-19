@@ -32,8 +32,8 @@ func (s *MessengerSyncBookmarkSuite) TestSyncBookmark() {
 	s.Require().NoError(err)
 
 	// pair
-	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	theirMessenger := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
@@ -106,9 +106,6 @@ func (s *MessengerSyncBookmarkSuite) TestSyncBookmark() {
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(bookmarks))
 	s.Require().True(bookmarks[0].Removed)
-
-	s.Require().NoError(theirMessenger.Shutdown())
-
 }
 
 func (s *MessengerSyncBookmarkSuite) TestGarbageCollectRemovedBookmarks() {

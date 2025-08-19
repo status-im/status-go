@@ -3,8 +3,7 @@ package communities
 import (
 	"bytes"
 	"crypto/ecdsa"
-
-	slices "golang.org/x/exp/slices"
+	"slices"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )

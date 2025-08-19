@@ -1,27 +1,26 @@
-import io
 import json
 import logging
 import string
-import tarfile
 import tempfile
 import time
 import random
-import threading
+import uuid
 import requests
-import docker
-import docker.errors
 import os
 
 from tenacity import retry, stop_after_delay, wait_fixed
 from clients.services.wallet import WalletService
-from clients.services.wakuext import WakuextService
+from clients.services.wakuext import WakuextService, PushNotificationRegistrationTokenType
 from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
-from clients.signals import SignalClient
+from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
-from conftest import option
-from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID
-from docker.errors import APIError
+from clients.metrics import Events, StatusGoMetrics
+from clients.expvar import ExpvarClient
+from clients.statusgo_container import StatusBackendContainer
+from utils.config import Config
+from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
+from utils import keys
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
@@ -29,36 +28,28 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 class StatusBackend(RpcClient, SignalClient):
     container = None
 
-    def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6):
+    def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6, **kwargs):
         self.temp_dir = None
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
-        self.docker_project_name = option.docker_project_name
-        self.network_name = f"{self.docker_project_name}_default"
 
-        if option.status_backend_url:
-            url = next(option.status_backend_urls)
+        if Config.status_backend_urls:
+            try:
+                url = next(Config.status_backend_urls)
+            except StopIteration:
+                raise Exception("--status-backend-url is found, but not enough backends provided")
+
             assert url != "", "not enough status-backend urls provided"
             self.temp_dir = tempfile.TemporaryDirectory()
             self.data_dir = self.temp_dir.name
         else:
+            host_port = random.choice(Config.status_backend_port_range)
+            Config.status_backend_port_range.remove(host_port)
+
+            self.container = StatusBackendContainer(host_port, privileged, self.ipv6, **kwargs)
             self.temp_dir = None
-            self.data_dir = "/usr/status-user"
-            self.docker_client = docker.from_env()
-            retries = 5
-            ports_tried = []
-            for _ in range(retries):
-                try:
-                    host_port = random.choice(option.status_backend_port_range)
-                    ports_tried.append(host_port)
-                    self.container = self._start_container(host_port, privileged)
-                    url = f"http://{'[::1]' if self.ipv6 else '127.0.0.1'}:{host_port}"
-                    option.status_backend_port_range.remove(host_port)
-                    break
-                except Exception as ex:
-                    logging.error(f"Error in starting the container: {str(ex)}")
-            else:
-                raise RuntimeError(f"Failed to start container on ports: {ports_tried}")
+            self.data_dir = self.container.data_dir()
+            url = self.container.url
 
         assert self.data_dir != ""
         self.base_url = url
@@ -66,96 +57,65 @@ class StatusBackend(RpcClient, SignalClient):
         self.ws_url = f"{url}".replace("http", "ws")
         self.rpc_url = f"{url}/statusgo/CallRPC"
         self.public_key = ""
+        self.mnemonic = ""
+        self.key_uid = ""
+        self.password = ""
+        self.display_name = ""
+        self.device_id = str(uuid.uuid4())  # In reality this is taken from the device, don't confuse with Status installation_id
+        self.device_platform = PushNotificationRegistrationTokenType.UNKNOWN
+        self.node_login_event = {}
+        self.events = Events()
+        self.version = "unknown"
 
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
 
         self.wait_for_healthy()
 
-        websocket_thread = threading.Thread(target=self._connect)
-        websocket_thread.daemon = True
-        websocket_thread.start()
+        SignalClient.connect(self)
 
         self.wallet_service = WalletService(self)
         self.wakuext_service = WakuextService(self)
         self.accounts_service = AccountService(self)
         self.settings_service = SettingsService(self)
+        self.expvar_client = ExpvarClient(self.base_url)
 
     def __del__(self):
+        self.shutdown()
+
+    def shutdown(self):
+        SignalClient.disconnect(self)
+
+        if self.container:
+            self.container.shutdown()
+
         if self.temp_dir is not None:
             self.temp_dir.cleanup()
-
-    def _start_container(self, host_port, privileged):
-        identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else os.popen("git rev-parse --short HEAD").read().strip()
-        image_name = f"{self.docker_project_name}-status-backend:latest"
-        container_name = f"{self.docker_project_name}-{identifier}-status-backend-{host_port}"
-
-        coverage_path = option.codecov_dir if option.codecov_dir else os.path.abspath("./coverage/binary")
-
-        container_args = {
-            "image": image_name,
-            "detach": True,
-            "privileged": privileged,
-            "name": container_name,
-            "labels": {"com.docker.compose.project": self.docker_project_name},
-            "entrypoint": ["status-backend", "--address", "0.0.0.0:3333"],
-            "ports": {"3333/tcp": host_port},
-            "environment": {
-                "GOCOVERDIR": "/coverage/binary",
-            },
-            "volumes": {
-                coverage_path: {
-                    "bind": "/coverage/binary",
-                    "mode": "rw",
-                }
-            },
-        }
-
-        if self.ipv6:
-            container_args.update(
-                {
-                    "entrypoint": ["status-backend", "--address", f"[::]:{host_port}"],
-                    "ports": {
-                        f"{host_port}/tcp": [
-                            {"HostIp": "::", "HostPort": str(host_port)},
-                        ]
-                    },
-                }
-            )
-
-        if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
-            container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
-
-        container = self.docker_client.containers.run(**container_args)
-
-        network = self.docker_client.networks.get(self.network_name)
-        network.connect(container)
-
-        option.status_backend_containers.append(self)
-        return container
 
     def wait_for_healthy(self, timeout=10):
         start_time = time.time()
         while time.time() - start_time <= timeout:
             try:
-                self.health(enable_logging=True)
-                logging.info(f"StatusBackend is healthy after {time.time() - start_time} seconds")
+                response = self.health()
+                response = json.loads(response.content)
+                self.version = response.get("version", "unknown")
+                logging.debug(f"StatusBackend is healthy after {time.time() - start_time} seconds")
                 return
             except Exception as ex:
-                logging.error(ex)
+                logging.debug(f"StatusBackend error: {ex}")
                 time.sleep(0.1)
         raise TimeoutError(f"StatusBackend was not healthy after {timeout} seconds")
 
-    def health(self, enable_logging=True):
-        return self.api_request("health", data=[], url=self.base_url, enable_logging=enable_logging)
+    def health(self):
+        return self.api_request("health", data=[], url=self.base_url, quiet=True)
 
-    def api_request(self, method, data, url=None, enable_logging=True):
+    def api_request(self, method, data, url=None, quiet=False):
         url = url if url else self.api_url
         url = f"{url}/{method}"
-        if enable_logging:
+        if not quiet:
             logging.debug(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True)}")
         response = requests.post(url, json=data)
-        if enable_logging:
+        if not quiet:
             logging.debug(f"Got response: {response.content}")
         return response
 
@@ -177,7 +137,7 @@ class StatusBackend(RpcClient, SignalClient):
         return response
 
     def init_status_backend(self):
-        if option.logout:
+        if Config.logout:
             logging.warning("automatically logging out before InitializeApplication")
             try:
                 self.logout()
@@ -191,19 +151,21 @@ class StatusBackend(RpcClient, SignalClient):
             "dataDir": self.data_dir,
             "logEnabled": True,
             "logLevel": "DEBUG",
-            "apiLogging": True,
+            "apiLoggingEnabled": True,
+            "wakuFleetsConfigFilePath": Config.waku_fleets_config,
+            "pushFleetsConfigFilePath": Config.push_fleets_config,
         }
-        data["wakuFleetsConfigFilePath"] = option.waku_fleets_config
+
         return self.api_valid_request(method, data)
 
     def _set_networks(self, data, **kwargs):
-        network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
+        self.network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
         anvil_network = {
-            "chainID": network_id,
+            "chainID": self.network_id,
             "chainName": "Anvil",
             "rpcProviders": [
                 {
-                    "chainId": network_id,
+                    "chainId": self.network_id,
                     "name": "Anvil Direct",
                     "url": "http://anvil:8545",
                     "enableRpsLimiter": False,
@@ -225,7 +187,7 @@ class StatusBackend(RpcClient, SignalClient):
         anvil_network = self._set_token_overrides(anvil_network, kwargs.get("token_overrides", []))
 
         data["testNetworksEnabled"] = False
-        data["networkId"] = network_id
+        data["networkId"] = self.network_id
         data["networksOverride"] = [anvil_network]
 
     def _set_proxy_credentials(self, data):
@@ -244,6 +206,15 @@ class StatusBackend(RpcClient, SignalClient):
         data["StatusProxyStageName"] = "test"
         return data
 
+    def _set_wallet_secrets(self, data):
+        if "STATUS_BUILD_INFURA_TOKEN" in os.environ:
+            data["infuraToken"] = os.environ["STATUS_BUILD_INFURA_TOKEN"]
+        if "STATUS_BUILD_INFURA_SECRET" in os.environ:
+            data["infuraSecret"] = os.environ["STATUS_BUILD_INFURA_SECRET"]
+        if "STATUS_BUILD_POKT_TOKEN" in os.environ:
+            data["poktToken"] = os.environ["STATUS_BUILD_POKT_TOKEN"]
+        return data
+
     def _set_token_overrides(self, network, token_overrides):
         if not token_overrides:
             return network
@@ -252,27 +223,30 @@ class StatusBackend(RpcClient, SignalClient):
         return network
 
     def extract_data(self, path: str):
-        if not self.container:
-            if os.path.exists(path):
-                return path
+        if self.container:
+            return self.container.extract_data(path)
+
+        if not os.path.exists(path):
             return None
 
-        try:
-            stream, _ = self.container.get_archive(path)
-        except docker.errors.NotFound:
-            return None
+        return path
 
-        temp_dir = tempfile.mkdtemp()
-        tar_bytes = io.BytesIO(b"".join(stream))
+    def import_data(self, src_path: str, dest_path: str):
+        """
+        Import a file from the host (src_path) into the container at dest_path.
+        If not running in a container, just copy the file locally.
+        """
+        if self.container:
+            self.container.import_data(src_path, dest_path)
+            return
 
-        with tarfile.open(fileobj=tar_bytes) as tar:
-            tar.extractall(path=temp_dir)
-            # If the tar contains a single file, return the path to that file
-            # Otherwise it's a directory, just return temp_dir.
-            if len(tar.getmembers()) == 1:
-                return os.path.join(temp_dir, tar.getmembers()[0].name)
+        # Not running in a container, just copy the file locally
+        if not os.path.exists(src_path):
+            raise FileNotFoundError(f"Source path '{src_path}' does not exist.")
 
-        return temp_dir
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        with open(src_path, "rb") as src, open(dest_path, "wb") as dst:
+            dst.write(src.read())
 
     def _set_display_name(self, **kwargs):
         self.display_name = kwargs.get(
@@ -281,22 +255,27 @@ class StatusBackend(RpcClient, SignalClient):
         )
 
     def _create_account_request(self, user, **kwargs):
+        self.password = kwargs.get("password", user.password)
         data = {
             "rootDataDir": self.data_dir,
             "kdfIterations": 256000,
             # Profile config
             "displayName": self.display_name,
-            "password": kwargs.get("password", user.password),
+            "password": self.password,
             "customizationColor": kwargs.get("customizationColor", "primary"),
             # Logs config
             "logEnabled": True,
+            "logToStderr": True,
             "logLevel": "DEBUG",
             # Waku config
-            "wakuV2LightClient": kwargs.get("wakuV2LightClient", False),
-            "wakuV2Fleet": option.waku_fleet,
+            "wakuV2LightClient": kwargs.get("waku_light_client", False),
+            "wakuV2Fleet": Config.waku_fleet,
         }
-        self._set_networks(data, **kwargs)
+        if not Config.disable_override_networks:
+            self._set_networks(data, **kwargs)
+
         data = self._set_proxy_credentials(data)
+        data = self._set_wallet_secrets(data)
         return data
 
     def create_account_and_login(self, user=user_1, **kwargs):
@@ -313,6 +292,7 @@ class StatusBackend(RpcClient, SignalClient):
         return self.api_valid_request(method, data)
 
     def login(self, keyUid, user=user_1):
+        self.password = user.password
         method = "LoginAccount"
         data = {
             "password": user.password,
@@ -320,98 +300,50 @@ class StatusBackend(RpcClient, SignalClient):
             "kdfIterations": 256000,
         }
         data = self._set_proxy_credentials(data)
+        data = self._set_wallet_secrets(data)
         return self.api_valid_request(method, data)
 
     def logout(self):
         method = "Logout"
         return self.api_valid_request(method, {})
 
+    def wait_for_login(self):
+        signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
+        if "error" in signal["event"]:
+            error_details = signal["event"]["error"]
+            assert not error_details, f"Unexpected error during login: {error_details}"
+        self.node_login_event = signal
+        logging.debug(f"Node login event: {self.node_login_event}")
+        self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
+        self.mnemonic = self.node_login_event.get("event", {}).get("settings", {}).get("mnemonic")
+        self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
+        return signal
+
     def container_pause(self):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
         self.container.pause()
-        logging.info(f"Container {self.container.name} paused.")
 
     def container_unpause(self):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
         self.container.unpause()
-        logging.info(f"Container {self.container.name} unpaused.")
 
     def container_exec(self, command):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
-        try:
-            exec_result = self.container.exec_run(cmd=["sh", "-c", command], stdout=True, stderr=True, tty=False)
-            if exec_result.exit_code != 0:
-                raise RuntimeError(f"Failed to execute command in container {self.container.id}:\n" f"OUTPUT: {exec_result.output.decode().strip()}")
-            return exec_result.output.decode().strip()
-        except APIError as e:
-            raise RuntimeError(f"API error during container execution: {str(e)}") from e
+        return self.container.exec(command)
 
-    def find_public_key(self):
-        self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
-
-    def find_key_uid(self):
-        return self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
+    def compressed_public_key(self):
+        if not self.public_key:
+            return ""
+        return keys.compress_public_key(self.public_key)
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.1), reraise=True)
     def change_container_ip(self, new_ipv4=None, new_ipv6=None):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
-
-        logging.info(f"Trying to change container {self.container.name} IPs (IPv6 Mode: {self.ipv6})")
-
-        try:
-            # Get the network details
-            network = self.docker_client.networks.get(self.network_name)
-
-            # Ensure network has explicitly configured subnets
-            ipam_config = network.attrs.get("IPAM", {}).get("Config", [])
-            if not ipam_config:
-                raise RuntimeError("Network does not have a user-defined subnet, cannot assign a custom IP.")
-
-            self.container.reload()
-            container_info = self.container.attrs["NetworkSettings"]["Networks"].get(self.network_name, {})
-            current_ipv4 = container_info.get("IPAddress", "Unknown")
-            current_ipv6 = container_info.get("GlobalIPv6Address", "Unknown")
-
-            logging.info(f"Current IPs for {self.container.name} - IPv4: {current_ipv4}, IPv6: {current_ipv6}")
-
-            # Generate new IPs based on mode
-            for config in ipam_config:
-                subnet = config.get("Subnet")
-
-                if self.ipv6 and ":" in subnet and not new_ipv6:  # IPv6 Subnet
-                    base_ipv6 = subnet.rstrip("::/64")
-                    new_ipv6 = f"{base_ipv6}::{random.randint(1, 9999):x}:{random.randint(1, 9999):x}"
-                    logging.info(f"Generated new IPv6: {new_ipv6}")
-
-                elif not self.ipv6 and "." in subnet and not new_ipv4:  # IPv4 Subnet
-                    new_ipv4 = subnet.rsplit(".", 1)[0] + f".{random.randint(2, 254)}"
-                    logging.info(f"Generated new IPv4: {new_ipv4}")
-
-            # Disconnect and reconnect with only the needed IP type
-            network.disconnect(self.container)
-            if self.ipv6:
-                network.connect(self.container, ipv6_address=new_ipv6)
-            else:
-                network.connect(self.container, ipv4_address=new_ipv4)
-
-            self.container.reload()
-            updated_info = self.container.attrs["NetworkSettings"]["Networks"].get(self.network_name, {})
-            updated_ipv4 = updated_info.get("IPAddress", "Unknown")
-            updated_ipv6 = updated_info.get("GlobalIPv6Address", "Unknown")
-
-            if self.ipv6 and current_ipv6 == updated_ipv6:
-                raise RuntimeError("IPV6 is the same after network reconnect")
-            if not self.ipv6 and current_ipv4 == updated_ipv4:
-                raise RuntimeError("IPV4 is the same after network reconnect")
-
-            logging.info(f"Changed container {self.container.name} IPs - New IPv4: {updated_ipv4}, New IPv6: {updated_ipv6}")
-
-        except Exception as e:
-            raise RuntimeError(f"Failed to change container IP: {e}")
+        self.container.change_ip(new_ipv4, new_ipv6)
 
     def wait_for_online(self, timeout=10):
         start_time = time.time()
@@ -423,3 +355,100 @@ class StatusBackend(RpcClient, SignalClient):
             logging.info(f"StatusBackend is online after {time.time() - start_time} seconds")
             return
         raise TimeoutError(f"StatusBackend was not online after {timeout} seconds")
+
+    def get_connection_string_for_bootstrapping_another_device(self):
+        method = "GetConnectionStringForBootstrappingAnotherDevice"
+        data = {
+            "senderConfig": {
+                "keystorePath": os.path.join(self.data_dir, "keystore", self.key_uid),
+                "deviceType": "macos",
+                "keyUID": self.key_uid,
+                "password": self.password,
+                "chatKey": "",
+            },
+            "serverConfig": {
+                "timeout": 5 * 60 * 1000,
+            },
+        }
+        response = self.api_request(method, data)
+        return response.content.decode()
+
+    def input_connection_string_for_bootstrapping(self, connection_string):
+        method = "InputConnectionStringForBootstrappingV2"
+        # Empty user
+        user = Account(
+            address="",
+            private_key="",
+            password="",
+            passphrase="",
+        )
+        data = {
+            "connectionString": connection_string,
+            "receiverClientConfig": {
+                "receiverConfig": {"createAccount": self._create_account_request(user)},
+                "clientConfig": {},
+            },
+        }
+        response = self.api_valid_request(method, data)
+        return json.loads(response.content)
+
+    def get_connection_string_for_being_bootstrapped(self):
+        method = "GetConnectionStringForBeingBootstrapped"
+        user = Account(
+            address="",
+            private_key="",
+            password="",
+            passphrase="",
+        )
+        data = {
+            "receiverConfig": {
+                "createAccount": self._create_account_request(user),
+                "deviceType": "macos",
+            },
+            "serverConfig": {
+                "timeout": 5 * 60 * 1000,
+            },
+        }
+        response = self.api_request(method, data)
+        return response.content.decode()
+
+    def input_connection_string_for_bootstrapping_another_device(self, connection_string):
+        method = "InputConnectionStringForBootstrappingAnotherDeviceV2"
+        data = {
+            "connectionString": connection_string,
+            "senderClientConfig": {
+                "senderConfig": {
+                    "keystorePath": os.path.join(self.data_dir, "keystore", self.key_uid),
+                    "deviceType": "macos",
+                    "keyUID": self.key_uid,
+                    "password": self.password,
+                    "chatKey": "",
+                },
+                "clientConfig": {},
+            },
+        }
+        response = self.api_request(method, data)
+        return json.loads(response.content)
+
+    def gather_metrics(self):
+        if not self.container:
+            raise RuntimeError("Gathering metrics is only supported when running status-backend in a Docker container")
+
+        # Stop both monitoring threads and get independent arrays
+        container_stats = self.container.stop_performance_monitoring()
+        go_metrics = self.expvar_client.stop_monitoring()
+
+        # Create PerformanceMetrics with independent arrays
+        return StatusGoMetrics(container_stats=container_stats, go_metrics=go_metrics, events=self.events, version=self.version)
+
+    def start_performance_monitoring(self):
+        """Start performance monitoring with independent threads"""
+        if not self.container:
+            raise RuntimeError("Performance monitoring is only supported when running status-backend in a Docker container")
+
+        self.container.start_performance_monitoring()
+        self.expvar_client.start_monitoring()
+
+    def free_os_memory(self):
+        url = f"{self.base_url}/statusgo/debug/FreeOSMemory"
+        requests.post(url)

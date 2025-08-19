@@ -2,15 +2,18 @@ package settings
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/brianvoe/gofakeit/v6"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
@@ -25,7 +28,6 @@ var (
 	networks = json.RawMessage("{}")
 	settings = Settings{
 		Address:                             types.HexToAddress("0xdC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
-		AnonMetricsShouldSend:               false,
 		CurrentNetwork:                      "mainnet_rpc",
 		DappsAddress:                        types.HexToAddress("0xD1300f99fDF7346986CbC766903245087394ecd0"),
 		InstallationID:                      "d3efcff6-cffa-560e-a547-21d3858cbc51",
@@ -295,4 +297,26 @@ func TestDatabase_NewsRSSEnabled(t *testing.T) {
 	settings, err = db.GetSettings()
 	require.NoError(t, err)
 	require.Equal(t, false, settings.NewsRSSEnabled)
+}
+
+func TestDatabase_BackupPath(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	path, err := db.BackupPath()
+	require.NoError(t, err)
+	// The default backup path is empty
+	require.Equal(t, "", path)
+
+	testPath, err := url.JoinPath(gofakeit.LetterN(3), gofakeit.LetterN(3))
+	require.NoError(t, err)
+	require.NotEmpty(t, testPath)
+	err = db.SaveSetting(BackupPath.GetReactName(), testPath)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, testPath, settings.BackupPath)
 }

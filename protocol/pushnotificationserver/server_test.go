@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -58,7 +58,8 @@ func (s *ServerSuite) SetupTest() {
 		Logger:   tt.MustCreateTestLogger(),
 	}
 
-	s.server = New(config, s.persistence, nil)
+	s.server = New(config)
+	s.server.persistence = s.persistence // Set persistence without starting the server
 
 	sharedKey, err := s.server.generateSharedKey(&s.key.PublicKey)
 	s.Require().NoError(err)

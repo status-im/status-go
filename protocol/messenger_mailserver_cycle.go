@@ -23,21 +23,6 @@ func (m *Messenger) AllMailservers() ([]wakutypes.Mailserver, error) {
 func (m *Messenger) allMailserversByFleet(fleet string) ([]wakutypes.Mailserver, error) {
 	// Get default mailservers for given fleet
 	allMailservers := params.DefaultStoreNodes(fleet)
-
-	// Add custom configured mailservers
-	if m.mailserversDatabase != nil {
-		customMailservers, err := m.mailserversDatabase.Mailservers()
-		if err != nil {
-			return nil, err
-		}
-
-		for _, c := range customMailservers {
-			if c.Fleet == fleet {
-				allMailservers = append(allMailservers, c)
-			}
-		}
-	}
-
 	return allMailservers, nil
 }
 

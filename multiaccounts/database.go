@@ -109,10 +109,6 @@ func (a *Account) GetCustomizationColorID() uint32 {
 	return common.ColorToIDFallbackToBlue(a.GetCustomizationColor())
 }
 
-type MultiAccountMarshaller interface {
-	ToMultiAccount() *Account
-}
-
 type IdentityImageSubscriptionChange struct {
 	PublishExpected bool
 }

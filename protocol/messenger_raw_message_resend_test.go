@@ -6,14 +6,11 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerRawMessageResendTestSuite(t *testing.T) {
@@ -21,29 +18,22 @@ func TestMessengerRawMessageResendTestSuite(t *testing.T) {
 }
 
 type MessengerRawMessageResendTest struct {
-	suite.Suite
-	logger *zap.Logger
+	MessengerBaseTestSuite
 
 	aliceMessenger *Messenger
 	bobMessenger   *Messenger
-
-	aliceWaku wakutypes.Waku
-	bobWaku   wakutypes.Waku
 
 	mockedBalances communities.BalancesByChain
 }
 
 func (s *MessengerRawMessageResendTest) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.MessengerBaseTestSuite.setupMessaging()
+
 	s.mockedBalances = make(communities.BalancesByChain)
 
-	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"alice", "bob"})
-
-	s.aliceWaku = wakuNodes[0]
-	s.aliceMessenger = newTestCommunitiesMessenger(&s.Suite, s.aliceWaku, testCommunitiesMessengerConfig{
+	s.aliceMessenger = newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
-			name:   "alice",
-			logger: s.logger,
+			name: "alice",
 		},
 		walletAddresses: []string{aliceAddress1},
 		password:        accountPassword,
@@ -53,11 +43,9 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 	_, err := s.aliceMessenger.Start()
 	s.Require().NoError(err)
 
-	s.bobWaku = wakuNodes[1]
-	s.bobMessenger = newTestCommunitiesMessenger(&s.Suite, s.bobWaku, testCommunitiesMessengerConfig{
+	s.bobMessenger = newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
-			name:   "bob",
-			logger: s.logger,
+			name: "bob",
 		},
 		walletAddresses: []string{bobAddress},
 		password:        bobPassword,
@@ -75,13 +63,7 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 func (s *MessengerRawMessageResendTest) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.aliceMessenger)
 	TearDownMessenger(&s.Suite, s.bobMessenger)
-	if s.aliceWaku != nil {
-		s.Require().NoError(s.aliceWaku.Stop())
-	}
-	if s.bobWaku != nil {
-		s.Require().NoError(s.bobWaku.Stop())
-	}
-	_ = s.logger.Sync()
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func (s *MessengerRawMessageResendTest) waitForMessageSent(messageID string) {
@@ -160,7 +142,7 @@ func (s *MessengerRawMessageResendTest) TestInvalidRawMessageToWatchDoesNotProdu
 	rawMessage.Payload = payload
 
 	_, err = s.bobMessenger.AddRawMessageToWatch(rawMessage)
-	s.Require().Error(err, common.ErrModifiedRawMessage)
+	s.Require().Error(err, messagingtypes.ErrModifiedRawMessage)
 
 	// simulate storing msg with modified payload, but old message ID
 	_, err = s.bobMessenger.UpsertRawMessageToWatch(rawMessage)
@@ -181,13 +163,13 @@ func (s *MessengerRawMessageResendTest) TestInvalidRawMessageToWatchDoesNotProdu
 	s.Require().NoError(err)
 }
 
-func (s *MessengerRawMessageResendTest) GetRequestToJoinToControlNodeRawMessage(ids []string) *common.RawMessage {
+func (s *MessengerRawMessageResendTest) GetRequestToJoinToControlNodeRawMessage(ids []string) *messagingtypes.RawMessage {
 	for _, messageID := range ids {
 		rawMessage, err := s.bobMessenger.RawMessageByID(messageID)
 		s.Require().NoError(err)
 		s.Require().NotNil(rawMessage)
 
-		if rawMessage.ResendMethod == common.ResendMethodSendCommunityMessage {
+		if rawMessage.ResendMethod == messagingtypes.ResendMethodSendCommunityMessage {
 			return rawMessage
 		}
 	}

@@ -16,12 +16,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	userimages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -221,9 +220,6 @@ func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollect
 	tm := &testTokenManager{}
 
 	options := []ManagerOption{
-		WithWalletConfig(&params.WalletConfig{
-			OpenseaAPIKey: security.NewSensitiveString("some-key"),
-		}),
 		WithCollectiblesManager(cm),
 		WithTokenManager(tm),
 	}

@@ -8,17 +8,14 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	datasyncnode "github.com/status-im/mvds/node"
-
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/messaging"
-	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 func (m *Messenger) GetCurrentUserStatus() (*UserStatus, error) {
@@ -69,16 +66,16 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 
 	contactCodeTopic := messaging.ContactCodeTopic(&m.identity.PublicKey)
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: contactCodeTopic,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
-		ResendType:  common.ResendTypeNone, // does this need to be resent?
+		ResendType:  messagingtypes.ResendTypeNone, // does this need to be resent?
 		Ephemeral:   statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
-		Priority:    &common.LowPriority,
+		Priority:    &messagingtypes.LowPriority,
 	}
 
-	_, err = m.sender.SendPublic(ctx, contactCodeTopic, rawMessage)
+	_, err = m.messaging.SendPublic(ctx, contactCodeTopic, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -90,7 +87,7 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 	for _, community := range joinedCommunities {
 		rawMessage.LocalChatID = community.StatusUpdatesChannelID()
 		rawMessage.PubsubTopic = community.PubsubTopic()
-		_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
+		_, err = m.messaging.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 		if err != nil {
 			return err
 		}
@@ -172,19 +169,19 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: community.StatusUpdatesChannelID(),
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
-		ResendType:  common.ResendTypeNone, // does this need to be resent?
+		ResendType:  messagingtypes.ResendTypeNone, // does this need to be resent?
 		Ephemeral:   statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
 		PubsubTopic: community.PubsubTopic(),
-		Priority:    &common.LowPriority,
+		Priority:    &messagingtypes.LowPriority,
 	}
 
-	_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
+	_, err = m.messaging.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 	if err != nil {
-		logger.Debug("m.sender.SendPublic error", zap.Error(err))
+		logger.Debug("m.messaging.SendPublic error", zap.Error(err))
 		return err
 	}
 
@@ -245,7 +242,7 @@ func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomT
 	return m.sendUserStatus(ctx, *currStatus)
 }
 
-func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *protobuf.StatusUpdate, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *protobuf.StatusUpdate, statusMessage *messagingtypes.Message) error {
 	if err := ValidateStatusUpdate(message); err != nil {
 		return err
 	}
@@ -278,17 +275,7 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *pro
 		if statusUpdate.StatusType == int(protobuf.StatusUpdate_AUTOMATIC) ||
 			statusUpdate.StatusType == int(protobuf.StatusUpdate_ALWAYS_ONLINE) ||
 			statusUpdate.StatusType == int(protobuf.StatusUpdate_INACTIVE) {
-			m.logger.Debug("reset data sync for peer", zap.String("public_key", statusUpdate.PublicKey), zap.Uint64("clock", statusUpdate.Clock))
-			select {
-			case m.mvdsStatusChangeEvent <- datasyncnode.PeerStatusChangeEvent{
-				PeerID:    datasyncpeer.PublicKeyToPeerID(*state.CurrentMessageState.PublicKey),
-				Status:    datasyncnode.OnlineStatus,
-				EventTime: statusUpdate.Clock,
-			}:
-			default:
-				m.logger.Debug("mvdsStatusChangeEvent channel is full")
-			}
-
+			m.messaging.ResetDatasyncForPeer(state.CurrentMessageState.PublicKey, statusUpdate.Clock)
 		}
 	}
 

@@ -241,6 +241,7 @@ func insertBlockDBFields(creator statementCreator, block blockDBFields) error {
 	if err != nil {
 		return err
 	}
+	defer insert.Close()
 
 	_, err = insert.Exec(block.chainID, block.account, (*bigint.SQLBigInt)(block.blockNumber), block.blockHash, true)
 	return err
@@ -251,12 +252,14 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, head
 	if err != nil {
 		return err
 	}
+	defer insert.Close()
 	updateTx, err := creator.Prepare(`UPDATE transfers
 	SET log = ?, log_index = ?
 	WHERE network_id = ? AND address = ? AND hash = ?`)
 	if err != nil {
 		return err
 	}
+	defer updateTx.Close()
 
 	insertTx, err := creator.Prepare(`INSERT OR IGNORE
 	INTO transfers (network_id, address, sender, hash, blk_number, blk_hash, type, timestamp, log, loaded, log_index, token_id, amount_padded128hex)
@@ -264,6 +267,7 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, head
 	if err != nil {
 		return err
 	}
+	defer insertTx.Close()
 
 	for _, header := range headers {
 		_, err = insert.Exec(chainID, header.Address, (*bigint.SQLBigInt)(header.Number), header.Hash, header.Loaded)
@@ -458,6 +462,7 @@ func updateOrInsertTransfersDBFields(creator statementCreator, transfers []trans
 	if err != nil {
 		return err
 	}
+	defer insert.Close()
 	for _, t := range transfers {
 		txGasPrice := sqlite.BigIntToClampedInt64(t.txGasPrice)
 		txGasTipCap := sqlite.BigIntToClampedInt64(t.txGasTipCap)
@@ -542,6 +547,7 @@ func markBlocksAsLoaded(chainID uint64, creator statementCreator, address common
 	if err != nil {
 		return err
 	}
+	defer update.Close()
 
 	for _, block := range blocks {
 		_, err := update.Exec(true, address, (*bigint.SQLBigInt)(block), chainID)
@@ -594,6 +600,7 @@ func deleteBlocks(creator statementCreator, address common.Address) error {
 	if err != nil {
 		return err
 	}
+	defer delete.Close()
 
 	_, err = delete.Exec(address)
 	return err
@@ -605,6 +612,8 @@ func getAddresses(creator statementCreator) (rst []common.Address, err error) {
 	if err != nil {
 		return
 	}
+	defer stmt.Close()
+
 	rows, err := stmt.Query()
 	if err != nil {
 		return nil, err

@@ -22,7 +22,7 @@ parse_commits() {
     # Run the loop in the current shell using process substitution
     while IFS= read -r message || [ -n "$message" ]; do
         # Check if commit message follows conventional commits format
-        if [[ $message =~ ^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\(.*\))?(\_|!):.*$ ]]; then
+        if [[ $message =~ ^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\(.*\))?(!)?:.*$ ]]; then
             # Check for breaking changes
             if [[ ${BASH_REMATCH[3]} == *'!'* ]]; then
                 is_breaking_change=true

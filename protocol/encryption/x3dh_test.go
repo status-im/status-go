@@ -6,8 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/crypto/ecies"
+	"github.com/status-im/status-go/crypto"
 )
 
 const (
@@ -161,10 +160,10 @@ func TestX3dhActive(t *testing.T) {
 	require.NoError(t, err, "Ephemeral key should be generated without errors")
 
 	x3dh, err := x3dhActive(
-		ecies.ImportECDSA(aliceIdentityKey),
-		ecies.ImportECDSAPublic(&bobSignedPreKey.PublicKey),
-		ecies.ImportECDSA(aliceEphemeralKey),
-		ecies.ImportECDSAPublic(&bobIdentityKey.PublicKey),
+		aliceIdentityKey,
+		&bobSignedPreKey.PublicKey,
+		aliceEphemeralKey,
+		&bobIdentityKey.PublicKey,
 	)
 	require.NoError(t, err, "Shared key should be generated without errors")
 	require.Equal(t, sharedKey, x3dh, "Should generate the correct key")

@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
-	nodetypes "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/chain"
@@ -217,7 +217,7 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 	accountsWithOutsideTransfers := []common.Address{}
 
 	for _, account := range c.accounts {
-		acc, err := c.accountsDB.GetAccountByAddress(nodetypes.Address(account))
+		acc, err := c.accountsDB.GetAccountByAddress(cryptotypes.Address(account))
 		if err != nil {
 			return err
 		}
@@ -312,7 +312,7 @@ func (c *findNewBlocksCommand) findAndSaveEthBlocks(parent context.Context, from
 
 	for _, account := range accounts {
 		if mnemonicWasNotShown {
-			acc, err := c.accountsDB.GetAccountByAddress(nodetypes.Address(account))
+			acc, err := c.accountsDB.GetAccountByAddress(cryptotypes.Address(account))
 			if err != nil {
 				return err
 			}
@@ -714,7 +714,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 	}
 
 	if mnemonicWasNotShown {
-		account, err := c.accountsDB.GetAccountByAddress(nodetypes.BytesToAddress(account.Bytes()))
+		account, err := c.accountsDB.GetAccountByAddress(cryptotypes.BytesToAddress(account.Bytes()))
 		if err != nil {
 			return err
 		}

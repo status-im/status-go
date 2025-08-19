@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/deprecation"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 // InitFilters analyzes chats and contacts in order to setup filters
@@ -25,15 +24,15 @@ func (m *Messenger) InitFilters() error {
 
 	// Community requests will arrive in this pubsub topic
 	// TODO depracate
-	if err := m.SubscribeToPubsubTopic(wakuv2.DefaultNonProtectedPubsubTopic()); err != nil {
+	if err := m.SubscribeToPubsubTopic(messagingtypes.DefaultNonProtectedPubsubTopic()); err != nil {
 		return err
 	}
 	// TODO only subscribe if interested in communities
-	if err := m.SubscribeToPubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()); err != nil {
+	if err := m.SubscribeToPubsubTopic(messagingtypes.GlobalCommunityControlPubsubTopic()); err != nil {
 		return err
 	}
 	// TODO only subscribe if interested in communities
-	if err := m.SubscribeToPubsubTopic(wakuv2.GlobalCommunityContentPubsubTopic()); err != nil {
+	if err := m.SubscribeToPubsubTopic(messagingtypes.GlobalCommunityContentPubsubTopic()); err != nil {
 		return err
 	}
 
@@ -236,6 +235,11 @@ func (m *Messenger) processCommunityChat(chat *Chat, communityInfo map[string]*c
 			chat.UnviewedMessagesCount = 0
 			chat.UnviewedMentionsCount = 0
 		}
+	}
+
+	// Members could be populated in the DB from previous inserts
+	if !community.ChannelHasPermissions(chat.CommunityChatID()) {
+		chat.Members = []ChatMember{}
 	}
 
 	return nil

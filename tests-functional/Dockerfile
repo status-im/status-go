@@ -1,14 +1,8 @@
-FROM ghcr.io/foundry-rs/foundry:v0.3.0
-
-RUN apk update && \
-    apk add git bash
+FROM ghcr.io/foundry-rs/foundry:v1.3.0
 
 WORKDIR /app
 
-COPY clone_and_run.sh /app
-RUN chmod +x /app/clone_and_run.sh
-
-COPY entrypoint.sh /app
-RUN chmod +x /app/entrypoint.sh
+COPY --chmod=0755 clone_and_run.sh /app
+COPY --chmod=0755 entrypoint.sh /app
 
 ENTRYPOINT [ "/app/entrypoint.sh" ]

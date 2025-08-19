@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/gorilla/websocket"
 
@@ -20,7 +21,7 @@ import (
 )
 
 func setupServer(t *testing.T) (*Server, string) {
-	srv := NewServer()
+	srv := NewServer(zap.NewNop())
 	srv.Setup()
 	err := srv.Listen("localhost:0")
 	require.NoError(t, err)

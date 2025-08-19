@@ -8,9 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/t/utils"
 )
@@ -62,11 +61,7 @@ func TestHashMessage(t *testing.T) {
 			}
 
 			// simulate signature from external signer like a keycard
-			sig, err := personalService.Sign(signParams, &account.SelectedExtKey{
-				AccountKey: &types.Key{
-					PrivateKey: key,
-				},
-			})
+			sig, err := personalService.Sign(signParams, generator.NewAccount(key, nil))
 			require.NoError(t, err)
 
 			// check that the message was wrapped correctly before hashing it

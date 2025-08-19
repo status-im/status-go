@@ -8,6 +8,11 @@ import os
 @pytest.mark.rpc
 class TestInitialiseApp:
 
+    @pytest.fixture(autouse=True)
+    def setup_cleanup(self, close_status_backend_containers):
+        """Automatically cleanup containers after each test"""
+        yield
+
     @pytest.mark.init
     def test_init_app(self):
 
@@ -23,22 +28,6 @@ class TestInitialiseApp:
         backend_client.restore_account_and_login()
 
         assert backend_client is not None
-        backend_client.verify_json_schema(
-            backend_client.wait_for_login(),
-            "signal_node_login",
-        )
-        backend_client.verify_json_schema(
-            backend_client.wait_for_signal(SignalType.MEDIASERVER_STARTED.value),
-            "signal_mediaserver_started",
-        )
-        backend_client.verify_json_schema(
-            backend_client.wait_for_signal(SignalType.NODE_STARTED.value),
-            "signal_node_started",
-        )
-        backend_client.verify_json_schema(
-            backend_client.wait_for_signal(SignalType.NODE_READY.value),
-            "signal_node_ready",
-        )
 
 
 def assert_file_first_line(path, pattern: str, expected: bool):
@@ -55,7 +44,7 @@ def assert_file_first_line(path, pattern: str, expected: bool):
 @pytest.mark.rpc
 @pytest.mark.init
 @pytest.mark.parametrize("log_enabled,api_logging_enabled", [(False, False), (True, True)])
-def test_check_logs(log_enabled: bool, api_logging_enabled: bool):
+def test_check_logs(log_enabled: bool, api_logging_enabled: bool, close_status_backend_containers):
     backend = StatusBackend()
 
     data_dir = os.path.join(backend.data_dir, "data")

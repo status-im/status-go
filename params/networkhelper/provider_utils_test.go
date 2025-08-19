@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network/testutil"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 func TestMergeProvidersPreserveEnabledAndOrder(t *testing.T) {
@@ -58,15 +58,15 @@ func TestMergeProvidersPreserveEnabledAndOrder(t *testing.T) {
 func TestOverrideBasicAuth(t *testing.T) {
 	// Arrange: Create a sample list of networks with various provider types
 	networks := []params.Network{
-		*testutil.CreateNetwork(api_common.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
-			*params.NewUserProvider(api_common.MainnetChainID, "Provider1", security.NewSensitiveString("https://userprovider.example.com"), true),
-			*params.NewProxyProvider(api_common.MainnetChainID, "Provider2", security.NewSensitiveString("https://proxyprovider.example.com"), true),
-			*params.NewEthRpcProxyProvider(api_common.MainnetChainID, "Provider3", security.NewSensitiveString("https://ethrpcproxy.example.com"), true),
+		*testutil.CreateNetwork(walletcommon.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
+			*params.NewUserProvider(walletcommon.EthereumMainnet, "Provider1", security.NewSensitiveString("https://userprovider.example.com"), true),
+			*params.NewProxyProvider(walletcommon.EthereumMainnet, "Provider2", security.NewSensitiveString("https://proxyprovider.example.com"), true),
+			*params.NewEthRpcProxyProvider(walletcommon.EthereumMainnet, "Provider3", security.NewSensitiveString("https://ethrpcproxy.example.com"), true),
 		}),
-		*testutil.CreateNetwork(api_common.OptimismChainID, "Optimism", []params.RpcProvider{
-			*params.NewDirectProvider(api_common.OptimismChainID, "Provider4", security.NewSensitiveString("https://directprovider.example.com"), true),
-			*params.NewProxyProvider(api_common.OptimismChainID, "Provider5", security.NewSensitiveString("https://proxyprovider2.example.com"), true),
-			*params.NewEthRpcProxyProvider(api_common.OptimismChainID, "Provider6", security.NewSensitiveString("https://ethrpcproxy2.example.com"), true),
+		*testutil.CreateNetwork(walletcommon.OptimismMainnet, "Optimism", []params.RpcProvider{
+			*params.NewDirectProvider(walletcommon.OptimismMainnet, "Provider4", security.NewSensitiveString("https://directprovider.example.com"), true),
+			*params.NewProxyProvider(walletcommon.OptimismMainnet, "Provider5", security.NewSensitiveString("https://proxyprovider2.example.com"), true),
+			*params.NewEthRpcProxyProvider(walletcommon.OptimismMainnet, "Provider6", security.NewSensitiveString("https://ethrpcproxy2.example.com"), true),
 		}),
 	}
 	networks[0].RpcProviders[1].Enabled = false
@@ -131,14 +131,14 @@ func TestOverrideBasicAuth(t *testing.T) {
 func TestOverrideDirectProvidersAuth(t *testing.T) {
 	// Create a sample list of networks with various provider types
 	networks := []params.Network{
-		*testutil.CreateNetwork(api_common.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
-			*params.NewUserProvider(api_common.MainnetChainID, "Provider1", security.NewSensitiveString("https://user.example.com/"), true),
-			*params.NewDirectProvider(api_common.MainnetChainID, "Provider2", security.NewSensitiveString("https://mainnet.infura.io/v3/"), true),
-			*params.NewDirectProvider(api_common.MainnetChainID, "Provider3", security.NewSensitiveString("https://eth-archival.rpc.grove.city/v1/"), true),
+		*testutil.CreateNetwork(walletcommon.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
+			*params.NewUserProvider(walletcommon.EthereumMainnet, "Provider1", security.NewSensitiveString("https://user.example.com/"), true),
+			*params.NewDirectProvider(walletcommon.EthereumMainnet, "Provider2", security.NewSensitiveString("https://mainnet.infura.io/v3/"), true),
+			*params.NewDirectProvider(walletcommon.EthereumMainnet, "Provider3", security.NewSensitiveString("https://eth-archival.rpc.grove.city/v1/"), true),
 		}),
-		*testutil.CreateNetwork(api_common.OptimismChainID, "Optimism", []params.RpcProvider{
-			*params.NewDirectProvider(api_common.OptimismChainID, "Provider4", security.NewSensitiveString("https://optimism.infura.io/v3/"), true),
-			*params.NewDirectProvider(api_common.OptimismChainID, "Provider5", security.NewSensitiveString("https://op.grove.city/v1/"), true),
+		*testutil.CreateNetwork(walletcommon.OptimismMainnet, "Optimism", []params.RpcProvider{
+			*params.NewDirectProvider(walletcommon.OptimismMainnet, "Provider4", security.NewSensitiveString("https://optimism.infura.io/v3/"), true),
+			*params.NewDirectProvider(walletcommon.OptimismMainnet, "Provider5", security.NewSensitiveString("https://op.grove.city/v1/"), true),
 		}),
 	}
 
@@ -175,9 +175,9 @@ func TestOverrideDirectProvidersAuth(t *testing.T) {
 }
 
 func TestDeepCopyNetwork(t *testing.T) {
-	originalNetwork := testutil.CreateNetwork(api_common.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
-		*params.NewUserProvider(api_common.MainnetChainID, "Provider1", security.NewSensitiveString("https://userprovider.example.com"), true),
-		*params.NewDirectProvider(api_common.MainnetChainID, "Provider2", security.NewSensitiveString("https://mainnet.infura.io/v3/"), true),
+	originalNetwork := testutil.CreateNetwork(walletcommon.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
+		*params.NewUserProvider(walletcommon.EthereumMainnet, "Provider1", security.NewSensitiveString("https://userprovider.example.com"), true),
+		*params.NewDirectProvider(walletcommon.EthereumMainnet, "Provider2", security.NewSensitiveString("https://mainnet.infura.io/v3/"), true),
 	})
 
 	originalNetwork.TokenOverrides = []params.TokenOverride{

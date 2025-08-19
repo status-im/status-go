@@ -10,11 +10,6 @@ const (
 )
 
 var (
-	AnonMetricsShouldSend = SettingField{
-		reactFieldName: "anon-metrics/should-send?",
-		dBColumnName:   "anon_metrics_should_send",
-		valueHandler:   BoolHandler,
-	}
 	Appearance = SettingField{
 		reactFieldName: "appearance",
 		dBColumnName:   "appearance",
@@ -33,6 +28,10 @@ var (
 		reactFieldName: "backup-fetched?",
 		dBColumnName:   "backup_fetched",
 		valueHandler:   BoolHandler,
+	}
+	BackupPath = SettingField{
+		reactFieldName: "backup-path",
+		dBColumnName:   "backup_path",
 	}
 	ChaosMode = SettingField{
 		reactFieldName: "chaos-mode?",
@@ -408,10 +407,6 @@ var (
 		dBColumnName:   "syncing_on_mobile_network",
 		valueHandler:   BoolHandler,
 	}
-	TelemetryServerURL = SettingField{
-		reactFieldName: "telemetry-server-url",
-		dBColumnName:   "telemetry_server_url",
-	}
 	TestNetworksEnabled = SettingField{
 		reactFieldName: "test-networks-enabled?",
 		dBColumnName:   "test_networks_enabled",
@@ -543,11 +538,11 @@ var (
 		valueHandler:   TimeHandler,
 	}
 	SettingFieldRegister = []SettingField{
-		AnonMetricsShouldSend,
 		Appearance,
 		AutoMessageEnabled,
 		BackupEnabled,
 		BackupFetched,
+		BackupPath,
 		Bio,
 		ChaosMode,
 		CollectibleGroupByCollection,
@@ -613,7 +608,6 @@ var (
 		StickersPacksPending,
 		StickersRecentStickers,
 		SyncingOnMobileNetwork,
-		TelemetryServerURL,
 		TestNetworksEnabled,
 		TokenGroupByCommunity,
 		URLUnfurlingMode,

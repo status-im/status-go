@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
@@ -234,7 +234,10 @@ func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) (m
 
 	filters := messagingtypes.ChatFilters{}
 	for _, cid := range chatIDs {
-		filters = append(filters, m.messaging.ChatFilterByChatID(cid))
+		filter := m.messaging.ChatFilterByChatID(cid)
+		if filter != nil {
+			filters = append(filters, filter)
+		}
 	}
 	return filters, nil
 }
@@ -247,7 +250,7 @@ func (m *ArchiveManager) GetCommunityChatsTopics(communityID types.HexBytes) ([]
 
 	topics := []messagingtypes.ContentTopic{}
 	for _, filter := range filters {
-		topics = append(topics, filter.ContentTopic)
+		topics = append(topics, filter.ContentTopic())
 	}
 
 	return topics, nil
@@ -278,7 +281,7 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 	topics := []messagingtypes.ContentTopic{}
 
 	for _, filter := range filters {
-		topics = append(topics, filter.ContentTopic)
+		topics = append(topics, filter.ContentTopic())
 	}
 
 	lastArchiveEndDateTimestamp, err := m.getLastMessageArchiveEndDate(communityID)
@@ -355,10 +358,15 @@ func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, 
 				m.logger.Error("failed to get community chat topics ", zap.Error(err))
 				continue
 			}
+			filter := m.messaging.ChatFilterByChatID(community.UniversalChatID())
+			if filter == nil {
+				m.logger.Error("failed to get chat filter", zap.String("community's UniversalChatID", community.UniversalChatID()))
+				continue
+			}
 			// adding the content-topic used for member updates.
 			// since member updates would not be too frequent i.e only addition/deletion would add a new message,
 			// this shouldn't cause too much increase in size of archive generated.
-			topics = append(topics, m.messaging.ChatFilterByChatID(community.UniversalChatID()).ContentTopic)
+			topics = append(topics, filter.ContentTopic())
 
 			ts := time.Now().Unix()
 			to := time.Unix(ts, 0)

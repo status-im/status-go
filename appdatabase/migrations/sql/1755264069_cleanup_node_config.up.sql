@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS shhext_default_push_notification_servers;

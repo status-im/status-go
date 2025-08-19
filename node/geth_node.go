@@ -15,8 +15,6 @@ import (
 // Errors related to node and services creation.
 var (
 	ErrNodeMakeFailureFormat                      = "error creating p2p node: %s"
-	ErrWakuServiceRegistrationFailure             = errors.New("failed to register the Waku service")
-	ErrWakuV2ServiceRegistrationFailure           = errors.New("failed to register the WakuV2 service")
 	ErrLightEthRegistrationFailure                = errors.New("failed to register the LES service")
 	ErrLightEthRegistrationFailureUpstreamEnabled = errors.New("failed to register the LES service, upstream is also configured")
 	ErrPersonalServiceRegistrationFailure         = errors.New("failed to register the personal api service")
@@ -34,10 +32,6 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 			return nil, fmt.Errorf("make node: make data directory: %v", err)
 		}
 
-		// make sure keys directory exists
-		if err := os.MkdirAll(filepath.Clean(config.KeyStoreDir), os.ModePerm); err != nil {
-			return nil, fmt.Errorf("make node: make keys directory: %v", err)
-		}
 	}
 
 	stackConfig, err := newGethNodeConfig(config)
@@ -57,24 +51,12 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 	nc := &node.Config{
 		DataDir:           config.DataDir,
-		KeyStoreDir:       config.KeyStoreDir,
 		UseLightweightKDF: true,
 		NoUSB:             true,
-		Name:              config.Name,
-		Version:           config.Version,
 		P2P: p2p.Config{
 			NoDiscovery: true,
 			NoDial:      true,
 		},
-	}
-
-	if config.IPCEnabled {
-		// use well-known defaults
-		if config.IPCFile == "" {
-			config.IPCFile = "geth.ipc"
-		}
-
-		nc.IPCPath = config.IPCFile
 	}
 
 	if config.HTTPEnabled {

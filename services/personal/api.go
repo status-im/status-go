@@ -3,8 +3,8 @@ package personal
 import (
 	"errors"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/crypto/types"
 )
 
 var (
@@ -33,6 +33,6 @@ func (api *PublicAPI) CanRecover(rpcParams RecoverParams, revealedAddress types.
 }
 
 // Sign is an implementation of `personal_sign` or `web3.personal.sign` API
-func (api *PublicAPI) Sign(rpcParams SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
+func (api *PublicAPI) Sign(rpcParams SignParams, verifiedAccount *generator.Account) (result types.HexBytes, err error) {
 	return api.s.Sign(rpcParams, verifiedAccount)
 }

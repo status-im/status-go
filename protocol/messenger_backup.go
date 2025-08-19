@@ -8,10 +8,10 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -25,7 +25,7 @@ var backupTickerInterval = 120 * time.Second
 
 // backupIntervalSeconds is the amount of seconds we should allow between
 // backups
-var backupIntervalSeconds uint64 = 28800
+var backupIntervalSeconds uint64 = 57600
 
 type CommunitySet struct {
 	Joined  []*communities.Community
@@ -96,17 +96,15 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 	chatsToBackup := m.backupChats(ctx, clock)
-	if err != nil {
-		return 0, err
-	}
+
 	profileToBackup, err := m.backupProfile(ctx, clock)
 	if err != nil {
 		return 0, err
 	}
-	_, settings, errors := m.prepareSyncSettingsMessages(clock, true)
-	if len(errors) != 0 {
+	_, settings, err := m.prepareSyncSettingsMessages(clock, true)
+	if err != nil {
 		// return just the first error, the others have been logged
-		return 0, errors[0]
+		return 0, err
 	}
 
 	keypairsToBackup, err := m.backupKeypairs()
@@ -136,7 +134,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 			},
 			ProfileDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
-				TotalNumber: uint32(len(profileToBackup)),
+				TotalNumber: uint32(1), // Profile is always one
 			},
 			SettingsDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
@@ -176,14 +174,12 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 	}
 
 	// Update profile messages encode and dispatch
-	for i, d := range profileToBackup {
-		pb := backupDetailsOnly()
-		pb.ProfileDetails.DataNumber = uint32(i + 1)
-		pb.Profile = d.Profile
-		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
-		if err != nil {
-			return 0, err
-		}
+	pb := backupDetailsOnly()
+	pb.ProfileDetails.DataNumber = uint32(1)
+	pb.Profile = profileToBackup.Profile
+	err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
+	if err != nil {
+		return 0, err
 	}
 
 	// Update chats encode and dispatch
@@ -208,6 +204,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		}
 	}
 
+	// TODO get rid of keypairs
 	// Update keypairs messages encode and dispatch
 	for i, d := range keypairsToBackup {
 		pb := backupDetailsOnly()
@@ -254,7 +251,7 @@ func (m *Messenger) encodeAndDispatchBackupMessage(ctx context.Context, message 
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
+	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
 		LocalChatID:         chatID,
 		Payload:             encodedMessage,
 		SkipEncryptionLayer: true,
@@ -393,6 +390,7 @@ func (m *Messenger) backupChats(ctx context.Context, clock uint64) []*protobuf.B
 					From:       membershipUpdate.From,
 					RawPayload: membershipUpdate.RawPayload,
 					Color:      membershipUpdate.Color,
+					Image:      membershipUpdate.Image,
 				}
 			}
 		}
@@ -447,7 +445,7 @@ func (m *Messenger) buildSyncContactMessage(contact *Contact) *protobuf.SyncInst
 	}
 }
 
-func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobuf.Backup, error) {
+func (m *Messenger) backupProfile(ctx context.Context, clock uint64) (*protobuf.Backup, error) {
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
 		return nil, err
@@ -515,9 +513,7 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 		},
 	}
 
-	backupMessages := []*protobuf.Backup{backupMessage}
-
-	return backupMessages, nil
+	return backupMessage, nil
 }
 
 func (m *Messenger) backupKeypairs() ([]*protobuf.Backup, error) {

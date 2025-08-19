@@ -89,13 +89,8 @@ type WakuKeyManager interface {
 	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)
 	// AddKeyPair imports a asymmetric private key and returns a deterministic identifier.
 	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
-	// DeleteKeyPair deletes the key with the specified ID if it exists.
-	DeleteKeyPair(keyID string) bool
 	// DeleteKeyPairs deletes all the keys
 	DeleteKeyPairs() error
-	AddSymKeyDirect(key []byte) (string, error)
-	AddSymKeyFromPassword(password string) (string, error)
-	DeleteSymKey(id string) bool
 	GetSymKey(id string) ([]byte, error)
 }
 

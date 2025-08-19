@@ -10,11 +10,12 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/deprecation"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -300,12 +301,12 @@ func (c *Chat) IsActivePersonalChat() bool {
 // Note that specific message might have different resent types. At times
 // some messages dictate their ResendType based on their own properties and
 // context, rather than the chat type it is associated with.
-func (c *Chat) DefaultResendType() common.ResendType {
+func (c *Chat) DefaultResendType() messagingtypes.ResendType {
 	if c.OneToOne() || c.PrivateGroupChat() {
-		return common.ResendTypeDataSync
+		return messagingtypes.ResendTypeDataSync
 	}
 
-	return common.ResendTypeRawMessage
+	return messagingtypes.ResendTypeRawMessage
 }
 
 func (c *Chat) shouldBeSynced() bool {
@@ -519,7 +520,7 @@ func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource comm
 	}
 }
 
-func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource) *Chat {
+func createCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource, populateMembers bool) *Chat {
 	color := orgChat.Identity.Color
 	if color == "" {
 		color = chatColors[rand.Intn(len(chatColors))] // nolint: gosec
@@ -529,12 +530,15 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 
 	// Populate community _channel_ members to _chat_ members
 	chatMembers := []ChatMember{}
-	for pubKey := range orgChat.Members {
-		chatMember := ChatMember{
-			ID:    pubKey,
-			Admin: false,
+	if populateMembers {
+		// Populate chat members from orgChat members
+		for pubKey := range orgChat.Members {
+			chatMember := ChatMember{
+				ID:    pubKey,
+				Admin: false,
+			}
+			chatMembers = append(chatMembers, chatMember)
 		}
-		chatMembers = append(chatMembers, chatMember)
 	}
 
 	return &Chat{
@@ -555,6 +559,14 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 		FirstMessageTimestamp:    orgChat.Identity.FirstMessageTimestamp,
 		ViewersCanPostReactions:  orgChat.ViewersCanPostReactions,
 	}
+}
+
+func CreateCommunityChat(org *communities.Community, orgChat *protobuf.CommunityChat, chatID string, timesource common.TimeSource) *Chat {
+	orgID := org.IDString()
+	populateMembers := org.ChannelHasPermissions(chatID)
+	chat := createCommunityChat(orgID, chatID, orgChat, timesource, populateMembers)
+
+	return chat
 }
 
 func (c *Chat) CommunityChannelID() string {
@@ -594,10 +606,9 @@ func (c *Chat) DeepLink() string {
 
 func CreateCommunityChats(org *communities.Community, timesource common.TimeSource) []*Chat {
 	var chats []*Chat
-	orgID := org.IDString()
-
 	for chatID, chat := range org.Chats() {
-		chats = append(chats, CreateCommunityChat(orgID, chatID, chat, timesource))
+		chat := CreateCommunityChat(org, chat, chatID, timesource)
+		chats = append(chats, chat)
 	}
 	return chats
 }
