@@ -102,6 +102,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, community 
 	communityShard := community.Shard
 	if communityShard == nil {
 		id := messaging.CommunityShardInfoTopic(community.CommunityID)
+		// TODO! subscribe to multiple shards here (Default, 128 and 256)
 		fetchedShard, err := m.subscribeToRequest(ctx, storeNodeShardRequest, id, messagingtypes.DefaultNonProtectedShard(), cfg)
 		if err != nil {
 			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a shard info request: %w", err)
