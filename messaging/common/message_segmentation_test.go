@@ -12,10 +12,10 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging/types"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessageSegmentationSuite(t *testing.T) {

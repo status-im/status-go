@@ -15,7 +15,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/wakuv2"
+	wakuv2 "github.com/status-im/status-go/messaging/waku"
 )
 
 var (

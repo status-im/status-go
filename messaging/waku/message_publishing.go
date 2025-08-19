@@ -12,7 +12,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/status-im/status-go/messaging/waku/common"
 )
 
 // Send injects a message into the waku send queue, to be distributed in the

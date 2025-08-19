@@ -28,12 +28,12 @@ import (
 	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
+	wakuv2 "github.com/status-im/status-go/messaging/waku"
+	wakuv2common "github.com/status-im/status-go/messaging/waku/common"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/messaging/wakumetrics"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
-	wakutypes "github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2"
-	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
 
 var (

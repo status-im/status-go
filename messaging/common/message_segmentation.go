@@ -14,8 +14,8 @@ import (
 	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging/types"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/protocol/protobuf"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 var ErrMessageSegmentsIncomplete = errors.New("message segments incomplete")

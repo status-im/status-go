@@ -9,7 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
 type StoreNode struct {

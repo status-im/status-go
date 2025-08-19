@@ -15,7 +15,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
 var (

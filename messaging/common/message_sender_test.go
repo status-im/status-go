@@ -7,9 +7,9 @@ import (
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	wakuv2 "github.com/status-im/status-go/messaging/waku"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/t/helpers"
-	wakutypes "github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 

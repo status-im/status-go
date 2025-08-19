@@ -8,8 +8,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2"
+	wakuv2 "github.com/status-im/status-go/messaging/waku"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
 type TestMessagingEnvironment struct {

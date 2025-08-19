@@ -6,11 +6,11 @@ import (
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 
-	"github.com/status-im/status-go/wakuv2"
+	wakuv2 "github.com/status-im/status-go/messaging/waku"
 
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 
-	v2common "github.com/status-im/status-go/wakuv2/common"
+	v2common "github.com/status-im/status-go/messaging/waku/common"
 )
 
 type ReceivedMessages struct {
