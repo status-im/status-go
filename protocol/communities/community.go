@@ -1705,7 +1705,10 @@ func upgradeTokenPermissions(description *protobuf.CommunityDescription) {
 
 	floatToWeiIntFunc := func(floatStr string, decimals uint64) string {
 		bigfloat := new(big.Float)
-		bigfloat.SetString(floatStr)
+		_, ok := bigfloat.SetString(floatStr)
+		if !ok {
+			return ""
+		}
 
 		multiplier := big.NewFloat(math.Pow(10, float64(decimals)))
 		bigfloat.Mul(bigfloat, multiplier)
