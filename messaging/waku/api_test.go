@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/status-im/status-go/messaging/waku/common"
+	"github.com/status-im/status-go/messaging/waku/types"
 )
 
 func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {

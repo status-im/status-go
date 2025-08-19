@@ -31,8 +31,8 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/status-im/status-go/connection"
+	"github.com/status-im/status-go/messaging/waku/common"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv2/common"
 )
 
 var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"

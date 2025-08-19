@@ -10,8 +10,8 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
+	wakuv2 "github.com/status-im/status-go/messaging/waku"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv2"
 
 	_ "github.com/mutecomm/go-sqlcipher/v4"
 	"github.com/stretchr/testify/suite"

@@ -10,11 +10,10 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/types"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
-
-	"github.com/status-im/status-go/wakuv2"
+	wakuv2 "github.com/status-im/status-go/messaging/waku"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
 const (
@@ -425,7 +424,7 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 }
 
 // LoadNegotiated loads a negotiated secret as a filter.
-func (f *FiltersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter, error) {
+func (f *FiltersManager) LoadNegotiated(secret ethtypes.NegotiatedSecret) (*Filter, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 

@@ -27,12 +27,11 @@ import (
 	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // Whisper message properties.

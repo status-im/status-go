@@ -10,7 +10,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 
-	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/status-im/status-go/messaging/waku/common"
 )
 
 func HexToPbHash(hexHash bindings.MessageHash) (pb.MessageHash, error) {

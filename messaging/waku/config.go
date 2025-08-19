@@ -27,7 +27,7 @@ import (
 
 	bindingscommon "github.com/waku-org/waku-go-bindings/waku/common"
 
-	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/status-im/status-go/messaging/waku/common"
 )
 
 var (

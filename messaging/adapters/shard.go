@@ -2,7 +2,7 @@ package adapters
 
 import (
 	"github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/wakuv2"
+	wakuv2 "github.com/status-im/status-go/messaging/waku"
 )
 
 func FromWakuShard(s *wakuv2.Shard) *types.Shard {
