@@ -21,7 +21,10 @@ class TestAddKeypairViaSeedPhrase:
         add_keypair_response = self.account.accounts_service.add_keypair_via_seed_phrase(
             user_1.passphrase, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS
         )
-        new_keypair = add_keypair_response.get("result").get("accounts")[0]
+        add_keypair_result = add_keypair_response.get("result")
+        accounts = add_keypair_result.get("accounts")
+        assert len(accounts) == 1
+        new_keypair = accounts[0]
         assert new_keypair.get("address").lower() == user_1.address.lower()
         assert new_keypair.get("chat") is False
         assert new_keypair.get("clock") == 0
@@ -35,12 +38,16 @@ class TestAddKeypairViaSeedPhrase:
         assert new_keypair.get("position") == 1
         assert new_keypair.get("removed") is False
         assert new_keypair.get("type") == ""
+        assert add_keypair_result.get("type") == "seed"
         assert new_keypair.get("wallet") is False
 
         # Fetch keypairs and ensure the imported one is present
-        keypairs_response = self.account.accounts_service.get_account_keypairs()
-        imported_keypair = [keypair for keypair in keypairs_response.get("result", []) if keypair.get("name") == KEYPAIR_NAME][0]
-        assert add_keypair_response.get("result").get("key-uid") == imported_keypair.get("key-uid")
+        get_keypairs_response = self.account.accounts_service.get_account_keypairs()
+        imported_keypairs = [keypair for keypair in get_keypairs_response.get("result", []) if keypair.get("name") == KEYPAIR_NAME]
+        assert len(imported_keypairs) == 1
+        assert add_keypair_result.get("key-uid") == imported_keypairs[0].get("key-uid")
+        assert add_keypair_result.get("type") == imported_keypairs[0].get("type")
+        assert add_keypair_result.get("derived-from") == imported_keypairs[0].get("derived-from")
 
     def test_add_a_second_keypair_via_sp_with_same_details(self):
         self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
@@ -76,6 +83,6 @@ class TestAddKeypairViaSeedPhrase:
             == f'[validation] unsupported profile or seed imported key pair wallet account -  path: {details["path"]} expected path: m/44\''
         )
 
-    def test_add_keypair_via_sp_with_wrong_password(self):
-        resp = self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, "wrongpass", KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
-        assert "error" in resp
+    def test_add_keypair_via_sp_with_empty_password(self):
+        resp = self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, "", KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
+        assert "error" not in resp
