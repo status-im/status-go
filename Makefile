@@ -162,7 +162,7 @@ endif
 LIBSDS := $(CURDIR)/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/libsds.$(LIBSDS_EXT)
 $(LIBSDS):
 	@echo "Building libsds"
-	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/sds-go-bindings/sds SHELL=/bin/bash
+	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/sds-go-bindings/sds SHELL=/bin/bash V=2
 
 statusgo: ##@build Build status-go as status-backend server
 statusgo: $(LIBSDS)
