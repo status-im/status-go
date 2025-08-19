@@ -92,21 +92,36 @@ func (bf *BonderFee) UnmarshalJSON(data []byte) error {
 	}
 
 	bf.AmountIn = &bigint.BigInt{Int: new(big.Int)}
-	bf.AmountIn.SetString(aux.AmountIn, 10)
+	_, ok := bf.AmountIn.SetString(aux.AmountIn, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
 
 	bf.Slippage = aux.Slippage
 
 	bf.AmountOutMin = &bigint.BigInt{Int: new(big.Int)}
-	bf.AmountOutMin.SetString(aux.AmountOutMin, 10)
+	_, ok = bf.AmountOutMin.SetString(aux.AmountOutMin, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
 
 	bf.DestinationAmountOutMin = &bigint.BigInt{Int: new(big.Int)}
-	bf.DestinationAmountOutMin.SetString(aux.DestinationAmountOutMin, 10)
+	_, ok = bf.DestinationAmountOutMin.SetString(aux.DestinationAmountOutMin, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
 
 	bf.BonderFee = &bigint.BigInt{Int: new(big.Int)}
-	bf.BonderFee.SetString(aux.BonderFee, 10)
+	_, ok = bf.BonderFee.SetString(aux.BonderFee, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
 
 	bf.EstimatedRecieved = &bigint.BigInt{Int: new(big.Int)}
-	bf.EstimatedRecieved.SetString(aux.EstimatedRecieved, 10)
+	_, ok = bf.EstimatedRecieved.SetString(aux.EstimatedRecieved, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
 
 	bf.Deadline = aux.Deadline
 

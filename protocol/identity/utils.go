@@ -47,7 +47,10 @@ func Slices(compressedPubkey []byte) (res [4][]byte, err error) {
 
 	getSlice := func(low, high int, and string, rsh uint) []byte {
 		sliceValue := new(big.Int).SetBytes(compressedPubkey[low:high])
-		andValue, _ := new(big.Int).SetString(and, 0)
+		andValue, ok := new(big.Int).SetString(and, 0)
+		if !ok {
+			return nil
+		}
 		andRes := new(big.Int).And(sliceValue, andValue)
 		return new(big.Int).Rsh(andRes, rsh).Bytes()
 	}

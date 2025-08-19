@@ -34,6 +34,7 @@ var (
 	ErrCommunityTokenIdsListEmpty                    = &errors.ErrorResponse{Code: errors.ErrorCode("WRRC-015"), Details: "token list is empty"}
 	ErrProvidedIndexForSettingInternalDataOutOfRange = &errors.ErrorResponse{Code: errors.ErrorCode("WRRC-016"), Details: "provided index for setting internal data is out of range"}
 	ErrSetSignerPubKeyWithMultipleTransferDetails    = &errors.ErrorResponse{Code: errors.ErrorCode("WRRC-017"), Details: "signer pub key can be set only with one transfer detail"}
+	ErrConvertingAmountToBigInt                      = &errors.ErrorResponse{Code: errors.ErrorCode("WRRC-018"), Details: "converting amount to big.Int"}
 )
 
 type CommunityRouteInputParams struct {
@@ -141,7 +142,10 @@ func (d *DeploymentParameters) Validate(isAsset bool) error {
 	}
 	var maxForType = big.NewInt(maxSupply)
 	if isAsset {
-		assetMultiplier, _ := big.NewInt(0).SetString("1000000000000000000", 10)
+		assetMultiplier, ok := big.NewInt(0).SetString("1000000000000000000", 10)
+		if !ok {
+			return ErrConvertingAmountToBigInt
+		}
 		maxForType = maxForType.Mul(maxForType, assetMultiplier)
 	}
 	if !d.InfiniteSupply && (d.Supply.Cmp(big.NewInt(0)) < 0 || d.Supply.Cmp(maxForType) > 0) {
