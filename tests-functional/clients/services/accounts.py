@@ -90,3 +90,8 @@ class AccountService(Service):
         params = [key_uid]
         response = self.rpc_request("getKeypairByKeyUID", params)
         return response.json()
+
+    def update_account(self, account):
+        params = [account]
+        response = self.rpc_request("updateAccount", params)
+        return response.json()

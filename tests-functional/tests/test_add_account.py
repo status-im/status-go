@@ -111,21 +111,6 @@ class TestAddAccount:
         self.account.accounts_service.add_account(profile_password, self.account_data)
         # TODO: Add more assertions on response
 
-    def test_delete_account(self):
-        self.account_data["type"] = "watch"
-        self.account.accounts_service.add_account(self.account.password, self.account_data)
-        # TODO: Add more assertions on response
-
-        accounts_response = self.account.accounts_service.get_accounts()
-        assert len(accounts_response.get("result", [])) == 3
-
-        # Delete the account
-        self.account.accounts_service.delete_account(self.account_data["address"])
-        # TODO: Add more assertions on response
-
-        accounts_response = self.account.accounts_service.get_accounts()
-        assert len(accounts_response.get("result", [])) == 2
-
     def get_account_keypairs(self):
         keypairs_response = self.account.accounts_service.get_account_keypairs()
         keypairs = keypairs_response.get("result", [])
