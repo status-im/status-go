@@ -39,7 +39,6 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 // 7 days interval
@@ -2448,8 +2447,8 @@ func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.Chat
 		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.GlobalCommunityContentPubsubTopic()},
 	}
 	if communityPubsubTopic == "" {
-		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: cID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()})
-		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: memberUpdateChannelID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()})
+		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: cID, PubsubTopic: messagingtypes.GlobalCommunityControlPubsubTopic()})
+		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: memberUpdateChannelID, PubsubTopic: messagingtypes.GlobalCommunityContentPubsubTopic()})
 	}
 	return chats
 }
