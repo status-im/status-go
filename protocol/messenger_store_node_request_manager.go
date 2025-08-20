@@ -101,6 +101,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, community 
 
 	if !cfg.WaitForResponse {
 		go func() {
+			defer gocommon.LogOnPanic()
 			_, _, err := fetch()
 			if err != nil {
 				m.logger.Error("failed to fetch community", zap.Error(err))
