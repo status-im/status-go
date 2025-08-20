@@ -82,4 +82,5 @@ type DatabaseSettingsManager interface {
 	NewsFeedEnabled() (result bool, err error)
 	NewsNotificationsEnabled() (result bool, err error)
 	NewsRSSEnabled() (result bool, err error)
+	ThirdpartyServicesEnabled() (result bool, err error)
 }

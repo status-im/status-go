@@ -88,6 +88,8 @@ type CreateAccount struct {
 	// for recovering account
 	KeycardPairingKey      string  `json:"keycardPairingKey"`
 	KeycardPairingDataFile *string `json:"keycardPairingDataFile"`
+
+	ThirdpartyServicesEnabled bool `json:"thirdpartyServicesEnabled"`
 }
 type WalletConfig struct {
 	TokensListsAutoRefreshInterval      int `json:"tokensListsAutoRefreshInterval"`      // in seconds

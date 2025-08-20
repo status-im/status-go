@@ -51,6 +51,7 @@ var (
 		ShowCommunityAssetWhenSendingTokens: true,
 		NewsFeedEnabled:                     true,
 		NewsRSSEnabled:                      true,
+		ThirdpartyServicesEnabled:           true,
 	}
 )
 
@@ -317,4 +318,32 @@ func TestDatabase_BackupPath(t *testing.T) {
 	settings, err = db.GetSettings()
 	require.NoError(t, err)
 	require.Equal(t, testPath, settings.BackupPath)
+}
+
+func TestDatabase_ThirdpartyServicesEnabled(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	// By default, third-party services should be enabled
+	enabled, err := db.ThirdpartyServicesEnabled()
+	require.NoError(t, err)
+	require.True(t, enabled, "expected ThirdpartyServicesEnabled to be true by default")
+
+	// Disable third-party services
+	err = db.SaveSetting(ThirdpartyServicesEnabled.GetReactName(), false)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.False(t, settings.ThirdpartyServicesEnabled, "expected ThirdpartyServicesEnabled to be false after disabling")
+
+	// Re-enable third-party services
+	err = db.SaveSetting(ThirdpartyServicesEnabled.GetReactName(), true)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.True(t, settings.ThirdpartyServicesEnabled, "expected ThirdpartyServicesEnabled to be true after enabling")
 }

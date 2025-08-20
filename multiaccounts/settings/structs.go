@@ -224,6 +224,7 @@ type Settings struct {
 	PeerSyncingEnabled                  bool                          `json:"peer-syncing-enabled?,omitempty"`
 	AutoRefreshTokensEnabled            bool                          `json:"auto-refresh-tokens-enabled,omitempty"`
 	LastTokensUpdate                    time.Time                     `json:"last-tokens-update,omitempty"`
+	ThirdpartyServicesEnabled           bool                          `json:"thirdparty_services_enabled,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {

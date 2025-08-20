@@ -193,3 +193,7 @@ func (api *SettingsAPI) MnemonicWasShown() error {
 func (api *SettingsAPI) LastTokensUpdate() (time.Time, error) {
 	return api.db.LastTokensUpdate()
 }
+
+func (api *SettingsAPI) ThirdpartyServicesEnabled() (bool, error) {
+	return api.db.ThirdpartyServicesEnabled()
+}
