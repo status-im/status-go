@@ -416,7 +416,7 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 		b.logger.Error("failed to create new *Database instance", zap.Error(err))
 		return
 	}
-	b.accountsManager.SetPersistence(accounts.NewAccountsManagerPersistenceAdapter(accountsDB))
+	b.accountsManager.SetPersistence(accountsDB)
 
 	return nil
 }
@@ -1218,7 +1218,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 
 	keypair, err := accountDB.GetKeypairByKeyUID(account.KeyUID)
 	if err != nil {
-		if err == accounts.ErrDbKeypairNotFound {
+		if err == accsmanagementtypes.ErrDbKeypairNotFound {
 			return errors.New("cannot convert an unknown keypair")
 		}
 		return err
@@ -1254,7 +1254,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	kc := accounts.Keycard{
+	kc := accsmanagementtypes.Keycard{
 		KeycardUID:    keycardUID,
 		KeycardName:   displayName,
 		KeycardLocked: false,
@@ -1472,31 +1472,31 @@ func (b *GethStatusBackend) prepareWalletAccount(request *requests.CreateAccount
 }
 
 func (b *GethStatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID string, masterAddress string,
-	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (keypair *accounts.Keypair, err error) {
+	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (keypair *accsmanagementtypes.Keypair, err error) {
 	// set up keypair
-	keypair = &accounts.Keypair{
+	keypair = &accsmanagementtypes.Keypair{
 		Name:                    request.DisplayName,
 		KeyUID:                  keyUID,
-		Type:                    accounts.KeypairTypeProfile,
+		Type:                    accsmanagementtypes.KeypairTypeProfile,
 		DerivedFrom:             masterAddress,
 		LastUsedDerivationIndex: 0,
 	}
 
 	// add chat account
 	chatDerivedAccount := derivedAddresses[accscommon.PathEIP1581Chat]
-	keypair.Accounts = append(keypair.Accounts, &accounts.Account{
+	keypair.Accounts = append(keypair.Accounts, &accsmanagementtypes.Account{
 		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
 		KeyUID:    keypair.KeyUID,
 		Address:   types.HexToAddress(chatDerivedAccount.Address),
 		Chat:      true,
 		Path:      accscommon.PathEIP1581Chat,
 		Position:  -1, // When creating a new account, the chat account should have position -1, cause it doesn't participate
-		Operable:  accounts.AccountFullyOperable,
+		Operable:  accsmanagementtypes.AccountFullyOperable,
 	})
 
 	// add wallet account
 	walletDerivedAccount := derivedAddresses[accscommon.PathDefaultWalletAccount]
-	keypair.Accounts = append(keypair.Accounts, &accounts.Account{
+	keypair.Accounts = append(keypair.Accounts, &accsmanagementtypes.Account{
 		PublicKey:          types.Hex2Bytes(walletDerivedAccount.PublicKey),
 		KeyUID:             keypair.KeyUID,
 		Address:            types.HexToAddress(walletDerivedAccount.Address),
@@ -1506,7 +1506,7 @@ func (b *GethStatusBackend) prepareKeypair(request *requests.CreateAccount, keyU
 		Name:               walletAccountDefaultName,
 		AddressWasNotShown: !restoreAccount,
 		Position:           0, // When creating a new account, the wallet account should have position 0, cause it's the default wallet account
-		Operable:           accounts.AccountFullyOperable,
+		Operable:           accsmanagementtypes.AccountFullyOperable,
 	})
 
 	return
@@ -1693,7 +1693,7 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 			accscommon.PathEIP1581Chat:          {},
 			accscommon.PathDefaultWalletAccount: {},
 		}
-		keypairToStoreDirectly *accounts.Keypair
+		keypairToStoreDirectly *accsmanagementtypes.Keypair
 	)
 
 	if keycardData != nil { // means that the keycard is already set, details already on it
@@ -1824,7 +1824,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	password string,
 	settings settings.Settings,
 	nodecfg *params.NodeConfig,
-	keypair *accounts.Keypair,
+	keypair *accsmanagementtypes.Keypair,
 	chatKey *ecdsa.PrivateKey,
 ) error {
 	err := b.ensureDBsOpened(*multiAccount, password)
@@ -1851,7 +1851,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	return nil
 }
 
-func (b *GethStatusBackend) saveKeypairAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, keypair *accounts.Keypair) error {
+func (b *GethStatusBackend) saveKeypairAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, keypair *accsmanagementtypes.Keypair) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	accdb, err := accounts.NewDB(b.appDB)

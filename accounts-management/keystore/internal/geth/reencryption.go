@@ -41,7 +41,7 @@ func reEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []
 	return EncryptKey(gethKey, newPass, n, p)
 }
 
-func reEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
+func ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
 	rencryptFileAtPath := func(tempKeyDirPath, path string, fileInfo os.FileInfo) error {
 		if fileInfo.IsDir() {
 			return nil

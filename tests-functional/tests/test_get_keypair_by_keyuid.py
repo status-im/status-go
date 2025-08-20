@@ -31,7 +31,7 @@ class TestGetKeypairByKeyUID:
 
     def test_get_keypair_by_nonexistent_keyuid(self):
         resp = self.account.accounts_service.get_keypair_by_key_uid("0x6d462df35b97fabb8f792eac01240556e26fd2600753e5bbffa4713a9c95abc7")
-        assert resp.get("error").get("message") == "accounts: keypair is not found"
+        assert "keypair is not found" in resp.get("error").get("message")
 
     def test_get_newly_imported_keypair(self):
         keypair_name = "SeedImportedKeypair"

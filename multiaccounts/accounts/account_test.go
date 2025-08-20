@@ -4,36 +4,37 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/multiaccounts/common"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsOwnAccount(t *testing.T) {
-	account := Account{Wallet: true, Type: AccountTypeGenerated}
+	account := accsmanagementtypes.Account{Wallet: true, Type: accsmanagementtypes.AccountTypeGenerated}
 	require.True(t, account.IsWalletNonWatchOnlyAccount())
 
-	account = Account{
-		Type: AccountTypeGenerated,
+	account = accsmanagementtypes.Account{
+		Type: accsmanagementtypes.AccountTypeGenerated,
 	}
 	require.True(t, account.IsWalletNonWatchOnlyAccount())
 
-	account = Account{
-		Type: AccountTypeKey,
+	account = accsmanagementtypes.Account{
+		Type: accsmanagementtypes.AccountTypeKey,
 	}
 	require.True(t, account.IsWalletNonWatchOnlyAccount())
 
-	account = Account{
-		Type: AccountTypeSeed,
+	account = accsmanagementtypes.Account{
+		Type: accsmanagementtypes.AccountTypeSeed,
 	}
 	require.True(t, account.IsWalletNonWatchOnlyAccount())
 
-	account = Account{
-		Type: AccountTypeWatch,
+	account = accsmanagementtypes.Account{
+		Type: accsmanagementtypes.AccountTypeWatch,
 	}
 	require.False(t, account.IsWalletNonWatchOnlyAccount())
 
-	account = Account{}
+	account = accsmanagementtypes.Account{}
 	require.False(t, account.IsWalletNonWatchOnlyAccount())
 }
 
@@ -56,7 +57,7 @@ func TestUnmarshal(t *testing.T) {
 		"operable": "fully"
 }
 `
-	var account Account
+	var account accsmanagementtypes.Account
 	err := json.Unmarshal([]byte(data), &account)
 	require.NoError(t, err)
 
@@ -68,10 +69,10 @@ func TestUnmarshal(t *testing.T) {
 	require.Equal(t, true, account.Chat)
 	require.Equal(t, "m/44'/60'/0'/0/0", account.Path)
 	require.Equal(t, "Status account", account.Name)
-	require.Equal(t, "generated", account.Type.String())
+	require.Equal(t, "generated", string(accsmanagementtypes.AccountTypeGenerated))
 	require.Equal(t, "some-emoji", account.Emoji)
 	require.Equal(t, true, account.Hidden)
 	require.Equal(t, uint64(1234), account.Clock)
 	require.Equal(t, true, account.Removed)
-	require.Equal(t, "fully", account.Operable.String())
+	require.Equal(t, "fully", string(accsmanagementtypes.AccountFullyOperable))
 }

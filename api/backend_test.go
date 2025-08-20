@@ -604,7 +604,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		key, err := testContext.backend.getVerifiedWalletAccount(address.String(), "wrong-password")
-		require.EqualError(t, err, keystore.ErrDecrypt.Error())
+		require.EqualError(t, err, keystore.ErrIncorrectPasswordProvided.Error())
 		require.Nil(t, key)
 	})
 
@@ -636,7 +636,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		derivedWalletAcc1, err := generator.DeriveChildFromAccount(masterAcc, accscommon.CustomWalletPath1)
 		require.NoError(t, err)
 
-		err = db.SaveOrUpdateAccounts([]*accounts.Account{
+		err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{
 			{
 				Address: derivedWalletAcc1.Address(),
 				KeyUID:  masterAcc.KeyUID(),
@@ -1182,10 +1182,10 @@ func TestCreateWallet(t *testing.T) {
 	require.NotNil(t, accountsService)
 	accountsAPI := accountsService.AccountsAPI()
 
-	err = accountsAPI.AddAccount(context.Background(), testPassword, &accounts.Account{
+	err = accountsAPI.AddAccount(context.Background(), testPassword, &accsmanagementtypes.Account{
 		Address:   derivedAddress[0].Address,
 		KeyUID:    account.KeyUID,
-		Type:      accounts.AccountTypeGenerated,
+		Type:      accsmanagementtypes.AccountTypeGenerated,
 		PublicKey: derivedAddress[0].PublicKey,
 		Emoji:     "some",
 		ColorID:   "so",

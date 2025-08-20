@@ -9,6 +9,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -378,21 +379,21 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	request := DummyProfileShowcasePreferences(true)
 
 	// Save wallet accounts to pass the validation
-	acc1 := &accounts.Account{
+	acc1 := &accsmanagementtypes.Account{
 		Address: types.HexToAddress(request.Accounts[0].Address),
-		Type:    accounts.AccountTypeGenerated,
+		Type:    accsmanagementtypes.AccountTypeGenerated,
 		Name:    "Test Account 1",
 		ColorID: "",
 		Emoji:   "emoji",
 	}
-	acc2 := &accounts.Account{
+	acc2 := &accsmanagementtypes.Account{
 		Address: types.HexToAddress(request.Accounts[1].Address),
-		Type:    accounts.AccountTypeSeed,
+		Type:    accsmanagementtypes.AccountTypeSeed,
 		Name:    "Test Account 2",
 		ColorID: "",
 		Emoji:   "emoji",
 	}
-	err = s.m.settings.SaveOrUpdateAccounts([]*accounts.Account{acc1, acc2}, true)
+	err = s.m.settings.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{acc1, acc2}, true)
 	s.Require().NoError(err)
 
 	// Provide collectible balances test response

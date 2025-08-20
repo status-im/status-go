@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 )
 
@@ -316,7 +316,7 @@ func Test_supportedChainInSession(t *testing.T) {
 
 func Test_caip10Accounts(t *testing.T) {
 	type args struct {
-		accounts []*accounts.Account
+		accounts []*accsmanagementtypes.Account
 		chains   []uint64
 	}
 	tests := []struct {
@@ -327,14 +327,14 @@ func Test_caip10Accounts(t *testing.T) {
 		{
 			name: "generate_caip10_accounts",
 			args: args{
-				accounts: []*accounts.Account{
+				accounts: []*accsmanagementtypes.Account{
 					{
 						Address: types.HexToAddress("0x1"),
-						Type:    accounts.AccountTypeWatch,
+						Type:    accsmanagementtypes.AccountTypeWatch,
 					},
 					{
 						Address: types.HexToAddress("0x2"),
-						Type:    accounts.AccountTypeSeed,
+						Type:    accsmanagementtypes.AccountTypeSeed,
 					},
 				},
 				chains: []uint64{1, 2},
@@ -349,7 +349,7 @@ func Test_caip10Accounts(t *testing.T) {
 		{
 			name: "empty_addresses",
 			args: args{
-				accounts: []*accounts.Account{},
+				accounts: []*accsmanagementtypes.Account{},
 				chains:   []uint64{1, 2},
 			},
 			want: []string{},
@@ -357,14 +357,14 @@ func Test_caip10Accounts(t *testing.T) {
 		{
 			name: "empty_chains",
 			args: args{
-				accounts: []*accounts.Account{
+				accounts: []*accsmanagementtypes.Account{
 					{
 						Address: types.HexToAddress("0x1"),
-						Type:    accounts.AccountTypeWatch,
+						Type:    accsmanagementtypes.AccountTypeWatch,
 					},
 					{
 						Address: types.HexToAddress("0x2"),
-						Type:    accounts.AccountTypeSeed,
+						Type:    accsmanagementtypes.AccountTypeSeed,
 					},
 				},
 				chains: []uint64{},

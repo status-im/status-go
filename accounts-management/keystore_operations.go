@@ -1,4 +1,4 @@
-package core
+package accountsmanagement
 
 import (
 	"errors"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/keystore"
-	"github.com/status-im/status-go/accounts-management/keystore/geth"
 	"github.com/status-im/status-go/accounts-management/types"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
@@ -116,7 +115,7 @@ func (m *AccountsManager) storeToKeystore(acc *generator.Account, password strin
 	return
 }
 
-func (m *AccountsManager) createKeystore(keyUID string) (keystore.KeyStore, error) {
+func (m *AccountsManager) createKeystore(keyUID string) (KeyStore, error) {
 	// prepare keystore path
 	const defaultKeystoreRelativePath = "keystore"
 	relativePath := filepath.Join(defaultKeystoreRelativePath, keyUID)
@@ -128,7 +127,7 @@ func (m *AccountsManager) createKeystore(keyUID string) (keystore.KeyStore, erro
 		}
 	}
 
-	return geth.NewGethKeystoreAdapter(absoluteKeystorePath)
+	return keystore.NewGethKeystoreAdapter(absoluteKeystorePath)
 }
 
 // deleteAccountFromKeystoreIfExists deletes an account from the keystore if it exists, if not returns no error
@@ -139,7 +138,7 @@ func (m *AccountsManager) deleteAccountFromKeystoreIfExists(address cryptotypes.
 	}
 	m.logger.Info("deleting account", zap.String("address", address.Hex()))
 	err := m.keystore.Delete(address, password)
-	if errors.Is(err, keystore.ErrNoMatch) {
+	if errors.Is(err, keystore.ErrKeystoreFileMissing) {
 		return nil
 	}
 	return err

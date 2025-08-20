@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
@@ -227,7 +228,7 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 				continue
 			}
 		}
-		if !mnemonicWasNotShown || acc.Type != accounts.AccountTypeGenerated {
+		if !mnemonicWasNotShown || acc.Type != accsmanagementtypes.AccountTypeGenerated {
 			accountsWithOutsideTransfers = append(accountsWithOutsideTransfers, account)
 		}
 

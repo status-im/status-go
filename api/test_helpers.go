@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
@@ -35,7 +34,7 @@ type setupContext struct {
 	settings       settings.Settings
 	config         *params.NodeConfig
 	multiAcc       *multiaccounts.Account
-	profileKeypair *accounts.Keypair
+	profileKeypair *accsmanagementtypes.Keypair
 	chatPrivateKey string
 }
 
@@ -55,10 +54,10 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 	derivedAccs, err := generator.DeriveChildrenFromAccount(genMasterAcc, append([]string{accscommon.PathWalletRoot}, accountsPaths...))
 	require.NoError(t, err)
 
-	data.profileKeypair = &accounts.Keypair{
+	data.profileKeypair = &accsmanagementtypes.Keypair{
 		KeyUID:      genMasterAcc.KeyUID(),
 		Name:        "Test Keypair",
-		Type:        accounts.KeypairTypeProfile,
+		Type:        accsmanagementtypes.KeypairTypeProfile,
 		DerivedFrom: genMasterAcc.Address().Hex(),
 	}
 
@@ -69,7 +68,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 			continue
 		}
 
-		data.profileKeypair.Accounts = append(data.profileKeypair.Accounts, &accounts.Account{
+		data.profileKeypair.Accounts = append(data.profileKeypair.Accounts, &accsmanagementtypes.Account{
 			Address:   acc.Address(),
 			KeyUID:    genMasterAcc.KeyUID(),
 			Path:      path,
@@ -168,7 +167,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 			}, true, 0)
 		require.NoError(t, err)
 
-		data.profileKeypair = accounts.AccountsManagerKeypairToKeypair(keypair)
+		data.profileKeypair = keypair
 	}
 
 	return

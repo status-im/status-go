@@ -17,6 +17,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
@@ -446,7 +447,7 @@ func (s *Service) GetCollectiblesManager() *collectibles.Manager {
 }
 
 // LocalBackup Code
-func (s *Service) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.SyncAccount {
+func (s *Service) prepareSyncAccountMessage(acc *accsmanagementtypes.Account) *protobuf.SyncAccount {
 	return &protobuf.SyncAccount{
 		Clock:                 acc.Clock,
 		Address:               acc.Address.Bytes(),
@@ -460,7 +461,7 @@ func (s *Service) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.Syn
 		Chat:                  acc.Chat,
 		Hidden:                acc.Hidden,
 		Removed:               acc.Removed,
-		Operable:              acc.Operable.String(),
+		Operable:              string(acc.Operable),
 		Position:              acc.Position,
 		ProdPreferredChainIDs: acc.ProdPreferredChainIDs,
 		TestPreferredChainIDs: acc.TestPreferredChainIDs,
@@ -499,8 +500,9 @@ func (s *Service) ExportBackup() ([]byte, error) {
 	return proto.Marshal(backup)
 }
 
-func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability accounts.AccountOperable, accType accounts.AccountType) *accounts.Account {
-	return &accounts.Account{
+func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability accsmanagementtypes.AccountOperable,
+	accType accsmanagementtypes.AccountType) *accsmanagementtypes.Account {
+	return &accsmanagementtypes.Account{
 		Address:               types.BytesToAddress(message.Address),
 		KeyUID:                message.KeyUid,
 		PublicKey:             types.HexBytes(message.PublicKey),
@@ -522,12 +524,12 @@ func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability a
 }
 
 // TODO this is a duplicate of the code in messenger_handler. Should it be moved to a common place?
-func (s *Service) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*accounts.Account, error) {
+func (s *Service) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*accsmanagementtypes.Account, error) {
 	if message.KeyUid != "" {
 		return nil, ErrNotWatchOnlyAccount
 	}
 
-	accountOperability := accounts.AccountFullyOperable
+	accountOperability := accsmanagementtypes.AccountFullyOperable
 
 	accAddress := types.BytesToAddress(message.Address)
 	dbAccount, err := s.accountsDB.GetAccountByAddress(accAddress)
@@ -551,9 +553,9 @@ func (s *Service) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*ac
 		}
 	}
 
-	acc := mapSyncAccountToAccount(message, accountOperability, accounts.AccountTypeWatch)
+	acc := mapSyncAccountToAccount(message, accountOperability, accsmanagementtypes.AccountTypeWatch)
 
-	err = s.accountsDB.SaveOrUpdateAccounts([]*accounts.Account{acc}, false)
+	err = s.accountsDB.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{acc}, false)
 	if err != nil {
 		return nil, err
 	}

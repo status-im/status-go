@@ -1,4 +1,4 @@
-package core
+package accountsmanagement
 
 import (
 	"bytes"
@@ -74,7 +74,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 			utils.TestConfig.Account1.Password,
 			true,
 			false,
-			keystore.ErrNoMatch,
+			keystore.ErrKeystoreFileMissing,
 		},
 		{
 			"wrong address, correct password",
@@ -83,7 +83,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 			utils.TestConfig.Account1.Password,
 			true,
 			true,
-			keystore.ErrNoMatch,
+			keystore.ErrKeystoreFileMissing,
 		},
 		{
 			"correct address, wrong password",
@@ -92,7 +92,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 			"wrong password", // wrong password
 			true,
 			true,
-			keystore.ErrDecrypt,
+			keystore.ErrIncorrectPasswordProvided,
 		},
 	}
 	for _, testCase := range testCases {
@@ -320,11 +320,11 @@ func (s *ManagerTestSuite) TestSetChatAccountSuccess() {
 }
 
 func (s *ManagerTestSuite) TestSetChatAccountWrongAddress() {
-	s.testSetChatAccount(cryptotypes.HexToAddress("0x0000000000000000000000000000000000000001"), s.testAccount.password, keystore.ErrNoMatch)
+	s.testSetChatAccount(cryptotypes.HexToAddress("0x0000000000000000000000000000000000000001"), s.testAccount.password, keystore.ErrKeystoreFileMissing)
 }
 
 func (s *ManagerTestSuite) TestSetChatAccountWrongPassword() {
-	s.testSetChatAccount(s.testAccount.chatAddress, "wrong", keystore.ErrDecrypt)
+	s.testSetChatAccount(s.testAccount.chatAddress, "wrong", keystore.ErrIncorrectPasswordProvided)
 }
 
 func (s *ManagerTestSuite) testSetChatAccount(chat cryptotypes.Address, password string, expErr error) {
@@ -413,12 +413,12 @@ func (s *ManagerTestSuite) TestAccounts() {
 	// Select the test account, when the profile keypair is not stored
 	err := s.accManager.SetChatAccount(s.chatAddress, s.password, nil)
 	s.Require().Error(err)
-	if !errors.Is(err, keystore.ErrNoMatch) {
+	if !errors.Is(err, keystore.ErrKeystoreFileMissing) {
 		var accountsErr *customerrors.AccountsError
 		if errors.As(err, &accountsErr) {
 			s.Contains(accountsErr.Error(), "keystore file is missing")
 		} else {
-			s.Equal(keystore.ErrNoMatch, err)
+			s.Equal(keystore.ErrKeystoreFileMissing, err)
 		}
 	}
 
@@ -449,11 +449,11 @@ func (s *ManagerTestSuite) TestAddressToAccountSuccess() {
 }
 
 func (s *ManagerTestSuite) TestAddressToAccountWrongAddress() {
-	s.testAddressToAccount(cryptotypes.HexToAddress("0x0001"), s.password, ErrKeystoreFileMissing)
+	s.testAddressToAccount(cryptotypes.HexToAddress("0x0001"), s.password, keystore.ErrKeystoreFileMissing)
 }
 
 func (s *ManagerTestSuite) TestAddressToAccountWrongPassword() {
-	s.testAddressToAccount(s.walletAddress, "wrong", keystore.ErrDecrypt)
+	s.testAddressToAccount(s.walletAddress, "wrong", keystore.ErrIncorrectPasswordProvided)
 }
 
 func (s *ManagerTestSuite) testAddressToAccount(wallet cryptotypes.Address, password string, expErr error) {

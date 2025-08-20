@@ -6,9 +6,9 @@ import (
 
 	"go.uber.org/zap"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 )
 
 type PayloadMounter interface {
@@ -302,7 +302,7 @@ func NewKeystoreFilesPayloadLoader(backend *api.GethStatusBackend, p *AccountPay
 			return nil, err
 		}
 
-		if kp.Type == accounts.KeypairTypeSeed {
+		if kp.Type == accsmanagementtypes.KeypairTypeSeed {
 			kfpl.keystoreFilesToTransfer = append(kfpl.keystoreFilesToTransfer, kp.DerivedFrom[2:])
 		}
 

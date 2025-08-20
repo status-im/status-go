@@ -111,8 +111,7 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingNewKeycards() {
 
 	s.accountsManagerMock.EXPECT().SaveOrUpdateKeycard(gomock.Any(), gomock.Any(), gomock.Any()).
 		Do(func(keycard *types.Keycard, password string, clock uint64) error {
-			kc := accounts.AccountsManagerKeycardToKeycard(keycard)
-			return s.m.settings.SaveOrUpdateKeycard(*kc, clock, true)
+			return s.m.settings.SaveOrUpdateKeycard(*keycard, clock, true)
 		}).Times(2)
 
 	err := s.main.SaveOrUpdateKeycard(context.Background(), keycard1, "")
@@ -171,8 +170,7 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingAccountsToKeycard() {
 
 	s.accountsManagerMock.EXPECT().SaveOrUpdateKeycard(gomock.Any(), gomock.Any(), gomock.Any()).
 		Do(func(keycard *types.Keycard, password string, clock uint64) error {
-			kc := accounts.AccountsManagerKeycardToKeycard(keycard)
-			return s.m.settings.SaveOrUpdateKeycard(*kc, clock, true)
+			return s.m.settings.SaveOrUpdateKeycard(*keycard, clock, true)
 		}).Times(1)
 
 	// Add additional accounts to sender
