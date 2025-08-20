@@ -5,13 +5,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
-
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
-
-	"github.com/stretchr/testify/suite"
 )
 
 func TestMessengerSyncClearHistorySuite(t *testing.T) {
@@ -25,7 +24,7 @@ type MessengerSyncClearHistory struct {
 func (s *MessengerSyncClearHistory) pair() *Messenger {
 	theirMessenger := s.anotherMessenger()
 
-	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})

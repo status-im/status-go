@@ -11,11 +11,11 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -76,7 +76,7 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.SigningPhrase = signingPhrase
 
 	s.SendPushNotifications = true
-	s.InstallationID = multidevice.GenerateInstallationID()
+	s.InstallationID = messaging.GenerateInstallationID()
 	s.UseMailservers = true
 
 	s.PreviewPrivacy = true

@@ -40,8 +40,8 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/status-im/status-go/messaging/waku/common"
+	"github.com/status-im/status-go/messaging/waku/types"
 )
 
 // List of errors

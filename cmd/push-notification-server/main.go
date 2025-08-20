@@ -23,7 +23,6 @@ import (
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/sqlite"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
@@ -121,12 +120,6 @@ func main() {
 		os.Exit(exitCodeDBMigrationFailed)
 	}
 
-	encryptionProtocol := encryption.New(
-		db,
-		installationID,
-		logger,
-	)
-
 	messaging, err := messaging.NewCore(
 		messaging.CoreParams{
 			Identity:    privateKey,
@@ -147,8 +140,8 @@ func main() {
 				DiscV5BootstrapNodes: params.DefaultDiscV5Nodes(*wakuFleet),
 				ClusterID:            16,
 			},
-			EncryptionProtocol: encryptionProtocol,
-			TimeSource:         timesource.Default(),
+			InstallationID: installationID,
+			TimeSource:     timesource.Default(),
 		},
 		messaging.WithLogger(logger.Named("messaging")),
 	)

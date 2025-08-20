@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/requests"
-
 	"github.com/stretchr/testify/suite"
+
+	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/protocol/requests"
 )
 
 func TestMessengerSettings(t *testing.T) {
@@ -34,7 +34,7 @@ func (s *MessengerSettingsSuite) TearDownTest() {
 
 func prepareMessengersForPairing(s *suite.Suite, m1, m2 *Messenger) {
 	// Set m's installation metadata
-	aim := &multidevice.InstallationMetadata{
+	aim := &messagingtypes.InstallationMetadata{
 		Name:       "m's-device",
 		DeviceType: "m's-device-type",
 	}
@@ -42,7 +42,7 @@ func prepareMessengersForPairing(s *suite.Suite, m1, m2 *Messenger) {
 	s.Require().NoError(err)
 
 	// Set m 2's installation metadata
-	a2im := &multidevice.InstallationMetadata{
+	a2im := &messagingtypes.InstallationMetadata{
 		Name:       "m's-other-device",
 		DeviceType: "m's-other-device-type",
 	}

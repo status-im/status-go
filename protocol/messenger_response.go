@@ -6,19 +6,18 @@ import (
 	"golang.org/x/exp/maps"
 
 	ensservice "github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/waku/types"
 
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
 
 	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/verification"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -46,7 +45,7 @@ type MessengerResponse struct {
 	Contacts                      []*Contact
 	Invitations                   []*GroupChatInvitation
 	CommunityChanges              []*communities.CommunityChanges
-	Mailservers                   []types.Mailserver
+	StoreNodes                    []messagingtypes.StoreNode
 	Bookmarks                     []*browsers.Bookmark
 	Settings                      []*settings.SyncSettingField
 	IdentityImages                []images.IdentityImage
@@ -63,7 +62,7 @@ type MessengerResponse struct {
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
-	installations                    map[string]*multidevice.Installation
+	installations                    map[string]*messagingtypes.Installation
 	notifications                    map[string]*localnotifications.Notification
 	requestsToJoinCommunity          map[string]*communities.RequestToJoin
 	chats                            map[string]*Chat
@@ -99,13 +98,13 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DeletedMessages         map[string][]string                 `json:"deletedMessages,omitempty"`
 		Messages                []*common.Message                   `json:"messages,omitempty"`
 		Contacts                []*Contact                          `json:"contacts,omitempty"`
-		Installations           []*multidevice.Installation         `json:"installations,omitempty"`
+		Installations           []*messagingtypes.Installation      `json:"installations,omitempty"`
 		PinMessages             []*common.PinMessage                `json:"pinMessages,omitempty"`
 		EmojiReactions          []*EmojiReaction                    `json:"emojiReactions,omitempty"`
 		Invitations             []*GroupChatInvitation              `json:"invitations,omitempty"`
 		CommunityChanges        []*communities.CommunityChanges     `json:"communityChanges,omitempty"`
 		RequestsToJoinCommunity []*communities.RequestToJoin        `json:"requestsToJoinCommunity,omitempty"`
-		Mailservers             []types.Mailserver                  `json:"mailservers,omitempty"`
+		StoreNodes              []messagingtypes.StoreNode          `json:"mailservers,omitempty"`
 		Bookmarks               []*browsers.Bookmark                `json:"bookmarks,omitempty"`
 		ClearedHistories        []*ClearedHistory                   `json:"clearedHistories,omitempty"`
 		VerificationRequests    []*verification.Request             `json:"verificationRequests,omitempty"`
@@ -142,7 +141,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Invitations:             r.Invitations,
 		CommunityChanges:        r.CommunityChanges,
 		RequestsToJoinCommunity: r.RequestsToJoinCommunity(),
-		Mailservers:             r.Mailservers,
+		StoreNodes:              r.StoreNodes,
 		Bookmarks:               r.Bookmarks,
 		CurrentStatus:           r.currentStatus,
 		Settings:                r.Settings,
@@ -190,8 +189,8 @@ func (r *MessengerResponse) Chats() []*Chat {
 	return chats
 }
 
-func (r *MessengerResponse) Installations() []*multidevice.Installation {
-	var is []*multidevice.Installation
+func (r *MessengerResponse) Installations() []*messagingtypes.Installation {
+	var is []*messagingtypes.Installation
 	for _, i := range r.installations {
 		is = append(is, i)
 	}
@@ -311,7 +310,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.removedChats)+
 		len(r.removedMessages)+
 		len(r.deletedMessages)+
-		len(r.Mailservers)+
+		len(r.StoreNodes)+
 		len(r.IdentityImages)+
 		len(r.WatchOnlyAccounts)+
 		len(r.Keypairs)+
@@ -337,7 +336,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 // the existing Messages & Chats if they have the same ID
 func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	if len(response.Invitations)+
-		len(response.Mailservers)+
+		len(response.StoreNodes)+
 		len(response.clearedHistories)+
 		len(response.DiscordChannels)+
 		len(response.DiscordCategories) != 0 {
@@ -795,14 +794,14 @@ func (r *MessengerResponse) AddContacts(contacts []*Contact) {
 	}
 }
 
-func (r *MessengerResponse) AddInstallation(i *multidevice.Installation) {
+func (r *MessengerResponse) AddInstallation(i *messagingtypes.Installation) {
 	if len(r.installations) == 0 {
-		r.installations = make(map[string]*multidevice.Installation)
+		r.installations = make(map[string]*messagingtypes.Installation)
 	}
 	r.installations[i.UniqueKey()] = i
 }
 
-func (r *MessengerResponse) AddInstallations(installations []*multidevice.Installation) {
+func (r *MessengerResponse) AddInstallations(installations []*messagingtypes.Installation) {
 	for idx := range installations {
 		r.AddInstallation(installations[idx])
 	}

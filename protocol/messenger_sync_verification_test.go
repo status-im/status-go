@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/stretchr/testify/suite"
+
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/protocol/verification"
-
-	"github.com/stretchr/testify/suite"
 )
 
 func TestMessengerSyncVerificationRequests(t *testing.T) {
@@ -38,7 +38,7 @@ func (s *MessengerSyncVerificationRequests) TestSyncVerificationRequests() {
 	theirMessenger := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -100,7 +100,7 @@ func (s *MessengerSyncVerificationRequests) TestSyncTrust() {
 	theirMessenger := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})

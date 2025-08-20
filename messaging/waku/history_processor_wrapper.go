@@ -6,7 +6,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 
-	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/status-im/status-go/messaging/waku/common"
 )
 
 type HistoryProcessorWrapper struct {

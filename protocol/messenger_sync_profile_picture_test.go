@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
-
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestMessengerSyncProfilePictureSuite(t *testing.T) {
@@ -30,7 +30,7 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	theirMessenger := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})

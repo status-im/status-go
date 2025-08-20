@@ -15,22 +15,23 @@ import (
 	"github.com/status-im/mvds/state"
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/datasync"
 	datasyncpeer "github.com/status-im/status-go/messaging/datasync/peer"
 	messagingevents "github.com/status-im/status-go/messaging/events"
+	"github.com/status-im/status-go/messaging/layers/encryption"
+	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // Whisper message properties.
@@ -900,20 +901,20 @@ func (h *handleMessageResponse) Messages() []*messagingtypes.Message {
 	return []*messagingtypes.Message{h.Message}
 }
 
-func (s *MessageSender) handleMessage(msg *messagingtypes.ReceivedMessage) (*handleMessageResponse, error) {
+func (s *MessageSender) handleMessage(receivedMsg *messagingtypes.ReceivedMessage) (*handleMessageResponse, error) {
 	logger := s.logger.With(zap.String("site", "handleMessage"))
-	hlogger := logger.With(zap.String("hash", types.EncodeHex(msg.Hash)))
+	hlogger := logger.With(zap.String("hash", types.EncodeHex(receivedMsg.Hash)))
 
 	message := &messagingtypes.Message{}
 
 	response := &handleMessageResponse{
-		Hash:             msg.Hash,
+		Hash:             receivedMsg.Hash,
 		Message:          message,
 		DatasyncMessages: []*messagingtypes.Message{},
 		DatasyncAcks:     [][]byte{},
 	}
 
-	err := message.HandleTransportLayer(msg)
+	err := populateMessageTransportLayer(message, receivedMsg)
 	if err != nil {
 		hlogger.Error("failed to handle transport layer message", zap.Error(err))
 		return nil, err
@@ -951,10 +952,14 @@ func (s *MessageSender) handleMessage(msg *messagingtypes.ReceivedMessage) (*han
 	}
 
 	for _, msg := range response.Messages() {
-		err := msg.HandleApplicationLayer()
+		err := populateMessageApplicationLayer(msg)
 		if err != nil {
 			hlogger.Error("failed to handle application metadata layer message", zap.Error(err))
 		}
+		s.logger.Debug("calculated ID for envelope",
+			zap.String("envelopeHash", hexutil.Encode(msg.TransportLayer.Hash)),
+			zap.String("messageId", hexutil.Encode(msg.ApplicationLayer.ID)),
+		)
 	}
 
 	return response, nil
@@ -982,7 +987,7 @@ func (s *MessageSender) handleEncryptionLayer(ctx context.Context, message *mess
 	// if it's an ephemeral key, we don't negotiate a topic
 	decryptionKey, skipNegotiation := s.fetchDecryptionKey(message.TransportLayer.Dst)
 
-	err := message.HandleEncryptionLayer(decryptionKey, publicKey, s.protocol, skipNegotiation)
+	err := populateMessageEncryptionLayer(message, decryptionKey, publicKey, s.protocol, skipNegotiation)
 
 	// if it's an ephemeral key, we don't have to handle a device not found error
 	if err == encryption.ErrDeviceNotFound && !skipNegotiation {
@@ -1298,4 +1303,86 @@ func (s *MessageSender) CleanupHashRatchetEncryptedMessages() error {
 
 func (s *MessageSender) Publisher() *pubsub.Publisher {
 	return s.publisher
+}
+
+func populateMessageTransportLayer(m *messagingtypes.Message, msg *messagingtypes.ReceivedMessage) error {
+	publicKey, err := crypto.UnmarshalPubkey(msg.Sig)
+	if err != nil {
+		return errors.Wrap(err, "failed to get signature")
+	}
+
+	m.TransportLayer.Message = msg
+	m.TransportLayer.Hash = msg.Hash
+	m.TransportLayer.SigPubKey = publicKey
+	m.TransportLayer.Payload = msg.Payload
+
+	if msg.Dst != nil {
+		publicKey, err := crypto.UnmarshalPubkey(msg.Dst)
+		if err != nil {
+			return err
+		}
+		m.TransportLayer.Dst = publicKey
+	}
+
+	return nil
+}
+
+func populateMessageEncryptionLayer(m *messagingtypes.Message, myKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, enc *encryption.Protocol, skipNegotiation bool) error {
+	// As we handle non-encrypted messages, we make sure that DecryptPayload
+	// is set regardless of whether this step is successful
+	m.EncryptionLayer.Payload = m.TransportLayer.Payload
+	// Nothing to do
+	if skipNegotiation {
+		return nil
+	}
+
+	var protocolMessage encryption.ProtocolMessage
+	err := proto.Unmarshal(m.TransportLayer.Payload, &protocolMessage)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal ProtocolMessage")
+	}
+
+	response, err := enc.HandleMessage(
+		myKey,
+		senderKey,
+		&protocolMessage,
+		m.TransportLayer.Hash,
+	)
+
+	if err == encryption.ErrHashRatchetGroupIDNotFound {
+
+		if response != nil {
+			m.EncryptionLayer.HashRatchetInfo = adapters.FromEncryptionHashRatchets(response.HashRatchetInfo)
+		}
+		return err
+	}
+
+	if err != nil {
+		return errors.Wrap(err, "failed to handle Encryption message")
+	}
+
+	m.EncryptionLayer.Payload = response.DecryptedMessage
+	m.EncryptionLayer.Installations = adapters.FromEncryptionInstallations(response.Installations)
+	m.EncryptionLayer.SharedSecrets = adapters.FromEncryptionSharedSecrets(response.SharedSecrets)
+	m.EncryptionLayer.HashRatchetInfo = adapters.FromEncryptionHashRatchets(response.HashRatchetInfo)
+	return nil
+}
+
+func populateMessageApplicationLayer(m *messagingtypes.Message) error {
+	message, err := protobuf.Unmarshal(m.EncryptionLayer.Payload)
+	if err != nil {
+		return err
+	}
+
+	recoveredKey, err := utils.RecoverKey(message)
+	if err != nil {
+		return err
+	}
+
+	m.ApplicationLayer.SigPubKey = recoveredKey
+	// Calculate ID using the wrapped record
+	m.ApplicationLayer.ID = messagingtypes.MessageID(recoveredKey, m.EncryptionLayer.Payload)
+	m.ApplicationLayer.Payload = message.Payload
+	m.ApplicationLayer.Type = message.Type
+	return nil
 }

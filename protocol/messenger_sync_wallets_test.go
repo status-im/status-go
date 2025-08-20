@@ -10,8 +10,8 @@ import (
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
 	"github.com/status-im/status-go/protocol/tt"
 )
@@ -112,7 +112,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().True(accounts.SameKeypairs(profileKpOtherDevice, dbProfileKp2))
 
 	// Pair devices
-	im1 := &multidevice.InstallationMetadata{
+	im1 := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}
@@ -337,7 +337,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 
 	// Pair devices
-	im1 := &multidevice.InstallationMetadata{
+	im1 := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}
@@ -537,7 +537,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	s.Require().NoError(err, "profile keypair alicesOtherDevice.settings.SaveOrUpdateKeypair")
 
 	// Pair devices
-	im1 := &multidevice.InstallationMetadata{
+	im1 := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}

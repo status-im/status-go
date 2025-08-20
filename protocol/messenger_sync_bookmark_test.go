@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/stretchr/testify/suite"
+
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/browsers"
-
-	"github.com/stretchr/testify/suite"
 )
 
 func TestMessengerSyncBookmarkSuite(t *testing.T) {
@@ -35,7 +35,7 @@ func (s *MessengerSyncBookmarkSuite) TestSyncBookmark() {
 	theirMessenger := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})

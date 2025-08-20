@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/ethereum/go-ethereum/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/services/wallet"
 )
 
@@ -31,7 +31,7 @@ func (s *MessengerSyncSavedAddressesSuite) SetupTest() {
 	s.other = s.anotherMessenger()
 
 	// Pair devices (main and other)
-	imOther := &multidevice.InstallationMetadata{
+	imOther := &messagingtypes.InstallationMetadata{
 		Name:       "other-device",
 		DeviceType: "other-device-type",
 	}

@@ -40,8 +40,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
@@ -103,7 +101,6 @@ type Messenger struct {
 	messaging                 *messaging.API
 	messagingPersistence      *messagingPersistence
 	persistence               *sqlitePersistence
-	encryptor                 *encryption.Protocol
 	ensVerifier               *ens.Verifier
 	pushNotificationClient    *pushnotificationclient.Client
 	pushNotificationServer    PushNotificationServer
@@ -354,14 +351,12 @@ func NewMessenger(
 
 	communitiesKeyDistributor := &CommunitiesKeyDistributorImpl{
 		messaging: messaging,
-		encryptor: messaging.EncryptionProtocol(),
 	}
 
 	communitiesManager, err := communities.NewManager(
 		identity,
 		installationID,
 		database,
-		messaging.EncryptionProtocol(),
 		logger,
 		c.ensVerifier,
 		c.communityTokensService,
@@ -381,7 +376,6 @@ func NewMessenger(
 		Persistence:   communitiesManager.GetPersistence(),
 		Messaging:     messaging,
 		Identity:      identity,
-		Encryptor:     messaging.EncryptionProtocol(),
 		Publisher:     communitiesManager,
 	}
 
@@ -409,7 +403,6 @@ func NewMessenger(
 		messaging:                  messaging,
 		messagingPersistence:       NewMessagingPersistence(database),
 		persistence:                sqlitePersistence,
-		encryptor:                  messaging.EncryptionProtocol(),
 		communityTokensService:     c.communityTokensService,
 		pushNotificationClient:     pushNotificationClient,
 		pushNotificationServer:     c.pushNotificationServer,
@@ -600,7 +593,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	m.handleEncryptionLayerSubscriptions(m.encryptor.Subscriptions())
+	m.handleEncryptionLayerSubscriptions(m.messaging.EncryptionSubscriptions())
 	m.handleCommunitiesSubscription(m.communitiesManager.Subscribe())
 	m.handleCommunitiesHistoryArchivesSubscription(m.communitiesManager.Subscribe())
 	m.updateCommunitiesActiveMembersPeriodically()
@@ -638,7 +631,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	response := &MessengerResponse{}
 
-	response.Mailservers, err = m.AllMailservers()
+	response.StoreNodes, err = m.AllMailservers()
 	if err != nil {
 		return nil, err
 	}
@@ -1238,7 +1231,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 }
 
 // handleInstallations adds the installations in the installations map
-func (m *Messenger) handleInstallations(installations []*multidevice.Installation) {
+func (m *Messenger) handleInstallations(installations []*messagingtypes.Installation) {
 	for _, installation := range installations {
 		if installation.Identity == contactIDFromPublicKey(&m.identity.PublicKey) {
 			if _, ok := m.allInstallations.Load(installation.ID); !ok {
@@ -1250,7 +1243,7 @@ func (m *Messenger) handleInstallations(installations []*multidevice.Installatio
 }
 
 // handleEncryptionLayerSubscriptions handles events from the encryption layer
-func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption.Subscriptions) {
+func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *messagingtypes.EncryptionSubscriptions) {
 	go func() {
 		defer gocommon.LogOnPanic()
 		for {
@@ -1719,7 +1712,7 @@ func (m *Messenger) hasPairedDevices() bool {
 	}
 
 	var count int
-	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
+	m.allInstallations.Range(func(installationID string, installation *messagingtypes.Installation) (shouldContinue bool) {
 		if installation.Enabled {
 			count++
 		}
@@ -2406,14 +2399,14 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact, rawMessag
 }
 
 func (m *Messenger) propagateSyncInstallationCommunityWithHRKeys(msg *protobuf.SyncInstallationCommunity, c *communities.Community) error {
-	communityKeys, err := m.encryptor.GetAllHRKeysMarshaledV1(c.ID())
+	communityKeys, err := m.messaging.GetAllHRKeysMarshaledV1(c.ID())
 	if err != nil {
 		return err
 	}
 	msg.EncryptionKeysV1 = communityKeys
 
 	communityAndChannelKeys := [][]byte{}
-	communityKeys, err = m.encryptor.GetAllHRKeysMarshaledV2(c.ID())
+	communityKeys, err = m.messaging.GetAllHRKeysMarshaledV2(c.ID())
 	if err != nil {
 		return err
 	}
@@ -2422,7 +2415,7 @@ func (m *Messenger) propagateSyncInstallationCommunityWithHRKeys(msg *protobuf.S
 	}
 
 	for channelID := range c.Chats() {
-		channelKeys, err := m.encryptor.GetAllHRKeysMarshaledV2([]byte(c.IDString() + channelID))
+		channelKeys, err := m.messaging.GetAllHRKeysMarshaledV2([]byte(c.IDString() + channelID))
 		if err != nil {
 			return err
 		}

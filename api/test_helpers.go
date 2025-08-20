@@ -10,11 +10,11 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 
@@ -135,7 +135,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 			DisplayName:       "UserDisplayName",
 			CurrentNetwork:    "mainnet_rpc",
 			DappsAddress:      derivedAccs[accscommon.PathDefaultWalletAccount].Address(),
-			InstallationID:    multidevice.GenerateInstallationID(),
+			InstallationID:    messaging.GenerateInstallationID(),
 			LatestDerivedPath: 0,
 			Name:              "Jittery Cornflowerblue Kingbird",
 			Networks:          &networks,

@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 )
@@ -33,7 +33,7 @@ func (s *MessengerDeleteMessageForMeSuite) TearDownTest() {
 }
 
 func (s *MessengerDeleteMessageForMeSuite) Pair() {
-	err := s.m2.SetInstallationMetadata(s.m2.installationID, &multidevice.InstallationMetadata{
+	err := s.m2.SetInstallationMetadata(s.m2.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "alice2",
 		DeviceType: "alice2",
 	})

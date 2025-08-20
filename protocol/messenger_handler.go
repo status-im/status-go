@@ -32,7 +32,6 @@ import (
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -1321,7 +1320,7 @@ func (m *Messenger) HandleSyncPairInstallation(state *ReceivedMessageState, mess
 		return errors.New("installation not found")
 	}
 
-	metadata := &multidevice.InstallationMetadata{
+	metadata := &messagingtypes.InstallationMetadata{
 		Name:       message.Name,
 		DeviceType: message.DeviceType,
 	}

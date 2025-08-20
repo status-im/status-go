@@ -8,13 +8,11 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type CommunitiesKeyDistributorImpl struct {
 	messaging *messaging.API
-	encryptor *encryption.Protocol
 }
 
 func (ckd *CommunitiesKeyDistributorImpl) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
@@ -52,8 +50,7 @@ func (ckd *CommunitiesKeyDistributorImpl) generateKey(community *communities.Com
 	if keyAction.ActionType != communities.EncryptionKeyAdd {
 		return nil
 	}
-	_, err := ckd.encryptor.GenerateHashRatchetKey(hashRatchetGroupID)
-	return err
+	return ckd.messaging.GenerateHashRatchetKey(hashRatchetGroupID)
 }
 
 func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.Community, hashRatchetGroupID []byte, keyAction *communities.EncryptionKeyAction) error {

@@ -4,11 +4,11 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/status-im/status-go/messaging/waku/common"
+	"github.com/status-im/status-go/messaging/waku/types"
 )
 
-// NewWakuV2EnvelopeEventWrapper returns a wakutypes.EnvelopeEvent object that mimics Geth's EnvelopeEvent
+// NewWakuV2EnvelopeEventWrapper returns a types.EnvelopeEvent object that mimics Geth's EnvelopeEvent
 func NewWakuV2EnvelopeEventWrapper(envelopeEvent *common.EnvelopeEvent) *types.EnvelopeEvent {
 	if envelopeEvent == nil {
 		panic("envelopeEvent should not be nil")
@@ -31,7 +31,7 @@ func NewWakuV2EnvelopeEventWrapper(envelopeEvent *common.EnvelopeEvent) *types.E
 	}
 }
 
-// NewWakuEnvelopeErrorWrapper returns a wakutypes.EnvelopeError object that mimics Geth's EnvelopeError
+// NewWakuEnvelopeErrorWrapper returns a types.EnvelopeError object that mimics Geth's EnvelopeError
 func NewWakuV2EnvelopeErrorWrapper(envelopeError *common.EnvelopeError) *types.EnvelopeError {
 	if envelopeError == nil {
 		panic("envelopeError should not be nil")

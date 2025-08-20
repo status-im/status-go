@@ -31,7 +31,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -546,7 +545,7 @@ func (m *Messenger) HandleCommunityUpdateGrant(state *ReceivedMessageState, mess
 		return err
 	}
 
-	grant, err := m.encryptor.DecryptCommunityGrant(m.identity, state.CurrentMessageState.PublicKey, message.Grants)
+	grant, err := m.messaging.DecryptCommunityGrant(m.identity, state.CurrentMessageState.PublicKey, message.Grants)
 	if err != nil {
 		return err
 	}
@@ -739,7 +738,7 @@ func (m *Messenger) handleCommunityGrant(community *communities.Community, grant
 }
 
 func (m *Messenger) publishGroupGrantMessage(community *communities.Community, timestamp uint64, recipientGrants map[*ecdsa.PublicKey][]byte) error {
-	grants, err := m.encryptor.EncryptCommunityGrants(community.PrivateKey(), recipientGrants)
+	grants, err := m.messaging.EncryptCommunityGrants(community.PrivateKey(), recipientGrants)
 	if err != nil {
 		return err
 	}
@@ -3618,7 +3617,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 	// Handle deprecated community keys
 	if len(syncCommunity.EncryptionKeysV1) != 0 {
 		//  We pass nil,nil as private key/public key as they won't be encrypted
-		_, err := m.encryptor.HandleHashRatchetKeysPayload(syncCommunity.Id, syncCommunity.EncryptionKeysV1, nil, nil)
+		err := m.messaging.HandleHashRatchetKeysPayload(syncCommunity.Id, syncCommunity.EncryptionKeysV1, nil, nil)
 		if err != nil {
 			return err
 		}
@@ -3626,7 +3625,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 
 	// Handle community and channel keys
 	if len(syncCommunity.EncryptionKeysV2) != 0 {
-		err := m.encryptor.HandleHashRatchetHeadersPayload(syncCommunity.EncryptionKeysV2)
+		err := m.messaging.HandleHashRatchetHeadersPayload(syncCommunity.EncryptionKeysV2)
 		if err != nil {
 			return err
 		}
@@ -4035,7 +4034,7 @@ importMessageArchivesLoop:
 
 			archiveMessages, err := m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
 			if err != nil {
-				if errors.Is(err, encryption.ErrHashRatchetGroupIDNotFound) {
+				if errors.Is(err, messagingtypes.ErrHashRatchetGroupIDNotFound) {
 					// In case we're missing hash ratchet keys, best we can do is
 					// to wait for them to be received and try import again.
 					delayImport = true

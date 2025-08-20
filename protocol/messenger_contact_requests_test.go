@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/deprecation"
+	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -970,16 +971,11 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateReceiveContactReques
 	alice2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alice2)
 
-	// We want to facilitate the discovery of the x3dh bundl here, since bob does not know about alice device
-
-	alice2Bundle, err := alice2.encryptor.GetBundle(alice2.identity)
-	s.Require().NoError(err)
-
-	_, err = bob.encryptor.ProcessPublicBundle(bob.identity, alice2Bundle)
+	// We want to facilitate the discovery of the x3dh bundle here, since bob does not know about alice device
+	err := messaging.TestUtils{API: bob.messaging}.ProcessPublicBundle(bob.identity, alice2.messaging, alice2.identity)
 	s.Require().NoError(err)
 
 	// Bob sends a chat message to alice
-
 	var chat Chat
 	chats := bob.Chats()
 	for i, c := range chats {
