@@ -350,7 +350,7 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *wakuty
 	}
 
 	// We load the filter to make sure we can post on it
-	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic)
+	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic, true)
 	if err != nil {
 		return nil, err
 	}

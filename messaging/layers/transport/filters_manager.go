@@ -542,13 +542,11 @@ func (f *FiltersManager) PersonalTopicFilter() *Filter {
 }
 
 // LoadPublic adds a filter for a public chat with specific pubsubTopic
-func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter, error) {
+func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, isCommunity ...bool) (*Filter, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	filterKey := toFilterKey(chatID, pubsubTopic)
-
-	if chat, ok := f.filters[filterKey]; ok {
+	if chat, ok := f.filters[chatID]; ok {
 		if chat.PubsubTopic != pubsubTopic {
 			f.logger.Debug("updating pubsub topic for filter",
 				zap.String("chatID", chatID),
@@ -557,9 +555,17 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 				zap.String("newTopic", pubsubTopic),
 			)
 			chat.PubsubTopic = pubsubTopic
-			f.filters[filterKey] = chat
+			f.filters[chatID] = chat
 		}
 		return chat, nil
+	}
+
+	filterKey := chatID
+	if len(isCommunity) > 0 && isCommunity[0] {
+		filterKey = toCommunityFilterKey(chatID, pubsubTopic)
+		if chat, ok := f.filters[filterKey]; ok {
+			return chat, nil
+		}
 	}
 
 	filterAndTopic, err := f.addSymmetric(chatID, pubsubTopic)
@@ -582,6 +588,8 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 
 	f.logger.Debug("registering filter for",
 		zap.String("chatID", chatID),
+		zap.String("filterKey", filterKey),
+		zap.Bool("isCommunity", len(isCommunity) > 0 && isCommunity[0]),
 		zap.String("type", "public"),
 		zap.String("ContentTopic", filterAndTopic.Topic.String()),
 		zap.String("PubsubTopic", pubsubTopic),
@@ -710,10 +718,10 @@ func (f *FiltersManager) GetNegotiated(identity *ecdsa.PublicKey) *Filter {
 	return f.filters[NegotiatedTopic(identity)]
 }
 
-// toFilterKey creates a unique key for filters map using chatID and pubsubTopic
+// toCommunityFilterKey creates a unique key for filters map using chatID and pubsubTopic
 //
 // to allow one chat to have multiple filters in different pubsubTopics so that we can migrate the communities to 128 and 256 shards
-func toFilterKey(chatID string, pubsubTopic string) string {
+func toCommunityFilterKey(chatID string, pubsubTopic string) string {
 	if pubsubTopic == "" {
 		return chatID
 	}
