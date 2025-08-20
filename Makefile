@@ -149,7 +149,7 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 
 LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(LIBWAKU_EXT)
 $(LIBWAKU):
-ifeq ($(USE_NWAKU),true)
+ifeq (true,true)
 	@echo "Building libwaku"
 	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
 endif
@@ -213,7 +213,7 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
 statusgo-library: generate
-statusgo-library: $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
+statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
@@ -230,7 +230,7 @@ statusgo-library: $(LIBWAKU) ##@cross-compile Build status-go as static library 
 build-libwaku: $(LIBWAKU)
 
 statusgo-shared-library: generate
-statusgo-shared-library: $(LIBWAKU) ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
@@ -281,6 +281,7 @@ generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
 	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
+generate: $(LIBWAKU)
 
 generate-contracts:
 	go generate ./contracts

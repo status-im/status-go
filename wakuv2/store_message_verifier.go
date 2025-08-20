@@ -1,6 +1,3 @@
-//go:build use_nwaku
-// +build use_nwaku
-
 package wakuv2
 
 import (
