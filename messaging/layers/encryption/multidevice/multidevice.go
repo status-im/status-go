@@ -4,8 +4,6 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 
-	"github.com/google/uuid"
-
 	"github.com/status-im/status-go/crypto"
 )
 
@@ -128,8 +126,4 @@ func (s *Multidevice) EnableInstallation(identity *ecdsa.PublicKey, installation
 func (s *Multidevice) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
 	myIdentityKeyC := crypto.CompressPubkey(myIdentityKey)
 	return s.persistence.DisableInstallation(myIdentityKeyC, installationID)
-}
-
-func GenerateInstallationID() string {
-	return uuid.New().String()
 }

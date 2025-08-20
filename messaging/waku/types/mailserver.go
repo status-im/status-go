@@ -1,7 +1,6 @@
 package types
 
 import (
-	"database/sql"
 	"errors"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -92,12 +91,4 @@ func (m Mailserver) PeerID() (peer.ID, error) {
 		return "", err
 	}
 	return p.ID, nil
-}
-
-func (m Mailserver) NullablePassword() (val sql.NullString) {
-	if m.Password != "" {
-		val.String = m.Password
-		val.Valid = true
-	}
-	return
 }

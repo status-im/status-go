@@ -5,22 +5,6 @@ import (
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
-func ToWakuMessage(m *types.ReceivedMessage) *wakutypes.Message {
-	if m == nil {
-		return nil
-	}
-	return &wakutypes.Message{
-		Sig:          m.Sig,
-		Timestamp:    m.Timestamp,
-		Topic:        ToWakuTopic(m.Topic),
-		Payload:      m.Payload,
-		Padding:      m.Padding,
-		Hash:         m.Hash,
-		Dst:          m.Dst,
-		ThirdPartyID: m.ThirdPartyID,
-	}
-}
-
 func FromWakuMessage(m *wakutypes.Message) *types.ReceivedMessage {
 	if m == nil {
 		return nil
