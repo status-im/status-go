@@ -5,9 +5,9 @@ import (
 
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
@@ -33,7 +33,7 @@ type StatusBackend interface {
 		password string,
 		settings settings.Settings,
 		nodecfg *params.NodeConfig,
-		keypair *accounts.Keypair,
+		keypair *accsmanagementtypes.Keypair,
 		chatKey *ecdsa.PrivateKey) error
 	StopNode() error
 

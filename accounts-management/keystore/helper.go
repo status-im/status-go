@@ -1,4 +1,4 @@
-package geth
+package keystore
 
 import (
 	"crypto/ecdsa"
@@ -8,10 +8,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	keystoretypes "github.com/status-im/status-go/accounts-management/keystore/types"
+	"github.com/status-im/status-go/accounts-management/keystore/internal/geth"
 	"github.com/status-im/status-go/accounts-management/types"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
+
+// This function is exposed from here just to be used for validating transferred keystore files while local pairing.
+// The rest of the code should use the keystore package, via KeyStore interface.
+func DecryptKey(keyjson []byte, auth string) (*types.Key, error) {
+	return geth.DecryptKey(keyjson, auth)
+}
 
 func (a *Adapter) find(address cryptotypes.Address) (accounts.Account, error) {
 	gethAccount, err := a.keystore.Find(accounts.Account{
@@ -23,20 +29,13 @@ func (a *Adapter) find(address cryptotypes.Address) (accounts.Account, error) {
 	return gethAccount, nil
 }
 
-func keystoreAccountFrom(account accounts.Account) keystoretypes.KeystoreAccount {
-	return keystoretypes.KeystoreAccount{
-		Address: cryptotypes.Address(account.Address),
-		URL:     account.URL.String(),
-	}
-}
-
 func readKeystoreFileAndDecryptedKey(path string, auth string) (*types.Key, error) {
 	keyjson, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	return DecryptKey(keyjson, auth)
+	return geth.DecryptKey(keyjson, auth)
 }
 
 func encryptKeyAndStoreToKeystoreFile(ethKey *types.Key, path string, scryptN int, scryptP int, passphrase string) error {
@@ -48,7 +47,7 @@ func encryptKeyAndStoreToKeystoreFile(ethKey *types.Key, path string, scryptN in
 		SubAccountIndex: ethKey.SubAccountIndex,
 	}
 
-	keyjson, err := EncryptKey(key, passphrase, scryptN, scryptP)
+	keyjson, err := geth.EncryptKey(key, passphrase, scryptN, scryptP)
 	if err != nil {
 		return err
 	}
@@ -57,23 +56,23 @@ func encryptKeyAndStoreToKeystoreFile(ethKey *types.Key, path string, scryptN in
 }
 
 func (a *Adapter) updateKeystoreFile(privateKey *ecdsa.PrivateKey, extKey *extkeys.ExtendedKey, scryptN int, scryptP int,
-	passphrase string) (keystoretypes.KeystoreAccount, error) {
+	passphrase string) (accounts.Account, error) {
 	gethAccount, err := a.keystore.ImportECDSA(privateKey, passphrase)
 	if err != nil {
-		return keystoretypes.KeystoreAccount{}, err
+		return accounts.Account{}, err
 	}
 
 	ethKey, err := readKeystoreFileAndDecryptedKey(gethAccount.URL.Path, passphrase)
 	if err != nil {
-		return keystoretypes.KeystoreAccount{}, err
+		return accounts.Account{}, err
 	}
 
 	ethKey.ExtendedKey = extKey
 
 	err = encryptKeyAndStoreToKeystoreFile(ethKey, gethAccount.URL.Path, scryptN, scryptP, passphrase)
 	if err != nil {
-		return keystoretypes.KeystoreAccount{}, err
+		return accounts.Account{}, err
 	}
 
-	return keystoreAccountFrom(gethAccount), nil
+	return gethAccount, nil
 }

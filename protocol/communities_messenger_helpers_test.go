@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/accounts-management/generator"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -345,7 +346,7 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 	s.Require().NoError(err)
 	s.Require().Len(walletAccounts, len(config.walletAddresses))
 	for i := range config.walletAddresses {
-		s.Require().Equal(walletAccounts[i].Type, accounts.AccountTypeGenerated)
+		s.Require().Equal(walletAccounts[i].Type, accsmanagementtypes.AccountTypeGenerated)
 	}
 
 	err = messenger.messaging.Start()

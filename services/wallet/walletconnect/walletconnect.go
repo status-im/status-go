@@ -16,9 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -258,7 +258,7 @@ func supportedChainsInSession(session Session) []uint64 {
 	return chains
 }
 
-func caip10Accounts(accounts []*accounts.Account, chains []uint64) []string {
+func caip10Accounts(accounts []*accsmanagementtypes.Account, chains []uint64) []string {
 	addresses := make([]string, 0, len(accounts)*len(chains))
 	for _, acc := range accounts {
 		for _, chainID := range chains {

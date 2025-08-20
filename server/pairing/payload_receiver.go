@@ -10,9 +10,9 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/signal"
 )
@@ -407,7 +407,7 @@ func NewKeystoreFilesPayloadStorer(backend *api.GethStatusBackend, p *AccountPay
 			return nil, err
 		}
 
-		if kp.Type == accounts.KeypairTypeSeed {
+		if kp.Type == accsmanagementtypes.KeypairTypeSeed {
 			kfps.expectedKeystoreFilesToReceive = append(kfps.expectedKeystoreFilesToReceive, kp.DerivedFrom[2:])
 		}
 

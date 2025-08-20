@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 )
 
-func migrateKeyStoreDir(oldDir, newDir string, addresses []string) error {
+func MigrateKeyStoreDir(oldDir, newDir string, addresses []string) error {
 	paths := []string{}
 
 	addressesMap := map[string]struct{}{}

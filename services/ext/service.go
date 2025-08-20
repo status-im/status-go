@@ -334,12 +334,12 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 	for {
 		select {
 		case <-ticker.C:
-			accounts, err := s.accountsDB.GetActiveAccounts()
+			activeAccounts, err := s.accountsDB.GetActiveAccounts()
 			if err != nil {
 				s.logger.Error("failed to retrieve accounts", zap.Error(err))
 			}
 			var wallets []types.Address
-			for _, account := range accounts {
+			for _, account := range activeAccounts {
 				if account.IsWalletNonWatchOnlyAccount() {
 					wallets = append(wallets, types.BytesToAddress(account.Address.Bytes()))
 				}

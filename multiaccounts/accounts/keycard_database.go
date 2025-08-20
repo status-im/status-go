@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 var (
@@ -17,47 +17,10 @@ var (
 	ErrNoKeycardForPassedKeycardUID      = errors.New("keycard: no keycard for the passed keycard uid")
 )
 
-type Keycard struct {
-	KeycardUID        string          `json:"keycard-uid"`
-	KeycardName       string          `json:"keycard-name"`
-	KeycardLocked     bool            `json:"keycard-locked"`
-	AccountsAddresses []types.Address `json:"accounts-addresses"`
-	KeyUID            string          `json:"key-uid"`
-	Position          uint64
-}
-
-func (kp *Keycard) ToSyncKeycard() *protobuf.SyncKeycard {
-	kc := &protobuf.SyncKeycard{
-		Uid:      kp.KeycardUID,
-		Name:     kp.KeycardName,
-		Locked:   kp.KeycardLocked,
-		KeyUid:   kp.KeyUID,
-		Position: kp.Position,
-	}
-
-	for _, addr := range kp.AccountsAddresses {
-		kc.Addresses = append(kc.Addresses, addr.Bytes())
-	}
-
-	return kc
-}
-
-func (kp *Keycard) FromSyncKeycard(kc *protobuf.SyncKeycard) {
-	kp.KeycardUID = kc.Uid
-	kp.KeycardName = kc.Name
-	kp.KeycardLocked = kc.Locked
-	kp.KeyUID = kc.KeyUid
-	kp.Position = kc.Position
-
-	for _, addr := range kc.Addresses {
-		kp.AccountsAddresses = append(kp.AccountsAddresses, types.BytesToAddress(addr))
-	}
-}
-
-func (db *Database) processResult(rows *sql.Rows) ([]*Keycard, error) {
-	keycards := []*Keycard{}
+func (db *Database) processResult(rows *sql.Rows) ([]*accsmanagementtypes.Keycard, error) {
+	keycards := []*accsmanagementtypes.Keycard{}
 	for rows.Next() {
-		keycard := &Keycard{}
+		keycard := &accsmanagementtypes.Keycard{}
 		var accAddress sql.NullString
 		err := rows.Scan(&keycard.KeycardUID, &keycard.KeycardName, &keycard.KeycardLocked, &accAddress, &keycard.KeyUID,
 			&keycard.Position)
@@ -91,7 +54,7 @@ func (db *Database) processResult(rows *sql.Rows) ([]*Keycard, error) {
 	return keycards, nil
 }
 
-func (db *Database) getKeycards(tx *sql.Tx, keyUID string, keycardUID string) ([]*Keycard, error) {
+func (db *Database) getKeycards(tx *sql.Tx, keyUID string, keycardUID string) ([]*accsmanagementtypes.Keycard, error) {
 	query := `
 		SELECT
 			kc.keycard_uid,
@@ -154,7 +117,7 @@ func (db *Database) getKeycards(tx *sql.Tx, keyUID string, keycardUID string) ([
 	return db.processResult(rows)
 }
 
-func (db *Database) getKeycardByKeycardUID(tx *sql.Tx, keycardUID string) (*Keycard, error) {
+func (db *Database) getKeycardByKeycardUID(tx *sql.Tx, keycardUID string) (*accsmanagementtypes.Keycard, error) {
 	keycards, err := db.getKeycards(tx, "", keycardUID)
 	if err != nil {
 		return nil, err
@@ -167,15 +130,15 @@ func (db *Database) getKeycardByKeycardUID(tx *sql.Tx, keycardUID string) (*Keyc
 	return keycards[0], nil
 }
 
-func (db *Database) GetAllKnownKeycards() ([]*Keycard, error) {
+func (db *Database) GetAllKnownKeycards() ([]*accsmanagementtypes.Keycard, error) {
 	return db.getKeycards(nil, "", "")
 }
 
-func (db *Database) GetKeycardsWithSameKeyUID(keyUID string) ([]*Keycard, error) {
+func (db *Database) GetKeycardsWithSameKeyUID(keyUID string) ([]*accsmanagementtypes.Keycard, error) {
 	return db.getKeycards(nil, keyUID, "")
 }
 
-func (db *Database) GetKeycardByKeycardUID(keycardUID string) (*Keycard, error) {
+func (db *Database) GetKeycardByKeycardUID(keycardUID string) (*accsmanagementtypes.Keycard, error) {
 	return db.getKeycardByKeycardUID(nil, keycardUID)
 }
 
@@ -282,7 +245,7 @@ func (db *Database) deleteKeycardAccounts(tx *sql.Tx, kcUID string, accountAddre
 	return err
 }
 
-func (db *Database) SaveOrUpdateKeycard(keycard Keycard, clock uint64, updateKeypairClock bool) error {
+func (db *Database) SaveOrUpdateKeycard(keycard accsmanagementtypes.Keycard, clock uint64, updateKeypairClock bool) error {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err

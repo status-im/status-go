@@ -12,13 +12,14 @@ import (
 	"encoding/json"
 	"fmt"
 
+	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
+
 	"github.com/google/uuid"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/scrypt"
 
 	"github.com/status-im/extkeys"
 
-	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto"
 )
@@ -161,7 +162,7 @@ func DecryptDataV3(cryptoJson CryptoJSON, auth string) ([]byte, error) {
 
 	calculatedMAC := crypto.Keccak256(derivedKey[16:32], cipherText)
 	if !bytes.Equal(calculatedMAC, mac) {
-		return nil, keystore.ErrDecrypt
+		return nil, gethkeystore.ErrDecrypt
 	}
 
 	plainText, err := aesCTRXOR(derivedKey[:16], cipherText, iv)
@@ -216,7 +217,7 @@ func decryptKeyV1(keyProtected *encryptedKeyJSONV1, auth string) (keyBytes []byt
 
 	calculatedMAC := crypto.Keccak256(derivedKey[16:32], cipherText)
 	if !bytes.Equal(calculatedMAC, mac) {
-		return nil, nil, keystore.ErrDecrypt
+		return nil, nil, gethkeystore.ErrDecrypt
 	}
 
 	plainText, err := aesCBCDecrypt(crypto.Keccak256(derivedKey[:16])[:16], cipherText, iv)
@@ -261,7 +262,7 @@ func decryptExtendedKey(keyProtected *EncryptedKeyJSONV3, auth string) (plainTex
 
 	calculatedMAC := crypto.Keccak256(derivedKey[16:32], cipherText)
 	if !bytes.Equal(calculatedMAC, mac) {
-		return nil, keystore.ErrDecrypt
+		return nil, gethkeystore.ErrDecrypt
 	}
 
 	plainText, err = aesCTRXOR(derivedKey[:16], cipherText, iv)
@@ -331,7 +332,7 @@ func aesCBCDecrypt(key, cipherText, iv []byte) ([]byte, error) {
 	decrypter.CryptBlocks(paddedPlaintext, cipherText)
 	plaintext := pkcs7Unpad(paddedPlaintext)
 	if plaintext == nil {
-		return nil, keystore.ErrDecrypt
+		return nil, gethkeystore.ErrDecrypt
 	}
 	return plaintext, err
 }

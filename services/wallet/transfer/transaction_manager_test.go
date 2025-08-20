@@ -14,8 +14,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	mock_transactor "github.com/status-im/status-go/transactions/mock"
@@ -25,18 +25,18 @@ import (
 )
 
 type dummyAccountsStorage struct {
-	keypair *accounts.Keypair
-	account *accounts.Account
+	keypair *accsmanagementtypes.Keypair
+	account *accsmanagementtypes.Account
 }
 
-func (d *dummyAccountsStorage) GetAccountByAddress(address types.Address) (*accounts.Account, error) {
+func (d *dummyAccountsStorage) GetAccountByAddress(address types.Address) (*accsmanagementtypes.Account, error) {
 	if address != d.account.Address {
 		return nil, fmt.Errorf("address not found")
 	}
 	return d.account, nil
 }
 
-func (d *dummyAccountsStorage) GetKeypairByKeyUID(keyUID string) (*accounts.Keypair, error) {
+func (d *dummyAccountsStorage) GetKeypairByKeyUID(keyUID string) (*accsmanagementtypes.Keypair, error) {
 	if keyUID != d.keypair.KeyUID {
 		return nil, fmt.Errorf("keyUID not found")
 	}
@@ -69,10 +69,10 @@ func setupTestSuite(t *testing.T) (*TransactionManager, *mock_transactor.MockTra
 
 func setupAccountsStorage() *dummyAccountsStorage {
 	return &dummyAccountsStorage{
-		keypair: &accounts.Keypair{
+		keypair: &accsmanagementtypes.Keypair{
 			KeyUID: "keyUid",
 		},
-		account: &accounts.Account{
+		account: &accsmanagementtypes.Account{
 			KeyUID:  "keyUid",
 			Address: types.Address{1},
 		},

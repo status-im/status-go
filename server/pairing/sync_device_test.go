@@ -20,7 +20,6 @@ import (
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
@@ -397,7 +396,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	//////////////////////////////////////////////////////////////////////////////
 	// Convert it to a keycard keypair on server and sync it to client
 	//////////////////////////////////////////////////////////////////////////////
-	err = serverAccountsAPI.SaveOrUpdateKeycard(ctx, &accounts.Keycard{
+	err = serverAccountsAPI.SaveOrUpdateKeycard(ctx, &accsmanagementtypes.Keycard{
 		KeycardUID:        "1234",
 		KeycardName:       "new-keycard",
 		KeyUID:            serverKp.KeyUID,

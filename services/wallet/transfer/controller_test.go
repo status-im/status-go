@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -85,7 +86,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	// Insert multitransactions
 	// Save address to accounts DB which transactions we want to preserve
 	counterparty := common.Address{0x1}
-	err = accountsDB.SaveOrUpdateAccounts([]*accounts.Account{
+	err = accountsDB.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{
 		{Address: types.Address(counterparty), Chat: false, Wallet: true},
 	}, false)
 	require.NoError(t, err)
@@ -226,7 +227,7 @@ func TestController_cleanupAccountLeftovers(t *testing.T) {
 
 	removedAddr := common.HexToAddress("0x5678")
 	existingAddr := types.HexToAddress("0x1234")
-	accounts := []*accounts.Account{
+	accounts := []*accsmanagementtypes.Account{
 		{Address: existingAddr, Chat: false, Wallet: true},
 	}
 	err = accountsDB.SaveOrUpdateAccounts(accounts, false)

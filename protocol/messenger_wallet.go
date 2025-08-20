@@ -107,7 +107,7 @@ func (m *Messenger) MoveWalletAccount(fromPosition int64, toPosition int64) erro
 	return m.syncAccountsPositions(m.dispatchMessage)
 }
 
-func (m *Messenger) resolveAndSetAccountPropsMaintainedByBackend(acc *accounts.Account) error {
+func (m *Messenger) resolveAndSetAccountPropsMaintainedByBackend(acc *accsmanagementtypes.Account) error {
 	// Account position is fully maintained by the backend, no need client to set it explicitly.
 	// To support DragAndDrop feature for accounts there is exposed `MoveWalletAccount` which
 	// moves an account to the passed position.
@@ -132,15 +132,15 @@ func (m *Messenger) resolveAndSetAccountPropsMaintainedByBackend(acc *accounts.A
 			return err
 		}
 		acc.Position = pos
-		acc.Operable = accounts.AccountFullyOperable
+		acc.Operable = accsmanagementtypes.AccountFullyOperable
 	}
 	return nil
 }
 
-func (m *Messenger) UpdateKeypair(keypair *accounts.Keypair) error {
+func (m *Messenger) UpdateKeypair(keypair *accsmanagementtypes.Keypair) error {
 	_, err := m.settings.GetKeypairByKeyUID(keypair.KeyUID)
 	if err != nil {
-		if err == accounts.ErrDbKeypairNotFound {
+		if err == accsmanagementtypes.ErrDbKeypairNotFound {
 			return fmt.Errorf("cannot update non-existing keypair: %w", err)
 		}
 		return err
@@ -170,7 +170,7 @@ func (m *Messenger) UpdateKeypair(keypair *accounts.Keypair) error {
 }
 
 func (m *Messenger) AddKeypairViaSeedPhrase(mnemonic string, password string, name string,
-	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accounts.Keypair, error) {
+	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accsmanagementtypes.Keypair, error) {
 	clock, _ := m.getLastClockWithRelatedChat()
 
 	keypair, err := m.accountsManager.CreateKeypairFromMnemonicAndStore(mnemonic, password, name, walletAccount, false, clock)
@@ -178,26 +178,25 @@ func (m *Messenger) AddKeypairViaSeedPhrase(mnemonic string, password string, na
 		return nil, err
 	}
 
-	return accounts.AccountsManagerKeypairToKeypair(keypair),
+	return keypair,
 		m.resolveAndSyncKeypairOrJustWalletAccount(keypair.KeyUID, types.Address{}, keypair.Clock, m.dispatchMessage)
 }
 
 func (m *Messenger) AddKeypairStoredToKeycard(keyUID string, masterAddress string, name string,
-	walletAccounts []*accounts.Account) (*accounts.Keypair, error) {
+	walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
 	clock, _ := m.getLastClockWithRelatedChat()
 
-	keypair, err := m.accountsManager.AddKeypairStoredToKeycard(keyUID, masterAddress, name,
-		accounts.AccountsToAccountsManagerAccounts(walletAccounts), clock)
+	keypair, err := m.accountsManager.AddKeypairStoredToKeycard(keyUID, masterAddress, name, walletAccounts, clock)
 	if err != nil {
 		return nil, err
 	}
 
-	return accounts.AccountsManagerKeypairToKeypair(keypair),
+	return keypair,
 		m.resolveAndSyncKeypairOrJustWalletAccount(keypair.KeyUID, types.Address{}, keypair.Clock, m.dispatchMessage)
 }
 
 func (m *Messenger) AddKeypairViaPrivateKey(privateKey string, password string, name string,
-	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accounts.Keypair, error) {
+	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accsmanagementtypes.Keypair, error) {
 	clock, _ := m.getLastClockWithRelatedChat()
 
 	keypair, err := m.accountsManager.CreateKeypairFromPrivateKeyAndStore(privateKey, password, name, walletAccount, clock)
@@ -205,11 +204,11 @@ func (m *Messenger) AddKeypairViaPrivateKey(privateKey string, password string, 
 		return nil, err
 	}
 
-	return accounts.AccountsManagerKeypairToKeypair(keypair),
+	return keypair,
 		m.resolveAndSyncKeypairOrJustWalletAccount(keypair.KeyUID, types.Address{}, keypair.Clock, m.dispatchMessage)
 }
 
-func (m *Messenger) UpdateAccount(acc *accounts.Account) error {
+func (m *Messenger) UpdateAccount(acc *accsmanagementtypes.Account) error {
 	_, err := m.settings.GetAccountByAddress(acc.Address)
 	if err != nil {
 		if err == accounts.ErrDbAccountNotFound {
@@ -226,7 +225,7 @@ func (m *Messenger) UpdateAccount(acc *accounts.Account) error {
 		return err
 	}
 
-	err = m.settings.SaveOrUpdateAccounts([]*accounts.Account{acc}, true)
+	err = m.settings.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{acc}, true)
 	if err != nil {
 		return err
 	}
@@ -239,7 +238,7 @@ func (m *Messenger) UpdateAccount(acc *accounts.Account) error {
 	return m.UpdateProfileShowcaseWalletAccount(acc)
 }
 
-func (m *Messenger) AddAccount(acc *accounts.Account, password string) error {
+func (m *Messenger) AddAccount(acc *accsmanagementtypes.Account, password string) error {
 	dbAcc, err := m.settings.GetAccountByAddress(acc.Address)
 	if err != nil && err != accounts.ErrDbAccountNotFound {
 		return err
@@ -256,13 +255,13 @@ func (m *Messenger) AddAccount(acc *accounts.Account, password string) error {
 		return err
 	}
 
-	if acc.Type == accounts.AccountTypeWatch {
-		err = m.settings.SaveOrUpdateAccounts([]*accounts.Account{acc}, true)
+	if acc.Type == accsmanagementtypes.AccountTypeWatch {
+		err = m.settings.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{acc}, true)
 		if err != nil {
 			return err
 		}
 	} else {
-		err = m.accountsManager.AddAccounts(acc.KeyUID, []*accsmanagementtypes.Account{accounts.AccountToAccountsManagerAccount(acc)}, password)
+		err = m.accountsManager.AddAccounts(acc.KeyUID, []*accsmanagementtypes.Account{acc}, password)
 		if err != nil {
 			return err
 		}
@@ -329,7 +328,7 @@ func (m *Messenger) DeleteAccount(address types.Address, password string) error 
 		return err
 	}
 
-	return m.DeleteProfileShowcaseWalletAccount(accounts.AccountsManagerAccountToAccount(acc))
+	return m.DeleteProfileShowcaseWalletAccount(acc)
 }
 
 func (m *Messenger) DeleteKeypair(keyUID string, password string) error {
@@ -355,7 +354,7 @@ func (m *Messenger) DeleteKeypair(keyUID string, password string) error {
 	return m.syncAccountsPositions(m.dispatchMessage)
 }
 
-func (m *Messenger) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.SyncAccount {
+func (m *Messenger) prepareSyncAccountMessage(acc *accsmanagementtypes.Account) *protobuf.SyncAccount {
 	return &protobuf.SyncAccount{
 		Clock:                 acc.Clock,
 		Address:               acc.Address.Bytes(),
@@ -369,7 +368,7 @@ func (m *Messenger) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.S
 		Chat:                  acc.Chat,
 		Hidden:                acc.Hidden,
 		Removed:               acc.Removed,
-		Operable:              acc.Operable.String(),
+		Operable:              string(acc.Operable),
 		Position:              acc.Position,
 		ProdPreferredChainIDs: acc.ProdPreferredChainIDs,
 		TestPreferredChainIDs: acc.TestPreferredChainIDs,
@@ -389,12 +388,12 @@ func (m *Messenger) getMyInstallationMetadata() (*messagingtypes.InstallationMet
 	return installation.InstallationMetadata, nil
 }
 
-func (m *Messenger) prepareSyncKeypairMessage(kp *accounts.Keypair) (*protobuf.SyncKeypair, error) {
+func (m *Messenger) prepareSyncKeypairMessage(kp *accsmanagementtypes.Keypair) (*protobuf.SyncKeypair, error) {
 	message := &protobuf.SyncKeypair{
 		Clock:                   kp.Clock,
 		KeyUid:                  kp.KeyUID,
 		Name:                    kp.Name,
-		Type:                    kp.Type.String(),
+		Type:                    string(kp.Type),
 		DerivedFrom:             kp.DerivedFrom,
 		LastUsedDerivationIndex: kp.LastUsedDerivationIndex,
 		SyncedFrom:              kp.SyncedFrom,
@@ -671,7 +670,7 @@ func (m *Messenger) syncAccountsPositions(rawMessageHandler RawMessageHandler) e
 	return err
 }
 
-func (m *Messenger) syncWalletAccount(acc *accounts.Account, rawMessageHandler RawMessageHandler) error {
+func (m *Messenger) syncWalletAccount(acc *accsmanagementtypes.Account, rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -699,7 +698,7 @@ func (m *Messenger) syncWalletAccount(acc *accounts.Account, rawMessageHandler R
 	return err
 }
 
-func (m *Messenger) syncKeypair(keypair *accounts.Keypair, rawMessageHandler RawMessageHandler) (err error) {
+func (m *Messenger) syncKeypair(keypair *accsmanagementtypes.Keypair, rawMessageHandler RawMessageHandler) (err error) {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -738,7 +737,7 @@ func (m *Messenger) resolveAndSyncKeypairOrJustWalletAccount(keyUID string, addr
 	}
 
 	if keyUID == "" {
-		var dbAccount *accounts.Account
+		var dbAccount *accsmanagementtypes.Account
 		allDbAccounts, err := m.settings.GetAllAccounts() // removed accounts included
 		if err != nil {
 			return err
@@ -760,7 +759,7 @@ func (m *Messenger) resolveAndSyncKeypairOrJustWalletAccount(keyUID string, addr
 			return err
 		}
 	} else {
-		var dbKeypair *accounts.Keypair
+		var dbKeypair *accsmanagementtypes.Keypair
 		allDbKeypairs, err := m.settings.GetAllKeypairs() // removed keypairs included
 		if err != nil {
 			return err
@@ -774,7 +773,7 @@ func (m *Messenger) resolveAndSyncKeypairOrJustWalletAccount(keyUID string, addr
 		}
 
 		if dbKeypair == nil {
-			return accounts.ErrDbKeypairNotFound
+			return accsmanagementtypes.ErrDbKeypairNotFound
 		}
 
 		err = m.syncKeypair(dbKeypair, rawMessageHandler)

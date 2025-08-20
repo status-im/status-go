@@ -1,13 +1,7 @@
-package types
+package keystore
 
 import (
-	"errors"
-
 	"github.com/status-im/status-go/crypto/types"
-)
-
-var (
-	ErrInvalidAddress = errors.New("cannot parse address to valid account address")
 )
 
 type KeystoreAccount struct {

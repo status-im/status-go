@@ -1,4 +1,4 @@
-package core
+package accountsmanagement
 
 import (
 	"crypto/ecdsa"
@@ -10,7 +10,6 @@ import (
 	accsmanagementerrors "github.com/status-im/status-go/accounts-management/errors"
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/keystore"
-	"github.com/status-im/status-go/accounts-management/persistence"
 	gocommon "github.com/status-im/status-go/common"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
@@ -18,8 +17,8 @@ import (
 // AccountsManager represents the default account manager implementation
 type AccountsManager struct {
 	mu          sync.RWMutex
-	keystore    keystore.KeyStore
-	persistence persistence.Persistence
+	keystore    KeyStore
+	persistence Persistence
 
 	rootDataDir         string
 	profileKeyUID       string
@@ -40,7 +39,7 @@ func NewAccountsManager(logger *zap.Logger) (*AccountsManager, error) {
 }
 
 // SetPersistence sets the persistence for the accounts manager
-func (m *AccountsManager) SetPersistence(persistence persistence.Persistence) {
+func (m *AccountsManager) SetPersistence(persistence Persistence) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -55,7 +54,7 @@ func (m *AccountsManager) SetRootDataDir(rootDataDir string) {
 	m.rootDataDir = rootDataDir
 }
 
-func (m *AccountsManager) setKeystore(keystore keystore.KeyStore) {
+func (m *AccountsManager) setKeystore(keystore KeyStore) {
 	m.keystore = keystore
 }
 
@@ -101,9 +100,9 @@ func (m *AccountsManager) loadAccountInternally(address cryptotypes.Address, pas
 	_, privateKey, extendedKey, err := m.keystore.AccountDecryptedKey(address, password)
 	if err != nil {
 		m.logger.Error("error loading account", zap.String("address", address.Hex()), zap.Error(err))
-		if errors.Is(err, keystore.ErrNoMatch) {
+		if errors.Is(err, keystore.ErrKeystoreFileMissing) {
 			m.logger.Error("cannot locate account for address", zap.String("address", address.Hex()))
-			return nil, ErrKeystoreFileMissing.WithContext("address", address.Hex())
+			return nil, keystore.ErrKeystoreFileMissing.Copy().WithContext("address", address.Hex())
 		}
 		return nil, err
 	}
@@ -223,7 +222,7 @@ func (m *AccountsManager) GetVerifiedWalletAccount(address cryptotypes.Address, 
 	account, err := m.loadAccountInternally(address, password)
 	if err != nil {
 		var accountsErr *accsmanagementerrors.AccountsError
-		if errors.As(err, &accountsErr) && accountsErr.Is(ErrKeystoreFileMissing) {
+		if errors.As(err, &accountsErr) && accountsErr.Is(keystore.ErrKeystoreFileMissing) {
 			account, err = m.generatePartialAccountKey(address, password)
 			if err != nil {
 				return nil, err

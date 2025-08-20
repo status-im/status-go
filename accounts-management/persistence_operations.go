@@ -1,13 +1,13 @@
-package core
+package accountsmanagement
 
 import (
 	"strings"
 
 	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/accounts-management/types"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
+	multiaccscommon "github.com/status-im/status-go/multiaccounts/common"
 )
 
 // CreateKeypairFromMnemonicAndStore creates a keypair with provided `walletAccount` and optionally a chat account if
@@ -67,7 +67,7 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 	if profile {
 		keypairType = types.KeypairTypeProfile
 
-		var keystore keystore.KeyStore
+		var keystore KeyStore
 		keystore, err = m.createKeystore(masterAccount.KeyUID())
 		if err != nil {
 			return
@@ -197,7 +197,7 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 			PublicKey:          cryptotypes.Hex2Bytes(walletDerivedAccount.PublicKeyHex()),
 			KeyUID:             keypair.KeyUID,
 			Address:            walletDerivedAccount.Address(),
-			ColorID:            walletAccount.ColorID,
+			ColorID:            multiaccscommon.CustomizationColor(walletAccount.ColorID),
 			Emoji:              walletAccount.Emoji,
 			Wallet:             profile, // default wallet account makes sense only for profile keypair
 			Path:               walletAccount.Path,
@@ -215,7 +215,7 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 			PublicKey:          cryptotypes.Hex2Bytes(account.PublicKeyHex()),
 			KeyUID:             keypair.KeyUID,
 			Address:            account.Address(),
-			ColorID:            walletAccount.ColorID,
+			ColorID:            multiaccscommon.CustomizationColor(walletAccount.ColorID),
 			Emoji:              walletAccount.Emoji,
 			Path:               common.PathMaster,
 			Name:               walletAccount.Name,
@@ -528,7 +528,7 @@ func (m *AccountsManager) SaveOrUpdateKeycard(keycard *types.Keycard, password s
 		return ErrKeycardDoesNotRelateToAnyKeypair(err)
 	}
 
-	err = m.persistence.SaveOrUpdateKeycard(keycard, clock, true)
+	err = m.persistence.SaveOrUpdateKeycard(*keycard, clock, true)
 	if err != nil {
 		return err
 	}
