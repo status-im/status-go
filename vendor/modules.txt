@@ -1,7 +1,3 @@
-# github.com/BurntSushi/toml v1.3.2
-## explicit; go 1.16
-github.com/BurntSushi/toml
-github.com/BurntSushi/toml/internal
 # github.com/Masterminds/squirrel v1.5.4
 ## explicit; go 1.14
 github.com/Masterminds/squirrel
@@ -357,10 +353,6 @@ github.com/golang/groupcache/singleflight
 # github.com/golang/protobuf v1.5.3
 ## explicit; go 1.9
 github.com/golang/protobuf/proto
-github.com/golang/protobuf/ptypes
-github.com/golang/protobuf/ptypes/any
-github.com/golang/protobuf/ptypes/duration
-github.com/golang/protobuf/ptypes/timestamp
 # github.com/golang/snappy v0.0.4
 ## explicit
 github.com/golang/snappy
@@ -950,16 +942,13 @@ github.com/shirou/gopsutil/internal/common
 # github.com/shopspring/decimal v1.2.0
 ## explicit; go 1.13
 github.com/shopspring/decimal
-# github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
-## explicit; go 1.18
-github.com/siphiuel/lc-proxy-wrapper
 # github.com/spaolacci/murmur3 v1.1.0
 ## explicit
 github.com/spaolacci/murmur3
 # github.com/status-im/doubleratchet v3.0.0+incompatible
 ## explicit
 github.com/status-im/doubleratchet
-# github.com/status-im/extkeys v1.1.0
+# github.com/status-im/extkeys v1.2.0
 ## explicit; go 1.21
 github.com/status-im/extkeys
 # github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4
@@ -970,7 +959,6 @@ github.com/status-im/markdown/parser
 # github.com/status-im/migrate/v4 v4.6.2-status.3
 ## explicit; go 1.12
 github.com/status-im/migrate/v4
-github.com/status-im/migrate/v4/database/postgres
 github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/migrate/v4/internal/url
 github.com/status-im/migrate/v4/source/go_bindata
@@ -1249,7 +1237,6 @@ golang.org/x/crypto/ripemd160
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/sha3
-golang.org/x/crypto/ssh/terminal
 # golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
 ## explicit; go 1.20
 golang.org/x/exp/constraints
@@ -1303,12 +1290,8 @@ golang.org/x/sync/singleflight
 ## explicit; go 1.18
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
-golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.29.0
-## explicit; go 1.18
-golang.org/x/term
 # golang.org/x/text v0.22.0
 ## explicit; go 1.18
 golang.org/x/text/cases
@@ -1422,8 +1405,6 @@ google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/descriptorpb
 google.golang.org/protobuf/types/dynamicpb
 google.golang.org/protobuf/types/gofeaturespb
-google.golang.org/protobuf/types/known/anypb
-google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/pluginpb
 # gopkg.in/go-playground/assert.v1 v1.2.1

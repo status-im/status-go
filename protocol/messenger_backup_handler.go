@@ -10,7 +10,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
@@ -282,7 +282,7 @@ func (m *Messenger) backupFetchingTimeout() {
 	}
 
 	notification.UpdatedAt = m.GetCurrentTimeInMillis()
-	if m.backedUpFetchingStatus.dataProgress == nil || len(m.backedUpFetchingStatus.dataProgress) == 0 {
+	if len(m.backedUpFetchingStatus.dataProgress) == 0 {
 		notification.Type = ActivityCenterNotificationTypeBackupSyncingFailure
 	} else {
 		notification.Type = ActivityCenterNotificationTypeBackupSyncingPartialFailure
@@ -375,6 +375,13 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 			if err != nil {
 				return err
 			}
+
+			if m.httpServer != nil {
+				for j, image := range idImages {
+					idImages[j].LocalURL = m.httpServer.MakeAccountImageURL(message.KeyUid, image.Name, image.Clock)
+				}
+			}
+
 			response.SetImages(idImages)
 		}
 	}

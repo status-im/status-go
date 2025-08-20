@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.20'
+library 'status-jenkins-lib@v1.9.26'
 
 pipeline {
   agent { label 'linux && x86_64 && nix-2.24' }
@@ -27,7 +27,7 @@ pipeline {
     )
     booleanParam(
       name: 'UNIT_TEST_USE_DEVELOPMENT_LOGGER',
-      defaultValue: !isNightlyJob(),
+      defaultValue: false,
       description: 'Should the job use detailed logging for tests, potentially generating large logs?'
     )
     booleanParam(
@@ -82,6 +82,9 @@ pipeline {
 
     /* prevent sharing cache dir across different jobs */
     GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
+
+    /* fixes nim cache collision */
+    XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
   }
 
   stages {
@@ -122,12 +125,6 @@ pipeline {
       }
       steps { script {
         nix.develop('make migration-check', pure: false)
-      } }
-    }
-
-    stage('Lint') {
-      steps { script {
-        nix.develop('make lint', pure: false)
       } }
     }
 

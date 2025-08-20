@@ -228,6 +228,11 @@ func (m *Messenger) processCommunityChat(chat *Chat, communityInfo map[string]*c
 		}
 	}
 
+	// Members could be populated in the DB from previous inserts
+	if !community.ChannelHasPermissions(chat.CommunityChatID()) {
+		chat.Members = []ChatMember{}
+	}
+
 	return nil
 }
 

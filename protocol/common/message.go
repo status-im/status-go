@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/markdown/ast"
 
 	"github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/protobuf"

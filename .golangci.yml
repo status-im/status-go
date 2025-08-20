@@ -1,78 +1,73 @@
+version: "2"
 run:
-  concurrency: 0
-  timeout: 10m
-  issues-exit-code: 1
   modules-download-mode: vendor
+  issues-exit-code: 1
   tests: true
-  skip-dirs:
-    - static
-    - vendor
-  skip-files:
-    - bindata.go
-    - .*_mock.go
-    - contracts/
-    - eth-node/crypto/ecies/ # copied
-
-output:
-  format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
-
-linters-settings:
-  errcheck:
-    check-type-assertions: false
-    check-blank: false
-  govet:
-    check-shadowing: false
-  golint:
-    min-confidence: 0.8
-  gofmt:
-    simplify: true
-  goimports:
-    local-prefixes: github.com/ethereum/go-ethereum,github.com/status-im/status-go,github.com/waku-org/go-waku
-  maligned:
-    suggest-new: true
-  dupl:
-    threshold: 50
-  goconst:
-    min-len: 3
-    min-occurrences: 2
-  gosec:
-    excludes:
-      - G115
-
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
     - gosec
-    - goimports
     - govet
     - ineffassign
     - misspell
-    # You can't disable typecheck, see:
-    # https://github.com/golangci/golangci-lint/blob/master/docs/src/docs/welcome/faq.mdx#why-do-you-have-typecheck-errors
-    - typecheck
     - unconvert
-  fast: false
+  settings:
+    dupl:
+      threshold: 50
+    errcheck:
+      check-type-assertions: false
+      check-blank: false
+    goconst:
+      min-len: 3
+      min-occurrences: 2
+    gosec:
+      excludes:
+        - G115
+  exclusions:
+    generated: lax
+    presets:
+      - std-error-handling
+      - legacy
+    paths:
+    - contracts/
+    rules:
+      - linters:
+          - goconst
+        path: eth-node/keystore/passphrase\.go
+        text: make it a constant
+      - linters:
+          - goconst
+        path: protocol/message_handler\.go
+        text: make it a constant
+      - linters:
+          - goconst
+        path: protocol/.*_test\.go
+        text: make it a constant
+      - path: (.+)\.go$
+        text: composite literal uses unkeyed fields
+      - path: (.+)\.go$
+        text: 'G304: Potential file inclusion via variable'
+      - path: (.+)\.go$
+        text: 'G104: Errors unhandled.'
+      - path: (.+)\.go$
+        text: lib._Ctype_char, which can be annoying to use
+      - path: (.+)\.go$
+        text: SA1019
 
-issues:
-  exclude:
-    - "composite literal uses unkeyed fields" # govet
-    - "G304: Potential file inclusion via variable" # gosec
-    - "G104: Errors unhandled." #gosec
-    - "lib._Ctype_char, which can be annoying to use" # golint
-    - "SA1019" # staticcheck
-  exclude-rules:
-    - path: eth-node/keystore/passphrase\.go
-      text: "make it a constant"
-      linters:
-        - goconst
-    - path: protocol/message_handler\.go
-      text: "make it a constant"
-      linters:
-        - goconst
-    - path: protocol/.*_test\.go
-      text: "make it a constant"
-      linters:
-        - goconst
+formatters:
+  enable:
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - github.com/ethereum/go-ethereum
+        - github.com/status-im/status-go
+        - github.com/waku-org/go-waku
+  exclusions:
+    generated: strict
+    paths:
+    - static
+    - vendor

@@ -21,9 +21,6 @@ const (
 	// EventNodeCrashed is triggered when node crashes
 	EventNodeCrashed = "node.crashed"
 
-	// EventChainDataRemoved is triggered when node's chain data is removed
-	EventChainDataRemoved = "chaindata.removed"
-
 	// EventLoggedIn is once node was injected with user account and ready to be used.
 	EventLoggedIn = "node.login"
 )
@@ -65,11 +62,6 @@ func SendNodeReady() {
 // SendNodeStopped emits a signal when underlying node has stopped.
 func SendNodeStopped() {
 	send(EventNodeStopped, nil)
-}
-
-// SendChainDataRemoved emits a signal when node's chain data has been removed.
-func SendChainDataRemoved() {
-	send(EventChainDataRemoved, nil)
 }
 
 func SendLoggedIn(account *multiaccounts.Account, settings *settings.Settings, ensUsernames json.RawMessage, err error) {

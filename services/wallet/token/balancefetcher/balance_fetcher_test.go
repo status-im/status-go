@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/params"
 
@@ -134,8 +133,6 @@ func (f *FakeERC20Caller) Decimals(opts *bind.CallOpts) (uint8, error) {
 }
 
 func TestBalanceFetcherFetchBalancesForChainNativeAndTokensWithScanContract(t *testing.T) {
-	log.Root().SetHandler(log.LvlFilterHandler(log.LvlInfo, log.StreamHandler(os.Stdout, log.TerminalFormat(true))))
-
 	ctx := context.Background()
 	accounts := []common.Address{
 		common.HexToAddress("0x1234567890abcdef"),
@@ -203,8 +200,6 @@ func TestBalanceFetcherFetchBalancesForChainNativeAndTokensWithScanContract(t *t
 }
 
 func TestBalanceFetcherFetchBalancesForChainTokensWithTokenContracts(t *testing.T) {
-	log.Root().SetHandler(log.LvlFilterHandler(log.LvlInfo, log.StreamHandler(os.Stdout, log.TerminalFormat(true))))
-
 	ctx := context.Background()
 	accounts := []common.Address{
 		common.HexToAddress("0x1234567890abcdef"),
@@ -267,8 +262,6 @@ func TestBalanceFetcherFetchBalancesForChainTokensWithTokenContracts(t *testing.
 }
 
 func TestBalanceFetcherGetBalancesAtByChain(t *testing.T) {
-	log.Root().SetHandler(log.LvlFilterHandler(log.LvlInfo, log.StreamHandler(os.Stdout, log.TerminalFormat(true))))
-
 	ctx := context.Background()
 	accounts := []common.Address{
 		common.HexToAddress("0x1234567890abcdef"),

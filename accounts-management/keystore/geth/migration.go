@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 )
 
 func migrateKeyStoreDir(oldDir, newDir string, addresses []string) error {

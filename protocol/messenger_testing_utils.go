@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/peer"
-
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/wakusync"
 
@@ -23,8 +21,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -170,15 +166,6 @@ func WaitOnSignaledMessengerResponse(m *Messenger, condition func(*MessengerResp
 			time.Sleep(interval)
 		}
 	}
-}
-
-func hasAllPeers(m map[peer.ID]wakutypes.WakuV2Peer, checkSlice peer.IDSlice) bool {
-	for _, check := range checkSlice {
-		if _, ok := m[check]; !ok {
-			return false
-		}
-	}
-	return true
 }
 
 func FindFirstByContentType(messages []*common.Message, contentType protobuf.ChatMessage_ContentType) *common.Message {

@@ -10,12 +10,12 @@ import (
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -29,24 +29,19 @@ const (
 	DefaultKeystoreRelativePath   = "keystore"
 	DefaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
 	DefaultDataDir                = "/ethereum/mainnet_rpc"
-	DefaultNodeName               = "StatusIM"
 	DefaultAPILogFile             = "api.log"
 
-	DefaultLogLevel                   = "ERROR"
-	DefaultMaxPeers                   = 20
-	DefaultMaxPendingPeers            = 20
-	DefaultListenAddr                 = ":0"
+	DefaultLogLevel                 = "ERROR"
+	DefaultVerifyTransactionChainID = 1
+	DefaultCurrentNetwork           = "mainnet_rpc"
+
 	DefaultMaxMessageDeliveryAttempts = 3
-	DefaultVerifyTransactionChainID   = 1
-	DefaultCurrentNetwork             = "mainnet_rpc"
 )
 
 var (
 	paths = []string{accscommon.PathWalletRoot, accscommon.PathEIP1581Root, accscommon.PathEIP1581Chat, accscommon.PathDefaultWalletAccount, accscommon.PathEIP1581Encryption}
 
 	DefaultFleet = params.FleetStatusProd
-
-	overrideApiConfig = overrideApiConfigProd
 )
 
 func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
@@ -81,7 +76,7 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.SigningPhrase = signingPhrase
 
 	s.SendPushNotifications = true
-	s.InstallationID = multidevice.GenerateInstallationID()
+	s.InstallationID = messaging.GenerateInstallationID()
 	s.UseMailservers = true
 
 	s.PreviewPrivacy = true
@@ -136,7 +131,6 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	specifiedWakuV2Config := nodeConfig.WakuV2Config
 	nodeConfig.WakuV2Config = params.WakuV2Config{
 		Enabled:        true,
-		EnableDiscV5:   true,
 		DiscoveryLimit: 20,
 		Host:           "0.0.0.0",
 		AutoUpdate:     true,
@@ -260,7 +254,7 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	return walletConfig
 }
 
-func overrideApiConfigProd(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
+func overrideApiConfig(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
 	nodeConfig.APIModules = config.APIModules
 	nodeConfig.ConnectorConfig.Enabled = config.ConnectorEnabled
 
@@ -325,19 +319,10 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.NetworkID = nodeConfig.Networks[0].ChainID
 	}
 
-	nodeConfig.Name = DefaultNodeName
-	nodeConfig.NoDiscovery = true
-	nodeConfig.MaxPeers = DefaultMaxPeers
-	nodeConfig.MaxPendingPeers = DefaultMaxPendingPeers
-
 	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
 
-	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
-	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
-
-	nodeConfig.ListenAddr = DefaultListenAddr
 
 	fleet := request.WakuV2Fleet
 	if fleet == "" {
@@ -367,8 +352,8 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		InstallationID:             installationID,
-		MaxMessageDeliveryAttempts: DefaultMaxMessageDeliveryAttempts,
 		MailServerConfirmations:    true,
+		MaxMessageDeliveryAttempts: DefaultMaxMessageDeliveryAttempts,
 		VerifyTransactionChainID:   DefaultVerifyTransactionChainID,
 		DataSyncEnabled:            true,
 		PFSEnabled:                 true,

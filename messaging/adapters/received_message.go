@@ -2,7 +2,7 @@ package adapters
 
 import (
 	"github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
 func ToWakuMessage(m *types.ReceivedMessage) *wakutypes.Message {

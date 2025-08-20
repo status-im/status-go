@@ -20,9 +20,8 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/crypto/ecies"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
 	messagingevents "github.com/status-im/status-go/messaging/events"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
@@ -50,7 +49,6 @@ import (
 // hoping to get a reply at some later stages.
 
 const encryptedPayloadKeyLength = 16
-const accessTokenKeyLength = 16
 const staleQueryTimeInSeconds = 86400
 const mentionInstallationID = "mention"
 const oneToOneChatIDLength = 132
@@ -702,11 +700,7 @@ func (c *Client) encryptRegistration(publicKey *ecdsa.PublicKey, payload []byte)
 }
 
 func (c *Client) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
-	return ecies.ImportECDSA(c.config.Identity).GenerateShared(
-		ecies.ImportECDSAPublic(publicKey),
-		encryptedPayloadKeyLength,
-		encryptedPayloadKeyLength,
-	)
+	return crypto.GenerateSharedKey(c.config.Identity, publicKey)
 }
 
 // subscribeForMessageEvents subscribes for newly sent/scheduled messages so we can check if we need to send a push notification
@@ -734,8 +728,6 @@ func (c *Client) subscribeForMessageEvents() {
 					if err := c.handleMessageSent(&m); err != nil {
 						c.config.Logger.Error("failed to handle message", zap.Error(err))
 					}
-				default:
-					c.config.Logger.Warn("message event type not supported")
 				}
 			case <-c.quit:
 				return
@@ -1150,11 +1142,7 @@ func (c *Client) chatIDsHashes(chatIDs []string) [][]byte {
 }
 
 func (c *Client) encryptToken(publicKey *ecdsa.PublicKey, token []byte) ([]byte, error) {
-	sharedKey, err := ecies.ImportECDSA(c.config.Identity).GenerateShared(
-		ecies.ImportECDSAPublic(publicKey),
-		accessTokenKeyLength,
-		accessTokenKeyLength,
-	)
+	sharedKey, err := crypto.GenerateSharedKey(c.config.Identity, publicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1166,11 +1154,7 @@ func (c *Client) encryptToken(publicKey *ecdsa.PublicKey, token []byte) ([]byte,
 }
 
 func (c *Client) decryptToken(publicKey *ecdsa.PublicKey, token []byte) ([]byte, error) {
-	sharedKey, err := ecies.ImportECDSA(c.config.Identity).GenerateShared(
-		ecies.ImportECDSAPublic(publicKey),
-		accessTokenKeyLength,
-		accessTokenKeyLength,
-	)
+	sharedKey, err := crypto.GenerateSharedKey(c.config.Identity, publicKey)
 	if err != nil {
 		return nil, err
 	}

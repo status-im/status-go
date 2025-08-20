@@ -6,7 +6,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 )
 
 // errors
@@ -33,7 +33,7 @@ func splitHMAC(seed, salt []byte) (secretKey, chainCode []byte, err error) {
 	// There's tiny possibility (<1 in 2^127) this invariant is violated:
 	//   error is returned in that case, and simple resolution is to request another child with i incremented.
 	keyBigInt := new(big.Int).SetBytes(secretKey)
-	if keyBigInt.Cmp(btcec.S256().N) >= 0 || keyBigInt.Sign() == 0 {
+	if keyBigInt.Cmp(secp256k1.S256().N) >= 0 || keyBigInt.Sign() == 0 {
 		err = ErrInvalidSecretKey
 	}
 

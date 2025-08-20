@@ -16,10 +16,10 @@ import (
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/deprecation"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
@@ -2454,6 +2454,10 @@ func buildImageWithoutAlbumIDMessage(chat Chat) (*common.Message, error) {
 
 type testTimeSource struct{}
 
+func (t *testTimeSource) Now() time.Time {
+	return time.Now()
+}
+
 func (t *testTimeSource) GetCurrentTime() uint64 {
 	return uint64(time.Now().Unix())
 }
@@ -2603,4 +2607,9 @@ func (s *MessengerSuite) TestFilterCommunityChats() {
 func getTimeWithAllowedFutureDrift() uint64 {
 	currentTime := timesource.GetCurrentTimeInMillis()
 	return currentTime + MaxWhisperFutureDriftMs/2
+}
+
+func (s *MessengerSuite) TestStats() {
+	stats := s.m.GetStats()
+	s.Require().NotNil(stats)
 }

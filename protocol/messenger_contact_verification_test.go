@@ -4,14 +4,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/verification"
 
 	"github.com/stretchr/testify/suite"
-
-	"github.com/status-im/status-go/eth-node/types"
 )
 
 func TestMessengerVerificationRequests(t *testing.T) { // nolint: deadcode,unused

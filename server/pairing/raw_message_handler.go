@@ -9,9 +9,9 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/signal"
@@ -130,7 +130,19 @@ func (s *SyncRawMessageHandler) HandleRawMessage(
 
 func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAccountRequest *requests.CreateAccount, rmp *RawMessagesPayload) error {
 	account := accountPayload.multiaccount
-	installationID := multidevice.GenerateInstallationID()
+
+	for _, acc := range rmp.profileKeypair.Accounts {
+		if acc.Chat {
+			err := api.EnrichMultiAccountByPublicKey(account, acc.PublicKey)
+			if err != nil {
+				return err
+			}
+			break
+		}
+	}
+
+	installationID := messaging.GenerateInstallationID()
+
 	nodeConfig, err := api.DefaultNodeConfig(installationID, account.KeyUID, createAccountRequest)
 	if err != nil {
 		return err
@@ -157,8 +169,7 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 	rmp.setting.CurrentNetwork = api.DefaultCurrentNetwork
 
 	return s.backend.StartNodeWithAccountAndInitialConfig(
-		"",
-		*account,
+		account,
 		accountPayload.password,
 		*rmp.setting,
 		nodeConfig,

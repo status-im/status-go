@@ -1,6 +1,6 @@
 package transport
 
-import wakutypes "github.com/status-im/status-go/waku/types"
+import wakutypes "github.com/status-im/status-go/messaging/waku/types"
 
 // TODO: revise fields encoding/decoding. Some are encoded using hexutil and some using encoding/hex.
 type Filter struct {

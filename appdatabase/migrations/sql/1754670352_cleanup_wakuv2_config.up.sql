@@ -1,0 +1,15 @@
+ALTER TABLE wakuv2_config DROP COLUMN enabled;
+ALTER TABLE wakuv2_config DROP COLUMN host;
+ALTER TABLE wakuv2_config DROP COLUMN port;
+ALTER TABLE wakuv2_config DROP COLUMN full_node;
+ALTER TABLE wakuv2_config DROP COLUMN enable_discv5;
+ALTER TABLE wakuv2_config DROP COLUMN peer_exchange;
+ALTER TABLE wakuv2_config DROP COLUMN discovery_limit;
+ALTER TABLE wakuv2_config DROP COLUMN data_dir;
+ALTER TABLE wakuv2_config DROP COLUMN max_message_size;
+ALTER TABLE wakuv2_config DROP COLUMN enable_confirmations;
+ALTER TABLE wakuv2_config DROP COLUMN udp_port;
+ALTER TABLE wakuv2_config DROP COLUMN auto_update;
+ALTER TABLE wakuv2_config DROP COLUMN enable_store;
+ALTER TABLE wakuv2_config DROP COLUMN store_capacity;
+ALTER TABLE wakuv2_config DROP COLUMN store_seconds;

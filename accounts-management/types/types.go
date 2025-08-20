@@ -1,8 +1,6 @@
 package types
 
-import (
-	ethtypes "github.com/status-im/status-go/eth-node/types"
-)
+import cryptotypes "github.com/status-im/status-go/crypto/types"
 
 type PublicKeyData struct {
 	CompressedKey string   `json:"compressedKey"`
@@ -11,8 +9,8 @@ type PublicKeyData struct {
 
 // SelectedExtKey is a container for the selected (logged in) external account.
 type SelectedExtKey struct {
-	Address     ethtypes.Address
-	AccountKey  *ethtypes.Key
+	Address     cryptotypes.Address
+	AccountKey  *Key
 	SubAccounts []Account
 }
 

@@ -13,7 +13,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
@@ -28,7 +28,6 @@ var (
 	networks = json.RawMessage("{}")
 	settings = Settings{
 		Address:                             types.HexToAddress("0xdC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
-		AnonMetricsShouldSend:               false,
 		CurrentNetwork:                      "mainnet_rpc",
 		DappsAddress:                        types.HexToAddress("0xD1300f99fDF7346986CbC766903245087394ecd0"),
 		InstallationID:                      "d3efcff6-cffa-560e-a547-21d3858cbc51",

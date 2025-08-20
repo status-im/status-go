@@ -29,7 +29,7 @@ import (
 	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multicommon "github.com/status-im/status-go/multiaccounts/common"
@@ -449,7 +449,7 @@ func (tc *TestClient) CallContract(ctx context.Context, call ethereum.CallMsg, b
 			}
 
 			hash := [32]byte{}
-			for i, b := range ethtypes.BytesToHash(balanceBytes).Bytes() {
+			for i, b := range cryptotypes.BytesToHash(balanceBytes).Bytes() {
 				hash[i] = b
 			}
 
@@ -1595,7 +1595,7 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 	}
 
 	acc := &accounts.Account{
-		Address: ethtypes.BytesToAddress(address.Bytes()),
+		Address: cryptotypes.BytesToAddress(address.Bytes()),
 		Type:    accounts.AccountTypeWatch,
 		Name:    address.String(),
 		ColorID: multicommon.CustomizationColorPrimary,
@@ -1655,7 +1655,7 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 
 	for _, address := range []*common.Address{&address1, &address2} {
 		acc := &accounts.Account{
-			Address: ethtypes.BytesToAddress(address.Bytes()),
+			Address: cryptotypes.BytesToAddress(address.Bytes()),
 			Type:    accounts.AccountTypeWatch,
 			Name:    address.String(),
 			ColorID: multicommon.CustomizationColorPrimary,

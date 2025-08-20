@@ -4,19 +4,10 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/jinzhu/copier"
-	"github.com/pkg/errors"
-	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -36,9 +27,9 @@ type TransportLayer struct {
 type EncryptionLayer struct {
 	// Payload after having been processed by the encryption layer
 	Payload         []byte `json:"-"`
-	Installations   []*multidevice.Installation
-	SharedSecrets   []*sharedsecret.Secret
-	HashRatchetInfo []*encryption.HashRatchetInfo
+	Installations   []*Installation
+	SharedSecrets   []*SharedSecret
+	HashRatchetInfo []*HashRatchetInfo
 }
 
 // ApplicationLayer is the topmost layer and represents the application message.
@@ -90,94 +81,7 @@ func (m *Message) Clone() (*Message, error) {
 	return copy, err
 }
 
-func (m *Message) HandleTransportLayer(msg *ReceivedMessage) error {
-	publicKey, err := crypto.UnmarshalPubkey(msg.Sig)
-	if err != nil {
-		return errors.Wrap(err, "failed to get signature")
-	}
-
-	m.TransportLayer.Message = msg
-	m.TransportLayer.Hash = msg.Hash
-	m.TransportLayer.SigPubKey = publicKey
-	m.TransportLayer.Payload = msg.Payload
-
-	if msg.Dst != nil {
-		publicKey, err := crypto.UnmarshalPubkey(msg.Dst)
-		if err != nil {
-			return err
-		}
-		m.TransportLayer.Dst = publicKey
-	}
-
-	return nil
-}
-
-func (m *Message) HandleEncryptionLayer(myKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, enc *encryption.Protocol, skipNegotiation bool) error {
-	// As we handle non-encrypted messages, we make sure that DecryptPayload
-	// is set regardless of whether this step is successful
-	m.EncryptionLayer.Payload = m.TransportLayer.Payload
-	// Nothing to do
-	if skipNegotiation {
-		return nil
-	}
-
-	var protocolMessage encryption.ProtocolMessage
-	err := proto.Unmarshal(m.TransportLayer.Payload, &protocolMessage)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal ProtocolMessage")
-	}
-
-	response, err := enc.HandleMessage(
-		myKey,
-		senderKey,
-		&protocolMessage,
-		m.TransportLayer.Hash,
-	)
-
-	if err == encryption.ErrHashRatchetGroupIDNotFound {
-
-		if response != nil {
-			m.EncryptionLayer.HashRatchetInfo = response.HashRatchetInfo
-		}
-		return err
-	}
-
-	if err != nil {
-		return errors.Wrap(err, "failed to handle Encryption message")
-	}
-
-	m.EncryptionLayer.Payload = response.DecryptedMessage
-	m.EncryptionLayer.Installations = response.Installations
-	m.EncryptionLayer.SharedSecrets = response.SharedSecrets
-	m.EncryptionLayer.HashRatchetInfo = response.HashRatchetInfo
-	return nil
-}
-
 func MessageID(author *ecdsa.PublicKey, data []byte) types.HexBytes {
 	keyBytes := crypto.FromECDSAPub(author)
 	return types.HexBytes(crypto.Keccak256(append(keyBytes, data...)))
-}
-
-// FIXME: move ApplicationLayer out of messaging
-func (m *Message) HandleApplicationLayer() error {
-	message, err := protobuf.Unmarshal(m.EncryptionLayer.Payload)
-	if err != nil {
-		return err
-	}
-
-	recoveredKey, err := utils.RecoverKey(message)
-	if err != nil {
-		return err
-	}
-	m.ApplicationLayer.SigPubKey = recoveredKey
-	// Calculate ID using the wrapped record
-	m.ApplicationLayer.ID = MessageID(recoveredKey, m.EncryptionLayer.Payload)
-	logutils.ZapLogger().Debug("calculated ID for envelope",
-		zap.String("envelopeHash", hexutil.Encode(m.TransportLayer.Hash)),
-		zap.String("messageId", hexutil.Encode(m.ApplicationLayer.ID)),
-	)
-
-	m.ApplicationLayer.Payload = message.Payload
-	m.ApplicationLayer.Type = message.Type
-	return nil
 }

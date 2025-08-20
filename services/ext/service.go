@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -26,25 +24,21 @@ import (
 	"github.com/status-im/status-go/api/multiformat"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/messaging"
-	messagingevents "github.com/status-im/status-go/messaging/events"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/metrics/wakumetrics"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
@@ -60,17 +54,10 @@ import (
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/timesource"
-	"github.com/status-im/status-go/wakuv2"
-	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
 
 const infinityString = "∞"
 const providerID = "community"
-
-var (
-	ErrWakuIdentityInjectionFailure = errors.New("failed to inject identity into waku")
-)
 
 // EnvelopeEventsHandler used for two different event types.
 type EnvelopeEventsHandler interface {
@@ -82,7 +69,6 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
-	waku            *wakuv2.Waku
 	messaging       *messaging.API
 	messenger       *protocol.Messenger
 	cancelMessenger chan struct{}
@@ -92,8 +78,7 @@ type Service struct {
 	multiAccountsDB *multiaccounts.Database
 	account         *multiaccounts.Account
 
-	metricsEnabled bool
-	wakumetrics    *wakumetrics.Client
+	logger *zap.Logger
 }
 
 // Make sure that Service implements node.Service interface.
@@ -102,93 +87,16 @@ var _ node.Lifecycle = (*Service)(nil)
 func New(
 	config params.NodeConfig,
 	rpcClient *rpc.Client,
+	logger *zap.Logger,
 ) *Service {
 	return &Service{
 		rpcClient: rpcClient,
 		config:    config,
+		logger:    logger,
 	}
-}
-
-func newWakuV2(identity *ecdsa.PrivateKey, nodeConfig *params.NodeConfig, appDB *sql.DB, ts *timesource.NTPTimeSource, metricsEnabled bool) (*wakuv2.Waku, error) {
-	cfg := &wakuv2.Config{
-		MaxMessageSize:                         wakuv2common.DefaultMaxMessageSize,
-		Host:                                   nodeConfig.WakuV2Config.Host,
-		Port:                                   nodeConfig.WakuV2Config.Port,
-		LightClient:                            nodeConfig.WakuV2Config.LightClient,
-		WakuNodes:                              nodeConfig.ClusterConfig.WakuNodes,
-		EnableStore:                            nodeConfig.WakuV2Config.EnableStore,
-		StoreCapacity:                          nodeConfig.WakuV2Config.StoreCapacity,
-		StoreSeconds:                           nodeConfig.WakuV2Config.StoreSeconds,
-		DiscoveryLimit:                         nodeConfig.WakuV2Config.DiscoveryLimit,
-		DiscV5BootstrapNodes:                   nodeConfig.ClusterConfig.DiscV5BootstrapNodes,
-		Nameserver:                             nodeConfig.WakuV2Config.Nameserver,
-		UDPPort:                                nodeConfig.WakuV2Config.UDPPort,
-		AutoUpdate:                             nodeConfig.WakuV2Config.AutoUpdate,
-		DefaultShardPubsubTopic:                messagingtypes.DefaultShardPubsubTopic(),
-		ClusterID:                              nodeConfig.ClusterConfig.ClusterID,
-		EnableMissingMessageVerification:       nodeConfig.WakuV2Config.EnableMissingMessageVerification,
-		EnableStoreConfirmationForMessagesSent: nodeConfig.WakuV2Config.EnableStoreConfirmationForMessagesSent,
-		UseThrottledPublish:                    true,
-		MetricsEnabled:                         metricsEnabled,
-	}
-
-	// Configure peer exchange and discv5 settings based on node type
-	if cfg.LightClient {
-		cfg.EnablePeerExchangeServer = false
-		cfg.EnablePeerExchangeClient = true
-		cfg.EnableDiscV5 = false
-	} else {
-		cfg.EnablePeerExchangeServer = true
-		cfg.EnablePeerExchangeClient = false
-		cfg.EnableDiscV5 = true
-	}
-
-	if nodeConfig.WakuV2Config.MaxMessageSize > 0 {
-		cfg.MaxMessageSize = nodeConfig.WakuV2Config.MaxMessageSize
-	}
-
-	var nodeKey *ecdsa.PrivateKey
-	var err error
-	if nodeConfig.NodeKey != "" {
-		nodeKey, err = crypto.HexToECDSA(nodeConfig.NodeKey)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert nodekey into a valid private key: %v", err)
-		}
-	} else {
-		nodeKeyStr := os.Getenv("WAKUV2_NODE_KEY")
-		if nodeKeyStr != "" {
-			nodeKeyBytes, err := hexutil.Decode(nodeKeyStr)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decode the go-waku private key: %v", err)
-			}
-
-			nodeKey, err = crypto.ToECDSA(nodeKeyBytes)
-			if err != nil {
-				return nil, fmt.Errorf("could not convert nodekey into a valid private key: %v", err)
-			}
-		}
-	}
-
-	waku, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger(), appDB, ts, signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
-	if err != nil {
-		return nil, err
-	}
-
-	// Inject the identity into Waku
-	err = waku.DeleteKeyPairs()
-	if err != nil {
-		return nil, err
-	}
-	_, err = waku.AddKeyPair(identity)
-	if err != nil {
-		return nil, ErrWakuIdentityInjectionFailure
-	}
-
-	return waku, nil
 }
 
 type InitProtocolParams struct {
-	NodeName               string
 	Identity               *ecdsa.PrivateKey
 	AppDB                  *sql.DB
 	WalletDB               *sql.DB
@@ -199,9 +107,8 @@ type InitProtocolParams struct {
 	RPCClient              *rpc.Client
 	WalletService          *wallet.Service
 	CommunityTokensService *communitytokens.Service
-	Logger                 *zap.Logger
 	AccountsPublisher      *pubsub.Publisher
-	TimeSource             *timesource.NTPTimeSource
+	TimeSource             timesource.TimeSource
 	MetricsEnabled         bool
 }
 
@@ -211,8 +118,6 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		return nil
 	}
 
-	s.metricsEnabled = params.MetricsEnabled
-
 	// If Messenger has been already set up, we need to shut it down
 	// before we init it again. Otherwise, it will lead to goroutines leakage
 	// due to not stopped filters.
@@ -221,8 +126,8 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 			return err
 		}
 	}
-	if s.waku != nil {
-		if err := s.waku.Stop(); err != nil {
+	if s.messaging != nil {
+		if err := s.messaging.Stop(); err != nil {
 			return err
 		}
 	}
@@ -234,11 +139,6 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		return err
 	}
 
-	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
-		MaxMessageDeliveryAttempts: s.config.ShhextConfig.MaxMessageDeliveryAttempts,
-		MailServerConfirmations:    s.config.ShhextConfig.MailServerConfirmations,
-		EnvelopeEventsHandler:      EnvelopeSignalHandler{},
-	}
 	s.accountsDB, err = accounts.NewDB(params.AppDB)
 	if err != nil {
 		return err
@@ -246,46 +146,53 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 	s.multiAccountsDB = params.MultiAccountDB
 	s.account = params.Account
 
-	s.waku, err = newWakuV2(params.Identity, &s.config, params.AppDB, params.TimeSource, params.MetricsEnabled)
-	if err != nil {
-		return err
-	}
-
-	ensVerifier := ens.New(
-		params.Logger,
-		s.waku, // timesource
-		params.AppDB,
-		s.config.ShhextConfig.VerifyENSURL,
-		s.config.ShhextConfig.VerifyENSContractAddress,
-	)
-
 	err = sqlite.Migrate(params.AppDB)
 	if err != nil {
 		return err
 	}
 
-	// Initialize encryption layer.
-	encryptor := encryption.New(
-		params.AppDB,
-		s.config.ShhextConfig.InstallationID,
-		params.Logger,
-	)
+	nodeKey, err := obtainNodeKey(&s.config)
+	if err != nil {
+		return err
+	}
+
+	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
+		MaxMessageDeliveryAttempts: s.config.ShhextConfig.MaxMessageDeliveryAttempts,
+		MailServerConfirmations:    s.config.ShhextConfig.MailServerConfirmations,
+		EnvelopeEventsHandler:      EnvelopeSignalHandler{},
+	}
 
 	messaging, err := messaging.NewCore(
-		s.waku,
-		params.Identity,
-		params.AppDB,
-		protocol.NewMessagingPersistence(params.AppDB),
-		encryptor,
-		messaging.WithLogger(params.Logger.Named("messaging")),
+		messaging.CoreParams{
+			Identity:       params.Identity,
+			DB:             params.AppDB,
+			Persistence:    protocol.NewMessagingPersistence(params.AppDB),
+			NodeKey:        nodeKey,
+			WakuConfig:     s.config.WakuV2Config,
+			ClusterConfig:  s.config.ClusterConfig,
+			InstallationID: s.config.ShhextConfig.InstallationID,
+			TimeSource:     params.TimeSource,
+		},
+		messaging.WithLogger(s.logger),
 		messaging.WithEnvelopeEventsConfig(envelopeEventsConfig),
+		messaging.WithHistoricMessagesRequestFailedHandler(signal.SendHistoricMessagesRequestFailed),
+		messaging.WithPeerStatsHandler(signal.SendPeerStats),
+		messaging.WithMetrics(params.MetricsEnabled),
 	)
 	if err != nil {
 		return err
 	}
 	s.messaging = messaging.API()
 
-	options, err := buildMessengerOptions(s.config, params.Identity, params.AppDB, params.WalletDB, params.HTTPServer, s.rpcClient, s.multiAccountsDB, params.Account, envelopeEventsConfig, s.accountsDB, params.WalletService, params.CommunityTokensService, params.Logger, &MessengerSignalsHandler{}, params.AccountsManager, params.AccountsPublisher, ensVerifier)
+	ensVerifier := ens.New(
+		s.logger,
+		params.TimeSource,
+		params.AppDB,
+		s.config.ShhextConfig.VerifyENSURL,
+		s.config.ShhextConfig.VerifyENSContractAddress,
+	)
+
+	options, err := buildMessengerOptions(s.config, params.Identity, params.AppDB, params.WalletDB, params.HTTPServer, s.rpcClient, s.multiAccountsDB, params.Account, envelopeEventsConfig, s.accountsDB, params.WalletService, params.CommunityTokensService, s.logger, &MessengerSignalsHandler{}, params.AccountsManager, params.AccountsPublisher, ensVerifier)
 	if err != nil {
 		return err
 	}
@@ -310,96 +217,10 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 	return s.messenger.InitInstallations()
 }
 
-func (s *Service) startWakuMetrics() error {
-	if s.wakumetrics == nil {
-		options := []wakumetrics.TelemetryClientOption{
-			wakumetrics.WithPeerID(s.waku.PeerID().String()),
-		}
-
-		wakuMetricsHandler, err := wakumetrics.NewClient(options...)
-		if err != nil {
-			return err
-		}
-
-		err = wakuMetricsHandler.RegisterWithRegistry()
-		if err != nil {
-			return err
-		}
-
-		installation, err := s.messenger.GetOurInstallationMetadata()
-		if err != nil {
-			return err
-		}
-		wakuMetricsHandler.SetDeviceType(installation.DeviceType)
-
-		s.waku.SetMetricsHandler(wakuMetricsHandler)
-
-		s.wakumetrics = wakuMetricsHandler
-	}
-
-	go func() {
-		defer gocommon.LogOnPanic()
-
-		retrievedMessagesSub, unsubRetrievedMessages := pubsub.Subscribe[protocol.RetrievedMessagesEvent](s.messenger.Publisher(), 100)
-		defer unsubRetrievedMessages()
-
-		sentMessagesSub, unsubSentMessages := pubsub.Subscribe[messagingevents.MessageEvent](s.messenger.Messaging().Publisher(), 100)
-		defer unsubSentMessages()
-
-		sentDatasyncSub, unsubSentDatasync := pubsub.Subscribe[messagingevents.DatasyncMessagesSentEvent](s.messenger.Messaging().Publisher(), 100)
-		defer unsubSentDatasync()
-
-		for {
-			select {
-			case sub := <-retrievedMessagesSub:
-				s.wakumetrics.PushReceivedMessages(wakumetrics.ReceivedMessages{
-					Filter:     sub.Filter,
-					SHHMessage: sub.SHHMessage,
-					Messages:   sub.Messages,
-				})
-
-			case sub := <-sentMessagesSub:
-				if sub.Type != messagingevents.RawMessageSent {
-					continue
-				}
-				msg := sub.RawMessage
-				s.wakumetrics.PushRawMessageByType(
-					msg.PubsubTopic,
-					msg.ContentTopic,
-					msg.MessageType.String(),
-					uint32(len(msg.Payload)),
-				)
-
-			case sub := <-sentDatasyncSub:
-				for _, msg := range sub.Messages {
-					s.wakumetrics.PushRawMessageByType(
-						msg.PubsubTopic,
-						msg.Topic.String(),
-						"DATASYNC",
-						uint32(len(msg.Payload)),
-					)
-				}
-
-			case <-s.cancelMessenger:
-				return
-			}
-		}
-	}()
-
-	return nil
-}
-
 func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
-	err := s.waku.Start()
+	err := s.messaging.Start()
 	if err != nil {
 		return nil, err
-	}
-
-	if s.metricsEnabled {
-		err = s.startWakuMetrics()
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	// Start a loop that retrieves all messages and propagates them to status-mobile.
@@ -501,7 +322,7 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct{}) {
 	defer gocommon.LogOnPanic()
 	if s.config.ShhextConfig.VerifyTransactionURL == "" {
-		logutils.ZapLogger().Warn("not starting transaction loop")
+		s.logger.Warn("not starting transaction loop")
 		return
 	}
 
@@ -515,7 +336,7 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 		case <-ticker.C:
 			accounts, err := s.accountsDB.GetActiveAccounts()
 			if err != nil {
-				logutils.ZapLogger().Error("failed to retrieve accounts", zap.Error(err))
+				s.logger.Error("failed to retrieve accounts", zap.Error(err))
 			}
 			var wallets []types.Address
 			for _, account := range accounts {
@@ -526,7 +347,7 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 
 			response, err := s.messenger.ValidateTransactions(ctx, wallets)
 			if err != nil {
-				logutils.ZapLogger().Error("failed to validate transactions", zap.Error(err))
+				s.logger.Error("failed to validate transactions", zap.Error(err))
 				continue
 			}
 			s.messenger.PublishMessengerResponse(response)
@@ -560,7 +381,7 @@ func (s *Service) Start() error {
 
 // Stop is run when a service is stopped.
 func (s *Service) Stop() error {
-	logutils.ZapLogger().Info("Stopping shhext service")
+	s.logger.Info("Stopping shhext service")
 	if s.cancelMessenger != nil {
 		select {
 		case <-s.cancelMessenger:
@@ -573,19 +394,19 @@ func (s *Service) Stop() error {
 
 	if s.messenger != nil {
 		if err := s.messenger.Shutdown(); err != nil {
-			logutils.ZapLogger().Error("failed to stop messenger", zap.Error(err))
+			s.logger.Error("failed to stop messenger", zap.Error(err))
 			return err
 		}
 		s.messenger = nil
 	}
 
-	if s.waku != nil {
-		err := s.waku.Stop()
+	if s.messaging != nil {
+		err := s.messaging.Stop()
 		if err != nil {
-			logutils.ZapLogger().Error("failed to stop waku", zap.Error(err))
+			s.logger.Error("failed to stop messaging", zap.Error(err))
 			return err
 		}
-		s.waku = nil
+		s.messaging = nil
 	}
 
 	return nil
@@ -645,45 +466,8 @@ func buildMessengerOptions(
 		return nil, err
 	}
 
-	// Generate anon metrics client config
-	if settings.AnonMetricsShouldSend {
-		keyBytes, err := hex.DecodeString(config.ShhextConfig.AnonMetricsSendID)
-		if err != nil {
-			return nil, err
-		}
-
-		key, err := crypto.UnmarshalPubkey(keyBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		amcc := &anonmetrics.ClientConfig{
-			ShouldSend:  true,
-			SendAddress: key,
-		}
-		options = append(options, protocol.WithAnonMetricsClientConfig(amcc))
-	}
-
-	// Generate anon metrics server config
-	if config.ShhextConfig.AnonMetricsServerEnabled {
-		if len(config.ShhextConfig.AnonMetricsServerPostgresURI) == 0 {
-			return nil, errors.New("AnonMetricsServerPostgresURI must be set")
-		}
-
-		amsc := &anonmetrics.ServerConfig{
-			Enabled:     true,
-			PostgresURI: config.ShhextConfig.AnonMetricsServerPostgresURI,
-		}
-		options = append(options, protocol.WithAnonMetricsServerConfig(amsc))
-	}
-
-	var pushNotifServKey []*ecdsa.PublicKey
-	for _, d := range config.ShhextConfig.DefaultPushNotificationsServers {
-		pushNotifServKey = append(pushNotifServKey, d.PublicKey)
-	}
-
 	options = append(options, protocol.WithPushNotificationClientConfig(&pushnotificationclient.Config{
-		DefaultServers:             pushNotifServKey,
+		DefaultServers:             config.ShhextConfig.PushNotificationsServers,
 		BlockMentions:              settings.PushNotificationsBlockMentions,
 		SendEnabled:                settings.SendPushNotifications,
 		AllowFromContactsOnly:      settings.PushNotificationsFromContactsOnly,
@@ -711,8 +495,8 @@ func (s *Service) Messenger() *protocol.Messenger {
 	return s.messenger
 }
 
-func (s *Service) Waku() *wakuv2.Waku {
-	return s.waku
+func (s *Service) Metrics() string {
+	return s.messaging.Metrics()
 }
 
 func tokenURIToCommunityID(tokenURI string) string {
@@ -1081,4 +865,22 @@ func getCollectibleCommunityTraits(token *token.CommunityToken) []thirdparty.Col
 			Value:     destructibleStr,
 		},
 	}
+}
+
+func obtainNodeKey(nodeConfig *params.NodeConfig) (*ecdsa.PrivateKey, error) {
+	if nodeConfig.NodeKey != "" {
+		return crypto.HexToECDSA(nodeConfig.NodeKey)
+	}
+
+	nodeKeyStr := os.Getenv("WAKUV2_NODE_KEY")
+	if nodeKeyStr != "" {
+		nodeKeyBytes, err := hexutil.Decode(nodeKeyStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode the go-waku private key: %v", err)
+		}
+
+		return crypto.ToECDSA(nodeKeyBytes)
+	}
+
+	return nil, nil
 }

@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
 
 func TestHex(t *testing.T) {
@@ -17,8 +17,8 @@ func TestHex(t *testing.T) {
 		out string
 	}{
 		{&SelectedExtKey{
-			Address:    ethtypes.HexToAddress("0x742d35Cc6634C0532925a3b844Bc454e4438f44e"),
-			AccountKey: &ethtypes.Key{PrivateKey: cr},
+			Address:    cryptotypes.HexToAddress("0x742d35Cc6634C0532925a3b844Bc454e4438f44e"),
+			AccountKey: &Key{PrivateKey: cr},
 		}, "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"},
 		{addr, "0x0"},
 	}

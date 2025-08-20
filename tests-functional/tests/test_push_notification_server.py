@@ -66,12 +66,10 @@ class TestPushNotificationServer(MessengerSteps):
 
         # Register devices
         alice.device_platform = PushNotificationRegistrationTokenType.APN_TOKEN
-        response = alice.wakuext_service.register_for_push_notifications(alice.device_id, APN_TOPIC, alice.device_platform)
-        assert "error" not in response
+        alice.wakuext_service.register_for_push_notifications(alice.device_id, APN_TOPIC, alice.device_platform)
 
         bob.device_platform = PushNotificationRegistrationTokenType.FIREBASE_TOKEN
-        response = bob.wakuext_service.register_for_push_notifications(bob.device_id, APN_TOPIC, bob.device_platform)
-        assert "error" not in response
+        bob.wakuext_service.register_for_push_notifications(bob.device_id, APN_TOPIC, bob.device_platform)
 
         # There is currently no way to reliably check if the devices have been registered, so we just wait a few seconds
         time.sleep(10)

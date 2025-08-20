@@ -12,14 +12,13 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -123,26 +122,23 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 
 	installationID := uuid.New().String()
 
-	// Initialize encryption layer.
-	encryptionProtocol := encryption.New(
-		appDb,
-		installationID,
-		config.logger,
-	)
-
 	messaging, err := messagingEnv.NewTestCore(
-		config.privateKey,
-		appDb,
-		NewMessagingPersistence(appDb),
-		encryptionProtocol,
-		messaging.WithLogger(config.logger))
+		messaging.CoreParams{
+			Identity:       config.privateKey,
+			DB:             appDb,
+			Persistence:    NewMessagingPersistence(appDb),
+			InstallationID: installationID,
+			TimeSource:     &testTimeSource{},
+		},
+		messaging.WithLogger(config.logger),
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	ensVerifier := ens.New(
 		config.logger,
-		messaging.API(), // timesource
+		&testTimeSource{},
 		appDb,
 		"",
 		"",
@@ -191,11 +187,6 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 		return nil, err
 	}
 
-	err = m.InitFilters()
-	if err != nil {
-		return nil, err
-	}
-
 	return m, nil
 }
 
@@ -206,6 +197,11 @@ func newRunningTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, c
 	}
 
 	m.EnableBackedupMessagesProcessing()
+
+	err = m.messaging.Start()
+	if err != nil {
+		return nil, err
+	}
 
 	_, err = m.Start()
 	if err != nil {

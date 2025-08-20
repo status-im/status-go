@@ -53,21 +53,10 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		DataDir:           config.DataDir,
 		UseLightweightKDF: true,
 		NoUSB:             true,
-		Name:              config.Name,
-		Version:           config.Version,
 		P2P: p2p.Config{
 			NoDiscovery: true,
 			NoDial:      true,
 		},
-	}
-
-	if config.IPCEnabled {
-		// use well-known defaults
-		if config.IPCFile == "" {
-			config.IPCFile = "geth.ipc"
-		}
-
-		nc.IPCPath = config.IPCFile
 	}
 
 	if config.HTTPEnabled {

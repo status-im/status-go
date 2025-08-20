@@ -12,12 +12,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -901,7 +900,7 @@ func (s *PersistenceSuite) TestDecryptedCommunityCache() {
 	s.Require().Nil(retrievedCommunity)
 
 	// invalidating the cache
-	err = s.db.InvalidateDecryptedCommunityCacheForKeys([]*encryption.HashRatchetInfo{{KeyID: keyID1}})
+	err = s.db.InvalidateDecryptedCommunityCacheForKeys([]*messagingtypes.HashRatchetInfo{{KeyID: keyID1}})
 	s.Require().NoError(err)
 
 	// community cannot be retrieved anymore

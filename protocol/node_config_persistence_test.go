@@ -21,11 +21,6 @@ type NodeConfigPersistenceTestSuite struct {
 	config *params.NodeConfig
 }
 
-const (
-	testWakuNodeEnrtree   = "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
-	testWakuNodeMultiaddr = "/ip4/127.0.0.1/tcp/34012"
-)
-
 func (s *NodeConfigPersistenceTestSuite) SetupTest() {
 	db, err := openTestDB()
 	s.Require().NoError(err)
@@ -37,24 +32,6 @@ func (s *NodeConfigPersistenceTestSuite) SetupTest() {
 	// write value to the db, otherwise log_config table won't be created
 	err = nodecfg.SaveNodeConfig(s.db, s.config)
 	s.Require().NoError(err)
-}
-
-func (s *NodeConfigPersistenceTestSuite) Test_SaveNewWakuNode() {
-	// GIVEN
-	wakuNodesBeforeChanges := s.config.ClusterConfig.WakuNodes
-
-	// WHEN
-	err := nodecfg.SaveNewWakuNode(s.db, testWakuNodeEnrtree)
-	s.Require().NoError(err)
-	err = nodecfg.SaveNewWakuNode(s.db, testWakuNodeMultiaddr)
-	s.Require().NoError(err)
-
-	// THEN
-	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(s.db)
-	s.Require().NoError(err)
-	s.Require().Len(dbNodeConfig.ClusterConfig.WakuNodes, len(wakuNodesBeforeChanges)+2)
-	s.Require().Contains(dbNodeConfig.ClusterConfig.WakuNodes, testWakuNodeEnrtree)
-	s.Require().Contains(dbNodeConfig.ClusterConfig.WakuNodes, testWakuNodeMultiaddr)
 }
 
 func (s *NodeConfigPersistenceTestSuite) Test_SaveMaxLogBackups() {

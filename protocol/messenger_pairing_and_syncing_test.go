@@ -7,10 +7,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 )
@@ -32,7 +32,7 @@ func (s *MessengerPairingSuite) TestEnableNonExistingInstallation() {
 	s.Require().NoError(err)
 
 	s.Require().Len(installations, 2)
-	var theirInstallation *multidevice.Installation
+	var theirInstallation *messagingtypes.Installation
 	for _, i := range installations {
 		if i.ID == installationID {
 			theirInstallation = i
@@ -44,7 +44,7 @@ func (s *MessengerPairingSuite) TestEnableNonExistingInstallation() {
 	s.Require().NotNil(theirInstallation)
 	s.Require().True(theirInstallation.Enabled)
 
-	installationsFromDB, err := s.m.encryptor.GetOurActiveInstallations(&s.m.identity.PublicKey)
+	installationsFromDB, err := s.m.messaging.GetOurActiveInstallations(&s.m.identity.PublicKey)
 	s.Require().NoError(err)
 	s.Require().Len(installationsFromDB, 2)
 	for _, i := range installationsFromDB {
@@ -181,10 +181,11 @@ func (s *MessengerPairingSuite) TestMessengerSyncFallback() {
 	alice2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alice2)
 
-	alice1ProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	alice1ProfileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	alice1ProfileKp.KeyUID = alice1.account.KeyUID
 	alice1ProfileKp.Accounts[0].KeyUID = alice1.account.KeyUID
-	err := alice1.settings.SaveOrUpdateKeypair(alice1ProfileKp)
+	err = alice1.settings.SaveOrUpdateKeypair(alice1ProfileKp)
 	s.Require().NoError(err)
 
 	expectedDisplayName := "alice1"

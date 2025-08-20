@@ -77,7 +77,10 @@ func (d *pathDecoder) parse() (startingPoint, []uint32, error) {
 			if err == io.EOF {
 				err = nil
 			} else {
-				err = fmt.Errorf("error parsing derivation path %s; at position %d, %s", d.s, d.pos, err.Error())
+				err = ErrPathParsingFailed.
+					WithContext("path", d.s).
+					WithContext("position", d.pos).
+					WithContext("error", err.Error())
 			}
 
 			return d.start, d.path, err
@@ -150,7 +153,7 @@ func (d *pathDecoder) saveSegment() error {
 
 		if i >= hardenedStart {
 			d.pos -= len(d.currentToken) - 1
-			return fmt.Errorf("index must be lower than 2^31, got %d", i)
+			return ErrInvalidDerivationIndex.WithContext("index", i)
 		}
 
 		if d.currentTokenHardened {
@@ -176,14 +179,14 @@ func (d *pathDecoder) parseSeparator() error {
 		return d.saveSegment()
 	}
 
-	return fmt.Errorf("expected %s, got %s", string(rune(tokenSeparator)), string(rune(b)))
+	return ErrUnexpectedToken.WithContext("expected", string(rune(tokenSeparator))).WithContext("got", string(rune(b)))
 }
 
 func (d *pathDecoder) parseSegment() error {
 	b, err := d.readByte()
 	if err == io.EOF {
 		if len(d.currentToken) == 0 {
-			return fmt.Errorf("expected number, got EOF")
+			return ErrUnexpectedEOF
 		}
 
 		if newErr := d.saveSegment(); newErr != nil {
@@ -208,7 +211,7 @@ func (d *pathDecoder) parseSegment() error {
 	}
 
 	if b < 0x30 || b > 0x39 {
-		return fmt.Errorf("expected number, got %s", string(b))
+		return ErrUnexpectedToken.WithContext("expected", "number").WithContext("got", string(b))
 	}
 
 	d.currentToken = fmt.Sprintf("%s%s", d.currentToken, string(b))

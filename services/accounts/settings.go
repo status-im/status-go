@@ -6,7 +6,6 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 )
@@ -47,11 +46,6 @@ func (api *SettingsAPI) GetSettings(ctx context.Context) (settings.Settings, err
 // NodeConfig returns the currently used node configuration
 func (api *SettingsAPI) NodeConfig(ctx context.Context) (*params.NodeConfig, error) {
 	return api.config, nil
-}
-
-// Saves the nodeconfig in the database. The node must be restarted for the changes to be applied
-func (api *SettingsAPI) SaveNodeConfig(ctx context.Context, n *params.NodeConfig) error {
-	return nodecfg.SaveNodeConfig(api.db.DB(), n)
 }
 
 // News Settings

@@ -23,8 +23,8 @@ import (
 	"github.com/google/uuid"
 
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
@@ -32,7 +32,6 @@ import (
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -754,6 +753,10 @@ func (m *Messenger) HandleSyncInstallationContactV2(state *ReceivedMessageState,
 			state.Response.AddChat(chat)
 		}
 
+		if err = m.updateContactImagesURL(contact); err != nil {
+			return err
+		}
+
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 	}
@@ -1317,7 +1320,7 @@ func (m *Messenger) HandleSyncPairInstallation(state *ReceivedMessageState, mess
 		return errors.New("installation not found")
 	}
 
-	metadata := &multidevice.InstallationMetadata{
+	metadata := &messagingtypes.InstallationMetadata{
 		Name:       message.Name,
 		DeviceType: message.DeviceType,
 	}
@@ -3304,13 +3307,13 @@ func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability a
 	}
 }
 
-func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, recoverinrecoveringFromWakuInitiatedByKeycard bool,
+func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, recoveringFromWakuInitiatedByKeycard bool,
 	syncKpMigratedToKeycard bool, dbKpMigratedToKeycard bool, accountReceivedFromLocalPairing bool) (accounts.AccountOperable, error) {
 	if accountReceivedFromLocalPairing {
 		return accounts.AccountOperable(syncAcc.Operable), nil
 	}
 
-	if syncKpMigratedToKeycard || recoverinrecoveringFromWakuInitiatedByKeycard && m.account.KeyUID == syncAcc.KeyUid {
+	if syncKpMigratedToKeycard || recoveringFromWakuInitiatedByKeycard && m.account.KeyUID == syncAcc.KeyUid {
 		return accounts.AccountFullyOperable, nil
 	}
 
@@ -3589,6 +3592,8 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		Removed:                 message.Removed,
 	}
 
+	oldAddresses := make(map[types.Address]bool)
+
 	if dbKeypair != nil {
 		if dbKeypair.Clock >= kp.Clock {
 			return nil, ErrTryingToStoreOldKeypair
@@ -3600,6 +3605,9 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		if dbKeypair.SyncedFrom != accounts.SyncedFromBackup {
 			kp.SyncedFrom = dbKeypair.SyncedFrom
 		}
+		for _, acc := range dbKeypair.Accounts {
+			oldAddresses[acc.Address] = !acc.Removed
+		}
 	}
 
 	syncKpMigratedToKeycard := len(message.Keycards) > 0
@@ -3609,10 +3617,10 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 	if err != nil {
 		return nil, err
 	}
-	recoverinrecoveringFromWakuInitiatedByKeycard := recoveringFromWaku && multiAcc != nil && multiAcc.RefersToKeycard()
+	recoveringFromWakuInitiatedByKeycard := recoveringFromWaku && multiAcc != nil && multiAcc.RefersToKeycard()
 	for _, sAcc := range message.Accounts {
 		accountOperability, err := m.resolveAccountOperability(sAcc,
-			recoverinrecoveringFromWakuInitiatedByKeycard,
+			recoveringFromWakuInitiatedByKeycard,
 			syncKpMigratedToKeycard,
 			dbKeypair != nil && dbKeypair.MigratedToKeycard(),
 			fromLocalPairing)
@@ -3624,11 +3632,11 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		kp.Accounts = append(kp.Accounts, acc)
 	}
 
-	if !fromLocalPairing && !recoverinrecoveringFromWakuInitiatedByKeycard {
+	if !fromLocalPairing && !recoveringFromWakuInitiatedByKeycard {
 		if kp.Removed ||
 			dbKeypair != nil && !dbKeypair.MigratedToKeycard() && syncKpMigratedToKeycard {
 			// delete all keystore files
-			err = m.deleteKeystoreFilesForKeypair(dbKeypair)
+			err = m.accountsManager.DeleteKeystoreFilesForKeypair(accounts.KeypairToAccountsManagerKeypair(dbKeypair))
 			if err != nil {
 				return nil, err
 			}
@@ -3649,7 +3657,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 					}
 				}
 				if removeAcc {
-					err = m.deleteKeystoreFileForAddress(dbAcc.Address)
+					err = m.accountsManager.DeleteKeystoreFileForAccount(dbAcc.Address)
 					if err != nil {
 						return nil, err
 					}
@@ -3727,24 +3735,27 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 				if acc.Chat {
 					continue
 				}
-				if acc.Removed {
+				// We call the signals only if there is a change in the account list
+				// i.e. an account is unknown (not part of the Accounts list before)
+				// or an account was removed and is now back (Removed flag changed)
+				stillPresent, ok := oldAddresses[acc.Address]
+				if acc.Removed && (!ok || stillPresent) {
 					removedAddresses = append(removedAddresses, gethcommon.Address(acc.Address))
-				} else {
+				} else if !ok || !stillPresent {
 					addedAddresses = append(addedAddresses, gethcommon.Address(acc.Address))
 				}
 			}
 		}
-		if m.config.accountsPublisher != nil {
-			if len(addedAddresses) > 0 {
-				pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsAddedEvent{
-					Accounts: addedAddresses,
-				})
-			}
-			if len(removedAddresses) > 0 {
-				pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsRemovedEvent{
-					Accounts: removedAddresses,
-				})
-			}
+
+		if len(addedAddresses) > 0 {
+			pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsAddedEvent{
+				Accounts: addedAddresses,
+			})
+		}
+		if len(removedAddresses) > 0 {
+			pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsRemovedEvent{
+				Accounts: removedAddresses,
+			})
 		}
 	}
 

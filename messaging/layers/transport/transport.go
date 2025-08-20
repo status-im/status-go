@@ -18,10 +18,10 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/crypto"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
 var (
@@ -176,7 +176,7 @@ func (t *Transport) ResetFilters(ctx context.Context) error {
 	return t.filters.Reset(ctx)
 }
 
-func (t *Transport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Filter, error) {
+func (t *Transport) ProcessNegotiatedSecret(secret ethtypes.NegotiatedSecret) (*Filter, error) {
 	filter, err := t.filters.LoadNegotiated(secret)
 	if err != nil {
 		return nil, err
@@ -233,7 +233,7 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*wakutypes.Message, error) {
 
 		ids := make([]string, len(msgs))
 		for i := range msgs {
-			id := types.EncodeHex(msgs[i].Hash)
+			id := cryptotypes.EncodeHex(msgs[i].Hash)
 			ids[i] = id
 		}
 
@@ -245,11 +245,11 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*wakutypes.Message, error) {
 
 		for i := range msgs {
 			// Exclude anything that is a cache hit
-			if !hits[types.EncodeHex(msgs[i].Hash)] {
+			if !hits[cryptotypes.EncodeHex(msgs[i].Hash)] {
 				result[*filter] = append(result[*filter], msgs[i])
-				logger.Debug("message not cached", zap.String("hash", types.EncodeHex(msgs[i].Hash)))
+				logger.Debug("message not cached", zap.String("hash", cryptotypes.EncodeHex(msgs[i].Hash)))
 			} else {
-				logger.Debug("message cached", zap.String("hash", types.EncodeHex(msgs[i].Hash)))
+				logger.Debug("message cached", zap.String("hash", cryptotypes.EncodeHex(msgs[i].Hash)))
 				t.waku.MarkP2PMessageAsProcessed(common.BytesToHash(msgs[i].Hash))
 			}
 		}
@@ -284,7 +284,7 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 		return nil, err
 	}
 
-	filter, err := t.filters.LoadNegotiated(types.NegotiatedSecret{
+	filter, err := t.filters.LoadNegotiated(ethtypes.NegotiatedSecret{
 		PublicKey: publicKey,
 		Key:       secret,
 	})
@@ -382,9 +382,9 @@ func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages
 		return
 	}
 
-	envelopeHashes := make([]types.Hash, len(hashes))
+	envelopeHashes := make([]cryptotypes.Hash, len(hashes))
 	for i, hash := range hashes {
-		envelopeHashes[i] = types.BytesToHash(hash)
+		envelopeHashes[i] = cryptotypes.BytesToHash(hash)
 	}
 
 	err := t.envelopesMonitor.Add(identifiers, envelopeHashes, newMessages)
@@ -471,15 +471,11 @@ func (t *Transport) ClearProcessedMessageIDsCache() error {
 }
 
 func PubkeyToHex(key *ecdsa.PublicKey) string {
-	return types.EncodeHex(crypto.FromECDSAPub(key))
+	return cryptotypes.EncodeHex(crypto.FromECDSAPub(key))
 }
 
 func (t *Transport) ListenAddresses() ([]multiaddr.Multiaddr, error) {
 	return t.waku.ListenAddresses()
-}
-
-func (t *Transport) RelayPeersByTopic(topic string) (*wakutypes.PeerList, error) {
-	return t.waku.RelayPeersByTopic(topic)
 }
 
 func (t *Transport) ENR() (*enode.Node, error) {

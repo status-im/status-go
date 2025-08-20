@@ -79,10 +79,6 @@ Continuous Integration (CI) will validate whether the `status-go` packages build
 
 ## Debugging
 
-### IDE Debugging
-
-If you’re using Visual Studio Code, you can rename the [.vscode/launch.example.json](https://github.com/status-im/status-go/blob/develop/.vscode/launch.example.json) file to .vscode/launch.json so that you can run the statusd server with the debugger attached.
-
 ### Android debugging
 
 In order to see the log files while debugging on an Android device, do the following:

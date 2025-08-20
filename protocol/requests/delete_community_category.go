@@ -3,7 +3,7 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 )
 
 var ErrDeleteCommunityCategoryInvalidCommunityID = errors.New("delete-community-category: invalid community id")

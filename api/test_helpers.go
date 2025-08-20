@@ -8,12 +8,13 @@ import (
 	"github.com/status-im/status-go/accounts-management/common"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/eth-node/types"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 
@@ -64,6 +65,10 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 	data.chatPrivateKey = derivedAccs[accscommon.PathEIP1581Chat].PrivateKeyHex()
 
 	for path, acc := range derivedAccs {
+		if path != accscommon.PathEIP1581Chat && path != accscommon.PathDefaultWalletAccount {
+			continue
+		}
+
 		data.profileKeypair.Accounts = append(data.profileKeypair.Accounts, &accounts.Account{
 			Address:   acc.Address(),
 			KeyUID:    genMasterAcc.KeyUID(),
@@ -130,7 +135,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 			DisplayName:       "UserDisplayName",
 			CurrentNetwork:    "mainnet_rpc",
 			DappsAddress:      derivedAccs[accscommon.PathDefaultWalletAccount].Address(),
-			InstallationID:    multidevice.GenerateInstallationID(),
+			InstallationID:    messaging.GenerateInstallationID(),
 			LatestDerivedPath: 0,
 			Name:              "Jittery Cornflowerblue Kingbird",
 			Networks:          &networks,
@@ -157,22 +162,14 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 		err = data.backend.ensureDBsOpened(*data.multiAcc, password)
 		require.NoError(t, err)
 
-		err = data.backend.saveKeypairAndSettings(data.settings, data.config, data.profileKeypair)
+		keypair, err := data.backend.AccountsManager().CreateKeypairFromMnemonicAndStore(data.mnemonic, password, "Test Keypair",
+			&accsmanagementtypes.AccountCreationDetails{
+				Path: accscommon.PathDefaultWalletAccount,
+			}, true, 0)
 		require.NoError(t, err)
 
-		_, _, err = data.backend.StoreAccount(data.mnemonic, password, accountsPaths, true)
-		require.NoError(t, err)
+		data.profileKeypair = accounts.AccountsManagerKeypairToKeypair(keypair)
 	}
 
 	return
-}
-
-// Only for tests
-func overrideApiConfigTest(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
-	overrideApiConfigProd(nodeConfig, config)
-	nodeConfig.HTTPVirtualHosts = config.HTTPVirtualHosts
-}
-
-func OverrideApiConfigTest() {
-	overrideApiConfig = overrideApiConfigTest
 }

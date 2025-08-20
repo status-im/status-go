@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/stickers"
 )
@@ -68,7 +68,6 @@ func (s *MessengerSyncSettingsSuite) SetupTest() {
 	networks := json.RawMessage("{}")
 	settings := settings.Settings{
 		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
-		AnonMetricsShouldSend:     false,
 		CurrentNetwork:            "mainnet_rpc",
 		DappsAddress:              types.HexToAddress("0x1122334455667788990011223344556677889900"),
 		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
@@ -111,7 +110,7 @@ func (s *MessengerSyncSettingsSuite) TearDownTest() {
 
 func prepAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 	// Set Alice's installation metadata
-	aim := &multidevice.InstallationMetadata{
+	aim := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-device",
 		DeviceType: "alice's-device-type",
 	}
@@ -119,7 +118,7 @@ func prepAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 	s.Require().NoError(err)
 
 	// Set Alice 2's installation metadata
-	a2im := &multidevice.InstallationMetadata{
+	a2im := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}

@@ -19,8 +19,8 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
@@ -102,7 +102,7 @@ func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []
 }
 
 type DerivedAddress struct {
-	Address        common.Address `json:"address"`
+	Address        types.Address  `json:"address"`
 	PublicKey      types.HexBytes `json:"public-key,omitempty"`
 	Path           string         `json:"path"`
 	HasActivity    bool           `json:"hasActivity"`
@@ -525,13 +525,13 @@ func (api *API) getDerivedAddresses(account *generator.Account, paths []string) 
 		accountInfo := childAccount.ToAccountInfo()
 
 		derivedAddress := &DerivedAddress{
-			Address:   common.HexToAddress(accountInfo.Address),
+			Address:   types.HexToAddress(accountInfo.Address),
 			PublicKey: types.Hex2Bytes(accountInfo.PublicKey),
 			Path:      accPath,
 		}
 
 		for _, account := range addedAccounts {
-			if types.Address(derivedAddress.Address) == account.Address {
+			if derivedAddress.Address == account.Address {
 				derivedAddress.AlreadyCreated = true
 				break
 			}
@@ -557,9 +557,9 @@ func (api *API) AddressDetails(ctx context.Context, params *requests.AddressDeta
 	}
 
 	result := &DerivedAddress{
-		Address: common.HexToAddress(params.Address),
+		Address: types.HexToAddress(params.Address),
 	}
-	addressExists, err := api.s.accountsDB.AddressExists(types.Address(result.Address))
+	addressExists, err := api.s.accountsDB.AddressExists(result.Address)
 	if err != nil {
 		return result, err
 	}
@@ -588,7 +588,7 @@ func (api *API) AddressDetails(ctx context.Context, params *requests.AddressDeta
 	}
 
 	for _, client := range clients {
-		balance, err := api.s.tokenManager.GetChainBalance(ctx, client, result.Address)
+		balance, err := api.s.tokenManager.GetChainBalance(ctx, client, common.Address(result.Address))
 		if err != nil {
 			if err != nil && errors.Is(err, context.DeadlineExceeded) {
 				return result, nil
@@ -609,9 +609,9 @@ func (api *API) AddressDetails(ctx context.Context, params *requests.AddressDeta
 // GetAddressDetails returns details for the passed address (response doesn't include derivation path)
 func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address string) (*DerivedAddress, error) {
 	result := &DerivedAddress{
-		Address: common.HexToAddress(address),
+		Address: types.HexToAddress(address),
 	}
-	addressExists, err := api.s.accountsDB.AddressExists(types.Address(result.Address))
+	addressExists, err := api.s.accountsDB.AddressExists(result.Address)
 	if err != nil {
 		return result, err
 	}
@@ -623,7 +623,7 @@ func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address s
 		return result, err
 	}
 
-	balance, err := api.s.tokenManager.GetChainBalance(ctx, chainClient, result.Address)
+	balance, err := api.s.tokenManager.GetChainBalance(ctx, chainClient, common.Address(result.Address))
 	if err != nil {
 		return result, err
 	}
@@ -632,10 +632,10 @@ func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address s
 	return result, nil
 }
 
-func (api *API) SignMessage(ctx context.Context, message types.HexBytes, address common.Address, password string) (string, error) {
+func (api *API) SignMessage(ctx context.Context, message types.HexBytes, address types.Address, password string) (string, error) {
 	logutils.ZapLogger().Debug("[WalletAPI::SignMessage]", zap.Stringer("message", message), zap.Stringer("address", address))
 
-	selectedAccount, err := api.s.gethManager.LoadAccount(types.Address(address), password)
+	selectedAccount, err := api.s.gethManager.LoadAccount(address, password)
 	if err != nil {
 		return "", err
 	}

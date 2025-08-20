@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/types"
 )
 
 func reEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []byte, e error) {
@@ -30,7 +30,7 @@ func reEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []
 	n := int(cryptoJSON.KDFParams["n"].(float64))
 	p := int(cryptoJSON.KDFParams["p"].(float64))
 
-	gethKey := &ethtypes.Key{
+	gethKey := &types.Key{
 		ID:              decryptedKey.ID,
 		Address:         decryptedKey.Address,
 		PrivateKey:      decryptedKey.PrivateKey,

@@ -21,11 +21,10 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/signal"
 
 	"github.com/anacrolix/torrent"
@@ -69,7 +68,6 @@ type ArchiveManager struct {
 	persistence *Persistence
 	messaging   *messaging.API
 	identity    *ecdsa.PrivateKey
-	encryptor   *encryption.Protocol
 
 	*ArchiveFileManager
 	publisher Publisher
@@ -89,7 +87,6 @@ func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 		persistence: amc.Persistence,
 		messaging:   amc.Messaging,
 		identity:    amc.Identity,
-		encryptor:   amc.Encryptor,
 
 		publisher:          amc.Publisher,
 		ArchiveFileManager: NewArchiveFileManager(amc),

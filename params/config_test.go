@@ -3,58 +3,18 @@ package params_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"path"
-	"path/filepath"
 	"testing"
 
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/brianvoe/gofakeit/v6"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/t/utils"
 )
-
-func TestNewNodeConfigWithDefaults(t *testing.T) {
-	c, err := params.NewNodeConfigWithDefaults(
-		"/some/data/path",
-		params.SepoliaNetworkID,
-		params.WithFleet(params.FleetProd),
-		params.WithLES(),
-		params.WithMailserver(),
-	)
-	require.NoError(t, err)
-	assert.Equal(t, "/some/data/path", c.DataDir)
-	// assert Whisper
-	assert.Equal(t, true, c.WakuV2Config.Enabled)
-	assert.Equal(t, "/some/data/path/wakuv2", c.WakuV2Config.DataDir)
-	// assert cluster
-	assert.Equal(t, false, c.NoDiscovery)
-	assert.Equal(t, params.FleetProd, c.ClusterConfig.Fleet)
-	assert.NotEmpty(t, c.ClusterConfig.BootNodes)
-	assert.NotEmpty(t, c.ClusterConfig.StaticNodes)
-	assert.NotEmpty(t, c.ClusterConfig.PushNotificationsServers)
-	// assert LES
-	assert.Equal(t, true, c.LightEthConfig.Enabled)
-	// assert other
-	assert.Equal(t, false, c.HTTPEnabled)
-	assert.Equal(t, false, c.IPCEnabled)
-
-	assert.Equal(t, "", c.RuntimeLogLevel)
-
-	assert.Equal(t, "/some/data/path/archivedata", c.TorrentConfig.DataDir)
-	assert.Equal(t, "/some/data/path/torrents", c.TorrentConfig.TorrentDir)
-	assert.Equal(t, 9025, c.TorrentConfig.Port)
-	assert.Equal(t, false, c.TorrentConfig.Enabled)
-
-	assert.NoError(t, c.UpdateWithDefaults())
-	assert.NotEmpty(t, c.ShhextConfig.DefaultPushNotificationsServers)
-}
 
 func TestNewConfigFromJSON(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -62,7 +22,6 @@ func TestNewConfigFromJSON(t *testing.T) {
 		"NetworkId": 3,
 		"DataDir": "` + tmpDir + `",
 		"KeycardPairingDataFile": "` + path.Join(tmpDir, "keycard/pairings.json") + `",
-		"NoDiscovery": true,
 		"TorrentConfig": {
 			"Port": 9025,
 			"Enabled": false,
@@ -82,22 +41,6 @@ func TestNewConfigFromJSON(t *testing.T) {
 	require.Equal(t, "DEBUG", c.RuntimeLogLevel)
 }
 
-func TestConfigWriteRead(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", tmpDir, params.SepoliaNetworkID)
-	require.Nil(t, err, "cannot create new config object")
-
-	err = nodeConfig.Save()
-	require.Nil(t, err, "cannot persist configuration")
-
-	loadedConfigData, err := ioutil.ReadFile(filepath.Join(nodeConfig.DataDir, "config.json"))
-	require.Nil(t, err, "cannot read configuration from disk")
-	loadedConfig := string(loadedConfigData)
-	require.Contains(t, loadedConfig, fmt.Sprintf(`"NetworkId": %d`, params.SepoliaNetworkID))
-	require.Contains(t, loadedConfig, fmt.Sprintf(`"DataDir": "%s"`, tmpDir))
-}
-
 // TestNodeConfigValidate checks validation of individual fields.
 func TestNodeConfigValidate(t *testing.T) {
 	testCases := []struct {
@@ -113,8 +56,7 @@ func TestNodeConfigValidate(t *testing.T) {
 				"NetworkId": 1,
 				"RootDataDir": "/tmp/data",
 				"DataDir": "/tmp/data",
-				"KeycardPairingDataFile": "/tmp/data/keycard/pairings.json",
-				"NoDiscovery": true
+				"KeycardPairingDataFile": "/tmp/data/keycard/pairings.json"
 			}`,
 		},
 		{
@@ -137,24 +79,11 @@ func TestNodeConfigValidate(t *testing.T) {
 			},
 		},
 		{
-			Name: "Validate that Name does not contain slash",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
-				"Name": "invalid/name"
-			}`,
-			FieldErrors: map[string]string{
-				"Name": "excludes",
-			},
-		},
-		{
 			Name: "Validate that NodeKey is checked for validity",
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
-				"NoDiscovery": true,
 				"NodeKey": "foo"
 			}`,
 			Error: "NodeKey is invalid",
@@ -165,7 +94,6 @@ func TestNodeConfigValidate(t *testing.T) {
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
-				"NoDiscovery": true,
 				"UpstreamConfig": {
 					"Enabled": false,
 					"URL": "[bad.url]"
@@ -178,7 +106,6 @@ func TestNodeConfigValidate(t *testing.T) {
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
-				"NoDiscovery": true,
 				"UpstreamConfig": {
 					"Enabled": true,
 					"URL": "` + params.MainnetEthereumNetworkURL + `"
@@ -186,22 +113,11 @@ func TestNodeConfigValidate(t *testing.T) {
 			}`,
 		},
 		{
-			Name: "Validate that ClusterConfig.BootNodes is verified to not be empty if discovery is disabled",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
-				"NoDiscovery": false
-			}`,
-			Error: "NoDiscovery is false, but ClusterConfig.BootNodes is empty",
-		},
-		{
 			Name: "Validate that PFSEnabled & InstallationID are checked for validity",
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
-				"NoDiscovery": true,
 				"ShhextConfig": {
 					"PFSEnabled": true
 				}

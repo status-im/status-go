@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/types"
 )
 
 type testAccount struct {
@@ -56,14 +56,14 @@ var testData = struct {
 	},
 }
 
-func createKey(t *testing.T, seedPhrase string, bip39Passphrase string) *ethtypes.Key {
+func createKey(t *testing.T, seedPhrase string, bip39Passphrase string) *types.Key {
 	mnemonic := extkeys.NewMnemonic()
 	seed := mnemonic.MnemonicSeed(seedPhrase, bip39Passphrase)
 
 	masterKey, err := extkeys.NewMaster(seed)
 	assert.NoError(t, err)
 
-	return &ethtypes.Key{
+	return &types.Key{
 		PrivateKey:  masterKey.ToECDSA(),
 		ExtendedKey: masterKey,
 	}

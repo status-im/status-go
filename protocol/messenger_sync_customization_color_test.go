@@ -6,9 +6,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/common"
-
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 )
 
 func TestMessengerAccountCustomizationColor(t *testing.T) {
@@ -37,7 +36,7 @@ func (s *MessengerSyncAccountCustomizationColorSuite) TearDownTest() {
 
 func prepareAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 	// Set Alice's installation metadata
-	aim := &multidevice.InstallationMetadata{
+	aim := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-device",
 		DeviceType: "alice's-device-type",
 	}
@@ -45,7 +44,7 @@ func prepareAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger)
 	s.Require().NoError(err)
 
 	// Set Alice 2's installation metadata
-	a2im := &multidevice.InstallationMetadata{
+	a2im := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}

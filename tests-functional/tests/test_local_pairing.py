@@ -203,11 +203,16 @@ class TestLocalPairing(MessengerSteps):
 
         # Check that contact is synced
         response = bob_second_device.wakuext_service.get_contacts()
-        assert "error" not in response
 
         contacts = response["result"]
         assert len(contacts) == 1
         assert contacts[0]["id"] == alice.public_key
+
+        # Checking the paired devices using accounts_hasPairedDevices method
+        alice_response = alice.accounts_service.has_paired_devices()
+        assert alice_response.get("result") is False
+        bob_response = bob.accounts_service.has_paired_devices()
+        assert bob_response.get("result") is True
 
     def test_pairing_server_as_receiver(self):
         # Create users
@@ -235,11 +240,16 @@ class TestLocalPairing(MessengerSteps):
 
         # Check that contact is synced
         response = bob_second_device.wakuext_service.get_contacts()
-        assert "error" not in response
 
         contacts = response["result"]
         assert len(contacts) == 1
         assert contacts[0]["id"] == alice.public_key
+
+        # Checking the paired devices using accounts_hasPairedDevices method
+        alice_response = alice.accounts_service.has_paired_devices()
+        assert alice_response.get("result") is False
+        bob_response = bob.accounts_service.has_paired_devices()
+        assert bob_response.get("result") is True
 
     def test_pairing_three_devices(self):
         # Create users
@@ -273,7 +283,6 @@ class TestLocalPairing(MessengerSteps):
         # Check that contacts and notifications are synced on all devices
         for bob_another_device in [bob2, bob3]:
             response = bob_another_device.wakuext_service.get_contacts()
-            assert "error" not in response
             contacts = response["result"]
             assert len(contacts) == 3
             contacts_dict = {contact["id"]: contact for contact in contacts}

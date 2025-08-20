@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 
-	statustypes "github.com/status-im/status-go/eth-node/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -98,7 +98,7 @@ func (s *Service) Stop() {
 	s.stopTransfersWatcher()
 }
 
-func (s *Service) triggerEvent(eventType walletevent.EventType, account statustypes.Address, message string) {
+func (s *Service) triggerEvent(eventType walletevent.EventType, account cryptotypes.Address, message string) {
 	s.eventFeed.Send(walletevent.Event{
 		Type: eventType,
 		Accounts: []common.Address{
@@ -121,10 +121,10 @@ func (s *Service) Start(ctx context.Context) {
 
 		err := s.updateBalanceHistory(s.serviceContext)
 		if s.serviceContext.Err() != nil {
-			s.triggerEvent(EventBalanceHistoryUpdateFinished, statustypes.Address{}, "Service canceled")
+			s.triggerEvent(EventBalanceHistoryUpdateFinished, cryptotypes.Address{}, "Service canceled")
 		}
 		if err != nil {
-			s.triggerEvent(EventBalanceHistoryUpdateFinishedWithError, statustypes.Address{}, err.Error())
+			s.triggerEvent(EventBalanceHistoryUpdateFinishedWithError, cryptotypes.Address{}, err.Error())
 		}
 	}()
 }
@@ -469,7 +469,7 @@ func (s *Service) updateBalanceHistory(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) addEntriesToDB(ctx context.Context, client chain.ClientInterface, network *params.Network, address statustypes.Address, entries []*entry) (err error) {
+func (s *Service) addEntriesToDB(ctx context.Context, client chain.ClientInterface, network *params.Network, address cryptotypes.Address, entries []*entry) (err error) {
 	for _, entry := range entries {
 		var balance *big.Int
 		// tokenAddess is zero for native currency
@@ -603,7 +603,7 @@ func (s *Service) startTransfersWatcher() {
 				zap.Any("unique", unique),
 			)
 
-			err = s.addEntriesToDB(s.serviceContext, client, network, statustypes.Address(address), unique)
+			err = s.addEntriesToDB(s.serviceContext, client, network, cryptotypes.Address(address), unique)
 			if err != nil {
 				logutils.ZapLogger().Error("Error adding entries to DB",
 					zap.Uint64("chainID", chainID),

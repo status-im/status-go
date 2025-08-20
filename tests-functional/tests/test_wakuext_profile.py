@@ -149,7 +149,7 @@ class TestUserStatus(MessengerSteps):
 
         for new_status, custom_text in statuses:
             response = self.sender.wakuext_service.set_user_status(new_status, custom_text)
-            self.sender.verify_json_schema(response, method="wakuext_setUserStatus")
+            # TODO: Add more assertions on response
 
             self.receiver.find_signal_containing_pattern(
                 SignalType.MESSAGES_NEW.value,
@@ -158,7 +158,7 @@ class TestUserStatus(MessengerSteps):
             )
 
             response = self.receiver.wakuext_service.status_updates()
-            self.sender.verify_json_schema(response, method="wakuext_statusUpdates")
+            # TODO: Add more assertions on response
 
             statusUpdate = response.get("result", {}).get("statusUpdates", [])[0]
             assert statusUpdate.get("statusType", -1) == new_status

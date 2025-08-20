@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
 	maErrors "github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/nodecfg"
@@ -394,7 +394,7 @@ func (db *Database) GetSettings() (Settings, error) {
 	)
 	err := db.db.QueryRow(`
 	SELECT
-		address, anon_metrics_should_send, chaos_mode, currency, current_network,
+		address, chaos_mode, currency, current_network,
 		custom_bootnodes, custom_bootnodes_enabled, dapps_address, display_name, bio, eip1581_address, fleet,
 		hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing,
 		last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level,
@@ -415,7 +415,6 @@ func (db *Database) GetSettings() (Settings, error) {
 	WHERE
 		synthetic_id = 'id'`).Scan(
 		&s.Address,
-		&s.AnonMetricsShouldSend,
 		&s.ChaosMode,
 		&s.Currency,
 		&s.CurrentNetwork,

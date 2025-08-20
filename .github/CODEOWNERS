@@ -4,8 +4,8 @@
 Makefile              @status-im/devops
 default.nix           @status-im/devops
 shell.nix             @status-im/devops
+Dockerfile            @status-im/devops
 /nix/                 @status-im/devops
-/_assets/build/       @status-im/devops
 /_assets/ci/          @status-im/devops
 /_assets/hooks/       @status-im/devops
 /_assets/scripts/     @status-im/devops

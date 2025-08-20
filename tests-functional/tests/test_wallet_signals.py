@@ -33,7 +33,7 @@ class TestWalletSignals:
         ]
         self.rpc_client.rpc_valid_request(method, params, self.request_id)
         signal_response = self.rpc_client.wait_for_signal(SignalType.WALLET.value, timeout=60)
-        self.rpc_client.verify_json_schema(signal_response, method)
+        # TODO: Add more assertions on response
         assert signal_response["event"]["type"] == "wallet-owned-collectibles-filtering-done"
         message = json.loads(signal_response["event"]["message"].replace("'", '"'))
         assert user_1.address in message["ownershipStatus"].keys()

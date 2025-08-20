@@ -23,29 +23,23 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/appmetrics"
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/newsfeed"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/pkg/pubsub"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
@@ -53,7 +47,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/storenodes"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/server"
@@ -65,8 +58,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 
 	_ "github.com/mmcdole/gofeed"
 )
@@ -110,10 +101,7 @@ type Messenger struct {
 	messaging                 *messaging.API
 	messagingPersistence      *messagingPersistence
 	persistence               *sqlitePersistence
-	encryptor                 *encryption.Protocol
 	ensVerifier               *ens.Verifier
-	anonMetricsClient         *anonmetrics.Client
-	anonMetricsServer         *anonmetrics.Server
 	pushNotificationClient    *pushnotificationclient.Client
 	pushNotificationServer    PushNotificationServer
 	communitiesManager        *communities.Manager
@@ -139,7 +127,6 @@ type Messenger struct {
 	allInstallations           *installationMap
 	modifiedInstallations      *stringBoolMap
 	installationID             string
-	communityStorenodes        *storenodes.CommunityStorenodes
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
 	settings                   *accounts.Database
@@ -196,8 +183,6 @@ type Messenger struct {
 	backedUpFetchingStatus *BackupFetchingStatus
 
 	newsFeedManager *newsfeed.NewsFeedManager
-
-	publisher *pubsub.Publisher
 }
 
 type EnvelopeEventsInterceptor struct {
@@ -324,36 +309,6 @@ func NewMessenger(
 			return nil, err
 		}
 	}
-
-	// Initialise anon metrics client
-	var anonMetricsClient *anonmetrics.Client
-	if c.anonMetricsClientConfig != nil &&
-		c.anonMetricsClientConfig.ShouldSend &&
-		c.anonMetricsClientConfig.Active == anonmetrics.ActiveClientPhrase {
-
-		anonMetricsClient = anonmetrics.NewClient(messaging)
-		anonMetricsClient.Config = c.anonMetricsClientConfig
-		anonMetricsClient.Identity = identity
-		anonMetricsClient.DB = appmetrics.NewDB(database)
-		anonMetricsClient.Logger = logger
-	}
-
-	// Initialise anon metrics server
-	var anonMetricsServer *anonmetrics.Server
-	if c.anonMetricsServerConfig != nil &&
-		c.anonMetricsServerConfig.Enabled &&
-		c.anonMetricsServerConfig.Active == anonmetrics.ActiveServerPhrase {
-
-		server, err := anonmetrics.NewServer(c.anonMetricsServerConfig.PostgresURI)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create anonmetrics.Server")
-		}
-
-		anonMetricsServer = server
-		anonMetricsServer.Config = c.anonMetricsServerConfig
-		anonMetricsServer.Logger = logger
-	}
-
 	// Initialize push notification client
 	pushNotificationClientPersistence := pushnotificationclient.NewPersistence(database)
 	pushNotificationClientConfig := c.pushNotificationClientConfig
@@ -396,14 +351,12 @@ func NewMessenger(
 
 	communitiesKeyDistributor := &CommunitiesKeyDistributorImpl{
 		messaging: messaging,
-		encryptor: messaging.EncryptionProtocol(),
 	}
 
 	communitiesManager, err := communities.NewManager(
 		identity,
 		installationID,
 		database,
-		messaging.EncryptionProtocol(),
 		logger,
 		c.ensVerifier,
 		c.communityTokensService,
@@ -423,7 +376,6 @@ func NewMessenger(
 		Persistence:   communitiesManager.GetPersistence(),
 		Messaging:     messaging,
 		Identity:      identity,
-		Encryptor:     messaging.EncryptionProtocol(),
 		Publisher:     communitiesManager,
 	}
 
@@ -451,9 +403,6 @@ func NewMessenger(
 		messaging:                  messaging,
 		messagingPersistence:       NewMessagingPersistence(database),
 		persistence:                sqlitePersistence,
-		encryptor:                  messaging.EncryptionProtocol(),
-		anonMetricsClient:          anonMetricsClient,
-		anonMetricsServer:          anonMetricsServer,
 		communityTokensService:     c.communityTokensService,
 		pushNotificationClient:     pushNotificationClient,
 		pushNotificationServer:     c.pushNotificationServer,
@@ -483,7 +432,6 @@ func NewMessenger(
 		peersyncingRequests:     make(map[string]uint64),
 		verificationDatabase:    verification.NewPersistence(database),
 		mailserversDatabase:     c.mailserversDatabase,
-		communityStorenodes:     storenodes.NewCommunityStorenodes(storenodes.NewDB(database), logger),
 		account:                 c.account,
 		quit:                    make(chan struct{}),
 		ctx:                     ctx,
@@ -501,28 +449,11 @@ func NewMessenger(
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			archiveManager.Stop,
-			wakumetrics.UnregisterMetrics,
-			func() error {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-				defer cancel()
-				err := messaging.ResetChatFilters(ctx)
-				if err != nil {
-					logger.Warn("could not reset filters", zap.Error(err))
-				}
-				// We don't want to thrown an error in this case, this is a soft
-				// fail
-				return nil
-			},
-			messaging.Stop,
-			// Currently this often fails, seems like it's safe to ignore them
-			// https://github.com/uber-go/zap/issues/328
-			func() error { _ = logger.Sync; return nil },
 			database.Close,
 		},
 		logger:                           logger,
 		savedAddressesManager:            savedAddressesManager,
 		retrievedMessagesIteratorFactory: NewDefaultMessagesIterator,
-		publisher:                        pubsub.NewPublisher(),
 	}
 
 	if c.rpcClient != nil {
@@ -558,12 +489,6 @@ func NewMessenger(
 
 	if c.ensVerifier != nil {
 		messenger.shutdownTasks = append(messenger.shutdownTasks, c.ensVerifier.Stop)
-	}
-	if anonMetricsClient != nil {
-		messenger.shutdownTasks = append(messenger.shutdownTasks, anonMetricsClient.Stop)
-	}
-	if anonMetricsServer != nil {
-		messenger.shutdownTasks = append(messenger.shutdownTasks, anonMetricsServer.Stop)
 	}
 
 	if c.envelopeEventsConfig != nil {
@@ -654,13 +579,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}
 	}
 
-	// Start anonymous metrics client
-	if m.anonMetricsClient != nil {
-		if err := m.anonMetricsClient.Start(); err != nil {
-			return nil, err
-		}
-	}
-
 	var ensSubscription chan []*ens.VerificationRecord
 	if m.ensVerifier != nil {
 		ensSubscription = m.ensVerifier.Subscribe()
@@ -675,12 +593,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	err = m.messaging.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	m.handleEncryptionLayerSubscriptions(m.encryptor.Subscriptions())
+	m.handleEncryptionLayerSubscriptions(m.messaging.EncryptionSubscriptions())
 	m.handleCommunitiesSubscription(m.communitiesManager.Subscribe())
 	m.handleCommunitiesHistoryArchivesSubscription(m.communitiesManager.Subscribe())
 	m.updateCommunitiesActiveMembersPeriodically()
@@ -718,16 +631,12 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	response := &MessengerResponse{}
 
-	response.Mailservers, err = m.AllMailservers()
+	response.StoreNodes, err = m.AllMailservers()
 	if err != nil {
 		return nil, err
 	}
 
 	m.messaging.SetStorenodeConfigProvider(m)
-
-	if err := m.communityStorenodes.ReloadFromDB(); err != nil {
-		return nil, err
-	}
 
 	go m.checkForMissingMessagesLoop()
 	go m.checkForStorenodeCycleSignals()
@@ -1322,7 +1231,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 }
 
 // handleInstallations adds the installations in the installations map
-func (m *Messenger) handleInstallations(installations []*multidevice.Installation) {
+func (m *Messenger) handleInstallations(installations []*messagingtypes.Installation) {
 	for _, installation := range installations {
 		if installation.Identity == contactIDFromPublicKey(&m.identity.PublicKey) {
 			if _, ok := m.allInstallations.Load(installation.ID); !ok {
@@ -1334,7 +1243,7 @@ func (m *Messenger) handleInstallations(installations []*multidevice.Installatio
 }
 
 // handleEncryptionLayerSubscriptions handles events from the encryption layer
-func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption.Subscriptions) {
+func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *messagingtypes.EncryptionSubscriptions) {
 	go func() {
 		defer gocommon.LogOnPanic()
 		for {
@@ -1648,7 +1557,6 @@ func (m *Messenger) Shutdown() (err error) {
 	close(m.quit)
 	m.cancel()
 	m.shutdownWaitGroup.Wait()
-	m.publisher.Close()
 	for i, task := range m.shutdownTasks {
 		m.logger.Debug("running shutdown task", zap.Int("n", i))
 		if tErr := task(); tErr != nil {
@@ -1804,7 +1712,7 @@ func (m *Messenger) hasPairedDevices() bool {
 	}
 
 	var count int
-	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
+	m.allInstallations.Range(func(installationID string, installation *messagingtypes.Installation) (shouldContinue bool) {
 		if installation.Enabled {
 			count++
 		}
@@ -1870,6 +1778,10 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage messagingtyp
 		publicKey, err := chat.PublicKey()
 		if err != nil {
 			return rawMessage, err
+		}
+
+		if publicKey.Curve != m.identity.PublicKey.Curve {
+			return rawMessage, errors.New("public key curve does not match")
 		}
 
 		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
@@ -2487,14 +2399,14 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact, rawMessag
 }
 
 func (m *Messenger) propagateSyncInstallationCommunityWithHRKeys(msg *protobuf.SyncInstallationCommunity, c *communities.Community) error {
-	communityKeys, err := m.encryptor.GetAllHRKeysMarshaledV1(c.ID())
+	communityKeys, err := m.messaging.GetAllHRKeysMarshaledV1(c.ID())
 	if err != nil {
 		return err
 	}
 	msg.EncryptionKeysV1 = communityKeys
 
 	communityAndChannelKeys := [][]byte{}
-	communityKeys, err = m.encryptor.GetAllHRKeysMarshaledV2(c.ID())
+	communityKeys, err = m.messaging.GetAllHRKeysMarshaledV2(c.ID())
 	if err != nil {
 		return err
 	}
@@ -2503,7 +2415,7 @@ func (m *Messenger) propagateSyncInstallationCommunityWithHRKeys(msg *protobuf.S
 	}
 
 	for channelID := range c.Chats() {
-		channelKeys, err := m.encryptor.GetAllHRKeysMarshaledV2([]byte(c.IDString() + channelID))
+		channelKeys, err := m.messaging.GetAllHRKeysMarshaledV2([]byte(c.IDString() + channelID))
 		if err != nil {
 			return err
 		}
@@ -2833,7 +2745,7 @@ func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {
 	localnotifications.PushMessages(notifications)
 }
 
-func (m *Messenger) GetStats() wakutypes.StatsSummary {
+func (m *Messenger) GetStats() messagingtypes.TransportStats {
 	return m.messaging.GetStats()
 }
 
@@ -3277,7 +3189,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 
 			statusMessages := handleMessagesResponse.StatusMessages
 
-			pubsub.Publish(m.publisher, RetrievedMessagesEvent{
+			m.messaging.MetricsPushReceivedMessages(messagingtypes.ReceivedMessages{
 				Filter:     filter,
 				SHHMessage: shhMessage,
 				Messages:   statusMessages,
@@ -5494,10 +5406,6 @@ func (m *Messenger) startCleanupLoop(name string, cleanupFunc func() error) {
 
 func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string) (string, error) {
 	return m.persistence.FindStatusMessageIDForBridgeMessageID(bridgeMessageID)
-}
-
-func (m *Messenger) Publisher() *pubsub.Publisher {
-	return m.publisher
 }
 
 func (m *Messenger) Messaging() *messaging.API {

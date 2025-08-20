@@ -8,9 +8,8 @@ import (
 
 	"github.com/bits-and-blooms/bloom/v3"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -94,7 +93,7 @@ func verifyMembershipWithBloomFilter(membersList *protobuf.CommunityBloomFilter,
 }
 
 func bloomFilterValue(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, channelID string, clock uint64) ([]byte, error) {
-	sharedSecret, err := encryption.GenerateSharedKey(privateKey, publicKey)
+	sharedSecret, err := crypto.GenerateSharedKey(privateKey, publicKey)
 	if err != nil {
 		return nil, err
 	}

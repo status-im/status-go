@@ -14,7 +14,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
@@ -22,8 +21,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -32,10 +31,8 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/storenodes"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/personal"
@@ -548,7 +545,7 @@ func (m *Messenger) HandleCommunityUpdateGrant(state *ReceivedMessageState, mess
 		return err
 	}
 
-	grant, err := m.encryptor.DecryptCommunityGrant(m.identity, state.CurrentMessageState.PublicKey, message.Grants)
+	grant, err := m.messaging.DecryptCommunityGrant(m.identity, state.CurrentMessageState.PublicKey, message.Grants)
 	if err != nil {
 		return err
 	}
@@ -741,7 +738,7 @@ func (m *Messenger) handleCommunityGrant(community *communities.Community, grant
 }
 
 func (m *Messenger) publishGroupGrantMessage(community *communities.Community, timestamp uint64, recipientGrants map[*ecdsa.PublicKey][]byte) error {
-	grants, err := m.encryptor.EncryptCommunityGrants(community.PrivateKey(), recipientGrants)
+	grants, err := m.messaging.EncryptCommunityGrants(community.PrivateKey(), recipientGrants)
 	if err != nil {
 		return err
 	}
@@ -2385,7 +2382,7 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 
 	var chats []*Chat
 	for chatID, chat := range changes.ChatsAdded {
-		c := CreateCommunityChat(changes.Community.IDString(), chatID, chat, m.getTimesource())
+		c := CreateCommunityChat(changes.Community, chat, chatID, m.getTimesource())
 		chats = append(chats, c)
 		response.AddChat(c)
 	}
@@ -2414,7 +2411,7 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 
 	var chats []*Chat
 	for chatID, change := range changes.ChatsModified {
-		c := CreateCommunityChat(community.IDString(), chatID, change.ChatModified, m.getTimesource())
+		c := CreateCommunityChat(community, change.ChatModified, chatID, m.getTimesource())
 		chats = append(chats, c)
 		response.AddChat(c)
 	}
@@ -2618,51 +2615,6 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 
 func (m *Messenger) RemovePubsubTopicPrivateKey(topic string) error {
 	return m.messaging.RemovePubsubTopicKey(topic)
-}
-
-func (m *Messenger) SetCommunityStorenodes(request *requests.SetCommunityStorenodes) (*MessengerResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-	community, err := m.communitiesManager.GetByID(request.CommunityID)
-	if err != nil {
-		return nil, err
-	}
-	if !community.IsControlNode() {
-		return nil, errors.New(ErrNotAdminOrOwner)
-	}
-
-	if err := m.communityStorenodes.UpdateStorenodesInDB(request.CommunityID, request.Storenodes, 0); err != nil {
-		return nil, err
-	}
-	err = m.sendCommunityPublicStorenodesInfo(community, request.Storenodes)
-	if err != nil {
-		return nil, err
-	}
-	response := &MessengerResponse{
-		CommunityStorenodes: request.Storenodes,
-	}
-	return response, nil
-}
-
-func (m *Messenger) GetCommunityStorenodes(communityID types.HexBytes) (*MessengerResponse, error) {
-	community, err := m.communitiesManager.GetByID(communityID)
-	if err != nil {
-		return nil, err
-	}
-	if community == nil {
-		return nil, communities.ErrOrgNotFound
-	}
-
-	snodes, err := m.communityStorenodes.GetStorenodesFromDB(communityID)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &MessengerResponse{
-		CommunityStorenodes: snodes,
-	}
-	return response, nil
 }
 
 func (m *Messenger) UpdateCommunityFilters(community *communities.Community) error {
@@ -3674,7 +3626,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 	// Handle deprecated community keys
 	if len(syncCommunity.EncryptionKeysV1) != 0 {
 		//  We pass nil,nil as private key/public key as they won't be encrypted
-		_, err := m.encryptor.HandleHashRatchetKeysPayload(syncCommunity.Id, syncCommunity.EncryptionKeysV1, nil, nil)
+		err := m.messaging.HandleHashRatchetKeysPayload(syncCommunity.Id, syncCommunity.EncryptionKeysV1, nil, nil)
 		if err != nil {
 			return err
 		}
@@ -3682,7 +3634,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 
 	// Handle community and channel keys
 	if len(syncCommunity.EncryptionKeysV2) != 0 {
-		err := m.encryptor.HandleHashRatchetHeadersPayload(syncCommunity.EncryptionKeysV2)
+		err := m.messaging.HandleHashRatchetHeadersPayload(syncCommunity.EncryptionKeysV2)
 		if err != nil {
 			return err
 		}
@@ -3831,6 +3783,8 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 	defer utils.LogOnPanic()
 	m.logger.Debug("initializing history archive tasks")
 
+	peerInfo := m.messaging.GetActiveStorenode()
+
 	for _, c := range communities {
 
 		if c.Joined() {
@@ -3895,8 +3849,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			}
 
 			// Request possibly missed waku messages for community
-			ms := m.getCommunityStorenode(c.ID().String())
-			_, err = m.syncFiltersFrom(ms, filters, uint32(latestWakuMessageTimestamp))
+			_, err = m.syncFiltersFrom(peerInfo, filters, uint32(latestWakuMessageTimestamp))
 			if err != nil {
 				m.logger.Error("failed to request missing messages", zap.Error(err))
 				continue
@@ -4090,7 +4043,7 @@ importMessageArchivesLoop:
 
 			archiveMessages, err := m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
 			if err != nil {
-				if errors.Is(err, encryption.ErrHashRatchetGroupIDNotFound) {
+				if errors.Is(err, messagingtypes.ErrHashRatchetGroupIDNotFound) {
 					// In case we're missing hash ratchet keys, best we can do is
 					// to wait for them to be received and try import again.
 					delayImport = true
@@ -5087,29 +5040,4 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 			}
 		}
 	}()
-}
-
-// getCommunityStorenode returns the active mailserver if a communityID is present then it'll return the mailserver
-// for that community if it has a mailserver setup otherwise it'll return the global mailserver
-func (m *Messenger) getCommunityStorenode(communityID ...string) peer.AddrInfo {
-	if len(communityID) == 0 || communityID[0] == "" {
-		return m.messaging.GetActiveStorenode()
-	}
-
-	ms, err := m.communityStorenodes.GetStorenodeByCommunityID(communityID[0])
-	if err != nil {
-		if !errors.Is(err, storenodes.ErrNotFound) {
-			m.logger.Error("getting storenode for community, using global", zap.String("communityID", gocommon.TruncateWithDot(communityID[0])), zap.Error(err))
-		}
-		// if we don't find a specific mailserver for the community, we just use the regular mailserverCycle's one
-		return m.messaging.GetActiveStorenode()
-	}
-
-	peerInfo, err := ms.PeerInfo()
-	if err != nil {
-		m.logger.Error("getting storenode for community, using global", zap.String("communityID", gocommon.TruncateWithDot(communityID[0])), zap.Error(err))
-		return m.messaging.GetActiveStorenode()
-	}
-
-	return peerInfo
 }

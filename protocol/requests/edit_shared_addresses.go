@@ -3,8 +3,8 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 )
 
 var ErrInvalidCommunityID = errors.New("invalid community id")

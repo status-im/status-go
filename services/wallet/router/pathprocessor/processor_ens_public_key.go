@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/resolver"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"

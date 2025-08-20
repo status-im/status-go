@@ -16,6 +16,8 @@ rm -rf "${benchmark_results_path}"
 
 mkdir -p "${test_results_path}"
 mkdir -p "${benchmark_results_path}"
+# Create coverage directory as jenkins user
+mkdir -p "${GIT_ROOT}/coverage/binary"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.waku.yml"
 identifier=${BUILD_ID:-$(git rev-parse --short HEAD)}
@@ -28,7 +30,7 @@ docker ps -a --filter "name=status-go-func-tests-${identifier}" --filter "status
 
 # Build statusgo image
 echo -e "${GRN}Building status-go${RST}"
-docker build --file ./_assets/build/Dockerfile . \
+docker build . \
   --build-arg "enable_go_cache=false" \
   --tag "${image_name}"
 

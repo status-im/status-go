@@ -14,7 +14,7 @@ import (
 
 	"github.com/mat/besticon/besticon"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/images"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"

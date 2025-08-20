@@ -11,30 +11,23 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/messaging"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/sqlite"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/timesource"
-	"github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2"
-	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -59,7 +52,7 @@ const (
 	exitCodeInvalidWakuFleetConfig
 	exitCodeInvalidKey
 	exitCodeCreateWakuFailed
-	exitCodeStartWakuFailed
+	exitCodeStartMessagingFailed
 	exitCodeDBMigrationFailed
 	exitCodeCreateMessengerFailed
 	exitCodeCreateDatabaseFailed
@@ -70,9 +63,8 @@ const (
 func init() {
 	flag.Parse()
 	logSettings := logutils.LogSettings{
-		Enabled:   true,
-		Level:     *logLevel,
-		Colorized: !*logNoColors && terminal.IsTerminal(int(os.Stdin.Fd())),
+		Enabled: true,
+		Level:   *logLevel,
 	}
 	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
 		panic(err)
@@ -122,52 +114,52 @@ func main() {
 		os.Exit(exitCodeCreateDatabaseFailed)
 	}
 
-	ts := timesource.Default()
-
-	wakuConfig := buildWakuConfig()
-	nopCb1 := func([]byte, peer.AddrInfo, error) {}
-	nopCb2 := func(types.ConnStatus) {}
-	waku, err := wakuv2.New(nil, wakuConfig, logger, db, ts, nopCb1, nopCb2)
-	if err != nil {
-		logger.Error("failed to create waku", zap.Error(err))
-		os.Exit(exitCodeCreateWakuFailed)
-	}
-
-	err = waku.Start()
-	if err != nil {
-		logger.Error("failed to start waku", zap.Error(err))
-		os.Exit(exitCodeStartWakuFailed)
-	}
-	defer func() {
-		err := waku.Stop()
-		if err != nil {
-			logger.Error("failed to stop waku", zap.Error(err))
-		}
-	}()
-
 	err = sqlite.Migrate(db)
 	if err != nil {
 		logger.Error("failed to migrate database", zap.Error(err))
 		os.Exit(exitCodeDBMigrationFailed)
 	}
 
-	encryptionProtocol := encryption.New(
-		db,
-		installationID,
-		logger,
-	)
-
 	messaging, err := messaging.NewCore(
-		waku,
-		privateKey,
-		db,
-		protocol.NewMessagingPersistence(db),
-		encryptionProtocol,
+		messaging.CoreParams{
+			Identity:    privateKey,
+			DB:          db,
+			Persistence: protocol.NewMessagingPersistence(db),
+			NodeKey:     nil,
+			WakuConfig: params.WakuV2Config{
+				Enabled:        true,
+				Host:           "0.0.0.0",
+				Port:           *Port,
+				UDPPort:        *UDPPort,
+				LightClient:    false,
+				DiscoveryLimit: 20,
+				AutoUpdate:     true,
+			},
+			ClusterConfig: params.ClusterConfig{
+				WakuNodes:            params.DefaultWakuNodes(*wakuFleet),
+				DiscV5BootstrapNodes: params.DefaultDiscV5Nodes(*wakuFleet),
+				ClusterID:            16,
+			},
+			InstallationID: installationID,
+			TimeSource:     timesource.Default(),
+		},
 		messaging.WithLogger(logger.Named("messaging")),
 	)
 	if err != nil {
 		os.Exit(exitCodeCreateMessengerFailed)
 	}
+
+	err = messaging.API().Start()
+	if err != nil {
+		logger.Error("failed to start messaging", zap.Error(err))
+		os.Exit(exitCodeStartMessagingFailed)
+	}
+	defer func() {
+		err := messaging.API().Stop()
+		if err != nil {
+			logger.Error("failed to stop messaging", zap.Error(err))
+		}
+	}()
 
 	// Set up the push notifications server
 	config := &pushnotificationserver.Config{
@@ -289,32 +281,4 @@ func createWalletDatabase(path string) (*sql.DB, error) {
 		return nil, err
 	}
 	return walletDB, nil
-}
-
-func buildWakuConfig() *wakuv2.Config {
-	cfg := &wakuv2.Config{
-		MaxMessageSize:                         wakuv2common.DefaultMaxMessageSize,
-		Host:                                   "0.0.0.0",
-		Port:                                   *Port,
-		LightClient:                            false,
-		EnablePeerExchangeClient:               false,
-		EnablePeerExchangeServer:               true,
-		EnableDiscV5:                           true,
-		WakuNodes:                              params.DefaultWakuNodes(*wakuFleet),
-		EnableStore:                            false,
-		StoreCapacity:                          0,
-		StoreSeconds:                           0,
-		DiscoveryLimit:                         20,
-		DiscV5BootstrapNodes:                   params.DefaultDiscV5Nodes(*wakuFleet),
-		Nameserver:                             "",
-		UDPPort:                                *UDPPort,
-		AutoUpdate:                             true,
-		DefaultShardPubsubTopic:                messagingtypes.DefaultShardPubsubTopic(),
-		ClusterID:                              16,
-		EnableMissingMessageVerification:       false,
-		EnableStoreConfirmationForMessagesSent: false,
-		UseThrottledPublish:                    true,
-	}
-
-	return cfg
 }

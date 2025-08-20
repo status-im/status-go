@@ -3,8 +3,8 @@ package types
 import (
 	wakuproto "github.com/waku-org/go-waku/waku/v2/protocol"
 
+	wakuv2 "github.com/status-im/status-go/messaging/waku"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 type Shard struct {

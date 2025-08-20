@@ -17,13 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appgeneral "github.com/status-im/status-go/services/app-general"
-	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
 	"github.com/status-im/status-go/services/communitytokens"
@@ -31,7 +29,6 @@ import (
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcstats"
@@ -60,7 +57,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 
 	services := []common.StatusService{}
 	services = append(services, b.rpcStatsService())
-	services = append(services, b.appmetricsService())
 	services = append(services, b.appgeneralService())
 	services = append(services, b.personalService())
 	services = append(services, b.statusPublicService())
@@ -72,7 +68,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accDB, mediaServer))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
-	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	services = appendIf(config.ConnectorConfig.Enabled, services, b.connectorService())
 	services = append(services, b.gifService(accDB))
 	services = append(services, b.ChatService(accDB))
@@ -138,7 +133,7 @@ func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Ser
 		return nil, errors.New("geth node not initialized")
 	}
 	if b.wakuV2ExtSrvc == nil {
-		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.rpcClient)
+		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.rpcClient, b.logger.Named("protocol"))
 	}
 
 	return b.wakuV2ExtSrvc, nil
@@ -266,21 +261,6 @@ func (b *StatusNode) permissionsService() *permissions.Service {
 		b.permissionsSrvc = permissions.NewService(permissions.NewDB(b.appDB))
 	}
 	return b.permissionsSrvc
-}
-
-func (b *StatusNode) mailserversService() *mailservers.Service {
-	if b.mailserversSrvc == nil {
-
-		b.mailserversSrvc = mailservers.NewService(mailservers.NewDB(b.appDB))
-	}
-	return b.mailserversSrvc
-}
-
-func (b *StatusNode) appmetricsService() common.StatusService {
-	if b.appMetricsSrvc == nil {
-		b.appMetricsSrvc = appmetricsservice.NewService(appmetrics.NewDB(b.appDB))
-	}
-	return b.appMetricsSrvc
 }
 
 func (b *StatusNode) appgeneralService() *appgeneral.Service {

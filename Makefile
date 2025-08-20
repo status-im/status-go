@@ -268,7 +268,7 @@ docker-image: SHELL := /bin/sh
 docker-image: BUILD_TARGET ?= cmd
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
-	docker build --file _assets/build/Dockerfile . \
+	docker build . \
 		--build-arg 'build_tags=$(BUILD_TAGS)' \
 		--build-arg 'build_flags=$(BUILD_FLAGS)' \
 		--build-arg 'build_target=$(BUILD_TARGET)' \
@@ -388,13 +388,13 @@ benchmark:
 
 lint-panics: export GOFLAGS ?= -tags='$(BUILD_TAGS)'
 lint-panics: generate
-	go run ./cmd/lint-panics -root="$(call sh, pwd)" -skip=./cmd -test=false ./...
+	go run ./cmd/lint-panics -root="$(PWD)" -skip=./cmd -test=false ./...
 
 lint: generate lint-panics
 	golangci-lint --build-tags '$(BUILD_TAGS)' run ./...
 
 clean: ##@other Cleanup
-	rm -fr build/bin/* mailserver-config.json
+	rm -fr build/bin/*
 
 git-clean:
 	git clean -xf
@@ -410,12 +410,6 @@ vendor: generate
 	go mod vendor
 	modvendor -copy="**/*.c **/*.h" -v
 .PHONY: vendor
-
-update-fleet-config: ##@other Update fleets configuration from fleets.status.im
-	./_assets/scripts/update-fleet-config.sh
-	@echo "Updating static assets..."
-	@go generate ./static
-	@echo "Done"
 
 migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
 migration:
@@ -451,26 +445,6 @@ migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
 migration-protocol:
 	touch $(DEFAULT_PROTOCOL_PATH)/$$(date +%s)_$(D).up.sql
 
-PROXY_WRAPPER_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
--include $(PROXY_WRAPPER_PATH)/Makefile.vars
-
-#export VERIF_PROXY_OUT_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
-build-verif-proxy:
-	$(MAKE) -C $(NIMBUS_ETH1_PATH) libverifproxy
-
-build-verif-proxy-wrapper:
-	$(MAKE) -C $(VERIF_PROXY_OUT_PATH) build-verif-proxy-wrapper
-
-test-verif-proxy-wrapper:
-	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)
-
-run-anvil: SHELL := /bin/sh
-run-anvil:
-	@docker compose \
-		-f tests-functional/docker-compose.anvil.yml \
-		-f tests-functional/docker-compose.anvil.dev.yml \
-		up --remove-orphans
-
 codecov-validate: SHELL := /bin/sh
 codecov-validate:
 	curl -X POST --data-binary @.codecov.yml https://codecov.io/validate
@@ -479,3 +453,6 @@ codecov-validate:
 pytest-lint:
 	$(MAKE) -C tests-functional lint
 
+generate-db: build/bin/generate-db
+generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL inspections
+	./build/bin/generate-db -out-dir build/db

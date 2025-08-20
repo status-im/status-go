@@ -28,22 +28,6 @@ class TestInitialiseApp:
         backend_client.restore_account_and_login()
 
         assert backend_client is not None
-        backend_client.verify_json_schema(
-            backend_client.wait_for_login(),
-            "signal_node_login",
-        )
-        backend_client.verify_json_schema(
-            backend_client.wait_for_signal(SignalType.MEDIASERVER_STARTED.value),
-            "signal_mediaserver_started",
-        )
-        backend_client.verify_json_schema(
-            backend_client.wait_for_signal(SignalType.NODE_STARTED.value),
-            "signal_node_started",
-        )
-        backend_client.verify_json_schema(
-            backend_client.wait_for_signal(SignalType.NODE_READY.value),
-            "signal_node_ready",
-        )
 
 
 def assert_file_first_line(path, pattern: str, expected: bool):

@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 )
 
 var (

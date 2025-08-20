@@ -10,9 +10,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/crypto/ecies"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	messagingevents "github.com/status-im/status-go/messaging/events"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -159,11 +158,7 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsO
 	// set up reader
 	reader := bytes.NewReader([]byte(expectedUUID))
 
-	sharedKey, err := ecies.ImportECDSA(s.identity).GenerateShared(
-		ecies.ImportECDSAPublic(&contactKey.PublicKey),
-		accessTokenKeyLength,
-		accessTokenKeyLength,
-	)
+	sharedKey, err := crypto.GenerateSharedKey(s.identity, &contactKey.PublicKey)
 	s.Require().NoError(err)
 	// build encrypted token
 	encryptedToken, err := encryptAccessToken([]byte(expectedUUID), sharedKey, reader)

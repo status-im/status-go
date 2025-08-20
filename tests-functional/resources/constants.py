@@ -58,6 +58,32 @@ user_mnemonic_24 = Account(
     profile_data=mnemonic_24.profile_data,
 )
 
+new_account_data_1 = {
+    "address": "0x1234567890abcdef1234567890abcdef12345678",
+    "key-uid": "",
+    "wallet": False,
+    "chat": False,
+    "type": "generated",
+    "path": "m/44'/60'/0'/0/0",
+    "public-key": "0xabcdef",
+    "name": "account1",
+    "emoji": "🔑",
+    "colorId": "blue",
+}
+
+new_account_data_2 = {
+    "address": "0xf2d58ae5aa880f7c3f65d769296b1061c61e0955",
+    "key-uid": "",
+    "wallet": False,
+    "chat": False,
+    "type": "generated",
+    "path": "m/44'/60'/0'/0/1",
+    "public-key": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+    "name": "account2",
+    "emoji": "🔑",
+    "colorId": "blue",
+}
+
 user_keycard_1 = {
     "keyUID": "5a0dd657-165a-4810-b800-6005452be42f",
     "address": "0x1234567890abcdef1234567890abcdef12345678",

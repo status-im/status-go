@@ -23,8 +23,8 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
@@ -33,7 +33,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -85,12 +84,13 @@ func (s *MessengerCommunitiesSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesSuite) setMessengerDisplayName(m *Messenger, name string) {
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = m.account.KeyUID
 	profileKp.Name = DefaultProfileDisplayName
 	profileKp.Accounts[0].KeyUID = m.account.KeyUID
 
-	err := m.settings.SaveOrUpdateKeypair(profileKp)
+	err = m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
 	err = m.SetDisplayName(name)
@@ -491,11 +491,12 @@ func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.
 
 func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	// add bob's profile keypair
-	bobProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	bobProfileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	bobProfileKp.KeyUID = s.bob.account.KeyUID
 	bobProfileKp.Accounts[0].KeyUID = s.bob.account.KeyUID
 
-	err := s.bob.settings.SaveOrUpdateKeypair(bobProfileKp)
+	err = s.bob.settings.SaveOrUpdateKeypair(bobProfileKp)
 	s.Require().NoError(err)
 
 	// create community and make bob and alice join to it
@@ -2398,7 +2399,7 @@ func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger 
 	s.Len(tcs, 0, "Must have 0 communities")
 
 	// Pair devices
-	metadata := &multidevice.InstallationMetadata{
+	metadata := &messagingtypes.InstallationMetadata{
 		Name:       "other-device",
 		DeviceType: "other-device-type",
 	}
@@ -2684,17 +2685,15 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
 	}
 
 	getKeysCount := func(m *Messenger) (communityKeysCount int, channelKeysCount int) {
-		keys, err := m.encryptor.GetAllHRKeys(community.ID())
-		s.Require().NoError(err)
-		if keys != nil {
-			communityKeysCount = len(keys.Keys)
-		}
+		mtu := messaging.TestUtils{API: m.messaging}
 
-		channelKeys, err := m.encryptor.GetAllHRKeys([]byte(community.IDString() + chat.CommunityChatID()))
+		var err error
+		communityKeysCount, err = mtu.GetAllHRKeysCount(community.ID())
 		s.Require().NoError(err)
-		if channelKeys != nil {
-			channelKeysCount = len(channelKeys.Keys)
-		}
+
+		channelKeysCount, err = mtu.GetAllHRKeysCount([]byte(community.IDString() + chat.CommunityChatID()))
+		s.Require().NoError(err)
+
 		return
 	}
 
@@ -2716,7 +2715,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
 // makes a request to join a community
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	// Set Alice's installation metadata
-	aim := &multidevice.InstallationMetadata{
+	aim := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-device",
 		DeviceType: "alice's-device-type",
 	}
@@ -2944,7 +2943,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Join() {
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	// Set Alice's installation metadata
-	aim := &multidevice.InstallationMetadata{
+	aim := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-device",
 		DeviceType: "alice's-device-type",
 	}
@@ -3779,8 +3778,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	// Make sure at least one key makes it to alice
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
-			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) != 1 {
+			keysCount, err := messaging.TestUtils{API: s.alice.messaging}.GetKeysForGroupCount(response.Communities()[0].ID())
+			if err != nil || keysCount != 1 {
 				return false
 			}
 			return true
@@ -3811,8 +3810,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
-			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) < 2 {
+			keysCount, err := messaging.TestUtils{API: s.alice.messaging}.GetKeysForGroupCount(response.Communities()[0].ID())
+			if err != nil || keysCount < 2 {
 				return false
 			}
 			return true
@@ -3882,8 +3881,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 	// Make sure at least one key makes it to alice
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
-			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) != 1 {
+			keysCount, err := messaging.TestUtils{API: s.alice.messaging}.GetKeysForGroupCount(response.Communities()[0].ID())
+			if err != nil || keysCount != 1 {
 				return false
 			}
 			return true
@@ -3914,8 +3913,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 
 	response, err = WaitOnMessengerResponse(s.alice,
 		func(r *MessengerResponse) bool {
-			keys, err := s.alice.encryptor.GetKeysForGroup(response.Communities()[0].ID())
-			if err != nil || len(keys) < 2 {
+			keysCount, err := messaging.TestUtils{API: s.alice.messaging}.GetKeysForGroupCount(response.Communities()[0].ID())
+			if err != nil || keysCount < 2 {
 				return false
 			}
 			return true
@@ -4548,9 +4547,9 @@ func (s *MessengerCommunitiesSuite) TestOpenAndNotJoinedCommunityNewChannelIsNot
 	s.Require().Len(response.CommunityChanges[0].ChatsAdded, 1)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Chats()[0].Members, 2)
+	s.Require().Len(response.Chats()[0].Members, 0)
 	for _, chat := range response.Communities()[0].Chats() {
-		s.Require().Len(chat.Members, 2)
+		s.Require().Len(chat.Members, 0)
 	}
 
 	// Check Alice gets the correct member list for a new channel
@@ -4559,16 +4558,16 @@ func (s *MessengerCommunitiesSuite) TestOpenAndNotJoinedCommunityNewChannelIsNot
 		func(r *MessengerResponse) bool {
 			if len(r.Chats()) == 1 && len(r.Communities()) > 0 {
 				for _, chat := range r.Chats() {
-					s.Require().Len(chat.Members, 2)
+					s.Require().Len(chat.Members, 0)
 				}
 				for _, chat := range r.Communities()[0].Chats() {
-					s.Require().Len(chat.Members, 2)
+					s.Require().Len(chat.Members, 0)
 				}
 				return true
 			}
 			return false
 		},
-		"no commiunity message for Alice",
+		"no community message for Alice",
 	)
 	s.Require().NoError(err)
 
@@ -4576,7 +4575,7 @@ func (s *MessengerCommunitiesSuite) TestOpenAndNotJoinedCommunityNewChannelIsNot
 	s.Require().NoError(err)
 	s.Require().Len(aliceCommunity.Chats(), 2)
 	for _, chat := range aliceCommunity.Chats() {
-		s.Require().Len(chat.Members, 2)
+		s.Require().Len(chat.Members, 0)
 	}
 }
 
