@@ -63,11 +63,6 @@ func BytesToTopic(b []byte) (t TopicType) {
 	return t
 }
 
-func StringToTopic(s string) (t TopicType) {
-	str, _ := hexutil.Decode(s)
-	return BytesToTopic(str)
-}
-
 // String converts a topic byte array to a string representation.
 func (t *TopicType) String() string {
 	return hexutil.Encode(t[:])

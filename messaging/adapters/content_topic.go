@@ -23,14 +23,3 @@ func ToWakuTopics(topics []types.ContentTopic) []wakutypes.TopicType {
 func FromWakuTopic(t wakutypes.TopicType) types.ContentTopic {
 	return types.ContentTopic(t)
 }
-
-func FromWakuTopics(topics []wakutypes.TopicType) []types.ContentTopic {
-	if topics == nil {
-		return nil
-	}
-	contentTopics := make([]types.ContentTopic, len(topics))
-	for i, t := range topics {
-		contentTopics[i] = FromWakuTopic(t)
-	}
-	return contentTopics
-}

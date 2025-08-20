@@ -228,7 +228,7 @@ func (c *Core) stop() error {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
-		err := c.API().ResetChatFilters(ctx)
+		err := c.transport.ResetFilters(ctx)
 		if err != nil {
 			c.logger.Warn("could not reset filters", zap.Error(err))
 		}
