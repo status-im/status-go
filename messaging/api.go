@@ -46,10 +46,6 @@ func (a *API) Publisher() *pubsub.Publisher {
 	return a.core.publisher
 }
 
-func (a *API) EncryptionProtocol() *encryption.Protocol {
-	return a.core.encryptor
-}
-
 func (a *API) InitChats(chats types.ChatsToInitialize, publicKeys []*ecdsa.PublicKey) error {
 	_, err := a.core.transport.InitFilters(adapters.ChatsToInitializeToTransport(chats), publicKeys)
 	return err
@@ -93,10 +89,6 @@ func (a *API) RemoveFilterByChatID(chatID string) (*types.ChatFilter, error) {
 	return adapters.FromTransportFilter(filter), nil
 }
 
-func (a *API) ResetChatFilters(ctx context.Context) error {
-	return a.core.transport.ResetFilters(ctx)
-}
-
 func (a *API) UpdateFilterPriority(chatID string, priority uint64) error {
 	transportFilter := a.core.transport.FilterByChatID(chatID)
 	if transportFilter == nil {
@@ -119,21 +111,13 @@ func (a *API) UpdateFilterEphemerality(chatID string, ephemeral bool) error {
 	return nil
 }
 
-func (a *API) ProcessNegotiatedSecret(secret ethtypes.NegotiatedSecret) (*types.ChatFilter, error) {
-	filter, err := a.core.transport.ProcessNegotiatedSecret(secret)
-	if err != nil {
-		return nil, err
-	}
-	return adapters.FromTransportFilter(filter), nil
-}
-
 func (a *API) HandleSharedSecrets(secrets []*types.SharedSecret) error {
 	for _, secret := range secrets {
 		fSecret := ethtypes.NegotiatedSecret{
 			PublicKey: secret.Identity,
 			Key:       secret.Key,
 		}
-		_, err := a.ProcessNegotiatedSecret(fSecret)
+		_, err := a.core.transport.ProcessNegotiatedSecret(fSecret)
 		if err != nil {
 			return err
 		}
@@ -229,20 +213,8 @@ func (a *API) PersonalTopicFilter() *types.ChatFilter {
 	return adapters.FromTransportFilter(a.core.transport.PersonalTopicFilter())
 }
 
-func (a *API) LoadKeyFilters(key *ecdsa.PrivateKey) (*types.ChatFilter, error) {
-	filter, err := a.core.transport.LoadKeyFilters(key)
-	if err != nil {
-		return nil, err
-	}
-	return adapters.FromTransportFilter(filter), nil
-}
-
 func (a *API) GetCurrentTime() uint64 {
 	return a.core.transport.GetCurrentTime()
-}
-
-func (a *API) MaxMessageSize() uint32 {
-	return a.core.transport.MaxMessageSize()
 }
 
 func (a *API) PeerCount() int {
@@ -351,10 +323,6 @@ func (a *API) OnStorenodeAvailable() <-chan peer.ID {
 
 func (a *API) WaitForAvailableStoreNode(ctx context.Context) bool {
 	return a.core.transport.WaitForAvailableStoreNode(ctx)
-}
-
-func (a *API) IsStorenodeAvailable(peerID peer.ID) bool {
-	return a.core.transport.IsStorenodeAvailable(peerID)
 }
 
 func (a *API) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
@@ -497,10 +465,6 @@ func (a *API) Metrics() string {
 
 func ToContentTopic(s string) []byte {
 	return transport.ToTopic(s)
-}
-
-func PartitionedTopic(publicKey *ecdsa.PublicKey) string {
-	return transport.PartitionedTopic(publicKey)
 }
 
 func ContactCodeTopic(publicKey *ecdsa.PublicKey) string {

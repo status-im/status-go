@@ -85,12 +85,6 @@ func NewBundleContainer(identity *ecdsa.PrivateKey, installationID string) (*Bun
 	}, nil
 }
 
-// VerifyBundle checks that a bundle is valid
-func VerifyBundle(bundle *Bundle) error {
-	_, err := ExtractIdentity(bundle)
-	return err
-}
-
 // ExtractIdentity extracts the identity key from a given bundle
 func ExtractIdentity(bundle *Bundle) (*ecdsa.PublicKey, error) {
 	bundleIdentityKey, err := crypto.DecompressPubkey(bundle.GetIdentity())

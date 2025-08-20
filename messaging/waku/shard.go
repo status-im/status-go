@@ -11,17 +11,6 @@ type Shard struct {
 	Index   uint16 `json:"index"`
 }
 
-func FromProtobuff(p *protobuf.Shard) *Shard {
-	if p == nil {
-		return nil
-	}
-
-	return &Shard{
-		Cluster: uint16(p.Cluster),
-		Index:   uint16(p.Index),
-	}
-}
-
 func (s *Shard) Protobuffer() *protobuf.Shard {
 	if s == nil {
 		return nil

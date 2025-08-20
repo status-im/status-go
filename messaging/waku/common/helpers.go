@@ -30,25 +30,6 @@ func ValidatePublicKey(k *ecdsa.PublicKey) bool {
 	return k != nil && k.X != nil && k.Y != nil && k.X.Sign() != 0 && k.Y.Sign() != 0
 }
 
-// BytesToUintLittleEndian converts the slice to 64-bit unsigned integer.
-func BytesToUintLittleEndian(b []byte) (res uint64) {
-	mul := uint64(1)
-	for i := 0; i < len(b); i++ {
-		res += uint64(b[i]) * mul
-		mul *= 256
-	}
-	return res
-}
-
-// BytesToUintBigEndian converts the slice to 64-bit unsigned integer.
-func BytesToUintBigEndian(b []byte) (res uint64) {
-	for i := 0; i < len(b); i++ {
-		res *= 256
-		res += uint64(b[i])
-	}
-	return res
-}
-
 // ContainsOnlyZeros checks if the data contain only zeros.
 func ContainsOnlyZeros(data []byte) bool {
 	for _, b := range data {
