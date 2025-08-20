@@ -19,9 +19,7 @@ class TestLightClientRateLimiting(MessengerSteps):
     def test_light_client_rate_limiting(self):
         sent_messages = []
 
-        message_count = 200
-
-        for i in range(message_count):
+        for i in range(200):
             message_text = f"test_message_{i+1}_{uuid4()}"
             response = self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, message_text)
             expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
@@ -45,7 +43,7 @@ class TestLightClientRateLimiting(MessengerSteps):
                 count += 1
             except Exception:
                 pass
-        assert count >= message_count * 0.99, f"Less than 99% of messages were received. Received: {count}"
+        assert count == 200, "Not all messages were received"
         elapsed_time = time() - start_time
 
         assert elapsed_time >= 30, f"Message sending was too fast: {elapsed_time:.2f} seconds. Rate limiting is not applied"

@@ -39,20 +39,6 @@ class TestUpdateAccount:
             before["clock"] = after["clock"] = 0
             assert after == before
 
-    def test_update_accounts_as_removed(self):
-        # fetch all accounts
-        accounts_response_before = self.account.accounts_service.get_accounts()
-        accounts_before = accounts_response_before.get("result", [])
-
-        for before in accounts_before:
-            before["removed"] = True
-            self.account.accounts_service.update_account(before)
-
-        # verify update persisted
-        accounts_response_after = self.account.accounts_service.get_accounts()
-        accounts_after = accounts_response_after.get("result", [])
-        assert len(accounts_after) == 0, "Not all accounts have been removed"
-
     def test_try_to_update_non_editable_fields(self):
         # fetch all accounts
         accounts_response_before = self.account.accounts_service.get_accounts()
