@@ -5,7 +5,7 @@
   platform ? "android",
   platformVersion ? "23",
   targets ? [ "android/arm64" ],
-  goBuildFlags ? [ ], # Use -v or -x for debugging.
+  goBuildFlags ? [ -v ], # Use -v or -x for debugging.
   goBuildLdFlags ? [ ],
   outputFileName,
 }:
