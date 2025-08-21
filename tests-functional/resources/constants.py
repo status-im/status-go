@@ -97,6 +97,13 @@ user_keycard_1 = {
     "encryptionPublicKey": "example-encryption-public-key",
 }
 
+keycard_1 = {
+    "keycard-uid": "kc-0xab1948",
+    "keycard-name": "TestKeycard-0xab19",
+    "accounts-addresses": ["0x5e98dbb30871a33f802a710420bf975095c1645c"],
+    "key-uid": "",
+}
+
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 TESTS_DIR = os.path.join(PROJECT_ROOT, "tests-functional")
 SIGNALS_DIR = os.path.join(TESTS_DIR, "signals")

@@ -95,3 +95,22 @@ class AccountService(Service):
         params = [account]
         response = self.rpc_request("updateAccount", params)
         return response
+
+    def save_or_update_keycard(self, keycard, accounts_coming_from_keycard=False):
+        params = [keycard, accounts_coming_from_keycard]
+        response = self.rpc_request("saveOrUpdateKeycard", params)
+        return response
+
+    def delete_keycard(self, keycard_uid):
+        params = [keycard_uid]
+        response = self.rpc_request("deleteKeycard", params)
+        return response
+
+    def get_all_known_keycards(self):
+        response = self.rpc_request("getAllKnownKeycards", [])
+        return response
+
+    def get_keycard_by_keycard_uid(self, keycard_uid):
+        params = [keycard_uid]
+        response = self.rpc_request("getKeycardByKeycardUID", params)
+        return response
