@@ -1375,6 +1375,9 @@ func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.Rest
 			Address:   request.Keycard.WalletAddress,
 			PublicKey: request.Keycard.WalletPublicKey,
 		},
+		accscommon.PathEIP1581Encryption: {
+			PublicKey: request.Keycard.EncryptionPublicKey,
+		},
 	}
 
 	input := &prepareAccountInput{
