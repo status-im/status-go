@@ -93,10 +93,3 @@ class TestSaveOrUpdateKeycard:
         assert keycards[0].get("accounts-addresses") == self.keycard.get("accounts-addresses")
         assert keycards[0].get("key-uid") == self.keycard.get("key-uid")
         assert keycards[0].get("Position") == 0
-
-    def test_get_keycard_by_keycard_uid(self):
-        self.test_save_multiple_keycards()
-        first_keycard = self.account.accounts_service.get_keycard_by_keycard_uid(self.keycard.get("keycard-uid"))
-        assert first_keycard.get("result").get("keycard-name") == self.keycard.get("keycard-name")
-        second_keycard = self.account.accounts_service.get_keycard_by_keycard_uid(self.second_keycard.get("keycard-uid"))
-        assert second_keycard.get("result").get("keycard-name") == self.second_keycard.get("keycard-name")

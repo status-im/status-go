@@ -114,3 +114,8 @@ class AccountService(Service):
         params = [keycard_uid]
         response = self.rpc_request("getKeycardByKeycardUID", params)
         return response
+
+    def get_keycards_with_same_key_uid(self, key_uid):
+        params = [key_uid]
+        response = self.rpc_request("getKeycardsWithSameKeyUID", params)
+        return response
