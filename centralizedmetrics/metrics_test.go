@@ -74,6 +74,10 @@ func (r *TestMetricRepository) Info() (*MetricsInfo, error) {
 	return &MetricsInfo{Enabled: r.enabled, UserConfirmed: r.userConfirmed}, nil
 }
 
+func (r *TestMetricRepository) CleanupOldMetrics() error {
+	return nil
+}
+
 func (r *TestMetricRepository) Delete(metrics []common.Metric) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()

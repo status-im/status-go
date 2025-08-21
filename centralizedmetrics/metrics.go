@@ -23,6 +23,7 @@ type MetricsInfo struct {
 type MetricRepository interface {
 	Poll() ([]common.Metric, error)
 	Delete(metrics []common.Metric) error
+	CleanupOldMetrics() error
 	Add(metric common.Metric) error
 	Info() (*MetricsInfo, error)
 	ToggleEnabled(isEnabled bool) error
@@ -60,6 +61,13 @@ func (s *MetricService) Start() {
 	if s.started {
 		return
 	}
+
+	err := s.repository.CleanupOldMetrics()
+	if err != nil {
+		// No need to return
+		s.logger.Error("error cleaning up old metrics", zap.Error(err))
+	}
+
 	s.ticker = time.NewTicker(s.interval)
 	s.wg.Add(1)
 	s.started = true
