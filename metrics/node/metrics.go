@@ -4,11 +4,6 @@ import (
 	"errors"
 	"strings"
 
-	"go.uber.org/zap"
-
-	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
-
 	prom "github.com/prometheus/client_golang/prometheus"
 )
 
@@ -33,19 +28,6 @@ func init() {
 	prom.MustRegister(nodeMaxPeersGauge)
 }
 
-func updateNodeMetrics(node *node.Node, evType p2p.PeerEventType) error {
-	server := node.Server()
-	if server == nil {
-		return errors.New("p2p server is unavailable")
-	}
-
-	calculatePeerCounts(server)
-	nodePeersAbsolute.Set(float64(server.PeerCount()))
-	nodeMaxPeersGauge.Set(float64(server.MaxPeers))
-
-	return nil
-}
-
 func labelsFromNodeName(name string) (prom.Labels, error) {
 	tokens := strings.Split(name, "/")
 	if len(tokens) == 4 {
@@ -62,20 +44,5 @@ func labelsFromNodeName(name string) (prom.Labels, error) {
 		}, nil
 	} else {
 		return nil, errors.New("wrong number of segments in name")
-	}
-}
-
-func calculatePeerCounts(server *p2p.Server) {
-	peers := server.Peers()
-	/* necessary to count all peers anew */
-	nodePeersGauge.Reset()
-
-	for _, p := range peers {
-		labels, err := labelsFromNodeName(p.Fullname())
-		if err != nil {
-			logger.Warn("failed parsing peer name", zap.String("name", p.Name()), zap.Error(err))
-			continue
-		}
-		nodePeersGauge.With(labels).Inc()
 	}
 }
