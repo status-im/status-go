@@ -288,16 +288,15 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
-generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/|sds") ##@ We'll handle sds manually
-generate: SDS_PACKAGE ?= $$(go list -e ./... | grep "sds-go-bindings")
-generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
-generate: export GO_GENERATE_FAST_DEBUG ?= false
-generate: export GO_GENERATE_FAST_RECACHE ?= false
-generate:  ##@ Build libsds
+generate:
+	PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/|sds") ##@ We'll handle sds manually
+	SDS_PACKAGE ?= $$(go list -e ./... | grep "sds-go-bindings")
+	GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
+	export GO_GENERATE_FAST_DEBUG ?= false
+	export GO_GENERATE_FAST_RECACHE ?= false
 	echo "Before building libsds."
 	cd $(SDS_PACKAGE)/sds && ls && make build
 	echo "After building libsds."
-generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
 	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
 
 generate-contracts:
