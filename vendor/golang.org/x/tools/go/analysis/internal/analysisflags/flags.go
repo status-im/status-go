@@ -201,7 +201,7 @@ func addVersionFlag() {
 type versionFlag struct{}
 
 func (versionFlag) IsBoolFlag() bool { return true }
-func (versionFlag) Get() interface{} { return nil }
+func (versionFlag) Get() any         { return nil }
 func (versionFlag) String() string   { return "" }
 func (versionFlag) Set(s string) error {
 	if s != "full" {
@@ -252,7 +252,7 @@ const (
 
 // triState implements flag.Value, flag.Getter, and flag.boolFlag.
 // They work like boolean flags: we can say vet -printf as well as vet -printf=true
-func (ts *triState) Get() interface{} {
+func (ts *triState) Get() any {
 	return *ts == setTrue
 }
 
@@ -318,29 +318,37 @@ var vetLegacyFlags = map[string]string{
 // If contextLines is nonnegative, it also prints the
 // offending line plus this many lines of context.
 func PrintPlain(out io.Writer, fset *token.FileSet, contextLines int, diag analysis.Diagnostic) {
-	posn := fset.Position(diag.Pos)
-	fmt.Fprintf(out, "%s: %s\n", posn, diag.Message)
+	print := func(pos, end token.Pos, message string) {
+		posn := fset.Position(pos)
+		fmt.Fprintf(out, "%s: %s\n", posn, message)
 
-	// show offending line plus N lines of context.
-	if contextLines >= 0 {
-		posn := fset.Position(diag.Pos)
-		end := fset.Position(diag.End)
-		if !end.IsValid() {
-			end = posn
-		}
-		data, _ := os.ReadFile(posn.Filename)
-		lines := strings.Split(string(data), "\n")
-		for i := posn.Line - contextLines; i <= end.Line+contextLines; i++ {
-			if 1 <= i && i <= len(lines) {
-				fmt.Fprintf(out, "%d\t%s\n", i, lines[i-1])
+		// show offending line plus N lines of context.
+		if contextLines >= 0 {
+			end := fset.Position(end)
+			if !end.IsValid() {
+				end = posn
+			}
+			// TODO(adonovan): highlight the portion of the line indicated
+			// by pos...end using ASCII art, terminal colors, etc?
+			data, _ := os.ReadFile(posn.Filename)
+			lines := strings.Split(string(data), "\n")
+			for i := posn.Line - contextLines; i <= end.Line+contextLines; i++ {
+				if 1 <= i && i <= len(lines) {
+					fmt.Fprintf(out, "%d\t%s\n", i, lines[i-1])
+				}
 			}
 		}
+	}
+
+	print(diag.Pos, diag.End, diag.Message)
+	for _, rel := range diag.Related {
+		print(rel.Pos, rel.End, "\t"+rel.Message)
 	}
 }
 
 // A JSONTree is a mapping from package ID to analysis name to result.
 // Each result is either a jsonError or a list of JSONDiagnostic.
-type JSONTree map[string]map[string]interface{}
+type JSONTree map[string]map[string]any
 
 // A TextEdit describes the replacement of a portion of a file.
 // Start and End are zero-based half-open indices into the original byte
@@ -383,7 +391,7 @@ type JSONRelatedInformation struct {
 // Add adds the result of analysis 'name' on package 'id'.
 // The result is either a list of diagnostics or an error.
 func (tree JSONTree) Add(fset *token.FileSet, id, name string, diags []analysis.Diagnostic, err error) {
-	var v interface{}
+	var v any
 	if err != nil {
 		type jsonError struct {
 			Err string `json:"error"`
@@ -429,7 +437,7 @@ func (tree JSONTree) Add(fset *token.FileSet, id, name string, diags []analysis.
 	if v != nil {
 		m, ok := tree[id]
 		if !ok {
-			m = make(map[string]interface{})
+			m = make(map[string]any)
 			tree[id] = m
 		}
 		m[name] = v
