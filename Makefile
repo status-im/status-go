@@ -294,7 +294,9 @@ generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate:  ##@ Build libsds
-	cd $(SDS_PACKAGE)/sds && make build
+	echo "Before building libsds."
+	cd $(SDS_PACKAGE)/sds && ls && make build
+	echo "After building libsds."
 generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
 	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
 
