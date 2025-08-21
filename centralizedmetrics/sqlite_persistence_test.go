@@ -2,7 +2,9 @@ package centralizedmetrics
 
 import (
 	"database/sql"
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -115,6 +117,57 @@ func TestSQLiteMetricRepository_Delete(t *testing.T) {
 	err = db.QueryRow("SELECT COUNT(*) FROM centralizedmetrics_metrics WHERE id = ?", metric.ID).Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
+}
+
+func TestSQLiteMetricRepository_CleanupOldMetrics(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewSQLiteMetricRepository(db)
+
+	// Insert a normal metric
+	metric := common.Metric{
+		ID:        "id",
+		EventName: "purchase",
+		EventValue: map[string]interface{}{
+			"amount": 99.99,
+		},
+	}
+
+	err := repo.Add(metric)
+	require.NoError(t, err)
+
+	// Cleanup should do nothing
+	err = repo.CleanupOldMetrics()
+	require.NoError(t, err)
+
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM centralizedmetrics_metrics").Scan(&count)
+	require.NoError(t, err)
+	// There will be one because the added metric will be from Now
+	require.Equal(t, 1, count)
+
+	// Insert an old metric
+	eventValue, err := json.Marshal(metric.EventValue)
+	require.NoError(t, err)
+	metric.ID = "old_id"
+	_, err = db.Exec("INSERT INTO centralizedmetrics_metrics (id, event_name, event_value, platform, app_version, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+		metric.ID, metric.EventName, string(eventValue), metric.Platform, metric.AppVersion, time.Now().Add(-6*24*time.Hour).UnixNano()/int64(time.Millisecond))
+	require.NoError(t, err)
+
+	err = db.QueryRow("SELECT COUNT(*) FROM centralizedmetrics_metrics").Scan(&count)
+	require.NoError(t, err)
+	// Now there are 2 metrics
+	require.Equal(t, 2, count)
+
+	// Cleanup will do something now
+	err = repo.CleanupOldMetrics()
+	require.NoError(t, err)
+
+	err = db.QueryRow("SELECT COUNT(*) FROM centralizedmetrics_metrics").Scan(&count)
+	require.NoError(t, err)
+	// Back to one metric
+	require.Equal(t, 1, count)
 }
 
 func TestSQLiteMetricRepository_UserID(t *testing.T) {

@@ -98,6 +98,26 @@ func (r *SQLiteMetricRepository) Delete(metrics []common.Metric) error {
 	return tx.Commit()
 }
 
+func (r *SQLiteMetricRepository) CleanupOldMetrics() error {
+	tx, err := r.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	const cleanupThreshold = 5 * 24 * time.Hour // 5 days is the MixPanel limit
+
+	_, err = tx.Exec("DELETE FROM centralizedmetrics_metrics WHERE timestamp < ?", time.Now().Add(-cleanupThreshold).UnixNano()/int64(time.Millisecond))
+	return err
+}
+
 func (r *SQLiteMetricRepository) Add(metric common.Metric) error {
 	eventValue, err := json.Marshal(metric.EventValue)
 	if err != nil {
