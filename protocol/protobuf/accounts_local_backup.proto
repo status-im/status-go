@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+import "sync_settings.proto";
+
+option go_package = "./;protobuf";
+package protobuf;
+
+message AccountsLocalBackup {
+  repeated SyncSetting settings = 1;
+}

@@ -5,7 +5,7 @@ package transactions
 import (
 	"sync"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 )
 
 // AddrLocker provides locks for addresses

@@ -6,33 +6,41 @@ from clients.signals import SignalType
 from resources.constants import USE_IPV6
 
 
-@pytest.mark.usefixtures("setup_two_privileged_nodes")
 @pytest.mark.reliability
 class TestPrivateGroupMessages(MessengerSteps):
 
+    @pytest.fixture(autouse=True)
+    def setup_backends(self, backend_new_profile):
+        """Initialize two unprivileged backends (sender and receiver) for each test function"""
+        self.sender = backend_new_profile("sender")
+        self.receiver = backend_new_profile("receiver")
+
     def test_private_group_messages_baseline(self, message_count=1):
-        self.make_contacts()
-        self.private_group_id = self.join_private_group()
-        self.private_group_message(message_count, self.private_group_id)
+        self.make_contacts(self.sender, self.receiver)
+        self.private_group_id = self.join_private_group(admin=self.sender, member=self.receiver)
+        self.private_group_message(message_count, self.private_group_id, sender=self.sender, receiver=self.receiver)
 
     def test_multiple_group_chat_messages(self):
         self.test_private_group_messages_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_private_group_chat_messages_with_latency(self):
         with self.add_latency(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_private_group_chat_messages_with_packet_loss(self):
         with self.add_packet_loss(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
 
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_private_group_chat_messages_with_low_bandwidth(self):
         with self.add_low_bandwith(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
 
     def test_private_group_messages_with_node_pause_30_seconds(self):
-        self.make_contacts()
-        self.private_group_id = self.join_private_group()
+        self.make_contacts(self.sender, self.receiver)
+        self.private_group_id = self.join_private_group(admin=self.sender, member=self.receiver)
 
         with self.node_pause(self.receiver):
             message_text = f"test_message_{uuid4()}"
@@ -43,8 +51,8 @@ class TestPrivateGroupMessages(MessengerSteps):
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
     def test_private_group_messages_with_ip_change(self):
-        self.make_contacts()
-        self.private_group_id = self.join_private_group()
-        self.private_group_message(1, self.private_group_id)
+        self.make_contacts(self.sender, self.receiver)
+        self.private_group_id = self.join_private_group(admin=self.sender, member=self.receiver)
+        self.private_group_message(1, self.private_group_id, sender=self.sender, receiver=self.receiver)
         self.receiver.change_container_ip()
-        self.private_group_message(1, self.private_group_id)
+        self.private_group_message(1, self.private_group_id, sender=self.sender, receiver=self.receiver)

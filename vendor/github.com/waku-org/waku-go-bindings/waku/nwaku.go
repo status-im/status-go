@@ -8,17 +8,17 @@ package waku
 	#include <stdio.h>
 	#include <stdlib.h>
 
-	extern void globalEventCallback(int ret, char* msg, size_t len, void* userData);
+	extern void wakuGlobalEventCallback(int ret, char* msg, size_t len, void* userData);
 
 	typedef struct {
 		int ret;
 		char* msg;
 		size_t len;
 		void* ffiWg;
-	} Resp;
+	} WakuResp;
 
 	static void* allocResp(void* wg) {
-		Resp* r = calloc(1, sizeof(Resp));
+		WakuResp* r = calloc(1, sizeof(WakuResp));
 		r->ffiWg = wg;
 		return r;
 	}
@@ -33,7 +33,7 @@ package waku
 		if (resp == NULL) {
 			return NULL;
 		}
-		Resp* m = (Resp*) resp;
+		WakuResp* m = (WakuResp*) resp;
 		return m->msg;
 	}
 
@@ -41,7 +41,7 @@ package waku
 		if (resp == NULL) {
 			return 0;
 		}
-		Resp* m = (Resp*) resp;
+		WakuResp* m = (WakuResp*) resp;
 		return m->len;
 	}
 
@@ -49,57 +49,57 @@ package waku
 		if (resp == NULL) {
 			return 0;
 		}
-		Resp* m = (Resp*) resp;
+		WakuResp* m = (WakuResp*) resp;
 		return m->ret;
 	}
 
 	// resp must be set != NULL in case interest on retrieving data from the callback
-	void GoCallback(int ret, char* msg, size_t len, void* resp);
+	void WakuGoCallback(int ret, char* msg, size_t len, void* resp);
 
 	static void* cGoWakuNew(const char* configJson, void* resp) {
 		// We pass NULL because we are not interested in retrieving data from this callback
-		void* ret = waku_new(configJson, (WakuCallBack) GoCallback, resp);
+		void* ret = waku_new(configJson, (WakuCallBack) WakuGoCallback, resp);
 		return ret;
 	}
 
 	static void cGoWakuStart(void* wakuCtx, void* resp) {
-		waku_start(wakuCtx, (WakuCallBack) GoCallback, resp);
+		waku_start(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuStop(void* wakuCtx, void* resp) {
-		waku_stop(wakuCtx, (WakuCallBack) GoCallback, resp);
+		waku_stop(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuDestroy(void* wakuCtx, void* resp) {
-		waku_destroy(wakuCtx, (WakuCallBack) GoCallback, resp);
+		waku_destroy(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuStartDiscV5(void* wakuCtx, void* resp) {
-		waku_start_discv5(wakuCtx, (WakuCallBack) GoCallback, resp);
+		waku_start_discv5(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuStopDiscV5(void* wakuCtx, void* resp) {
-		waku_stop_discv5(wakuCtx, (WakuCallBack) GoCallback, resp);
+		waku_stop_discv5(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuVersion(void* wakuCtx, void* resp) {
-		waku_version(wakuCtx, (WakuCallBack) GoCallback, resp);
+		waku_version(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuSetEventCallback(void* wakuCtx) {
-		// The 'globalEventCallback' Go function is shared amongst all possible Waku instances.
+		// The 'wakuGlobalEventCallback' Go function is shared amongst all possible Waku instances.
 
-		// Given that the 'globalEventCallback' is shared, we pass again the
+		// Given that the 'wakuGlobalEventCallback' is shared, we pass again the
 		// wakuCtx instance but in this case is needed to pick up the correct method
 		// that will handle the event.
 
-		// In other words, for every call the libwaku makes to globalEventCallback,
+		// In other words, for every call the libwaku makes to wakuGlobalEventCallback,
 		// the 'userData' parameter will bring the context of the node that registered
-		// that globalEventCallback.
+		// that wakuGlobalEventCallback.
 
 		// This technique is needed because cgo only allows to export Go functions and not methods.
 
-		waku_set_event_callback(wakuCtx, (WakuCallBack) globalEventCallback, wakuCtx);
+		waku_set_event_callback(wakuCtx, (WakuCallBack) wakuGlobalEventCallback, wakuCtx);
 	}
 
 	static void cGoWakuContentTopic(void* wakuCtx,
@@ -114,16 +114,16 @@ package waku
 							appVersion,
 							contentTopicName,
 							encoding,
-							(WakuCallBack) GoCallback,
+							(WakuCallBack) WakuGoCallback,
 							resp);
 	}
 
 	static void cGoWakuPubsubTopic(void* wakuCtx, char* topicName, void* resp) {
-		waku_pubsub_topic(wakuCtx, topicName, (WakuCallBack) GoCallback, resp);
+		waku_pubsub_topic(wakuCtx, topicName, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuDefaultPubsubTopic(void* wakuCtx, void* resp) {
-		waku_default_pubsub_topic(wakuCtx, (WakuCallBack) GoCallback, resp);
+		waku_default_pubsub_topic(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuRelayPublish(void* wakuCtx,
@@ -136,14 +136,14 @@ package waku
                        pubSubTopic,
                        jsonWakuMessage,
                        timeoutMs,
-                       (WakuCallBack) GoCallback,
+                       (WakuCallBack) WakuGoCallback,
                        resp);
 	}
 
 	static void cGoWakuRelaySubscribe(void* wakuCtx, char* pubSubTopic, void* resp) {
 		waku_relay_subscribe(wakuCtx,
 							pubSubTopic,
-							(WakuCallBack) GoCallback,
+							(WakuCallBack) WakuGoCallback,
 							resp);
 	}
 
@@ -152,7 +152,7 @@ package waku
 							clusterId,
 							shardId,
 							publicKey,
-							(WakuCallBack) GoCallback,
+							(WakuCallBack) WakuGoCallback,
 							resp);
 	}
 
@@ -160,7 +160,7 @@ package waku
 
 		waku_relay_unsubscribe(wakuCtx,
 							pubSubTopic,
-							(WakuCallBack) GoCallback,
+							(WakuCallBack) WakuGoCallback,
 							resp);
 	}
 
@@ -168,7 +168,7 @@ package waku
 		waku_connect(wakuCtx,
 						peerMultiAddr,
 						timeoutMs,
-						(WakuCallBack) GoCallback,
+						(WakuCallBack) WakuGoCallback,
 						resp);
 	}
 
@@ -182,7 +182,7 @@ package waku
 						peerMultiAddr,
 						protocol,
 						timeoutMs,
-						(WakuCallBack) GoCallback,
+						(WakuCallBack) WakuGoCallback,
 						resp);
 	}
 
@@ -196,59 +196,65 @@ package waku
 						peerId,
 						protocol,
 						timeoutMs,
-						(WakuCallBack) GoCallback,
+						(WakuCallBack) WakuGoCallback,
 						resp);
 	}
 
 	static void cGoWakuDisconnectPeerById(void* wakuCtx, char* peerId, void* resp) {
 		waku_disconnect_peer_by_id(wakuCtx,
 						peerId,
-						(WakuCallBack) GoCallback,
+						(WakuCallBack) WakuGoCallback,
+						resp);
+	}
+
+	static void cGoWakuDisconnectAllPeers(void* wakuCtx, void* resp) {
+		waku_disconnect_all_peers(wakuCtx,
+						(WakuCallBack) WakuGoCallback,
 						resp);
 	}
 
 	static void cGoWakuListenAddresses(void* wakuCtx, void* resp) {
-		waku_listen_addresses(wakuCtx, (WakuCallBack) GoCallback, resp);
+		waku_listen_addresses(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuGetMyENR(void* ctx, void* resp) {
-		waku_get_my_enr(ctx, (WakuCallBack) GoCallback, resp);
+		waku_get_my_enr(ctx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuGetMyPeerId(void* ctx, void* resp) {
-		waku_get_my_peerid(ctx, (WakuCallBack) GoCallback, resp);
+		waku_get_my_peerid(ctx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuPingPeer(void* ctx, char* peerAddr, int timeoutMs, void* resp) {
-		waku_ping_peer(ctx, peerAddr, timeoutMs, (WakuCallBack) GoCallback, resp);
+		waku_ping_peer(ctx, peerAddr, timeoutMs, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuGetPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
-		waku_relay_get_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp);
+		waku_relay_get_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuGetNumPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
-		waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp);
+		waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuGetNumConnectedRelayPeers(void* ctx, char* pubSubTopic, void* resp) {
-		waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp);
+		waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuGetConnectedRelayPeers(void* ctx, char* pubSubTopic, void* resp) {
-		waku_relay_get_connected_peers(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp);
+		waku_relay_get_connected_peers(ctx, pubSubTopic, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuGetConnectedPeers(void* wakuCtx, void* resp) {
-		waku_get_connected_peers(wakuCtx, (WakuCallBack) GoCallback, resp);
+		waku_get_connected_peers(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuGetPeerIdsFromPeerStore(void* wakuCtx, void* resp) {
-		waku_get_peerids_from_peerstore(wakuCtx, (WakuCallBack) GoCallback, resp);
+		waku_get_peerids_from_peerstore(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuGetConnectedPeersInfo(void* wakuCtx, void* resp) {
-		waku_get_connected_peers_info(wakuCtx, (WakuCallBack) GoCallback, resp);
+		waku_get_connected_peers_info(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 	static void cGoWakuLightpushPublish(void* wakuCtx,
@@ -259,7 +265,7 @@ package waku
 		waku_lightpush_publish(wakuCtx,
 						pubSubTopic,
 						jsonWakuMessage,
-						(WakuCallBack) GoCallback,
+						(WakuCallBack) WakuGoCallback,
 						resp);
 	}
 
@@ -273,7 +279,7 @@ package waku
 					jsonQuery,
 					peerAddr,
 					timeoutMs,
-					(WakuCallBack) GoCallback,
+					(WakuCallBack) WakuGoCallback,
 					resp);
 	}
 
@@ -283,7 +289,7 @@ package waku
 
 		waku_peer_exchange_request(wakuCtx,
 									numPeers,
-									(WakuCallBack) GoCallback,
+									(WakuCallBack) WakuGoCallback,
 									resp);
 	}
 
@@ -293,7 +299,7 @@ package waku
 
 		waku_get_peerids_by_protocol(wakuCtx,
 									protocol,
-									(WakuCallBack) GoCallback,
+									(WakuCallBack) WakuGoCallback,
 									resp);
 	}
 
@@ -307,8 +313,16 @@ package waku
 							entTreeUrl,
 							nameDnsServer,
 							timeoutMs,
-							(WakuCallBack) GoCallback,
+							(WakuCallBack) WakuGoCallback,
 							resp);
+	}
+
+	static void cGoWakuIsOnline(void* wakuCtx, void* resp) {
+		waku_is_online(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
+	}
+
+	static void cGoWakuGetMetrics(void* wakuCtx, void* resp) {
+		waku_get_metrics(wakuCtx, (WakuCallBack) WakuGoCallback, resp);
 	}
 
 */
@@ -342,10 +356,10 @@ const MsgChanBufferSize = 1024
 const TopicHealthChanBufferSize = 1024
 const ConnectionChangeChanBufferSize = 1024
 
-//export GoCallback
-func GoCallback(ret C.int, msg *C.char, len C.size_t, resp unsafe.Pointer) {
+//export WakuGoCallback
+func WakuGoCallback(ret C.int, msg *C.char, len C.size_t, resp unsafe.Pointer) {
 	if resp != nil {
-		m := (*C.Resp)(resp)
+		m := (*C.WakuResp)(resp)
 		m.ret = ret
 		m.msg = msg
 		m.len = len
@@ -384,15 +398,15 @@ func NewWakuNode(config *common.WakuConfig, nodeName string) (*WakuNode, error) 
 	defer C.free(unsafe.Pointer(cJsonConfig))
 	defer C.freeResp(resp)
 
+	wg.Add(1)
+	n.wakuCtx = C.cGoWakuNew(cJsonConfig, resp)
+	wg.Wait()
+
 	if C.getRet(resp) != C.RET_OK {
 		errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		Error("error wakuNew for %s: %v", nodeName, errMsg)
 		return nil, errors.New(errMsg)
 	}
-
-	wg.Add(1)
-	n.wakuCtx = C.cGoWakuNew(cJsonConfig, resp)
-	wg.Wait()
 
 	n.MsgChan = make(chan common.Envelope, MsgChanBufferSize)
 	n.TopicHealthChan = make(chan topicHealth, TopicHealthChanBufferSize)
@@ -428,8 +442,8 @@ func unregisterNode(node *WakuNode) {
 	delete(nodeRegistry, node.wakuCtx)
 }
 
-//export globalEventCallback
-func globalEventCallback(callerRet C.int, msg *C.char, len C.size_t, userData unsafe.Pointer) {
+//export wakuGlobalEventCallback
+func wakuGlobalEventCallback(callerRet C.int, msg *C.char, len C.size_t, userData unsafe.Pointer) {
 	if callerRet == C.RET_OK {
 		eventStr := C.GoStringN(msg, C.int(len))
 		node, ok := nodeRegistry[userData] // userData contains node's ctx
@@ -439,9 +453,9 @@ func globalEventCallback(callerRet C.int, msg *C.char, len C.size_t, userData un
 	} else {
 		if len != 0 {
 			errMsg := C.GoStringN(msg, C.int(len))
-			Error("globalEventCallback retCode not ok, retCode: %v: %v", callerRet, errMsg)
+			Error("wakuGlobalEventCallback retCode not ok, retCode: %v: %v", callerRet, errMsg)
 		} else {
-			Error("globalEventCallback retCode not ok, retCode: %v", callerRet)
+			Error("wakuGlobalEventCallback retCode not ok, retCode: %v", callerRet)
 		}
 	}
 }
@@ -629,6 +643,23 @@ func (n *WakuNode) DisconnectPeerByID(peerID peer.ID) error {
 		return nil
 	}
 	errMsg := "error DisconnectPeerById: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) DisconnectAllPeers() error {
+	wg := sync.WaitGroup{}
+
+	var resp = C.allocResp(unsafe.Pointer(&wg))
+	defer C.freeResp(resp)
+
+	wg.Add(1)
+	C.cGoWakuDisconnectAllPeers(n.wakuCtx, resp)
+	wg.Wait()
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error DisconnectAllPeers: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return errors.New(errMsg)
 }
 
@@ -1589,4 +1620,74 @@ func (n *WakuNode) DisconnectPeer(target *WakuNode) error {
 
 	Debug("Successfully disconnected %s from %s", n.nodeName, target.nodeName)
 	return nil
+}
+
+func (n *WakuNode) IsOnline() (bool, error) {
+	if n == nil {
+		err := errors.New("waku node is nil")
+		Error("Failed to get online state %v", err)
+		return false, err
+	}
+
+	Debug("Querying online state for %v", n.nodeName)
+
+	wg := sync.WaitGroup{}
+	var resp = C.allocResp(unsafe.Pointer(&wg))
+	defer C.freeResp(resp)
+
+	wg.Add(1)
+	C.cGoWakuIsOnline(n.wakuCtx, resp)
+	wg.Wait()
+
+	if C.getRet(resp) == C.RET_OK {
+		onlineStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+
+		if onlineStr == "true" {
+			return true, nil
+		}
+
+		return false, nil
+
+	}
+
+	errMsg := "error IsOnline: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to query online state for %v: %v", n.nodeName, errMsg)
+
+	return false, errors.New(errMsg)
+}
+
+func (n *WakuNode) GetMetrics() (string, error) {
+	if n == nil {
+		err := errors.New("waku node is nil")
+		Error("Failed to get metrics %v", err)
+		return "", err
+	}
+
+	Debug("Querying metrics for %v", n.nodeName)
+
+	wg := sync.WaitGroup{}
+	var resp = C.allocResp(unsafe.Pointer(&wg))
+	defer C.freeResp(resp)
+
+	wg.Add(1)
+	C.cGoWakuGetMetrics(n.wakuCtx, resp)
+	wg.Wait()
+
+	if C.getRet(resp) == C.RET_OK {
+		metricsStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+
+		if metricsStr == "" {
+			errMsg := "received empty metrics response"
+			Error(errMsg)
+			return "", errors.New(errMsg)
+		}
+
+		return metricsStr, nil
+
+	}
+
+	errMsg := "error GetMetrics: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to query metrics for %v: %v", n.nodeName, errMsg)
+
+	return "", errors.New(errMsg)
 }

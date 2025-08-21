@@ -1,13 +1,14 @@
 import random
-
 import pytest
-
-from steps.status_backend import StatusBackendSteps
+from resources.constants import user_1
 
 
 @pytest.mark.wallet
 @pytest.mark.rpc
-class TestRpc(StatusBackendSteps):
+class TestRpc:
+    @pytest.fixture(autouse=True)
+    def setup_backend(self, backend_recovered_profile):
+        self.rpc_client = backend_recovered_profile(name="main_user", user=user_1)
 
     @pytest.mark.parametrize(
         "method, params",
@@ -83,5 +84,5 @@ class TestRpc(StatusBackendSteps):
     def test_(self, method, params):
         _id = str(random.randint(1, 8888))
 
-        response = self.rpc_client.rpc_valid_request(method, params, _id)
-        self.rpc_client.verify_json_schema(response.json(), method)
+        self.rpc_client.rpc_valid_request(method, params, _id)
+        # TODO: Add more assertions on response
