@@ -1672,7 +1672,7 @@ func EnrichMultiAccountByPublicKey(account *multiaccounts.Account, chatPublicKey
 
 func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 	request *requests.CreateAccount,
-	mnemonic string,                   // empty mnemonic is used for keycard account, not empty for regular account
+	mnemonic string, // empty mnemonic is used for keycard account, not empty for regular account
 	keycardData *requests.KeycardData, // nil for regular account, not nil for account with already set keycard
 	restoreAccount bool,
 	fetchBackup bool,
