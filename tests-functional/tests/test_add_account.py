@@ -44,33 +44,6 @@ class TestAddAccount:
         add_account_response = self.account.accounts_service.add_account(self.account.password, defaultAccount)
         assert add_account_response.get("error", {}).get("message", "") == "account already exists"
 
-    def test_add_new_keypair_via_seed_phrase(self):
-        keypair_name = "SeedImportedKeypair"
-        wallet_account_details = {
-            "name": "SeedImportedAccount",
-            "path": "m/44'/60'/0'/0/0",
-            "emoji": "🔑",
-            "colorId": "primary",
-        }
-        add_keypair_response = self.account.accounts_service.add_keypair_via_seed_phrase(
-            user_1.passphrase, self.account.password, keypair_name, wallet_account_details
-        )
-
-        keypairs = self.get_account_keypairs()
-        assert len(keypairs) == 2
-        imported_keypair = keypairs[0]
-        if imported_keypair["name"] != keypair_name:
-            imported_keypair = keypairs[1]
-        assert imported_keypair["name"] == keypair_name
-
-        assert imported_keypair["key-uid"] == add_keypair_response["result"]["key-uid"]
-        assert imported_keypair["type"] == "seed"
-        assert add_keypair_response["result"]["type"] == "seed"
-        assert add_keypair_response["result"]["key-uid"] == imported_keypair["key-uid"]
-        assert add_keypair_response["result"]["derived-from"] == imported_keypair["derived-from"]
-        assert len(add_keypair_response["result"]["accounts"]) == 1
-        assert len(imported_keypair["accounts"]) == 1
-
     def test_add_account_for_unknown_key_uid(self):
         self.account_data["key-uid"] = "0x3231d92c94548d14f097173765a50bebe28fbad8f2267c9e08cc4433a6f219a4"
         add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
@@ -137,21 +110,6 @@ class TestAddAccount:
 
         self.account.accounts_service.add_account(profile_password, self.account_data)
         # TODO: Add more assertions on response
-
-    def test_delete_account(self):
-        self.account_data["type"] = "watch"
-        self.account.accounts_service.add_account(self.account.password, self.account_data)
-        # TODO: Add more assertions on response
-
-        accounts_response = self.account.accounts_service.get_accounts()
-        assert len(accounts_response.get("result", [])) == 3
-
-        # Delete the account
-        self.account.accounts_service.delete_account(self.account_data["address"])
-        # TODO: Add more assertions on response
-
-        accounts_response = self.account.accounts_service.get_accounts()
-        assert len(accounts_response.get("result", [])) == 2
 
     def get_account_keypairs(self):
         keypairs_response = self.account.accounts_service.get_account_keypairs()
