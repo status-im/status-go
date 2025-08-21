@@ -951,10 +951,6 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 		return nil, err
 	}
 
-	for _, filter := range filters {
-		fmt.Printf(">>> filter: %s %s\n", filter.ChatID, filter.PubsubTopic)
-	}
-
 	if community.IsControlNode() {
 		// Init the community filter so we can receive messages on the community
 
