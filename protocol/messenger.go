@@ -34,7 +34,6 @@ import (
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -1817,7 +1816,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage messagingtyp
 		// Use a single content-topic for all community chats.
 		// Reasoning: https://github.com/status-im/status-go/pull/5864
 		rawMessage.ContentTopic = community.UniversalChatID()
-		rawMessage.PubsubTopic = community.PubsubTopic(wakuv2.GlobalCommunityContentPubsubTopic())
+		rawMessage.PubsubTopic = community.PubsubTopic(messagingtypes.GlobalCommunityContentPubsubTopic())
 
 		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID(), rawMessage.MessageType)
 		if err != nil {

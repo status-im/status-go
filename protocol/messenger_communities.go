@@ -203,7 +203,7 @@ func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities
 		Sender:              community.PrivateKey(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
-		PubsubTopic:         community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
+		PubsubTopic:         community.PubsubTopic(messagingtypes.GlobalCommunityControlPubsubTopic()),
 	}
 
 	for _, receivers := range msg.Receivers {
