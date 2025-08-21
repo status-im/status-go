@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
@@ -63,7 +63,7 @@ func (tm *TransactionManager) SendTransactionForSigningToKeycard(ctx context.Con
 	return nil
 }
 
-func (tm *TransactionManager) SendTransactions(ctx context.Context, multiTransaction *MultiTransaction, data []*pathprocessor.MultipathProcessorTxArgs, pathProcessors map[string]pathprocessor.PathProcessor, account *account.SelectedExtKey) (*MultiTransactionCommandResult, error) {
+func (tm *TransactionManager) SendTransactions(ctx context.Context, multiTransaction *MultiTransaction, data []*pathprocessor.MultipathProcessorTxArgs, pathProcessors map[string]pathprocessor.PathProcessor, account *generator.Account) (*MultiTransactionCommandResult, error) {
 	updateDataFromMultiTx(data, multiTransaction)
 	hashes, err := sendTransactions(data, pathProcessors, account)
 	if err != nil {

@@ -18,10 +18,9 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	abi_spec "github.com/status-im/status-go/abi-spec"
-	"github.com/status-im/status-go/account"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
@@ -88,7 +87,7 @@ func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addre
 }
 
 func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address, forceRefresh bool) (map[common.Address][]tokenTypes.StorageToken, error) {
-	activeNetworks, err := api.s.rpcClient.NetworkManager.GetActiveNetworks()
+	activeNetworks, err := api.s.rpcClient.GetNetworkManager().GetActiveNetworks()
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +102,7 @@ func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []
 }
 
 type DerivedAddress struct {
-	Address        common.Address `json:"address"`
+	Address        types.Address  `json:"address"`
 	PublicKey      types.HexBytes `json:"public-key,omitempty"`
 	Path           string         `json:"path"`
 	HasActivity    bool           `json:"hasActivity"`
@@ -338,42 +337,42 @@ func (api *API) SearchCollections(ctx context.Context, chainID wcommon.ChainID, 
 // @deprecated: Custom networks not currently supported. Change settings using specific API functions.
 func (api *API) AddEthereumChain(ctx context.Context, network params.Network) error {
 	logutils.ZapLogger().Debug("call to AddEthereumChain")
-	return api.s.rpcClient.NetworkManager.Upsert(&network)
+	return api.s.rpcClient.GetNetworkManager().Upsert(&network)
 }
 
 // @deprecated: Custom networks not currently supported. Change settings using specific API functions.
 func (api *API) DeleteEthereumChain(ctx context.Context, chainID uint64) error {
 	logutils.ZapLogger().Debug("call to DeleteEthereumChain")
-	return api.s.rpcClient.NetworkManager.Delete(chainID)
+	return api.s.rpcClient.GetNetworkManager().Delete(chainID)
 }
 
 func (api *API) SetChainUserRpcProviders(ctx context.Context, chainID uint64, rpcProviders []params.RpcProvider) error {
 	logutils.ZapLogger().Debug("call to SetChainUserRpcProviders")
-	return api.s.rpcClient.NetworkManager.SetUserRpcProviders(chainID, rpcProviders)
+	return api.s.rpcClient.GetNetworkManager().SetUserRpcProviders(chainID, rpcProviders)
 }
 
 // Active chains are the ones that are available for selection across the whole application
 // Providers are expected to be accessed only for active chains.
 func (api *API) SetChainActive(ctx context.Context, chainID uint64, active bool) error {
 	logutils.ZapLogger().Debug("call to SetChainActive")
-	return api.s.rpcClient.NetworkManager.SetActive(chainID, active)
+	return api.s.rpcClient.GetNetworkManager().SetActive(chainID, active)
 }
 
 // Enabled chains are the ones taken into account when displaying balances, collectibles, activity, etc.
 func (api *API) SetChainEnabled(ctx context.Context, chainID uint64, enabled bool) error {
 	logutils.ZapLogger().Debug("call to SetChainEnabled")
-	return api.s.rpcClient.NetworkManager.SetEnabled(chainID, enabled)
+	return api.s.rpcClient.GetNetworkManager().SetEnabled(chainID, enabled)
 }
 
 // @deprecated: Combined networks are not used anymore, use GetFlatEthereumChains instead
 func (api *API) GetEthereumChains(ctx context.Context) ([]*network.CombinedNetwork, error) {
 	logutils.ZapLogger().Debug("call to GetEthereumChains")
-	return api.s.rpcClient.NetworkManager.GetCombinedNetworks()
+	return api.s.rpcClient.GetNetworkManager().GetCombinedNetworks()
 }
 
 func (api *API) GetFlatEthereumChains(ctx context.Context) ([]*params.Network, error) {
 	logutils.ZapLogger().Debug("call to GetFlatEthereumChains")
-	return api.s.rpcClient.NetworkManager.GetAll()
+	return api.s.rpcClient.GetNetworkManager().GetAll()
 }
 
 // @deprecated
@@ -489,49 +488,50 @@ func (api *API) SetCustomTxDetails(ctx context.Context, pathTxIdentity *requests
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
 func (api *API) GetDerivedAddresses(ctx context.Context, password string, derivedFrom string, paths []string) ([]*DerivedAddress, error) {
-	info, err := api.s.gethManager.AccountsGenerator().LoadAccount(derivedFrom, password)
+	acc, err := api.s.gethManager.LoadAccount(types.HexToAddress(derivedFrom), password)
 	if err != nil {
 		return nil, err
 	}
 
-	return api.getDerivedAddresses(info.ID, paths)
+	return api.getDerivedAddresses(acc, paths)
 }
 
 // Generates addresses for the provided paths derived from the provided mnemonic, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
 func (api *API) GetDerivedAddressesForMnemonic(ctx context.Context, mnemonic string, paths []string) ([]*DerivedAddress, error) {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
 
-	info, err := api.s.gethManager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	acc, err := generator.CreateAccountFromMnemonic(mnemonicNoExtraSpaces, "")
 	if err != nil {
 		return nil, err
 	}
 
-	return api.getDerivedAddresses(info.ID, paths)
+	return api.getDerivedAddresses(acc, paths)
 }
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
-func (api *API) getDerivedAddresses(id string, paths []string) ([]*DerivedAddress, error) {
+func (api *API) getDerivedAddresses(account *generator.Account, paths []string) ([]*DerivedAddress, error) {
 	addedAccounts, err := api.s.accountsDB.GetActiveAccounts()
 	if err != nil {
 		return nil, err
 	}
 
-	info, err := api.s.gethManager.AccountsGenerator().DeriveAddresses(id, paths)
+	childrenAccounts, err := generator.DeriveChildrenFromAccount(account, paths)
 	if err != nil {
 		return nil, err
 	}
 
 	derivedAddresses := make([]*DerivedAddress, 0)
-	for accPath, acc := range info {
+	for accPath, childAccount := range childrenAccounts {
+		accountInfo := childAccount.ToAccountInfo()
 
 		derivedAddress := &DerivedAddress{
-			Address:   common.HexToAddress(acc.Address),
-			PublicKey: types.Hex2Bytes(acc.PublicKey),
+			Address:   types.HexToAddress(accountInfo.Address),
+			PublicKey: types.Hex2Bytes(accountInfo.PublicKey),
 			Path:      accPath,
 		}
 
 		for _, account := range addedAccounts {
-			if types.Address(derivedAddress.Address) == account.Address {
+			if derivedAddress.Address == account.Address {
 				derivedAddress.AlreadyCreated = true
 				break
 			}
@@ -557,9 +557,9 @@ func (api *API) AddressDetails(ctx context.Context, params *requests.AddressDeta
 	}
 
 	result := &DerivedAddress{
-		Address: common.HexToAddress(params.Address),
+		Address: types.HexToAddress(params.Address),
 	}
-	addressExists, err := api.s.accountsDB.AddressExists(types.Address(result.Address))
+	addressExists, err := api.s.accountsDB.AddressExists(result.Address)
 	if err != nil {
 		return result, err
 	}
@@ -568,7 +568,7 @@ func (api *API) AddressDetails(ctx context.Context, params *requests.AddressDeta
 
 	chainIDs := params.ChainIDs
 	if len(chainIDs) == 0 {
-		activeNetworks, err := api.s.rpcClient.NetworkManager.GetActiveNetworks()
+		activeNetworks, err := api.s.rpcClient.GetNetworkManager().GetActiveNetworks()
 		if err != nil {
 			return nil, err
 		}
@@ -588,7 +588,7 @@ func (api *API) AddressDetails(ctx context.Context, params *requests.AddressDeta
 	}
 
 	for _, client := range clients {
-		balance, err := api.s.tokenManager.GetChainBalance(ctx, client, result.Address)
+		balance, err := api.s.tokenManager.GetChainBalance(ctx, client, common.Address(result.Address))
 		if err != nil {
 			if err != nil && errors.Is(err, context.DeadlineExceeded) {
 				return result, nil
@@ -609,9 +609,9 @@ func (api *API) AddressDetails(ctx context.Context, params *requests.AddressDeta
 // GetAddressDetails returns details for the passed address (response doesn't include derivation path)
 func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address string) (*DerivedAddress, error) {
 	result := &DerivedAddress{
-		Address: common.HexToAddress(address),
+		Address: types.HexToAddress(address),
 	}
-	addressExists, err := api.s.accountsDB.AddressExists(types.Address(result.Address))
+	addressExists, err := api.s.accountsDB.AddressExists(result.Address)
 	if err != nil {
 		return result, err
 	}
@@ -623,7 +623,7 @@ func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address s
 		return result, err
 	}
 
-	balance, err := api.s.tokenManager.GetChainBalance(ctx, chainClient, result.Address)
+	balance, err := api.s.tokenManager.GetChainBalance(ctx, chainClient, common.Address(result.Address))
 	if err != nil {
 		return result, err
 	}
@@ -632,15 +632,15 @@ func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address s
 	return result, nil
 }
 
-func (api *API) SignMessage(ctx context.Context, message types.HexBytes, address common.Address, password string) (string, error) {
+func (api *API) SignMessage(ctx context.Context, message types.HexBytes, address types.Address, password string) (string, error) {
 	logutils.ZapLogger().Debug("[WalletAPI::SignMessage]", zap.Stringer("message", message), zap.Stringer("address", address))
 
-	selectedAccount, err := api.s.gethManager.VerifyAccountPassword(api.s.Config().KeyStoreDir, address.Hex(), password)
+	selectedAccount, err := api.s.gethManager.LoadAccount(address, password)
 	if err != nil {
 		return "", err
 	}
 
-	return api.s.transactionManager.SignMessage(message, selectedAccount)
+	return api.s.transactionManager.SignMessage(message, selectedAccount.PrivateKey())
 }
 
 func (api *API) BuildTransaction(ctx context.Context, chainID uint64, sendTxArgsJSON string) (response *transfer.TxResponse, err error) {
@@ -822,31 +822,6 @@ func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int
 	return client.ChainID(ctx)
 }
 
-func (api *API) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
-	exists, err := api.s.accountsDB.AddressExists(types.HexToAddress(address))
-	if err != nil {
-		logutils.ZapLogger().Error("failed to query db for a given address", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
-		return nil, err
-	}
-
-	if !exists {
-		logutils.ZapLogger().Error("failed to get a selected account", zap.Error(wallettypes.ErrInvalidTxSender))
-		return nil, wallettypes.ErrAccountDoesntExist
-	}
-
-	keyStoreDir := api.s.Config().KeyStoreDir
-	key, err := api.s.gethManager.VerifyAccountPassword(keyStoreDir, address, password)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to verify account", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
-		return nil, err
-	}
-
-	return &account.SelectedExtKey{
-		Address:    key.Address,
-		AccountKey: key,
-	}, nil
-}
-
 // AddWalletConnectSession adds or updates a session wallet connect session
 func (api *API) AddWalletConnectSession(ctx context.Context, session_json string) error {
 	logutils.ZapLogger().Debug("wallet.api.AddWalletConnectSession", zap.Int("rpcURL", len(session_json)))
@@ -893,7 +868,7 @@ func (api *API) SignTypedDataV4(typedJson string, address string, password strin
 		zap.Int("len(password)", len(password)),
 	)
 
-	account, err := api.getVerifiedWalletAccount(address, password)
+	account, err := api.s.gethManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
@@ -905,7 +880,7 @@ func (api *API) SignTypedDataV4(typedJson string, address string, password strin
 
 	// This is not used down the line but required by the typeddata.SignTypedDataV4 function call
 	chain := new(big.Int).SetUint64(api.s.config.NetworkID)
-	sig, err := typeddata.SignTypedDataV4(typed, account.AccountKey.PrivateKey, chain)
+	sig, err := typeddata.SignTypedDataV4(typed, account.PrivateKey(), chain)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
@@ -926,12 +901,12 @@ func (api *API) SafeSignTypedDataForDApps(typedJson string, address string, pass
 		zap.Bool("legacy", legacy),
 	)
 
-	account, err := api.getVerifiedWalletAccount(address, password)
+	account, err := api.s.gethManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
 	if err != nil {
 		return types.HexBytes{}, err
 	}
 
-	return walletconnect.SafeSignTypedDataForDApps(typedJson, account.AccountKey.PrivateKey, chainID, legacy)
+	return walletconnect.SafeSignTypedDataForDApps(typedJson, account.PrivateKey(), chainID, legacy)
 }
 
 func (api *API) RestartWalletReloadTimer(ctx context.Context) error {

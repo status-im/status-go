@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -46,7 +46,7 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 	temp := struct {
 		KeyUID       string `json:"keyUid"`
 		Name         string `json:"type"`
-		URI          string `json:"uri"`
+		URI          string `json:"uri"` // Deprecated, use LocalURL instead
 		Width        int    `json:"width"`
 		Height       int    `json:"height"`
 		FileSize     int    `json:"fileSize"`

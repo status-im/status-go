@@ -39,7 +39,7 @@ func toBigBaseImpl(value *big.Int, base uint64, res *[](uint64)) {
 	*res = append(*res, new(big.Int).Mod(value, bigBase).Uint64())
 }
 
-// compressedPubKey = |1.5 bytes chars cutoff|20 bytes emoji hash|10 bytes color hash|1.5 bytes chars cutoff|
+// Slices compressedPubKey = |1.5 bytes chars cutoff|20 bytes emoji hash|10 bytes color hash|1.5 bytes chars cutoff|
 func Slices(compressedPubkey []byte) (res [4][]byte, err error) {
 	if len(compressedPubkey) != 33 {
 		return res, errors.New("incorrect compressed pubkey")
@@ -47,7 +47,10 @@ func Slices(compressedPubkey []byte) (res [4][]byte, err error) {
 
 	getSlice := func(low, high int, and string, rsh uint) []byte {
 		sliceValue := new(big.Int).SetBytes(compressedPubkey[low:high])
-		andValue, _ := new(big.Int).SetString(and, 0)
+		andValue, ok := new(big.Int).SetString(and, 0)
+		if !ok {
+			return nil
+		}
 		andRes := new(big.Int).And(sliceValue, andValue)
 		return new(big.Int).Rsh(andRes, rsh).Bytes()
 	}

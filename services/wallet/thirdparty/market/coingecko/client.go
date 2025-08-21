@@ -3,17 +3,25 @@ package coingecko
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/exp/maps"
 
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
 )
 
 const baseURL = "https://api.coingecko.com/api/v3"
+
+const (
+	requestDelay     = 500 * time.Millisecond
+	pricesChunkLimit = 500
+	tokensChunkLimit = 250
+)
 
 var coinGeckoMapping = map[string]string{
 	"STT":   "status",
@@ -61,29 +69,54 @@ type Client struct {
 	httpClient       *thirdparty.HTTPClient
 	tokens           map[string][]GeckoToken
 	baseURL          string
+	creds            *thirdparty.BasicCreds
 	fetchTokensMutex sync.Mutex
 }
 
+type Params struct {
+	URL      string
+	User     security.SensitiveString
+	Password security.SensitiveString
+}
+
 func NewClient() *Client {
-	// Configure HTTP client with detailed timeouts:
-	// - 5 seconds for connection establishment (dialTimeout)
-	// - 5 seconds for TLS handshake (tlsHandshakeTimeout)
-	// - 5 seconds for receiving response headers (responseHeaderTimeout)
-	// - 20 seconds for overall request timeout (requestTimeout)
+	return NewClientWithParams(Params{
+		URL:      baseURL,
+		User:     security.SensitiveString{},
+		Password: security.SensitiveString{},
+	})
+}
+
+func NewClientWithParams(params Params) *Client {
+	var creds *thirdparty.BasicCreds
+	if !params.User.Empty() {
+		creds = &thirdparty.BasicCreds{
+			User:     params.User,
+			Password: params.Password,
+		}
+	}
+
 	httpClient := thirdparty.NewHTTPClient(
 		thirdparty.WithDetailedTimeouts(
-			5*time.Second,
-			5*time.Second,
-			5*time.Second,
-			20*time.Second,
+			5*time.Second,  // dialTimeout
+			5*time.Second,  // tlsHandshakeTimeout
+			5*time.Second,  // responseHeaderTimeout
+			20*time.Second, // requestTimeout
 		),
 		thirdparty.WithMaxRetries(5),
 	)
 
+	// Ensure baseURL doesn't end with a slash
+	clientBaseURL := strings.TrimSuffix(params.URL, "/")
+	if clientBaseURL == "" {
+		clientBaseURL = baseURL
+	}
+
 	return &Client{
 		httpClient: httpClient,
 		tokens:     make(map[string][]GeckoToken),
-		baseURL:    baseURL,
+		baseURL:    clientBaseURL,
+		creds:      creds,
 	}
 }
 
@@ -166,7 +199,15 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 		return nil, err
 	}
 
-	simplePrices, err := c.FetchSimplePrice(context.Background(), maps.Values(mappedSymbols), currencies)
+	simplePrices, err := utils.ChunkMapFetcher[CurrencyPriceMap](
+		context.Background(),
+		maps.Values(mappedSymbols),
+		pricesChunkLimit,
+		requestDelay,
+		func(ctx context.Context, chunkIds []string) (map[string]CurrencyPriceMap, error) {
+			return c.FetchSimplePrice(ctx, chunkIds, currencies)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +255,15 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		return nil, err
 	}
 
-	marketValues, err := c.FetchCoinsMarkets(context.Background(), maps.Values(mappedSymbols), currency)
+	marketValues, err := utils.ChunkArrayFetcher[GeckoMarketValues](
+		context.Background(),
+		maps.Values(mappedSymbols),
+		tokensChunkLimit,
+		requestDelay,
+		func(ctx context.Context, chunkIds []string) ([]GeckoMarketValues, error) {
+			return c.FetchCoinsMarkets(ctx, chunkIds, currency)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +295,15 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 }
 
 func (c *Client) FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
-	return []thirdparty.HistoricalPrice{}, nil
+	days := (limit + 23) / 24 // round up
+	if days == 0 {
+		days = 1 // minimum 1 day
+	}
+	if days > 90 {
+		days = 90 // maximum 90 days
+	}
+
+	return c.FetchHistoricalDailyPrices(symbol, currency, days, false, aggregate)
 }
 
 func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
@@ -260,7 +317,14 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 		return nil, err
 	}
 
-	container, err := c.FetchHistoryMarketData(context.Background(), id, currency)
+	var days string
+	if allData {
+		days = "max"
+	} else {
+		days = fmt.Sprintf("%d", limit)
+	}
+
+	container, err := c.FetchHistoryMarketData(context.Background(), id, currency, days)
 	if err != nil {
 		return nil, err
 	}
@@ -274,4 +338,12 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 	}
 
 	return result, nil
+}
+
+// doGetRequestWithOptionalAuth performs a GET request, using credentials if they are available
+func (c *Client) doGetRequestWithOptionalAuth(ctx context.Context, url string, params url.Values) ([]byte, error) {
+	if c.creds != nil {
+		return c.httpClient.DoGetRequestWithCredentials(ctx, url, params, c.creds)
+	}
+	return c.httpClient.DoGetRequest(ctx, url, params)
 }

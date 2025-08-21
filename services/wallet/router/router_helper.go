@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/contracts"
 	gaspriceproxy "github.com/status-im/status-go/contracts/gas-price-proxy"
 	"github.com/status-im/status-go/contracts/hop"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -387,22 +387,24 @@ func (r *Router) applyCustomTxFeeMode(ctx context.Context, path *routes.Path, fe
 	return nil
 }
 
-func (r *Router) updatePathFields(path *routes.Path, fetchedFees *fees.SuggestedFees) {
+func (r *Router) updatePathFields(path *routes.Path, fetchedFees *fees.SuggestedFees, noBaseFee bool, noPriorityFee bool) {
 	path.FromChain.EIP1559Enabled = fetchedFees.EIP1559Enabled
-	path.FromChain.NoBaseFee = walletCommon.HasNoBaseFee(path.FromChain.ChainID)
-	path.FromChain.NoPriorityFee = walletCommon.HasNoPriorityFee(path.FromChain.ChainID)
+	path.FromChain.NoBaseFee = noBaseFee
+	path.FromChain.NoPriorityFee = noPriorityFee
 }
 
 func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees,
-	usedNonces map[uint64]uint64, testsMode bool, testApprovalL1Fee uint64) (err error) {
+	usedNonces map[uint64]uint64, noBaseFee bool, noPriorityFee bool, testsMode bool, testApprovalL1Fee uint64) (err error) {
 
-	r.updatePathFields(path, fetchedFees)
+	r.updatePathFields(path, fetchedFees, noBaseFee, noPriorityFee)
 
 	l1TxFeeWei := big.NewInt(0)
 	l1ApprovalFeeWei := big.NewInt(0)
 
 	needL1Fee := path.FromChain.ChainID == walletCommon.OptimismMainnet ||
-		path.FromChain.ChainID == walletCommon.OptimismSepolia
+		path.FromChain.ChainID == walletCommon.OptimismSepolia ||
+		path.FromChain.ChainID == walletCommon.BaseMainnet ||
+		path.FromChain.ChainID == walletCommon.BaseSepolia
 
 	if testsMode {
 		usedNonces[path.FromChain.ChainID] = usedNonces[path.FromChain.ChainID] + 1

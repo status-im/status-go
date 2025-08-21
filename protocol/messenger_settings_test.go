@@ -4,13 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
-
 	"github.com/stretchr/testify/suite"
+
+	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/protocol/requests"
 )
 
 func TestMessengerSettings(t *testing.T) {
@@ -23,33 +21,20 @@ type MessengerSettingsSuite struct {
 }
 
 func (s *MessengerSettingsSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	shh, err := newTestWakuNode(s.logger)
-	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
-	s.shh = shh
-
-	pk, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	s.m, err = newMessengerWithKey(s.shh, pk, s.logger, nil)
-	s.Require().NoError(err)
-
-	s.m2, err = newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	s.MessengerBaseTestSuite.SetupTest()
+	s.m2 = s.anotherMessenger()
 
 	prepareMessengersForPairing(&s.Suite, s.m, s.m2)
 }
 
 func (s *MessengerSettingsSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.m)
 	TearDownMessenger(&s.Suite, s.m2)
-	_ = s.logger.Sync()
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func prepareMessengersForPairing(s *suite.Suite, m1, m2 *Messenger) {
 	// Set m's installation metadata
-	aim := &multidevice.InstallationMetadata{
+	aim := &messagingtypes.InstallationMetadata{
 		Name:       "m's-device",
 		DeviceType: "m's-device-type",
 	}
@@ -57,7 +42,7 @@ func prepareMessengersForPairing(s *suite.Suite, m1, m2 *Messenger) {
 	s.Require().NoError(err)
 
 	// Set m 2's installation metadata
-	a2im := &multidevice.InstallationMetadata{
+	a2im := &messagingtypes.InstallationMetadata{
 		Name:       "m's-other-device",
 		DeviceType: "m's-other-device-type",
 	}

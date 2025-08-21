@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -401,7 +401,7 @@ func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxA
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
 }
 
-func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types.Hash, uint64, error) {
+func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (types.Hash, uint64, error) {
 	err := s.prepareTransaction(sendArgs)
 	if err != nil {
 		return types.Hash{}, 0, createSwapParaswapErrorResponse(err)

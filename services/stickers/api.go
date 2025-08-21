@@ -12,11 +12,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/stickers"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -41,13 +41,12 @@ const (
 
 type API struct {
 	contractMaker   *contracts.ContractMaker
-	accountsManager *account.GethManager
+	accountsManager *accsmanagement.AccountsManager
 	accountsDB      *accounts.Database
 	pendingTracker  *transactions.PendingTxTracker
 
-	keyStoreDir string
-	downloader  *ipfs.Downloader
-	httpServer  *server.MediaServer
+	downloader *ipfs.Downloader
+	httpServer *server.MediaServer
 
 	ctx context.Context
 }
@@ -88,7 +87,8 @@ type ednStickerPackInfo struct {
 	Meta ednStickerPack
 }
 
-func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker, keyStoreDir string, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
+func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager,
+	pendingTracker *transactions.PendingTxTracker, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
 	result := &API{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
@@ -96,7 +96,6 @@ func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, 
 		accountsManager: accountsManager,
 		accountsDB:      acc,
 		pendingTracker:  pendingTracker,
-		keyStoreDir:     keyStoreDir,
 		downloader:      downloader,
 		ctx:             ctx,
 		httpServer:      httpServer,

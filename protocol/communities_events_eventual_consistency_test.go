@@ -9,7 +9,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestCommunityEventsEventualConsistencySuite(t *testing.T) {
@@ -23,23 +22,20 @@ type CommunityEventsEventualConsistencySuite struct {
 }
 
 func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.setupMessaging()
+
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 	s.accountsTestData = make(map[string][]string)
 	s.accountsPasswords = make(map[string]string)
 	s.mockedBalances = createMockedWalletBalance(&s.Suite)
 
-	wakuWrapper, err := newTestWakuWrapper(s.logger)
-	s.Require().NoError(err)
-	s.shh = wakuWrapper
-
 	s.messagesOrderController = NewMessagesOrderController(messagesOrderRandom)
-	s.messagesOrderController.Start(wakuWrapper.SubscribePostEvents())
+	s.messagesOrderController.Start(s.messagingEnv.SubscribePostEvents())
 
 	s.owner = s.newMessenger("", []string{})
 	s.eventSender = s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
 	s.alice = s.newMessenger(accountPassword, []string{aliceAccountAddress})
-	_, err = s.owner.Start()
+	_, err := s.owner.Start()
 	s.Require().NoError(err)
 	_, err = s.eventSender.Start()
 	s.Require().NoError(err)
@@ -49,9 +45,8 @@ func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
 }
 
 func (s *CommunityEventsEventualConsistencySuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	messenger := newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	messenger := newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
-			logger:                  s.logger,
 			messagesOrderController: s.messagesOrderController,
 		},
 		password:            password,

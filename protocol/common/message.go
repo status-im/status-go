@@ -18,8 +18,8 @@ import (
 	"github.com/status-im/markdown"
 	"github.com/status-im/markdown/ast"
 
-	accountJson "github.com/status-im/status-go/account/json"
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -140,8 +140,6 @@ type Message struct {
 	From string `json:"from"`
 	// Random 3 words name
 	Alias string `json:"alias"`
-	// Identicon of the author
-	Identicon string `json:"identicon"`
 	// The chat id to be stored locally
 	LocalChatID string `json:"localChatId"`
 	// Seen set to true when user have read this message already
@@ -242,7 +240,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		WhisperTimestamp         uint64                           `json:"whisperTimestamp"`
 		From                     string                           `json:"from"`
 		Alias                    string                           `json:"alias"`
-		Identicon                string                           `json:"identicon"`
 		Seen                     bool                             `json:"seen"`
 		OutgoingStatus           string                           `json:"outgoingStatus,omitempty"`
 		QuotedMessage            *QuotedMessage                   `json:"quotedMessage"`
@@ -294,7 +291,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		WhisperTimestamp:         m.WhisperTimestamp,
 		From:                     m.From,
 		Alias:                    m.Alias,
-		Identicon:                m.Identicon,
 		Seen:                     m.Seen,
 		OutgoingStatus:           m.OutgoingStatus,
 		QuotedMessage:            m.QuotedMessage,
@@ -362,7 +358,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 	}
 
 	if item.From != "" {
-		ext, err := accountJson.ExtendStructWithPubKeyData(item.From, item)
+		ext, err := common.ExtendStructWithPubKeyData(item.From, item)
 		if err != nil {
 			return nil, err
 		}

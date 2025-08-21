@@ -7,10 +7,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 )
@@ -32,7 +32,7 @@ func (s *MessengerPairingSuite) TestEnableNonExistingInstallation() {
 	s.Require().NoError(err)
 
 	s.Require().Len(installations, 2)
-	var theirInstallation *multidevice.Installation
+	var theirInstallation *messagingtypes.Installation
 	for _, i := range installations {
 		if i.ID == installationID {
 			theirInstallation = i
@@ -44,7 +44,7 @@ func (s *MessengerPairingSuite) TestEnableNonExistingInstallation() {
 	s.Require().NotNil(theirInstallation)
 	s.Require().True(theirInstallation.Enabled)
 
-	installationsFromDB, err := s.m.encryptor.GetOurActiveInstallations(&s.m.identity.PublicKey)
+	installationsFromDB, err := s.m.messaging.GetOurActiveInstallations(&s.m.identity.PublicKey)
 	s.Require().NoError(err)
 	s.Require().Len(installationsFromDB, 2)
 	for _, i := range installationsFromDB {
@@ -81,12 +81,11 @@ func (m *stubEnableInstallationAndPair) Validate() error {
 // should be created for alice1
 func (s *MessengerPairingSuite) TestNewInstallationReceivedIsNotCreated() {
 	alice1 := s.m
-	alice2, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	alice2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alice2)
 
 	mockRequest := &stubEnableInstallationAndPair{installationID: alice1.installationID}
-	_, err = alice2.EnableInstallationAndPair(mockRequest)
+	_, err := alice2.EnableInstallationAndPair(mockRequest)
 	s.Require().NoError(err)
 
 	resp, err := WaitOnMessengerResponse(
@@ -112,15 +111,13 @@ func (s *MessengerPairingSuite) TestNewInstallationReceivedIsNotCreated() {
 // 4. check AC NewInstallationCreated for alice3 is not deleted
 func (s *MessengerPairingSuite) TestNewInstallationCreatedIsNotDeleted() {
 	alice1 := s.m
-	alice2, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	alice3, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	alice2 := s.anotherMessenger()
+	alice3 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alice2)
 	defer TearDownMessenger(&s.Suite, alice3)
 
 	// prepare AC NewInstallationCreated for alice2
-	_, err = alice2.EnableInstallationAndPair(&requests.EnableInstallationAndPair{InstallationID: alice1.installationID})
+	_, err := alice2.EnableInstallationAndPair(&requests.EnableInstallationAndPair{InstallationID: alice1.installationID})
 	s.Require().NoError(err)
 
 	// alice1 should get the installationID2 from alice2
@@ -181,11 +178,11 @@ func (s *MessengerPairingSuite) expectInstallationReceived(m *Messenger, install
 // alice2 should get the display name from alice1 after pairing
 func (s *MessengerPairingSuite) TestMessengerSyncFallback() {
 	alice1 := s.m
-	alice2, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	alice2 := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alice2)
 
-	alice1ProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	alice1ProfileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	alice1ProfileKp.KeyUID = alice1.account.KeyUID
 	alice1ProfileKp.Accounts[0].KeyUID = alice1.account.KeyUID
 	err = alice1.settings.SaveOrUpdateKeypair(alice1ProfileKp)

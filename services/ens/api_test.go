@@ -38,7 +38,6 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 		UpstreamChainID: 1,
 		Networks:        nil,
 		DB:              db,
-		WalletFeed:      nil,
 	}
 	rpcClient, err := statusRPC.NewClient(config)
 	require.NoError(t, err)

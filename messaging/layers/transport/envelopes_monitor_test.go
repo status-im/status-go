@@ -12,9 +12,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
 var (
@@ -56,7 +57,7 @@ func (s *EnvelopesMonitorSuite) SetupTest() {
 			EnvelopeEventsHandler:            s.eventsHandlerMock,
 			MaxAttempts:                      6,
 			AwaitOnlyMailServerConfirmations: false,
-			IsMailserver:                     func(types.EnodeID) bool { return false },
+			IsMailserver:                     func(ethtypes.EnodeID) bool { return false },
 			Logger:                           zap.NewNop(),
 		},
 	)
@@ -105,7 +106,7 @@ func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
 	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
 		Event: wakutypes.EventBatchAcknowledged,
 		Batch: testBatch,
-		Peer:  types.EnodeID(node.ID()),
+		Peer:  ethtypes.EnodeID(node.ID()),
 	})
 	s.Contains(s.monitor.envelopes, testHash)
 	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash].state)
@@ -130,13 +131,13 @@ func (s *EnvelopesMonitorSuite) TestIgnoreNotFromMailserver() {
 	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
 		Event: wakutypes.EventEnvelopeSent,
 		Hash:  testHash,
-		Peer:  types.EnodeID{1}, // could be empty, doesn't impact test behaviour
+		Peer:  ethtypes.EnodeID{1}, // could be empty, doesn't impact test behaviour
 	})
 	s.Require().Equal(EnvelopePosted, s.monitor.GetState(testHash))
 }
 
 func (s *EnvelopesMonitorSuite) TestReceived() {
-	s.monitor.isMailserver = func(peer types.EnodeID) bool {
+	s.monitor.isMailserver = func(peer ethtypes.EnodeID) bool {
 		return true
 	}
 	err := s.monitor.Add(testIDs, testHashes, []*wakutypes.NewMessage{{}})
@@ -249,9 +250,6 @@ func (m *mockWakuAPI) Post(ctx context.Context, msg wakutypes.NewMessage) ([]byt
 }
 
 func (m *mockWakuAPI) AddPrivateKey(ctx context.Context, privateKey types.HexBytes) (string, error) {
-	return "", nil
-}
-func (m *mockWakuAPI) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
 	return "", nil
 }
 func (m *mockWakuAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {

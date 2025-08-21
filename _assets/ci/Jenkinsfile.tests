@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.20'
+library 'status-jenkins-lib@v1.9.26'
 
 pipeline {
   agent { label 'linux && x86_64 && nix-2.24' }
@@ -27,7 +27,7 @@ pipeline {
     )
     booleanParam(
       name: 'UNIT_TEST_USE_DEVELOPMENT_LOGGER',
-      defaultValue: !isNightlyJob(),
+      defaultValue: false,
       description: 'Should the job use detailed logging for tests, potentially generating large logs?'
     )
     booleanParam(
@@ -48,6 +48,7 @@ pipeline {
     /* Prevent Jenkins jobs from running forever */
     timeout(time: getDefaultTimeout(), unit: 'MINUTES')
     disableConcurrentBuilds()
+    disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: getAmountToKeep(),
@@ -81,11 +82,24 @@ pipeline {
 
     /* prevent sharing cache dir across different jobs */
     GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
+
+    /* fixes nim cache collision */
+    XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
   }
 
   stages {
     stage('Prep') {
-      steps { /* Go needs to find status-go in GOPATH. */
+      steps {
+        /* Check NWAKU ports before starting containers */
+        sh '''
+          for port in ${NWAKU_REST_PORT} ${NWAKU_TCP_PORT} ${NWAKU_UDP_PORT}; do
+            if lsof -i :$port; then
+              echo "Port $port is already in use! Failing early."
+              exit 1
+            fi
+          done
+        '''
+        /* Go needs to find status-go in GOPATH. */
         sh "mkdir -p \$(dirname ${REPO_SRC})"
         sh "ln -s ${WORKSPACE} ${REPO_SRC}"
       }
@@ -114,12 +128,6 @@ pipeline {
       } }
     }
 
-    stage('Lint') {
-      steps { script {
-        nix.develop('make lint', pure: false)
-      } }
-    }
-
     stage('Unit Tests') {
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"
@@ -132,7 +140,7 @@ pipeline {
           "--env=POSTGRES_HOST_AUTH_METHOD=trust",
           "--publish=${DB_PORT}:${DB_PORT}",
         ].join(' '), "-p ${DB_PORT}") { c ->
-          nwaku = docker.image('harbor.status.im/wakuorg/nwaku:latest').withRun([
+          nwaku = docker.image('wakuorg/nwaku:v0.36.0').withRun([
             "--name=${NWAKU_CONT}",
             "--publish=${NWAKU_TCP_PORT}:${NWAKU_TCP_PORT}/tcp",
             "--publish=${NWAKU_UDP_PORT}:${NWAKU_UDP_PORT}/udp",
@@ -141,6 +149,7 @@ pipeline {
             "--tcp-port=${NWAKU_TCP_PORT}",
             "--discv5-discovery=true",
             "--cluster-id=16",
+         // "--num-shards-in-network=0", // uncomment when switching to nwaku:v0.37.0
             "--shard=32",
             "--shard=64",
             "--nat=extip:${ipAddress}",
@@ -164,8 +173,8 @@ pipeline {
         }
       } }
       post { cleanup { /* Leftover DB containers. */
-        sh "docker rm ${DB_CONT} || true"
-        sh "docker rm ${NWAKU_CONT} || true"
+        sh "docker rm -f ${DB_CONT} || true"
+        sh "docker rm -f ${NWAKU_CONT} || true"
       } }
     }
   } // stages
@@ -202,9 +211,9 @@ pipeline {
       }
     }
     success { script { github.notifyPR(true) } }
-    failure { 
-      script { 
-        github.notifyPR(false) 
+    failure {
+      script {
+        github.notifyPR(false)
         archiveArtifacts('**/test_*.log')
       }
     }

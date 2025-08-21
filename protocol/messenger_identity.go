@@ -8,8 +8,8 @@ import (
 	"unicode/utf8"
 
 	utils "github.com/status-im/status-go/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/server"
 )
 
@@ -128,7 +128,7 @@ func (m *Messenger) SetBio(bio string) error {
 }
 
 func (m *Messenger) setInstallationHostname() error {
-	imd, err := m.getOurInstallationMetadata()
+	imd, err := m.GetOurInstallationMetadata()
 	if err != nil {
 		return err
 	}
@@ -164,14 +164,14 @@ func (m *Messenger) setInstallationHostname() error {
 
 }
 
-func (m *Messenger) getOurInstallationMetadata() (*multidevice.InstallationMetadata, error) {
+func (m *Messenger) GetOurInstallationMetadata() (*messagingtypes.InstallationMetadata, error) {
 	ourInstallation, ok := m.allInstallations.Load(m.installationID)
 	if !ok {
 		return nil, fmt.Errorf("messenger's installationID is not set or not loadable")
 	}
 
 	if ourInstallation.InstallationMetadata == nil {
-		return new(multidevice.InstallationMetadata), nil
+		return new(messagingtypes.InstallationMetadata), nil
 	}
 
 	return ourInstallation.InstallationMetadata, nil
@@ -182,7 +182,7 @@ func (m *Messenger) SetInstallationDeviceType(deviceType string) error {
 		return errors.New("device type is empty")
 	}
 
-	imd, err := m.getOurInstallationMetadata()
+	imd, err := m.GetOurInstallationMetadata()
 	if err != nil {
 		return err
 	}

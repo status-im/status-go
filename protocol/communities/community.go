@@ -8,27 +8,26 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
-	slices "golang.org/x/exp/slices"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"github.com/status-im/status-go/api/multiformat"
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/wakuv2"
 )
 
 const signatureLength = 65
@@ -55,7 +54,7 @@ type Config struct {
 	RequestsToJoin                      []*RequestToJoin
 	MemberIdentity                      *ecdsa.PrivateKey
 	EventsData                          *EventsData
-	Shard                               *wakuv2.Shard
+	Shard                               *messagingtypes.Shard
 	PubsubTopicPrivateKey               *ecdsa.PrivateKey
 	LastOpenedAt                        int64
 }
@@ -179,7 +178,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		ActiveMembersCount      uint64                               `json:"activeMembersCount"`
 		PubsubTopic             string                               `json:"pubsubTopic"`
 		PubsubTopicKey          string                               `json:"pubsubTopicKey"`
-		Shard                   *wakuv2.Shard                        `json:"shard"`
+		Shard                   *messagingtypes.Shard                `json:"shard"`
 	}{
 		ID:             o.ID(),
 		Verified:       o.config.Verified,
@@ -315,7 +314,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		ActiveMembersCount          uint64                               `json:"activeMembersCount"`
 		PubsubTopic                 string                               `json:"pubsubTopic"`
 		PubsubTopicKey              string                               `json:"pubsubTopicKey"`
-		Shard                       *wakuv2.Shard                        `json:"shard"`
+		Shard                       *messagingtypes.Shard                `json:"shard"`
 		LastOpenedAt                int64                                `json:"lastOpenedAt"`
 		Clock                       uint64                               `json:"clock"`
 	}{
@@ -468,7 +467,7 @@ func (o *Community) DescriptionText() string {
 	return ""
 }
 
-func (o *Community) Shard() *wakuv2.Shard {
+func (o *Community) Shard() *messagingtypes.Shard {
 	if o != nil && o.config != nil {
 		return o.config.Shard
 	}
@@ -712,7 +711,14 @@ func (o *Community) getChatMember(pk *ecdsa.PublicKey, chatID string) *protobuf.
 	}
 
 	key := common.PubkeyToHex(pk)
-	return chat.Members[key]
+	member := chat.Members[key]
+
+	if member == nil && !channelHasPermissions(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
+		// User is a member of the community, but not in the chat. The chat is public, so we return the community member.
+		return o.getMember(pk)
+	}
+
+	return member
 }
 
 func (o *Community) hasMember(pk *ecdsa.PublicKey) bool {
@@ -1701,22 +1707,14 @@ func dehydrateChannelsMembers(description *protobuf.CommunityDescription) {
 	}
 }
 
-func hydrateChannelsMembers(description *protobuf.CommunityDescription) {
-	for channelID, channel := range description.Chats {
-		if !channelHasPermissions(ChatID(description.ID, channelID), description.TokenPermissions) {
-			channel.Members = make(map[string]*protobuf.CommunityMember)
-			for pubKey, member := range description.Members {
-				channel.Members[pubKey] = member
-			}
-		}
-	}
-}
-
 func upgradeTokenPermissions(description *protobuf.CommunityDescription) {
 
 	floatToWeiIntFunc := func(floatStr string, decimals uint64) string {
 		bigfloat := new(big.Float)
-		bigfloat.SetString(floatStr)
+		_, ok := bigfloat.SetString(floatStr)
+		if !ok {
+			return ""
+		}
 
 		multiplier := big.NewFloat(math.Pow(10, float64(decimals)))
 		bigfloat.Mul(bigfloat, multiplier)
@@ -1934,6 +1932,12 @@ func channelEncrypted(chatID string, permissions map[string]*protobuf.CommunityT
 	return hasPermission && !viewableByEveryone
 }
 
+func (o *Community) ChannelHasPermissions(channelID string) bool {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	return channelHasPermissions(o.ChatID(channelID), o.config.CommunityDescription.TokenPermissions)
+}
+
 func (o *Community) channelEncrypted(channelID string) bool {
 	return channelEncrypted(o.ChatID(channelID), o.config.CommunityDescription.TokenPermissions)
 }
@@ -2125,7 +2129,7 @@ func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) bool {
 	}
 
 	// community creator can always post, return immediately
-	if common.IsPubKeyEqual(pk, o.ControlNode()) {
+	if common.IsPubKeyEqual(pk, o.ControlNode()) || o.IsPrivilegedMember(pk) {
 		return true
 	}
 
@@ -2146,6 +2150,10 @@ func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) bool {
 		return false
 	}
 
+	if !channelHasPermissions(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
+		return true
+	}
+
 	if chat.Members == nil {
 		o.config.Logger.Debug("Community.CanView: no members in chat", zap.String("chat-id", chatID))
 		return false
@@ -2161,8 +2169,18 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType prot
 		return false, nil
 	}
 
+	if o.IsPrivilegedMember(pk) || common.IsPubKeyEqual(pk, o.ControlNode()) {
+		// If the user is a privileged member, they can post in any chat
+		return true, nil
+	}
+
 	chat := o.config.CommunityDescription.Chats[chatID]
 	member := chat.Members[common.PubkeyToHex(pk)]
+
+	// Channels with permissions require the member to be present
+	if member == nil && channelHasPermissions(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
+		return false, nil
+	}
 
 	switch messageType {
 	case protobuf.ApplicationMetadataMessage_PIN_MESSAGE:
@@ -2376,49 +2394,6 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey,
 	return changes, nil
 }
 
-func (o *Community) PopulateChannelsWithAllMembers() {
-	members := o.Members()
-	for _, channel := range o.Chats() {
-		channel.Members = members
-	}
-	o.increaseClock()
-}
-
-func (o *Community) PopulateChatWithAllMembers(chatID string) (*CommunityChanges, error) {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
-	if !o.IsControlNode() {
-		return o.emptyCommunityChanges(), ErrNotControlNode
-	}
-
-	return o.populateChatWithAllMembers(chatID)
-}
-
-func (o *Community) populateChatWithAllMembers(chatID string) (*CommunityChanges, error) {
-	result := o.emptyCommunityChanges()
-
-	chat, exists := o.chats()[chatID]
-	if !exists {
-		return result, ErrChatNotFound
-	}
-
-	membersAdded := make(map[string]*protobuf.CommunityMember)
-	for pubKey, member := range o.Members() {
-		if chat.Members[pubKey] == nil {
-			membersAdded[pubKey] = member
-		}
-	}
-	result.ChatsModified[chatID] = &CommunityChatChanges{
-		MembersAdded: membersAdded,
-	}
-
-	chat.Members = o.Members()
-	o.increaseClock()
-
-	return result, nil
-}
-
 func ChatID(communityID, channelID string) string {
 	return communityID + channelID
 }
@@ -2608,11 +2583,6 @@ func (o *Community) createChat(chatID string, chat *protobuf.CommunityChat) erro
 		if c.CategoryId == chat.CategoryId {
 			chat.Position++
 		}
-	}
-
-	chat.Members = make(map[string]*protobuf.CommunityMember)
-	for pubKey, member := range o.config.CommunityDescription.Members {
-		chat.Members[pubKey] = member
 	}
 
 	o.config.CommunityDescription.Chats[chatID] = chat

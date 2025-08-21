@@ -11,15 +11,16 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/crypto/ecies"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 const encryptedPayloadKeyLength = 16
-const defaultGorushURL = "https://gorush.infra.status.im/"
+const DefaultGorushURL = "https://gorush.infra.status.im/"
 
 var errUnhandledPushNotificationType = errors.New("unhandled push notification type")
 
@@ -34,22 +35,25 @@ type Config struct {
 }
 
 type Server struct {
-	persistence   Persistence
-	config        *Config
-	messageSender *common.MessageSender
+	persistence Persistence
+	config      *Config
+	messaging   *messaging.API
 	// SentRequests keeps track of the requests sent to gorush, for testing only
 	SentRequests int64
 }
 
-func New(config *Config, persistence Persistence, messageSender *common.MessageSender) *Server {
+func New(config *Config) *Server {
 	if len(config.GorushURL) == 0 {
-		config.GorushURL = defaultGorushURL
+		config.GorushURL = DefaultGorushURL
 
 	}
-	return &Server{persistence: persistence, config: config, messageSender: messageSender}
+	return &Server{config: config}
 }
 
-func (s *Server) Start() error {
+func (s *Server) Start(persistence Persistence, messaging *messaging.API) error {
+	s.persistence = persistence
+	s.messaging = messaging
+
 	if s.config.Logger == nil {
 		logger, err := zap.NewDevelopment()
 		if err != nil {
@@ -105,14 +109,14 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION_RESPONSE,
 		// we skip encryption as might be sent from an ephemeral key
 		SkipEncryptionLayer: true,
 	}
 
-	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)
+	_, err = s.messaging.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 
@@ -132,14 +136,14 @@ func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, message
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY_RESPONSE,
 		// we skip encryption as sent from an ephemeral key
 		SkipEncryptionLayer: true,
 	}
 
-	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)
+	_, err = s.messaging.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 
@@ -167,7 +171,7 @@ func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 	}
 	err = s.sendPushNotification(requestsAndRegistrations)
 	if err != nil {
-		s.config.Logger.Error("failed to send go rush notification", zap.Error(err))
+		s.config.Logger.Error("failed to send gorush notification", zap.Error(err))
 		return err
 	}
 	encodedMessage, err := proto.Marshal(response)
@@ -175,14 +179,14 @@ func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 		return err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE,
 		// We skip encryption here as the message has been sent from an ephemeral key
 		SkipEncryptionLayer: true,
 	}
 
-	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)
+	_, err = s.messaging.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 
@@ -216,11 +220,7 @@ func (s *Server) verifyGrantSignature(clientPublicKey *ecdsa.PublicKey, accessTo
 }
 
 func (s *Server) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
-	return ecies.ImportECDSA(s.config.Identity).GenerateShared(
-		ecies.ImportECDSAPublic(publicKey),
-		encryptedPayloadKeyLength,
-		encryptedPayloadKeyLength,
-	)
+	return crypto.GenerateSharedKey(s.config.Identity, publicKey)
 }
 
 func (s *Server) validateUUID(u string) error {
@@ -463,11 +463,12 @@ func (s *Server) sendPushNotification(requestAndRegistrations []*RequestAndRegis
 
 // listenToPublicKeyQueryTopic listen to a topic derived from the hashed public key
 func (s *Server) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
-	if s.messageSender == nil {
+	if s.messaging == nil {
 		return nil
 	}
+
 	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
-	_, err := s.messageSender.JoinPublic(encodedPublicKey)
+	_, err := s.messaging.JoinPublicChat(encodedPublicKey)
 	return err
 }
 

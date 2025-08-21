@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/stretchr/testify/suite"
+
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/protocol/verification"
-
-	"github.com/stretchr/testify/suite"
 )
 
 func TestMessengerSyncVerificationRequests(t *testing.T) {
@@ -35,10 +35,10 @@ func (s *MessengerSyncVerificationRequests) TestSyncVerificationRequests() {
 	s.Require().NoError(err)
 
 	// pair
-	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	theirMessenger := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -90,8 +90,6 @@ func (s *MessengerSyncVerificationRequests) TestSyncVerificationRequests() {
 	requests, err := theirMessenger.verificationDatabase.GetVerificationRequests()
 	s.Require().NoError(err)
 	s.Require().Len(requests, 1)
-
-	s.Require().NoError(theirMessenger.Shutdown())
 }
 
 func (s *MessengerSyncVerificationRequests) TestSyncTrust() {
@@ -99,10 +97,10 @@ func (s *MessengerSyncVerificationRequests) TestSyncTrust() {
 	s.Require().NoError(err)
 
 	// pair
-	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	theirMessenger := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -153,6 +151,4 @@ func (s *MessengerSyncVerificationRequests) TestSyncTrust() {
 	trustLevel, err := theirMessenger.verificationDatabase.GetTrustStatus("0x01")
 	s.Require().NoError(err)
 	s.Require().Equal(verification.TrustStatusTRUSTED, trustLevel)
-
-	s.Require().NoError(theirMessenger.Shutdown())
 }

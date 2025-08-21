@@ -7,10 +7,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/services/wallet/common"
 )
 
 func TestBuildDefaultNetworks(t *testing.T) {
@@ -31,17 +31,17 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	for _, n := range actualNetworks {
 		var err error
 		switch n.ChainID {
-		case common.MainnetChainID:
-		case common.SepoliaChainID:
-		case common.OptimismChainID:
-		case common.OptimismSepoliaChainID:
-		case common.ArbitrumChainID:
-		case common.ArbitrumSepoliaChainID:
-		case common.BaseChainID:
-		case common.BaseSepoliaChainID:
-		case common.StatusNetworkSepoliaChainID:
-		case common.BNBSmartChainID:
-		case common.BNBSmartChainTestnetChainID:
+		case common.EthereumMainnet:
+		case common.EthereumSepolia:
+		case common.OptimismMainnet:
+		case common.OptimismSepolia:
+		case common.ArbitrumMainnet:
+		case common.ArbitrumSepolia:
+		case common.BaseMainnet:
+		case common.BaseSepolia:
+		case common.StatusNetworkSepolia:
+		case common.BSCMainnet:
+		case common.BSCTestnet:
 		default:
 			err = errors.Errorf("unexpected chain id: %d", n.ChainID)
 		}

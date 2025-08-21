@@ -14,7 +14,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -540,11 +540,12 @@ func (s *MessengerLinkPreviewsTestSuite) setProfileParameters(messenger *Messeng
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
 
-	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
 	// Set initial profile parameters

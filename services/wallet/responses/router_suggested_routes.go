@@ -7,8 +7,7 @@ import (
 
 type RouterSuggestedRoutes struct {
 	Uuid          string                `json:"Uuid"`
-	Best          routes.Route          `json:"Best,omitempty"`
-	Candidates    routes.Route          `json:"Candidates,omitempty"`
+	Route         routes.Route          `json:"Route,omitempty"`
 	UpdatedPrices map[string]float64    `json:"UpdatedPrices,omitempty"`
 	ErrorResponse *errors.ErrorResponse `json:"ErrorResponse,omitempty"`
 }

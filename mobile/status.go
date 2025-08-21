@@ -12,7 +12,6 @@ import (
 	"unsafe"
 
 	"go.uber.org/zap"
-	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 
@@ -22,22 +21,20 @@ import (
 	"github.com/status-im/extkeys"
 
 	abi_spec "github.com/status-im/status-go/abi-spec"
-	"github.com/status-im/status-go/account"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/centralizedmetrics"
 	"github.com/status-im/status-go/centralizedmetrics/providers"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/exportlogs"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/callog"
 	"github.com/status-im/status-go/logutils/requestlog"
 	m_requests "github.com/status-im/status-go/mobile/requests"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
@@ -138,9 +135,22 @@ func initializeApplication(requestJSON string) string {
 	}
 
 	if request.WakuFleetsConfigFilePath != "" {
-		err = params.LoadFleetsFromFile(request.WakuFleetsConfigFilePath)
+		err = params.LoadWakuFleetsFromFile(request.WakuFleetsConfigFilePath)
 		if err != nil {
 			return makeJSONResponse(err)
+		}
+	}
+
+	if request.PushFleetsConfigFilePath != "" {
+		err = params.LoadPushFleetsFromFile(request.PushFleetsConfigFilePath)
+		if err != nil {
+			return makeJSONResponse(err)
+		}
+	}
+
+	for i, acc := range accs {
+		for j, images := range acc.Images {
+			accs[i].Images[j].LocalURL = statusBackend.StatusNode().HTTPServer().MakeAccountImageURL(acc.KeyUID, images.Name, images.Clock)
 		}
 	}
 
@@ -296,62 +306,6 @@ func getNodeConfig() string {
 	return string(respJSON)
 }
 
-func ValidateNodeConfig(configJSON string) string {
-	return callWithResponse(validateNodeConfig, configJSON)
-}
-
-// validateNodeConfig validates config for the Status node.
-func validateNodeConfig(configJSON string) string {
-	var resp APIDetailedResponse
-
-	_, err := params.NewConfigFromJSON(configJSON)
-
-	// Convert errors to APIDetailedResponse
-	switch err := err.(type) {
-	case validator.ValidationErrors:
-		resp = APIDetailedResponse{
-			Message:     "validation: validation failed",
-			FieldErrors: make([]APIFieldError, len(err)),
-		}
-
-		for i, ve := range err {
-			resp.FieldErrors[i] = APIFieldError{
-				Parameter: ve.Namespace(),
-				Errors: []APIError{
-					{
-						Message: fmt.Sprintf("field validation failed on the '%s' tag", ve.Tag()),
-					},
-				},
-			}
-		}
-	case error:
-		resp = APIDetailedResponse{
-			Message: fmt.Sprintf("validation: %s", err.Error()),
-		}
-	case nil:
-		resp = APIDetailedResponse{
-			Status: true,
-		}
-	}
-
-	respJSON, err := json.Marshal(resp)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(respJSON)
-}
-
-func ResetChainData() string {
-	return callWithResponse(resetChainData)
-}
-
-// resetChainData removes chain data from data directory.
-func resetChainData() string {
-	api.RunAsync(statusBackend.ResetChainData)
-	return makeJSONResponse(nil)
-}
-
 func CallRPC(inputJSON string) string {
 	return callRPC(inputJSON)
 }
@@ -379,13 +333,13 @@ func callPrivateRPC(inputJSON string) string {
 }
 
 // Deprecated: Use VerifyAccountPasswordV2 instead
-func VerifyAccountPassword(keyStoreDir, address, password string) string {
-	return verifyAccountPassword(keyStoreDir, address, password)
+func VerifyAccountPassword(address, password string) string {
+	return verifyAccountPassword(address, password)
 }
 
 // verifyAccountPassword verifies account password.
-func verifyAccountPassword(keyStoreDir, address, password string) string {
-	_, err := statusBackend.AccountManager().VerifyAccountPassword(keyStoreDir, address, password)
+func verifyAccountPassword(address, password string) string {
+	_, err := statusBackend.AccountsManager().LoadAccount(types.HexToAddress(address), password)
 	return makeJSONResponse(err)
 }
 
@@ -405,7 +359,7 @@ func verifyAccountPasswordV2(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	_, err = statusBackend.AccountManager().VerifyAccountPassword(request.KeyStoreDir, request.Address, request.Password)
+	_, err = statusBackend.AccountsManager().LoadAccount(types.HexToAddress(request.Address), request.Password)
 	return makeJSONResponse(err)
 }
 
@@ -455,24 +409,18 @@ func migrateKeyStoreDirV2(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.MigrateKeyStoreDir(request.Account, request.Password, request.OldDir, request.NewDir)
+	err = statusBackend.AccountsManager().MigrateKeyStoreDir(request.NewDir)
 	return makeJSONResponse(err)
 }
 
 // Deprecated: Use MigrateKeyStoreDirV2 instead
 func MigrateKeyStoreDir(accountData, password, oldDir, newDir string) string {
-	return migrateKeyStoreDir(accountData, password, oldDir, newDir)
+	return migrateKeyStoreDir(newDir)
 }
 
 // migrateKeyStoreDir migrates key files to a new directory
-func migrateKeyStoreDir(accountData, password, oldDir, newDir string) string {
-	var account multiaccounts.Account
-	err := json.Unmarshal([]byte(accountData), &account)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = statusBackend.MigrateKeyStoreDir(account, password, oldDir, newDir)
+func migrateKeyStoreDir(newDir string) string {
+	err := statusBackend.AccountsManager().MigrateKeyStoreDir(newDir)
 	return makeJSONResponse(err)
 }
 
@@ -618,7 +566,7 @@ func restoreAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	err = request.Validate()
+	err = request.Validate(request.Keycard != nil)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -640,126 +588,6 @@ func restoreAccountAndLogin(requestJSON string) string {
 		return statusBackend.SetupLogSettings()
 	})
 
-	return makeJSONResponse(nil)
-}
-
-// SaveAccountAndLogin saves account in status-go database.
-// Deprecated: Use CreateAccountAndLogin instead.
-func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subaccountData string) string {
-	var account multiaccounts.Account
-	err := json.Unmarshal([]byte(accountData), &account)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	var settings settings.Settings
-	err = json.Unmarshal([]byte(settingsJSON), &settings)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	if *settings.Mnemonic != "" {
-		settings.MnemonicWasNotShown = true
-	}
-
-	var conf params.NodeConfig
-	err = json.Unmarshal([]byte(configJSON), &conf)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	var subaccs []*accounts.Account
-	err = json.Unmarshal([]byte(subaccountData), &subaccs)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	api.RunAsync(func() error {
-		logutils.ZapLogger().Debug("starting a node, and saving account with configuration", zap.String("key-uid", account.KeyUID))
-		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs, nil)
-		if err != nil {
-			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
-			return err
-		}
-		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
-		return statusBackend.SetupLogSettings()
-	})
-	return makeJSONResponse(nil)
-}
-
-// Deprecated: Use DeleteMultiaccountV2 instead
-func DeleteMultiaccount(keyUID, keyStoreDir string) string {
-	return callWithResponse(deleteMultiaccount, keyUID, keyStoreDir)
-}
-
-// deleteMultiaccount
-func deleteMultiaccount(keyUID, keyStoreDir string) string {
-	err := statusBackend.DeleteMultiaccount(keyUID, keyStoreDir)
-	return makeJSONResponse(err)
-}
-
-func DeleteMultiaccountV2(requestJSON string) string {
-	return callWithResponse(deleteMultiaccountV2, requestJSON)
-}
-
-func deleteMultiaccountV2(requestJSON string) string {
-	var request requests.DeleteMultiaccount
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = request.Validate()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = statusBackend.DeleteMultiaccount(request.KeyUID, request.KeyStoreDir)
-	return makeJSONResponse(err)
-}
-
-func InitKeystore(keydir string) string {
-	return callWithResponse(initKeystore, keydir)
-}
-
-// initKeystore initialize keystore before doing any operations with keys.
-func initKeystore(keydir string) string {
-	err := statusBackend.AccountManager().InitKeystore(keydir)
-	return makeJSONResponse(err)
-}
-
-// SaveAccountAndLoginWithKeycard saves account in status-go database.
-// Deprecated: Use CreateAndAccountAndLogin with required keycard properties.
-func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJSON, subaccountData string, keyHex string) string {
-	var account multiaccounts.Account
-	err := json.Unmarshal([]byte(accountData), &account)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	var settings settings.Settings
-	err = json.Unmarshal([]byte(settingsJSON), &settings)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	var conf params.NodeConfig
-	err = json.Unmarshal([]byte(configJSON), &conf)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	var subaccs []*accounts.Account
-	err = json.Unmarshal([]byte(subaccountData), &subaccs)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	api.RunAsync(func() error {
-		logutils.ZapLogger().Debug("starting a node, and saving account with configuration", zap.String("key-uid", account.KeyUID))
-		err := statusBackend.SaveAccountAndStartNodeWithKey(account, password, settings, &conf, subaccs, keyHex)
-		if err != nil {
-			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
-			return err
-		}
-		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
-		return nil
-	})
 	return makeJSONResponse(nil)
 }
 
@@ -1197,29 +1025,6 @@ func SetSignalEventCallback(cb unsafe.Pointer) {
 // setSignalEventCallback setup geth callback to notify about new signal
 func setSignalEventCallback(cb unsafe.Pointer) {
 	signal.SetSignalEventCallback(cb)
-}
-
-// ExportNodeLogs reads current node log and returns content to a caller.
-//
-//export ExportNodeLogs
-func ExportNodeLogs() string {
-	return callWithResponse(exportNodeLogs)
-}
-
-func exportNodeLogs() string {
-	node := statusBackend.StatusNode()
-	if node == nil {
-		return makeJSONResponse(errors.New("node is not running"))
-	}
-	config := node.Config()
-	if config == nil {
-		return makeJSONResponse(errors.New("config and log file are not available"))
-	}
-	data, err := json.Marshal(exportlogs.ExportFromBaseFile(config.LogFilePath()))
-	if err != nil {
-		return makeJSONResponse(fmt.Errorf("error marshalling to json: %v", err))
-	}
-	return string(data)
 }
 
 func SignHash(hexEncodedHash string) string {
@@ -1760,6 +1565,7 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 // and the device has no camera to read a QR code with
 //
 // Example: A desktop device (device without camera) receiving account data from mobile (device with camera)
+// Note: Once the bootstrapping is complete, the device will be in a logged-in state.
 func getConnectionStringForBeingBootstrapped(configJSON string) string {
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
@@ -1771,11 +1577,6 @@ func getConnectionStringForBeingBootstrapped(configJSON string) string {
 	}()
 
 	cs, err := pairing.StartUpReceiverServer(statusBackend, configJSON)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = statusBackend.Logout()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -2218,7 +2019,7 @@ func deserializeAndCompressKey(DesktopKey string) string {
 }
 
 func GetRandomMnemonic() string {
-	mnemonic, err := account.GetRandomMnemonic()
+	mnemonic, err := accscommon.CreateRandomMnemonicWithDefaultLength()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -2397,4 +2198,38 @@ func IntendedPanic(message string) string {
 		err := intendedPanic{error: errors.New(message)}
 		panic(err)
 	})
+}
+
+func performLocalBackup() string {
+	filePath, err := statusBackend.StatusNode().PerformLocalBackup()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	respJSON, err := json.Marshal(map[string]interface{}{
+		"filePath": filePath,
+	})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(respJSON)
+}
+
+func PerformLocalBackup() string {
+	return callWithResponse(performLocalBackup)
+}
+
+func LoadLocalBackup(requestJSON string) string {
+	var request requests.LoadLocalBackup
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = statusBackend.StatusNode().LoadLocalBackup(request.FilePath)
+	return makeJSONResponse(err)
 }

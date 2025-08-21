@@ -5,12 +5,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
-
 	"github.com/stretchr/testify/suite"
+	gomock "go.uber.org/mock/gomock"
+
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/crypto/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
+	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestMessengerSyncWalletSuite(t *testing.T) {
@@ -19,17 +22,28 @@ func TestMessengerSyncWalletSuite(t *testing.T) {
 
 type MessengerSyncWalletSuite struct {
 	MessengerBaseTestSuite
+
+	accountsManagerMock *mock_protocol_accounts_manager.MockAccountsManager
+}
+
+func (s *MessengerSyncWalletSuite) SetupTest() {
+	s.MessengerBaseTestSuite.SetupTest()
+
+	ctrl := gomock.NewController(s.T())
+	s.accountsManagerMock = mock_protocol_accounts_manager.NewMockAccountsManager(ctrl)
+	s.m.accountsManager = s.accountsManagerMock
 }
 
 // user should not be able to change a keypair name directly, it follows display name
 func (s *MessengerSyncWalletSuite) TestProfileKeypairNameChange() {
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Name = s.m.account.Name
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
 
 	// Create a main account on alice
-	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err, "profile keypair alice.settings.SaveOrUpdateKeypair")
 
 	// Check account is present in the db
@@ -38,12 +52,13 @@ func (s *MessengerSyncWalletSuite) TestProfileKeypairNameChange() {
 	s.Require().True(accounts.SameKeypairs(profileKp, dbProfileKp))
 
 	// Try to change profile keypair name using `SaveOrUpdateKeypair` function
-	profileKp1 := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp1, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp1.Name = profileKp1.Name + "updated"
 	profileKp1.KeyUID = s.m.account.KeyUID
 	profileKp1.Accounts[0].KeyUID = s.m.account.KeyUID
 
-	err = s.m.SaveOrUpdateKeypair(profileKp1)
+	err = s.m.UpdateKeypair(profileKp1)
 	s.Require().Error(err)
 	s.Require().True(err == ErrCannotChangeKeypairName)
 
@@ -64,7 +79,8 @@ func (s *MessengerSyncWalletSuite) TestProfileKeypairNameChange() {
 }
 
 func (s *MessengerSyncWalletSuite) TestSyncWallets() {
-	profileKp := accounts.GetProfileKeypairForTest(true, true, true)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, true, true)
+	s.Require().NoError(err)
 	// set clocks for accounts
 	profileKp.Clock = uint64(len(profileKp.Accounts) - 1)
 	for i, acc := range profileKp.Accounts {
@@ -72,7 +88,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	}
 
 	// Create a main account on alice
-	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err, "profile keypair alice.settings.SaveOrUpdateKeypair")
 
 	// Check account is present in the db
@@ -81,11 +97,12 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().True(accounts.SameKeypairs(profileKp, dbProfileKp1))
 
 	// Create new device and add main account to
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	// Store only chat and default wallet account on other device
-	profileKpOtherDevice := accounts.GetProfileKeypairForTest(true, true, false)
+	profileKpOtherDevice, _, _, err := accounts.GetProfileKeypairForTest(true, true, false)
+	s.Require().NoError(err)
 	err = alicesOtherDevice.settings.SaveOrUpdateKeypair(profileKpOtherDevice)
 	s.Require().NoError(err, "profile keypair alicesOtherDevice.settings.SaveOrUpdateKeypair")
 
@@ -95,7 +112,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().True(accounts.SameKeypairs(profileKpOtherDevice, dbProfileKp2))
 
 	// Pair devices
-	im1 := &multidevice.InstallationMetadata{
+	im1 := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}
@@ -125,7 +142,8 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().NoError(err)
 
 	// Store seed phrase keypair with accounts on alice's device
-	seedPhraseKp := accounts.GetSeedImportedKeypair1ForTest()
+	seedPhraseKp, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	s.Require().NoError(err)
 	err = s.m.settings.SaveOrUpdateKeypair(seedPhraseKp)
 	s.Require().NoError(err, "seed phrase keypair alice.settings.SaveOrUpdateKeypair")
 
@@ -218,10 +236,11 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().True(haveSameElements(dbAccounts1, dbAccounts2, accounts.SameAccounts))
 
 	// Update keypair name on alice's primary device
-	profileKpUpdated := accounts.GetProfileKeypairForTest(true, true, false)
+	profileKpUpdated, _, _, err := accounts.GetProfileKeypairForTest(true, true, false)
+	s.Require().NoError(err)
 	profileKpUpdated.Name = profileKp.Name + "Updated"
 	profileKpUpdated.Accounts = profileKp.Accounts[:0]
-	err = s.m.SaveOrUpdateKeypair(profileKpUpdated)
+	err = s.m.UpdateKeypair(profileKpUpdated)
 	s.Require().NoError(err, "updated keypair name on alice primary device")
 
 	// Sync between devices is triggered automatically
@@ -246,13 +265,14 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().Equal(profileKpUpdated.Name, dbProfileKp2.Name)
 
 	// Update accounts on alice's primary device
-	profileKpUpdated = accounts.GetProfileKeypairForTest(true, true, true)
+	profileKpUpdated, _, _, err = accounts.GetProfileKeypairForTest(true, true, true)
+	s.Require().NoError(err)
 	accountsToUpdate := profileKpUpdated.Accounts[2:]
 	for _, acc := range accountsToUpdate {
 		acc.Name = acc.Name + "Updated"
 		acc.ColorID = acc.ColorID + "Updated"
 		acc.Emoji = acc.Emoji + "Updated"
-		err = s.m.SaveOrUpdateAccount(acc)
+		err = s.m.UpdateAccount(acc)
 		s.Require().NoError(err, "updated account on alice primary device")
 	}
 
@@ -278,7 +298,8 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 }
 
 func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.Accounts[0].Position = -1 // Chat account must be at position -1 always
 
 	woAccounts := []*accounts.Account{
@@ -291,7 +312,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	}
 
 	// Create a main account on alice
-	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err, "profile keypair alice.settings.SaveOrUpdateKeypair")
 	// Store watch only accounts on alice's device
 	err = s.m.settings.SaveOrUpdateAccounts(woAccounts, false)
@@ -302,8 +323,9 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 
 	// Create a main account on alice's other device
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
 	err = alicesOtherDevice.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err, "profile keypair alice.settings.SaveOrUpdateKeypair")
 	// Store watch only accounts on alice's other device
@@ -315,7 +337,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 
 	// Pair devices
-	im1 := &multidevice.InstallationMetadata{
+	im1 := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}
@@ -446,7 +468,8 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 }
 
 func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
-	profileKp := accounts.GetProfileKeypairForTest(true, true, true)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, true, true)
+	s.Require().NoError(err)
 	// set clocks for accounts
 	profileKp.Clock = uint64(len(profileKp.Accounts) - 1)
 	i := -1
@@ -458,10 +481,11 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	}
 
 	// Create a main account on alice
-	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err, "profile keypair alice.settings.SaveOrUpdateKeypair")
 	// Store seed phrase keypair with accounts on alice's device
-	seedPhraseKp := accounts.GetSeedImportedKeypair1ForTest()
+	seedPhraseKp, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	s.Require().NoError(err)
 	for _, acc := range seedPhraseKp.Accounts {
 		acc.Clock = uint64(i + 1)
 		acc.Position = int64(i)
@@ -497,15 +521,23 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
 
 	// Create new device and add main account to
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
+	ctrl := gomock.NewController(s.T())
+	defer ctrl.Finish()
+
+	accountsManagerAnotherMock := mock_protocol_accounts_manager.NewMockAccountsManager(ctrl)
+	alicesOtherDevice.accountsManager = accountsManagerAnotherMock
+
 	// Store only chat and default wallet account on other device
-	profileKpOtherDevice := accounts.GetProfileKeypairForTest(true, true, false)
+	profileKpOtherDevice, _, _, err := accounts.GetProfileKeypairForTest(true, true, false)
+	s.Require().NoError(err)
 	err = alicesOtherDevice.settings.SaveOrUpdateKeypair(profileKpOtherDevice)
 	s.Require().NoError(err, "profile keypair alicesOtherDevice.settings.SaveOrUpdateKeypair")
 
 	// Pair devices
-	im1 := &multidevice.InstallationMetadata{
+	im1 := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}
@@ -561,10 +593,26 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 
 	// Delete keypair related account on alice's primary device
 	accToDelete := seedPhraseKp.Accounts[1]
+
+	s.accountsManagerMock.EXPECT().DeleteAccount(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(address types.Address, clock uint64) (*accsmanagementtypes.Account, error) {
+			err := s.m.settings.RemoveAccount(address, clock)
+			if err != nil {
+				return nil, err
+			}
+			return accounts.AccountToAccountsManagerAccount(accToDelete), nil
+		}).Times(1)
+
 	err = s.m.DeleteAccount(accToDelete.Address)
 	s.Require().NoError(err, "delete account on alice primary device")
 
 	totalNumOfAccounts-- //one acc less
+
+	dbAccounts1, err = s.m.settings.GetActiveAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
+
+	accountsManagerAnotherMock.EXPECT().DeleteKeystoreFileForAccount(accToDelete.Address).Return(nil).Times(1)
 
 	err = tt.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
@@ -579,10 +627,6 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	})
 	s.Require().NoError(err)
 
-	dbAccounts1, err = s.m.settings.GetActiveAccounts()
-	s.Require().NoError(err)
-	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
-
 	dbAccounts2, err = alicesOtherDevice.settings.GetActiveAccounts()
 	s.Require().NoError(err)
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts2))
@@ -591,6 +635,16 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 
 	// Delete watch only account on alice's primary device
 	accToDelete = woAccounts[1]
+
+	s.accountsManagerMock.EXPECT().DeleteAccount(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(address types.Address, clock uint64) (*accsmanagementtypes.Account, error) {
+			err := s.m.settings.RemoveAccount(address, clock)
+			if err != nil {
+				return nil, err
+			}
+			return accounts.AccountToAccountsManagerAccount(accToDelete), nil
+		}).Times(1)
+
 	err = s.m.DeleteAccount(accToDelete.Address)
 	s.Require().NoError(err, "delete account on alice primary device")
 

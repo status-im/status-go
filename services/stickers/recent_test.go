@@ -27,7 +27,7 @@ func SetupAPI(t *testing.T) (*API, *mock_settings.MockDatabaseSettingsManager) {
 		DatabaseSettingsManager: mockDB,
 	}
 
-	api := NewAPI(context.Background(), accountDatabase, nil, nil, nil, "test-store-dir", nil, nil)
+	api := NewAPI(context.Background(), accountDatabase, nil, nil, nil, nil, nil)
 	require.NotNil(t, api)
 
 	return api, mockDB

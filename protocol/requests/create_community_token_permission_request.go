@@ -5,7 +5,7 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -16,6 +16,7 @@ var (
 	ErrCreateCommunityTokenPermissionTooManyTokenCriteria  = errors.New("too many token criteria")
 	ErrCreateCommunityTokenPermissionInvalidPermissionType = errors.New("invalid community token permission type")
 	ErrCreateCommunityTokenPermissionInvalidTokenCriteria  = errors.New("invalid community permission token criteria data")
+	ErrConvertingAmountToBigInt                            = errors.New("converting amount to big.Int")
 )
 
 type CreateCommunityTokenPermission struct {
@@ -45,7 +46,10 @@ func (p *CreateCommunityTokenPermission) Validate() error {
 		}
 
 		var amountBig = new(big.Int)
-		amountBig.SetString(c.AmountInWei, 10)
+		_, ok := amountBig.SetString(c.AmountInWei, 10)
+		if !ok {
+			return ErrConvertingAmountToBigInt
+		}
 		if len(c.ContractAddresses) > 0 && amountBig.Cmp(big.NewInt(0)) == 0 {
 			return ErrCreateCommunityTokenPermissionInvalidTokenCriteria
 		}
@@ -58,7 +62,10 @@ func (p *CreateCommunityTokenPermission) FillDeprecatedAmount() {
 
 	computeErc20AmountFunc := func(amountInWeis string, decimals uint64) string {
 		bigfloat := new(big.Float)
-		bigfloat.SetString(amountInWeis)
+		_, ok := bigfloat.SetString(amountInWeis)
+		if !ok {
+			return ""
+		}
 		multiplier := big.NewFloat(math.Pow(10, float64(decimals)))
 		bigfloat.Quo(bigfloat, multiplier)
 		return bigfloat.String()

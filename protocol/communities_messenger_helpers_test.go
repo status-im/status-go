@@ -15,9 +15,9 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -31,22 +31,10 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
+
+	"go.uber.org/mock/gomock"
 )
-
-type AccountManagerMock struct {
-	AccountsMap map[string]string
-}
-
-func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*account.SelectedExtKey, error) {
-	return &account.SelectedExtKey{
-		Address: types.HexToAddress(address),
-	}, nil
-}
-
-func (m *AccountManagerMock) DeleteAccount(address types.Address) error {
-	return nil
-}
 
 type TokenManagerMock struct {
 	Balances *communities.BalancesByChain
@@ -257,9 +245,6 @@ func (s *CollectiblesServiceMock) ProcessCommunityTokenAction(message *protobuf.
 type testCommunitiesMessengerConfig struct {
 	testMessengerConfig
 
-	nodeConfig  *params.NodeConfig
-	appSettings *settings.Settings
-
 	password            string
 	walletAddresses     []string
 	mockedBalances      *communities.BalancesByChain
@@ -268,16 +253,16 @@ type testCommunitiesMessengerConfig struct {
 }
 
 func (tcmc *testCommunitiesMessengerConfig) complete() error {
-	err := tcmc.testMessengerConfig.complete()
-	if err != nil {
-		return err
-	}
-
 	if tcmc.nodeConfig == nil {
 		tcmc.nodeConfig = defaultTestCommunitiesMessengerNodeConfig()
 	}
 	if tcmc.appSettings == nil {
 		tcmc.appSettings = defaultTestCommunitiesMessengerSettings()
+	}
+
+	err := tcmc.testMessengerConfig.complete()
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -293,7 +278,6 @@ func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 	networks := json.RawMessage("{}")
 	return &settings.Settings{
 		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
-		AnonMetricsShouldSend:     false,
 		CurrentNetwork:            "mainnet_rpc",
 		DappsAddress:              types.HexToAddress("0x1122334455667788990011223344556677889900"),
 		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
@@ -314,32 +298,30 @@ func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
 }
 
-func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config testCommunitiesMessengerConfig) *Messenger {
+func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMessagingEnvironment, config testCommunitiesMessengerConfig) *Messenger {
 	err := config.complete()
 	s.Require().NoError(err)
 
-	accountsManagerMock := &AccountManagerMock{}
-	accountsManagerMock.AccountsMap = make(map[string]string)
-	for _, walletAddress := range config.walletAddresses {
-		accountsManagerMock.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(config.password)))
-	}
+	ctrl := gomock.NewController(s.T())
+	accountsManagerMock := mock_protocol_accounts_manager.NewMockAccountsManager(ctrl)
+	accountsManagerMock.EXPECT().GetVerifiedWalletAccount(gomock.Any(), gomock.Any()).
+		Return(generator.NewAccount(nil, nil), nil).AnyTimes()
 
 	tokenManagerMock := &TokenManagerMock{
 		Balances: config.mockedBalances,
 	}
 
 	options := []Option{
-		WithAccountManager(accountsManagerMock),
+		WithAccountsManager(accountsManagerMock),
 		WithTokenManager(tokenManagerMock),
 		WithMessageSigner(NewSignerStub()),
 		WithCollectiblesManager(config.collectiblesManager),
 		WithCommunityTokensService(config.collectiblesService),
-		WithAppSettings(*config.appSettings, *config.nodeConfig),
 	}
 
 	config.extraOptions = append(config.extraOptions, options...)
 
-	messenger, err := newTestMessenger(waku, config.testMessengerConfig)
+	messenger, err := newTestMessenger(messagingEnv, config.testMessengerConfig)
 	s.Require().NoError(err)
 
 	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)
@@ -352,9 +334,10 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config tes
 
 	// add wallet account with keypair
 	for _, walletAddress := range config.walletAddresses {
-		kp := accounts.GetProfileKeypairForTest(false, true, false)
+		kp, _, _, err := accounts.GetProfileKeypairForTest(false, true, false)
+		s.Require().NoError(err)
 		kp.Accounts[0].Address = types.HexToAddress(walletAddress)
-		err := messenger.settings.SaveOrUpdateKeypair(kp)
+		err = messenger.settings.SaveOrUpdateKeypair(kp)
 		s.Require().NoError(err)
 	}
 
@@ -364,6 +347,10 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config tes
 	for i := range config.walletAddresses {
 		s.Require().Equal(walletAccounts[i].Type, accounts.AccountTypeGenerated)
 	}
+
+	err = messenger.messaging.Start()
+	s.Require().NoError(err)
+
 	return messenger
 }
 

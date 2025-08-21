@@ -3,8 +3,6 @@ package ext
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
-	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -22,8 +20,8 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -32,121 +30,14 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/verification"
-	"github.com/status-im/status-go/wakuv2"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
-
-const (
-	// defaultRequestTimeout is the default request timeout in seconds
-	defaultRequestTimeout = 10
-)
-
-var (
-	// ErrInvalidMailServerPeer is returned when it fails to parse enode from params.
-	ErrInvalidMailServerPeer = errors.New("invalid mailServerPeer value")
-	// ErrInvalidSymKeyID is returned when it fails to get a symmetric key.
-	ErrInvalidSymKeyID = errors.New("invalid symKeyID value")
-	// ErrInvalidPublicKey is returned when public key can't be extracted
-	// from MailServer's nodeID.
-	ErrInvalidPublicKey = errors.New("can't extract public key")
-	// ErrPFSNotEnabled is returned when an endpoint PFS only is called but
-	// PFS is disabled
-	ErrPFSNotEnabled = errors.New("pfs not enabled")
-)
-
-// -----
-// PAYLOADS
-// -----
-
-// MessagesRequest is a RequestMessages() request payload.
-type MessagesRequest struct {
-	// MailServerPeer is MailServer's enode address.
-	MailServerPeer string `json:"mailServerPeer"`
-
-	// From is a lower bound of time range (optional).
-	// Default is 24 hours back from now.
-	From uint32 `json:"from"`
-
-	// To is a upper bound of time range (optional).
-	// Default is now.
-	To uint32 `json:"to"`
-
-	// Limit determines the number of messages sent by the mail server
-	// for the current paginated request
-	Limit uint32 `json:"limit"`
-
-	// Cursor is used as starting point for paginated requests
-	Cursor string `json:"cursor"`
-
-	// StoreCursor is used as starting point for WAKUV2 paginatedRequests
-	StoreCursor *StoreRequestCursor `json:"storeCursor"`
-
-	// Topic is a regular Whisper topic.
-	// DEPRECATED
-	Topic wakutypes.TopicType `json:"topic"`
-
-	// Topics is a list of Whisper topics.
-	Topics []wakutypes.TopicType `json:"topics"`
-
-	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
-	// It's derived from MailServer password.
-	SymKeyID string `json:"symKeyID"`
-
-	// Timeout is the time to live of the request specified in seconds.
-	// Default is 10 seconds
-	Timeout time.Duration `json:"timeout"`
-
-	// Force ensures that requests will bypass enforced delay.
-	Force bool `json:"force"`
-}
-
-type StoreRequestCursor struct {
-	Digest       []byte  `json:"digest"`
-	ReceivedTime float64 `json:"receivedTime"`
-}
-
-func (r *MessagesRequest) SetDefaults(now time.Time) {
-	// set From and To defaults
-	if r.To == 0 {
-		r.To = uint32(now.UTC().Unix())
-	}
-
-	if r.From == 0 {
-		oneDay := uint32(86400) // -24 hours
-		if r.To < oneDay {
-			r.From = 0
-		} else {
-			r.From = r.To - oneDay
-		}
-	}
-
-	if r.Timeout == 0 {
-		r.Timeout = defaultRequestTimeout
-	}
-}
-
-// MessagesResponse is a response for requestMessages2 method.
-type MessagesResponse struct {
-	// Cursor from the response can be used to retrieve more messages
-	// for the previous request.
-	Cursor string `json:"cursor"`
-
-	// Error indicates that something wrong happened when sending messages
-	// to the requester.
-	Error error `json:"error"`
-}
-
-// -----
-// PUBLIC API
-// -----
 
 // PublicAPI extends whisper public API.
 type PublicAPI struct {
@@ -160,54 +51,6 @@ func NewPublicAPI(s *Service) *PublicAPI {
 		service: s,
 		logger:  logutils.ZapLogger().Named("sshextService"),
 	}
-}
-
-// RetryConfig specifies configuration for retries with timeout and max amount of retries.
-type RetryConfig struct {
-	BaseTimeout time.Duration
-	// StepTimeout defines duration increase per each retry.
-	StepTimeout time.Duration
-	MaxRetries  int
-}
-
-func WaitForExpiredOrCompleted(requestID types.Hash, events chan wakutypes.EnvelopeEvent, timeout time.Duration) (*wakutypes.MailServerResponse, error) {
-	expired := fmt.Errorf("request %x expired", requestID)
-	after := time.NewTimer(timeout)
-	defer after.Stop()
-	for {
-		var ev wakutypes.EnvelopeEvent
-		select {
-		case ev = <-events:
-		case <-after.C:
-			return nil, expired
-		}
-		if ev.Hash != requestID {
-			continue
-		}
-		switch ev.Event {
-		case wakutypes.EventMailServerRequestCompleted:
-			data, ok := ev.Data.(*wakutypes.MailServerResponse)
-			if ok {
-				return data, nil
-			}
-			return nil, errors.New("invalid event data type")
-		case wakutypes.EventMailServerRequestExpired:
-			return nil, expired
-		}
-	}
-}
-
-type Author struct {
-	PublicKey types.HexBytes `json:"publicKey"`
-	Alias     string         `json:"alias"`
-	Identicon string         `json:"identicon"`
-}
-
-type Metadata struct {
-	DedupID      []byte         `json:"dedupId"`
-	EncryptionID types.HexBytes `json:"encryptionId"`
-	MessageID    types.HexBytes `json:"messageId"`
-	Author       Author         `json:"author"`
 }
 
 func (api *PublicAPI) LeaveGroupChat(ctx Context, chatID string, remove bool) (*protocol.MessengerResponse, error) {
@@ -360,12 +203,12 @@ func (api *PublicAPI) DisableInstallation(installationID string) error {
 }
 
 // GetOurInstallations returns all the installations available given an identity
-func (api *PublicAPI) GetOurInstallations() []*multidevice.Installation {
+func (api *PublicAPI) GetOurInstallations() []*messagingtypes.Installation {
 	return api.service.messenger.Installations()
 }
 
 // SetInstallationMetadata sets the metadata for our own installation
-func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multidevice.InstallationMetadata) error {
+func (api *PublicAPI) SetInstallationMetadata(installationID string, data *messagingtypes.InstallationMetadata) error {
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
 }
 
@@ -440,16 +283,6 @@ func (api *PublicAPI) RemovePrivateKey(id types.HexBytes) (*protocol.MessengerRe
 // Sets the community shard for a community and updates all active filters for the community
 func (api *PublicAPI) SetCommunityShard(request *requests.SetCommunityShard) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SetCommunityShard(request)
-}
-
-// Sets the community storenodes for a community
-func (api *PublicAPI) SetCommunityStorenodes(request *requests.SetCommunityStorenodes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SetCommunityStorenodes(request)
-}
-
-// Gets the community storenodes for a community
-func (api *PublicAPI) GetCommunityStorenodes(id types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.GetCommunityStorenodes(id)
 }
 
 // ExportCommunity exports the private key of the community with given ID
@@ -1098,25 +931,6 @@ func (api *PublicAPI) RemainingCapacityForSavedAddresses(ctx context.Context, te
 	return api.service.messenger.RemainingCapacityForSavedAddresses(testnetMode)
 }
 
-// PushNotifications server endpoints
-func (api *PublicAPI) StartPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, true)
-	if err != nil {
-		return err
-	}
-
-	return api.service.messenger.StartPushNotificationsServer()
-}
-
-func (api *PublicAPI) StopPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, false)
-	if err != nil {
-		return err
-	}
-
-	return api.service.messenger.StopPushNotificationsServer()
-}
-
 // PushNotification client endpoints
 
 func (api *PublicAPI) RegisterForPushNotifications(ctx context.Context, deviceToken string, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType) error {
@@ -1262,7 +1076,7 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*c
 
 // Deprecated: RequestCommunityInfoFromMailserverWithShard is deprecated in favor of
 // configurable FetchCommunity.
-func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID string, shard *wakuv2.Shard) (*communities.Community, error) {
+func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID string, shard *messagingtypes.Shard) (*communities.Community, error) {
 	request := &protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
 		Shard:           shard,
@@ -1287,7 +1101,7 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string
 
 // Deprecated: RequestCommunityInfoFromMailserverAsyncWithShard is deprecated in favor of
 // configurable FetchCommunity.
-func (api *PublicAPI) RequestCommunityInfoFromMailserverAsyncWithShard(communityID string, shard *wakuv2.Shard) error {
+func (api *PublicAPI) RequestCommunityInfoFromMailserverAsyncWithShard(communityID string, shard *messagingtypes.Shard) error {
 	request := &protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
 		Shard:           shard,
@@ -1467,12 +1281,8 @@ func (api *PublicAPI) DropPeer(peerID string) error {
 	return api.service.messenger.DropPeer(pID)
 }
 
-func (api *PublicAPI) Peers() wakutypes.PeerStats {
+func (api *PublicAPI) Peers() messagingtypes.PeerStats {
 	return api.service.messenger.Peers()
-}
-
-func (api *PublicAPI) RelayPeersByTopic(topic string) (*wakutypes.PeerList, error) {
-	return api.service.messenger.RelayPeersByTopic(topic)
 }
 
 func (api *PublicAPI) ListenAddresses() ([]multiaddr.Multiaddr, error) {
@@ -1795,7 +1605,7 @@ func (api *PublicAPI) SetMaxLogBackups(request *requests.SetMaxLogBackups) error
 	return api.service.messenger.SetMaxLogBackups(request)
 }
 
-func (api *PublicAPI) LogTest() error {
+func (api *PublicAPI) LogTest() {
 	l1 := logutils.ZapLogger().Named("test1")
 	l2 := l1.Named("test2")
 	l3 := l2.Named("test3")
@@ -1806,15 +1616,7 @@ func (api *PublicAPI) LogTest() error {
 		}
 	}
 
-	return l1.Sync()
-}
-
-func (api *PublicAPI) SetCustomNodes(request *requests.SetCustomNodes) error {
-	return api.service.messenger.SetCustomNodes(request)
-}
-
-func (api *PublicAPI) SaveNewWakuNode(request *requests.SaveNewWakuNode) error {
-	return api.service.messenger.SaveNewWakuNode(request)
+	_ = l1.Sync()
 }
 
 func (api *PublicAPI) SetCustomizationColor(ctx context.Context, request *requests.SetCustomizationColor) error {

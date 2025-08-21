@@ -3,7 +3,7 @@ package wallettypes
 import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 )

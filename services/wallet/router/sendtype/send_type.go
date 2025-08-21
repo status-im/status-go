@@ -50,8 +50,7 @@ func (s SendType) IsCommunityRelatedTransfer() bool {
 func (s SendType) CanUseProcessor(pathProcessorName string) bool {
 	switch s {
 	case Transfer:
-		return pathProcessorName == pathProcessorCommon.ProcessorTransferName ||
-			walletCommon.IsProcessorBridge(pathProcessorName)
+		return pathProcessorName == pathProcessorCommon.ProcessorTransferName
 	case Bridge:
 		return walletCommon.IsProcessorBridge(pathProcessorName)
 	case Swap:
@@ -98,6 +97,8 @@ func (s SendType) ProcessZeroAmountInProcessor(amountIn *big.Int, amountOut *big
 				return false
 			}
 		} else if s.IsCommunityRelatedTransfer() {
+			return true
+		} else if s == ENSSetPubKey {
 			return true
 		} else if s != ENSRelease {
 			return false

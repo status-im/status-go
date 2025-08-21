@@ -11,11 +11,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/accounts-management/generator"
 	communitytokens "github.com/status-im/status-go/contracts/community-tokens"
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
@@ -129,7 +129,7 @@ func (s *CommunityMintTokensProcessor) EstimateGas(params ProcessorInputParams, 
 	return uint64(increasedEstimation), nil
 }
 
-func (s *CommunityMintTokensProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
+func (s *CommunityMintTokensProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, usedNonce uint64, err error) {
 	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce, verifiedAccount)
 }
 

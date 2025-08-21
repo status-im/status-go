@@ -4,9 +4,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 )
 
 // Make sure that Service implements node.Service interface.
@@ -81,11 +81,14 @@ func (s *Service) CanRecover(rpcParams RecoverParams, revealedAddress types.Addr
 }
 
 // Sign is an implementation of `personal_sign` or `web3.personal.sign` API
-func (s *Service) Sign(rpcParams SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
+func (s *Service) Sign(rpcParams SignParams, verifiedAccount *generator.Account) (result types.HexBytes, err error) {
 	var dBytes []byte
 	switch d := rpcParams.Data.(type) {
 	case string:
-		dBytes = []byte(d)
+		dBytes, err = hexutil.Decode(rpcParams.Data.(string))
+		if err != nil {
+			return types.HexBytes{}, err
+		}
 	case []byte:
 		dBytes = d
 	case byte:
@@ -94,7 +97,7 @@ func (s *Service) Sign(rpcParams SignParams, verifiedAccount *account.SelectedEx
 
 	hash := crypto.TextHash(dBytes)
 
-	sig, err := crypto.Sign(hash, verifiedAccount.AccountKey.PrivateKey)
+	sig, err := crypto.Sign(hash, verifiedAccount.PrivateKey())
 	if err != nil {
 		return types.HexBytes{}, err
 	}

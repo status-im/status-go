@@ -40,6 +40,7 @@ func (b *BlockDAO) insertRange(chainID uint64, account common.Address, from, to,
 	if err != nil {
 		return err
 	}
+	defer insert.Close()
 	_, err = insert.Exec(chainID, account, (*bigint.SQLBigInt)(from), (*bigint.SQLBigInt)(to), (*bigint.SQLBigIntBytes)(balance), &nonce)
 	return err
 }
@@ -171,7 +172,7 @@ func deleteAllRanges(creator statementCreator, account common.Address) error {
 	if err != nil {
 		return err
 	}
-
+	defer delete.Close()
 	_, err = delete.Exec(account)
 	return err
 }

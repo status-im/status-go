@@ -5,8 +5,12 @@ import (
 )
 
 var (
-	ErrRestoreAccountInvalidMnemonic    = errors.New("restore-account: no mnemonic or keycard is set")
-	ErrRestoreAccountMnemonicAndKeycard = errors.New("restore-account: both mnemonic and keycard info are set")
+	ErrRestoreRegularAccountKeycardSet      = errors.New("restore-account: keycard details set for regular account")
+	ErrRestoreRegularAccountMnemonicMissing = errors.New("restore-account: mnemonic is not set")
+
+	ErrRestoreKeycardAccountMnemonicSet           = errors.New("restore-account: mnemonic is set for keycard account")
+	ErrRestoreKeycardAccountKecardDetatilsMissing = errors.New("restore-account: keycard details are not set")
+	ErrRestoreKeycardAccountNoWhisperPrivateKey   = errors.New("restore-account: chat private key is not set")
 )
 
 type RestoreAccount struct {
@@ -21,13 +25,27 @@ type RestoreAccount struct {
 	CreateAccount
 }
 
-func (c *RestoreAccount) Validate() error {
-	if len(c.Mnemonic) == 0 && c.Keycard == nil {
-		return ErrRestoreAccountInvalidMnemonic
-	}
+func (c *RestoreAccount) Validate(restoreViaKeycard bool) error {
+	if restoreViaKeycard {
+		if len(c.Mnemonic) > 0 {
+			return ErrRestoreKeycardAccountMnemonicSet
+		}
 
-	if len(c.Mnemonic) > 0 && c.Keycard != nil {
-		return ErrRestoreAccountMnemonicAndKeycard
+		if c.Keycard == nil {
+			return ErrRestoreKeycardAccountKecardDetatilsMissing
+		}
+
+		if c.Keycard.WhisperPrivateKey == "" {
+			return ErrRestoreKeycardAccountNoWhisperPrivateKey
+		}
+	} else {
+		if c.Keycard != nil {
+			return ErrRestoreRegularAccountKeycardSet
+		}
+
+		if len(c.Mnemonic) == 0 {
+			return ErrRestoreRegularAccountMnemonicMissing
+		}
 	}
 
 	return c.CreateAccount.Validate(&CreateAccountValidation{

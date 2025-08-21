@@ -62,6 +62,7 @@ func getCollectibleTraits(creator sqlite.StatementCreator, id thirdparty.Collect
 	if err != nil {
 		return nil, err
 	}
+	defer selectTraits.Close()
 
 	rows, err := selectTraits.Query(
 		id.ContractID.ChainID,
@@ -81,6 +82,7 @@ func upsertCollectibleTraits(creator sqlite.StatementCreator, id thirdparty.Coll
 	if err != nil {
 		return err
 	}
+	defer deleteTraits.Close()
 
 	_, err = deleteTraits.Exec(
 		id.ContractID.ChainID,
@@ -97,6 +99,7 @@ func upsertCollectibleTraits(creator sqlite.StatementCreator, id thirdparty.Coll
 	if err != nil {
 		return err
 	}
+	defer insertTrait.Close()
 
 	for _, t := range traits {
 		_, err = insertTrait.Exec(
@@ -122,6 +125,7 @@ func setCollectiblesData(creator sqlite.StatementCreator, collectibles []thirdpa
 	if err != nil {
 		return err
 	}
+	defer insertCollectible.Close()
 
 	for _, c := range collectibles {
 		_, err = insertCollectible.Exec(
@@ -229,6 +233,7 @@ func (o *CollectibleDataDB) GetIDsNotInDB(ids []thirdparty.CollectibleUniqueID) 
 	if err != nil {
 		return nil, err
 	}
+	defer exists.Close()
 
 	for _, id := range idMap {
 		row := exists.QueryRow(
@@ -258,6 +263,7 @@ func (o *CollectibleDataDB) GetData(ids []thirdparty.CollectibleUniqueID) (map[s
 	if err != nil {
 		return nil, err
 	}
+	defer getData.Close()
 
 	for _, id := range ids {
 		row := getData.QueryRow(
@@ -308,6 +314,7 @@ func (o *CollectibleDataDB) SetCommunityInfo(id thirdparty.CollectibleUniqueID, 
 	if err != nil {
 		return err
 	}
+	defer update.Close()
 
 	_, err = update.Exec(
 		communityInfo.PrivilegesLevel,
@@ -330,6 +337,7 @@ func (o *CollectibleDataDB) GetCommunityInfo(id thirdparty.CollectibleUniqueID) 
 	if err != nil {
 		return nil, err
 	}
+	defer getData.Close()
 
 	row := getData.QueryRow(
 		id.ContractID.ChainID,

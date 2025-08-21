@@ -14,9 +14,9 @@ import (
 
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/eth-node/keystore"
 )
 
 func newValidate() (*validator.Validate, error) {
@@ -45,12 +45,12 @@ func newValidate() (*validator.Validate, error) {
 
 func validateKeys(keys map[string][]byte, password string) error {
 	for _, key := range keys {
-		k, err := keystore.DecryptKey(key, password)
+		k, err := common.DecryptKey(key, password)
 		if err != nil {
 			return err
 		}
 
-		err = generator.ValidateKeystoreExtendedKey(k)
+		_, err = generator.CreateAccountFromKey(k)
 		if err != nil {
 			return err
 		}
@@ -87,7 +87,7 @@ func loadKeys(keys map[string][]byte, keyStorePath string) error {
 	return nil
 }
 
-func validate(s interface{}) error {
+func ValidateStruct(s interface{}) error {
 	v, err := newValidate()
 	if err != nil {
 		return err
@@ -97,7 +97,7 @@ func validate(s interface{}) error {
 }
 
 func validateAndVerifyPassword(s interface{}, senderConfig *SenderConfig) error {
-	err := validate(s)
+	err := ValidateStruct(s)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func validateAndVerifyPassword(s interface{}, senderConfig *SenderConfig) error 
 }
 
 func validateReceiverConfig(s interface{}, receiverConfig *ReceiverConfig) error {
-	err := validate(s)
+	err := ValidateStruct(s)
 	if err != nil {
 		return err
 	}

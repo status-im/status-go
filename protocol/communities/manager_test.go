@@ -16,12 +16,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 	userimages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -62,7 +61,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 	logger, err := zap.NewDevelopment()
 	s.Require().NoError(err)
 
-	m, err := NewManager(key, "", db, nil, logger, nil, ownerVerifier, nil, &TimeSourceStub{}, nil, nil)
+	m, err := NewManager(key, "", db, logger, nil, ownerVerifier, nil, &TimeSourceStub{}, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
@@ -72,7 +71,6 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 		Persistence:   m.GetPersistence(),
 		Messaging:     nil,
 		Identity:      key,
-		Encryptor:     nil,
 		Publisher:     m,
 	}
 	t := NewArchiveManager(amc)
@@ -221,14 +219,11 @@ func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollect
 	tm := &testTokenManager{}
 
 	options := []ManagerOption{
-		WithWalletConfig(&params.WalletConfig{
-			OpenseaAPIKey: security.NewSensitiveString("some-key"),
-		}),
 		WithCollectiblesManager(cm),
 		WithTokenManager(tm),
 	}
 
-	m, err := NewManager(key, "", db, nil, nil, nil, nil, nil, &TimeSourceStub{}, nil, nil, options...)
+	m, err := NewManager(key, "", db, nil, nil, nil, nil, &TimeSourceStub{}, nil, nil, options...)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 

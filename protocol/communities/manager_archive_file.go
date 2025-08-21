@@ -15,12 +15,12 @@ import (
 	"path"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/signal"
 
@@ -36,7 +36,7 @@ type ArchiveFileManager struct {
 	logger      *zap.Logger
 	persistence *Persistence
 	identity    *ecdsa.PrivateKey
-	encryptor   *encryption.Protocol
+	messaging   *messaging.API
 
 	publisher Publisher
 }
@@ -47,7 +47,7 @@ func NewArchiveFileManager(amc *ArchiveManagerConfig) *ArchiveFileManager {
 		logger:        amc.Logger,
 		persistence:   amc.Persistence,
 		identity:      amc.Identity,
-		encryptor:     amc.Encryptor,
+		messaging:     amc.Messaging,
 		publisher:     amc.Publisher,
 	}
 }
@@ -179,12 +179,7 @@ func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBy
 			}
 
 			if encrypt {
-				messageSpec, err := m.encryptor.BuildHashRatchetMessage(communityID, encodedArchive)
-				if err != nil {
-					return archiveIDs, err
-				}
-
-				encodedArchive, err = proto.Marshal(messageSpec.Message)
+				encodedArchive, err = m.messaging.BuildHashRatchetMessage(communityID, encodedArchive)
 				if err != nil {
 					return archiveIDs, err
 				}
@@ -244,11 +239,7 @@ func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBy
 		}
 
 		if encrypt {
-			messageSpec, err := m.encryptor.BuildHashRatchetMessage(communityID, indexBytes)
-			if err != nil {
-				return archiveIDs, err
-			}
-			indexBytes, err = proto.Marshal(messageSpec.Message)
+			indexBytes, err = m.messaging.BuildHashRatchetMessage(communityID, indexBytes)
 			if err != nil {
 				return archiveIDs, err
 			}
@@ -447,25 +438,19 @@ func (m *ArchiveFileManager) ExtractMessagesFromHistoryArchive(communityID types
 
 	err = proto.Unmarshal(data, archive)
 	if err != nil {
-		// The archive data might eb encrypted so we try to decrypt instead first
-		var protocolMessage encryption.ProtocolMessage
-		err := proto.Unmarshal(data, &protocolMessage)
-		if err != nil {
-			m.logger.Error("failed to unmarshal protocol message", zap.Error(err))
-			return nil, err
-		}
-
 		pk, err := crypto.DecompressPubkey(communityID)
 		if err != nil {
 			m.logger.Error("failed to decompress community pubkey", zap.Error(err))
 			return nil, err
 		}
-		decryptedBytes, err := m.encryptor.HandleMessage(m.identity, pk, &protocolMessage, make([]byte, 0))
+
+		decryptedData, err := m.messaging.DecryptMessage(m.identity, pk, data)
 		if err != nil {
 			m.logger.Error("failed to decrypt message archive", zap.Error(err))
 			return nil, err
 		}
-		err = proto.Unmarshal(decryptedBytes.DecryptedMessage, archive)
+
+		err = proto.Unmarshal(decryptedData, archive)
 		if err != nil {
 			m.logger.Error("failed to unmarshal message archive", zap.Error(err))
 			return nil, err
@@ -490,20 +475,18 @@ func (m *ArchiveFileManager) LoadHistoryArchiveIndexFromFile(myKey *ecdsa.Privat
 
 	if len(wakuMessageArchiveIndexProto.Archives) == 0 && len(indexData) > 0 {
 		// This means we're dealing with an encrypted index file, so we have to decrypt it first
-		var protocolMessage encryption.ProtocolMessage
-		err := proto.Unmarshal(indexData, &protocolMessage)
-		if err != nil {
-			return nil, err
-		}
 		pk, err := crypto.DecompressPubkey(communityID)
 		if err != nil {
 			return nil, err
 		}
-		decryptedBytes, err := m.encryptor.HandleMessage(myKey, pk, &protocolMessage, make([]byte, 0))
+
+		decryptedData, err := m.messaging.DecryptMessage(myKey, pk, indexData)
 		if err != nil {
+			m.logger.Error("failed to decrypt message archive", zap.Error(err))
 			return nil, err
 		}
-		err = proto.Unmarshal(decryptedBytes.DecryptedMessage, wakuMessageArchiveIndexProto)
+
+		err = proto.Unmarshal(decryptedData, wakuMessageArchiveIndexProto)
 		if err != nil {
 			return nil, err
 		}

@@ -2,14 +2,11 @@ package main
 
 import (
 	"flag"
-	stdlog "log"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"golang.org/x/crypto/ssh/terminal"
-
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/cmd/status-backend/server"
 	"github.com/status-im/status-go/logutils"
@@ -19,19 +16,21 @@ import (
 )
 
 var (
-	address = flag.String("address", "127.0.0.1:0", "host:port to listen")
-	logger  = log.New("package", "status-go/cmd/status-backend")
+	address      = flag.String("address", "127.0.0.1:0", "host:port to listen")
+	pprofEnabled = flag.Bool("pprof", false, "enable pprof")
+	logger       *zap.Logger
 )
 
 func init() {
 	logSettings := logutils.LogSettings{
-		Enabled:   true,
-		Level:     "INFO",
-		Colorized: terminal.IsTerminal(int(os.Stdin.Fd())),
+		Enabled: true,
+		Level:   "INFO",
 	}
 	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
-		stdlog.Fatalf("failed to initialize log: %v", err)
+		panic(err)
 	}
+
+	logger = logutils.ZapLogger()
 }
 
 func main() {
@@ -44,19 +43,22 @@ func main() {
 	flag.Parse()
 	go handleInterrupts()
 
-	srv := server.NewServer()
+	srv := server.NewServer(
+		logger.Named("server"),
+		server.WithProfiling(*pprofEnabled),
+	)
 	srv.Setup()
 
 	err := srv.Listen(*address)
 	if err != nil {
-		logger.Error("failed to start server", "error", err)
+		logger.Error("failed to start server", zap.Error(err))
 		return
 	}
 
-	log.Info("status-backend started",
-		"address", srv.Address(),
-		"version", version.Version(),
-		"gitCommit", version.GitCommit(),
+	logger.Info("status-backend started",
+		zap.String("address", srv.Address()),
+		zap.String("version", version.Version()),
+		zap.String("gitCommit", version.GitCommit()),
 	)
 	srv.RegisterMobileAPI()
 	srv.Serve()
@@ -70,7 +72,7 @@ func handleInterrupts() {
 	defer signal.Stop(ch)
 
 	receivedSignal := <-ch
-	logger.Info("interrupt signal received", "signal", receivedSignal)
+	logger.Info("interrupt signal received", zap.Stringer("signal", receivedSignal))
 	_ = statusgo.Logout()
 	os.Exit(0)
 }

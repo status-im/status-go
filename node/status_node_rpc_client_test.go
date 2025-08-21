@@ -12,9 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
@@ -69,19 +70,27 @@ func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
 }
 
 func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
-	accountManager := account.NewGethManager(tt.MustCreateTestLogger())
-	statusNode := New(nil, accountManager, tt.MustCreateTestLogger())
-
 	appDB, walletDB, stop, err := setupTestDBs()
 	defer func() {
-		err := stop()
-		if err != nil {
-			statusNode.logger.Error("stopping db", zap.Error(err))
-		}
+		err = stop()
 	}()
 	if err != nil {
 		return nil, err
 	}
+
+	accsDB, err := accounts.NewDB(appDB)
+	if err != nil {
+		return nil, err
+	}
+
+	accountsManager, err := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
+	if err != nil {
+		return nil, err
+	}
+	accountsManager.SetPersistence(accounts.NewAccountsManagerPersistenceAdapter(accsDB))
+
+	statusNode := New(nil, accountsManager, tt.MustCreateTestLogger())
+
 	statusNode.appDB = appDB
 	statusNode.walletDB = walletDB
 
@@ -110,8 +119,19 @@ func createStatusNode() (*StatusNode, func() error, func() error, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	accountManager := account.NewGethManager(tt.MustCreateTestLogger())
-	statusNode := New(nil, accountManager, tt.MustCreateTestLogger())
+
+	accsDB, err := accounts.NewDB(appDB)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	accountsManager, err := accsmanagement.NewAccountsManager(tt.MustCreateTestLogger())
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	accountsManager.SetPersistence(accounts.NewAccountsManagerPersistenceAdapter(accsDB))
+
+	statusNode := New(nil, accountsManager, tt.MustCreateTestLogger())
 	statusNode.SetAppDB(appDB)
 	statusNode.SetWalletDB(walletDB)
 
@@ -169,7 +189,7 @@ func TestNodeRPCPrivateClientCallPrivateService(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	result, err := statusNode.CallPrivateRPC(`{"jsonrpc": "2.0", "id": 1, "method": "waku_info"}`)
+	result, err := statusNode.CallPrivateRPC(`{"jsonrpc": "2.0", "id": 1, "method": "wakuext_echo", "params": ["hello"]}`)
 	require.NoError(t, err)
 
 	// the call is successful

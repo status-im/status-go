@@ -2,10 +2,13 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"reflect"
 	"time"
 
+	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/params"
 )
@@ -38,10 +41,8 @@ func ArrayContainsElement[T comparable](el T, arr []T) bool {
 	return false
 }
 
-func IsSingleChainOperation(fromChains []*params.Network, toChains []*params.Network) bool {
-	return len(fromChains) == 1 &&
-		len(toChains) == 1 &&
-		fromChains[0].ChainID == toChains[0].ChainID
+func IsSingleChainOperation(fromChain *params.Network, toChain *params.Network) bool {
+	return fromChain.ChainID == toChain.ChainID
 }
 
 // CopyMapGeneric creates a copy of any map, if the deepCopyValue function is provided, it will be used to copy values.
@@ -87,17 +88,35 @@ func GetBlockCreationTimeForChain(chainID uint64) time.Duration {
 
 // Special functions to hardcode the nature of some special chains (eg. Status Network), where we cannot deduce EIP-1559 compatibility in a generic way
 
-// IsGaslessChainAndEIP1559Compatible returns true if the chain is gasless and EIP-1559 compatible
-func IsGaslessChainAndEIP1559Compatible(chainID uint64) bool {
+// IsPartiallyOrFullyGaslessChain returns true if the chain is fully or partially (no base or no priority fee) gasless
+func IsPartiallyOrFullyGaslessChain(chainID uint64) bool {
 	return chainID == StatusNetworkSepolia
 }
 
-// HasNoBaseFee returns true if the chain has no base fee (eg. Status Network is (will be fully) gasless chain, but EIP-1559 compatible, but at the moment its base fee is 0)
-func HasNoBaseFee(chainID uint64) bool {
-	return chainID == StatusNetworkSepolia
+// IsPartiallyOrFullyGaslessChainEIP1559Compatible throws an error if the chain is not partially or fully gasless, if it is, returns true if the chain is EIP-1559 compatible
+func IsPartiallyOrFullyGaslessChainEIP1559Compatible(chainID uint64) (bool, error) {
+	if !IsPartiallyOrFullyGaslessChain(chainID) {
+		return false, fmt.Errorf("chain %d is not supposed to be gasless", chainID) // for non-gasless chains, we should not use this function
+	}
+	return chainID == StatusNetworkSepolia, nil
 }
 
-// HasNoPriorityFee returns true if the chain has no priority fee (eg. Status Network is (will be fully) gasless chain, but EIP-1559 compatible, but at the moment it has priority fee greater than 0)
-func HasNoPriorityFee(chainID uint64) bool {
-	return false // At this moment Status Network has priority fee, but it will be 0 after the upgrade
+func ToCallArg(msg ethereum.CallMsg) interface{} {
+	arg := map[string]interface{}{
+		"from": msg.From,
+		"to":   msg.To,
+	}
+	if len(msg.Data) > 0 {
+		arg["data"] = hexutil.Bytes(msg.Data)
+	}
+	if msg.Value != nil {
+		arg["value"] = (*hexutil.Big)(msg.Value)
+	}
+	if msg.Gas != 0 {
+		arg["gas"] = hexutil.Uint64(msg.Gas)
+	}
+	if msg.GasPrice != nil {
+		arg["gasPrice"] = (*hexutil.Big)(msg.GasPrice)
+	}
+	return arg
 }

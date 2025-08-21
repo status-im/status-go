@@ -5,17 +5,17 @@ import (
 	"reflect"
 	"time"
 
-	accountJson "github.com/status-im/status-go/account/json"
-	"github.com/status-im/status-go/eth-node/types"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/crypto/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type ValueHandler func(interface{}) (interface{}, error)
 type ValueCastHandler func(interface{}) (interface{}, error)
-type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*common.RawMessage, *protobuf.SyncSetting, error)
-type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*common.RawMessage, *protobuf.SyncSetting, error)
+type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error)
+type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error)
 type SyncSettingProtobufToValue func(setting *protobuf.SyncSetting) interface{}
 
 // SyncProtobufFactory represents a collection of functionality to generate and parse *protobuf.SyncSetting
@@ -125,7 +125,6 @@ func (s SettingField) Equals(other SettingField) bool {
 type Settings struct {
 	// required
 	Address                   types.Address    `json:"address"`
-	AnonMetricsShouldSend     bool             `json:"anon-metrics/should-send?,omitempty"`
 	ChaosMode                 bool             `json:"chaos-mode?,omitempty"`
 	Currency                  string           `json:"currency,omitempty"`
 	CurrentNetwork            string           `json:"networks/current-network"`
@@ -176,8 +175,6 @@ type Settings struct {
 	PreferredName  *string `json:"preferred-name,omitempty"`
 	PreviewPrivacy bool    `json:"preview-privacy?"`
 	PublicKey      string  `json:"public-key"`
-	// PushNotificationsServerEnabled indicates whether we should be running a push notification server
-	PushNotificationsServerEnabled bool `json:"push-notifications-server-enabled?,omitempty"`
 	// PushNotificationsFromContactsOnly indicates whether we should only receive push notifications from contacts
 	PushNotificationsFromContactsOnly bool `json:"push-notifications-from-contacts-only?,omitempty"`
 	// PushNotificationsBlockMentions indicates whether we should receive notifications for mentions
@@ -212,11 +209,10 @@ type Settings struct {
 	GifRecents                          *json.RawMessage              `json:"gifs/recent-gifs"`
 	GifFavorites                        *json.RawMessage              `json:"gifs/favorite-gifs"`
 	OpenseaEnabled                      bool                          `json:"opensea-enabled?,omitempty"`
-	TelemetryServerURL                  string                        `json:"telemetry-server-url,omitempty"`
-	TelemetrySendPeriodMs               int                           `json:"telemetry-send-period-ms,omitempty"`
 	LastBackup                          uint64                        `json:"last-backup,omitempty"`
 	BackupEnabled                       bool                          `json:"backup-enabled?,omitempty"`
 	BackupFetched                       bool                          `json:"backup-fetched?,omitempty"`
+	BackupPath                          string                        `json:"backup-path,omitempty"`
 	AutoMessageEnabled                  bool                          `json:"auto-message-enabled?,omitempty"`
 	GifAPIKey                           string                        `json:"gifs/api-key"`
 	TestNetworksEnabled                 bool                          `json:"test-networks-enabled?,omitempty"`
@@ -238,7 +234,7 @@ func (s Settings) MarshalJSON() ([]byte, error) {
 	// when marshaling JSON
 	type Alias Settings
 
-	ext, err := accountJson.ExtendStructWithPubKeyData(s.PublicKey, Alias(s))
+	ext, err := accscommon.ExtendStructWithPubKeyData(s.PublicKey, Alias(s))
 	if err != nil {
 		return nil, err
 	}

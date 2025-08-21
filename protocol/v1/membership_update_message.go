@@ -12,8 +12,8 @@ import (
 	"github.com/pkg/errors"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 

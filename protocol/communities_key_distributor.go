@@ -4,16 +4,16 @@ import (
 	"context"
 	"crypto/ecdsa"
 
+	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/wakuv2"
 )
 
 type CommunitiesKeyDistributorImpl struct {
-	sender    *common.MessageSender
-	encryptor *encryption.Protocol
+	messaging *messaging.API
 }
 
 func (ckd *CommunitiesKeyDistributorImpl) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
@@ -51,8 +51,7 @@ func (ckd *CommunitiesKeyDistributorImpl) generateKey(community *communities.Com
 	if keyAction.ActionType != communities.EncryptionKeyAdd {
 		return nil
 	}
-	_, err := ckd.encryptor.GenerateHashRatchetKey(hashRatchetGroupID)
-	return err
+	return ckd.messaging.GenerateHashRatchetKey(hashRatchetGroupID)
 }
 
 func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.Community, hashRatchetGroupID []byte, keyAction *communities.EncryptionKeyAction) error {
@@ -66,19 +65,19 @@ func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.C
 	switch keyAction.ActionType {
 	case communities.EncryptionKeyAdd:
 		// key must be already generated
-		err := ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, common.KeyExMsgReuse)
+		err := ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, messagingtypes.KeyExMsgReuse)
 		if err != nil {
 			return err
 		}
 
 	case communities.EncryptionKeyRekey:
-		err := ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, common.KeyExMsgRekey)
+		err := ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, messagingtypes.KeyExMsgRekey)
 		if err != nil {
 			return err
 		}
 
 	case communities.EncryptionKeySendToMembers:
-		err := ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, common.KeyExMsgReuse)
+		err := ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, messagingtypes.KeyExMsgReuse)
 		if err != nil {
 			return err
 		}
@@ -87,8 +86,8 @@ func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.C
 	return nil
 }
 
-func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *communities.Community, hashRatchetGroupID []byte, pubkeys []*ecdsa.PublicKey, msgType common.CommKeyExMsgType) error {
-	rawMessage := common.RawMessage{
+func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *communities.Community, hashRatchetGroupID []byte, pubkeys []*ecdsa.PublicKey, msgType messagingtypes.CommKeyExMsgType) error {
+	rawMessage := messagingtypes.RawMessage{
 		Sender:                community.PrivateKey(),
 		SkipEncryptionLayer:   false,
 		CommunityID:           community.ID(),
@@ -98,7 +97,7 @@ func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *comm
 		HashRatchetGroupID:    hashRatchetGroupID,
 		PubsubTopic:           community.PubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()),
 	}
-	_, err := ckd.sender.SendCommunityMessage(context.Background(), &rawMessage)
+	_, err := ckd.messaging.SendCommunityMessage(context.Background(), &rawMessage)
 
 	if err != nil {
 		return err

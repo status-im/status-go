@@ -34,7 +34,7 @@ func TestFetchHistoryMarketData(t *testing.T) {
 		baseURL:    srv.URL,
 	}
 
-	received, err := geckoClient.FetchHistoryMarketData(context.Background(), "status", "usd")
+	received, err := geckoClient.FetchHistoryMarketData(context.Background(), "status", "usd", "30")
 	require.NoError(t, err)
 	require.True(t, reflect.DeepEqual(expectedData, received))
 }
@@ -48,7 +48,7 @@ func TestErrorWhenFetchingHistoryMarketData(t *testing.T) {
 		baseURL:    srv.URL,
 	}
 
-	received, err := geckoClient.FetchHistoryMarketData(context.Background(), "status", "usd")
+	received, err := geckoClient.FetchHistoryMarketData(context.Background(), "status", "usd", "30")
 	require.Error(t, err)
 	require.Len(t, received.Prices, 0)
 }

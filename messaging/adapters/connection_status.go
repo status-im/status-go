@@ -3,7 +3,7 @@ package adapters
 import (
 	"github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/messaging/utils"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
 type ConnectionStatusSubscription struct {

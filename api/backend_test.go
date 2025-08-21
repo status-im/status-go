@@ -4,14 +4,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -24,11 +21,16 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 
-	"github.com/status-im/status-go/api/common"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
+	accscommon "github.com/status-im/status-go/accounts-management/common"
+	accsmanagementcommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/accounts-management/keystore"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -41,32 +43,11 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/walletdatabase"
-)
-
-var (
-	networks     = json.RawMessage("{}")
-	testSettings = settings.Settings{
-		Address:           types.HexToAddress("0xeC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
-		DisplayName:       "UserDisplayName",
-		CurrentNetwork:    "mainnet_rpc",
-		DappsAddress:      types.HexToAddress("0xe1300f99fDF7346986CbC766903245087394ecd0"),
-		EIP1581Address:    types.HexToAddress("0xe1DDDE9235a541d1344550d969715CF43982de9f"),
-		InstallationID:    "d3efcff6-cffa-560e-a547-21d3858cbc51",
-		KeyUID:            "0x4e8129f3edfc004875be17bf468a784098a9f69b53c095be1f52deff286935ab",
-		LatestDerivedPath: 0,
-		Name:              "Jittery Cornflowerblue Kingbird",
-		Networks:          &networks,
-		PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
-		PreviewPrivacy:    false,
-		PublicKey:         "0x04211fe0f69772ecf7eb0b5bfc7678672508a9fb01f2d699096f0d59ef7fe1a0cb1e648a80190db1c0f5f088872444d846f2956d0bd84069f3f9f69335af852ac0",
-		SigningPhrase:     "yurt joey vibe",
-		WalletRootAddress: types.HexToAddress("0xeB591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}
 )
 
 func setupTestDB() (*sql.DB, func() error, error) {
@@ -78,7 +59,7 @@ func setupTestWalletDB() (*sql.DB, func() error, error) {
 }
 
 func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
-	tmpfile, err := ioutil.TempFile("", "tests")
+	tmpfile, err := os.CreateTemp("", "tests")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -121,6 +102,12 @@ func setupGethStatusBackend() (*GethStatusBackend, func() error, func() error, f
 	return backend, stop1, stop2, stop3, err
 }
 
+func handleError(t *testing.T, err error) {
+	if err != nil {
+		t.Logf("deferred function error: '%s'", err)
+	}
+}
+
 func TestBackendStartNodeConcurrently(t *testing.T) {
 	utils.Init()
 
@@ -147,7 +134,7 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
+
 	count := 2
 	resultCh := make(chan error)
 
@@ -202,8 +189,8 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	count := 3
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
+	const count = 3
+
 	require.NoError(t, backend.StartNode(config))
 	defer func() {
 		require.NoError(t, backend.StopNode())
@@ -221,8 +208,6 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 
 	wg.Wait()
 }
-
-// TODO(adam): add concurrent tests for ResetChainData()
 
 func TestBackendGettersConcurrently(t *testing.T) {
 	utils.Init()
@@ -250,7 +235,7 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
+
 	err = backend.StartNode(config)
 	require.NoError(t, err)
 	defer func() {
@@ -267,7 +252,7 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		assert.NotNil(t, backend.AccountManager())
+		assert.NotNil(t, backend.AccountsManager())
 		wg.Done()
 	}()
 
@@ -357,8 +342,6 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
-	count := 3
 
 	err = backend.StartNode(config)
 	require.NoError(t, err)
@@ -368,6 +351,7 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 
 	var wg sync.WaitGroup
 
+	const count = 3
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(idx int) {
@@ -453,7 +437,7 @@ func TestBlockedRPCMethods(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
+
 	err = backend.StartNode(config)
 	require.NoError(t, err)
 	defer func() { require.NoError(t, backend.StopNode()) }()
@@ -513,13 +497,6 @@ func TestStartStopMultipleTimes(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
-	config.NoDiscovery = false
-	// doesn't have to be running. just any valid enode to bypass validation.
-	config.ClusterConfig.BootNodes = []string{
-		"enode://e8a7c03b58911e98bbd66accb2a55d57683f35b23bf9dfca89e5e244eb5cc3f25018b4112db507faca34fb69ffb44b362f79eda97a669a8df29c72e654416784@0.0.0.0:30404",
-	}
-	require.NoError(t, err)
 	require.NoError(t, backend.StartNode(config))
 	require.NoError(t, backend.StopNode())
 	require.NoError(t, backend.StartNode(config))
@@ -552,7 +529,7 @@ func TestHashTypedData(t *testing.T) {
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
+
 	err = backend.StartNode(config)
 	require.NoError(t, err)
 	defer func() {
@@ -597,257 +574,211 @@ func TestHashTypedData(t *testing.T) {
 func TestBackendGetVerifiedAccount(t *testing.T) {
 	utils.Init()
 
-	password := "test"
-	backend, defers, err := setupWalletTest(t, password)
+	testContext := setupTestContext(t, testPassword, true, true, false)
+
+	err := testContext.backend.StartNode(testContext.config)
 	require.NoError(t, err)
-	defer defers()
+
+	defer func() {
+		require.NoError(t, testContext.backend.StopNode())
+	}()
 
 	t.Run("AccountDoesntExist", func(t *testing.T) {
 		pkey, err := gethcrypto.GenerateKey()
 		require.NoError(t, err)
 		address := gethcrypto.PubkeyToAddress(pkey.PublicKey)
-		key, err := backend.getVerifiedWalletAccount(address.String(), password)
-		require.EqualError(t, err, wallettypes.ErrAccountDoesntExist.Error())
+		key, err := testContext.backend.getVerifiedWalletAccount(address.String(), testPassword)
+		require.EqualError(t, err, accsmanagement.ErrAccountDoesNotExist.Error())
 		require.Nil(t, key)
 	})
 
 	t.Run("PasswordDoesntMatch", func(t *testing.T) {
-		pkey, err := crypto.GenerateKey()
+		pkey, err := gethcrypto.GenerateKey()
 		require.NoError(t, err)
-		address := crypto.PubkeyToAddress(pkey.PublicKey)
-		keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&pkey.PublicKey))
-		keyUID := types.EncodeHex(keyUIDHex[:])
+		privateKeyHex := types.EncodeHex(gethcrypto.FromECDSA(pkey))
+		address := gethcrypto.PubkeyToAddress(pkey.PublicKey)
 
-		db, err := accounts.NewDB(backend.appDB)
+		_, err = testContext.backend.AccountsManager().CreateKeypairFromPrivateKeyAndStore(privateKeyHex, testPassword, "private key keypair", &accsmanagementtypes.AccountCreationDetails{
+			Path: accsmanagementcommon.PathMaster,
+		}, 0)
+		require.NoError(t, err)
 
-		require.NoError(t, err)
-		_, err = backend.AccountManager().ImportAccount(pkey, password)
-		require.NoError(t, err)
-		require.NoError(t, db.SaveOrUpdateKeypair(&accounts.Keypair{
-			KeyUID: keyUID,
-			Name:   "private key keypair",
-			Type:   accounts.KeypairTypeKey,
-			Accounts: []*accounts.Account{
-				&accounts.Account{
-					Address: address,
-					KeyUID:  keyUID,
-				},
-			},
-		}))
-		key, err := backend.getVerifiedWalletAccount(address.String(), "wrong-password")
-		require.EqualError(t, err, "could not decrypt key with given password")
+		key, err := testContext.backend.getVerifiedWalletAccount(address.String(), "wrong-password")
+		require.EqualError(t, err, keystore.ErrDecrypt.Error())
 		require.Nil(t, key)
 	})
 
-	t.Run("PartialAccount", func(t *testing.T) {
+	t.Run("PartialAccount", func(t *testing.T) { // This is mobile app specific test and can be removed
 		// Create a derived wallet account without storing the keys
-		db, err := accounts.NewDB(backend.appDB)
+		db, err := accounts.NewDB(testContext.backend.appDB)
 		require.NoError(t, err)
-		newPath := "m/0"
+
+		err = db.CreateSettings(testContext.settings, *testContext.config)
+		require.NoError(t, err)
+
 		walletRootAddress, err := db.GetWalletRootAddress()
 		require.NoError(t, err)
 
-		walletInfo, err := backend.AccountManager().AccountsGenerator().LoadAccount(walletRootAddress.String(), password)
+		// Store keystore file for the wallet root address
+		masterAcc, derivedAccs, err := testContext.backend.AccountsManager().StoreKeystoreFilesForMnemonic(testContext.mnemonic, testPassword,
+			[]string{accscommon.PathWalletRoot})
 		require.NoError(t, err)
-		derivedInfos, err := backend.AccountManager().AccountsGenerator().DeriveAddresses(walletInfo.ID, []string{newPath})
-		require.NoError(t, err)
-		derivedInfo := derivedInfos[newPath]
 
-		keypair := &accounts.Keypair{
-			KeyUID: walletInfo.KeyUID,
-			Name:   "profile keypair",
-			Type:   accounts.KeypairTypeProfile,
-			Accounts: []*accounts.Account{
-				&accounts.Account{
-					Address:   types.HexToAddress(derivedInfo.Address),
-					KeyUID:    walletInfo.KeyUID,
-					Type:      accounts.AccountTypeGenerated,
-					PublicKey: types.Hex2Bytes(derivedInfo.PublicKey),
-					Path:      newPath,
-					Wallet:    false,
-					Name:      "PartialAccount",
-				},
+		walletRootGeneratedAccount := derivedAccs[accscommon.PathWalletRoot]
+		require.Equal(t, walletRootAddress, walletRootGeneratedAccount.Address())
+
+		// check the number of wallet addresses in the db
+		walletAddresses, err := db.GetWalletAddresses()
+		require.NoError(t, err)
+		require.Equal(t, 2, len(walletAddresses)) // should be 1, but because of the tests `Run` before this one it's 2
+
+		// Create a new wallet account and store it to db only, without storing the keystore file
+		derivedWalletAcc1, err := generator.DeriveChildFromAccount(masterAcc, accscommon.CustomWalletPath1)
+		require.NoError(t, err)
+
+		err = db.SaveOrUpdateAccounts([]*accounts.Account{
+			{
+				Address: derivedWalletAcc1.Address(),
+				KeyUID:  masterAcc.KeyUID(),
+				Path:    accscommon.CustomWalletPath1,
 			},
-		}
-		require.NoError(t, db.SaveOrUpdateKeypair(keypair))
-
-		// With partial account we need to dynamically generate private key
-		key, err := backend.getVerifiedWalletAccount(keypair.Accounts[0].Address.Hex(), password)
+		}, false)
 		require.NoError(t, err)
-		require.Equal(t, keypair.Accounts[0].Address, key.Address)
+
+		// check the number of wallet addresses in the db, to ensure that the account was saved
+		walletAddresses, err = db.GetWalletAddresses()
+		require.NoError(t, err)
+		require.Equal(t, 3, len(walletAddresses)) // should be 2, but because of the tests `Run` before this one it's 3
+
+		// try to load the account, it should fail because the account is not in the keystore, just in the db
+		loadedWalletAcc1, err := testContext.backend.AccountsManager().LoadAccount(derivedWalletAcc1.Address(), testPassword)
+		require.Error(t, err)
+		// Check if the error contains the expected message (new structured error format includes context)
+		require.Contains(t, err.Error(), "keystore file is missing")
+		require.Nil(t, loadedWalletAcc1)
+
+		// try to get verified wallet account, it should generate a keystore for the wallet account from the wallet root address
+		verifiedWalletAcc1, err := testContext.backend.AccountsManager().GetVerifiedWalletAccount(derivedWalletAcc1.Address(),
+			testPassword)
+		require.NoError(t, err)
+
+		loadedWalletAcc1, err = testContext.backend.AccountsManager().LoadAccount(derivedWalletAcc1.Address(), testPassword)
+		require.NoError(t, err)
+
+		// derive, verified and loaded wallet account should be the same
+		require.Equal(t, derivedWalletAcc1.Address(), verifiedWalletAcc1.Address())
+		require.Equal(t, derivedWalletAcc1.Address(), loadedWalletAcc1.Address())
 	})
 
 	t.Run("Success", func(t *testing.T) {
 		pkey, err := crypto.GenerateKey()
 		require.NoError(t, err)
+		privateKeyHex := types.EncodeHex(crypto.FromECDSA(pkey))
 		address := crypto.PubkeyToAddress(pkey.PublicKey)
 		keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&pkey.PublicKey))
 		keyUID := types.EncodeHex(keyUIDHex[:])
 
-		db, err := accounts.NewDB(backend.appDB)
+		db, err := accounts.NewDB(testContext.backend.appDB)
 		require.NoError(t, err)
-		defer db.Close()
-		_, err = backend.AccountManager().ImportAccount(pkey, password)
+		defer func() {
+			handleError(t, db.Close())
+		}()
+
+		keypair, err := testContext.backend.AccountsManager().CreateKeypairFromPrivateKeyAndStore(privateKeyHex, testPassword,
+			"private key keypair", &accsmanagementtypes.AccountCreationDetails{
+				Path: accsmanagementcommon.PathMaster,
+			}, 0)
 		require.NoError(t, err)
-		require.NoError(t, db.SaveOrUpdateKeypair(&accounts.Keypair{
-			KeyUID: keyUID,
-			Name:   "private key keypair",
-			Type:   accounts.KeypairTypeKey,
-			Accounts: []*accounts.Account{
-				&accounts.Account{
-					Address: address,
-					KeyUID:  keyUID,
-				},
-			},
-		}))
-		key, err := backend.getVerifiedWalletAccount(address.String(), password)
+
+		require.Equal(t, keypair.KeyUID, keyUID)
+		require.Len(t, keypair.Accounts, 1)
+		require.Equal(t, keypair.Accounts[0].Address, address)
+
+		acc, err := testContext.backend.getVerifiedWalletAccount(address.String(), testPassword)
 		require.NoError(t, err)
-		require.Equal(t, address, key.Address)
+		require.Equal(t, address, acc.Address())
 	})
 }
 
 func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 	utils.Init()
 
-	b := NewGethStatusBackend(tt.MustCreateTestLogger())
-
-	chatKey, err := gethcrypto.GenerateKey()
-	require.NoError(t, err)
-	walletKey, err := gethcrypto.GenerateKey()
-	require.NoError(t, err)
-	keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&chatKey.PublicKey))
-	keyUID := types.EncodeHex(keyUIDHex[:])
-	main := multiaccounts.Account{
-		KeyUID: keyUID,
-	}
-
-	tmpdir := t.TempDir()
+	testContext := setupTestContext(t, testPassword, false, false, false)
 
 	json := `{
 		"NetworkId": 3,
-		"DataDir": "` + tmpdir + `",
-		"KeyStoreDir": "` + tmpdir + `",
-		"KeycardPairingDataFile": "` + path.Join(tmpdir, "keycard/pairings.json") + `",
+		"DataDir": "` + testContext.config.DataDir + `",
+		"KeycardPairingDataFile": "` + path.Join(testContext.config.DataDir, "keycard/pairings.json") + `",
 		"NoDiscovery": true,
 		"TorrentConfig": {
 			"Port": 9025,
 			"Enabled": false,
-			"DataDir": "` + tmpdir + `/archivedata",
-			"TorrentDir": "` + tmpdir + `/torrents"
+			"DataDir": "` + testContext.config.DataDir + `/archivedata",
+			"TorrentDir": "` + testContext.config.DataDir + `/torrents"
 		},
 		"RuntimeLogLevel": "INFO",
 		"LogLevel": "DEBUG"
 	}`
 
-	conf, err := params.NewConfigFromJSON(json)
+	newConf, err := params.NewConfigFromJSON(json)
 	require.NoError(t, err)
-	require.Equal(t, "INFO", conf.RuntimeLogLevel)
-	keyhex := hex.EncodeToString(gethcrypto.FromECDSA(chatKey))
+	require.Equal(t, "INFO", newConf.RuntimeLogLevel)
 
-	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
-	b.UpdateRootDataDir(conf.DataDir)
-	require.NoError(t, b.OpenAccounts())
-	require.NotNil(t, b.statusNode.HTTPServer())
+	require.NoError(t, testContext.backend.OpenAccounts())
+	require.NotNil(t, testContext.backend.statusNode.HTTPServer())
 
-	address := crypto.PubkeyToAddress(walletKey.PublicKey)
+	err = testContext.backend.ensureDBsOpened(*testContext.multiAcc, testPassword)
+	require.NoError(t, err)
 
-	settings := testSettings
-	settings.KeyUID = keyUID
-	settings.Address = crypto.PubkeyToAddress(walletKey.PublicKey)
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.DataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
+	}
 
-	chatPubKey := crypto.FromECDSAPub(&chatKey.PublicKey)
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf,
-		[]*accounts.Account{
-			{Address: address, KeyUID: keyUID, Wallet: true},
-			{Address: crypto.PubkeyToAddress(chatKey.PublicKey), KeyUID: keyUID, Chat: true, PublicKey: chatPubKey}}, keyhex))
-	require.NoError(t, b.Logout())
-	require.NoError(t, b.StopNode())
+	_, err = testContext.backend.StartNodeWithChatKeyOrMnemonic(
+		request,
+		testContext.mnemonic,
+		nil,
+		false,
+		false,
+	)
+	require.NoError(t, err)
 
-	require.NoError(t, b.StartNodeWithKey(main, "test-pass", keyhex, conf))
+	require.NoError(t, testContext.backend.Logout())
+	require.NoError(t, testContext.backend.StopNode())
+
+	chatPrivKey := strings.TrimPrefix(testContext.chatPrivateKey, "0x")
+	require.NoError(t, testContext.backend.StartNodeWithKey(*testContext.multiAcc, testPassword, chatPrivKey, newConf))
+
 	defer func() {
-		assert.NoError(t, b.Logout())
-		assert.NoError(t, b.StopNode())
+		assert.NoError(t, testContext.backend.Logout())
+		assert.NoError(t, testContext.backend.StopNode())
 	}()
 
-	c, err := b.GetNodeConfig()
+	c, err := testContext.backend.GetNodeConfig()
 	require.NoError(t, err)
 	require.Equal(t, "", c.RuntimeLogLevel)
 	require.Equal(t, "DEBUG", c.LogLevel)
 }
 
-func TestLoginWithKey(t *testing.T) {
-	utils.Init()
-
-	b := NewGethStatusBackend(tt.MustCreateTestLogger())
-
-	chatKey, err := gethcrypto.GenerateKey()
-	require.NoError(t, err)
-	walletKey, err := gethcrypto.GenerateKey()
-	require.NoError(t, err)
-	keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&chatKey.PublicKey))
-	keyUID := types.EncodeHex(keyUIDHex[:])
-	main := multiaccounts.Account{
-		KeyUID: keyUID,
-	}
-	tmpdir := t.TempDir()
-	conf, err := params.NewNodeConfig(tmpdir, 1777)
-	require.NoError(t, err)
-	keyhex := hex.EncodeToString(gethcrypto.FromECDSA(chatKey))
-
-	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
-	b.UpdateRootDataDir(conf.DataDir)
-	require.NoError(t, b.OpenAccounts())
-	require.NotNil(t, b.statusNode.HTTPServer())
-
-	address := crypto.PubkeyToAddress(walletKey.PublicKey)
-
-	settings := testSettings
-	settings.KeyUID = keyUID
-	settings.Address = crypto.PubkeyToAddress(walletKey.PublicKey)
-
-	chatPubKey := crypto.FromECDSAPub(&chatKey.PublicKey)
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf,
-		[]*accounts.Account{
-			{Address: address, KeyUID: keyUID, Wallet: true},
-			{Address: crypto.PubkeyToAddress(chatKey.PublicKey), KeyUID: keyUID, Chat: true, PublicKey: chatPubKey}}, keyhex))
-	require.NoError(t, b.Logout())
-	require.NoError(t, b.StopNode())
-
-	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
-	b.UpdateRootDataDir(conf.DataDir)
-	require.NoError(t, b.OpenAccounts())
-
-	require.NoError(t, b.StartNodeWithKey(main, "test-pass", keyhex, conf))
-	defer func() {
-		assert.NoError(t, b.Logout())
-		assert.NoError(t, b.StopNode())
-	}()
-	extkey, err := b.accountManager.SelectedChatAccount()
-	require.NoError(t, err)
-	require.Equal(t, crypto.PubkeyToAddress(chatKey.PublicKey), extkey.Address)
-
-	activeAccount, err := b.GetActiveAccount()
-	require.NoError(t, err)
-	require.NotNil(t, activeAccount.ColorHash)
-}
-
 func TestLoginAccount(t *testing.T) {
 	utils.Init()
-	password := "some-password"
-	tmpdir := t.TempDir()
-	nameserver := "8.8.8.8"
 
-	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+	testContext := setupTestContext(t, testPassword, false, false, false)
+
+	nameserver := "8.8.8.8"
 
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
-		Password:           password,
-		RootDataDir:        tmpdir,
-		LogFilePath:        tmpdir + "/log",
+		Password:           testPassword,
+		RootDataDir:        testContext.config.DataDir,
+		LogFilePath:        testContext.config.DataDir + "/log",
 		WakuV2Nameserver:   &nameserver,
 		WakuV2Fleet:        "status.staging",
 	}
+
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
 		if strings.Contains(string(data), signal.EventLoggedIn) {
@@ -865,11 +796,11 @@ func TestLoginAccount(t *testing.T) {
 		}
 	}
 
-	acc, err := b.CreateAccountAndLogin(createAccountRequest)
+	acc, err := testContext.backend.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
-	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
+	require.Equal(t, nameserver, testContext.backend.config.WakuV2Config.Nameserver)
 
-	accountsDB, err := b.accountsDB()
+	accountsDB, err := testContext.backend.accountsDB()
 	require.NoError(t, err)
 	backupFecthed, err := accountsDB.BackupFetched()
 	require.NoError(t, err)
@@ -878,10 +809,12 @@ func TestLoginAccount(t *testing.T) {
 	require.True(t, acc.HasAcceptedTerms)
 
 	waitForLogin(c)
-	require.NoError(t, b.Logout())
-	require.NoError(t, b.StopNode())
+	require.NoError(t, testContext.backend.Logout())
+	require.NoError(t, testContext.backend.StopNode())
 
-	accounts, err := b.GetAccounts()
+	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
+
+	accounts, err := testContext.backend.GetAccounts()
 	require.NoError(t, err)
 	require.Len(t, accounts, 1)
 
@@ -890,290 +823,92 @@ func TestLoginAccount(t *testing.T) {
 
 	loginAccountRequest := &requests.Login{
 		KeyUID:           accounts[0].KeyUID,
-		Password:         password,
+		Password:         testPassword,
 		WakuV2Nameserver: nameserver,
 	}
-	err = b.LoginAccount(loginAccountRequest)
+	err = testContext.backend.LoginAccount(loginAccountRequest)
 	require.NoError(t, err)
 	waitForLogin(c)
-
-	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
+	require.Equal(t, nameserver, testContext.backend.config.WakuV2Config.Nameserver)
 }
 
 func TestVerifyDatabasePassword(t *testing.T) {
 	utils.Init()
 
-	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+	testContext := setupTestContext(t, testPassword, false, false, false)
 
-	chatKey, err := gethcrypto.GenerateKey()
-	require.NoError(t, err)
-	walletKey, err := gethcrypto.GenerateKey()
-	require.NoError(t, err)
-	keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&chatKey.PublicKey))
-	keyUID := types.EncodeHex(keyUIDHex[:])
-	main := multiaccounts.Account{
-		KeyUID: keyUID,
-	}
-	tmpdir := t.TempDir()
-	conf, err := params.NewNodeConfig(tmpdir, 1777)
-	require.NoError(t, err)
-	keyhex := hex.EncodeToString(gethcrypto.FromECDSA(chatKey))
-
-	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
-	b.UpdateRootDataDir(conf.DataDir)
-	require.NoError(t, b.OpenAccounts())
-
-	address := crypto.PubkeyToAddress(walletKey.PublicKey)
-
-	settings := testSettings
-	settings.KeyUID = keyUID
-	settings.Address = crypto.PubkeyToAddress(walletKey.PublicKey)
-
-	chatPubKey := crypto.FromECDSAPub(&chatKey.PublicKey)
-
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []*accounts.Account{
-		{Address: address, KeyUID: keyUID, Wallet: true},
-		{Address: crypto.PubkeyToAddress(chatKey.PublicKey), KeyUID: keyUID, Chat: true, PublicKey: chatPubKey}}, keyhex))
-	require.NoError(t, b.Logout())
-	require.NoError(t, b.StopNode())
-
-	require.Error(t, b.VerifyDatabasePassword(main.KeyUID, "wrong-pass"))
-	require.NoError(t, b.VerifyDatabasePassword(main.KeyUID, "test-pass"))
-}
-
-func TestDeleteMultiaccount(t *testing.T) {
-	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
-
-	rootDataDir := t.TempDir()
-
-	keyStoreDir := filepath.Join(rootDataDir, "keystore")
-
-	backend.rootDataDir = rootDataDir
-
-	err := backend.AccountManager().InitKeystore(keyStoreDir)
-	require.NoError(t, err)
-
-	backend.AccountManager()
-	accs, err := backend.AccountManager().
-		AccountsGenerator().
-		GenerateAndDeriveAddresses(12, 1, "", []string{"m/44'/60'/0'/0"})
-	require.NoError(t, err)
-
-	generateAccount := accs[0]
-	accountInfo, err := backend.AccountManager().
-		AccountsGenerator().
-		StoreAccount(generateAccount.ID, "123123")
-	require.NoError(t, err)
-
-	account := multiaccounts.Account{
-		Name:           "foo",
-		Timestamp:      1,
-		KeycardPairing: "pairing",
-		KeyUID:         generateAccount.KeyUID,
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.DataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
 	}
 
-	err = backend.ensureAppDBOpened(account, "123123")
+	_, err := testContext.backend.StartNodeWithChatKeyOrMnemonic(
+		request,
+		testContext.mnemonic,
+		nil,
+		false,
+		false,
+	)
 	require.NoError(t, err)
 
-	s := settings.Settings{
-		Address:           types.HexToAddress(accountInfo.Address),
-		CurrentNetwork:    "mainnet_rpc",
-		DappsAddress:      types.HexToAddress(accountInfo.Address),
-		EIP1581Address:    types.HexToAddress(accountInfo.Address),
-		InstallationID:    "d3efcff6-cffa-560e-a547-21d3858cbc51",
-		KeyUID:            account.KeyUID,
-		LatestDerivedPath: 0,
-		Name:              "Jittery Cornflowerblue Kingbird",
-		Networks:          &networks,
-		PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
-		PreviewPrivacy:    false,
-		PublicKey:         accountInfo.PublicKey,
-		SigningPhrase:     "yurt joey vibe",
-		WalletRootAddress: types.HexToAddress(accountInfo.Address)}
+	require.NoError(t, testContext.backend.Logout())
+	require.NoError(t, testContext.backend.StopNode())
 
-	err = backend.saveAccountsAndSettings(
-		s,
-		&params.NodeConfig{},
-		nil)
-	require.Error(t, err)
-	require.True(t, err == accounts.ErrKeypairWithoutAccounts)
-
-	err = backend.OpenAccounts()
-	require.NoError(t, err)
-
-	err = backend.SaveAccount(account)
-	require.NoError(t, err)
-
-	files, err := ioutil.ReadDir(rootDataDir)
-	require.NoError(t, err)
-	require.NotEqual(t, 3, len(files))
-
-	err = backend.DeleteMultiaccount(account.KeyUID, keyStoreDir)
-	require.NoError(t, err)
-
-	files, err = ioutil.ReadDir(rootDataDir)
-	require.NoError(t, err)
-	require.Equal(t, 3, len(files))
+	require.Error(t, testContext.backend.VerifyDatabasePassword(testContext.profileKeypair.KeyUID, "wrong-pass"))
+	require.NoError(t, testContext.backend.VerifyDatabasePassword(testContext.profileKeypair.KeyUID, testPassword))
 }
 
 func TestConvertAccount(t *testing.T) {
-	const mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
-	const password = "111111"        // represents password for a regular user
-	const keycardPassword = "222222" // represents password for a keycard user
-	const keycardUID = "1234"
-	const pathEIP1581Root = "m/43'/60'/1581'"
-	const pathEIP1581Chat = pathEIP1581Root + "/0'/0"
-	const pathWalletRoot = "m/44'/60'/0'/0"
-	const pathDefaultWalletAccount = pathWalletRoot + "/0"
-	const customWalletPath1 = pathWalletRoot + "/1"
-	const customWalletPath2 = pathWalletRoot + "/2"
-	var allGeneratedPaths []string
-	allGeneratedPaths = append(allGeneratedPaths, pathEIP1581Root, pathEIP1581Chat, pathWalletRoot, pathDefaultWalletAccount, customWalletPath1, customWalletPath2)
+	testContext := setupTestContext(t, testPassword, false, false, true)
 
-	var err error
-
-	keystoreContainsFileForAccount := func(keyStoreDir string, hexAddress string) bool {
-		addrWithoutPrefix := strings.ToLower(hexAddress[2:])
-		found := false
-		err = filepath.Walk(keyStoreDir, func(path string, fileInfo os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !fileInfo.IsDir() && strings.Contains(strings.ToUpper(path), strings.ToUpper(addrWithoutPrefix)) {
-				found = true
-			}
-			return nil
-		})
-		return found
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.DataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
 	}
 
-	rootDataDir := t.TempDir()
-
-	keyStoreDirName := "keystore"
-	keyStoreDirPath := filepath.Join(rootDataDir, keyStoreDirName)
-
-	utils.Init()
-
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
+	_, err := testContext.backend.StartNodeWithChatKeyOrMnemonic(
+		request,
+		testContext.mnemonic,
+		nil,
+		false,
+		false,
+	)
 	require.NoError(t, err)
 
-	backend.rootDataDir = rootDataDir
-	require.NoError(t, backend.AccountManager().InitKeystore(keyStoreDirPath))
-	err = backend.OpenAccounts()
-	require.NoError(t, err)
-
-	genAccInfo, err := backend.AccountManager().AccountsGenerator().ImportMnemonic(mnemonic, "")
-	assert.NoError(t, err)
-
-	masterAddress := genAccInfo.Address
-
-	accountInfo, err := backend.AccountManager().AccountsGenerator().StoreAccount(genAccInfo.ID, password)
-	assert.NoError(t, err)
-
-	found := keystoreContainsFileForAccount(keyStoreDirPath, accountInfo.Address)
-	require.True(t, found)
-
-	derivedAccounts, err := backend.AccountManager().AccountsGenerator().StoreDerivedAccounts(genAccInfo.ID, password, allGeneratedPaths)
-	assert.NoError(t, err)
-
-	chatKey := derivedAccounts[pathEIP1581Chat].PrivateKey[2:]
-	chatAddress := derivedAccounts[pathEIP1581Chat].Address
-	found = keystoreContainsFileForAccount(keyStoreDirPath, chatAddress)
-	require.True(t, found)
-
-	defaultSettings, err := defaultSettings(genAccInfo.KeyUID, genAccInfo.Address, derivedAccounts)
-	require.NoError(t, err)
-	nodeConfig, err := DefaultNodeConfig(defaultSettings.InstallationID, genAccInfo.KeyUID, &requests.CreateAccount{
-		LogLevel: defaultSettings.LogLevel,
-	})
-	require.NoError(t, err)
-	nodeConfig.DataDir = rootDataDir
-	nodeConfig.KeyStoreDir = keyStoreDirName
-
-	profileKeypair := &accounts.Keypair{
-		KeyUID:      genAccInfo.KeyUID,
-		Name:        "Profile Name",
-		Type:        accounts.KeypairTypeProfile,
-		DerivedFrom: masterAddress,
-	}
-
-	profileKeypair.Accounts = append(profileKeypair.Accounts, &accounts.Account{
-		Address:   types.HexToAddress(chatAddress),
-		KeyUID:    profileKeypair.KeyUID,
-		Type:      accounts.AccountTypeGenerated,
-		PublicKey: types.Hex2Bytes(accountInfo.PublicKey),
-		Path:      pathEIP1581Chat,
-		Wallet:    false,
-		Chat:      true,
-		Name:      "GeneratedAccount",
-	})
-
-	for p, dAccInfo := range derivedAccounts {
-		found = keystoreContainsFileForAccount(keyStoreDirPath, dAccInfo.Address)
-		require.NoError(t, err)
-		require.True(t, found)
-
-		if p == pathDefaultWalletAccount ||
-			p == customWalletPath1 ||
-			p == customWalletPath2 {
-			wAcc := &accounts.Account{
-				Address: types.HexToAddress(dAccInfo.Address),
-				KeyUID:  genAccInfo.KeyUID,
-				Wallet:  false,
-				Chat:    false,
-				Type:    accounts.AccountTypeGenerated,
-				Path:    p,
-				Name:    "derivacc" + p,
-				Hidden:  false,
-				Removed: false,
-			}
-			if p == pathDefaultWalletAccount {
-				wAcc.Wallet = true
-			}
-			profileKeypair.Accounts = append(profileKeypair.Accounts, wAcc)
-		}
-	}
-
-	account := multiaccounts.Account{
-		Name:      profileKeypair.Name,
-		Timestamp: 1,
-		KeyUID:    profileKeypair.KeyUID,
-	}
-
-	err = backend.ensureAppDBOpened(account, password)
-	require.NoError(t, err)
-
-	err = backend.StartNodeWithAccountAndInitialConfig(account, password, *defaultSettings, nodeConfig, profileKeypair.Accounts, nil)
-	require.NoError(t, err)
-	multiaccounts, err := backend.GetAccounts()
+	multiaccounts, err := testContext.backend.GetAccounts()
 	require.NoError(t, err)
 	require.NotEmpty(t, multiaccounts[0].ColorHash)
-	serverMessenger := backend.Messenger()
+	serverMessenger := testContext.backend.Messenger()
 	require.NotNil(t, serverMessenger)
 
-	files, err := ioutil.ReadDir(rootDataDir)
+	// Ensure all created accounts are in the keystore and can be loaded
+	masterAddress := types.HexToAddress(testContext.profileKeypair.DerivedFrom)
+	ok, err := testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
 	require.NoError(t, err)
-	require.NotEqual(t, 3, len(files))
+	require.True(t, ok)
 
-	keycardAccount := account
+	for _, acc := range testContext.profileKeypair.Accounts {
+		ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(acc.Address, testPassword)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+
+	// Ensure we're able to open the DB
+	err = testContext.backend.ensureAppDBOpened(*testContext.multiAcc, testPassword)
+	require.NoError(t, err)
+
+	// db creation
+	db, err := accounts.NewDB(testContext.backend.appDB)
+	require.NoError(t, err)
+
+	// Check that there is no registered keycards
+	keycards, err := db.GetKeycardsWithSameKeyUID(testContext.profileKeypair.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(keycards))
+
+	keycardAccount := *testContext.multiAcc
 	keycardAccount.KeycardPairing = "pairing"
 
 	keycardSettings := settings.Settings{
@@ -1182,103 +917,91 @@ func TestConvertAccount(t *testing.T) {
 		KeycardPairing:     "pairing",
 	}
 
-	// Ensure we're able to open the DB
-	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
-	require.NoError(t, err)
-
-	// db creation
-	db, err := accounts.NewDB(backend.appDB)
-	require.NoError(t, err)
-
-	// Check that there is no registered keycards
-	keycards, err := db.GetKeycardsWithSameKeyUID(genAccInfo.KeyUID)
-	require.NoError(t, err)
-	require.Equal(t, 0, len(keycards))
-
 	// Converting to a keycard account
-	err = backend.ConvertToKeycardAccount(keycardAccount, keycardSettings, keycardUID, password, keycardPassword)
+	const keycardPassword = "222222" // represents password for a keycard user
+	err = testContext.backend.ConvertToKeycardAccount(keycardAccount, keycardSettings, testContext.profileKeypair.KeyUID, testPassword, keycardPassword)
 	require.NoError(t, err)
 
 	// Validating results of converting to a keycard account.
 	// All keystore files for the account which is migrated need to be removed.
-	found = keystoreContainsFileForAccount(keyStoreDirPath, masterAddress)
-	require.False(t, found)
+	ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
+	require.Error(t, err)
+	require.False(t, ok)
 
-	for _, dAccInfo := range derivedAccounts {
-		found = keystoreContainsFileForAccount(keyStoreDirPath, dAccInfo.Address)
-		require.False(t, found)
+	for _, acc := range testContext.profileKeypair.Accounts {
+		ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(acc.Address, testPassword)
+		require.Error(t, err)
+		require.False(t, ok)
 	}
 
-	require.NoError(t, backend.Logout())
-	require.NoError(t, backend.StopNode())
+	require.NoError(t, testContext.backend.Logout())
+	require.NoError(t, testContext.backend.StopNode())
 
-	require.NoError(t, backend.AccountManager().InitKeystore(keyStoreDirPath))
-	require.NoError(t, backend.OpenAccounts())
+	chatPrivKey := strings.TrimPrefix(testContext.chatPrivateKey, "0x")
+	require.NoError(t, testContext.backend.StartNodeWithKey(*testContext.multiAcc, keycardPassword, chatPrivKey, testContext.config))
 
-	require.NoError(t, backend.StartNodeWithKey(account, keycardPassword, chatKey, nodeConfig))
 	defer func() {
-		assert.NoError(t, backend.Logout())
-		assert.NoError(t, backend.StopNode())
+		assert.NoError(t, testContext.backend.Logout())
+		assert.NoError(t, testContext.backend.StopNode())
 	}()
 
 	// Ensure we're able to open the DB
-	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
+	err = testContext.backend.ensureAppDBOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
 
 	// db creation after re-encryption
-	db1, err := accounts.NewDB(backend.appDB)
+	db1, err := accounts.NewDB(testContext.backend.appDB)
 	require.NoError(t, err)
 
 	// Check that there is a registered keycard
-	keycards, err = db1.GetKeycardsWithSameKeyUID(genAccInfo.KeyUID)
+	keycards, err = db1.GetKeycardsWithSameKeyUID(testContext.profileKeypair.KeyUID)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(keycards))
 
 	// Converting to a regular account
-	err = backend.ConvertToRegularAccount(mnemonic, keycardPassword, password)
+	err = testContext.backend.ConvertToRegularAccount(testContext.mnemonic, keycardPassword, testPassword)
 	require.NoError(t, err)
 
 	// Validating results of converting to a regular account.
 	// All keystore files for need to be created.
-	found = keystoreContainsFileForAccount(keyStoreDirPath, accountInfo.Address)
-	require.True(t, found)
+	ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
+	require.NoError(t, err)
+	require.True(t, ok)
 
-	for _, dAccInfo := range derivedAccounts {
-		found = keystoreContainsFileForAccount(keyStoreDirPath, dAccInfo.Address)
-		require.True(t, found)
+	for _, acc := range testContext.profileKeypair.Accounts {
+		ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(acc.Address, testPassword)
+		require.NoError(t, err)
+		require.True(t, ok)
 	}
 
-	found = keystoreContainsFileForAccount(keyStoreDirPath, masterAddress)
-	require.True(t, found)
-
 	// Ensure we're able to open the DB
-	err = backend.ensureAppDBOpened(keycardAccount, password)
+	err = testContext.backend.ensureAppDBOpened(keycardAccount, testPassword)
 	require.NoError(t, err)
 
 	// db creation after re-encryption
-	db2, err := accounts.NewDB(backend.appDB)
+	db2, err := accounts.NewDB(testContext.backend.appDB)
 	require.NoError(t, err)
 
 	// Check that there is no registered keycards
-	keycards, err = db2.GetKeycardsWithSameKeyUID(genAccInfo.KeyUID)
+	keycards, err = db2.GetKeycardsWithSameKeyUID(testContext.profileKeypair.KeyUID)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(keycards))
 }
 
 func copyFile(srcFolder string, dstFolder string, fileName string, t *testing.T) {
-	data, err := ioutil.ReadFile(path.Join(srcFolder, fileName))
+	data, err := os.ReadFile(path.Join(srcFolder, fileName))
 	if err != nil {
 		t.Fail()
 	}
 
-	err = ioutil.WriteFile(path.Join(dstFolder, fileName), data, 0600)
+	err = os.WriteFile(path.Join(dstFolder, fileName), data, 0600)
 	if err != nil {
 		t.Fail()
 	}
 }
 
 func copyDir(srcFolder string, dstFolder string, t *testing.T) {
-	files, err := ioutil.ReadDir(srcFolder)
+	files, err := os.ReadDir(srcFolder)
 	require.NoError(t, err)
 	for _, file := range files {
 		if !file.IsDir() {
@@ -1293,34 +1016,32 @@ func copyDir(srcFolder string, dstFolder string, t *testing.T) {
 	}
 }
 
-func loginDesktopUser(t *testing.T, conf *params.NodeConfig) {
+func loginDesktopUser(t *testing.T, conf *params.NodeConfig, keyUID string) {
 	// The following passwords and DB used in this test unit are only
 	// used to determine if login process works correctly after a migration
 
 	// Expected account data:
-	keyUID := "0x7c46c8f6f059ab72d524f2a6d356904db30bb0392636172ab3929a6bd2220f84" // #nosec G101
 	username := "TestUser"
 	passwd := "0xC888C9CE9E098D5864D3DED6EBCC140A12142263BACE3A23A36F9905F12BD64A" // #nosec G101
 
 	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 
-	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
 	b.UpdateRootDataDir(conf.DataDir)
 
 	require.NoError(t, b.OpenAccounts())
 
-	accounts, err := b.GetAccounts()
+	accs, err := b.GetAccounts()
 	require.NoError(t, err)
 
-	require.Len(t, accounts, 1)
-	require.Equal(t, username, accounts[0].Name)
-	require.Equal(t, keyUID, accounts[0].KeyUID)
+	require.Len(t, accs, 1)
+	require.Equal(t, username, accs[0].Name)
+	require.Equal(t, keyUID, accs[0].KeyUID)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := b.StartNodeWithAccount(accounts[0], passwd, conf, nil)
+		err := b.StartNodeWithAccount(accs[0], passwd, conf, nil)
 		require.NoError(t, err)
 	}()
 
@@ -1334,92 +1055,97 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig) {
 func TestLoginAndMigrationsStillWorkWithExistingDesktopUser(t *testing.T) {
 	utils.Init()
 
+	keyUID := "0x7c46c8f6f059ab72d524f2a6d356904db30bb0392636172ab3929a6bd2220f84" // #nosec G101
+
 	srcFolder := "../static/test-0.132.0-account/"
 
 	tmpdir := t.TempDir()
-
 	copyDir(srcFolder, tmpdir, t)
+
+	keystoreDir := path.Join(tmpdir, "keystore", keyUID)
+	err := os.MkdirAll(keystoreDir, 0700)
+	require.NoError(t, err)
+
+	srcKeystoreFolder := "../static/test-0.132.0-account/keystore/"
+	copyDir(srcKeystoreFolder, keystoreDir, t)
 
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 
-	loginDesktopUser(t, conf)
-	loginDesktopUser(t, conf) // Login twice to catch weird errors that only appear after logout
+	loginDesktopUser(t, conf, keyUID)
+	loginDesktopUser(t, conf, keyUID) // Login twice to catch weird errors that only appear after logout
 }
 
 func TestChangeDatabasePassword(t *testing.T) {
-	oldPassword := "password"
-	newPassword := "newPassword"
+	utils.Init()
 
-	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
-	backend.UpdateRootDataDir(t.TempDir())
+	testContext := setupTestContext(t, testPassword, true, true, false)
 
-	// Setup keystore to test decryption of it
-	keyStoreDir := t.TempDir()
-	require.NoError(t, backend.accountManager.InitKeystore(keyStoreDir))
-
-	_, accountInfo, _, err := backend.accountManager.CreateAccount(oldPassword)
+	err := testContext.backend.StartNode(testContext.config)
 	require.NoError(t, err)
 
-	account := multiaccounts.Account{
-		Name:          "TestAccount",
-		Timestamp:     1,
-		KeyUID:        "0x7c46c8f6f059ab72d524f2a6d356904db30bb0392636172ab3929a6bd2220f84",
-		KDFIterations: 1,
-	}
+	defer func() {
+		require.NoError(t, testContext.backend.StopNode())
+	}()
 
-	// Initialize accounts DB
-	err = backend.OpenAccounts()
+	masterAddress := types.HexToAddress(testContext.profileKeypair.DerivedFrom)
+	ok, err := testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
 	require.NoError(t, err)
-	err = backend.SaveAccount(account)
+	require.True(t, ok)
+
+	ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(testContext.profileKeypair.Accounts[0].Address, testPassword)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(testContext.profileKeypair.Accounts[1].Address, testPassword)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	db, err := testContext.backend.accountsDB()
 	require.NoError(t, err)
 
-	// Created DBs with old password
-	err = backend.ensureDBsOpened(account, oldPassword)
+	acc, err := db.GetAccountByAddress(testContext.profileKeypair.Accounts[0].Address)
 	require.NoError(t, err)
+	require.Equal(t, testContext.profileKeypair.Accounts[0].Address, acc.Address)
+
+	acc, err = db.GetAccountByAddress(testContext.profileKeypair.Accounts[1].Address)
+	require.NoError(t, err)
+	require.Equal(t, testContext.profileKeypair.Accounts[1].Address, acc.Address)
 
 	// Change password
-	err = backend.ChangeDatabasePassword(account.KeyUID, oldPassword, newPassword)
+	const newPassword = "newPassword"
+	err = testContext.backend.ChangeDatabasePassword(testContext.profileKeypair.KeyUID, testPassword, newPassword)
 	require.NoError(t, err)
 
-	// Test that DBs can be opened with new password
-	appDbPath, err := backend.getAppDBPath(account.KeyUID)
-	require.NoError(t, err)
-	appDb, err := sqlite.OpenDB(appDbPath, newPassword, account.KDFIterations)
-	require.NoError(t, err)
-	appDb.Close()
-
-	walletDbPath, err := backend.getWalletDBPath(account.KeyUID)
-	require.NoError(t, err)
-	walletDb, err := sqlite.OpenDB(walletDbPath, newPassword, account.KDFIterations)
-	require.NoError(t, err)
-	walletDb.Close()
+	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
 
 	// Test that keystore can be decrypted with the new password
-	acc, key, err := backend.accountManager.AddressToDecryptedAccount(accountInfo.WalletAddress, newPassword)
+	ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, newPassword)
 	require.NoError(t, err)
-	require.NotNil(t, acc)
-	require.NotNil(t, key)
-	require.Equal(t, acc.Address, key.Address)
+	require.True(t, ok)
+
+	ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(testContext.profileKeypair.Accounts[0].Address, newPassword)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(testContext.profileKeypair.Accounts[1].Address, newPassword)
+	require.NoError(t, err)
+	require.True(t, ok)
 }
 
 func TestCreateWallet(t *testing.T) {
 	utils.Init()
-	password := "some-password2" // nolint: goconst
-	tmpdir := t.TempDir()
 
-	b := NewGethStatusBackend(tt.MustCreateTestLogger())
-	defer func() {
-		require.NoError(t, b.StopNode())
-	}()
+	testContext := setupTestContext(t, testPassword, false, false, true)
 
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
-		Password:           password,
-		RootDataDir:        tmpdir,
-		LogFilePath:        tmpdir + "/log",
+		Password:           testPassword,
+		RootDataDir:        testContext.config.DataDir,
+		LogFilePath:        testContext.config.DataDir + "/log",
 	}
+
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
 		if strings.Contains(string(data), "node.login") {
@@ -1428,9 +1154,9 @@ func TestCreateWallet(t *testing.T) {
 	})
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
-	account, err := b.CreateAccountAndLogin(createAccountRequest)
+	account, err := testContext.backend.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
-	statusNode := b.statusNode
+	statusNode := testContext.backend.statusNode
 	require.NotNil(t, statusNode)
 
 	walletService := statusNode.WalletService()
@@ -1439,16 +1165,16 @@ func TestCreateWallet(t *testing.T) {
 
 	paths := []string{"m/44'/60'/0'/0/1"}
 
-	db, err := accounts.NewDB(b.appDB)
+	db, err := accounts.NewDB(testContext.backend.appDB)
 	require.NoError(t, err)
-	walletRootAddress, err := db.GetWalletRootAddress()
+	masterAddress, err := db.GetMasterAddress()
 	require.NoError(t, err)
 
 	mnemonic, err := db.Mnemonic()
 	require.NoError(t, err)
 	require.NotEmpty(t, mnemonic)
 
-	derivedAddress, err := walletAPI.GetDerivedAddresses(context.Background(), password, walletRootAddress.String(), paths)
+	derivedAddress, err := walletAPI.GetDerivedAddresses(context.Background(), testPassword, masterAddress.String(), paths)
 	require.NoError(t, err)
 	require.Len(t, derivedAddress, 1)
 
@@ -1456,7 +1182,8 @@ func TestCreateWallet(t *testing.T) {
 	require.NotNil(t, accountsService)
 	accountsAPI := accountsService.AccountsAPI()
 
-	err = accountsAPI.AddAccount(context.Background(), password, &accounts.Account{
+	err = accountsAPI.AddAccount(context.Background(), testPassword, &accounts.Account{
+		Address:   derivedAddress[0].Address,
 		KeyUID:    account.KeyUID,
 		Type:      accounts.AccountTypeGenerated,
 		PublicKey: derivedAddress[0].PublicKey,
@@ -1470,17 +1197,17 @@ func TestCreateWallet(t *testing.T) {
 
 func TestSetFleet(t *testing.T) {
 	utils.Init()
-	password := "some-password2" // nolint: goconst
-	tmpdir := t.TempDir()
 
-	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+	testContext := setupTestContext(t, testPassword, false, false, true)
+
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
-		Password:           password,
-		RootDataDir:        tmpdir,
-		LogFilePath:        tmpdir + "/log",
+		Password:           testPassword,
+		RootDataDir:        testContext.config.DataDir,
+		LogFilePath:        testContext.config.DataDir + "/log",
 	}
+
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
 		if strings.Contains(string(data), "node.login") {
@@ -1489,32 +1216,34 @@ func TestSetFleet(t *testing.T) {
 	})
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
-	newAccount, err := b.CreateAccountAndLogin(createAccountRequest)
+	newAccount, err := testContext.backend.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
-	statusNode := b.statusNode
+	statusNode := testContext.backend.statusNode
 	require.NotNil(t, statusNode)
 
-	savedSettings, err := b.GetSettings()
+	savedSettings, err := testContext.backend.GetSettings()
 	require.NoError(t, err)
 	require.Empty(t, savedSettings.Fleet)
 
-	accountsDB, err := b.accountsDB()
+	accountsDB, err := testContext.backend.accountsDB()
 	require.NoError(t, err)
 	err = accountsDB.SaveSettingField(settings.Fleet, params.FleetStatusProd)
 	require.NoError(t, err)
 
-	savedSettings, err = b.GetSettings()
+	savedSettings, err = testContext.backend.GetSettings()
 	require.NoError(t, err)
 	require.NotEmpty(t, savedSettings.Fleet)
 	require.Equal(t, params.FleetStatusProd, *savedSettings.Fleet)
 
-	require.NoError(t, b.Logout())
+	require.NoError(t, testContext.backend.Logout())
+
+	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
 
 	loginAccountRequest := &requests.Login{
 		KeyUID:   newAccount.KeyUID,
-		Password: password,
+		Password: testPassword,
 	}
-	require.NoError(t, b.LoginAccount(loginAccountRequest))
+	require.NoError(t, testContext.backend.LoginAccount(loginAccountRequest))
 	select {
 	case <-c:
 		break
@@ -1522,9 +1251,9 @@ func TestSetFleet(t *testing.T) {
 		t.FailNow()
 	}
 	// Check is using the right fleet
-	require.Equal(t, b.config.ClusterConfig.WakuNodes, params.DefaultWakuNodes(params.FleetStatusProd))
+	require.Equal(t, testContext.backend.config.ClusterConfig.WakuNodes, params.DefaultWakuNodes(params.FleetStatusProd))
 
-	require.NoError(t, b.Logout())
+	require.NoError(t, testContext.backend.Logout())
 }
 
 func fakeToken() security.SensitiveString {
@@ -1533,8 +1262,9 @@ func fakeToken() security.SensitiveString {
 
 func TestWalletConfigOnLoginAccount(t *testing.T) {
 	utils.Init()
-	password := "some-password2"
-	tmpdir := t.TempDir()
+
+	testContext := setupTestContext(t, testPassword, false, false, true)
+
 	poktToken := fakeToken()
 	infuraToken := fakeToken()
 	alchemyEthereumMainnetToken := fakeToken()
@@ -1548,13 +1278,12 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	raribleMainnetAPIKey := fakeToken()
 	raribleTestnetAPIKey := fakeToken()
 
-	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
-		Password:           password,
-		RootDataDir:        tmpdir,
-		LogFilePath:        tmpdir + "/log",
+		Password:           testPassword,
+		RootDataDir:        testContext.config.DataDir,
+		LogFilePath:        testContext.config.DataDir + "/log",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1564,16 +1293,16 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	})
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
-	newAccount, err := b.CreateAccountAndLogin(createAccountRequest)
+	newAccount, err := testContext.backend.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
-	statusNode := b.statusNode
+	statusNode := testContext.backend.statusNode
 	require.NotNil(t, statusNode)
 
-	require.NoError(t, b.Logout())
+	require.NoError(t, testContext.backend.Logout())
 
 	loginAccountRequest := &requests.Login{
 		KeyUID:   newAccount.KeyUID,
-		Password: password,
+		Password: testPassword,
 		WalletSecretsConfig: requests.WalletSecretsConfig{
 			PoktToken:                   poktToken,
 			InfuraToken:                 infuraToken,
@@ -1590,7 +1319,9 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, b.LoginAccount(loginAccountRequest))
+	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
+
+	require.NoError(t, testContext.backend.LoginAccount(loginAccountRequest))
 	select {
 	case <-c:
 		break
@@ -1598,19 +1329,20 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 		t.FailNow()
 	}
 
-	require.Equal(t, b.config.WalletConfig.InfuraAPIKey, infuraToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.MainnetChainID], alchemyEthereumMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.SepoliaChainID], alchemyEthereumSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.ArbitrumChainID], alchemyArbitrumMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.ArbitrumSepoliaChainID], alchemyArbitrumSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.OptimismChainID], alchemyOptimismMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.OptimismSepoliaChainID], alchemyOptimismSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.BaseChainID], alchemyBaseMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.BaseSepoliaChainID], alchemyBaseSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
-	require.Equal(t, b.config.WalletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
+	walletConfig := testContext.backend.config.WalletConfig
+	require.Equal(t, walletConfig.InfuraAPIKey, infuraToken)
+	require.Equal(t, walletConfig.AlchemyAPIKeys[common.EthereumMainnet], alchemyEthereumMainnetToken)
+	require.Equal(t, walletConfig.AlchemyAPIKeys[common.EthereumSepolia], alchemyEthereumSepoliaToken)
+	require.Equal(t, walletConfig.AlchemyAPIKeys[common.ArbitrumMainnet], alchemyArbitrumMainnetToken)
+	require.Equal(t, walletConfig.AlchemyAPIKeys[common.ArbitrumSepolia], alchemyArbitrumSepoliaToken)
+	require.Equal(t, walletConfig.AlchemyAPIKeys[common.OptimismMainnet], alchemyOptimismMainnetToken)
+	require.Equal(t, walletConfig.AlchemyAPIKeys[common.OptimismSepolia], alchemyOptimismSepoliaToken)
+	require.Equal(t, walletConfig.AlchemyAPIKeys[common.BaseMainnet], alchemyBaseMainnetToken)
+	require.Equal(t, walletConfig.AlchemyAPIKeys[common.BaseSepolia], alchemyBaseSepoliaToken)
+	require.Equal(t, walletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
+	require.Equal(t, walletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
 
-	require.NoError(t, b.Logout())
+	require.NoError(t, testContext.backend.Logout())
 }
 
 func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
@@ -1722,7 +1454,7 @@ func TestAcceptTerms(t *testing.T) {
 	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
-	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
+
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
 	nameserver := "8.8.8.8"
@@ -1887,7 +1619,6 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 	require.NoError(t, err)
 
-	require.NoError(t, backend.AccountManager().InitKeystore(conf.KeyStoreDir))
 	backend.UpdateRootDataDir(conf.DataDir)
 
 	require.NoError(t, backend.OpenAccounts())

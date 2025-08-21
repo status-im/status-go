@@ -43,9 +43,9 @@ func TestStatusNodeStart(t *testing.T) {
 	require.NotNil(t, n.GethNode())
 	require.NotNil(t, n.Config())
 	require.NotNil(t, n.RPCClient())
-	accountManager, err := n.AccountManager()
+	accountsManager, err := n.AccountsManager()
 	require.Nil(t, err)
-	require.NotNil(t, accountManager)
+	require.NotNil(t, accountsManager)
 	// try to start already started node
 	require.EqualError(t, n.Start(config), ErrNodeRunning.Error())
 
@@ -68,8 +68,7 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 	require.NoError(t, err)
 
 	config := params.NodeConfig{
-		DataDir:     dir,
-		KeyStoreDir: keyStoreDir,
+		DataDir: dir,
 	}
 
 	n, stop1, stop2, err := createStatusNode()

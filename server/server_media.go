@@ -238,6 +238,14 @@ func (s *MediaServer) MakeContactImageURL(publicKey string, imageType string, im
 	return u.String()
 }
 
+func (s *MediaServer) MakeAccountImageURL(keyUid string, imageType string, imageClock uint64) string {
+	u := s.MakeBaseURL()
+	u.Path = accountImagesPath
+	u.RawQuery = url.Values{"keyUid": {keyUid}, "imageName": {imageType}, "clock": {fmt.Sprint(imageClock)}}.Encode()
+
+	return u.String()
+}
+
 func (s *MediaServer) MakeCommunityTokenImagesURL(communityID string, chainID uint64, symbol string) string {
 	u := s.MakeBaseURL()
 	u.Path = communityTokenImagesPath

@@ -37,13 +37,14 @@ in pkgs.buildGoPackage rec {
       go-bindata
       mockgen
       protoc-gen-go
-      protobuf3_20
+      protobuf3_24
       fakeGit
   ] ++ optional isAndroid pkgs.openjdk_headless
     ++ optional isAndroid pkgs.nwaku.libwaku-android-arm64
     ++ optional isIOS pkgs.xcodeWrapper;
 
-  ldflags = goBuildLdFlags;
+  # https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later
+  ldflags = goBuildLdFlags ++ optional isAndroid "-checklinkname=0";
 
   ANDROID_HOME = optionalString isAndroid "${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/";
 

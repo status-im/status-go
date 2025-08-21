@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/hop"
 	hopL1CctpImplementation "github.com/status-im/status-go/contracts/hop/l1Contracts/l1CctpImplementation"
@@ -28,7 +28,7 @@ import (
 	hopL2BaseBridge "github.com/status-im/status-go/contracts/hop/l2Contracts/l2BaseBridge"
 	hopL2CctpImplementation "github.com/status-im/status-go/contracts/hop/l2Contracts/l2CctpImplementation"
 	hopL2OptimismBridge "github.com/status-im/status-go/contracts/hop/l2Contracts/l2OptimismBridge"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
@@ -92,21 +92,36 @@ func (bf *BonderFee) UnmarshalJSON(data []byte) error {
 	}
 
 	bf.AmountIn = &bigint.BigInt{Int: new(big.Int)}
-	bf.AmountIn.SetString(aux.AmountIn, 10)
+	_, ok := bf.AmountIn.SetString(aux.AmountIn, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
 
 	bf.Slippage = aux.Slippage
 
 	bf.AmountOutMin = &bigint.BigInt{Int: new(big.Int)}
-	bf.AmountOutMin.SetString(aux.AmountOutMin, 10)
+	_, ok = bf.AmountOutMin.SetString(aux.AmountOutMin, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
 
 	bf.DestinationAmountOutMin = &bigint.BigInt{Int: new(big.Int)}
-	bf.DestinationAmountOutMin.SetString(aux.DestinationAmountOutMin, 10)
+	_, ok = bf.DestinationAmountOutMin.SetString(aux.DestinationAmountOutMin, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
 
 	bf.BonderFee = &bigint.BigInt{Int: new(big.Int)}
-	bf.BonderFee.SetString(aux.BonderFee, 10)
+	_, ok = bf.BonderFee.SetString(aux.BonderFee, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
 
 	bf.EstimatedRecieved = &bigint.BigInt{Int: new(big.Int)}
-	bf.EstimatedRecieved.SetString(aux.EstimatedRecieved, 10)
+	_, ok = bf.EstimatedRecieved.SetString(aux.EstimatedRecieved, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
 
 	bf.Deadline = aux.Deadline
 
@@ -436,8 +451,8 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, sig
 	return tx, nil
 }
 
-func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, nonce uint64, err error) {
-	tx, err := h.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.HopTx.ChainID, sendArgs.HopTx.From, verifiedAccount.AccountKey.PrivateKey), lastUsedNonce)
+func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, nonce uint64, err error) {
+	tx, err := h.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.HopTx.ChainID, sendArgs.HopTx.From, verifiedAccount.PrivateKey()), lastUsedNonce)
 	if err != nil {
 		return types.Hash{}, 0, createBridgeHopErrorResponse(err)
 	}

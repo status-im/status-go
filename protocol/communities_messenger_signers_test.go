@@ -8,7 +8,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	utils "github.com/status-im/status-go/common"
 
@@ -59,7 +58,6 @@ func (s *MessengerCommunitiesSignersSuite) newMessenger(password string, walletA
 	}
 
 	return s.newMessengerWithConfig(testMessengerConfig{
-		logger:       s.logger,
 		extraOptions: []Option{WithCommunityManagerOptions(communityManagerOptions)},
 	}, password, walletAddresses)
 }
@@ -597,11 +595,10 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 	}
 
 	// Create alice second instance
-	alice2, err := newMessengerWithKey(
-		s.shh,
-		s.alice.identity,
-		s.logger.With(zap.String("name", "alice-2")),
-		[]Option{WithCommunityTokensService(s.collectiblesServiceMock)})
+	alice2, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{
+		privateKey:   s.alice.identity,
+		extraOptions: []Option{WithCommunityTokensService(s.collectiblesServiceMock)},
+	})
 
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice2)
@@ -866,7 +863,8 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeDeviceChanged() {
 	s.Require().NoError(err)
 	s.Require().Len(community.Members(), 2)
 	for _, chat := range community.Chats() {
-		s.Require().Len(chat.Members, 2)
+		// All chats are public, so no members
+		s.Require().Len(chat.Members, 0)
 	}
 
 	// Bob will receive request to share RevealedAddresses and send request to join to the control node

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -14,19 +14,19 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, config *params.NodeConfig, downloader *ipfs.Downloader, httpServer *server.MediaServer, pendingTracker *transactions.PendingTxTracker) *Service {
+func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, config *params.NodeConfig,
+	downloader *ipfs.Downloader, httpServer *server.MediaServer, pendingTracker *transactions.PendingTxTracker) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Service{
 		accountsDB:      acc,
 		rpcClient:       rpcClient,
 		accountsManager: accountsManager,
-		keyStoreDir:     config.KeyStoreDir,
 		downloader:      downloader,
 		httpServer:      httpServer,
 		ctx:             ctx,
 		cancel:          cancel,
-		api:             NewAPI(ctx, acc, rpcClient, accountsManager, pendingTracker, config.KeyStoreDir, downloader, httpServer),
+		api:             NewAPI(ctx, acc, rpcClient, accountsManager, pendingTracker, downloader, httpServer),
 	}
 }
 
@@ -34,9 +34,8 @@ func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *
 type Service struct {
 	accountsDB      *accounts.Database
 	rpcClient       *rpc.Client
-	accountsManager *account.GethManager
+	accountsManager *accsmanagement.AccountsManager
 	downloader      *ipfs.Downloader
-	keyStoreDir     string
 	httpServer      *server.MediaServer
 	ctx             context.Context
 	cancel          context.CancelFunc

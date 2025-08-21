@@ -160,11 +160,13 @@ func (s *Service) GetActivityCollectiblesAsync(requestID int32, chainIDs []w_com
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
-			collectibles := result.([]CollectibleHeader)
-			res.Collectibles = collectibles
-			res.Offset = offset
-			res.HasMore = len(collectibles) == limit
-			res.ErrorCode = ErrorCodeSuccess
+			collectibles, ok := result.([]CollectibleHeader)
+			if ok {
+				res.Collectibles = collectibles
+				res.Offset = offset
+				res.HasMore = len(collectibles) == limit
+				res.ErrorCode = ErrorCodeSuccess
+			}
 		}
 
 		sendResponseEvent(s.eventFeed, &requestID, EventActivityGetCollectibles, res, err)
@@ -272,14 +274,19 @@ func (s *Service) GetRecipientsAsync(requestID int32, chainIDs []w_common.ChainI
 		result.Addresses, result.HasMore, err = GetRecipients(ctx, s.db, chainIDs, addresses, offset, limit)
 		return result, err
 	}, func(result interface{}, taskType async.TaskType, err error) {
-		res := result.(*GetRecipientsResponse)
+		res := &GetRecipientsResponse{
+			ErrorCode: ErrorCodeFailed,
+		}
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
-		} else if err != nil {
-			res.ErrorCode = ErrorCodeFailed
+		} else if err == nil {
+			recipientsResponse, ok := result.(*GetRecipientsResponse)
+			if ok {
+				res = recipientsResponse
+			}
 		}
 
-		sendResponseEvent(s.eventFeed, &requestID, EventActivityGetRecipientsDone, result, err)
+		sendResponseEvent(s.eventFeed, &requestID, EventActivityGetRecipientsDone, res, err)
 	})
 }
 
@@ -300,8 +307,11 @@ func (s *Service) GetOldestTimestampAsync(requestID int32, addresses []common.Ad
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
-			res.Timestamp = int64(result.(uint64))
-			res.ErrorCode = ErrorCodeSuccess
+			timestamp, ok := result.(uint64)
+			if ok {
+				res.Timestamp = int64(timestamp)
+				res.ErrorCode = ErrorCodeSuccess
+			}
 		}
 
 		sendResponseEvent(s.eventFeed, &requestID, EventActivityGetOldestTimestampDone, res, err)

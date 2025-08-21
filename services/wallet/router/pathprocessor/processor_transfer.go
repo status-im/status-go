@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/contracts/ierc20"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
@@ -114,7 +114,7 @@ func (s *TransferProcessor) EstimateGas(params ProcessorInputParams, input []byt
 	return uint64(increasedEstimation), nil
 }
 
-func (s *TransferProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types.Hash, uint64, error) {
+func (s *TransferProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (types.Hash, uint64, error) {
 	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce, verifiedAccount)
 }
 

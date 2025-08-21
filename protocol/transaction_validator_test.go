@@ -11,9 +11,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/tt"
 )

@@ -18,13 +18,3 @@ services:
   foundry:
     networks:
       - default
-
-  status-backend:
-    entrypoint: [
-      "status-backend",
-      "--address", "[::]:3333"
-    ]
-    healthcheck:
-      test: ["CMD-SHELL", "curl -X POST --data '{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":1}' -H 'Content-Type: application/json' http://[::1]:3333 || exit 1"]
-    networks:
-      - default

@@ -9,9 +9,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/deprecation"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
@@ -329,11 +329,11 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 		if err != nil {
 			return nil, err
 		}
-		_, err = m.dispatchMessage(context.Background(), common.RawMessage{
+		_, err = m.dispatchMessage(context.Background(), messagingtypes.RawMessage{
 			LocalChatID: contactRequest.From,
 			Payload:     encodedMessage,
 			MessageType: protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST,
-			ResendType:  common.ResendTypeDataSync,
+			ResendType:  messagingtypes.ResendTypeDataSync,
 		})
 		if err != nil {
 			return nil, err
@@ -781,6 +781,7 @@ func (m *Messenger) updateContactImagesURL(contact *Contact) error {
 				return err
 			}
 			v.LocalURL = m.httpServer.MakeContactImageURL(common.PubkeyToHex(publicKey), k, v.Clock)
+			v.Payload = nil
 			contact.Images[k] = v
 		}
 	}
@@ -1101,11 +1102,11 @@ func (m *Messenger) sendContactUpdate(ctx context.Context,
 		return nil, err
 	}
 
-	rawMessage := common.RawMessage{
+	rawMessage := messagingtypes.RawMessage{
 		LocalChatID: chatID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_CONTACT_UPDATE,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -1125,6 +1126,9 @@ func (m *Messenger) sendContactUpdate(ctx context.Context,
 }
 
 func (m *Messenger) addENSNameToContact(contact *Contact) error {
+	if m.ensVerifier == nil {
+		return nil
+	}
 
 	// Check if there's already a verified record
 	ensRecord, err := m.ensVerifier.GetVerifiedRecord(contact.ID)
@@ -1179,11 +1183,11 @@ func (m *Messenger) sendRetractContactRequest(contact *Contact) error {
 		return err
 	}
 
-	_, err = m.dispatchMessage(context.Background(), common.RawMessage{
+	_, err = m.dispatchMessage(context.Background(), messagingtypes.RawMessage{
 		LocalChatID: contact.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	})
 	if err != nil {
 		return err

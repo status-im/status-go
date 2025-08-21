@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -16,34 +14,35 @@ import (
 	"go.uber.org/zap"
 
 	commongethtypes "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/account"
+	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/api/multiformat"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
-	"github.com/status-im/status-go/protocol/pushnotificationserver"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -54,8 +53,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	wakutypes "github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2"
+	"github.com/status-im/status-go/signal"
 )
 
 const infinityString = "∞"
@@ -71,15 +69,16 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
+	messaging       *messaging.API
 	messenger       *protocol.Messenger
-	identity        *ecdsa.PrivateKey
 	cancelMessenger chan struct{}
-	waku            wakutypes.Waku
 	rpcClient       *rpc.Client
 	config          params.NodeConfig
 	accountsDB      *accounts.Database
 	multiAccountsDB *multiaccounts.Database
 	account         *multiaccounts.Account
+
+	logger *zap.Logger
 }
 
 // Make sure that Service implements node.Service interface.
@@ -87,21 +86,33 @@ var _ node.Lifecycle = (*Service)(nil)
 
 func New(
 	config params.NodeConfig,
-	waku wakutypes.Waku,
 	rpcClient *rpc.Client,
+	logger *zap.Logger,
 ) *Service {
 	return &Service{
-		waku:      waku,
 		rpcClient: rpcClient,
 		config:    config,
+		logger:    logger,
 	}
 }
 
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB,
-	httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account,
-	accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service,
-	communityTokensService *communitytokens.Service, wakuService *wakuv2.Waku, logger *zap.Logger,
-	accountsFeed *event.Feed) error {
+type InitProtocolParams struct {
+	Identity               *ecdsa.PrivateKey
+	AppDB                  *sql.DB
+	WalletDB               *sql.DB
+	HTTPServer             *server.MediaServer
+	MultiAccountDB         *multiaccounts.Database
+	Account                *multiaccounts.Account
+	AccountsManager        *accsmanagement.AccountsManager
+	RPCClient              *rpc.Client
+	WalletService          *wallet.Service
+	CommunityTokensService *communitytokens.Service
+	AccountsPublisher      *pubsub.Publisher
+	TimeSource             timesource.TimeSource
+	MetricsEnabled         bool
+}
+
+func (s *Service) InitProtocol(params InitProtocolParams) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
@@ -115,8 +126,11 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 			return err
 		}
 	}
-
-	s.identity = identity
+	if s.messaging != nil {
+		if err := s.messaging.Stop(); err != nil {
+			return err
+		}
+	}
 
 	// This directory should have already been created in loadNodeConfig, keeping this to ensure.
 	dataDir := filepath.Clean(s.config.RootDataDir)
@@ -125,34 +139,67 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		return err
 	}
 
+	s.accountsDB, err = accounts.NewDB(params.AppDB)
+	if err != nil {
+		return err
+	}
+	s.multiAccountsDB = params.MultiAccountDB
+	s.account = params.Account
+
+	err = sqlite.Migrate(params.AppDB)
+	if err != nil {
+		return err
+	}
+
+	nodeKey, err := obtainNodeKey(&s.config)
+	if err != nil {
+		return err
+	}
+
 	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
 		MaxMessageDeliveryAttempts: s.config.ShhextConfig.MaxMessageDeliveryAttempts,
 		MailServerConfirmations:    s.config.ShhextConfig.MailServerConfirmations,
 		EnvelopeEventsHandler:      EnvelopeSignalHandler{},
 	}
-	s.accountsDB, err = accounts.NewDB(appDb)
+
+	messaging, err := messaging.NewCore(
+		messaging.CoreParams{
+			Identity:       params.Identity,
+			DB:             params.AppDB,
+			Persistence:    protocol.NewMessagingPersistence(params.AppDB),
+			NodeKey:        nodeKey,
+			WakuConfig:     s.config.WakuV2Config,
+			ClusterConfig:  s.config.ClusterConfig,
+			InstallationID: s.config.ShhextConfig.InstallationID,
+			TimeSource:     params.TimeSource,
+		},
+		messaging.WithLogger(s.logger),
+		messaging.WithEnvelopeEventsConfig(envelopeEventsConfig),
+		messaging.WithHistoricMessagesRequestFailedHandler(signal.SendHistoricMessagesRequestFailed),
+		messaging.WithPeerStatsHandler(signal.SendPeerStats),
+		messaging.WithMetrics(params.MetricsEnabled),
+	)
 	if err != nil {
 		return err
 	}
-	s.multiAccountsDB = multiAccountDb
-	s.account = acc
+	s.messaging = messaging.API()
 
 	ensVerifier := ens.New(
-		logger,
-		s.waku, // timesource
-		appDb,
+		s.logger,
+		params.TimeSource,
+		params.AppDB,
 		s.config.ShhextConfig.VerifyENSURL,
 		s.config.ShhextConfig.VerifyENSContractAddress,
 	)
 
-	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsFeed, ensVerifier)
+	options, err := buildMessengerOptions(s.config, params.Identity, params.AppDB, params.WalletDB, params.HTTPServer, s.rpcClient, s.multiAccountsDB, params.Account, envelopeEventsConfig, s.accountsDB, params.WalletService, params.CommunityTokensService, s.logger, &MessengerSignalsHandler{}, params.AccountsManager, params.AccountsPublisher, ensVerifier)
 	if err != nil {
 		return err
 	}
 
 	messenger, err := protocol.NewMessenger(
-		identity,
-		s.waku,
+		params.Identity,
+		messaging.API(),
 		s.config.ShhextConfig.InstallationID,
 		options...,
 	)
@@ -171,6 +218,11 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 }
 
 func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
+	err := s.messaging.Start()
+	if err != nil {
+		return nil, err
+	}
+
 	// Start a loop that retrieves all messages and propagates them to status-mobile.
 	s.cancelMessenger = make(chan struct{})
 	response, err := s.messenger.Start()
@@ -270,7 +322,7 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct{}) {
 	defer gocommon.LogOnPanic()
 	if s.config.ShhextConfig.VerifyTransactionURL == "" {
-		logutils.ZapLogger().Warn("not starting transaction loop")
+		s.logger.Warn("not starting transaction loop")
 		return
 	}
 
@@ -284,7 +336,7 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 		case <-ticker.C:
 			accounts, err := s.accountsDB.GetActiveAccounts()
 			if err != nil {
-				logutils.ZapLogger().Error("failed to retrieve accounts", zap.Error(err))
+				s.logger.Error("failed to retrieve accounts", zap.Error(err))
 			}
 			var wallets []types.Address
 			for _, account := range accounts {
@@ -295,7 +347,7 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 
 			response, err := s.messenger.ValidateTransactions(ctx, wallets)
 			if err != nil {
-				logutils.ZapLogger().Error("failed to validate transactions", zap.Error(err))
+				s.logger.Error("failed to validate transactions", zap.Error(err))
 				continue
 			}
 			s.messenger.PublishMessengerResponse(response)
@@ -323,14 +375,13 @@ func (s *Service) APIs() []gethrpc.API {
 }
 
 // Start is run when a service is started.
-// It does nothing in this case but is required by `node.Service` interface.
 func (s *Service) Start() error {
 	return nil
 }
 
 // Stop is run when a service is stopped.
 func (s *Service) Stop() error {
-	logutils.ZapLogger().Info("Stopping shhext service")
+	s.logger.Info("Stopping shhext service")
 	if s.cancelMessenger != nil {
 		select {
 		case <-s.cancelMessenger:
@@ -343,10 +394,19 @@ func (s *Service) Stop() error {
 
 	if s.messenger != nil {
 		if err := s.messenger.Shutdown(); err != nil {
-			logutils.ZapLogger().Error("failed to stop messenger", zap.Error(err))
+			s.logger.Error("failed to stop messenger", zap.Error(err))
 			return err
 		}
 		s.messenger = nil
+	}
+
+	if s.messaging != nil {
+		err := s.messaging.Stop()
+		if err != nil {
+			s.logger.Error("failed to stop messaging", zap.Error(err))
+			return err
+		}
+		s.messaging = nil
 	}
 
 	return nil
@@ -365,11 +425,10 @@ func buildMessengerOptions(
 	accountsDB *accounts.Database,
 	walletService *wallet.Service,
 	communityTokensService *communitytokens.Service,
-	wakuService *wakuv2.Waku,
 	logger *zap.Logger,
 	messengerSignalsHandler protocol.MessengerSignalsHandler,
-	accountManager account.Manager,
-	accountsFeed *event.Feed,
+	accountsManager *accsmanagement.AccountsManager,
+	accountsPublisher *pubsub.Publisher,
 	ensVerifier *ens.Verifier,
 ) ([]protocol.Option, error) {
 	personalService := personal.New()
@@ -390,12 +449,10 @@ func buildMessengerOptions(
 		protocol.WithHTTPServer(httpServer),
 		protocol.WithRPCClient(rpcClient),
 		protocol.WithMessageCSV(config.OutputMessageCSVEnabled),
-		protocol.WithWalletConfig(&config.WalletConfig),
 		protocol.WithWalletService(walletService),
 		protocol.WithCommunityTokensService(communityTokensService),
-		protocol.WithWakuService(wakuService),
-		protocol.WithAccountManager(accountManager),
-		protocol.WithAccountsFeed(accountsFeed),
+		protocol.WithAccountsManager(accountsManager),
+		protocol.WithAccountsPublisher(accountsPublisher),
 		protocol.WithNewsFeed(),
 		protocol.WithMessageSigner(personalService),
 	}
@@ -409,57 +466,8 @@ func buildMessengerOptions(
 		return nil, err
 	}
 
-	// Generate anon metrics client config
-	if settings.AnonMetricsShouldSend {
-		keyBytes, err := hex.DecodeString(config.ShhextConfig.AnonMetricsSendID)
-		if err != nil {
-			return nil, err
-		}
-
-		key, err := crypto.UnmarshalPubkey(keyBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		amcc := &anonmetrics.ClientConfig{
-			ShouldSend:  true,
-			SendAddress: key,
-		}
-		options = append(options, protocol.WithAnonMetricsClientConfig(amcc))
-	}
-
-	// Generate anon metrics server config
-	if config.ShhextConfig.AnonMetricsServerEnabled {
-		if len(config.ShhextConfig.AnonMetricsServerPostgresURI) == 0 {
-			return nil, errors.New("AnonMetricsServerPostgresURI must be set")
-		}
-
-		amsc := &anonmetrics.ServerConfig{
-			Enabled:     true,
-			PostgresURI: config.ShhextConfig.AnonMetricsServerPostgresURI,
-		}
-		options = append(options, protocol.WithAnonMetricsServerConfig(amsc))
-	}
-
-	if settings.TelemetryServerURL != "" {
-		options = append(options, protocol.WithTelemetry(settings.TelemetryServerURL, time.Duration(settings.TelemetrySendPeriodMs)*time.Millisecond))
-	}
-
-	if settings.PushNotificationsServerEnabled {
-		config := &pushnotificationserver.Config{
-			Enabled: true,
-			Logger:  logger,
-		}
-		options = append(options, protocol.WithPushNotificationServerConfig(config))
-	}
-
-	var pushNotifServKey []*ecdsa.PublicKey
-	for _, d := range config.ShhextConfig.DefaultPushNotificationsServers {
-		pushNotifServKey = append(pushNotifServKey, d.PublicKey)
-	}
-
 	options = append(options, protocol.WithPushNotificationClientConfig(&pushnotificationclient.Config{
-		DefaultServers:             pushNotifServKey,
+		DefaultServers:             config.ShhextConfig.PushNotificationsServers,
 		BlockMentions:              settings.PushNotificationsBlockMentions,
 		SendEnabled:                settings.SendPushNotifications,
 		AllowFromContactsOnly:      settings.PushNotificationsFromContactsOnly,
@@ -485,6 +493,10 @@ func (s *Service) ConnectionChanged(state connection.State) {
 
 func (s *Service) Messenger() *protocol.Messenger {
 	return s.messenger
+}
+
+func (s *Service) Metrics() string {
+	return s.messaging.Metrics()
 }
 
 func tokenURIToCommunityID(tokenURI string) string {
@@ -853,4 +865,22 @@ func getCollectibleCommunityTraits(token *token.CommunityToken) []thirdparty.Col
 			Value:     destructibleStr,
 		},
 	}
+}
+
+func obtainNodeKey(nodeConfig *params.NodeConfig) (*ecdsa.PrivateKey, error) {
+	if nodeConfig.NodeKey != "" {
+		return crypto.HexToECDSA(nodeConfig.NodeKey)
+	}
+
+	nodeKeyStr := os.Getenv("WAKUV2_NODE_KEY")
+	if nodeKeyStr != "" {
+		nodeKeyBytes, err := hexutil.Decode(nodeKeyStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode the go-waku private key: %v", err)
+		}
+
+		return crypto.ToECDSA(nodeKeyBytes)
+	}
+
+	return nil, nil
 }

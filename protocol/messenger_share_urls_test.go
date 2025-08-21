@@ -8,8 +8,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/api/multiformat"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -480,6 +481,19 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithData() {
 
 	expectedURL := fmt.Sprintf("%s/u/%s#%s", baseShareURL, userData, chatKey)
 	s.Require().Equal(expectedURL, url)
+}
+
+func (s *MessengerShareUrlsSuite) TestPrepareEncodedUserDataWithEmptyAccount() {
+	_, contact := s.createContact()
+
+	contact.DisplayName = ""
+	contact.Bio = ""
+
+	userData, chatKey, err := s.m.prepareEncodedUserData(contact)
+	s.Require().NoError(err)
+	// The data should be empty if no display name or bio is set
+	s.Require().Empty(userData)
+	s.Require().NotEmpty(chatKey)
 }
 
 func (s *MessengerShareUrlsSuite) TestShareAndParseUserURLWithData() {

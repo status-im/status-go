@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/tt"
 )
 
@@ -18,14 +18,6 @@ type MessengerCommunityForMobileTestingTestSuite struct {
 
 func TestMessengerCommunityForMobileTesting(t *testing.T) {
 	suite.Run(t, new(MessengerCommunityForMobileTestingTestSuite))
-}
-
-func (s *MessengerCommunityForMobileTestingTestSuite) SetupTest() {
-	s.MessengerBaseTestSuite.SetupTest()
-}
-
-func (s *MessengerCommunityForMobileTestingTestSuite) TearDownTest() {
-	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func (s *MessengerCommunityForMobileTestingTestSuite) TestCreateClosedCommunity() {

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
-
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestMessengerSyncProfilePictureSuite(t *testing.T) {
@@ -27,10 +27,10 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	keyUID := s.m.account.KeyUID
 
 	// pair
-	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
-	s.Require().NoError(err)
+	theirMessenger := s.anotherMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -133,6 +133,4 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	for _, img := range syncedImages {
 		s.Require().NotEqual(img.Clock, lowClock)
 	}
-
-	s.Require().NoError(theirMessenger.Shutdown())
 }

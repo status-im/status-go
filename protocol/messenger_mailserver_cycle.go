@@ -5,12 +5,12 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
-func (m *Messenger) AllMailservers() ([]wakutypes.Mailserver, error) {
+func (m *Messenger) AllMailservers() ([]messagingtypes.StoreNode, error) {
 	// Get configured fleet
 	fleet, err := m.getFleet()
 	if err != nil {
@@ -20,24 +20,9 @@ func (m *Messenger) AllMailservers() ([]wakutypes.Mailserver, error) {
 	return m.allMailserversByFleet(fleet)
 }
 
-func (m *Messenger) allMailserversByFleet(fleet string) ([]wakutypes.Mailserver, error) {
+func (m *Messenger) allMailserversByFleet(fleet string) ([]messagingtypes.StoreNode, error) {
 	// Get default mailservers for given fleet
 	allMailservers := params.DefaultStoreNodes(fleet)
-
-	// Add custom configured mailservers
-	if m.mailserversDatabase != nil {
-		customMailservers, err := m.mailserversDatabase.Mailservers()
-		if err != nil {
-			return nil, err
-		}
-
-		for _, c := range customMailservers {
-			if c.Fleet == fleet {
-				allMailservers = append(allMailservers, c)
-			}
-		}
-	}
-
 	return allMailservers, nil
 }
 
@@ -139,7 +124,7 @@ func (m *Messenger) checkForStorenodeCycleSignals() {
 		return
 	}
 
-	mailserverMap := make(map[peer.ID]wakutypes.Mailserver)
+	mailserverMap := make(map[peer.ID]messagingtypes.StoreNode)
 	for _, ms := range allMailservers {
 		peerID, err := ms.PeerID()
 		if err != nil {
@@ -154,22 +139,22 @@ func (m *Messenger) checkForStorenodeCycleSignals() {
 		case <-m.ctx.Done():
 			return
 		case <-notWorking:
-			signal.SendMailserverNotWorking()
+			signal.SendStoreNodeNotWorking()
 
 		case activeMailserver := <-changed:
 			if activeMailserver != "" {
 				ms, ok := mailserverMap[activeMailserver]
 				if ok {
-					signal.SendMailserverChanged(&ms)
+					signal.SendStoreNodeChanged(&ms)
 				}
 			} else {
-				signal.SendMailserverChanged(nil)
+				signal.SendStoreNodeChanged(nil)
 			}
 		case activeMailserver := <-available:
 			if activeMailserver != "" {
 				ms, ok := mailserverMap[activeMailserver]
 				if ok {
-					signal.SendMailserverAvailable(&ms)
+					signal.SendStoreNodeAvailable(&ms)
 				}
 				m.asyncRequestAllHistoricMessages()
 			}

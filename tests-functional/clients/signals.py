@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 import time
 
 import websocket
@@ -23,6 +24,7 @@ class SignalType(Enum):
     WALLET_ROUTER_SIGN_TRANSACTIONS = "wallet.router.sign-transactions"
     WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED = "wallet.router.sending-transactions-started"
     WALLET_ROUTER_TRANSACTIONS_SENT = "wallet.router.transactions-sent"
+    LOCAL_PAIRING = "localPairing"
 
 
 class WalletEventType(Enum):
@@ -31,6 +33,31 @@ class WalletEventType(Enum):
     WALLET_ACTIVITY_SESSION_UPDATED = "wallet-activity-session-updated"
     TRANSACTIONS_PENDING_TRANSACTION_UPDATE = "pending-transaction-update"
     TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED = "pending-transaction-status-changed"
+    WALLET_TICK_RELOAD = "wallet-tick-reload"
+
+
+class LocalPairingEventType(Enum):
+    # Both Sender and Receiver
+    EVENT_PEER_DISCOVERED = "peer-discovered"
+    EVENT_CONNECTION_ERROR = "connection-error"
+    EVENT_CONNECTION_SUCCESS = "connection-success"
+    EVENT_TRANSFER_ERROR = "transfer-error"
+    EVENT_TRANSFER_SUCCESS = "transfer-success"
+    EVENT_RECEIVED_INSTALLATION = "received-installation"
+    # Only Receiver side
+    EVENT_RECEIVED_ACCOUNT = "received-account"
+    EVENT_PROCESS_SUCCESS = "process-success"
+    EVENT_PROCESS_ERROR = "process-error"
+    EVENT_RECEIVED_KEYSTORE_FILES = "received-keystore-files"
+
+
+class LocalPairingEventAction(Enum):
+    ACTION_CONNECT = 1
+    ACTION_PAIRING_ACCOUNT = 2
+    ACTION_SYNC_DEVICE = 3
+    ACTION_PAIRING_INSTALLATION = 4
+    ACTION_PEER_DISCOVERY = 5
+    ACTION_KEYSTORE_FILES_TRANSFER = 6
 
 
 class SignalClient:
@@ -101,13 +128,17 @@ class SignalClient:
             return self.received_signals[signal_type]["received"][-1]
         return self.received_signals[signal_type]["received"][-delta_count:]
 
-    def wait_for_login(self):
-        signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
-        if "error" in signal["event"]:
-            error_details = signal["event"]["error"]
-            assert not error_details, f"Unexpected error during login: {error_details}"
-        self.node_login_event = signal
-        return signal
+    def wait_for_signal_predicate(self, signal_type, predicate=lambda signal: True, timeout=20):
+        start_time = time.time()
+        while True:
+            elapsed_time = time.time() - start_time
+            if elapsed_time >= timeout:
+                break
+            remaining_time = int(timeout - elapsed_time)
+            signal = self.wait_for_signal(signal_type, remaining_time)
+            if predicate(signal):
+                return signal
+        raise TimeoutError(f"Signal {signal_type} satisfying the predicate is not received in {timeout} seconds")
 
     def wait_for_logout(self):
         signal = self.wait_for_signal(SignalType.NODE_LOGOUT.value)
@@ -123,28 +154,40 @@ class SignalClient:
                 continue
             for event in self.received_signals[signal_type]["received"]:
                 if event_pattern in json.dumps(event):
-                    logging.info(f"Signal {signal_type} containing {event_pattern} is received in {round(time.time() - start_time)} seconds")
+                    logging.debug(f"Signal {signal_type} containing {event_pattern} is received in {round(time.time() - start_time)} seconds")
                     return event
             time.sleep(0.2)
 
+    def get_all_events(self, signal_type):
+        signals = self.received_signals.get(signal_type, {}).get("received", [])
+        return [signal.get("event") for signal in signals]
+
     def _on_error(self, ws, error):
-        logging.error(f"Error: {error}")
+        logging.error(f"SignalClient [{self.url}]: websocket error: {error}")
 
     def _on_close(self, ws, close_status_code, close_msg):
-        logging.info(f"Connection closed: {close_status_code}, {close_msg}")
+        logging.debug(f"SignalClient [{self.url}]: websocket connection closed: {close_status_code}, {close_msg}")
 
     def _on_open(self, ws):
-        logging.info("Connection opened")
+        logging.debug(f"SignalClient [{self.url}]: websocket connection opened")
 
     def _connect(self):
-        ws = websocket.WebSocketApp(
-            self.url,
+        self.wsapp = websocket.WebSocketApp(
+            url=self.url,
             on_message=self.on_message,
             on_error=self._on_error,
+            on_open=self._on_open,
             on_close=self._on_close,
         )
-        ws.on_open = self._on_open
-        ws.run_forever()
+        self.wsapp.run_forever()
+
+    def connect(self):
+        websocket_thread = threading.Thread(target=self._connect)
+        websocket_thread.daemon = True
+        websocket_thread.start()
+
+    def disconnect(self):
+        self.wsapp.close()
 
     def write_signal_to_file(self, signal_data):
         with open(self.signal_file_path, "a+") as file:

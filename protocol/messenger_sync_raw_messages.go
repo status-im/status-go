@@ -2,17 +2,16 @@ package protocol
 
 import (
 	"context"
-	"errors"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-type RawMessageHandler func(ctx context.Context, rawMessage common.RawMessage) (common.RawMessage, error)
+type RawMessageHandler func(ctx context.Context, rawMessage messagingtypes.RawMessage) (messagingtypes.RawMessage, error)
 
 func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) error {
 	state := m.buildMessageState()
@@ -282,14 +281,14 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				return err
 			}
 			identity := m.myHexIdentity()
-			installations := []*multidevice.Installation{
+			installations := []*messagingtypes.Installation{
 				{
 					Identity:  identity,
 					ID:        message.InstallationId,
 					Version:   message.Version,
 					Enabled:   true,
 					Timestamp: int64(message.Clock),
-					InstallationMetadata: &multidevice.InstallationMetadata{
+					InstallationMetadata: &messagingtypes.InstallationMetadata{
 						DeviceType: message.DeviceType,
 						Name:       message.Name,
 					},
@@ -302,11 +301,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				return err
 			}
 
-			multidevice := m.encryptor.GetMultiDevice()
-			if multidevice == nil {
-				return errors.New("multidevice is nil")
-			}
-			_, err = multidevice.AddInstallations(m.IdentityPublicKeyCompressed(), int64(message.GetClock()), installations, true)
+			_, err = m.messaging.AddInstallations(m.IdentityPublicKeyCompressed(), int64(message.GetClock()), installations, true)
 			if err != nil {
 				return err
 			}

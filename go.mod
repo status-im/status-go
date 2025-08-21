@@ -1,8 +1,8 @@
 module github.com/status-im/status-go
 
-go 1.22
+go 1.23
 
-replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.19
+replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.21
 
 replace github.com/rjeczalik/notify => github.com/status-im/notify v1.0.2-status
 
@@ -21,7 +21,7 @@ require (
 	github.com/beevik/ntp v0.3.0
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/cenkalti/backoff/v3 v3.2.2
-	github.com/davecgh/go-spew v1.1.1
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/forPelevin/gomoji v1.1.2
@@ -43,7 +43,6 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/multiformats/go-varint v0.0.7
 	github.com/nfnt/resize v0.0.0-00010101000000-000000000000
-	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/oliamb/cutter v0.2.2
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
@@ -62,8 +61,8 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0
 	github.com/zenthangplus/goccm v0.0.0-20211005163543-2f2e522aca15
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.26.0
-	golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
+	golang.org/x/crypto v0.33.0
+	golang.org/x/image v0.24.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
@@ -79,6 +78,7 @@ require (
 	github.com/andybalholm/brotli v1.1.0
 	github.com/bits-and-blooms/bloom/v3 v3.7.0
 	github.com/brianvoe/gofakeit/v6 v6.28.0
+	github.com/brianvoe/gofakeit/v7 v7.2.1
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/gorilla/sessions v1.2.1
@@ -93,11 +93,9 @@ require (
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
 	github.com/prometheus/client_model v0.6.1
 	github.com/schollz/peerdiscovery v1.7.0
-	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
-	github.com/status-im/extkeys v1.1.0
-	github.com/urfave/cli/v2 v2.27.2
+	github.com/status-im/extkeys v1.2.0
 	github.com/waku-org/go-waku v0.8.1-0.20250411145637-900b98812a91
-	github.com/waku-org/waku-go-bindings v0.0.0-20250528131356-4af668737057
+	github.com/waku-org/waku-go-bindings v0.0.0-20250714110306-6feba5b0df4d
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
@@ -107,14 +105,13 @@ require (
 	go.uber.org/mock v0.4.0
 	go.uber.org/multierr v1.11.0
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
-	golang.org/x/net v0.28.0
-	golang.org/x/text v0.17.0
+	golang.org/x/net v0.35.0
+	golang.org/x/text v0.22.0
 	golang.org/x/time v0.5.0
-	golang.org/x/tools v0.24.0
+	golang.org/x/tools v0.30.0
 )
 
 require (
-	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/RoaringBitmap/roaring v0.9.4 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
@@ -156,7 +153,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
-	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
 	github.com/flynn/noise v1.1.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
@@ -268,6 +264,7 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tklauser/go-sysconf v0.3.6 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
+	github.com/urfave/cli/v2 v2.27.2 // indirect
 	github.com/waku-org/go-discover v0.0.0-20240506173252-4912704efdc5 // indirect
 	github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0 // indirect
 	github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 // indirect
@@ -286,10 +283,9 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/dig v1.18.0 // indirect
 	go.uber.org/fx v1.22.2 // indirect
-	golang.org/x/mod v0.20.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/term v0.23.0 // indirect
+	golang.org/x/mod v0.23.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.3.0 // indirect

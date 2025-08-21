@@ -13,13 +13,16 @@ type HistoricalPriceContainer struct {
 	Prices [][]float64 `json:"prices"`
 }
 
-func (c *Client) FetchHistoryMarketData(ctx context.Context, id string, currency string) (HistoricalPriceContainer, error) {
+func (c *Client) FetchHistoryMarketData(ctx context.Context, id string, currency string, days string) (HistoricalPriceContainer, error) {
+	if days == "" {
+		days = "30"
+	}
 
 	params := netUrl.Values{}
 	params.Add("vs_currency", currency)
-	params.Add("days", "30")
+	params.Add("days", days)
 	url := fmt.Sprintf(coinMarketChartURL, c.baseURL, id)
-	response, err := c.httpClient.DoGetRequest(ctx, url, params)
+	response, err := c.doGetRequestWithOptionalAuth(ctx, url, params)
 	if err != nil {
 		return HistoricalPriceContainer{}, err
 	}

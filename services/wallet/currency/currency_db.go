@@ -62,6 +62,7 @@ func (cdb *DB) UpdateCachedFormats(formats FormatPerSymbol) error {
 	if err != nil {
 		return err
 	}
+	defer insert.Close()
 
 	for _, format := range formats {
 		_, err = insert.Exec(format.Symbol, format.DisplayDecimals, format.StripTrailingZeroes)

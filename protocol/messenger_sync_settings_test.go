@@ -6,16 +6,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/stickers"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 var (
@@ -61,54 +57,17 @@ func TestMessengerSyncSettings(t *testing.T) {
 }
 
 type MessengerSyncSettingsSuite struct {
-	suite.Suite
+	MessengerBaseTestSuite
 	alice  *Messenger
 	alice2 *Messenger
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh    wakutypes.Waku
-	logger *zap.Logger
-
-	ignoreTests bool
-}
-
-func (s *MessengerSyncSettingsSuite) SetupSuite() {
-	s.ignoreTests = true
 }
 
 func (s *MessengerSyncSettingsSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	shh, err := newTestWakuNode(s.logger)
-	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
-	s.shh = shh
-
-	s.alice = s.newMessenger()
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
-
-	s.alice2, err = newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
-	s.Require().NoError(err)
-
-	prepAliceMessengersForPairing(&s.Suite, s.alice, s.alice2)
-}
-
-func (s *MessengerSyncSettingsSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.alice)
-	_ = s.logger.Sync()
-}
-
-func (s *MessengerSyncSettingsSuite) newMessenger() *Messenger {
-	config := params.NodeConfig{
-		NetworkID: 10,
-		DataDir:   "test",
-	}
+	s.MessengerBaseTestSuite.setupMessaging()
 
 	networks := json.RawMessage("{}")
-	setting := settings.Settings{
+	settings := settings.Settings{
 		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
-		AnonMetricsShouldSend:     false,
 		CurrentNetwork:            "mainnet_rpc",
 		DappsAddress:              types.HexToAddress("0x1122334455667788990011223344556677889900"),
 		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
@@ -133,16 +92,25 @@ func (s *MessengerSyncSettingsSuite) newMessenger() *Messenger {
 		Currency:                  "eth",
 	}
 
-	m, err := newTestMessenger(s.shh, testMessengerConfig{
-		extraOptions: []Option{WithAppSettings(setting, config)},
-	})
+	var err error
+	s.m, err = newRunningTestMessenger(s.messagingEnv, testMessengerConfig{appSettings: &settings})
 	s.Require().NoError(err)
-	return m
+	s.privateKey = s.m.identity
+	s.alice = s.m
+
+	s.alice2 = s.anotherMessenger()
+
+	prepAliceMessengersForPairing(&s.Suite, s.alice, s.alice2)
+}
+
+func (s *MessengerSyncSettingsSuite) TearDownTest() {
+	TearDownMessenger(&s.Suite, s.alice2)
+	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func prepAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 	// Set Alice's installation metadata
-	aim := &multidevice.InstallationMetadata{
+	aim := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-device",
 		DeviceType: "alice's-device-type",
 	}
@@ -150,7 +118,7 @@ func prepAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 	s.Require().NoError(err)
 
 	// Set Alice 2's installation metadata
-	a2im := &multidevice.InstallationMetadata{
+	a2im := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}
@@ -211,10 +179,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
-	if s.ignoreTests {
-		s.T().Skip("Currently sticker pack syncing has been deactivated, testing to resume after sticker packs works correctly")
-		return
-	}
+	s.T().Skip("Currently sticker pack syncing has been deactivated, testing to resume after sticker packs works correctly")
 
 	// Check alice 1 settings values
 	as, err := s.alice.settings.GetSettings()

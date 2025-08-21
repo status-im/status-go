@@ -89,7 +89,7 @@ func (c *SendTransactionCommand) Execute(ctx context.Context, request RPCRequest
 		feeManager := &fees.FeeManager{
 			RPCClient: c.RpcClient,
 		}
-		fetchedFees, err := feeManager.SuggestedFees(ctx, dApp.ChainID)
+		fetchedFees, _, _, err := feeManager.SuggestedFees(ctx, dApp.ChainID, common.Address(dApp.SharedAccount))
 		if err != nil {
 			return "", err
 		}

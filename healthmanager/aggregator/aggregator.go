@@ -9,16 +9,19 @@ import (
 
 // Aggregator manages and aggregates the statuses of multiple providers.
 type Aggregator struct {
-	mu               sync.RWMutex
-	name             string
-	providerStatuses map[string]*rpcstatus.ProviderStatus
+	mu                          sync.RWMutex
+	name                        string
+	providerStatuses            map[string]*rpcstatus.ProviderStatus
+	lastAggregatedStatus        rpcstatus.ProviderStatus
+	isLastAggregatedStatusDirty bool
 }
 
 // NewAggregator creates a new instance of Aggregator with the given name.
 func NewAggregator(name string) *Aggregator {
 	return &Aggregator{
-		name:             name,
-		providerStatuses: make(map[string]*rpcstatus.ProviderStatus),
+		name:                        name,
+		providerStatuses:            make(map[string]*rpcstatus.ProviderStatus),
+		isLastAggregatedStatusDirty: true,
 	}
 }
 
@@ -37,6 +40,7 @@ func (a *Aggregator) RegisterProvider(providerName string) {
 			TotalErrorCount:   0,
 		}
 	}
+	a.isLastAggregatedStatusDirty = true
 }
 
 // Update modifies the status of a specific provider.
@@ -73,6 +77,7 @@ func (a *Aggregator) Update(providerStatus rpcstatus.ProviderStatus) {
 			TotalErrorCount:   providerStatus.TotalErrorCount,
 		}
 	}
+	a.isLastAggregatedStatusDirty = true
 }
 
 // UpdateBatch processes a batch of provider statuses.
@@ -90,6 +95,10 @@ func (a *Aggregator) UpdateBatch(statuses []rpcstatus.ProviderStatus) {
 func (a *Aggregator) ComputeAggregatedStatus() rpcstatus.ProviderStatus {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
+
+	if !a.isLastAggregatedStatusDirty {
+		return a.lastAggregatedStatus
+	}
 
 	var lastSuccessAt, lastErrorAt time.Time
 	var lastError error
@@ -142,6 +151,9 @@ func (a *Aggregator) ComputeAggregatedStatus() rpcstatus.ProviderStatus {
 	} else {
 		aggregatedStatus.Status = rpcstatus.StatusDown
 	}
+
+	a.lastAggregatedStatus = aggregatedStatus
+	a.isLastAggregatedStatusDirty = false
 
 	return aggregatedStatus
 }

@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	utils "github.com/status-im/status-go/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 
 	"github.com/stretchr/testify/suite"
@@ -30,7 +30,8 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameChange() {
 	s.Require().Equal(DefaultProfileDisplayName, displayName)
 
 	// add profile keypair
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Name = DefaultProfileDisplayName
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
@@ -77,7 +78,8 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 	s.Require().Equal(DefaultProfileDisplayName, displayName)
 
 	// add profile keypair
-	profileKp := accounts.GetProfileKeypairForTest(true, true, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, true, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Name = DefaultProfileDisplayName
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
@@ -92,12 +94,12 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 	s.Require().True(accounts.SameKeypairs(profileKp, dbProfileKp))
 
 	// Create new device and add main account to
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.anotherMessenger()
 	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	// Store only chat and default wallet account on other device
-	profileKpOtherDevice := accounts.GetProfileKeypairForTest(true, true, false)
+	profileKpOtherDevice, _, _, err := accounts.GetProfileKeypairForTest(true, true, false)
+	s.Require().NoError(err)
 	profileKpOtherDevice.KeyUID = s.m.account.KeyUID
 	profileKpOtherDevice.Name = DefaultProfileDisplayName
 	profileKpOtherDevice.Accounts[0].KeyUID = s.m.account.KeyUID
@@ -112,7 +114,7 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 	s.Require().True(accounts.SameKeypairs(profileKpOtherDevice, dbProfileKp2))
 
 	// Pair devices
-	im1 := &multidevice.InstallationMetadata{
+	im1 := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-other-device",
 		DeviceType: "alice's-other-device-type",
 	}
@@ -196,7 +198,8 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() 
 	s.Require().Equal(DefaultProfileDisplayName, displayName)
 
 	// add profile keypair
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Name = DefaultProfileDisplayName
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
@@ -210,11 +213,11 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() 
 	}
 
 	setInvalidName("dot.not", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("t", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("tt", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("ttt", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("tttt", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("name is bigger than 24 symb", utils.ErrInvalidDisplayNameRegExp)
+	setInvalidName("t", utils.ErrInvalidDisplayNameLength)
+	setInvalidName("tt", utils.ErrInvalidDisplayNameLength)
+	setInvalidName("ttt", utils.ErrInvalidDisplayNameLength)
+	setInvalidName("tttt", utils.ErrInvalidDisplayNameLength)
+	setInvalidName("name is bigger than 24 symb", utils.ErrInvalidDisplayNameLength)
 
 	err = s.m.SetDisplayName("name with space")
 	s.Require().NoError(err)
@@ -242,7 +245,8 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestSaveAccountWhenEnsNameIsSe
 	s.Require().Equal("godfrain.stateofus.eth", displayName)
 
 	// add profile keypair
-	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Name = DefaultProfileDisplayName
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID

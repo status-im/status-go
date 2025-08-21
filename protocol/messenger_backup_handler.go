@@ -10,14 +10,13 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/wakusync"
 	ensservice "github.com/status-im/status-go/services/ens"
 )
@@ -45,7 +44,7 @@ type BackupFetchingStatus struct {
 	fetchingCompletedMutex sync.Mutex
 }
 
-func (m *Messenger) HandleBackup(state *ReceivedMessageState, message *protobuf.Backup, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleBackup(state *ReceivedMessageState, message *protobuf.Backup, statusMessage *messagingtypes.Message) error {
 	if !m.processBackedupMessages {
 		return nil
 	}
@@ -60,6 +59,7 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message *protobuf.
 	return nil
 }
 
+// TODO remove this function once we do the Waku backup removal
 func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.Backup) []error {
 	var errors []error
 
@@ -85,7 +85,7 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 		errors = append(errors, communityErrors...)
 	}
 
-	err = m.handleBackedUpSettings(message.Setting)
+	err = m.HandleBackedUpSettings(message.Setting)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -95,7 +95,7 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 		errors = append(errors, err)
 	}
 
-	err = m.handleWatchOnlyAccount(message.WatchOnlyAccount)
+	err = m.HandleWatchOnlyAccount(message.WatchOnlyAccount)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -122,6 +122,34 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 	}
 
 	state.Response.BackupHandled = true
+
+	return errors
+}
+
+func (m *Messenger) handleLocalBackup(state *ReceivedMessageState, message *protobuf.MessengerLocalBackup) []error {
+	var errors []error
+
+	err := m.handleBackedUpProfile(message.Profile, message.Clock)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	for _, contact := range message.Contacts {
+		err = m.HandleSyncInstallationContactV2(state, contact, nil)
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	err = m.handleSyncChats(state, message.Chats)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	communityErrors := m.handleLocalBackupCommunities(state, message.Communities)
+	if len(communityErrors) > 0 {
+		errors = append(errors, communityErrors...)
+	}
 
 	return errors
 }
@@ -254,7 +282,7 @@ func (m *Messenger) backupFetchingTimeout() {
 	}
 
 	notification.UpdatedAt = m.GetCurrentTimeInMillis()
-	if m.backedUpFetchingStatus.dataProgress == nil || len(m.backedUpFetchingStatus.dataProgress) == 0 {
+	if len(m.backedUpFetchingStatus.dataProgress) == 0 {
 		notification.Type = ActivityCenterNotificationTypeBackupSyncingFailure
 	} else {
 		notification.Type = ActivityCenterNotificationTypeBackupSyncingPartialFailure
@@ -347,6 +375,13 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 			if err != nil {
 				return err
 			}
+
+			if m.httpServer != nil {
+				for j, image := range idImages {
+					idImages[j].LocalURL = m.httpServer.MakeAccountImageURL(message.KeyUid, image.Name, image.Clock)
+				}
+			}
+
 			response.SetImages(idImages)
 		}
 	}
@@ -376,7 +411,7 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 	return err
 }
 
-func (m *Messenger) handleBackedUpSettings(message *protobuf.SyncSetting) error {
+func (m *Messenger) HandleBackedUpSettings(message *protobuf.SyncSetting) error {
 	if message == nil {
 		return nil
 	}
@@ -405,7 +440,7 @@ func (m *Messenger) handleBackedUpSettings(message *protobuf.SyncSetting) error 
 				m.account.Name = message.GetValueString()
 				err = m.multiAccounts.SaveAccount(*m.account)
 				if err != nil {
-					m.logger.Warn("[handleBackedUpSettings] failed to save account", zap.Error(err))
+					m.logger.Warn("[HandleBackedUpSettings] failed to save account", zap.Error(err))
 					return nil
 				}
 			}
@@ -456,7 +491,7 @@ func (m *Messenger) handleKeypair(message *protobuf.SyncKeypair) error {
 	return nil
 }
 
-func (m *Messenger) handleWatchOnlyAccount(message *protobuf.SyncAccount) error {
+func (m *Messenger) HandleWatchOnlyAccount(message *protobuf.SyncAccount) error {
 	if message == nil {
 		return nil
 	}
@@ -492,9 +527,27 @@ func syncInstallationCommunitiesSet(communities []*protobuf.SyncInstallationComm
 	return ret
 }
 
+// TODO remove this function once we do the Waku backup removal
 func (m *Messenger) handleSyncedCommunities(state *ReceivedMessageState, message *protobuf.Backup) []error {
 	var errors []error
 	for _, syncCommunity := range syncInstallationCommunitiesSet(message.Communities) {
+		err := m.handleSyncInstallationCommunity(state, syncCommunity)
+		if err != nil {
+			errors = append(errors, err)
+		}
+
+		err = m.requestCommunityKeysAndSharedAddresses(state, syncCommunity)
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	return errors
+}
+
+func (m *Messenger) handleLocalBackupCommunities(state *ReceivedMessageState, communities []*protobuf.SyncInstallationCommunity) []error {
+	var errors []error
+	for _, syncCommunity := range syncInstallationCommunitiesSet(communities) {
 		err := m.handleSyncInstallationCommunity(state, syncCommunity)
 		if err != nil {
 			errors = append(errors, err)
@@ -533,7 +586,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(state *ReceivedMessag
 		return err
 	}
 
-	rawMessage := &common.RawMessage{
+	rawMessage := &messagingtypes.RawMessage{
 		Payload:             payload,
 		Sender:              m.identity,
 		CommunityID:         community.ID(),

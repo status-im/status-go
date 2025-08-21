@@ -13,3 +13,61 @@ class AccountService(Service):
     def get_account_keypairs(self):
         response = self.rpc_request("getKeypairs")
         return response.json()
+
+    def add_account(self, password, account_data):
+        params = [password, account_data]
+        response = self.rpc_request("addAccount", params)
+        return response.json()
+
+    def delete_account(self, account_address):
+        params = [account_address]
+        response = self.rpc_request("deleteAccount", params)
+        return response.json()
+
+    def import_mnemonic(self, mnemonic, password):
+        params = [mnemonic, password]
+        response = self.rpc_request("importMnemonic", params)
+        return response.json()
+
+    def add_keypair_via_seed_phrase(self, mnemonic, password, name, wallet_account):
+        params = [mnemonic, password, name, wallet_account]
+        response = self.rpc_request("addKeypairViaSeedPhrase", params)
+        return response.json()
+
+    def add_keypair_via_private_key(self, private_key, password, name, wallet_account):
+        params = [private_key, password, name, wallet_account]
+        response = self.rpc_request("addKeypairViaPrivateKey", params)
+        return response.json()
+
+    def verify_password(self, password):
+        params = [password]
+        response = self.rpc_request("verifyPassword", params)
+        return response.json()
+
+    def resolve_suggested_path_for_keypair(self, key_uid):
+        params = [key_uid]
+        response = self.rpc_request("resolveSuggestedPathForKeypair", params)
+        return response.json()
+
+    def has_paired_devices(self):
+        response = self.rpc_request("hasPairedDevices", [])
+        return response.json()
+
+    def update_keypair_name(self, key_uid, name):
+        params = [key_uid, name]
+        response = self.rpc_request("updateKeypairName", params)
+        return response.json()
+
+    def move_wallet_account(self, from_position, to_position):
+        params = [from_position, to_position]
+        response = self.rpc_request("moveWalletAccount", params)
+        return response.json()
+
+    def update_token_preferences(self, preferences):
+        params = [preferences]
+        response = self.rpc_request("updateTokenPreferences", params)
+        return response.json()
+
+    def get_token_preferences(self):
+        response = self.rpc_request("getTokenPreferences", [])
+        return response.json()

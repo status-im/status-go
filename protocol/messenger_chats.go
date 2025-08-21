@@ -425,11 +425,11 @@ func (m *Messenger) deactivateChat(chatID string, deactivationClock uint64, shou
 
 	if m.mailserversDatabase != nil {
 		for _, filter := range filters {
-			if !filter.Listen || filter.Ephemeral {
+			if !filter.IsListening() || filter.IsEphemeral() {
 				continue
 			}
 
-			err := m.mailserversDatabase.ResetLastRequest(filter.PubsubTopic, filter.ContentTopic.String())
+			err := m.mailserversDatabase.ResetLastRequest(filter.PubsubTopic(), filter.ContentTopic().String())
 			if err != nil {
 				return nil, err
 			}

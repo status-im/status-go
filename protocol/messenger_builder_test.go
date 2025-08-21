@@ -2,24 +2,30 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/messaging"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type testMessengerConfig struct {
@@ -30,6 +36,8 @@ type testMessengerConfig struct {
 	unhandledMessagesTracker *unhandledMessagesTracker
 	messagesOrderController  *MessagesOrderController
 
+	appSettings  *settings.Settings
+	nodeConfig   *params.NodeConfig
 	extraOptions []Option
 }
 
@@ -51,17 +59,29 @@ func (tmc *testMessengerConfig) complete() error {
 		tmc.logger = logger.Named(tmc.name)
 	}
 
+	if tmc.appSettings == nil {
+		tmc.appSettings = newTestSettings()
+	}
+
+	if tmc.nodeConfig == nil {
+		tmc.nodeConfig = &params.NodeConfig{}
+	}
+
 	return nil
 }
 
-func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messenger, error) {
+func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
 	err := config.complete()
 	if err != nil {
 		return nil, err
 	}
 
 	acc := generator.NewAccount(config.privateKey, nil)
-	iai := acc.ToIdentifiedAccountInfo("")
+	iai := acc.ToIdentifiedAccountInfo()
+	multiAcc := &multiaccounts.Account{
+		Timestamp: time.Now().Unix(),
+		KeyUID:    iai.KeyUID,
+	}
 
 	madb, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
 	if err != nil {
@@ -76,9 +96,49 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		return nil, err
 	}
 
+	err = sqlite.Migrate(appDb)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to apply migrations")
+	}
+
+	if config.appSettings.Networks == nil {
+		networks := new(json.RawMessage)
+		if err := networks.UnmarshalJSON([]byte("net")); err != nil {
+			return nil, err
+		}
+
+		config.appSettings.Networks = networks
+	}
+
+	sDB, err := accounts.NewDB(appDb)
+	if err != nil {
+		return nil, err
+	}
+
+	err = sDB.CreateSettings(*config.appSettings, *config.nodeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	installationID := uuid.New().String()
+
+	messaging, err := messagingEnv.NewTestCore(
+		messaging.CoreParams{
+			Identity:       config.privateKey,
+			DB:             appDb,
+			Persistence:    NewMessagingPersistence(appDb),
+			InstallationID: installationID,
+			TimeSource:     &testTimeSource{},
+		},
+		messaging.WithLogger(config.logger),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	ensVerifier := ens.New(
 		config.logger,
-		waku, // timesource
+		&testTimeSource{},
 		appDb,
 		"",
 		"",
@@ -88,11 +148,10 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		WithCustomLogger(config.logger),
 		WithDatabase(appDb),
 		WithWalletDatabase(walletDb),
+		WithBrowserDatabase(browsers.NewDB(appDb)),
 		WithMultiAccounts(madb),
-		WithAccount(iai.ToMultiAccount()),
+		WithAccount(multiAcc),
 		WithDatasync(),
-		WithToplevelDatabaseMigrations(),
-		WithBrowserDatabase(nil),
 		WithCuratedCommunitiesUpdateLoop(false),
 		WithStubOnlineChecker(),
 		WithENSVerifier(ensVerifier),
@@ -102,8 +161,8 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 
 	m, err := NewMessenger(
 		config.privateKey,
-		waku,
-		uuid.New().String(),
+		messaging.API(),
+		installationID,
 		options...,
 	)
 	if err != nil {
@@ -128,7 +187,23 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		return nil, err
 	}
 
-	err = m.InitFilters()
+	return m, nil
+}
+
+func newRunningTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
+	m, err := newTestMessenger(messagingEnv, config)
+	if err != nil {
+		return nil, err
+	}
+
+	m.EnableBackedupMessagesProcessing()
+
+	err = m.messaging.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = m.Start()
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +212,7 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 }
 
 type unhandedMessage struct {
-	*v1protocol.StatusMessage
+	*messagingtypes.Message
 	err error
 }
 
@@ -145,7 +220,7 @@ type unhandledMessagesTracker struct {
 	messages map[protobuf.ApplicationMetadataMessage_Type][]*unhandedMessage
 }
 
-func (u *unhandledMessagesTracker) addMessage(msg *v1protocol.StatusMessage, err error) {
+func (u *unhandledMessagesTracker) addMessage(msg *messagingtypes.Message, err error) {
 	msgType := msg.ApplicationLayer.Type
 
 	if _, exists := u.messages[msgType]; !exists {
@@ -153,14 +228,14 @@ func (u *unhandledMessagesTracker) addMessage(msg *v1protocol.StatusMessage, err
 	}
 
 	newMessage := &unhandedMessage{
-		StatusMessage: msg,
-		err:           err,
+		Message: msg,
+		err:     err,
 	}
 	u.messages[msgType] = append(u.messages[msgType], newMessage)
 }
 
-func newTestSettings() settings.Settings {
-	return settings.Settings{
+func newTestSettings() *settings.Settings {
+	return &settings.Settings{
 		DisplayName:               DefaultProfileDisplayName,
 		ProfilePicturesShowTo:     1,
 		ProfilePicturesVisibility: 1,

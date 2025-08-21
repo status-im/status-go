@@ -3,7 +3,9 @@ package chain
 import (
 	"context"
 	"errors"
+	"math/big"
 	"reflect"
+	"runtime"
 	"strconv"
 	"testing"
 
@@ -90,12 +92,10 @@ func TestClientWithFallback_Copy(t *testing.T) {
 	// Setup test values
 	testTag := "test-tag"
 	testGroupTag := "test-group-tag"
-	testNotifier := func(chainId uint64, message string) {}
 
 	// Set values on the original client
 	client.tag = testTag
 	client.groupTag = testGroupTag
-	client.WalletNotifier = testNotifier
 
 	// Copy the client
 	clientCopy := client.Copy().(*ClientWithFallback)
@@ -104,7 +104,6 @@ func TestClientWithFallback_Copy(t *testing.T) {
 	require.Equal(t, client.ChainID, clientCopy.ChainID)
 	require.Equal(t, client.tag, clientCopy.tag)
 	require.Equal(t, client.groupTag, clientCopy.groupTag)
-	require.Equal(t, client.LastCheckedAt, clientCopy.LastCheckedAt)
 
 	// Verify that both clients have the same ethClients slice
 	require.Equal(t, len(client.ethClients), len(clientCopy.ethClients))
@@ -113,14 +112,8 @@ func TestClientWithFallback_Copy(t *testing.T) {
 	}
 
 	// Check that pointer values are the same (shallow copy)
-	require.Same(t, client.isConnected, clientCopy.isConnected)
 	require.Same(t, client.circuitbreaker, clientCopy.circuitbreaker)
 	require.Same(t, client.providersHealthManager, clientCopy.providersHealthManager)
-
-	// Verify that function references are the same
-	clientFuncPtr := getFuncPtr(client.WalletNotifier)
-	copyFuncPtr := getFuncPtr(clientCopy.WalletNotifier)
-	require.Equal(t, clientFuncPtr, copyFuncPtr)
 
 	// Modify the copy, ensure it doesn't affect the original
 	clientCopy.tag = "new-tag"
@@ -135,4 +128,172 @@ func getFuncPtr(f func(uint64, string)) uintptr {
 		return 0
 	}
 	return reflect.ValueOf(f).Pointer()
+}
+
+// TestClientWithFallback_CloseStopsOperations tests that closing the client
+// properly stops all ongoing operations
+func TestClientWithFallback_CloseStopsOperations(t *testing.T) {
+	client, ethClients, cleanup := setupClientTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	addr := common.HexToAddress("0x1234")
+
+	// Create channels to coordinate the test
+	done := make(chan struct{})
+	operationStarted := make(chan struct{})
+
+	// Set up the first client to block for a short time
+	ethClients[0].EXPECT().CodeAt(ctx, addr, nil).DoAndReturn(
+		func(ctx context.Context, addr common.Address, blockNumber *big.Int) ([]byte, error) {
+			close(operationStarted) // Signal that operation has started
+
+			// Wait for context cancellation
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}).Times(1)
+
+	// Set up expectations for other clients - they should not be called
+	// because the operation should be cancelled after the first client
+	ethClients[1].EXPECT().CodeAt(ctx, addr, nil).Times(0)
+	ethClients[2].EXPECT().CodeAt(ctx, addr, nil).Times(0)
+
+	// Set up expectations for Close on all clients
+	for _, ethClient := range ethClients {
+		ethClient.EXPECT().Close().Times(1)
+	}
+
+	// Start the operation in a goroutine
+	go func() {
+		defer close(done)
+		_, err := client.CodeAt(ctx, addr, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "context canceled")
+	}()
+
+	// Wait for operation to start
+	<-operationStarted
+
+	// Close the client while operation is running
+	client.Close()
+
+	// Wait for the operation to complete
+	<-done
+
+	// Verify that subsequent calls fail immediately
+	_, err := client.CodeAt(ctx, addr, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "client is closed")
+}
+
+// TestClientWithFallback_CloseStopsMultipleOperations tests that closing the client
+// properly stops multiple concurrent operations
+func TestClientWithFallback_CloseStopsMultipleOperations(t *testing.T) {
+	client, ethClients, cleanup := setupClientTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	addr1 := common.HexToAddress("0x1234")
+	addr2 := common.HexToAddress("0x5678")
+	hash := common.HexToHash("0xabcd")
+	blockNumber := big.NewInt(100)
+
+	// Create channels to coordinate the test
+	operation1Started := make(chan struct{})
+	operation2Started := make(chan struct{})
+	operation3Started := make(chan struct{})
+
+	operation1Done := make(chan struct{})
+	operation2Done := make(chan struct{})
+	operation3Done := make(chan struct{})
+
+	allOperationsStarted := make(chan struct{})
+
+	// Helper function to create operation handlers with common logic
+	createOperationHandler := func(operationStarted chan struct{}) func(context.Context) error {
+		return func(ctx context.Context) error {
+			close(operationStarted)
+
+			// Wait for all operations to start or context to be cancelled
+			select {
+			case <-allOperationsStarted:
+				// Continue with normal processing
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+
+			// Now wait for context cancellation
+			<-ctx.Done()
+			return ctx.Err()
+		}
+	}
+
+	// Set up the mock responses for operation 1
+	ethClients[0].EXPECT().CodeAt(ctx, addr1, nil).DoAndReturn(
+		func(ctx context.Context, addr common.Address, blockNumber *big.Int) ([]byte, error) {
+			err := createOperationHandler(operation1Started)(ctx)
+			return nil, err
+		}).Times(1)
+
+	// Set up the mock responses for operation 2
+	ethClients[0].EXPECT().BalanceAt(ctx, addr2, blockNumber).DoAndReturn(
+		func(ctx context.Context, addr common.Address, blockNumber *big.Int) (*big.Int, error) {
+			err := createOperationHandler(operation2Started)(ctx)
+			return nil, err
+		}).Times(1)
+
+	// Set up the mock responses for operation 3
+	ethClients[0].EXPECT().BlockByHash(ctx, hash).DoAndReturn(
+		func(ctx context.Context, hash common.Hash) (*types.Block, error) {
+			err := createOperationHandler(operation3Started)(ctx)
+			return nil, err
+		}).Times(1)
+
+	// Set up expectations for Close on all clients
+	for _, ethClient := range ethClients {
+		ethClient.EXPECT().Close().Times(1)
+	}
+
+	// Start operation 1 in a goroutine
+	go func() {
+		defer close(operation1Done)
+		_, err := client.CodeAt(ctx, addr1, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "context canceled")
+	}()
+
+	// Start operation 2 in a goroutine
+	go func() {
+		defer close(operation2Done)
+		_, err := client.BalanceAt(ctx, addr2, blockNumber)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "context canceled")
+	}()
+
+	// Start operation 3 in a goroutine
+	go func() {
+		defer close(operation3Done)
+		_, err := client.BlockByHash(ctx, hash)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "context canceled")
+	}()
+
+	// Wait for all operations to start
+	<-operation1Started
+	<-operation2Started
+	<-operation3Started
+
+	// Signal all operations that they can proceed past their initial state
+	close(allOperationsStarted)
+
+	// Wait a small amount of time for operations to reach the waiting state
+	runtime.Gosched()
+
+	// Close the client while operations are running
+	client.Close()
+
+	// All operations should complete with cancellation errors
+	<-operation1Done
+	<-operation2Done
+	<-operation3Done
 }

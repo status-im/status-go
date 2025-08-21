@@ -42,7 +42,19 @@ func (t *TokenLists) rebuildTokensMap(fetchedLists []fetcher.FetchedTokenList) e
 	// temporary soltion to avoid token collisions
 	t.solveCollision()
 
+	t.ensureEmptyTokenListsAreNotNil()
+
 	return nil
+}
+
+func (t *TokenLists) ensureEmptyTokenListsAreNotNil() {
+	t.tokensListsMu.RLock()
+	defer t.tokensListsMu.RUnlock()
+	for _, list := range t.tokensLists {
+		if len(list.Tokens) == 0 {
+			list.Tokens = make([]*tokenTypes.Token, 0)
+		}
+	}
 }
 
 func getDefaultTokensLists() []fetcher.FetchedTokenList {
@@ -113,7 +125,8 @@ func filterTokens(tokens []*tokenTypes.Token) []*tokenTypes.Token {
 				break
 			}
 		}
-		if !found {
+		// remove native token on respective chains as they are added via a different list
+		if !found || token.IsNative() {
 			continue
 		}
 		filteredTokens = append(filteredTokens, token)

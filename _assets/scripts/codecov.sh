@@ -16,6 +16,9 @@ report_to_codecov() {
     report_files_args+="--file ${file} "
   done
 
+  # Print codecov version
+  codecov --version
+
   # Don't upload test results to Codecov while we re-run tests on failure.
   # This results in having both failure and success results in the same report, which Codecov treats as a failure
   # and doesn't report coverage to Github. More details here: https://github.com/status-im/status-go/issues/5963

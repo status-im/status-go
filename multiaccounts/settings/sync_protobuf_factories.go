@@ -8,7 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 
-	"github.com/status-im/status-go/protocol/common"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/sqlite"
 )
@@ -17,23 +17,23 @@ var (
 	ErrTypeAssertionFailed = errors.New("type assertion of interface value failed")
 )
 
-func buildRawSyncSettingMessage(msg *protobuf.SyncSetting, chatID string) (*common.RawMessage, error) {
+func buildRawSyncSettingMessage(msg *protobuf.SyncSetting, chatID string) (*messagingtypes.RawMessage, error) {
 	encodedMessage, err := proto.Marshal(msg)
 	if err != nil {
 		return nil, err
 	}
 
-	return &common.RawMessage{
+	return &messagingtypes.RawMessage{
 		LocalChatID: chatID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_SETTING,
-		ResendType:  common.ResendTypeDataSync,
+		ResendType:  messagingtypes.ResendTypeDataSync,
 	}, nil
 }
 
 // Currency
 
-func buildRawCurrencySyncMessage(v string, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawCurrencySyncMessage(v string, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_CURRENCY,
 		Value: &protobuf.SyncSetting_ValueString{ValueString: v},
@@ -43,7 +43,7 @@ func buildRawCurrencySyncMessage(v string, clock uint64, chatID string) (*common
 	return rm, pb, err
 }
 
-func currencyProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func currencyProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertString(value)
 	if err != nil {
 		return nil, nil, err
@@ -52,13 +52,13 @@ func currencyProtobufFactory(value interface{}, clock uint64, chatID string) (*c
 	return buildRawCurrencySyncMessage(v, clock, chatID)
 }
 
-func currencyProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func currencyProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawCurrencySyncMessage(s.Currency, clock, chatID)
 }
 
 // GifFavorites
 
-func buildRawGifFavoritesSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawGifFavoritesSyncMessage(v []byte, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_GIF_FAVOURITES,
 		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
@@ -68,7 +68,7 @@ func buildRawGifFavoritesSyncMessage(v []byte, clock uint64, chatID string) (*co
 	return rm, pb, err
 }
 
-func gifFavouritesProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func gifFavouritesProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertBytes(value)
 	if err != nil {
 		return nil, nil, err
@@ -77,14 +77,14 @@ func gifFavouritesProtobufFactory(value interface{}, clock uint64, chatID string
 	return buildRawGifFavoritesSyncMessage(v, clock, chatID)
 }
 
-func gifFavouritesProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func gifFavouritesProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	gf := extractJSONRawMessage(s.GifFavorites)
 	return buildRawGifFavoritesSyncMessage(gf, clock, chatID)
 }
 
 // GifRecents
 
-func buildRawGifRecentsSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawGifRecentsSyncMessage(v []byte, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_GIF_RECENTS,
 		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
@@ -94,7 +94,7 @@ func buildRawGifRecentsSyncMessage(v []byte, clock uint64, chatID string) (*comm
 	return rm, pb, err
 }
 
-func gifRecentsProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func gifRecentsProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertBytes(value)
 	if err != nil {
 		return nil, nil, err
@@ -103,14 +103,14 @@ func gifRecentsProtobufFactory(value interface{}, clock uint64, chatID string) (
 	return buildRawGifRecentsSyncMessage(v, clock, chatID)
 }
 
-func gifRecentsProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func gifRecentsProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	gr := extractJSONRawMessage(s.GifRecents)
 	return buildRawGifRecentsSyncMessage(gr, clock, chatID)
 }
 
 // MessagesFromContactsOnly
 
-func buildRawMessagesFromContactsOnlySyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawMessagesFromContactsOnlySyncMessage(v bool, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_MESSAGES_FROM_CONTACTS_ONLY,
 		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
@@ -120,7 +120,7 @@ func buildRawMessagesFromContactsOnlySyncMessage(v bool, clock uint64, chatID st
 	return rm, pb, err
 }
 
-func messagesFromContactsOnlyProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func messagesFromContactsOnlyProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertBool(value)
 	if err != nil {
 		return nil, nil, err
@@ -129,13 +129,13 @@ func messagesFromContactsOnlyProtobufFactory(value interface{}, clock uint64, ch
 	return buildRawMessagesFromContactsOnlySyncMessage(v, clock, chatID)
 }
 
-func messagesFromContactsOnlyProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func messagesFromContactsOnlyProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawMessagesFromContactsOnlySyncMessage(s.MessagesFromContactsOnly, clock, chatID)
 }
 
 // PreferredName
 
-func buildRawPreferredNameSyncMessage(v string, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawPreferredNameSyncMessage(v string, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_PREFERRED_NAME,
 		Value: &protobuf.SyncSetting_ValueString{ValueString: v},
@@ -145,7 +145,7 @@ func buildRawPreferredNameSyncMessage(v string, clock uint64, chatID string) (*c
 	return rm, pb, err
 }
 
-func preferredNameProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func preferredNameProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertString(value)
 	if err != nil {
 		return nil, nil, err
@@ -154,7 +154,7 @@ func preferredNameProtobufFactory(value interface{}, clock uint64, chatID string
 	return buildRawPreferredNameSyncMessage(v, clock, chatID)
 }
 
-func preferredNameProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func preferredNameProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	var pn string
 	if s.PreferredName != nil {
 		pn = *s.PreferredName
@@ -165,7 +165,7 @@ func preferredNameProtobufFactoryStruct(s Settings, clock uint64, chatID string)
 
 // PreviewPrivacy
 
-func buildRawPreviewPrivacySyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawPreviewPrivacySyncMessage(v bool, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_PREVIEW_PRIVACY,
 		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
@@ -175,7 +175,7 @@ func buildRawPreviewPrivacySyncMessage(v bool, clock uint64, chatID string) (*co
 	return rm, pb, err
 }
 
-func previewPrivacyProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func previewPrivacyProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertBool(value)
 	if err != nil {
 		return nil, nil, err
@@ -184,13 +184,13 @@ func previewPrivacyProtobufFactory(value interface{}, clock uint64, chatID strin
 	return buildRawPreviewPrivacySyncMessage(v, clock, chatID)
 }
 
-func previewPrivacyProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func previewPrivacyProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawPreviewPrivacySyncMessage(s.PreviewPrivacy, clock, chatID)
 }
 
 // ProfilePicturesShowTo
 
-func buildRawProfilePicturesShowToSyncMessage(v int64, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawProfilePicturesShowToSyncMessage(v int64, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_PROFILE_PICTURES_SHOW_TO,
 		Value: &protobuf.SyncSetting_ValueInt64{ValueInt64: v},
@@ -200,7 +200,7 @@ func buildRawProfilePicturesShowToSyncMessage(v int64, clock uint64, chatID stri
 	return rm, pb, err
 }
 
-func profilePicturesShowToProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func profilePicturesShowToProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := parseNumberToInt64(value)
 	if err != nil {
 		return nil, nil, err
@@ -209,13 +209,13 @@ func profilePicturesShowToProtobufFactory(value interface{}, clock uint64, chatI
 	return buildRawProfilePicturesShowToSyncMessage(v, clock, chatID)
 }
 
-func profilePicturesShowToProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func profilePicturesShowToProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawProfilePicturesShowToSyncMessage(int64(s.ProfilePicturesShowTo), clock, chatID)
 }
 
 // ProfilePicturesVisibility
 
-func buildRawProfilePicturesVisibilitySyncMessage(v int64, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawProfilePicturesVisibilitySyncMessage(v int64, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_PROFILE_PICTURES_VISIBILITY,
 		Value: &protobuf.SyncSetting_ValueInt64{ValueInt64: v},
@@ -225,7 +225,7 @@ func buildRawProfilePicturesVisibilitySyncMessage(v int64, clock uint64, chatID 
 	return rm, pb, err
 }
 
-func profilePicturesVisibilityProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func profilePicturesVisibilityProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := parseNumberToInt64(value)
 	if err != nil {
 		return nil, nil, err
@@ -234,13 +234,13 @@ func profilePicturesVisibilityProtobufFactory(value interface{}, clock uint64, c
 	return buildRawProfilePicturesVisibilitySyncMessage(v, clock, chatID)
 }
 
-func profilePicturesVisibilityProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func profilePicturesVisibilityProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawProfilePicturesVisibilitySyncMessage(int64(s.ProfilePicturesVisibility), clock, chatID)
 }
 
 // SendStatusUpdates
 
-func buildRawSendStatusUpdatesSyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawSendStatusUpdatesSyncMessage(v bool, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_SEND_STATUS_UPDATES,
 		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
@@ -250,7 +250,7 @@ func buildRawSendStatusUpdatesSyncMessage(v bool, clock uint64, chatID string) (
 	return rm, pb, err
 }
 
-func sendStatusUpdatesProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func sendStatusUpdatesProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertBool(value)
 	if err != nil {
 		return nil, nil, err
@@ -259,13 +259,13 @@ func sendStatusUpdatesProtobufFactory(value interface{}, clock uint64, chatID st
 	return buildRawSendStatusUpdatesSyncMessage(v, clock, chatID)
 }
 
-func sendStatusUpdatesProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func sendStatusUpdatesProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawSendStatusUpdatesSyncMessage(s.SendStatusUpdates, clock, chatID)
 }
 
 // StickerPacksInstalled
 
-func buildRawStickerPacksInstalledSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawStickerPacksInstalledSyncMessage(v []byte, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_STICKERS_PACKS_INSTALLED,
 		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
@@ -275,7 +275,7 @@ func buildRawStickerPacksInstalledSyncMessage(v []byte, clock uint64, chatID str
 	return rm, pb, err
 }
 
-func stickersPacksInstalledProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func stickersPacksInstalledProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := parseJSONBlobData(value)
 	if err != nil {
 		return nil, nil, err
@@ -284,14 +284,14 @@ func stickersPacksInstalledProtobufFactory(value interface{}, clock uint64, chat
 	return buildRawStickerPacksInstalledSyncMessage(v, clock, chatID)
 }
 
-func stickersPacksInstalledProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func stickersPacksInstalledProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	spi := extractJSONRawMessage(s.StickerPacksInstalled)
 	return buildRawStickerPacksInstalledSyncMessage(spi, clock, chatID)
 }
 
 // StickerPacksPending
 
-func buildRawStickerPacksPendingSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawStickerPacksPendingSyncMessage(v []byte, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_STICKERS_PACKS_PENDING,
 		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
@@ -301,7 +301,7 @@ func buildRawStickerPacksPendingSyncMessage(v []byte, clock uint64, chatID strin
 	return rm, pb, err
 }
 
-func stickersPacksPendingProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func stickersPacksPendingProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := parseJSONBlobData(value)
 	if err != nil {
 		return nil, nil, err
@@ -310,14 +310,14 @@ func stickersPacksPendingProtobufFactory(value interface{}, clock uint64, chatID
 	return buildRawStickerPacksPendingSyncMessage(v, clock, chatID)
 }
 
-func stickersPacksPendingProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func stickersPacksPendingProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	spp := extractJSONRawMessage(s.StickerPacksPending)
 	return buildRawStickerPacksPendingSyncMessage(spp, clock, chatID)
 }
 
 // StickersRecentStickers
 
-func buildRawStickersRecentStickersSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawStickersRecentStickersSyncMessage(v []byte, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_STICKERS_RECENT_STICKERS,
 		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
@@ -327,7 +327,7 @@ func buildRawStickersRecentStickersSyncMessage(v []byte, clock uint64, chatID st
 	return rm, pb, err
 }
 
-func stickersRecentStickersProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func stickersRecentStickersProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := parseJSONBlobData(value)
 	if err != nil {
 		return nil, nil, err
@@ -336,7 +336,7 @@ func stickersRecentStickersProtobufFactory(value interface{}, clock uint64, chat
 	return buildRawStickersRecentStickersSyncMessage(v, clock, chatID)
 }
 
-func stickersRecentStickersProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func stickersRecentStickersProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	srs := extractJSONRawMessage(s.StickersRecentStickers)
 	return buildRawStickersRecentStickersSyncMessage(srs, clock, chatID)
 }
@@ -445,7 +445,7 @@ func extractJSONRawMessage(jrm *json.RawMessage) []byte {
 
 // DisplayName
 
-func buildRawDisplayNameSyncMessage(v string, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawDisplayNameSyncMessage(v string, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_DISPLAY_NAME,
 		Value: &protobuf.SyncSetting_ValueString{ValueString: v},
@@ -455,7 +455,7 @@ func buildRawDisplayNameSyncMessage(v string, clock uint64, chatID string) (*com
 	return rm, pb, err
 }
 
-func displayNameProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func displayNameProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertString(value)
 	if err != nil {
 		return nil, nil, err
@@ -464,14 +464,14 @@ func displayNameProtobufFactory(value interface{}, clock uint64, chatID string) 
 	return buildRawDisplayNameSyncMessage(v, clock, chatID)
 }
 
-func displayNameProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func displayNameProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 
 	return buildRawDisplayNameSyncMessage(s.DisplayName, clock, chatID)
 }
 
 // Bio
 
-func buildRawBioSyncMessage(v string, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawBioSyncMessage(v string, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_BIO,
 		Value: &protobuf.SyncSetting_ValueString{ValueString: v},
@@ -481,7 +481,7 @@ func buildRawBioSyncMessage(v string, clock uint64, chatID string) (*common.RawM
 	return rm, pb, err
 }
 
-func bioProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func bioProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertString(value)
 	if err != nil {
 		return nil, nil, err
@@ -490,13 +490,13 @@ func bioProtobufFactory(value interface{}, clock uint64, chatID string) (*common
 	return buildRawBioSyncMessage(v, clock, chatID)
 }
 
-func bioProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func bioProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawBioSyncMessage(s.Bio, clock, chatID)
 }
 
 // MnemonicRemoved
 
-func buildRawMnemonicRemovedSyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawMnemonicRemovedSyncMessage(v bool, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_MNEMONIC_REMOVED,
 		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
@@ -506,7 +506,7 @@ func buildRawMnemonicRemovedSyncMessage(v bool, clock uint64, chatID string) (*c
 	return rm, pb, err
 }
 
-func mnemonicRemovedProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func mnemonicRemovedProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertBool(value)
 	if err != nil {
 		return nil, nil, err
@@ -515,13 +515,13 @@ func mnemonicRemovedProtobufFactory(value interface{}, clock uint64, chatID stri
 	return buildRawMnemonicRemovedSyncMessage(v, clock, chatID)
 }
 
-func mnemonicRemovedProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func mnemonicRemovedProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawMnemonicRemovedSyncMessage(s.MnemonicRemoved, clock, chatID)
 }
 
 // UrlUnfurlingMode
 
-func buildRawURLUnfurlingModeSyncMessage(v int64, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawURLUnfurlingModeSyncMessage(v int64, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_URL_UNFURLING_MODE,
 		Value: &protobuf.SyncSetting_ValueInt64{ValueInt64: v},
@@ -531,7 +531,7 @@ func buildRawURLUnfurlingModeSyncMessage(v int64, clock uint64, chatID string) (
 	return rm, pb, err
 }
 
-func urlUnfurlingModeProtobufFactory(value any, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func urlUnfurlingModeProtobufFactory(value any, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := parseNumberToInt64(value)
 	if err != nil {
 		return nil, nil, err
@@ -540,13 +540,13 @@ func urlUnfurlingModeProtobufFactory(value any, clock uint64, chatID string) (*c
 	return buildRawURLUnfurlingModeSyncMessage(v, clock, chatID)
 }
 
-func urlUnfurlingModeProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func urlUnfurlingModeProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawURLUnfurlingModeSyncMessage(int64(s.URLUnfurlingMode), clock, chatID)
 }
 
 // ShowCommunityAssetWhenSendingTokens
 
-func buildRawShowCommunityAssetWhenSendingTokensSyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawShowCommunityAssetWhenSendingTokensSyncMessage(v bool, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_SHOW_COMMUNITY_ASSET_WHEN_SENDING_TOKENS,
 		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
@@ -556,7 +556,7 @@ func buildRawShowCommunityAssetWhenSendingTokensSyncMessage(v bool, clock uint64
 	return rm, pb, err
 }
 
-func showCommunityAssetWhenSendingTokensProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func showCommunityAssetWhenSendingTokensProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertBool(value)
 	if err != nil {
 		return nil, nil, err
@@ -565,13 +565,13 @@ func showCommunityAssetWhenSendingTokensProtobufFactory(value interface{}, clock
 	return buildRawShowCommunityAssetWhenSendingTokensSyncMessage(v, clock, chatID)
 }
 
-func showCommunityAssetWhenSendingTokensProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func showCommunityAssetWhenSendingTokensProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawShowCommunityAssetWhenSendingTokensSyncMessage(s.ShowCommunityAssetWhenSendingTokens, clock, chatID)
 }
 
 // DisplayAssetsBelowBalance
 
-func buildRawDisplayAssetsBelowBalanceSyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawDisplayAssetsBelowBalanceSyncMessage(v bool, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_DISPLAY_ASSETS_BELOW_BALANCE,
 		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
@@ -581,7 +581,7 @@ func buildRawDisplayAssetsBelowBalanceSyncMessage(v bool, clock uint64, chatID s
 	return rm, pb, err
 }
 
-func displayAssetsBelowBalanceProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func displayAssetsBelowBalanceProtobufFactory(value interface{}, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertBool(value)
 	if err != nil {
 		return nil, nil, err
@@ -590,13 +590,13 @@ func displayAssetsBelowBalanceProtobufFactory(value interface{}, clock uint64, c
 	return buildRawDisplayAssetsBelowBalanceSyncMessage(v, clock, chatID)
 }
 
-func displayAssetsBelowBalanceProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func displayAssetsBelowBalanceProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawDisplayAssetsBelowBalanceSyncMessage(s.DisplayAssetsBelowBalance, clock, chatID)
 }
 
 // DisplayAssetsBelowBalanceThreshold
 
-func buildRawDisplayAssetsBelowBalanceThresholdSyncMessage(v int64, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawDisplayAssetsBelowBalanceThresholdSyncMessage(v int64, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_DISPLAY_ASSETS_BELOW_BALANCE_THRESHOLD,
 		Value: &protobuf.SyncSetting_ValueInt64{ValueInt64: v},
@@ -606,7 +606,7 @@ func buildRawDisplayAssetsBelowBalanceThresholdSyncMessage(v int64, clock uint64
 	return rm, pb, err
 }
 
-func displayAssetsBelowBalanceThresholdProtobufFactory(value any, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func displayAssetsBelowBalanceThresholdProtobufFactory(value any, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := parseNumberToInt64(value)
 	if err != nil {
 		return nil, nil, err
@@ -615,11 +615,11 @@ func displayAssetsBelowBalanceThresholdProtobufFactory(value any, clock uint64, 
 	return buildRawDisplayAssetsBelowBalanceThresholdSyncMessage(v, clock, chatID)
 }
 
-func displayAssetsBelowBalanceThresholdProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func displayAssetsBelowBalanceThresholdProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawDisplayAssetsBelowBalanceThresholdSyncMessage(s.DisplayAssetsBelowBalanceThreshold, clock, chatID)
 }
 
-func buildRawAutoRefreshTokensEnabledSyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func buildRawAutoRefreshTokensEnabledSyncMessage(v bool, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	pb := &protobuf.SyncSetting{
 		Type:  protobuf.SyncSetting_AUTO_REFRESH_TOKENS_ENABLED,
 		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
@@ -629,7 +629,7 @@ func buildRawAutoRefreshTokensEnabledSyncMessage(v bool, clock uint64, chatID st
 	return rm, pb, err
 }
 
-func autoRefreshTokensEnabledProtobufFactory(value any, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func autoRefreshTokensEnabledProtobufFactory(value any, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := assertBool(value)
 	if err != nil {
 		return nil, nil, err
@@ -638,6 +638,6 @@ func autoRefreshTokensEnabledProtobufFactory(value any, clock uint64, chatID str
 	return buildRawAutoRefreshTokensEnabledSyncMessage(v, clock, chatID)
 }
 
-func autoRefreshTokensEnabledProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func autoRefreshTokensEnabledProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*messagingtypes.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawAutoRefreshTokensEnabledSyncMessage(s.AutoRefreshTokensEnabled, clock, chatID)
 }

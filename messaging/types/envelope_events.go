@@ -1,6 +1,6 @@
 package types
 
-import "github.com/status-im/status-go/eth-node/types"
+import "github.com/status-im/status-go/crypto/types"
 
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)

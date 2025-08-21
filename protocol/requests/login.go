@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/crypto"
 )
 
 var (
@@ -45,7 +45,6 @@ type Login struct {
 	WakuV2LightClient                            bool    `json:"wakuV2LightClient"`
 	WakuV2EnableStoreConfirmationForMessagesSent bool    `json:"wakuV2EnableStoreConfirmationForMessagesSent"`
 	WakuV2EnableMissingMessageVerification       bool    `json:"wakuV2EnableMissingMessageVerification"`
-	TelemetryServerURL                           string  `json:"telemetryServerURL"`
 	VerifyTransactionURL                         *string `json:"verifyTransactionURL"`
 	VerifyENSURL                                 *string `json:"verifyENSURL"`
 	VerifyENSContractAddress                     *string `json:"verifyENSContractAddress"`
