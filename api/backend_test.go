@@ -39,7 +39,6 @@ import (
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
@@ -405,47 +404,6 @@ func TestAppStateChange(t *testing.T) {
 			backend.AppStateChange(tc.toState)
 			assert.Equal(t, tc.expectedState.String(), backend.appState.String())
 		})
-	}
-}
-
-func TestBlockedRPCMethods(t *testing.T) {
-	utils.Init()
-
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	require.NoError(t, err)
-
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
-	require.NoError(t, err)
-
-	err = backend.StartNode(config)
-	require.NoError(t, err)
-	defer func() { require.NoError(t, backend.StopNode()) }()
-
-	for idx, m := range rpc.BlockedMethods() {
-		result := backend.CallInternalRPC(fmt.Sprintf(
-			`{"jsonrpc":"2.0","method":"%s","params":[],"id":%d}`,
-			m,
-			idx+1,
-		))
-		assert.Contains(t, result, fmt.Sprintf(`{"code":-32700,"message":"%s"}`, rpc.ErrMethodNotFound))
 	}
 }
 

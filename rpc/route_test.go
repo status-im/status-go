@@ -34,24 +34,3 @@ func TestRouteWithoutUpstream(t *testing.T) {
 		require.False(t, router.routeRemote(method), "method "+method+" should routed to local")
 	}
 }
-
-func TestBlockedRoutes(t *testing.T) {
-	// Be explicit as any change to `blockedMethods`
-	// should be confirmed with a unit test fail.
-	expectedBlockedMethods := [...]string{"shh_getPrivateKey"}
-	require.Equal(t, expectedBlockedMethods, blockedMethods)
-	require.Equal(t, expectedBlockedMethods[:], BlockedMethods())
-
-	router := newRouter(false)
-	for _, method := range blockedMethods {
-		require.True(t, router.routeBlocked(method))
-	}
-}
-
-func TestLineaEstimateGasRouting(t *testing.T) {
-	router := newRouter(true)
-
-	require.True(t, router.routeRemote("linea_estimateGas"), "linea_estimateGas should be routed to remote")
-
-	require.False(t, router.routeBlocked("linea_estimateGas"), "linea_estimateGas should not be blocked")
-}

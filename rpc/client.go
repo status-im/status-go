@@ -371,9 +371,6 @@ func (c *Client) Call(result interface{}, chainID uint64, method string, args ..
 // If there are any local handlers registered for this call, they will handle it.
 func (c *Client) CallContext(ctx context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error {
 	rpcstats.CountCall(method)
-	if c.router.routeBlocked(method) {
-		return ErrMethodNotFound
-	}
 
 	// check locally registered handlers first
 	if handler, ok := c.handler(method); ok {
@@ -391,10 +388,6 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, chainID ui
 // handler itself.
 // Upstream calls routing will be used anyway.
 func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error {
-	if c.router.routeBlocked(method) {
-		return ErrMethodNotFound
-	}
-
 	if c.router.routeRemote(method) {
 		client, err := c.getClientUsingCache(chainID)
 		if err != nil {
