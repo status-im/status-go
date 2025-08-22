@@ -64,7 +64,7 @@ func setupRouter(t *testing.T) (*Router, func()) {
 	transfer := pathprocessor.NewTransferProcessor(nil, nil)
 	router.AddPathProcessor(transfer)
 
-	erc721Transfer := pathprocessor.NewERC721Processor(nil, nil)
+	erc721Transfer := pathprocessor.NewNFTProcessor(nil, nil)
 	router.AddPathProcessor(erc721Transfer)
 
 	erc1155Transfer := pathprocessor.NewERC1155Processor(nil, nil)
