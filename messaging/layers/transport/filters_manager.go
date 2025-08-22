@@ -129,13 +129,15 @@ func (f *FiltersManager) Init(
 type FiltersToInitialize struct {
 	ChatID      string
 	PubsubTopic string
+	// TODO (#6384) temporary flag while migrating community shards
+	IsCommunity bool
 }
 
 func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitialize) ([]*Filter, error) {
 	var filters []*Filter
 	// Add public, one-to-one and negotiated filters.
 	for _, pf := range publicFiltersToInit {
-		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic)
+		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic, pf.IsCommunity)
 		if err != nil {
 			return nil, err
 		}
@@ -545,7 +547,12 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, isCommuni
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	if chat, ok := f.filters[chatID]; ok {
+	filterKey := chatID
+	if len(isCommunity) > 0 && isCommunity[0] {
+		filterKey = toCommunityFilterKey(chatID, pubsubTopic)
+	}
+
+	if chat, ok := f.filters[filterKey]; ok {
 		if chat.PubsubTopic != pubsubTopic {
 			f.logger.Debug("updating pubsub topic for filter",
 				zap.String("chatID", chatID),
@@ -554,17 +561,9 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, isCommuni
 				zap.String("newTopic", pubsubTopic),
 			)
 			chat.PubsubTopic = pubsubTopic
-			f.filters[chatID] = chat
+			f.filters[filterKey] = chat
 		}
 		return chat, nil
-	}
-
-	filterKey := chatID
-	if len(isCommunity) > 0 && isCommunity[0] {
-		filterKey = toCommunityFilterKey(chatID, pubsubTopic)
-		if chat, ok := f.filters[filterKey]; ok {
-			return chat, nil
-		}
 	}
 
 	filterAndTopic, err := f.addSymmetric(chatID, pubsubTopic)
