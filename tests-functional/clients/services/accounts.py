@@ -106,6 +106,16 @@ class AccountService(Service):
         response = self.rpc_request("deleteKeycard", params)
         return response
 
+    def delete_keycard_accounts(self, keycard_uid, account_addresses):
+        params = [keycard_uid, account_addresses]
+        response = self.rpc_request("deleteKeycardAccounts", params)
+        return response.json()
+
+    def delete_all_keycards_with_key_uid(self, key_uid):
+        params = [key_uid]
+        response = self.rpc_request("deleteAllKeycardsWithKeyUID", params)
+        return response.json()
+
     def get_all_known_keycards(self):
         response = self.rpc_request("getAllKnownKeycards", [])
         return response
