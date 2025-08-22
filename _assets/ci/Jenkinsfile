@@ -2,8 +2,13 @@
 library 'status-jenkins-lib@v1.9.26'
 
 pipeline {
-  agent { label 'linux' }
-
+  agent {
+    /* Image with Ubuntu 22.04, QT 6.9.0 installed */
+    docker {
+      label 'linuxcontainer'
+      image 'statusteam/status-go:1.0.0-qt6.9.0'
+    }
+  }
   parameters {
     string(
       name: 'BRANCH',

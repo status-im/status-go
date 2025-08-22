@@ -2,7 +2,14 @@
 library 'status-jenkins-lib@v1.9.26'
 
 pipeline {
-  agent { label 'linux && x86_64 && nix-2.24' }
+
+  agent {
+    docker {
+      label 'linuxcontainer'
+      image 'nixos/nix:2.28.4'
+      args '-v /nix:/nix -e NIX_REMOTE=daemon'
+    }
+  }
 
   parameters {
     string(

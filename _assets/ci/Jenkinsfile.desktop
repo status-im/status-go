@@ -3,8 +3,16 @@
 library 'status-jenkins-lib@v1.9.26'
 
 pipeline {
-  /* This way we run the same Jenkinsfile on different platforms. */
-  agent { label "${params.AGENT_LABEL} && go-1.23" }
+
+  agent {
+    /* Image with Ubuntu 22.04, QT 6.9.0 installed */
+    docker {
+      label 'linuxcontainer'
+      image 'statusteam/status-go:1.0.0-qt6.9.0'
+      /* allows jenkins use cat and mounts '/dev/fuse' for linuxdeployqt */
+      args '--entrypoint="" -v /var/run/docker.sock:/var/run/docker.sock --network host'
+    }
+  }
 
   parameters {
     string(
