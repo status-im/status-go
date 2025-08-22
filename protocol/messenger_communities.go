@@ -2443,14 +2443,14 @@ func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.Chat
 	communityPubsubTopic := o.PubsubTopic()
 
 	chats := messagingtypes.ChatsToInitialize{
-		{ChatID: cID, PubsubTopic: communityPubsubTopic},
-		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
-		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.DefaultNonProtectedPubsubTopic()},
-		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.GlobalCommunityContentPubsubTopic()},
+		{ChatID: cID, PubsubTopic: communityPubsubTopic, IsCommunity: true},
+		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic, IsCommunity: true},
+		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.DefaultNonProtectedPubsubTopic(), IsCommunity: true},
+		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.GlobalCommunityContentPubsubTopic(), IsCommunity: true},
 	}
 	if communityPubsubTopic == "" {
-		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: cID, PubsubTopic: messagingtypes.GlobalCommunityControlPubsubTopic()})
-		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: memberUpdateChannelID, PubsubTopic: messagingtypes.GlobalCommunityContentPubsubTopic()})
+		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: cID, PubsubTopic: messagingtypes.GlobalCommunityControlPubsubTopic(), IsCommunity: true})
+		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: memberUpdateChannelID, PubsubTopic: messagingtypes.GlobalCommunityContentPubsubTopic(), IsCommunity: true})
 	}
 	return chats
 }
