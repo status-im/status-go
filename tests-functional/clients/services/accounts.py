@@ -116,6 +116,16 @@ class AccountService(Service):
         response = self.rpc_request("deleteAllKeycardsWithKeyUID", params)
         return response.json()
 
+    def keycard_locked(self, keycard_uid):
+        params = [keycard_uid]
+        response = self.rpc_request("keycardLocked", params)
+        return response.json()
+
+    def keycard_unlocked(self, keycard_uid):
+        params = [keycard_uid]
+        response = self.rpc_request("keycardUnlocked", params)
+        return response.json()
+
     def get_all_known_keycards(self):
         response = self.rpc_request("getAllKnownKeycards", [])
         return response
