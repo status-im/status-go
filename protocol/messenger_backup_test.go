@@ -18,6 +18,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
@@ -915,7 +916,7 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 
 	dbSeedKp2, err := bob2.settings.GetKeypairByKeyUID(seedKp.KeyUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(seedKp, dbSeedKp2, false, accounts.SyncedFromBackup, accounts.AccountNonOperable))
+	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(seedKp, dbSeedKp2, false, accounts.SyncedFromBackup, accsmanagementtypes.AccountNonOperable))
 
 	keypairs, err := bob2.settings.GetAllKeypairs()
 	s.Require().NoError(err)

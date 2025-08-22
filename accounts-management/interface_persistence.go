@@ -1,6 +1,6 @@
-package persistence
+package accountsmanagement
 
-//go:generate mockgen -package=mock_persistence -source=interface.go -destination=../mock/persistence.go
+//go:generate mockgen -package=mock_persistence -source=interface_persistence.go -destination=./mock/persistence.go
 
 import (
 	"github.com/status-im/status-go/accounts-management/types"
@@ -20,12 +20,14 @@ type Persistence interface {
 	GetKeypairByKeyUID(keyUID string) (*types.Keypair, error)
 	// GetActiveKeypairs returns all active keypairs
 	GetActiveKeypairs() ([]*types.Keypair, error)
+	// GetAllKeypairs returns all keypairs
+	GetAllKeypairs() ([]*types.Keypair, error)
 	// SaveOrUpdateKeypair saves or updates a keypair and its accounts
 	SaveOrUpdateKeypair(keypair *types.Keypair) error
 	// SaveOrUpdateAccounts saves or updates accounts
 	SaveOrUpdateAccounts(accounts []*types.Account, updateKeypairClock bool) error
 	// SaveOrUpdateKeycard saves or updates a keycard and its accounts
-	SaveOrUpdateKeycard(keycard *types.Keycard, clock uint64, updateKeypairClock bool) error
+	SaveOrUpdateKeycard(keycard types.Keycard, clock uint64, updateKeypairClock bool) error
 	// MarkKeypairFullyOperable marks a keypair as fully operable
 	MarkKeypairFullyOperable(keyUID string, clock uint64, updateKeypairClock bool) (err error)
 	// MarkAccountFullyOperable marks an account as fully operable

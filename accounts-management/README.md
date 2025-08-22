@@ -8,66 +8,61 @@ The package is organized into focused subpackages:
 
 ```
 accounts-management/
-├── accounts.go           # Main package with public API and re-exports
-├── core/                 # Main account manager implementation
-│   ├── manager.go        # AccountsManager and core business logic
-│   ├── keystore_operations.go  # Keystore-related operations
-│   ├── persistence_operations.go  # Database operations
-│   └── manager_test.go   # Test suite for core functionality
-
-├── errors/               # Structured error handling system
-│   ├── errors.go         # Error definitions, codes, and categories
-│   ├── errors_test.go    # Error system tests
-│   ├── errors_test_data.go # Test data for error tests
-│   └── README.md         # Error handling documentation
-├── keystore/             # Cryptographic key storage operations
-│   ├── interface.go      # KeyStore interface definition
-│   └── geth/             # Geth-compatible keystore implementation
-│       ├── adapter.go    # Geth keystore adapter
-│       ├── encryption.go # Encryption operations
-│       ├── decryption.go # Decryption operations
-│       ├── reencryption.go # Re-encryption operations
-│       ├── migration.go  # Migration utilities
-│       ├── helper.go     # Helper functions
-│       └── const.go      # Constants
-├── persistence/          # Database operations for account data
-│   └── interface.go      # Persistence interface definition
-├── generator/            # Account creation and derivation
-│   ├── generator.go      # Account generation functions
-│   ├── types.go          # Account types and methods
-│   ├── path_decoder.go   # BIP32 path parsing
-│   ├── README.md         # Generator-specific documentation
-│   └── *_test.go         # Generator tests
-├── types/                # Core type definitions
-│   ├── types.go          # Core type definitions
-│   ├── key.go            # Key type structure
-│   ├── account.go        # Account-related types
-│   ├── keypair.go        # Keypair-related types
-│   └── *_test.go         # Type tests
-├── common/               # Shared utilities
-│   ├── const.go          # Constants and paths
-│   ├── mnemonic.go       # Mnemonic generation utilities
-│   ├── address.go        # Address utilities
-│   ├── publickey.go      # Public key utilities
-│   ├── utils.go          # General utilities
-│   └── *_test.go         # Common tests
-└── mock/                 # Mock implementations for testing
-    └── persistence.go    # Mock persistence implementation
+├── manager.go                 # AccountsManager and core business logic
+├── keystore_operations.go     # Keystore-related operations
+├── persistence_operations.go  # Database operations
+├── interface_keystore.go      # KeyStore interface definition
+├── interface_persistence.go   # Persistence interface definition
+├── manager_test.go            # Test suite for core functionality
+├── errors.go                  # Error definitions and handling
+├── keystore/                  # Cryptographic key storage operations
+│   ├── keystore.go            # Main keystore package with re-exports
+│   ├── types/                 # Keystore-specific types
+│   └── geth/                  # Geth-compatible keystore implementation
+│       ├── adapter.go         # Geth keystore adapter
+│       ├── encryption.go      # Encryption operations
+│       ├── decryption.go      # Decryption operations
+│       ├── reencryption.go    # Re-encryption operations
+│       ├── migration.go       # Migration utilities
+│       ├── helper.go          # Helper functions
+│       └── const.go           # Constants
+├── generator/                 # Account creation and derivation
+│   ├── generator.go           # Account generation functions
+│   ├── types.go               # Account types and methods
+│   ├── path_decoder.go        # BIP32 path parsing
+│   ├── README.md              # Generator-specific documentation
+│   └── *_test.go              # Generator tests
+├── types/                     # Core type definitions
+│   ├── types.go               # Core type definitions
+│   ├── key.go                 # Key type structure
+│   ├── account.go             # Account-related types
+│   ├── keypair.go             # Keypair-related types
+│   └── *_test.go              # Type tests
+├── common/                    # Shared utilities
+│   ├── const.go               # Constants and paths
+│   ├── mnemonic.go            # Mnemonic generation utilities
+│   ├── address.go             # Address utilities
+│   ├── publickey.go           # Public key utilities
+│   ├── utils.go               # General utilities
+│   └── *_test.go              # Common tests
+└── mock/                      # Mock implementations for testing
+    └── persistence.go         # Mock persistence implementation
 ```
 
 ## Key Components
 
-### Core Package
+### Main Package
 
-The main account management operations are in the `core` package:
+The main account management operations are directly in the root package:
 
 - **AccountsManager**: Main interface for account management operations including account creation, selection, and verification
 - **Keystore Operations**: Methods for keystore management and account loading
 - **Persistence Operations**: Methods for database operations including keypair and account management
+- **Interface Definitions**: KeyStore and Persistence interfaces for implementing custom backends
 
 ### Errors Package
 
-A structured error handling system in the `errors` package:
+A structured error handling system in the `errors.go` file:
 
 - **Structured Errors**: Rich error types with codes, categories, and context
 - **Error Codes**: Numeric error codes for programmatic error handling
@@ -79,7 +74,9 @@ A structured error handling system in the `errors` package:
 
 Handles secure cryptographic key storage:
 
-- **KeyStore Interface**: Defines the contract for keystore implementations
+- **KeyStore Interface**: Defined in `interface_keystore.go` for keystore implementations
+- **Main Package**: `keystore/keystore.go` provides re-exports and common error constants
+- **Types**: `keystore/types/` contains keystore-specific type definitions
 - **Geth Implementation**: Complete Geth-compatible keystore adapter with encryption, decryption, re-encryption, and migration capabilities
 
 ### Persistence Package
@@ -197,7 +194,7 @@ For more advanced usage, you can import specific subpackages:
 
 ```go
 import (
-    "github.com/status-im/status-go/accounts-management/core"
+    "github.com/status-im/status-go/accounts-management"
     "github.com/status-im/status-go/accounts-management/generator"
     "github.com/status-im/status-go/accounts-management/types"
     "github.com/status-im/status-go/accounts-management/errors"

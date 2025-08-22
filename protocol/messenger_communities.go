@@ -19,6 +19,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
@@ -26,7 +27,6 @@ import (
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -1306,7 +1306,7 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 
 	msgsToSign := make([]personal.SignParams, 0)
 	for _, walletAccount := range walletAccounts {
-		if walletAccount.Chat || walletAccount.Type == accounts.AccountTypeWatch {
+		if walletAccount.Chat || walletAccount.Type == accsmanagementtypes.AccountTypeWatch {
 			continue
 		}
 
@@ -1353,7 +1353,7 @@ func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error)
 			return nil, err
 		}
 
-		if account.Chat || account.Type == accounts.AccountTypeWatch {
+		if account.Chat || account.Type == accsmanagementtypes.AccountTypeWatch {
 			return nil, errors.New(ErrForbiddenProfileOrWatchOnlyAccount)
 		}
 

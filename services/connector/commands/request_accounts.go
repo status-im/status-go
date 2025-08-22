@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/accounts-management/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/signal"
 )
@@ -22,9 +22,9 @@ type RequestAccountsCommand struct {
 }
 
 type RawAccountsResponse struct {
-	JSONRPC string             `json:"jsonrpc"`
-	ID      int                `json:"id"`
-	Result  []accounts.Account `json:"result"`
+	JSONRPC string          `json:"jsonrpc"`
+	ID      int             `json:"id"`
+	Result  []types.Account `json:"result"`
 }
 
 func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {

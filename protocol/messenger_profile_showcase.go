@@ -16,10 +16,10 @@ import (
 
 	eth_common "github.com/ethereum/go-ethereum/common"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/identity"
@@ -686,7 +686,7 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState
 	return nil
 }
 
-func (m *Messenger) UpdateProfileShowcaseWalletAccount(account *accounts.Account) error {
+func (m *Messenger) UpdateProfileShowcaseWalletAccount(account *accsmanagementtypes.Account) error {
 	profileAccount, err := m.persistence.GetProfileShowcaseAccountPreference(account.Address.Hex())
 	if err != nil {
 		return err
@@ -700,7 +700,7 @@ func (m *Messenger) UpdateProfileShowcaseWalletAccount(account *accounts.Account
 	return m.DispatchProfileShowcase()
 }
 
-func (m *Messenger) DeleteProfileShowcaseWalletAccount(account *accounts.Account) error {
+func (m *Messenger) DeleteProfileShowcaseWalletAccount(account *accsmanagementtypes.Account) error {
 	deleted, err := m.persistence.DeleteProfileShowcaseAccountPreference(account.Address.Hex())
 	if err != nil {
 		return err

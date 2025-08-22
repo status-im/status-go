@@ -5,6 +5,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	ensservice "github.com/status-im/status-go/services/ens"
 
 	"github.com/status-im/status-go/services/browsers"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
@@ -50,9 +50,9 @@ type MessengerResponse struct {
 	Settings                      []*settings.SyncSettingField
 	IdentityImages                []images.IdentityImage
 	CustomizationColor            string
-	WatchOnlyAccounts             []*accounts.Account
-	Keypairs                      []*accounts.Keypair
-	AccountsPositions             []*accounts.Account
+	WatchOnlyAccounts             []*accsmanagementtypes.Account
+	Keypairs                      []*accsmanagementtypes.Keypair
+	AccountsPositions             []*accsmanagementtypes.Account
 	TokenPreferences              []walletsettings.TokenPreferences
 	CollectiblePreferences        []walletsettings.CollectiblePreferences
 	DiscordCategories             []*discord.Category
@@ -121,9 +121,9 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Settings                         []*settings.SyncSettingField            `json:"settings,omitempty"`
 		IdentityImages                   []images.IdentityImage                  `json:"identityImages,omitempty"`
 		CustomizationColor               string                                  `json:"customizationColor,omitempty"`
-		WatchOnlyAccounts                []*accounts.Account                     `json:"watchOnlyAccounts,omitempty"`
-		Keypairs                         []*accounts.Keypair                     `json:"keypairs,omitempty"`
-		AccountsPositions                []*accounts.Account                     `json:"accountsPositions,omitempty"`
+		WatchOnlyAccounts                []*accsmanagementtypes.Account          `json:"watchOnlyAccounts,omitempty"`
+		Keypairs                         []*accsmanagementtypes.Keypair          `json:"keypairs,omitempty"`
+		AccountsPositions                []*accsmanagementtypes.Account          `json:"accountsPositions,omitempty"`
 		TokenPreferences                 []walletsettings.TokenPreferences       `json:"tokenPreferences,omitempty"`
 		CollectiblePreferences           []walletsettings.CollectiblePreferences `json:"collectiblePreferences,omitempty"`
 		DiscordCategories                []*discord.Category                     `json:"discordCategories,omitempty"`

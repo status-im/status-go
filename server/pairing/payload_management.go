@@ -10,9 +10,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -125,7 +125,7 @@ func (ppm *AccountPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *pr
 
 type RawMessagesPayload struct {
 	rawMessages    []*protobuf.RawMessage
-	profileKeypair *accounts.Keypair
+	profileKeypair *accsmanagementtypes.Keypair
 	setting        *settings.Settings
 }
 

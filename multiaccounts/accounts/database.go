@@ -2,12 +2,12 @@ package accounts
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -32,7 +32,6 @@ const (
 var (
 	errDbPassedParameterIsNil                      = errors.New("accounts: passed parameter is nil")
 	errDbTransactionIsNil                          = errors.New("accounts: database transaction is nil")
-	ErrDbKeypairNotFound                           = errors.New("accounts: keypair is not found")
 	ErrCannotRemoveProfileKeypair                  = errors.New("accounts: cannot remove profile keypair")
 	ErrDbAccountNotFound                           = errors.New("accounts: account is not found")
 	ErrCannotRemoveProfileAccount                  = errors.New("accounts: cannot remove profile account")
@@ -46,248 +45,16 @@ var (
 	ErrKeypairWithoutAccounts                      = errors.New("cannot store keypair without accounts")
 )
 
-type Keypair struct {
-	KeyUID                  string      `json:"key-uid"`
-	Name                    string      `json:"name"`
-	Type                    KeypairType `json:"type"`
-	DerivedFrom             string      `json:"derived-from"`
-	LastUsedDerivationIndex uint64      `json:"last-used-derivation-index,omitempty"`
-	SyncedFrom              string      `json:"synced-from,omitempty"` // keeps an info which device this keypair is added from can be one of two values defined in constants or device name (custom)
-	Clock                   uint64      `json:"clock,omitempty"`
-	Accounts                []*Account  `json:"accounts,omitempty"`
-	Keycards                []*Keycard  `json:"keycards,omitempty"`
-	Removed                 bool        `json:"removed,omitempty"`
-}
-
-type Account struct {
-	Address               types.Address             `json:"address"`
-	KeyUID                string                    `json:"key-uid"`
-	Wallet                bool                      `json:"wallet"`
-	AddressWasNotShown    bool                      `json:"address-was-not-shown,omitempty"`
-	Chat                  bool                      `json:"chat"`
-	Type                  AccountType               `json:"type,omitempty"`
-	Path                  string                    `json:"path,omitempty"`
-	PublicKey             types.HexBytes            `json:"public-key,omitempty"`
-	Name                  string                    `json:"name"`
-	Emoji                 string                    `json:"emoji"`
-	ColorID               common.CustomizationColor `json:"colorId,omitempty"`
-	Hidden                bool                      `json:"hidden"`
-	Clock                 uint64                    `json:"clock,omitempty"`
-	Removed               bool                      `json:"removed,omitempty"`
-	Operable              AccountOperable           `json:"operable"` // describes an account's operability (check AccountOperable type constants for details)
-	CreatedAt             int64                     `json:"createdAt"`
-	Position              int64                     `json:"position"`
-	ProdPreferredChainIDs string                    `json:"prodPreferredChainIds"`
-	TestPreferredChainIDs string                    `json:"testPreferredChainIds"`
-}
-
-type KeypairType string
-type AccountType string
-type AccountOperable string
-
-func (a KeypairType) String() string {
-	return string(a)
-}
-
-func (a AccountType) String() string {
-	return string(a)
-}
-
-func (a AccountOperable) String() string {
-	return string(a)
-}
-
 const (
-	KeypairTypeProfile KeypairType = "profile"
-	KeypairTypeKey     KeypairType = "key"
-	KeypairTypeSeed    KeypairType = "seed"
-)
-
-const (
-	AccountTypeGenerated AccountType = "generated"
-	AccountTypeKey       AccountType = "key"
-	AccountTypeSeed      AccountType = "seed"
-	AccountTypeWatch     AccountType = "watch"
-)
-
-const (
-	AccountNonOperable       AccountOperable = "no"        // an account is non operable it is not a keycard account and there is no keystore file for it and no keystore file for the address it is derived from
-	AccountPartiallyOperable AccountOperable = "partially" // an account is partially operable if it is not a keycard account and there is created keystore file for the address it is derived from
-	AccountFullyOperable     AccountOperable = "fully"     // an account is fully operable if it is not a keycard account and there is a keystore file for it
-
 	ProdPreferredChainIDsDefault        = "1:10:42161:8453"
 	TestPreferredChainIDsDefault        = "5:420:421613"
 	TestSepoliaPreferredChainIDsDefault = "11155111:11155420:421614:84532:1660990954"
 )
 
-// Returns true if an account is a wallet account that logged in user has a control over, otherwise returns false.
-func (a *Account) IsWalletNonWatchOnlyAccount() bool {
-	return !a.Chat && len(a.Type) > 0 && a.Type != AccountTypeWatch
-}
-
-// Returns true if an account is a wallet account that is ready for sending transactions, otherwise returns false.
-func (a *Account) IsWalletAccountReadyForTransaction() bool {
-	return a.IsWalletNonWatchOnlyAccount() && a.Operable != AccountNonOperable
-}
-
-func (a *Account) MarshalJSON() ([]byte, error) {
-	item := struct {
-		Address               types.Address             `json:"address"`
-		MixedcaseAddress      string                    `json:"mixedcase-address"`
-		KeyUID                string                    `json:"key-uid"`
-		Wallet                bool                      `json:"wallet"`
-		Chat                  bool                      `json:"chat"`
-		Type                  AccountType               `json:"type"`
-		Path                  string                    `json:"path"`
-		PublicKey             types.HexBytes            `json:"public-key"`
-		Name                  string                    `json:"name"`
-		Emoji                 string                    `json:"emoji"`
-		ColorID               common.CustomizationColor `json:"colorId"`
-		Hidden                bool                      `json:"hidden"`
-		Clock                 uint64                    `json:"clock"`
-		Removed               bool                      `json:"removed"`
-		Operable              AccountOperable           `json:"operable"`
-		CreatedAt             int64                     `json:"createdAt"`
-		Position              int64                     `json:"position"`
-		ProdPreferredChainIDs string                    `json:"prodPreferredChainIds"`
-		TestPreferredChainIDs string                    `json:"testPreferredChainIds"`
-	}{
-		Address:               a.Address,
-		MixedcaseAddress:      a.Address.Hex(),
-		KeyUID:                a.KeyUID,
-		Wallet:                a.Wallet,
-		Chat:                  a.Chat,
-		Type:                  a.Type,
-		Path:                  a.Path,
-		PublicKey:             a.PublicKey,
-		Name:                  a.Name,
-		Emoji:                 a.Emoji,
-		ColorID:               a.ColorID,
-		Hidden:                a.Hidden,
-		Clock:                 a.Clock,
-		Removed:               a.Removed,
-		Operable:              a.Operable,
-		CreatedAt:             a.CreatedAt,
-		Position:              a.Position,
-		ProdPreferredChainIDs: a.ProdPreferredChainIDs,
-		TestPreferredChainIDs: a.TestPreferredChainIDs,
-	}
-
-	return json.Marshal(item)
-}
-
-func (a *Keypair) MarshalJSON() ([]byte, error) {
-	item := struct {
-		KeyUID                  string      `json:"key-uid"`
-		Name                    string      `json:"name"`
-		Type                    KeypairType `json:"type"`
-		DerivedFrom             string      `json:"derived-from"`
-		LastUsedDerivationIndex uint64      `json:"last-used-derivation-index"`
-		SyncedFrom              string      `json:"synced-from"`
-		Clock                   uint64      `json:"clock"`
-		Accounts                []*Account  `json:"accounts"`
-		Keycards                []*Keycard  `json:"keycards"`
-		Removed                 bool        `json:"removed"`
-	}{
-		KeyUID:                  a.KeyUID,
-		Name:                    a.Name,
-		Type:                    a.Type,
-		DerivedFrom:             a.DerivedFrom,
-		LastUsedDerivationIndex: a.LastUsedDerivationIndex,
-		SyncedFrom:              a.SyncedFrom,
-		Clock:                   a.Clock,
-		Accounts:                a.Accounts,
-		Keycards:                a.Keycards,
-		Removed:                 a.Removed,
-	}
-
-	return json.Marshal(item)
-}
-
-func (a *Keypair) CopyKeypair() *Keypair {
-	kp := &Keypair{
-		Clock:                   a.Clock,
-		KeyUID:                  a.KeyUID,
-		Name:                    a.Name,
-		Type:                    a.Type,
-		DerivedFrom:             a.DerivedFrom,
-		LastUsedDerivationIndex: a.LastUsedDerivationIndex,
-		SyncedFrom:              a.SyncedFrom,
-		Accounts:                make([]*Account, len(a.Accounts)),
-		Keycards:                make([]*Keycard, len(a.Keycards)),
-		Removed:                 a.Removed,
-	}
-
-	for i, acc := range a.Accounts {
-		kp.Accounts[i] = &Account{
-			Address:               acc.Address,
-			KeyUID:                acc.KeyUID,
-			Wallet:                acc.Wallet,
-			Chat:                  acc.Chat,
-			Type:                  acc.Type,
-			Path:                  acc.Path,
-			PublicKey:             acc.PublicKey,
-			Name:                  acc.Name,
-			Emoji:                 acc.Emoji,
-			ColorID:               acc.ColorID,
-			Hidden:                acc.Hidden,
-			Clock:                 acc.Clock,
-			Removed:               acc.Removed,
-			Operable:              acc.Operable,
-			CreatedAt:             acc.CreatedAt,
-			Position:              acc.Position,
-			ProdPreferredChainIDs: acc.ProdPreferredChainIDs,
-			TestPreferredChainIDs: acc.TestPreferredChainIDs,
-		}
-	}
-
-	for i, kc := range a.Keycards {
-		kp.Keycards[i] = &Keycard{
-			KeycardUID:        kc.KeycardUID,
-			KeycardName:       kc.KeycardName,
-			KeycardLocked:     kc.KeycardLocked,
-			AccountsAddresses: kc.AccountsAddresses,
-			KeyUID:            kc.KeyUID,
-		}
-	}
-
-	return kp
-}
-
-func (a *Keypair) GetChatAccount() *Account {
-	for _, acc := range a.Accounts {
-		if acc.Chat {
-			return acc
-		}
-	}
-	return nil
-}
-
-func (a *Keypair) MigratedToKeycard() bool {
-	return len(a.Keycards) > 0
-}
-
-// Returns operability of a keypair:
-// - if any of keypair's account is not operable, then a keyapir is considered as non operable
-// - if any of keypair's account is partially operable, then a keyapir is considered as partially operable
-// - if all accounts are fully operable, then a keyapir is considered as fully operable
-func (a *Keypair) Operability() AccountOperable {
-	for _, acc := range a.Accounts {
-		if acc.Operable == AccountNonOperable {
-			return AccountNonOperable
-		}
-		if acc.Operable == AccountPartiallyOperable {
-			return AccountPartiallyOperable
-		}
-	}
-
-	return AccountFullyOperable
-}
-
 // TODO: implement clean full interface. This might require refactoring Database methods
 type AccountsStorage interface {
-	GetKeypairByKeyUID(keyUID string) (*Keypair, error)
-	GetAccountByAddress(address types.Address) (*Account, error)
+	GetKeypairByKeyUID(keyUID string) (*accsmanagementtypes.Keypair, error)
+	GetAccountByAddress(address types.Address) (*accsmanagementtypes.Account, error)
 	AddressExists(address types.Address) (bool, error)
 }
 
@@ -325,22 +92,9 @@ func (db *Database) Close() error {
 	return db.db.Close()
 }
 
-func GetAccountTypeForKeypairType(kpType KeypairType) AccountType {
-	switch kpType {
-	case KeypairTypeProfile:
-		return AccountTypeGenerated
-	case KeypairTypeKey:
-		return AccountTypeKey
-	case KeypairTypeSeed:
-		return AccountTypeSeed
-	default:
-		return AccountTypeWatch
-	}
-}
-
-func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) {
-	keypairMap := make(map[string]*Keypair)
-	allAccounts := []*Account{}
+func (db *Database) processRows(rows *sql.Rows) ([]*accsmanagementtypes.Keypair, []*accsmanagementtypes.Account, error) {
+	keypairMap := make(map[string]*accsmanagementtypes.Keypair)
+	allAccounts := []*accsmanagementtypes.Account{}
 
 	var (
 		kpKeyUID                  sql.NullString
@@ -374,8 +128,8 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 	)
 
 	for rows.Next() {
-		kp := &Keypair{}
-		acc := &Account{}
+		kp := &accsmanagementtypes.Keypair{}
+		acc := &accsmanagementtypes.Account{}
 		pubkey := []byte{}
 		err := rows.Scan(
 			&kpKeyUID, &kpName, &kpType, &kpDerivedFrom, &kpLastUsedDerivationIndex, &kpSyncedFrom, &kpClock, &kpRemoved,
@@ -394,7 +148,7 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 			kp.Name = kpName.String
 		}
 		if kpType.Valid {
-			kp.Type = KeypairType(kpType.String)
+			kp.Type = accsmanagementtypes.KeypairType(kpType.String)
 		}
 		if kpDerivedFrom.Valid {
 			kp.DerivedFrom = kpDerivedFrom.String
@@ -440,7 +194,7 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 			acc.Hidden = accHidden.Bool
 		}
 		if accOperable.Valid {
-			acc.Operable = AccountOperable(accOperable.String)
+			acc.Operable = accsmanagementtypes.AccountOperable(accOperable.String)
 		}
 		if accClock.Valid {
 			acc.Clock = uint64(accClock.Int64)
@@ -467,7 +221,7 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 		if accRemoved.Valid {
 			acc.Removed = accRemoved.Bool
 		}
-		acc.Type = GetAccountTypeForKeypairType(kp.Type)
+		acc.Type = accsmanagementtypes.GetAccountTypeForKeypairType(kp.Type)
 
 		if kp.KeyUID != "" {
 			if _, ok := keypairMap[kp.KeyUID]; !ok {
@@ -483,7 +237,7 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 	}
 
 	// Convert map to list
-	keypairs := make([]*Keypair, 0, len(keypairMap))
+	keypairs := make([]*accsmanagementtypes.Keypair, 0, len(keypairMap))
 	for _, keypair := range keypairMap {
 		keypairs = append(keypairs, keypair)
 	}
@@ -495,7 +249,7 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 // If `includeRemoved` is true and `keyUID` is not empty, then keypairs which match the `keyUID` will be returned (regardless how they are flagged).
 // If `includeRemoved` is false and `keyUID` is empty, then all keypairs which are not flagged as removed will be returned.
 // If `includeRemoved` is true and `keyUID` is empty, then all keypairs will be returned (regardless how they are flagged).
-func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) ([]*Keypair, error) {
+func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) ([]*accsmanagementtypes.Keypair, error) {
 	var (
 		rows           *sql.Rows
 		err            error
@@ -600,14 +354,14 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 	return keypairs, nil
 }
 
-func (db *Database) getKeypairByKeyUID(tx *sql.Tx, keyUID string, includeRemoved bool) (*Keypair, error) {
+func (db *Database) getKeypairByKeyUID(tx *sql.Tx, keyUID string, includeRemoved bool) (*accsmanagementtypes.Keypair, error) {
 	keypairs, err := db.getKeypairs(tx, keyUID, includeRemoved)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 
 	if len(keypairs) == 0 {
-		return nil, ErrDbKeypairNotFound
+		return nil, accsmanagementtypes.ErrDbKeypairNotFound
 	}
 	return keypairs[0], nil
 }
@@ -616,7 +370,7 @@ func (db *Database) getKeypairByKeyUID(tx *sql.Tx, keyUID string, includeRemoved
 // If `includeRemoved` is true and `address` is not zero address, then accounts which match the `address` will be returned (regardless how they are flagged).
 // If `includeRemoved` is false and `address` is zero address, then all accounts which are not flagged as removed will be returned.
 // If `includeRemoved` is true and `address` is zero address, then all accounts will be returned (regardless how they are flagged).
-func (db *Database) getAccounts(tx *sql.Tx, address types.Address, includeRemoved bool) ([]*Account, error) {
+func (db *Database) getAccounts(tx *sql.Tx, address types.Address, includeRemoved bool) ([]*accsmanagementtypes.Account, error) {
 	var (
 		rows  *sql.Rows
 		err   error
@@ -699,7 +453,7 @@ func (db *Database) getAccounts(tx *sql.Tx, address types.Address, includeRemove
 	return allAccounts, nil
 }
 
-func (db *Database) getAccountByAddress(tx *sql.Tx, address types.Address) (*Account, error) {
+func (db *Database) getAccountByAddress(tx *sql.Tx, address types.Address) (*accsmanagementtypes.Account, error) {
 	accounts, err := db.getAccounts(tx, address, false)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -787,43 +541,43 @@ func (db *Database) markKeypairRemoved(tx *sql.Tx, keyUID string, clock uint64) 
 }
 
 // Returns active keypairs (excluding removed and excluding removed accounts).
-func (db *Database) GetActiveKeypairs() ([]*Keypair, error) {
+func (db *Database) GetActiveKeypairs() ([]*accsmanagementtypes.Keypair, error) {
 	return db.getKeypairs(nil, "", false)
 }
 
 // Returns all keypairs (including removed and removed accounts).
-func (db *Database) GetAllKeypairs() ([]*Keypair, error) {
+func (db *Database) GetAllKeypairs() ([]*accsmanagementtypes.Keypair, error) {
 	return db.getKeypairs(nil, "", true)
 }
 
 // Returns keypair if it is not marked as removed and its accounts which are not marked as removed.
-func (db *Database) GetKeypairByKeyUID(keyUID string) (*Keypair, error) {
+func (db *Database) GetKeypairByKeyUID(keyUID string) (*accsmanagementtypes.Keypair, error) {
 	return db.getKeypairByKeyUID(nil, keyUID, false)
 }
 
 // Returns active accounts (excluding removed).
-func (db *Database) GetActiveAccounts() ([]*Account, error) {
+func (db *Database) GetActiveAccounts() ([]*accsmanagementtypes.Account, error) {
 	return db.getAccounts(nil, types.Address{}, false)
 }
 
 // Returns all accounts (including removed).
-func (db *Database) GetAllAccounts() ([]*Account, error) {
+func (db *Database) GetAllAccounts() ([]*accsmanagementtypes.Account, error) {
 	return db.getAccounts(nil, types.Address{}, true)
 }
 
 // Returns account if it is not marked as removed.
-func (db *Database) GetAccountByAddress(address types.Address) (*Account, error) {
+func (db *Database) GetAccountByAddress(address types.Address) (*accsmanagementtypes.Account, error) {
 	return db.getAccountByAddress(nil, address)
 }
 
 // Returns active watch only accounts (excluding removed).
-func (db *Database) GetActiveWatchOnlyAccounts() (res []*Account, err error) {
+func (db *Database) GetActiveWatchOnlyAccounts() (res []*accsmanagementtypes.Account, err error) {
 	accounts, err := db.getAccounts(nil, types.Address{}, false)
 	if err != nil {
 		return nil, err
 	}
 	for _, acc := range accounts {
-		if acc.Type == AccountTypeWatch {
+		if acc.Type == accsmanagementtypes.AccountTypeWatch {
 			res = append(res, acc)
 		}
 	}
@@ -831,13 +585,13 @@ func (db *Database) GetActiveWatchOnlyAccounts() (res []*Account, err error) {
 }
 
 // Returns all watch only accounts (including removed).
-func (db *Database) GetAllWatchOnlyAccounts() (res []*Account, err error) {
+func (db *Database) GetAllWatchOnlyAccounts() (res []*accsmanagementtypes.Account, err error) {
 	accounts, err := db.getAccounts(nil, types.Address{}, true)
 	if err != nil {
 		return nil, err
 	}
 	for _, acc := range accounts {
-		if acc.Type == AccountTypeWatch {
+		if acc.Type == accsmanagementtypes.AccountTypeWatch {
 			res = append(res, acc)
 		}
 	}
@@ -851,7 +605,7 @@ func (db *Database) IsAnyAccountPartiallyOrFullyOperableForKeyUID(keyUID string)
 	}
 
 	for _, acc := range kp.Accounts {
-		if acc.Operable != AccountNonOperable {
+		if acc.Operable != accsmanagementtypes.AccountNonOperable {
 			return true, nil
 		}
 	}
@@ -894,7 +648,7 @@ func (db *Database) RemoveAccount(address types.Address, clock uint64) error {
 	}
 
 	kp, err := db.getKeypairByKeyUID(tx, acc.KeyUID, false)
-	if err != nil && err != ErrDbKeypairNotFound {
+	if err != nil && err != accsmanagementtypes.ErrDbKeypairNotFound {
 		return err
 	}
 
@@ -973,13 +727,13 @@ func (db *Database) updateKeypairClock(tx *sql.Tx, keyUID string, clock uint64) 
 	return err
 }
 
-func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, updateKeypairClock bool) (err error) {
+func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*accsmanagementtypes.Account, updateKeypairClock bool) (err error) {
 	if tx == nil {
 		return errDbTransactionIsNil
 	}
 
 	for _, acc := range accounts {
-		var relatedKeypair *Keypair
+		var relatedKeypair *accsmanagementtypes.Keypair
 		// only watch only accounts have an empty `KeyUID` field
 		var keyUID *string
 		if acc.KeyUID != "" {
@@ -1000,7 +754,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 		}
 
 		// Apply default values if account is new and not a watch only
-		if !exists && acc.Type != AccountTypeWatch {
+		if !exists && acc.Type != accsmanagementtypes.AccountTypeWatch {
 			if acc.ProdPreferredChainIDs == "" {
 				acc.ProdPreferredChainIDs = ProdPreferredChainIDsDefault
 			}
@@ -1061,7 +815,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 				return err
 			}
 
-			accountsContainPath := func(accounts []*Account, path string) bool {
+			accountsContainPath := func(accounts []*accsmanagementtypes.Account, path string) bool {
 				for _, acc := range accounts {
 					if acc.Path == path {
 						return true
@@ -1094,7 +848,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 }
 
 // Saves accounts, if an account already exists, it will be updated.
-func (db *Database) SaveOrUpdateAccounts(accounts []*Account, updateKeypairClock bool) error {
+func (db *Database) SaveOrUpdateAccounts(accounts []*accsmanagementtypes.Account, updateKeypairClock bool) error {
 	if len(accounts) == 0 {
 		return errors.New("no provided accounts to save/update")
 	}
@@ -1118,7 +872,7 @@ func (db *Database) SaveOrUpdateAccounts(accounts []*Account, updateKeypairClock
 // if any of its accounts exists it will be updated as well, otherwise it will be added.
 // Since keypair type contains `Keycards` as well, they are excluded from the saving/updating this way regardless they
 // are set or not.
-func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
+func (db *Database) SaveOrUpdateKeypair(keypair *accsmanagementtypes.Keypair) error {
 	if keypair == nil {
 		return ErrKeypairIsNil
 	}
@@ -1137,7 +891,7 @@ func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
 
 	// If keypair is being saved, not updated, then it must be at least one account and all accounts must have the same key uid.
 	dbKeypair, err := db.getKeypairByKeyUID(tx, keypair.KeyUID, true)
-	if err != nil && err != ErrDbKeypairNotFound {
+	if err != nil && err != accsmanagementtypes.ErrDbKeypairNotFound {
 		return err
 	}
 	if dbKeypair == nil {
@@ -1235,14 +989,14 @@ func (db *Database) GetWalletAddress() (rst types.Address, err error) {
 	return
 }
 
-func (db *Database) GetProfileKeypair() (*Keypair, error) {
+func (db *Database) GetProfileKeypair() (*accsmanagementtypes.Keypair, error) {
 	keypairs, err := db.getKeypairs(nil, "", false)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, kp := range keypairs {
-		if kp.Type == KeypairTypeProfile {
+		if kp.Type == accsmanagementtypes.KeypairTypeProfile {
 			return kp, nil
 		}
 	}
@@ -1361,7 +1115,7 @@ func (db *Database) MarkKeypairFullyOperable(keyUID string, clock uint64, update
 	}
 
 	for _, acc := range kp.Accounts {
-		_, err = tx.Exec(`UPDATE keypairs_accounts SET operable = ?	WHERE address = ?`, AccountFullyOperable, acc.Address)
+		_, err = tx.Exec(`UPDATE keypairs_accounts SET operable = ?	WHERE address = ?`, accsmanagementtypes.AccountFullyOperable, acc.Address)
 		if err != nil {
 			return err
 		}
@@ -1380,12 +1134,12 @@ func (db *Database) MarkKeypairFullyOperable(keyUID string, clock uint64, update
 }
 
 func (db *Database) MarkAccountFullyOperable(address types.Address) (err error) {
-	_, err = db.db.Exec(`UPDATE keypairs_accounts SET operable = ?	WHERE address = ?`, AccountFullyOperable, address)
+	_, err = db.db.Exec(`UPDATE keypairs_accounts SET operable = ?	WHERE address = ?`, accsmanagementtypes.AccountFullyOperable, address)
 	return err
 }
 
 // This function should not update the clock, cause it marks a keypair locally.
-func (db *Database) SetKeypairSyncedFrom(address types.Address, operable AccountOperable) (err error) {
+func (db *Database) SetKeypairSyncedFrom(address types.Address, operable accsmanagementtypes.AccountOperable) (err error) {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err
@@ -1472,7 +1226,7 @@ func (db *Database) ResolveAccountsPositions(clock uint64) (err error) {
 }
 
 // Sets positions for passed accounts.
-func (db *Database) SetWalletAccountsPositions(accounts []*Account, clock uint64) (err error) {
+func (db *Database) SetWalletAccountsPositions(accounts []*accsmanagementtypes.Account, clock uint64) (err error) {
 	if len(accounts) == 0 {
 		return nil
 	}
@@ -1621,7 +1375,7 @@ func (db *Database) CheckAndDeleteExpiredKeypairsAndAccounts(time uint64) error 
 	}
 
 	for _, dbKp := range dbKeypairs {
-		if dbKp.Type == KeypairTypeProfile ||
+		if dbKp.Type == accsmanagementtypes.KeypairTypeProfile ||
 			!dbKp.Removed ||
 			time-dbKp.Clock < ThirtyDaysInMilliseconds {
 			continue
@@ -1686,7 +1440,7 @@ func (db *Database) AddressWasShown(address types.Address) error {
 	return err
 }
 
-func (db *Database) resolveNumOfAddressesToGenerate(keypair *Keypair) uint64 {
+func (db *Database) resolveNumOfAddressesToGenerate(keypair *accsmanagementtypes.Keypair) uint64 {
 	if keypair == nil {
 		return maxNumOfGeneratedAddresses
 	}
@@ -1705,7 +1459,7 @@ func (db *Database) resolveNumOfAddressesToGenerate(keypair *Keypair) uint64 {
 func (db *Database) GetNumOfAddressesToGenerateForKeypair(keyUID string) (uint64, error) {
 	kp, err := db.GetKeypairByKeyUID(keyUID)
 	if err != nil {
-		if err == ErrDbKeypairNotFound {
+		if err == accsmanagementtypes.ErrDbKeypairNotFound {
 			return maxNumOfGeneratedAddresses, nil
 		}
 		return 0, err
@@ -1729,10 +1483,10 @@ func (db *Database) ResolveSuggestedPathForKeypair(keyUID string) (suggestedPath
 		_ = tx.Rollback()
 	}()
 
-	var kp *Keypair
+	var kp *accsmanagementtypes.Keypair
 	kp, err = db.getKeypairByKeyUID(tx, keyUID, false)
 	if err != nil {
-		if err == ErrDbKeypairNotFound {
+		if err == accsmanagementtypes.ErrDbKeypairNotFound {
 			return fmt.Sprintf("%s0", statusWalletRootPath), nil
 		}
 		return "", err
@@ -1754,7 +1508,7 @@ func (db *Database) ResolveSuggestedPathForKeypair(keyUID string) (suggestedPath
 		}
 		if !found {
 			// relate custom migration https://github.com/status-im/status-go/pull/5279/files#diff-e62600839ff3a2748953a173d3627e2c48a252b0a962a25a873b778313f81494
-			if kp.Type == KeypairTypeProfile {
+			if kp.Type == accsmanagementtypes.KeypairTypeProfile {
 				walletRootAddress, err := db.GetWalletRootAddress()
 				if err != nil {
 					return relativePath, err

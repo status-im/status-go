@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/common"
@@ -27,7 +28,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 func TestGetAddresses(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	accounts := []*Account{
+	accounts := []*accsmanagementtypes.Account{
 		{Address: types.Address{0x01}, Chat: true, Wallet: true},
 		{Address: types.Address{0x02}},
 	}
@@ -49,13 +50,13 @@ func TestMoveWalletAccount(t *testing.T) {
 	err := db.CreateSettings(setting, config)
 	require.NoError(t, err)
 
-	accounts := []*Account{
-		{Address: types.Address{0x01}, Type: AccountTypeWatch, Position: 0},
-		{Address: types.Address{0x02}, Type: AccountTypeWatch, Position: 1},
-		{Address: types.Address{0x03}, Type: AccountTypeWatch, Position: 2},
-		{Address: types.Address{0x04}, Type: AccountTypeWatch, Position: 3},
-		{Address: types.Address{0x05}, Type: AccountTypeWatch, Position: 4},
-		{Address: types.Address{0x06}, Type: AccountTypeWatch, Position: 5},
+	accounts := []*accsmanagementtypes.Account{
+		{Address: types.Address{0x01}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0},
+		{Address: types.Address{0x02}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x03}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x04}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x05}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4},
+		{Address: types.Address{0x06}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
 	}
 	require.NoError(t, db.SaveOrUpdateAccounts(accounts, false))
 	dbAccounts, err := db.GetActiveAccounts()
@@ -78,13 +79,13 @@ func TestMoveWalletAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	// Expected after moving down
-	accounts = []*Account{
-		{Address: types.Address{0x01}, Type: AccountTypeWatch, Position: 0},
-		{Address: types.Address{0x03}, Type: AccountTypeWatch, Position: 1},
-		{Address: types.Address{0x04}, Type: AccountTypeWatch, Position: 2},
-		{Address: types.Address{0x05}, Type: AccountTypeWatch, Position: 3},
-		{Address: types.Address{0x02}, Type: AccountTypeWatch, Position: 4}, // acc with addr 0x02 is at position 4 (moved from position 1)
-		{Address: types.Address{0x06}, Type: AccountTypeWatch, Position: 5},
+	accounts = []*accsmanagementtypes.Account{
+		{Address: types.Address{0x01}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0},
+		{Address: types.Address{0x03}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x04}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x05}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x02}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4}, // acc with addr 0x02 is at position 4 (moved from position 1)
+		{Address: types.Address{0x06}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
 	}
 
 	dbAccounts, err = db.GetActiveAccounts()
@@ -104,13 +105,13 @@ func TestMoveWalletAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	// Expected after moving up
-	accounts = []*Account{
-		{Address: types.Address{0x06}, Type: AccountTypeWatch, Position: 0}, // acc with addr 0x06 is at position 0 (moved from position 5)
-		{Address: types.Address{0x01}, Type: AccountTypeWatch, Position: 1},
-		{Address: types.Address{0x03}, Type: AccountTypeWatch, Position: 2},
-		{Address: types.Address{0x04}, Type: AccountTypeWatch, Position: 3},
-		{Address: types.Address{0x05}, Type: AccountTypeWatch, Position: 4},
-		{Address: types.Address{0x02}, Type: AccountTypeWatch, Position: 5},
+	accounts = []*accsmanagementtypes.Account{
+		{Address: types.Address{0x06}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0}, // acc with addr 0x06 is at position 0 (moved from position 5)
+		{Address: types.Address{0x01}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x03}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x04}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x05}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4},
+		{Address: types.Address{0x02}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
 	}
 
 	dbAccounts, err = db.GetActiveAccounts()
@@ -131,7 +132,7 @@ func TestGetWalletAddress(t *testing.T) {
 	address := types.Address{0x01}
 	_, err := db.GetWalletAddress()
 	require.Equal(t, err, sql.ErrNoRows)
-	require.NoError(t, db.SaveOrUpdateAccounts([]*Account{{Address: address, Wallet: true}}, false))
+	require.NoError(t, db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{{Address: address, Wallet: true}}, false))
 	wallet, err := db.GetWalletAddress()
 	require.NoError(t, err)
 	require.Equal(t, address, wallet)
@@ -143,7 +144,7 @@ func TestGetChatAddress(t *testing.T) {
 	address := types.Address{0x01}
 	_, err := db.GetChatAddress()
 	require.Equal(t, err, sql.ErrNoRows)
-	require.NoError(t, db.SaveOrUpdateAccounts([]*Account{{Address: address, Chat: true}}, false))
+	require.NoError(t, db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{{Address: address, Chat: true}}, false))
 	chat, err := db.GetChatAddress()
 	require.NoError(t, err)
 	require.Equal(t, address, chat)
@@ -153,7 +154,7 @@ func TestAddressExists(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	accounts := []*Account{
+	accounts := []*accsmanagementtypes.Account{
 		{Address: types.Address{0x01}, Chat: true, Wallet: true},
 	}
 	require.NoError(t, db.SaveOrUpdateAccounts(accounts, false))
@@ -183,7 +184,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	woAccounts := GetWatchOnlyAccountsForTest()
 
 	// try to save keypair with watch only accounts
-	kp := &Keypair{}
+	kp := &accsmanagementtypes.Keypair{}
 	kp.Accounts = append(kp.Accounts, woAccounts...)
 	err = db.SaveOrUpdateKeypair(kp)
 	require.Error(t, err)
@@ -198,7 +199,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.NoError(t, err)
 	_, err = db.GetKeypairByKeyUID(woAccounts[0].KeyUID)
 	require.Error(t, err)
-	require.True(t, err == ErrDbKeypairNotFound)
+	require.True(t, err == accsmanagementtypes.ErrDbKeypairNotFound)
 	dbAccounts, err = db.GetActiveAccounts()
 	require.NoError(t, err)
 	require.Equal(t, len(woAccounts), len(dbAccounts))
@@ -215,14 +216,14 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.Equal(t, woAccounts[:1][0].Address, dbAcc.Address)
 
 	// try to save new watch only account
-	wo4 := &Account{
+	wo4 := &accsmanagementtypes.Account{
 		Address: types.Address{0x14},
-		Type:    AccountTypeWatch,
+		Type:    accsmanagementtypes.AccountTypeWatch,
 		Name:    "WatchOnlyAcc4",
 		ColorID: common.CustomizationColorPrimary,
 		Emoji:   "emoji-1",
 	}
-	err = db.SaveOrUpdateAccounts([]*Account{wo4}, false)
+	err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{wo4}, false)
 	require.NoError(t, err)
 	dbAccounts, err = db.GetActiveAccounts()
 	require.NoError(t, err)
@@ -235,7 +236,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	wo4.Name = wo4.Name + "updated"
 	wo4.ColorID = common.CustomizationColorCamel
 	wo4.Emoji = wo4.Emoji + "updated"
-	err = db.SaveOrUpdateAccounts([]*Account{wo4}, false)
+	err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{wo4}, false)
 	require.NoError(t, err)
 	dbAccounts, err = db.GetActiveAccounts()
 	require.NoError(t, err)
@@ -247,7 +248,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	// try to delete keypair for watch only account
 	err = db.RemoveKeypair(wo4.KeyUID, 0)
 	require.Error(t, err)
-	require.True(t, err == ErrDbKeypairNotFound)
+	require.True(t, err == accsmanagementtypes.ErrDbKeypairNotFound)
 
 	// try to delete watch only account
 	err = db.RemoveAccount(wo4.Address, 0)
@@ -302,7 +303,7 @@ func TestKeypairs(t *testing.T) {
 	require.NoError(t, err)
 	// in this context (when testing db functions) there is not limitations for private key imported keypair
 	require.NoError(t, err)
-	keypairs := []*Keypair{
+	keypairs := []*accsmanagementtypes.Keypair{
 		profileKp,
 		seedKp,
 		privKeyKp,
@@ -322,7 +323,7 @@ func TestKeypairs(t *testing.T) {
 			require.Equal(t, 0, len(dbAccounts))
 
 			expectedLastUsedDerivationIndex := uint64(len(kp.Accounts) - 1)
-			if kp.Type == KeypairTypeProfile {
+			if kp.Type == accsmanagementtypes.KeypairTypeProfile {
 				expectedLastUsedDerivationIndex-- // subtract one more in case of profile keypair because of chat account
 			}
 
@@ -346,7 +347,7 @@ func TestKeypairs(t *testing.T) {
 			require.NoError(t, err)
 			_, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.Error(t, err)
-			require.True(t, err == ErrDbKeypairNotFound)
+			require.True(t, err == accsmanagementtypes.ErrDbKeypairNotFound)
 
 			// save keypair again to test the flow below
 			err = db.SaveOrUpdateKeypair(kp)
@@ -359,7 +360,7 @@ func TestKeypairs(t *testing.T) {
 			accToUpdate := kp.Accounts[ind]
 
 			// try to save the same account again
-			err = db.SaveOrUpdateAccounts([]*Account{accToUpdate}, false)
+			err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{accToUpdate}, false)
 			require.NoError(t, err)
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.NoError(t, err)
@@ -374,7 +375,7 @@ func TestKeypairs(t *testing.T) {
 			accToUpdate.ColorID = common.CustomizationColorBrown
 			accToUpdate.Emoji = accToUpdate.Emoji + "updated"
 
-			err = db.SaveOrUpdateAccounts([]*Account{accToUpdate}, false)
+			err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{accToUpdate}, false)
 			require.NoError(t, err)
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.NoError(t, err)
@@ -406,7 +407,7 @@ func TestKeypairs(t *testing.T) {
 			accToAdd.PublicKey = types.Hex2Bytes("0x000000008")
 			accToAdd.Name = "Generated Acc 8"
 
-			err = db.SaveOrUpdateAccounts([]*Account{accToAdd}, false)
+			err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{accToAdd}, false)
 			require.NoError(t, err)
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.NoError(t, err)
@@ -427,15 +428,15 @@ func TestKeypairs(t *testing.T) {
 			accToAdd.Name = "Generated Acc 9"
 
 			expectedLastUsedDerivationIndex = 3
-			if kp.Type == KeypairTypeSeed {
+			if kp.Type == accsmanagementtypes.KeypairTypeSeed {
 				accToAdd.Path = "m/44'/60'/0'/0/2"
 				expectedLastUsedDerivationIndex = 2
-			} else if kp.Type == KeypairTypeKey {
+			} else if kp.Type == accsmanagementtypes.KeypairTypeKey {
 				accToAdd.Path = "m/44'/60'/0'/0/1"
 				expectedLastUsedDerivationIndex = 1
 			}
 
-			err = db.SaveOrUpdateAccounts([]*Account{accToAdd}, false)
+			err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{accToAdd}, false)
 			require.NoError(t, err)
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.NoError(t, err)
@@ -465,7 +466,7 @@ func TestKeypairs(t *testing.T) {
 
 			_, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.Error(t, err)
-			require.True(t, err == ErrDbKeypairNotFound)
+			require.True(t, err == accsmanagementtypes.ErrDbKeypairNotFound)
 		})
 	}
 }
@@ -481,7 +482,7 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 	// check the db
 	dbKp, err := db.GetKeypairByKeyUID(kp.KeyUID)
 	require.Error(t, err)
-	require.True(t, err == ErrDbKeypairNotFound)
+	require.True(t, err == accsmanagementtypes.ErrDbKeypairNotFound)
 	require.Nil(t, dbKp)
 
 	expectedLastUsedDerivationIndex := uint64(2)
@@ -505,12 +506,12 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+1), suggestedPath)
 
 	// prepare new account with the next suggested path
-	generatedWalletAccountThatWillBeRemovedLater := &Account{
+	generatedWalletAccountThatWillBeRemovedLater := &accsmanagementtypes.Account{
 		Address:               types.Address{0x05},
 		KeyUID:                kp.KeyUID,
 		Wallet:                false,
 		Chat:                  false,
-		Type:                  AccountTypeGenerated,
+		Type:                  accsmanagementtypes.AccountTypeGenerated,
 		Path:                  suggestedPath,
 		PublicKey:             types.Hex2Bytes("0x000000005"),
 		Name:                  "Generated Acc 4",
@@ -519,13 +520,13 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 		Hidden:                false,
 		Clock:                 0,
 		Removed:               false,
-		Operable:              AccountFullyOperable,
+		Operable:              accsmanagementtypes.AccountFullyOperable,
 		ProdPreferredChainIDs: "1",
 		TestPreferredChainIDs: "5",
 	}
 
 	// add new account with the next suggested path
-	err = db.SaveOrUpdateAccounts([]*Account{generatedWalletAccountThatWillBeRemovedLater}, false)
+	err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{generatedWalletAccountThatWillBeRemovedLater}, false)
 	require.NoError(t, err)
 
 	totalNumOfAccounts++
@@ -544,12 +545,12 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 	customSuggestedPath := fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+1+1)
 
 	// prepare new account with the custom suggested path
-	generatedWalletAccount := &Account{
+	generatedWalletAccount := &accsmanagementtypes.Account{
 		Address:               types.Address{0x07},
 		KeyUID:                kp.KeyUID,
 		Wallet:                false,
 		Chat:                  false,
-		Type:                  AccountTypeGenerated,
+		Type:                  accsmanagementtypes.AccountTypeGenerated,
 		Path:                  customSuggestedPath,
 		PublicKey:             types.Hex2Bytes("0x000000007"),
 		Name:                  "Generated Acc 6",
@@ -558,13 +559,13 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 		Hidden:                false,
 		Clock:                 0,
 		Removed:               false,
-		Operable:              AccountFullyOperable,
+		Operable:              accsmanagementtypes.AccountFullyOperable,
 		ProdPreferredChainIDs: "1",
 		TestPreferredChainIDs: "5",
 	}
 
 	// add new account with the next suggested path
-	err = db.SaveOrUpdateAccounts([]*Account{generatedWalletAccount}, false)
+	err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{generatedWalletAccount}, false)
 	require.NoError(t, err)
 
 	totalNumOfAccounts++
@@ -580,12 +581,12 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+1), suggestedPath)
 
 	// prepare new account with the next suggested path
-	generatedWalletAccount = &Account{
+	generatedWalletAccount = &accsmanagementtypes.Account{
 		Address:               types.Address{0x06},
 		KeyUID:                kp.KeyUID,
 		Wallet:                false,
 		Chat:                  false,
-		Type:                  AccountTypeGenerated,
+		Type:                  accsmanagementtypes.AccountTypeGenerated,
 		Path:                  suggestedPath,
 		PublicKey:             types.Hex2Bytes("0x000000006"),
 		Name:                  "Generated Acc 5",
@@ -594,13 +595,13 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 		Hidden:                false,
 		Clock:                 0,
 		Removed:               false,
-		Operable:              AccountFullyOperable,
+		Operable:              accsmanagementtypes.AccountFullyOperable,
 		ProdPreferredChainIDs: "1",
 		TestPreferredChainIDs: "5",
 	}
 
 	// add new account with the next suggested path
-	err = db.SaveOrUpdateAccounts([]*Account{generatedWalletAccount}, false)
+	err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{generatedWalletAccount}, false)
 	require.NoError(t, err)
 
 	totalNumOfAccounts++
@@ -617,12 +618,12 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+2), suggestedPath)
 
 	// prepare new account with the next suggested path
-	generatedWalletAccount = &Account{
+	generatedWalletAccount = &accsmanagementtypes.Account{
 		Address:               types.Address{0x08},
 		KeyUID:                kp.KeyUID,
 		Wallet:                false,
 		Chat:                  false,
-		Type:                  AccountTypeGenerated,
+		Type:                  accsmanagementtypes.AccountTypeGenerated,
 		Path:                  suggestedPath,
 		PublicKey:             types.Hex2Bytes("0x000000008"),
 		Name:                  "Generated Acc 7",
@@ -631,13 +632,13 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 		Hidden:                false,
 		Clock:                 0,
 		Removed:               false,
-		Operable:              AccountFullyOperable,
+		Operable:              accsmanagementtypes.AccountFullyOperable,
 		ProdPreferredChainIDs: "1",
 		TestPreferredChainIDs: "5",
 	}
 
 	// add new account with the next suggested path
-	err = db.SaveOrUpdateAccounts([]*Account{generatedWalletAccount}, false)
+	err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{generatedWalletAccount}, false)
 	require.NoError(t, err)
 
 	totalNumOfAccounts++
@@ -678,7 +679,7 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 	require.NoError(t, err)
 	_, err = db.GetKeypairByKeyUID(kp.KeyUID)
 	require.Error(t, err)
-	require.True(t, err == ErrDbKeypairNotFound)
+	require.True(t, err == accsmanagementtypes.ErrDbKeypairNotFound)
 
 	// check suggested path after removing keypair when adding the same keypair again
 	suggestedPath, err = db.ResolveSuggestedPathForKeypair(kp.KeyUID)

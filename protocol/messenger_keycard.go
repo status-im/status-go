@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -46,7 +47,7 @@ func (m *Messenger) dispatchKeycardActivity(keyUID string, keycardUID string, ne
 // Keycard position is fully maintained by the backend.
 // If keycard is already stored, this function updates `KeycardName` and adds accounts which are not already added, in this case
 // `KeycardLocked` and `Position` remains as they were, they won't be changed.
-func (m *Messenger) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.Keycard, removeKeystoreFiles bool) (err error) {
+func (m *Messenger) SaveOrUpdateKeycard(ctx context.Context, keycard *accsmanagementtypes.Keycard, password string) (err error) {
 	dbKeycard, err := m.settings.GetKeycardByKeycardUID(keycard.KeycardUID)
 	if err != nil && err != accounts.ErrNoKeycardForPassedKeycardUID {
 		return err
@@ -65,7 +66,7 @@ func (m *Messenger) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.K
 	}
 
 	return m.dispatchKeycardActivity(keycard.KeyUID, "", "", []types.Address{}, func(clock uint64) error {
-		return m.accountsManager.SaveOrUpdateKeycard(accounts.KeycardToAccountsManagerKeycard(keycard), clock, removeKeystoreFiles)
+		return m.accountsManager.SaveOrUpdateKeycard(keycard, password, clock)
 	})
 }
 

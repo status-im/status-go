@@ -6,30 +6,18 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ethereum/go-ethereum/metrics"
 )
 
 func createTestServer(t *testing.T) *Server {
-	server := NewMetricsServer(":8080", nil)
+	server := NewMetricsServer(":8080")
 	require.NotNil(t, server)
 	return server
 }
 
 func TestNewMetricsServer(t *testing.T) {
-	server := NewMetricsServer(":8080", nil)
+	server := NewMetricsServer(":8080")
 	require.NotNil(t, server)
 	require.Equal(t, ":8080", server.server.Addr)
-}
-
-func TestNewMetricsServer_WithRegistry(t *testing.T) {
-	registry := metrics.NewRegistry()
-	server := NewMetricsServer(":8080", registry)
-	require.NotNil(t, server)
-
-	// Check that geth handler was registered
-	_, exists := server.handlers.Load("geth")
-	require.True(t, exists)
 }
 
 func TestServer_RegisterHandler(t *testing.T) {

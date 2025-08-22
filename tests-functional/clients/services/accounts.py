@@ -19,8 +19,8 @@ class AccountService(Service):
         response = self.rpc_request("addAccount", params)
         return response.json()
 
-    def delete_account(self, account_address):
-        params = [account_address]
+    def delete_account(self, account_address, password):
+        params = [account_address, password]
         response = self.rpc_request("deleteAccount", params)
         return response.json()
 
@@ -70,4 +70,28 @@ class AccountService(Service):
 
     def get_token_preferences(self):
         response = self.rpc_request("getTokenPreferences", [])
+        return response.json()
+
+    def update_collectible_preferences(self, preferences):
+        params = [preferences]
+        response = self.rpc_request("updateCollectiblePreferences", params)
+        return response.json()
+
+    def get_collectible_preferences(self):
+        response = self.rpc_request("getCollectiblePreferences", [])
+        return response.json()
+
+    def get_account_by_address(self, address):
+        params = [address]
+        response = self.rpc_request("getAccountByAddress", params)
+        return response.json()
+
+    def get_keypair_by_key_uid(self, key_uid):
+        params = [key_uid]
+        response = self.rpc_request("getKeypairByKeyUID", params)
+        return response.json()
+
+    def update_account(self, account):
+        params = [account]
+        response = self.rpc_request("updateAccount", params)
         return response.json()

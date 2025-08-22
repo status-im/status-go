@@ -203,9 +203,9 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	// chat and default wallet account should be fully operable, other accounts partially operable
 	for i := range profileKp.Accounts {
 		match := false
-		expectedOperableValue := accounts.AccountPartiallyOperable
+		expectedOperableValue := accsmanagementtypes.AccountPartiallyOperable
 		if profileKp.Accounts[i].Chat || profileKp.Accounts[i].Wallet {
-			expectedOperableValue = accounts.AccountFullyOperable
+			expectedOperableValue = accsmanagementtypes.AccountFullyOperable
 		}
 		for j := range dbProfileKp2.Accounts {
 			if accounts.SameAccountsWithDifferentOperable(profileKp.Accounts[i], dbProfileKp2.Accounts[j], expectedOperableValue) {
@@ -218,11 +218,11 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 
 	dbSeedPhraseKp2, err := alicesOtherDevice.settings.GetKeypairByKeyUID(seedPhraseKp.KeyUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(seedPhraseKp, dbSeedPhraseKp2, true, "", accounts.AccountNonOperable))
+	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(seedPhraseKp, dbSeedPhraseKp2, true, "", accsmanagementtypes.AccountNonOperable))
 
 	dbPrivKeyKp2, err := alicesOtherDevice.settings.GetKeypairByKeyUID(privKeyKp.KeyUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(privKeyKp, dbPrivKeyKp2, true, "", accounts.AccountNonOperable))
+	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(privKeyKp, dbPrivKeyKp2, true, "", accsmanagementtypes.AccountNonOperable))
 
 	dbWoAccounts2, err := alicesOtherDevice.settings.GetActiveWatchOnlyAccounts()
 	s.Require().NoError(err)
@@ -302,13 +302,13 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().NoError(err)
 	profileKp.Accounts[0].Position = -1 // Chat account must be at position -1 always
 
-	woAccounts := []*accounts.Account{
-		{Address: types.Address{0x11}, Type: accounts.AccountTypeWatch, Position: 0},
-		{Address: types.Address{0x12}, Type: accounts.AccountTypeWatch, Position: 1},
-		{Address: types.Address{0x13}, Type: accounts.AccountTypeWatch, Position: 2},
-		{Address: types.Address{0x14}, Type: accounts.AccountTypeWatch, Position: 3},
-		{Address: types.Address{0x15}, Type: accounts.AccountTypeWatch, Position: 4},
-		{Address: types.Address{0x16}, Type: accounts.AccountTypeWatch, Position: 5},
+	woAccounts := []*accsmanagementtypes.Account{
+		{Address: types.Address{0x11}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0},
+		{Address: types.Address{0x12}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x13}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x14}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x15}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4},
+		{Address: types.Address{0x16}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
 	}
 
 	// Create a main account on alice
@@ -371,13 +371,13 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().NoError(err)
 
 	// Expected after moving down
-	woAccounts = []*accounts.Account{
-		{Address: types.Address{0x11}, Type: accounts.AccountTypeWatch, Position: 0},
-		{Address: types.Address{0x13}, Type: accounts.AccountTypeWatch, Position: 1},
-		{Address: types.Address{0x14}, Type: accounts.AccountTypeWatch, Position: 2},
-		{Address: types.Address{0x15}, Type: accounts.AccountTypeWatch, Position: 3},
-		{Address: types.Address{0x12}, Type: accounts.AccountTypeWatch, Position: 4}, // acc with addr 0x12 is at position 4 (moved from position 1)
-		{Address: types.Address{0x16}, Type: accounts.AccountTypeWatch, Position: 5},
+	woAccounts = []*accsmanagementtypes.Account{
+		{Address: types.Address{0x11}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0},
+		{Address: types.Address{0x13}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x14}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x15}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x12}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4}, // acc with addr 0x12 is at position 4 (moved from position 1)
+		{Address: types.Address{0x16}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
 	}
 
 	dbAccounts, err = s.m.settings.GetActiveAccounts()
@@ -421,13 +421,13 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().NoError(err)
 
 	// Expected after moving down
-	woAccounts = []*accounts.Account{
-		{Address: types.Address{0x16}, Type: accounts.AccountTypeWatch, Position: 0}, // acc with addr 0x16 is at position 0 (moved from position 5)
-		{Address: types.Address{0x11}, Type: accounts.AccountTypeWatch, Position: 1},
-		{Address: types.Address{0x13}, Type: accounts.AccountTypeWatch, Position: 2},
-		{Address: types.Address{0x14}, Type: accounts.AccountTypeWatch, Position: 3},
-		{Address: types.Address{0x15}, Type: accounts.AccountTypeWatch, Position: 4},
-		{Address: types.Address{0x12}, Type: accounts.AccountTypeWatch, Position: 5},
+	woAccounts = []*accsmanagementtypes.Account{
+		{Address: types.Address{0x16}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0}, // acc with addr 0x16 is at position 0 (moved from position 5)
+		{Address: types.Address{0x11}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x13}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x14}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x15}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4},
+		{Address: types.Address{0x12}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
 	}
 
 	dbAccounts, err = s.m.settings.GetActiveAccounts()
@@ -476,7 +476,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	for _, acc := range profileKp.Accounts {
 		acc.Clock = uint64(i + 1)
 		acc.Position = int64(i)
-		acc.Operable = accounts.AccountNonOperable
+		acc.Operable = accsmanagementtypes.AccountNonOperable
 		i++
 	}
 
@@ -489,7 +489,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	for _, acc := range seedPhraseKp.Accounts {
 		acc.Clock = uint64(i + 1)
 		acc.Position = int64(i)
-		acc.Operable = accounts.AccountNonOperable
+		acc.Operable = accsmanagementtypes.AccountNonOperable
 		i++
 	}
 	err = s.m.settings.SaveOrUpdateKeypair(seedPhraseKp)
@@ -499,7 +499,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	for _, acc := range privKeyKp.Accounts {
 		acc.Clock = uint64(i + 1)
 		acc.Position = int64(i)
-		acc.Operable = accounts.AccountNonOperable
+		acc.Operable = accsmanagementtypes.AccountNonOperable
 		i++
 	}
 	err = s.m.settings.SaveOrUpdateKeypair(privKeyKp)
@@ -509,7 +509,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	for _, acc := range woAccounts {
 		acc.Clock = uint64(i + 1)
 		acc.Position = int64(i)
-		acc.Operable = accounts.AccountFullyOperable
+		acc.Operable = accsmanagementtypes.AccountFullyOperable
 		i++
 	}
 	err = s.m.settings.SaveOrUpdateAccounts(woAccounts, false)
@@ -594,16 +594,16 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	// Delete keypair related account on alice's primary device
 	accToDelete := seedPhraseKp.Accounts[1]
 
-	s.accountsManagerMock.EXPECT().DeleteAccount(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(address types.Address, clock uint64) (*accsmanagementtypes.Account, error) {
+	s.accountsManagerMock.EXPECT().DeleteAccount(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(address types.Address, password string, clock uint64) (*accsmanagementtypes.Account, error) {
 			err := s.m.settings.RemoveAccount(address, clock)
 			if err != nil {
 				return nil, err
 			}
-			return accounts.AccountToAccountsManagerAccount(accToDelete), nil
+			return accToDelete, nil
 		}).Times(1)
 
-	err = s.m.DeleteAccount(accToDelete.Address)
+	err = s.m.DeleteAccount(accToDelete.Address, "")
 	s.Require().NoError(err, "delete account on alice primary device")
 
 	totalNumOfAccounts-- //one acc less
@@ -611,8 +611,6 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	dbAccounts1, err = s.m.settings.GetActiveAccounts()
 	s.Require().NoError(err)
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
-
-	accountsManagerAnotherMock.EXPECT().DeleteKeystoreFileForAccount(accToDelete.Address).Return(nil).Times(1)
 
 	err = tt.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
@@ -636,16 +634,16 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	// Delete watch only account on alice's primary device
 	accToDelete = woAccounts[1]
 
-	s.accountsManagerMock.EXPECT().DeleteAccount(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(address types.Address, clock uint64) (*accsmanagementtypes.Account, error) {
+	s.accountsManagerMock.EXPECT().DeleteAccount(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(address types.Address, password string, clock uint64) (*accsmanagementtypes.Account, error) {
 			err := s.m.settings.RemoveAccount(address, clock)
 			if err != nil {
 				return nil, err
 			}
-			return accounts.AccountToAccountsManagerAccount(accToDelete), nil
+			return accToDelete, nil
 		}).Times(1)
 
-	err = s.m.DeleteAccount(accToDelete.Address)
+	err = s.m.DeleteAccount(accToDelete.Address, "")
 	s.Require().NoError(err, "delete account on alice primary device")
 
 	totalNumOfAccounts-- //one acc less

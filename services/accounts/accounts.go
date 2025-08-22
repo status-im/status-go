@@ -39,7 +39,7 @@ type DerivedAddress struct {
 	AlreadyCreated bool           `json:"alreadyCreated"`
 }
 
-func (api *API) publishAccountsEvent(accounts []*accounts.Account, removeEvent bool) {
+func (api *API) publishAccountsEvent(accounts []*accsmanagementtypes.Account, removeEvent bool) {
 	if api.publisher != nil {
 		commonAddresses := []common.Address{}
 		for _, acc := range accounts {
@@ -59,7 +59,8 @@ func (api *API) publishAccountsEvent(accounts []*accounts.Account, removeEvent b
 }
 
 func (api *API) AddKeypairViaSeedPhrase(ctx context.Context, mnemonic string, password string, name string,
-	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accounts.Keypair, error) {
+	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accsmanagementtypes.Keypair, error) {
+
 	addedKeypair, err := (*api.messenger).AddKeypairViaSeedPhrase(mnemonic, password, name, walletAccount)
 	if err != nil {
 		return nil, err
@@ -71,7 +72,7 @@ func (api *API) AddKeypairViaSeedPhrase(ctx context.Context, mnemonic string, pa
 }
 
 func (api *API) AddKeypairStoredToKeycard(ctx context.Context, keyUID string, masterAddress string, name string,
-	walletAccounts []*accounts.Account) (*accounts.Keypair, error) {
+	walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
 	addedKeypair, err := (*api.messenger).AddKeypairStoredToKeycard(keyUID, masterAddress, name, walletAccounts)
 	if err != nil {
 		return nil, err
@@ -83,7 +84,7 @@ func (api *API) AddKeypairStoredToKeycard(ctx context.Context, keyUID string, ma
 }
 
 func (api *API) AddKeypairViaPrivateKey(ctx context.Context, privateKey string, password string, name string,
-	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accounts.Keypair, error) {
+	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accsmanagementtypes.Keypair, error) {
 	addedKeypair, err := (*api.messenger).AddKeypairViaPrivateKey(privateKey, password, name, walletAccount)
 	if err != nil {
 		return nil, err
@@ -94,8 +95,8 @@ func (api *API) AddKeypairViaPrivateKey(ctx context.Context, privateKey string, 
 	return addedKeypair, nil
 }
 
-func (api *API) AddAccount(ctx context.Context, password string, account *accounts.Account) error {
-	if account.Type == accounts.AccountTypeGenerated {
+func (api *API) AddAccount(ctx context.Context, password string, account *accsmanagementtypes.Account) error {
+	if account.Type == accsmanagementtypes.AccountTypeGenerated {
 		account.AddressWasNotShown = true
 	}
 
@@ -104,25 +105,25 @@ func (api *API) AddAccount(ctx context.Context, password string, account *accoun
 		return err
 	}
 
-	api.publishAccountsEvent([]*accounts.Account{account}, false)
+	api.publishAccountsEvent([]*accsmanagementtypes.Account{account}, false)
 
 	return nil
 }
 
-func (api *API) UpdateAccount(ctx context.Context, account *accounts.Account) error {
+func (api *API) UpdateAccount(ctx context.Context, account *accsmanagementtypes.Account) error {
 	logutils.ZapLogger().Info("[AccountsAPI::SaveAccount]")
 	err := (*api.messenger).UpdateAccount(account)
 	if err != nil {
 		return err
 	}
 
-	api.publishAccountsEvent([]*accounts.Account{account}, false)
+	api.publishAccountsEvent([]*accsmanagementtypes.Account{account}, false)
 
 	return nil
 }
 
 // Setting `Keypair` without `Accounts` will update keypair only, `Keycards` won't be saved/updated this way.
-func (api *API) UpdateKeypair(ctx context.Context, keypair *accounts.Keypair) error {
+func (api *API) UpdateKeypair(ctx context.Context, keypair *accsmanagementtypes.Keypair) error {
 	logutils.ZapLogger().Info("[AccountsAPI::SaveKeypair]")
 	err := (*api.messenger).UpdateKeypair(keypair)
 	if err != nil {
@@ -163,48 +164,48 @@ func (api *API) GetCollectiblePreferences(ctx context.Context) ([]walletsettings
 	return (*api.messenger).GetCollectiblePreferences()
 }
 
-func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
+func (api *API) GetAccounts(ctx context.Context) ([]*accsmanagementtypes.Account, error) {
 	return api.db.GetActiveAccounts()
 }
 
-func (api *API) GetWatchOnlyAccounts(ctx context.Context) ([]*accounts.Account, error) {
+func (api *API) GetWatchOnlyAccounts(ctx context.Context) ([]*accsmanagementtypes.Account, error) {
 	return api.db.GetActiveWatchOnlyAccounts()
 }
 
-func (api *API) GetKeypairs(ctx context.Context) ([]*accounts.Keypair, error) {
+func (api *API) GetKeypairs(ctx context.Context) ([]*accsmanagementtypes.Keypair, error) {
 	return api.db.GetActiveKeypairs()
 }
 
-func (api *API) GetAccountByAddress(ctx context.Context, address types.Address) (*accounts.Account, error) {
+func (api *API) GetAccountByAddress(ctx context.Context, address types.Address) (*accsmanagementtypes.Account, error) {
 	return api.db.GetAccountByAddress(address)
 }
 
-func (api *API) GetKeypairByKeyUID(ctx context.Context, keyUID string) (*accounts.Keypair, error) {
+func (api *API) GetKeypairByKeyUID(ctx context.Context, keyUID string) (*accsmanagementtypes.Keypair, error) {
 	return api.db.GetKeypairByKeyUID(keyUID)
 }
 
-func (api *API) DeleteAccount(ctx context.Context, address types.Address) error {
-	err := (*api.messenger).DeleteAccount(address)
+func (api *API) DeleteAccount(ctx context.Context, address types.Address, password string) error {
+	err := (*api.messenger).DeleteAccount(address, password)
 	if err != nil {
 		return err
 	}
 
-	api.publishAccountsEvent([]*accounts.Account{{Address: address}}, true)
+	api.publishAccountsEvent([]*accsmanagementtypes.Account{{Address: address}}, true)
 
 	return nil
 }
 
-func (api *API) DeleteKeypair(ctx context.Context, keyUID string) error {
+func (api *API) DeleteKeypair(ctx context.Context, keyUID string, password string) error {
 	keypair, err := api.db.GetKeypairByKeyUID(keyUID)
 	if err != nil {
 		return err
 	}
 
-	if keypair.Type == accounts.KeypairTypeProfile {
+	if keypair.Type == accsmanagementtypes.KeypairTypeProfile {
 		return accounts.ErrCannotRemoveProfileKeypair
 	}
 
-	err = (*api.messenger).DeleteKeypair(keyUID)
+	err = (*api.messenger).DeleteKeypair(keyUID, password)
 	if err != nil {
 		return err
 	}
@@ -232,6 +233,14 @@ func (api *API) RemainingWatchOnlyAccountCapacity(ctx context.Context) (int, err
 // Creates all keystore files for a keypair and mark it in db as fully operable.
 func (api *API) MakePrivateKeyKeypairFullyOperable(ctx context.Context, privateKey string, password string) error {
 	return (*api.messenger).MakePrivateKeyKeypairFullyOperable(privateKey, password)
+}
+
+// CleanKeystoreFiles cleans the keystore files for all keypairs
+// if the keypair is already migrated to keycard or removed, it cleans all accounts of the keypair, including the master account
+// if the keypair is not migrated to keycard and not removed, it cleans the keystore files for removed accounts of the keypair,
+// the master account is not cleaned if the keypair is not removed/migrated to keycard
+func (api *API) CleanKeystoreFiles(ctx context.Context, password string) error {
+	return api.manager.CleanKeystoreFiles(password)
 }
 
 func (api *API) MakePartiallyOperableAccoutsFullyOperable(ctx context.Context, password string) (addresses []types.Address, err error) {
@@ -269,22 +278,21 @@ func (api *API) MigrateNonProfileKeycardKeypairToApp(ctx context.Context, mnemon
 	return (*api.messenger).MigrateNonProfileKeycardKeypairToApp(ctx, mnemonicNoExtraSpaces, password)
 }
 
-// If keypair is migrated from keycard to app, then `accountsComingFromKeycard` should be set to true, otherwise false.
 // If keycard is new `Position` will be determined and set by the backend and `KeycardLocked` will be set to false.
 // If keycard is already added, `Position` and `KeycardLocked` will be unchanged.
-func (api *API) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.Keycard, accountsComingFromKeycard bool) error {
-	return (*api.messenger).SaveOrUpdateKeycard(ctx, keycard, !accountsComingFromKeycard)
+func (api *API) SaveOrUpdateKeycard(ctx context.Context, keycard *accsmanagementtypes.Keycard, password string) error {
+	return (*api.messenger).SaveOrUpdateKeycard(ctx, keycard, password)
 }
 
-func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*accounts.Keycard, error) {
+func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*accsmanagementtypes.Keycard, error) {
 	return api.db.GetAllKnownKeycards()
 }
 
-func (api *API) GetKeycardsWithSameKeyUID(ctx context.Context, keyUID string) ([]*accounts.Keycard, error) {
+func (api *API) GetKeycardsWithSameKeyUID(ctx context.Context, keyUID string) ([]*accsmanagementtypes.Keycard, error) {
 	return api.db.GetKeycardsWithSameKeyUID(keyUID)
 }
 
-func (api *API) GetKeycardByKeycardUID(ctx context.Context, keycardUID string) (*accounts.Keycard, error) {
+func (api *API) GetKeycardByKeycardUID(ctx context.Context, keycardUID string) (*accsmanagementtypes.Keycard, error) {
 	return api.db.GetKeycardByKeycardUID(keycardUID)
 }
 

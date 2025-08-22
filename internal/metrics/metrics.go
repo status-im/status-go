@@ -10,11 +10,8 @@ import (
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/ethereum/go-ethereum/metrics"
-	gethprom "github.com/ethereum/go-ethereum/metrics/prometheus"
-	"github.com/status-im/status-go/logutils"
-
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 // Server runs and controls a HTTP pprof interface.
@@ -23,7 +20,7 @@ type Server struct {
 	handlers sync.Map
 }
 
-func NewMetricsServer(address string, r metrics.Registry) *Server {
+func NewMetricsServer(address string) *Server {
 	mux := http.NewServeMux()
 
 	s := &Server{
@@ -34,15 +31,10 @@ func NewMetricsServer(address string, r metrics.Registry) *Server {
 		},
 	}
 
-	// we disable compression because geth doesn't support it
-	opts := promhttp.HandlerOpts{DisableCompression: true}
+	opts := promhttp.HandlerOpts{}
+
 	// register status handler
 	s.RegisterHandler("status", promhttp.HandlerFor(prom.DefaultGatherer, opts))
-
-	// register geth handler
-	if r != nil {
-		s.RegisterHandler("geth", gethprom.Handler(r))
-	}
 
 	mux.Handle("/health", healthHandler())
 	mux.Handle("/metrics", s.metricsHandler())
@@ -87,7 +79,8 @@ func healthHandler() http.Handler {
 // Listen starts the HTTP server in the background.
 func (s *Server) Listen() {
 	defer common.LogOnPanic()
-	logutils.ZapLogger().Info("metrics server stopped", zap.Error(s.server.ListenAndServe()))
+	err := s.server.ListenAndServe()
+	logutils.ZapLogger().Info("metrics server stopped", zap.Error(err))
 }
 
 // Stop gracefully shuts down the metrics server

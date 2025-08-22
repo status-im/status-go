@@ -1,4 +1,4 @@
-package core
+package accountsmanagement
 
 import "github.com/status-im/status-go/accounts-management/errors"
 
@@ -16,7 +16,6 @@ const (
 	ErrCodePersistenceMissing
 	ErrCodeAccountIsNil
 	ErrCodeKeypairIsNil
-	ErrCodeKeystoreFileMissing
 	ErrCodeAccountMismatch
 	ErrCodeAddressAndPasswordOrPrivateKeyRequired
 	ErrCodeNoAccountSelected
@@ -39,6 +38,7 @@ const (
 	ErrCodeKeycardDoesNotHaveAnyAccounts
 	ErrCodeKeycardDoesNotRelateToAnyKeypair
 	ErrCodeCannotRemoveProfileKeypair
+	ErrCodeNoPasswordProvided
 )
 
 var (
@@ -47,7 +47,6 @@ var (
 	ErrPersistenceMissing                              = errors.NewError(ErrCodePersistenceMissing, "persistence is missing", getErrorCategory)
 	ErrAccountIsNil                                    = errors.NewError(ErrCodeAccountIsNil, "account is nil", getErrorCategory)
 	ErrKeypairIsNil                                    = errors.NewError(ErrCodeKeypairIsNil, "keypair is nil", getErrorCategory)
-	ErrKeystoreFileMissing                             = errors.NewError(ErrCodeKeystoreFileMissing, "keystore file is missing", getErrorCategory)
 	ErrAccountMismatch                                 = errors.NewError(ErrCodeAccountMismatch, "account mismatch", getErrorCategory)
 	ErrAddressAndPasswordOrPrivateKeyRequired          = errors.NewError(ErrCodeAddressAndPasswordOrPrivateKeyRequired, "address and password or private key are required", getErrorCategory)
 	ErrNoAccountSelected                               = errors.NewError(ErrCodeNoAccountSelected, "no account selected", getErrorCategory)
@@ -67,6 +66,7 @@ var (
 	ErrKeypairIsNotKeycard                             = errors.NewError(ErrCodeKeypairIsNotKeycard, "keypair is not a keycard keypair", getErrorCategory)
 	ErrKeycardDoesNotHaveAnyAccounts                   = errors.NewError(ErrCodeKeycardDoesNotHaveAnyAccounts, "keycard does not have any accounts", getErrorCategory)
 	ErrCannotRemoveProfileKeypair                      = errors.NewError(ErrCodeCannotRemoveProfileKeypair, "cannot remove profile keypair", getErrorCategory)
+	ErrNoPasswordProvided                              = errors.NewError(ErrCodeNoPasswordProvided, "no password provided", getErrorCategory)
 )
 
 func ErrKeystoreDirectoryError(err error) *errors.AccountsError {
@@ -87,13 +87,13 @@ func getErrorCategory(code errors.ErrorCode) errors.ErrorCategory {
 		return ErrorCategorySystem
 	case ErrCodeAccountMismatch, ErrCodeNoAccountSelected, ErrCodeAccountDoesNotExist, ErrCodeAccountIsNil, ErrCodeKeypairIsNil:
 		return ErrorCategoryAccount
-	case ErrCodeKeystoreDirectoryError, ErrCodeKeystoreFileMissing:
+	case ErrCodeKeystoreDirectoryError:
 		return ErrorCategoryKeystore
 	case ErrCodeAddressAndPasswordOrPrivateKeyRequired, ErrCodeKeypairDoesNotHaveWalletAccount, ErrCodeUnsupportedWalletAccountPath,
 		ErrCodeKeypairAlreadyAdded, ErrCodeAccountAlreadyAdded, ErrCodeChatAccountNotFoundInDerivedAccounts,
 		ErrCodeKeypairMustHaveAtLeastOneWalletAccount, ErrCodeCannotAddAccountsToKeypairImportedViaPrivateKey,
 		ErrCodeCannotMigrateProfileKeypair, ErrCodeKeypairIsNotKeycard, ErrCodeWrongPasswordProvided, ErrCodeKeycardDoesNotHaveAnyAccounts,
-		ErrCodeKeycardDoesNotRelateToAnyKeypair:
+		ErrCodeKeycardDoesNotRelateToAnyKeypair, ErrCodeNoPasswordProvided:
 		return ErrorCategoryValidation
 	case ErrCodeCannotAddDefaultWalletAccount, ErrCodeCannotAddDefaultChatAccount, ErrCodeCannotRemoveDefaultWalletAccount,
 		ErrCodeCannotRemoveDefaultChatAccount, ErrCodeCannotRemoveProfileKeypair:

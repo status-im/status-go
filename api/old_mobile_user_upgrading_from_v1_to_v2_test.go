@@ -11,6 +11,7 @@ import (
 
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	d_common "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/requests"
@@ -113,13 +114,13 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 		s.Require().True(len(kps) == 3)
 
 		// Create a map to categorize keypairs by their type
-		keypairMap := make(map[accounts.KeypairType][]*accounts.Keypair)
+		keypairMap := make(map[accsmanagementtypes.KeypairType][]*accsmanagementtypes.Keypair)
 		for _, kp := range kps {
 			keypairMap[kp.Type] = append(keypairMap[kp.Type], kp)
 		}
 
 		// Check profile keypair
-		profileKps, ok := keypairMap[accounts.KeypairTypeProfile]
+		profileKps, ok := keypairMap[accsmanagementtypes.KeypairTypeProfile]
 		s.Require().True(ok, "Profile keypair not found")
 		s.Require().True(len(profileKps) == 1, "Unexpected number of profile keypairs")
 		s.Require().True(len(profileKps[0].Accounts) == 3)
@@ -128,7 +129,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 		}
 
 		// Check seed keypair
-		seedKps, ok := keypairMap[accounts.KeypairTypeSeed]
+		seedKps, ok := keypairMap[accsmanagementtypes.KeypairTypeSeed]
 		s.Require().True(ok, "Seed keypair not found")
 		s.Require().True(len(seedKps) == 1, "Unexpected number of seed keypairs")
 		s.Require().True(len(seedKps[0].Accounts) == 1)
@@ -154,7 +155,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 		s.Require().False(importedAcc.KeyUID() == seedKps[0].KeyUID)
 
 		// Check key keypair
-		keyKps, ok := keypairMap[accounts.KeypairTypeKey]
+		keyKps, ok := keypairMap[accsmanagementtypes.KeypairTypeKey]
 		s.Require().True(ok, "Key keypair not found")
 		s.Require().True(len(keyKps) == 1, "Unexpected number of key keypairs")
 		s.Require().True(len(keyKps[0].Accounts) == 1)
@@ -202,11 +203,11 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 
 	kps, _ := db.GetAllKeypairs()
 	// Create a map to categorize keypairs by their type
-	keypairMap := make(map[accounts.KeypairType][]*accounts.Keypair)
+	keypairMap := make(map[accsmanagementtypes.KeypairType][]*accsmanagementtypes.Keypair)
 	for _, kp := range kps {
 		keypairMap[kp.Type] = append(keypairMap[kp.Type], kp)
 	}
-	profileKps := keypairMap[accounts.KeypairTypeProfile]
+	profileKps := keypairMap[accsmanagementtypes.KeypairTypeProfile]
 	profileKp := profileKps[0]
 	s.Require().True(profileKp.DerivedFrom == walletRootAddress.Hex())
 	s.Require().False(masterAddress.Hex() == walletRootAddress.Hex())
@@ -227,12 +228,12 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 	s.Require().Equal(expectedDerivedAddress, deriveAccountInfo.Address().Hex())
 	derivedAddress := deriveAccountInfo.Address()
 	accountsAPI := b.StatusNode().AccountService().AccountsAPI()
-	err = accountsAPI.AddAccount(context.Background(), oldMobileUserPasswd, &accounts.Account{
+	err = accountsAPI.AddAccount(context.Background(), oldMobileUserPasswd, &accsmanagementtypes.Account{
 		Address:   derivedAddress,
 		KeyUID:    oldMobileUserKeyUID,
 		Wallet:    false,
 		Chat:      false,
-		Type:      accounts.AccountTypeGenerated,
+		Type:      accsmanagementtypes.AccountTypeGenerated,
 		Path:      suggestedPath,
 		PublicKey: types.Hex2Bytes(deriveAccountInfo.PublicKeyHex()),
 		Name:      "GeneratedAccount2",
@@ -242,7 +243,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 	s.Require().NoError(err)
 	// need retry since there's a possible of getting "no key for given address or file" error
 	err = tt.RetryWithBackOff(func() error {
-		return accountsAPI.DeleteAccount(context.Background(), derivedAddress)
+		return accountsAPI.DeleteAccount(context.Background(), derivedAddress, oldMobileUserPasswd)
 	})
 	s.Require().NoError(err)
 	s.Require().NoError(b.Logout())
