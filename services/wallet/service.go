@@ -250,7 +250,7 @@ func buildPathProcessors(
 	transfer := pathprocessor.NewTransferProcessor(rpcClient, transactor)
 	ret = append(ret, transfer)
 
-	erc721Transfer := pathprocessor.NewERC721Processor(rpcClient, transactor)
+	erc721Transfer := pathprocessor.NewNFTProcessor(rpcClient, transactor)
 	ret = append(ret, erc721Transfer)
 
 	erc1155Transfer := pathprocessor.NewERC1155Processor(rpcClient, transactor)
