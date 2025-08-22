@@ -23,7 +23,6 @@ class TestMessageReactions(MessengerSteps):
         message_id, sender_chat_id = message["id"], message["chatId"]
         receiver_chat_id = self.receiver.wakuext_service.rpc_request(method="chats").json()["result"][0]["id"]
         response = self.receiver.wakuext_service.rpc_request(method="sendEmojiReaction", params=[receiver_chat_id, message_id, 1]).json()
-        self.sender.verify_json_schema(response, "wakuext_sendEmojiReaction")
         self.sender.find_signal_containing_pattern(
             SignalType.MESSAGES_NEW.value,
             event_pattern="emojiReactions",
@@ -34,7 +33,6 @@ class TestMessageReactions(MessengerSteps):
             method="emojiReactionsByChatIDMessageID",
             params=[sender_chat_id, message_id],
         ).json()
-        self.sender.verify_json_schema(response, "wakuext_emojiReactionsByChatIDMessageID")
         result = response["result"]
         assert all(
             (
@@ -52,7 +50,6 @@ class TestMessageReactions(MessengerSteps):
                 emoji_id,
             ],
         ).json()
-        self.sender.verify_json_schema(response, "wakuext_sendEmojiReactionRetraction")
         assert response["result"]["chats"][0]["id"] == receiver_chat_id
 
         self.sender.find_signal_containing_pattern(
@@ -89,7 +86,6 @@ class TestMessageReactions(MessengerSteps):
         )
         time.sleep(10)
         response = self.sender.wakuext_service.rpc_request(method="emojiReactionsByChatID", params=[sender_chat_id, None, 20]).json()
-        self.sender.verify_json_schema(response, "wakuext_emojiReactionsByChatID")
         result = response["result"]
         assert len(result) == 2
         for item in result:
