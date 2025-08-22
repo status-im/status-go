@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	errorspkg "github.com/pkg/errors"
 
 	"go.uber.org/zap"
 
@@ -293,14 +296,23 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 	for _, service := range n.services {
 		err = n.registerService(service)
 		if err != nil {
-			return err
+			name := reflect.TypeOf(service).Name()
+			text := fmt.Sprintf("failed to register service '%s'", name)
+			return errorspkg.Wrap(err, text)
 		}
+	}
+
+	err = n.timeSourceSrvc.Start(context.Background())
+	if err != nil {
+		return errorspkg.Wrap(err, "failed to start time source")
 	}
 
 	for _, service := range n.services {
 		err := service.Start()
 		if err != nil {
-			return err
+			name := reflect.TypeOf(service).Name()
+			text := fmt.Sprintf("failed to start service '%s'", name)
+			return errorspkg.Wrap(err, text)
 		}
 	}
 
@@ -327,15 +339,18 @@ func (n *StatusNode) Stop() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	n.logger.Debug("stopping")
+
 	if !n.running.CompareAndSwap(true, false) {
 		return ErrNoRunningNode
 	}
 
+	var errs []error
+	n.timeSourceSrvc.Stop()
+
 	for _, service := range n.services {
 		err := service.Stop()
-		if err != nil {
-			return err
-		}
+		errs = append(errs, err)
 	}
 
 	if n.localBackup != nil {
@@ -343,11 +358,6 @@ func (n *StatusNode) Stop() error {
 		n.localBackup = nil
 	}
 
-	return n.stop()
-}
-
-// stop will stop current StatusNode. A stopped node cannot be resumed.
-func (n *StatusNode) stop() error {
 	n.accountsPublisher.Close()
 
 	n.rpcClient.Stop()
@@ -356,7 +366,7 @@ func (n *StatusNode) stop() error {
 
 	err := n.httpServer.Stop()
 	if err != nil {
-		return err
+		errs = append(errs, err)
 	}
 	n.httpServer = nil
 
@@ -379,8 +389,9 @@ func (n *StatusNode) stop() error {
 	n.publicMethods = make(map[string]bool)
 	n.pendingTracker = nil
 	n.appGeneralSrvc = nil
+
 	n.logger.Debug("status node stopped")
-	return nil
+	return errors.Join(errs...)
 }
 
 // IsRunning confirm that node is running.

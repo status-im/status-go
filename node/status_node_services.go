@@ -1,7 +1,6 @@
 package node
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"time"
@@ -365,16 +364,8 @@ func (b *StatusNode) personalService() *personal.Service {
 }
 
 func (b *StatusNode) TimeSource() *timesource.NTPTimeSource {
-
 	if b.timeSourceSrvc == nil {
 		b.timeSourceSrvc = timesource.Default()
-		go func() {
-			defer common.LogOnPanic()
-			err := b.timeSourceSrvc.Start(context.Background())
-			if err != nil {
-				panic("could not obtain timesource: " + err.Error())
-			}
-		}()
 	}
 	return b.timeSourceSrvc
 }
