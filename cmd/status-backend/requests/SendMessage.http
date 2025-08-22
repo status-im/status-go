@@ -4,6 +4,7 @@ POST {{address}}/statusgo/CallRPC
 
 {
     "jsonrpc": "2.0",
+    "id": "{{$uuid}}",
     "method": "wakuext_sendOneToOneMessage",
     "params": [
         {
