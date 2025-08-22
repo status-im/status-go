@@ -126,6 +126,21 @@ class AccountService(Service):
         response = self.rpc_request("keycardUnlocked", params)
         return response.json()
 
+    def set_keycard_name(self, keycard_uid, kp_name):
+        params = [keycard_uid, kp_name]
+        response = self.rpc_request("setKeycardName", params)
+        return response.json()
+
+    def update_keycard_uid(self, old_keycard_uid, new_keycard_uid):
+        params = [old_keycard_uid, new_keycard_uid]
+        response = self.rpc_request("updateKeycardUID", params)
+        return response.json()
+
+    def migrate_non_profile_keycard_keypair_to_app(self, mnemonic, password):
+        params = [mnemonic, password]
+        response = self.rpc_request("migrateNonProfileKeycardKeypairToApp", params)
+        return response.json()
+
     def get_all_known_keycards(self):
         response = self.rpc_request("getAllKnownKeycards", [])
         return response
