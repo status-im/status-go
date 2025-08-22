@@ -1,9 +1,12 @@
 package types
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 var (
@@ -55,25 +58,25 @@ type AccountCreationDetails struct {
 }
 
 type Account struct {
-	Address               types.Address   `json:"address"`
-	KeyUID                string          `json:"key-uid"`
-	Wallet                bool            `json:"wallet"`
-	AddressWasNotShown    bool            `json:"address-was-not-shown,omitempty"`
-	Chat                  bool            `json:"chat"`
-	Type                  AccountType     `json:"type,omitempty"`
-	Path                  string          `json:"path,omitempty"`
-	PublicKey             types.HexBytes  `json:"public-key,omitempty"`
-	Name                  string          `json:"name"`
-	Emoji                 string          `json:"emoji"`
-	ColorID               string          `json:"colorId,omitempty"`
-	Hidden                bool            `json:"hidden"`
-	Clock                 uint64          `json:"clock,omitempty"`
-	Removed               bool            `json:"removed,omitempty"`
-	Operable              AccountOperable `json:"operable"` // describes an account's operability (check AccountOperable type constants for details)
-	CreatedAt             int64           `json:"createdAt"`
-	Position              int64           `json:"position"`
-	ProdPreferredChainIDs string          `json:"prodPreferredChainIds"`
-	TestPreferredChainIDs string          `json:"testPreferredChainIds"`
+	Address               types.Address             `json:"address"`
+	KeyUID                string                    `json:"key-uid"`
+	Wallet                bool                      `json:"wallet"`
+	AddressWasNotShown    bool                      `json:"address-was-not-shown,omitempty"`
+	Chat                  bool                      `json:"chat"`
+	Type                  AccountType               `json:"type,omitempty"`
+	Path                  string                    `json:"path,omitempty"`
+	PublicKey             types.HexBytes            `json:"public-key,omitempty"`
+	Name                  string                    `json:"name"`
+	Emoji                 string                    `json:"emoji"`
+	ColorID               common.CustomizationColor `json:"colorId,omitempty"`
+	Hidden                bool                      `json:"hidden"`
+	Clock                 uint64                    `json:"clock,omitempty"`
+	Removed               bool                      `json:"removed,omitempty"`
+	Operable              AccountOperable           `json:"operable"` // describes an account's operability (check AccountOperable type constants for details)
+	CreatedAt             int64                     `json:"createdAt"`
+	Position              int64                     `json:"position"`
+	ProdPreferredChainIDs string                    `json:"prodPreferredChainIds"`
+	TestPreferredChainIDs string                    `json:"testPreferredChainIds"`
 }
 
 type Keycard struct {
@@ -83,6 +86,149 @@ type Keycard struct {
 	AccountsAddresses []types.Address `json:"accounts-addresses"`
 	KeyUID            string          `json:"key-uid"`
 	Position          uint64
+}
+
+// Returns true if an account is a wallet account that logged in user has a control over, otherwise returns false.
+func (a *Account) IsWalletNonWatchOnlyAccount() bool {
+	return !a.Chat && len(a.Type) > 0 && a.Type != AccountTypeWatch
+}
+
+// Returns true if an account is a wallet account that is ready for sending transactions, otherwise returns false.
+func (a *Account) IsWalletAccountReadyForTransaction() bool {
+	return a.IsWalletNonWatchOnlyAccount() && a.Operable != AccountNonOperable
+}
+
+func (a *Account) MarshalJSON() ([]byte, error) {
+	item := struct {
+		Address               types.Address             `json:"address"`
+		MixedcaseAddress      string                    `json:"mixedcase-address"`
+		KeyUID                string                    `json:"key-uid"`
+		Wallet                bool                      `json:"wallet"`
+		Chat                  bool                      `json:"chat"`
+		Type                  AccountType               `json:"type"`
+		Path                  string                    `json:"path"`
+		PublicKey             types.HexBytes            `json:"public-key"`
+		Name                  string                    `json:"name"`
+		Emoji                 string                    `json:"emoji"`
+		ColorID               common.CustomizationColor `json:"colorId"`
+		Hidden                bool                      `json:"hidden"`
+		Clock                 uint64                    `json:"clock"`
+		Removed               bool                      `json:"removed"`
+		Operable              AccountOperable           `json:"operable"`
+		CreatedAt             int64                     `json:"createdAt"`
+		Position              int64                     `json:"position"`
+		ProdPreferredChainIDs string                    `json:"prodPreferredChainIds"`
+		TestPreferredChainIDs string                    `json:"testPreferredChainIds"`
+	}{
+		Address:               a.Address,
+		MixedcaseAddress:      a.Address.Hex(),
+		KeyUID:                a.KeyUID,
+		Wallet:                a.Wallet,
+		Chat:                  a.Chat,
+		Type:                  a.Type,
+		Path:                  a.Path,
+		PublicKey:             a.PublicKey,
+		Name:                  a.Name,
+		Emoji:                 a.Emoji,
+		ColorID:               a.ColorID,
+		Hidden:                a.Hidden,
+		Clock:                 a.Clock,
+		Removed:               a.Removed,
+		Operable:              a.Operable,
+		CreatedAt:             a.CreatedAt,
+		Position:              a.Position,
+		ProdPreferredChainIDs: a.ProdPreferredChainIDs,
+		TestPreferredChainIDs: a.TestPreferredChainIDs,
+	}
+
+	return json.Marshal(item)
+}
+
+func (a *Keypair) MarshalJSON() ([]byte, error) {
+	item := struct {
+		KeyUID                  string      `json:"key-uid"`
+		Name                    string      `json:"name"`
+		Type                    KeypairType `json:"type"`
+		DerivedFrom             string      `json:"derived-from"`
+		LastUsedDerivationIndex uint64      `json:"last-used-derivation-index"`
+		SyncedFrom              string      `json:"synced-from"`
+		Clock                   uint64      `json:"clock"`
+		Accounts                []*Account  `json:"accounts"`
+		Keycards                []*Keycard  `json:"keycards"`
+		Removed                 bool        `json:"removed"`
+	}{
+		KeyUID:                  a.KeyUID,
+		Name:                    a.Name,
+		Type:                    a.Type,
+		DerivedFrom:             a.DerivedFrom,
+		LastUsedDerivationIndex: a.LastUsedDerivationIndex,
+		SyncedFrom:              a.SyncedFrom,
+		Clock:                   a.Clock,
+		Accounts:                a.Accounts,
+		Keycards:                a.Keycards,
+		Removed:                 a.Removed,
+	}
+
+	return json.Marshal(item)
+}
+
+func (a *Keypair) CopyKeypair() *Keypair {
+	kp := &Keypair{
+		Clock:                   a.Clock,
+		KeyUID:                  a.KeyUID,
+		Name:                    a.Name,
+		Type:                    a.Type,
+		DerivedFrom:             a.DerivedFrom,
+		LastUsedDerivationIndex: a.LastUsedDerivationIndex,
+		SyncedFrom:              a.SyncedFrom,
+		Accounts:                make([]*Account, len(a.Accounts)),
+		Keycards:                make([]*Keycard, len(a.Keycards)),
+		Removed:                 a.Removed,
+	}
+
+	for i, acc := range a.Accounts {
+		kp.Accounts[i] = &Account{
+			Address:               acc.Address,
+			KeyUID:                acc.KeyUID,
+			Wallet:                acc.Wallet,
+			Chat:                  acc.Chat,
+			Type:                  acc.Type,
+			Path:                  acc.Path,
+			PublicKey:             acc.PublicKey,
+			Name:                  acc.Name,
+			Emoji:                 acc.Emoji,
+			ColorID:               acc.ColorID,
+			Hidden:                acc.Hidden,
+			Clock:                 acc.Clock,
+			Removed:               acc.Removed,
+			Operable:              acc.Operable,
+			CreatedAt:             acc.CreatedAt,
+			Position:              acc.Position,
+			ProdPreferredChainIDs: acc.ProdPreferredChainIDs,
+			TestPreferredChainIDs: acc.TestPreferredChainIDs,
+		}
+	}
+
+	for i, kc := range a.Keycards {
+		kp.Keycards[i] = &Keycard{
+			KeycardUID:        kc.KeycardUID,
+			KeycardName:       kc.KeycardName,
+			KeycardLocked:     kc.KeycardLocked,
+			AccountsAddresses: kc.AccountsAddresses,
+			KeyUID:            kc.KeyUID,
+		}
+	}
+
+	return kp
+}
+
+func (a *Keypair) GetChatAccount() *Account {
+	for _, acc := range a.Accounts {
+		if acc.Chat {
+			return acc
+		}
+	}
+	return nil
 }
 
 func (a *Keypair) MigratedToKeycard() bool {
@@ -104,4 +250,45 @@ func (a *Keypair) Operability() AccountOperable {
 	}
 
 	return AccountFullyOperable
+}
+
+func GetAccountTypeForKeypairType(kpType KeypairType) AccountType {
+	switch kpType {
+	case KeypairTypeProfile:
+		return AccountTypeGenerated
+	case KeypairTypeKey:
+		return AccountTypeKey
+	case KeypairTypeSeed:
+		return AccountTypeSeed
+	default:
+		return AccountTypeWatch
+	}
+}
+
+func (kp *Keycard) ToSyncKeycard() *protobuf.SyncKeycard {
+	kc := &protobuf.SyncKeycard{
+		Uid:      kp.KeycardUID,
+		Name:     kp.KeycardName,
+		Locked:   kp.KeycardLocked,
+		KeyUid:   kp.KeyUID,
+		Position: kp.Position,
+	}
+
+	for _, addr := range kp.AccountsAddresses {
+		kc.Addresses = append(kc.Addresses, addr.Bytes())
+	}
+
+	return kc
+}
+
+func (kp *Keycard) FromSyncKeycard(kc *protobuf.SyncKeycard) {
+	kp.KeycardUID = kc.Uid
+	kp.KeycardName = kc.Name
+	kp.KeycardLocked = kc.Locked
+	kp.KeyUID = kc.KeyUid
+	kp.Position = kc.Position
+
+	for _, addr := range kc.Addresses {
+		kp.AccountsAddresses = append(kp.AccountsAddresses, types.BytesToAddress(addr))
+	}
 }

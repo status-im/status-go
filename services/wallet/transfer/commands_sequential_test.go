@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/balancechecker"
@@ -1594,14 +1595,14 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 		logsCheckIntervalIterations:  2,
 	}
 
-	acc := &accounts.Account{
+	acc := &accsmanagementtypes.Account{
 		Address: cryptotypes.BytesToAddress(address.Bytes()),
-		Type:    accounts.AccountTypeWatch,
+		Type:    accsmanagementtypes.AccountTypeWatch,
 		Name:    address.String(),
 		ColorID: multicommon.CustomizationColorPrimary,
 		Emoji:   "emoji",
 	}
-	err = accDB.SaveOrUpdateAccounts([]*accounts.Account{acc}, false)
+	err = accDB.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{acc}, false)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -1654,14 +1655,14 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, address := range []*common.Address{&address1, &address2} {
-		acc := &accounts.Account{
+		acc := &accsmanagementtypes.Account{
 			Address: cryptotypes.BytesToAddress(address.Bytes()),
-			Type:    accounts.AccountTypeWatch,
+			Type:    accsmanagementtypes.AccountTypeWatch,
 			Name:    address.String(),
 			ColorID: multicommon.CustomizationColorPrimary,
 			Emoji:   "emoji",
 		}
-		err = accDB.SaveOrUpdateAccounts([]*accounts.Account{acc}, false)
+		err = accDB.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{acc}, false)
 		require.NoError(t, err)
 	}
 

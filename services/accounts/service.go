@@ -9,6 +9,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts"
@@ -93,7 +94,7 @@ func (s *Service) AccountsAPI() *API {
 	return NewAccountsAPI(s.manager, s.config, s.db, &s.messenger, s.publisher)
 }
 
-func (s *Service) GetKeypairByKeyUID(keyUID string) (*accounts.Keypair, error) {
+func (s *Service) GetKeypairByKeyUID(keyUID string) (*accsmanagementtypes.Keypair, error) {
 
 	return s.db.GetKeypairByKeyUID(keyUID)
 }

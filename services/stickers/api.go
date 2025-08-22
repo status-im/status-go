@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	accsmanagement "github.com/status-im/status-go/accounts-management"
+	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/stickers"
@@ -401,7 +402,7 @@ func (api *API) getContractPacks(chainID uint64) ([]StickerPack, error) {
 	}
 }
 
-func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accounts.Account, resultChan chan<- *big.Int, errChan chan<- error, doneChan chan<- struct{}) {
+func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accsmanagementtypes.Account, resultChan chan<- *big.Int, errChan chan<- error, doneChan chan<- struct{}) {
 	defer gocommon.LogOnPanic()
 	defer close(doneChan)
 	defer close(errChan)
@@ -414,7 +415,7 @@ func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accounts.Accoun
 	c := goccm.New(maxConcurrentRequests)
 	for _, account := range accs {
 		c.Wait()
-		go func(acc *accounts.Account) {
+		go func(acc *accsmanagementtypes.Account) {
 			defer gocommon.LogOnPanic()
 			defer c.Done()
 			packs, err := api.getPurchasedPackIDs(chainID, acc.Address)

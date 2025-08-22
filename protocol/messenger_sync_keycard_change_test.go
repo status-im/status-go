@@ -110,21 +110,14 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingNewKeycards() {
 	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
 
 	s.accountsManagerMock.EXPECT().SaveOrUpdateKeycard(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(keycard *types.Keycard, clock uint64, removeKeystoreFiles bool) error {
-			kc := accounts.AccountsManagerKeycardToKeycard(keycard)
-			err := s.m.settings.SaveOrUpdateKeycard(*kc, clock, removeKeystoreFiles)
-			if err != nil {
-				return err
-			}
-			return nil
+		Do(func(keycard *types.Keycard, password string, clock uint64) error {
+			return s.m.settings.SaveOrUpdateKeycard(*keycard, clock, true)
 		}).Times(2)
 
-	err := s.main.SaveOrUpdateKeycard(context.Background(), keycard1, false)
+	err := s.main.SaveOrUpdateKeycard(context.Background(), keycard1, "")
 	s.Require().NoError(err)
-	err = s.main.SaveOrUpdateKeycard(context.Background(), keycard2, false)
+	err = s.main.SaveOrUpdateKeycard(context.Background(), keycard2, "")
 	s.Require().NoError(err)
-
-	s.accountsManagerOtherMock.EXPECT().DeleteKeystoreFilesForKeypair(gomock.Any()).Return(nil).Times(2)
 
 	// Wait for the response
 	_, err = WaitOnMessengerResponse(
@@ -161,25 +154,28 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingAccountsToKeycard() {
 	err := senderDb.SaveOrUpdateKeycard(*keycard1, 0, false)
 	s.Require().NoError(err)
 
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(senderKeycards))
+	s.Require().True(contains(senderKeycards, keycard1, accounts.SameKeycards))
+
 	// Add the same keycard on receiver
 	err = dbOnReceiver.SaveOrUpdateKeycard(*keycard1, 0, false)
 	s.Require().NoError(err)
 
+	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(syncedKeycards))
+	s.Require().True(contains(syncedKeycards, keycard1, accounts.SameKeycards))
+
 	s.accountsManagerMock.EXPECT().SaveOrUpdateKeycard(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(keycard *types.Keycard, clock uint64, removeKeystoreFiles bool) error {
-			kc := accounts.AccountsManagerKeycardToKeycard(keycard)
-			err := s.m.settings.SaveOrUpdateKeycard(*kc, clock, removeKeystoreFiles)
-			if err != nil {
-				return err
-			}
-			return nil
+		Do(func(keycard *types.Keycard, password string, clock uint64) error {
+			return s.m.settings.SaveOrUpdateKeycard(*keycard, clock, true)
 		}).Times(1)
 
 	// Add additional accounts to sender
-	err = s.main.SaveOrUpdateKeycard(context.Background(), keycard2, false)
+	err = s.main.SaveOrUpdateKeycard(context.Background(), keycard2, "")
 	s.Require().NoError(err)
-
-	s.accountsManagerOtherMock.EXPECT().DeleteKeystoreFilesForKeypair(gomock.Any()).Return(nil).Times(1)
 
 	// Wait for the response
 	_, err = WaitOnMessengerResponse(
@@ -191,13 +187,13 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingAccountsToKeycard() {
 	)
 	s.Require().NoError(err)
 
-	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	senderKeycards, err = senderDb.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(2, len(senderKeycards))
 	s.Require().True(contains(senderKeycards, keycard1, accounts.SameKeycards))
 	s.Require().True(contains(senderKeycards, keycard2, accounts.SameKeycards))
 
-	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
+	syncedKeycards, err = dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(2, len(syncedKeycards))
 	s.Require().True(contains(syncedKeycards, keycard1, accounts.SameKeycards))

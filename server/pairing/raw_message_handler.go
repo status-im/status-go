@@ -8,9 +8,9 @@ import (
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/messaging"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -40,7 +40,7 @@ func (s *SyncRawMessageHandler) CollectInstallationData(rawMessageCollector *Raw
 	return err
 }
 
-func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rm []*protobuf.RawMessage, kp *accounts.Keypair, syncSettings *settings.Settings, err error) {
+func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rm []*protobuf.RawMessage, kp *types.Keypair, syncSettings *settings.Settings, err error) {
 	syncSettings = new(settings.Settings)
 	messenger := s.backend.Messenger()
 	if messenger == nil {

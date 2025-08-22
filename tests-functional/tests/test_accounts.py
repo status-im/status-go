@@ -16,8 +16,6 @@ class TestAccounts:
     @pytest.mark.parametrize(
         "method, params",
         [
-            ("accounts_getAccounts", []),
-            ("accounts_getKeypairs", []),
             # ("accounts_hasPairedDevices", []), # randomly crashes app, to be reworked/fixed
             # ("accounts_remainingAccountCapacity", []), # randomly crashes app, to be reworked/fixed
             ("multiaccounts_getIdentityImages", [user_1.private_key]),

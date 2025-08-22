@@ -20,9 +20,9 @@ const (
 )
 
 var errToCodeMap = map[error]int{
-	accsmanagement.ErrNoAccountSelected: codeErrNoAccountSelected,
-	wallettypes.ErrInvalidTxSender:      codeErrInvalidTxSender,
-	keystore.ErrDecrypt:                 codeErrDecrypt,
+	accsmanagement.ErrNoAccountSelected:   codeErrNoAccountSelected,
+	wallettypes.ErrInvalidTxSender:        codeErrInvalidTxSender,
+	keystore.ErrIncorrectPasswordProvided: codeErrDecrypt,
 }
 
 type jsonrpcSuccessfulResponse struct {

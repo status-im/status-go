@@ -1,13 +1,13 @@
-package core
+package accountsmanagement
 
 import (
 	"strings"
 
 	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/accounts-management/types"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
+	multiaccscommon "github.com/status-im/status-go/multiaccounts/common"
 )
 
 // CreateKeypairFromMnemonicAndStore creates a keypair with provided `walletAccount` and optionally a chat account if
@@ -67,7 +67,7 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 	if profile {
 		keypairType = types.KeypairTypeProfile
 
-		var keystore keystore.KeyStore
+		var keystore KeyStore
 		keystore, err = m.createKeystore(masterAccount.KeyUID())
 		if err != nil {
 			return
@@ -197,7 +197,7 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 			PublicKey:          cryptotypes.Hex2Bytes(walletDerivedAccount.PublicKeyHex()),
 			KeyUID:             keypair.KeyUID,
 			Address:            walletDerivedAccount.Address(),
-			ColorID:            walletAccount.ColorID,
+			ColorID:            multiaccscommon.CustomizationColor(walletAccount.ColorID),
 			Emoji:              walletAccount.Emoji,
 			Wallet:             profile, // default wallet account makes sense only for profile keypair
 			Path:               walletAccount.Path,
@@ -215,7 +215,7 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 			PublicKey:          cryptotypes.Hex2Bytes(account.PublicKeyHex()),
 			KeyUID:             keypair.KeyUID,
 			Address:            account.Address(),
-			ColorID:            walletAccount.ColorID,
+			ColorID:            multiaccscommon.CustomizationColor(walletAccount.ColorID),
 			Emoji:              walletAccount.Emoji,
 			Path:               common.PathMaster,
 			Name:               walletAccount.Name,
@@ -349,6 +349,10 @@ func (m *AccountsManager) MakePrivateKeyKeypairFullyOperable(privateKey string, 
 }
 
 func (m *AccountsManager) MakePartiallyOperableAccoutsFullyOperable(password string) (addresses []cryptotypes.Address, err error) {
+	if password == "" {
+		return nil, ErrNoPasswordProvided
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -454,32 +458,6 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 	return nil
 }
 
-func (m *AccountsManager) RemoveAccounts(keyUID string, accounts []*types.Account) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.persistence == nil {
-		return ErrPersistenceMissing
-	}
-
-	kp, err := m.persistence.GetKeypairByKeyUID(keyUID)
-	if err != nil {
-		return err
-	}
-
-	if !kp.MigratedToKeycard() {
-		for _, acc := range accounts {
-			err = m.deleteAccountFromKeystore(acc.Address)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return m.persistence.SaveOrUpdateAccounts(accounts, true)
-
-}
-
 func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, password string, clock uint64) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -532,9 +510,8 @@ func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, 
 }
 
 // SaveOrUpdateKeycard saves or updates a keycard and its accounts
-// If `removeKeystoreFiles` is true, then corresponding keystore files will be deleted if keypair is not already migrated.
 // In case of migration to a keycard, corresponding keystore files need to be deleted if the keypair being migrated is not already migrated.
-func (m *AccountsManager) SaveOrUpdateKeycard(keycard *types.Keycard, clock uint64, removeKeystoreFiles bool) error {
+func (m *AccountsManager) SaveOrUpdateKeycard(keycard *types.Keycard, password string, clock uint64) error {
 	if len(keycard.AccountsAddresses) == 0 {
 		return ErrKeycardDoesNotHaveAnyAccounts
 	}
@@ -551,30 +528,15 @@ func (m *AccountsManager) SaveOrUpdateKeycard(keycard *types.Keycard, clock uint
 		return ErrKeycardDoesNotRelateToAnyKeypair(err)
 	}
 
-	err = m.persistence.SaveOrUpdateKeycard(keycard, clock, true)
+	err = m.persistence.SaveOrUpdateKeycard(*keycard, clock, true)
 	if err != nil {
 		return err
 	}
 
-	if removeKeystoreFiles {
-		// Once we migrate a keypair, corresponding keystore files need to be deleted
-		// if the keypair being migrated is not already migrated (in case user is creating a copy of an existing Keycard)
-		// and if keypair operability is different from non operable (otherwise there are not keystore files to be deleted).
-		if !kpDb.MigratedToKeycard() && kpDb.Operability() != types.AccountNonOperable {
-			for _, acc := range kpDb.Accounts {
-				if acc.Operable != types.AccountFullyOperable {
-					continue
-				}
-				err = m.deleteAccountFromKeystore(acc.Address)
-				if err != nil {
-					return err
-				}
-			}
-
-			err = m.deleteAccountFromKeystore(cryptotypes.HexToAddress(kpDb.DerivedFrom))
-			if err != nil {
-				return err
-			}
+	if !kpDb.MigratedToKeycard() && password != "" {
+		err = m.deleteKeystoreFilesForKeypairInternally(kpDb, password)
+		if err != nil {
+			return err
 		}
 
 		err = m.persistence.MarkKeypairFullyOperable(keycard.KeyUID, clock, true)
@@ -586,7 +548,7 @@ func (m *AccountsManager) SaveOrUpdateKeycard(keycard *types.Keycard, clock uint
 	return nil
 }
 
-func (m *AccountsManager) DeleteAccount(address cryptotypes.Address, clock uint64) (account *types.Account, err error) {
+func (m *AccountsManager) DeleteAccount(address cryptotypes.Address, password string, clock uint64) (account *types.Account, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -609,7 +571,7 @@ func (m *AccountsManager) DeleteAccount(address cryptotypes.Address, clock uint6
 		return
 	}
 
-	err = m.deleteKeystoreFileForAccountInternally(address)
+	err = m.deleteKeystoreFileForAccountInternally(address, password)
 	if err != nil {
 		return
 	}
@@ -618,7 +580,11 @@ func (m *AccountsManager) DeleteAccount(address cryptotypes.Address, clock uint6
 	return
 }
 
-func (m *AccountsManager) DeleteKeypair(keyUID string, clock uint64) (keypair *types.Keypair, err error) {
+func (m *AccountsManager) DeleteKeypair(keyUID string, password string, clock uint64) (keypair *types.Keypair, err error) {
+	if password == "" {
+		return nil, ErrNoPasswordProvided
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -636,7 +602,7 @@ func (m *AccountsManager) DeleteKeypair(keyUID string, clock uint64) (keypair *t
 		return
 	}
 
-	err = m.deleteKeystoreFilesForKeypairInternally(keypair)
+	err = m.deleteKeystoreFilesForKeypairInternally(keypair, password)
 	if err != nil {
 		return
 	}

@@ -128,8 +128,6 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNoKeycard
 	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
 	s.Require().NoError(err)
 
-	s.accountsManagerOtherMock.EXPECT().DeleteKeystoreFilesForKeypair(gomock.Any()).Return(nil).AnyTimes()
-
 	// Wait for the response
 	_, err = WaitOnMessengerResponse(
 		s.other,
@@ -249,8 +247,6 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverAndSenderHas
 	// Trigger's a sync between devices
 	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
 	s.Require().NoError(err)
-
-	s.accountsManagerOtherMock.EXPECT().DeleteKeystoreFilesForKeypair(gomock.Any()).Return(nil).AnyTimes()
 
 	// Wait for the response
 	_, err = WaitOnMessengerResponse(

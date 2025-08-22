@@ -11,6 +11,8 @@ type ErrorCategory string
 
 const (
 	ErrorCategoryUnknown ErrorCategory = "unknown"
+
+	ErrorCodeUnknown ErrorCode = 0
 )
 
 type AccountsError struct {
@@ -39,6 +41,25 @@ func WrapError(code ErrorCode, message string, err error, getErrorCategory func(
 	accountsErr := NewError(code, message, getErrorCategory)
 	accountsErr.Err = err
 	return accountsErr
+}
+
+// Copy returns a deep copy of the error
+func (e *AccountsError) Copy() *AccountsError {
+	var ctx map[string]interface{}
+	if e.Context != nil {
+		ctx = make(map[string]interface{}, len(e.Context))
+		for k, v := range e.Context {
+			ctx[k] = v
+		}
+	}
+
+	return &AccountsError{
+		Code:     e.Code,
+		Category: e.Category,
+		Message:  e.Message,
+		Err:      e.Err,
+		Context:  ctx,
+	}
 }
 
 // WithContext adds additional context to the error
