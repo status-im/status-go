@@ -61,14 +61,13 @@ GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
-ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
 
 ifeq ($(USE_NWAKU), true)
 BUILD_TAGS += use_nwaku
 endif
 
-BUILD_FLAGS ?= -ldflags="-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)"
+BUILD_FLAGS ?= -ldflags=""
 BUILD_FLAGS_MOBILE ?=
 
 networkid ?= StatusChain

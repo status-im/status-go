@@ -40,8 +40,8 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/metrics"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
@@ -302,7 +302,7 @@ func (b *GethStatusBackend) StartPrometheusMetricsServer(address string) error {
 	if b.prometheusMetrics != nil {
 		return nil
 	}
-	b.prometheusMetrics = metrics.NewMetricsServer(address, nil)
+	b.prometheusMetrics = metrics.NewMetricsServer(address)
 	go b.prometheusMetrics.Listen()
 	return nil
 }
