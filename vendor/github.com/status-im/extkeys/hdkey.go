@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcutil/base58"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 )
 
@@ -27,7 +27,7 @@ import (
 // https://bitcoin.org/en/developer-guide#hardened-keys
 
 // Reference Implementations
-// https://github.com/btcsuite/btcutil/tree/master/hdkeychain
+// https://github.com/btcsuite/btcd/tree/master/btcutil/hdkeychain
 // https://github.com/WeMeetAgain/go-hdwallet
 
 // https://github.com/ConsenSys/eth-lightwallet/blob/master/lib/keystore.js
@@ -243,22 +243,48 @@ func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 		// Case #3: childKey = serP(point(parse256(IL)) + parentKey)
 
 		// Calculate the corresponding intermediate public key for intermediate private key.
+		// Use btcec for all operations to maintain curve consistency
 		keyx, keyy := secp256k1.S256().ScalarBaseMult(secretKey)
 		if keyx.Sign() == 0 || keyy.Sign() == 0 {
 			return nil, ErrInvalidKey
 		}
 
+		// Convert big.Int coordinates to btcec.FieldVal
+		var keyXField, keyYField btcec.FieldVal
+		keyXField.SetByteSlice(keyx.Bytes())
+		keyYField.SetByteSlice(keyy.Bytes())
+
 		// Convert the serialized compressed parent public key into X and Y coordinates
 		// so it can be added to the intermediate public key.
-		pubKey, err := btcec.ParsePubKey(k.KeyData, btcec.S256())
-		if err != nil {
-			return nil, err
+		// For compressed public keys, the format is: 0x02/0x03 + 32-byte X coordinate
+		// We need to decompress to get Y coordinate
+		if len(k.KeyData) != 33 {
+			return nil, ErrInvalidKey
 		}
 
+		// Extract X coordinate from compressed public key
+		xBytes := k.KeyData[1:33]
+		var xField btcec.FieldVal
+		xField.SetByteSlice(xBytes)
+
+		// Decompress Y coordinate
+		var yField btcec.FieldVal
+		wantOddY := k.KeyData[0] == 0x03
+		if !btcec.DecompressY(&xField, wantOddY, &yField) {
+			return nil, ErrInvalidKey
+		}
+
+		// Convert FieldVal to big.Int for secp256k1 operations
+		xInt := new(big.Int).SetBytes(xField.Bytes()[:])
+		yInt := new(big.Int).SetBytes(yField.Bytes()[:])
+
 		// childKey = serP(point(parse256(IL)) + parentKey)
-		childX, childY := secp256k1.S256().Add(keyx, keyy, pubKey.X, pubKey.Y)
-		pk := btcec.PublicKey{Curve: secp256k1.S256(), X: childX, Y: childY}
-		child.KeyData = pk.SerializeCompressed()
+		// Use secp256k1 for all operations to maintain curve consistency
+		childX, childY := secp256k1.S256().Add(keyx, keyy, xInt, yInt)
+
+		// Serialize the coordinates directly to compressed format without creating btcec.PublicKey
+		// This avoids the curve mismatch issue
+		child.KeyData = secp256k1.CompressPubkey(childX, childY)
 		child.Version = PublicKeyVersion
 	}
 	return child, nil
@@ -416,14 +442,18 @@ func (k *ExtendedKey) pubKeyBytes() []byte {
 	}
 
 	pkx, pky := secp256k1.S256().ScalarBaseMult(k.KeyData)
-	pubKey := btcec.PublicKey{Curve: secp256k1.S256(), X: pkx, Y: pky}
-	return pubKey.SerializeCompressed()
+	// Use secp256k1.CompressPubkey directly to avoid curve mismatch
+	return secp256k1.CompressPubkey(pkx, pky)
 }
 
 // ToECDSA returns the key data as ecdsa.PrivateKey
 func (k *ExtendedKey) ToECDSA() *ecdsa.PrivateKey {
-	privKey, _ := btcec.PrivKeyFromBytes(secp256k1.S256(), k.KeyData)
-	return privKey.ToECDSA()
+	// Use standard crypto/ecdsa to avoid curve mismatch
+	privKey := new(ecdsa.PrivateKey)
+	privKey.PublicKey.Curve = secp256k1.S256()
+	privKey.D = new(big.Int).SetBytes(k.KeyData)
+	privKey.PublicKey.X, privKey.PublicKey.Y = secp256k1.S256().ScalarBaseMult(k.KeyData)
+	return privKey
 }
 
 // NewKeyFromString returns a new extended key instance from a base58-encoded
@@ -474,9 +504,10 @@ func NewKeyFromString(key string) (*ExtendedKey, error) {
 	} else {
 		// Ensure the public key parses correctly and is actually on the
 		// secp256k1 curve.
-		_, err := btcec.ParsePubKey(keyData, btcec.S256())
-		if err != nil {
-			return nil, err
+		// Use secp256k1.DecompressPubkey to validate the public key
+		x, y := secp256k1.DecompressPubkey(keyData)
+		if x == nil || y == nil {
+			return nil, ErrInvalidKey
 		}
 	}
 

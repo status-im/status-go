@@ -3,7 +3,7 @@ package wakuv2
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcutil/base58"
+	"github.com/btcsuite/btcd/btcutil/base58"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
 	"go.uber.org/zap"

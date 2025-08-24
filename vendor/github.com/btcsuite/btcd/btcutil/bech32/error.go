@@ -65,15 +65,17 @@ func (e ErrNonCharsetChar) Error() string {
 }
 
 // ErrInvalidChecksum is returned when the extracted checksum of the string
-// is different than what was expected.
+// is different than what was expected. Both the original version, as well as
+// the new bech32m checksum may be specified.
 type ErrInvalidChecksum struct {
-	Expected string
-	Actual   string
+	Expected  string
+	ExpectedM string
+	Actual    string
 }
 
 func (e ErrInvalidChecksum) Error() string {
-	return fmt.Sprintf("invalid checksum (expected %v got %v)",
-		e.Expected, e.Actual)
+	return fmt.Sprintf("invalid checksum (expected (bech32=%v, "+
+		"bech32m=%v), got %v)", e.Expected, e.ExpectedM, e.Actual)
 }
 
 // ErrInvalidDataByte is returned when a byte outside the range required for

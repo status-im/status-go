@@ -2,7 +2,7 @@ module github.com/status-im/status-go
 
 go 1.23.0
 
-replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.22
+replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.23
 
 replace github.com/rjeczalik/notify => github.com/status-im/notify v1.0.2-status
 
@@ -19,7 +19,6 @@ replace github.com/libp2p/go-libp2p-pubsub v0.13.1 => github.com/waku-org/go-lib
 require (
 	github.com/anacrolix/torrent v1.41.0
 	github.com/beevik/ntp v0.3.0
-	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
@@ -49,7 +48,7 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4
+	github.com/status-im/markdown v0.0.0-20250825083641-55c1df9bc05d
 	github.com/status-im/migrate/v4 v4.6.2-status.3
 	github.com/status-im/mvds v0.0.27-0.20241031073756-b192c603a75d
 	github.com/status-im/tcp-shaker v1.1.1-status
@@ -79,6 +78,7 @@ require (
 	github.com/bits-and-blooms/bloom/v3 v3.7.0
 	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/brianvoe/gofakeit/v7 v7.2.1
+	github.com/btcsuite/btcd/btcutil v1.1.6
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/gorilla/sessions v1.2.1
@@ -93,7 +93,7 @@ require (
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
 	github.com/prometheus/client_model v0.6.1
 	github.com/schollz/peerdiscovery v1.7.0
-	github.com/status-im/extkeys v1.2.0
+	github.com/status-im/extkeys v1.3.0
 	github.com/waku-org/go-waku v0.8.1-0.20250825172353-0c3d6dc0a8cc
 	github.com/waku-org/waku-go-bindings v0.0.0-20250714110306-6feba5b0df4d
 	github.com/wk8/go-ordered-map/v2 v2.1.7
@@ -138,9 +138,9 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
 	github.com/bradfitz/iter v0.0.0-20191230175014-e8f45d346db8 // indirect
-	github.com/btcsuite/btcd v0.22.1 // indirect
-	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
-	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
+	github.com/btcsuite/btcd v0.24.2 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.3.5 // indirect
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
