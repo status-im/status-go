@@ -6,8 +6,10 @@ package btcutil
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"strconv"
+	"strings"
 )
 
 // AmountUnit describes a method of converting an Amount to something
@@ -72,7 +74,7 @@ func round(f float64) Amount {
 // NewAmount is for specifically for converting BTC to Satoshi.
 // For creating a new Amount with an int64 value which denotes a quantity of Satoshi,
 // do a simple type conversion from type int64 to Amount.
-// See GoDoc for example: http://godoc.org/github.com/btcsuite/btcutil#example-Amount
+// See GoDoc for example: http://godoc.org/github.com/btcsuite/btcd/btcutil#example-Amount
 func NewAmount(f float64) (Amount, error) {
 	// The amount is only considered invalid if it cannot be represented
 	// as an integer type.  This may happen if f is NaN or +-Infinity.
@@ -101,11 +103,20 @@ func (a Amount) ToBTC() float64 {
 
 // Format formats a monetary amount counted in bitcoin base units as a
 // string for a given unit.  The conversion will succeed for any unit,
-// however, known units will be formated with an appended label describing
+// however, known units will be formatted with an appended label describing
 // the units with SI notation, or "Satoshi" for the base unit.
 func (a Amount) Format(u AmountUnit) string {
 	units := " " + u.String()
-	return strconv.FormatFloat(a.ToUnit(u), 'f', -int(u+8), 64) + units
+	formatted := strconv.FormatFloat(a.ToUnit(u), 'f', -int(u+8), 64)
+
+	// When formatting full BTC, add trailing zeroes for numbers
+	// with decimal point to ease reading of sat amount.
+	if u == AmountBTC {
+		if strings.Contains(formatted, ".") {
+			return fmt.Sprintf("%.8f%s", a.ToUnit(u), units)
+		}
+	}
+	return formatted + units
 }
 
 // String is the equivalent of calling Format with AmountBTC.

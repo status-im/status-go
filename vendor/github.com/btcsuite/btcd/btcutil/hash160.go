@@ -13,7 +13,7 @@ import (
 
 // Calculate the hash of hasher over buf.
 func calcHash(buf []byte, hasher hash.Hash) []byte {
-	hasher.Write(buf)
+	_, _ = hasher.Write(buf)
 	return hasher.Sum(nil)
 }
 

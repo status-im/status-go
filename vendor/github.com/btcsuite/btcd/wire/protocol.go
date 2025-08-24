@@ -13,7 +13,7 @@ import (
 // XXX pedro: we will probably need to bump this.
 const (
 	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 70013
+	ProtocolVersion uint32 = 70016
 
 	// MultipleAddressVersion is the protocol version which added multiple
 	// addresses per message (pver >= MultipleAddressVersion).
@@ -51,6 +51,19 @@ const (
 	// FeeFilterVersion is the protocol version which added a new
 	// feefilter message.
 	FeeFilterVersion uint32 = 70013
+
+	// AddrV2Version is the protocol version which added two new messages.
+	// sendaddrv2 is sent during the version-verack handshake and signals
+	// support for sending and receiving the addrv2 message. In the future,
+	// new messages that occur during the version-verack handshake will not
+	// come with a protocol version bump.
+	AddrV2Version uint32 = 70016
+)
+
+const (
+	// NodeNetworkLimitedBlockThreshold is the number of blocks that a node
+	// broadcasting SFNodeNetworkLimited MUST be able to serve from the tip.
+	NodeNetworkLimitedBlockThreshold = 288
 )
 
 // ServiceFlag identifies services supported by a bitcoin peer.
@@ -86,18 +99,23 @@ const (
 	// SFNode2X is a flag used to indicate a peer is running the Segwit2X
 	// software.
 	SFNode2X
+
+	// SFNodeNetWorkLimited is a flag used to indicate a peer supports serving
+	// the last 288 blocks.
+	SFNodeNetworkLimited = 1 << 10
 )
 
 // Map of service flags back to their constant names for pretty printing.
 var sfStrings = map[ServiceFlag]string{
-	SFNodeNetwork: "SFNodeNetwork",
-	SFNodeGetUTXO: "SFNodeGetUTXO",
-	SFNodeBloom:   "SFNodeBloom",
-	SFNodeWitness: "SFNodeWitness",
-	SFNodeXthin:   "SFNodeXthin",
-	SFNodeBit5:    "SFNodeBit5",
-	SFNodeCF:      "SFNodeCF",
-	SFNode2X:      "SFNode2X",
+	SFNodeNetwork:        "SFNodeNetwork",
+	SFNodeGetUTXO:        "SFNodeGetUTXO",
+	SFNodeBloom:          "SFNodeBloom",
+	SFNodeWitness:        "SFNodeWitness",
+	SFNodeXthin:          "SFNodeXthin",
+	SFNodeBit5:           "SFNodeBit5",
+	SFNodeCF:             "SFNodeCF",
+	SFNode2X:             "SFNode2X",
+	SFNodeNetworkLimited: "SFNodeNetworkLimited",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -111,6 +129,12 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeBit5,
 	SFNodeCF,
 	SFNode2X,
+	SFNodeNetworkLimited,
+}
+
+// HasFlag returns a bool indicating if the service has the given flag.
+func (f ServiceFlag) HasFlag(s ServiceFlag) bool {
+	return f&s == s
 }
 
 // String returns the ServiceFlag in human-readable form.
