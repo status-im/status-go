@@ -9,10 +9,13 @@ import requests
 import os
 
 from tenacity import retry, stop_after_delay, wait_fixed
+
+import resources.constants as constants
 from clients.services.wallet import WalletService
 from clients.services.wakuext import WakuextService, PushNotificationRegistrationTokenType
 from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
+from clients.services.connector import ConnectorService
 from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
 from clients.metrics import Events, StatusGoMetrics
@@ -42,14 +45,17 @@ class StatusBackend(RpcClient, SignalClient):
             assert url != "", "not enough status-backend urls provided"
             self.temp_dir = tempfile.TemporaryDirectory()
             self.data_dir = self.temp_dir.name
+            if kwargs.get("connector_enabled", False):
+                self.connector_http_url = f"http://localhost:{constants.STATUS_CONNECTOR_HTTP_PORT}"
+                self.connector_ws_url = f"ws://localhost:{constants.STATUS_CONNECTOR_WS_PORT}"
         else:
-            host_port = random.choice(Config.status_backend_port_range)
-            Config.status_backend_port_range.remove(host_port)
-
-            self.container = StatusBackendContainer(host_port, privileged, self.ipv6, **kwargs)
+            self.container = StatusBackendContainer(privileged, self.ipv6, **kwargs)
             self.temp_dir = None
             self.data_dir = self.container.data_dir()
             url = self.container.url
+            if kwargs.get("connector_enabled", False):
+                self.connector_http_url = self.container.connector_http_url
+                self.connector_ws_url = self.container.connector_ws_url
 
         assert self.data_dir != ""
         self.base_url = url
@@ -78,6 +84,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.wakuext_service = WakuextService(self)
         self.accounts_service = AccountService(self)
         self.settings_service = SettingsService(self)
+        self.connector_service = ConnectorService(self)
         self.expvar_client = ExpvarClient(self.base_url)
 
     def __del__(self):
@@ -270,6 +277,17 @@ class StatusBackend(RpcClient, SignalClient):
             # Waku config
             "wakuV2LightClient": kwargs.get("waku_light_client", False),
             "wakuV2Fleet": Config.waku_fleet,
+            # Connector config
+            "apiConfig": {
+                "apiModules": "connector",
+                "connectorEnabled": kwargs.get("connector_enabled", False),
+                "httpEnabled": True,
+                "httpHost": "0.0.0.0",
+                "httpPort": constants.STATUS_CONNECTOR_HTTP_PORT,
+                "wsEnabled": True,
+                "wsHost": "0.0.0.0",
+                "wsPort": constants.STATUS_CONNECTOR_WS_PORT,
+            },
         }
         if not Config.disable_override_networks:
             self._set_networks(data, **kwargs)

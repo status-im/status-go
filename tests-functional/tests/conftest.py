@@ -86,7 +86,7 @@ def backend_new_profile(request, backend_factory):
         backends.append(backend)
 
         backend.init_status_backend()
-        backend.create_account_and_login(waku_light_client=waku_light_client)
+        backend.create_account_and_login(waku_light_client=waku_light_client, **kwargs)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()
         return backend

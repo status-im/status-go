@@ -28,6 +28,14 @@ class SignalType(Enum):
     DB_REENCRYPTION_STARTED = "db.reEncryption.started"
     DB_REENCRYPTION_FINISHED = "db.reEncryption.finished"
 
+    class Connector(Enum):
+        SEND_REQUEST_ACCOUNTS = "connector.sendRequestAccounts"
+        SEND_TRANSACTION = "connector.sendTransaction"
+        SIGN = "connector.sign"
+        DAPP_PERMISSION_GRANTED = "connector.dAppPermissionGranted"
+        DAPP_PERMISSION_REVOKED = "connector.dAppPermissionRevoked"
+        DAPP_CHAIN_ID_SWITCHED = "connector.dAppChainIdSwitched"
+
 
 class WalletEventType(Enum):
     WALLET_ACTIVITY_FILTERING_DONE = "wallet-activity-filtering-done"

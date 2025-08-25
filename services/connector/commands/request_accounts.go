@@ -3,17 +3,10 @@ package commands
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/status-im/status-go/accounts-management/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/signal"
-)
-
-// errors
-var (
-	ErrAccountsRequestDeniedByUser = errors.New("accounts request denied by user")
-	ErrNoAccountsAvailable         = errors.New("no accounts available")
 )
 
 type RequestAccountsCommand struct {
