@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/transactions"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -67,6 +68,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = appendIf(config.ConnectorConfig.Enabled, services, b.connectorService())
 	services = append(services, b.gifService(accDB))
 	services = append(services, b.ChatService(accDB))
+	services = append(services, b.ethService())
 
 	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
 	// Keep this initialization before the other two
@@ -295,6 +297,13 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB,
 		)
 	}
 	return b.walletSrvc
+}
+
+func (b *StatusNode) ethService() *eth.Service {
+	if b.ethSrvc == nil {
+		b.ethSrvc = eth.NewService(b.rpcClient, b.gethAccountsManager)
+	}
+	return b.ethSrvc
 }
 
 func (b *StatusNode) localNotificationsService(network uint64) (*localnotifications.Service, error) {

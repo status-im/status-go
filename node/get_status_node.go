@@ -39,6 +39,7 @@ import (
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/permissions"
@@ -108,6 +109,7 @@ type StatusNode struct {
 	pendingTracker         *transactions.PendingTxTracker
 	connectorSrvc          *connector.Service
 	appGeneralSrvc         *appgeneral.Service
+	ethSrvc                *eth.Service
 
 	walletFeed        event.Feed
 	accountsPublisher *pubsub.Publisher
