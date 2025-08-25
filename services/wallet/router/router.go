@@ -226,10 +226,12 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 		return ErrNoBestRouteFound
 	}
 
+	var addrFrom common.Address
 	r.lastInputParamsMutex.Lock()
-	defer r.lastInputParamsMutex.Unlock()
+	addrFrom = r.lastInputParams.AddrFrom
+	r.lastInputParamsMutex.Unlock()
 
-	fetchedFees, noBaseFee, noPriorityFee, err := r.feesManager.SuggestedFees(ctx, pathTxIdentity.ChainID, r.lastInputParams.AddrFrom)
+	fetchedFees, noBaseFee, noPriorityFee, err := r.feesManager.SuggestedFees(ctx, pathTxIdentity.ChainID, addrFrom)
 	if err != nil {
 		return err
 	}
@@ -244,7 +246,9 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 				continue
 			}
 
+			r.lastInputParamsMutex.Lock()
 			processorInputParams, err := r.CreateProcessorInputParams(r.lastInputParams, path.FromChain, path.ToChain, path.FromToken, path.ToToken, 0)
+			r.lastInputParamsMutex.Unlock()
 			if err != nil {
 				return err
 			}
