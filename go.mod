@@ -16,7 +16,7 @@ replace github.com/mutecomm/go-sqlcipher/v4 v4.4.2 => github.com/status-im/go-sq
 
 replace github.com/libp2p/go-libp2p-pubsub v0.12.0 => github.com/waku-org/go-libp2p-pubsub v0.12.0-gowaku.0.20240823143342-b0f2429ca27f
 
-replace github.com/waku-org/sds-go-bindings v0.0.0-20250825160213-83ca70c0c9c6 => ./vendor/github.com/waku-org/sds-go-bindings
+replace github.com/waku-org/sds-go-bindings v0.0.0-20250825204154-0b8dddea2275 => ./vendor/github.com/waku-org/sds-go-bindings
 
 require (
 	github.com/anacrolix/torrent v1.41.0
@@ -97,7 +97,7 @@ require (
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/status-im/extkeys v1.2.0
 	github.com/waku-org/go-waku v0.8.1-0.20250411145637-900b98812a91
-	github.com/waku-org/sds-go-bindings v0.0.0-20250825160213-83ca70c0c9c6
+	github.com/waku-org/sds-go-bindings v0.0.0-20250825204154-0b8dddea2275
 	github.com/waku-org/waku-go-bindings v0.0.0-20250714110306-6feba5b0df4d
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
