@@ -120,7 +120,7 @@ func (s *controllingSelector) HandleBindingRequest(m *stun.Message, local, remot
 }
 
 func (s *controllingSelector) HandleSuccessResponse(m *stun.Message, local, remote Candidate, remoteAddr net.Addr) {
-	ok, pendingRequest := s.agent.handleInboundBindingSuccess(m.TransactionID)
+	ok, pendingRequest, rtt := s.agent.handleInboundBindingSuccess(m.TransactionID)
 	if !ok {
 		s.log.Warnf("Discard message from (%s), unknown TransactionID 0x%x", remote, m.TransactionID)
 		return
@@ -149,6 +149,8 @@ func (s *controllingSelector) HandleSuccessResponse(m *stun.Message, local, remo
 	if pendingRequest.isUseCandidate && s.agent.getSelectedPair() == nil {
 		s.agent.setSelectedPair(p)
 	}
+
+	p.UpdateRoundTripTime(rtt)
 }
 
 func (s *controllingSelector) PingCandidate(local, remote Candidate) {
@@ -211,7 +213,7 @@ func (s *controlledSelector) HandleSuccessResponse(m *stun.Message, local, remot
 	// request with an appropriate error code response (e.g., 400)
 	// [RFC5389].
 
-	ok, pendingRequest := s.agent.handleInboundBindingSuccess(m.TransactionID)
+	ok, pendingRequest, rtt := s.agent.handleInboundBindingSuccess(m.TransactionID)
 	if !ok {
 		s.log.Warnf("Discard message from (%s), unknown TransactionID 0x%x", remote, m.TransactionID)
 		return
@@ -239,12 +241,14 @@ func (s *controlledSelector) HandleSuccessResponse(m *stun.Message, local, remot
 	s.log.Tracef("Found valid candidate pair: %s", p)
 	if p.nominateOnBindingSuccess {
 		if selectedPair := s.agent.getSelectedPair(); selectedPair == nil ||
-			(selectedPair != p && selectedPair.priority() <= p.priority()) {
+			(selectedPair != p && (!s.agent.needsToCheckPriorityOnNominated() || selectedPair.priority() <= p.priority())) {
 			s.agent.setSelectedPair(p)
 		} else if selectedPair != p {
 			s.log.Tracef("Ignore nominate new pair %s, already nominated pair %s", p, selectedPair)
 		}
 	}
+
+	p.UpdateRoundTripTime(rtt)
 }
 
 func (s *controlledSelector) HandleBindingRequest(m *stun.Message, local, remote Candidate) {
@@ -262,7 +266,7 @@ func (s *controlledSelector) HandleBindingRequest(m *stun.Message, local, remote
 			// generated a valid pair (Section 7.2.5.3.2).  The agent sets the
 			// nominated flag value of the valid pair to true.
 			selectedPair := s.agent.getSelectedPair()
-			if selectedPair == nil || (selectedPair != p && selectedPair.priority() <= p.priority()) {
+			if selectedPair == nil || (selectedPair != p && (!s.agent.needsToCheckPriorityOnNominated() || selectedPair.priority() <= p.priority())) {
 				s.agent.setSelectedPair(p)
 			} else if selectedPair != p {
 				s.log.Tracef("Ignore nominate new pair %s, already nominated pair %s", p, selectedPair)

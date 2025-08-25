@@ -103,7 +103,7 @@ endif
 shell: ##@prepare Enter into a pre-configured shell
 ifndef IN_NIX_SHELL
 	@echo "Entering nix development environment..."
-	@nix develop
+	@nix --extra-experimental-features 'nix-command flakes' develop
 else
 	@echo -e "$(YELLOW)Nix shell is already active$(RESET)"
 endif

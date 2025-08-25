@@ -153,6 +153,8 @@ type Agent struct {
 	insecureSkipVerify bool
 
 	proxyDialer proxy.Dialer
+
+	enableUseCandidateCheckPriority bool
 }
 
 type task struct {
@@ -323,6 +325,8 @@ func NewAgent(config *AgentConfig) (*Agent, error) { //nolint:gocognit
 		disableActiveTCP: config.DisableActiveTCP,
 
 		userBindingRequestHandler: config.BindingRequestHandler,
+
+		enableUseCandidateCheckPriority: config.EnableUseCandidateCheckPriority,
 	}
 	a.connectionStateNotifier = &handlerNotifier{connectionStateFunc: a.onConnectionStateChange, done: make(chan struct{})}
 	a.candidateNotifier = &handlerNotifier{candidateFunc: a.onCandidate, done: make(chan struct{})}
@@ -1055,16 +1059,16 @@ func (a *Agent) invalidatePendingBindingRequests(filterTime time.Time) {
 
 // Assert that the passed TransactionID is in our pendingBindingRequests and returns the destination
 // If the bindingRequest was valid remove it from our pending cache
-func (a *Agent) handleInboundBindingSuccess(id [stun.TransactionIDSize]byte) (bool, *bindingRequest) {
+func (a *Agent) handleInboundBindingSuccess(id [stun.TransactionIDSize]byte) (bool, *bindingRequest, time.Duration) {
 	a.invalidatePendingBindingRequests(time.Now())
 	for i := range a.pendingBindingRequests {
 		if a.pendingBindingRequests[i].transactionID == id {
 			validBindingRequest := a.pendingBindingRequests[i]
 			a.pendingBindingRequests = append(a.pendingBindingRequests[:i], a.pendingBindingRequests[i+1:]...)
-			return true, &validBindingRequest
+			return true, &validBindingRequest, time.Since(validBindingRequest.timestamp)
 		}
 	}
-	return false, nil
+	return false, nil, 0
 }
 
 // handleInbound processes STUN traffic from a remote candidate
@@ -1300,4 +1304,8 @@ func (a *Agent) setGatheringState(newState GatheringState) error {
 
 	<-done
 	return nil
+}
+
+func (a *Agent) needsToCheckPriorityOnNominated() bool {
+	return !a.lite || a.enableUseCandidateCheckPriority
 }

@@ -149,7 +149,7 @@ func HasTool(tool string) error {
 func cgoEnabled(bypassEnvironment bool) (bool, error) {
 	cmd := exec.Command("go", "env", "CGO_ENABLED")
 	if bypassEnvironment {
-		cmd.Env = append(append([]string(nil), os.Environ()...), "CGO_ENABLED=")
+		cmd.Env = append(os.Environ(), "CGO_ENABLED=")
 	}
 	out, err := cmd.Output()
 	if err != nil {
@@ -251,8 +251,8 @@ func NeedsGoPackagesEnv(t testing.TB, env []string) {
 	t.Helper()
 
 	for _, v := range env {
-		if strings.HasPrefix(v, "GOPACKAGESDRIVER=") {
-			tool := strings.TrimPrefix(v, "GOPACKAGESDRIVER=")
+		if after, ok := strings.CutPrefix(v, "GOPACKAGESDRIVER="); ok {
+			tool := after
 			if tool == "off" {
 				NeedsTool(t, "go")
 			} else {
@@ -275,6 +275,16 @@ func NeedsGoBuild(t testing.TB) {
 	// This logic was derived from internal/testing.HasGoBuild and
 	// may need to be updated as that function evolves.
 
+	NeedsTool(t, "go")
+}
+
+// NeedsDefaultImporter skips t if the test uses the default importer,
+// returned by [go/importer.Default].
+func NeedsDefaultImporter(t testing.TB) {
+	t.Helper()
+	// The default importer may call `go list`
+	// (in src/internal/exportdata/exportdata.go:lookupGorootExport),
+	// so check for the go tool.
 	NeedsTool(t, "go")
 }
 

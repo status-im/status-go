@@ -113,7 +113,8 @@ report/results.xml
 
 
 # generated files
-mock
+mock/
+!vendor/**/mock/
 mock.go
 *_mock_test.go
 *.pb.go
