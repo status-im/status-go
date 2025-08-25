@@ -12,9 +12,10 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
-	proto "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+
 	"github.com/waku-org/go-waku/logging"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
@@ -388,7 +389,7 @@ func (w *WakuRelay) EnoughPeersToPublishToTopic(topic string) bool {
 }
 
 // subscribe returns list of Subscription to receive messages based on content filter
-func (w *WakuRelay) subscribe(ctx context.Context, contentFilter waku_proto.ContentFilter, opts ...RelaySubscribeOption) ([]*Subscription, error) {
+func (w *WakuRelay) subscribe(contentFilter waku_proto.ContentFilter, opts ...RelaySubscribeOption) ([]*Subscription, error) {
 
 	var subscriptions []*Subscription
 	pubSubTopicMap, err := waku_proto.ContentFilterToPubSubTopicMap(contentFilter)
@@ -438,11 +439,6 @@ func (w *WakuRelay) subscribe(ctx context.Context, contentFilter waku_proto.Cont
 		w.topicsMutex.Unlock()
 
 		subscriptions = append(subscriptions, subscription)
-		go func() {
-			defer utils.LogOnPanic()
-			<-ctx.Done()
-			subscription.Unsubscribe()
-		}()
 	}
 
 	return subscriptions, nil
@@ -450,11 +446,13 @@ func (w *WakuRelay) subscribe(ctx context.Context, contentFilter waku_proto.Cont
 
 // Subscribe returns a Subscription to receive messages as per contentFilter
 // contentFilter can contain pubSubTopic and contentTopics or only contentTopics(in case of autosharding)
+// ctx argument is ignored and left for compatibility.
 func (w *WakuRelay) Subscribe(ctx context.Context, contentFilter waku_proto.ContentFilter, opts ...RelaySubscribeOption) ([]*Subscription, error) {
-	return w.subscribe(ctx, contentFilter, opts...)
+	return w.subscribe(contentFilter, opts...)
 }
 
 // Unsubscribe closes a subscription to a pubsub topic
+// ctx argument is ignored and left for compatibility.
 func (w *WakuRelay) Unsubscribe(ctx context.Context, contentFilter waku_proto.ContentFilter) error {
 
 	pubSubTopicMap, err := waku_proto.ContentFilterToPubSubTopicMap(contentFilter)
