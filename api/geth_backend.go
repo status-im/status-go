@@ -1622,7 +1622,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 }
 
 func (b *GethStatusBackend) VerifyCurrentAccountPassword(password string) (bool, error) {
-	return b.accountsManager.VerifySelectedChatAccountPassword(password)
+	return b.statusNode.AccountService().VerifyPassword(password)
 }
 
 func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {

@@ -219,7 +219,7 @@ func validateKeystoreFilesConfig(backend *api.GethStatusBackend, conf interface{
 	}
 
 	if selectedAccount.KeycardPairing == "" {
-		if !accountService.VerifyPassword(password) {
+		if ok, _ := accountService.VerifyPassword(password); !ok {
 			return fmt.Errorf("provided password is not correct")
 		}
 	}

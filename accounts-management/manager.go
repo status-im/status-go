@@ -5,8 +5,6 @@ import (
 	"errors"
 	"sync"
 
-	errorspkg "github.com/pkg/errors"
-
 	"go.uber.org/zap"
 
 	accsmanagementerrors "github.com/status-im/status-go/accounts-management/errors"
@@ -235,28 +233,4 @@ func (m *AccountsManager) GetVerifiedWalletAccount(address cryptotypes.Address, 
 	}
 
 	return account, nil
-}
-
-func (m *AccountsManager) VerifySelectedChatAccountPassword(password string) (bool, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.persistence == nil {
-		return false, ErrPersistenceMissing
-	}
-
-	profileKeypair, err := m.persistence.GetProfileKeypair()
-	if err != nil {
-		return false, errorspkg.Wrap(err, "error getting profile keypair")
-	}
-
-	if profileKeypair.MigratedToKeycard() {
-		return false, ErrKeypairIsNotKeycard
-	}
-
-	if m.selectedChatAccount == nil {
-		return false, ErrNoAccountSelected
-	}
-
-	return m.VerifyAccountPassword(m.selectedChatAccount.Address(), password)
 }
