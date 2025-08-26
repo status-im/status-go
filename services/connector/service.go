@@ -27,13 +27,15 @@ type Config struct {
 }
 
 func NewService(logger *zap.Logger, db *sql.DB, rpc rpc.ClientInterface, nm *network.Manager, config *Config) *Service {
-	return &Service{
+	s := &Service{
 		logger: logger,
 		db:     db,
 		rpc:    rpc,
 		nm:     nm,
 		config: config,
 	}
+	s.api = NewAPI(s)
+	return s
 }
 
 type Service struct {
@@ -41,6 +43,10 @@ type Service struct {
 	db     *sql.DB
 	rpc    rpc.ClientInterface
 	nm     *network.Manager
+
+	// api stores a single API, to have the single *commands.ClientSideHandler instance.
+	// This is more of a workaround and should be refactored together with the services refactoring.
+	api *API
 
 	config *Config
 
@@ -131,7 +137,7 @@ func (s *Service) APIs() []gethrpc.API {
 		{
 			Namespace: serviceName,
 			Version:   "0.1.0",
-			Service:   NewAPI(s),
+			Service:   s.api,
 		},
 	}
 }
