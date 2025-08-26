@@ -10,10 +10,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -25,12 +23,10 @@ import (
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/community"
-
 	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/transactions/fake"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -334,12 +330,8 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	address := common.HexToAddress("0x1234")
 	accountsPublisher := pubsub.NewPublisher()
 	chainID := uint64(1)
-	txServiceMockCtrl := gomock.NewController(t)
-	server, _ := fake.NewTestServer(txServiceMockCtrl)
-	client := gethrpc.DialInProc(server)
 
 	config := rpc.ClientConfig{
-		Client:          client,
 		UpstreamChainID: chainID,
 		Networks:        nil,
 		DB:              appDB,
@@ -395,8 +387,6 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	group.Wait()
 
 	// Stop service
-	txServiceMockCtrl.Finish()
-	server.Stop()
 	manager.Stop()
 }
 

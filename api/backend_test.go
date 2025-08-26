@@ -354,22 +354,20 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(idx int) {
-			result, err := backend.CallRPC(fmt.Sprintf(
-				`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":%d}`,
+			result := backend.CallInternalRPC(fmt.Sprintf(
+				`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":%d}`,
 				idx+1,
 			))
-			assert.NoError(t, err)
 			assert.NotContains(t, result, "error")
 			wg.Done()
 		}(i)
 
 		wg.Add(1)
 		go func(idx int) {
-			result, err := backend.CallPrivateRPC(fmt.Sprintf(
-				`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":%d}`,
+			result := backend.CallInternalRPC(fmt.Sprintf(
+				`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":%d}`,
 				idx+1,
 			))
-			assert.NoError(t, err)
 			assert.NotContains(t, result, "error")
 			wg.Done()
 		}(i)
@@ -442,12 +440,11 @@ func TestBlockedRPCMethods(t *testing.T) {
 	defer func() { require.NoError(t, backend.StopNode()) }()
 
 	for idx, m := range rpc.BlockedMethods() {
-		result, err := backend.CallRPC(fmt.Sprintf(
+		result := backend.CallInternalRPC(fmt.Sprintf(
 			`{"jsonrpc":"2.0","method":"%s","params":[],"id":%d}`,
 			m,
 			idx+1,
 		))
-		assert.NoError(t, err)
 		assert.Contains(t, result, fmt.Sprintf(`{"code":-32700,"message":"%s"}`, rpc.ErrMethodNotFound))
 	}
 }
@@ -455,17 +452,15 @@ func TestBlockedRPCMethods(t *testing.T) {
 func TestCallRPCWithStoppedNode(t *testing.T) {
 	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 
-	resp, err := backend.CallRPC(
-		`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}`,
+	resp := backend.CallInternalRPC(
+		`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":1}`,
 	)
-	assert.Equal(t, ErrRPCClientUnavailable, err)
-	assert.Equal(t, "", resp)
+	assert.Contains(t, resp, "error")
 
-	resp, err = backend.CallPrivateRPC(
-		`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}`,
+	resp = backend.CallInternalRPC(
+		`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":1}`,
 	)
-	assert.Equal(t, ErrRPCClientUnavailable, err)
-	assert.Equal(t, "", resp)
+	assert.Contains(t, resp, "error")
 }
 
 // TODO(adam): add concurrent tests for: SendTransaction

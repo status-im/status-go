@@ -14,8 +14,6 @@ import (
 
 	"go.uber.org/zap"
 
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
-
 	appCommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/logutils"
@@ -88,7 +86,6 @@ type Client struct {
 
 	UpstreamChainID uint64
 
-	local              *gethrpc.Client
 	rpcClientsMutex    sync.RWMutex
 	rpcClients         map[uint64]chain.ClientInterface
 	rpsLimiterMutex    sync.RWMutex
@@ -112,7 +109,6 @@ var verifProxyInitFn func(c *Client)
 
 // ClientConfig holds the configuration for initializing a new Client.
 type ClientConfig struct {
-	Client            *gethrpc.Client
 	UpstreamChainID   uint64
 	Networks          []params.Network
 	DB                *sql.DB
@@ -137,7 +133,6 @@ func NewClient(config ClientConfig) (*Client, error) {
 	}
 
 	c := Client{
-		local:              config.Client,
 		networkManager:     networkManager,
 		handlers:           make(map[string]Handler),
 		rpcClients:         make(map[uint64]chain.ClientInterface),
@@ -408,11 +403,7 @@ func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result in
 		return client.CallContext(ctx, result, method, args...)
 	}
 
-	if c.local == nil {
-		c.logger.Warn("Local JSON-RPC endpoint missing", zap.String("method", method))
-		return errors.New("missing local JSON-RPC endpoint")
-	}
-	return c.local.CallContext(ctx, result, method, args...)
+	return errors.New("unknown JSON-RPC endpoint")
 }
 
 // RegisterHandler registers local handler for specific RPC method.

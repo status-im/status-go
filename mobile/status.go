@@ -313,24 +313,12 @@ func CallRPC(inputJSON string) string {
 
 // callRPC calls public APIs via RPC.
 func callRPC(inputJSON string) string {
-	resp, err := statusBackend.CallRPC(inputJSON)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	return resp
+	return statusBackend.StatusNode().CallInternalRPC(inputJSON)
 }
 
+// Deprecated: Use CallRPC instead, the behaviour is the same.
 func CallPrivateRPC(inputJSON string) string {
-	return callPrivateRPC(inputJSON)
-}
-
-// callPrivateRPC calls both public and private APIs via RPC.
-func callPrivateRPC(inputJSON string) string {
-	resp, err := statusBackend.CallPrivateRPC(inputJSON)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	return resp
+	return callRPC(inputJSON)
 }
 
 func MigrateKeyStoreDirV2(requestJSON string) string {

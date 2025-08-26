@@ -6,10 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strings"
-	"testing"
 
-	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
@@ -139,62 +136,4 @@ func createStatusNode() (*StatusNode, func() error, func() error, error) {
 	statusNode.SetMultiaccountsDB(ma)
 
 	return statusNode, stop1, stop2, err
-}
-
-func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
-	var err error
-
-	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
-		APIModules: "", // no whitelisted API modules; use only public APIs
-		WakuV2Config: params.WakuV2Config{
-			Enabled: true,
-		},
-	})
-	require.NoError(t, err)
-	defer func() {
-		err := statusNode.Stop()
-		require.NoError(t, err)
-	}()
-
-	client := statusNode.RPCClient()
-	require.NotNil(t, client)
-
-	// call public API with public RPC Client
-	result, err := statusNode.CallRPC(`{"jsonrpc":"2.0", "id": 1, "method":"rpcstats_reset"}`)
-	require.NoError(t, err)
-
-	// the call is successful
-	require.False(t, strings.Contains(result, "error"), result)
-
-	// call private API with public RPC client
-	result, err = statusNode.CallRPC(`{"jsonrpc": "2.0", "id": 1, "method": "waku_info"}`)
-	require.NoError(t, err)
-
-	// the call fails
-	require.Equal(t, ErrRPCMethodUnavailable, result)
-
-}
-
-func TestNodeRPCPrivateClientCallPrivateService(t *testing.T) {
-	var err error
-
-	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
-		WakuV2Config: params.WakuV2Config{
-			Enabled: true,
-		},
-	})
-	require.NoError(t, err)
-	defer func() {
-		err := statusNode.Stop()
-		require.NoError(t, err)
-	}()
-
-	result, err := statusNode.CallPrivateRPC(`{"jsonrpc": "2.0", "id": 1, "method": "wakuext_echo", "params": ["hello"]}`)
-	require.NoError(t, err)
-
-	// the call is successful
-	require.False(t, strings.Contains(result, "error"))
-
-	_, err = statusNode.CallPrivateRPC(`{"jsonrpc": "2.0", "id": 1, "method": "settings_getSettings"}`)
-	require.NoError(t, err)
 }

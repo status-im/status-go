@@ -3,9 +3,7 @@ package node
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
-	"reflect"
 	"time"
 
 	"go.uber.org/zap"
@@ -15,7 +13,6 @@ import (
 	"github.com/status-im/status-go/transactions"
 
 	"github.com/ethereum/go-ethereum/event"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -105,33 +102,25 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	}
 	services = append(services, lns)
 
-	for i := range services {
-		b.RegisterLifecycle(services[i])
+	b.services = services
+
+	return nil
+}
+
+func (b *StatusNode) registerService(s common.StatusService) error {
+	for _, api := range s.APIs() {
+		b.logger.Debug("registering service api", zap.String("namespace", api.Namespace))
+		err := b.rpcServer.RegisterName(api.Namespace, api.Service)
+		if err != nil {
+			b.logger.Error("Failed to register API", zap.String("namespace", api.Namespace), zap.Error(err))
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (b *StatusNode) RegisterLifecycle(s common.StatusService) {
-	b.addPublicMethods(s.APIs())
-	b.gethNode.RegisterAPIs(s.APIs())
-	b.gethNode.RegisterLifecycle(s)
-}
-
-// Add through reflection a list of public methods so we can check when the
-// user makes a call if they are allowed
-func (b *StatusNode) addPublicMethods(apis []gethrpc.API) {
-	for _, api := range apis {
-		if api.Public {
-			addSuitableCallbacks(reflect.ValueOf(api.Service), api.Namespace, b.publicMethods)
-		}
-	}
-}
-
 func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Service, error) {
-	if b.gethNode == nil {
-		return nil, errors.New("geth node not initialized")
-	}
 	if b.wakuV2ExtSrvc == nil {
 		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.rpcClient, b.logger.Named("protocol"))
 	}
@@ -410,40 +399,4 @@ func (b *StatusNode) Cleanup() error {
 	}
 
 	return nil
-}
-
-type RPCCall struct {
-	Method string `json:"method"`
-}
-
-func (b *StatusNode) CallPrivateRPC(inputJSON string) (string, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.rpcClient == nil {
-		return "", ErrRPCClientUnavailable
-	}
-
-	return b.rpcClient.CallRaw(inputJSON), nil
-}
-
-// CallRPC calls public methods on the node, we register public methods
-// in a map and check if they can be called in this function
-func (b *StatusNode) CallRPC(inputJSON string) (string, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.rpcClient == nil {
-		return "", ErrRPCClientUnavailable
-	}
-
-	rpcCall := &RPCCall{}
-	err := json.Unmarshal([]byte(inputJSON), rpcCall)
-	if err != nil {
-		return "", err
-	}
-
-	if rpcCall.Method == "" || !b.publicMethods[rpcCall.Method] {
-		return ErrRPCMethodUnavailable, nil
-	}
-
-	return b.rpcClient.CallRaw(inputJSON), nil
 }

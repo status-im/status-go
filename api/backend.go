@@ -47,8 +47,7 @@ type StatusBackend interface {
 	Recover(rpcParams personal.RecoverParams) (types.Address, error)
 	Logout() error
 
-	CallPrivateRPC(inputJSON string) (string, error)
-	CallRPC(inputJSON string) (string, error)
+	CallInternalRPC(inputJSON string) string
 	HashTransaction(sendArgs wallettypes.SendTxArgs) (wallettypes.SendTxArgs, types.Hash, error)
 	HashTypedData(typed typeddata.TypedData) (types.Hash, error)
 	HashTypedDataV4(typed signercore.TypedData) (types.Hash, error)

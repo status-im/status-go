@@ -4,20 +4,6 @@ const (
 	ArchivesRelativePath        = "data/archivedata"
 	TorrentTorrentsRelativePath = "data/torrents"
 
-	// SendTransactionMethodName https://docs.walletconnect.com/advanced/rpc-reference/ethereum-rpc#eth_sendtransaction
-	SendTransactionMethodName = "eth_sendTransaction"
-
-	BalanceMethodName = "eth_getBalance"
-
-	// AccountsMethodName defines the name for listing the currently signed accounts.
-	AccountsMethodName = "eth_accounts"
-
-	// PersonalSignMethodName https://docs.walletconnect.com/advanced/rpc-reference/ethereum-rpc#personal_sign
-	PersonalSignMethodName = "personal_sign"
-
-	// PersonalRecoverMethodName defines the name for `personal.recover` API.
-	PersonalRecoverMethodName = "personal_ecRecover"
-
 	// MainnetEthereumNetworkURL is URL where the upstream ethereum network is loaded to
 	// allow us avoid syncing node.
 	MainnetEthereumNetworkURL = "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"

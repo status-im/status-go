@@ -149,7 +149,6 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	require.NotEmpty(t, networks)
 
 	config := rpc.ClientConfig{
-		Client:          nil,
 		UpstreamChainID: chainID,
 		Networks:        networks,
 		DB:              appDB,
@@ -237,7 +236,6 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 		},
 	}
 	config := rpc.ClientConfig{
-		Client:          nil,
 		UpstreamChainID: chainID,
 		Networks:        networks,
 		DB:              appDB,

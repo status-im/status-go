@@ -71,11 +71,6 @@ import (
 )
 
 var (
-	// ErrUnsupportedRPCMethod is for methods not supported by the RPC interface
-	ErrUnsupportedRPCMethod = errors.New("method is unsupported by RPC interface")
-	// ErrRPCClientUnavailable is returned if an RPC client can't be retrieved.
-	// This is a normal situation when a node is stopped.
-	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
 	// ErrDBNotAvailable is returned if a method is called before the DB is available for usage
 	ErrDBNotAvailable = errors.New("DB is unavailable")
 )
@@ -1915,13 +1910,6 @@ func (b *GethStatusBackend) GetNodeConfig() (*params.NodeConfig, error) {
 }
 
 func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("node crashed on start: %v", err)
-			sentry.RecoverError(err)
-		}
-	}()
-
 	b.logger.Info("status-go version details",
 		zap.String("version", version.Version()),
 		zap.String("commit", version.GitCommit()))
@@ -1949,12 +1937,6 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	b.transactor.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
 
 	signal.SendNodeStarted()
-
-	if err = b.registerHandlers(); err != nil {
-		b.logger.Error("Handler registration failed", zap.Error(err))
-		return
-	}
-	b.logger.Info("Handlers registered")
 
 	if b.statusNode.WalletService() != nil {
 		b.statusNode.WalletService().KeycardPairings().SetKeycardPairingsFile(config.KeycardPairingDataFile)
@@ -2003,21 +1985,8 @@ func (b *GethStatusBackend) RestartNode() error {
 }
 
 // CallRPC executes public RPC requests on node's in-proc RPC server.
-func (b *GethStatusBackend) CallRPC(inputJSON string) (string, error) {
-	client := b.statusNode.RPCClient()
-	if client == nil {
-		return "", ErrRPCClientUnavailable
-	}
-	return client.CallRaw(inputJSON), nil
-}
-
-// CallPrivateRPC executes public and private RPC requests on node's in-proc RPC server.
-func (b *GethStatusBackend) CallPrivateRPC(inputJSON string) (string, error) {
-	client := b.statusNode.RPCClient()
-	if client == nil {
-		return "", ErrRPCClientUnavailable
-	}
-	return client.CallRaw(inputJSON), nil
+func (b *GethStatusBackend) CallInternalRPC(inputJSON string) string {
+	return b.statusNode.CallInternalRPC(inputJSON)
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
@@ -2121,40 +2090,6 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 
 func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*generator.Account, error) {
 	return b.accountsManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
-}
-
-// registerHandlers attaches Status callback handlers to running node
-func (b *GethStatusBackend) registerHandlers() error {
-	var clients []*rpc.Client
-
-	if c := b.StatusNode().RPCClient(); c != nil {
-		clients = append(clients, c)
-	} else {
-		return errors.New("RPC client unavailable")
-	}
-
-	for _, client := range clients {
-		client.RegisterHandler(
-			params.AccountsMethodName,
-			func(context.Context, uint64, ...interface{}) (interface{}, error) {
-				return b.accountsManager.Accounts()
-			},
-		)
-
-		if b.allowAllRPC {
-			// this should only happen in unit-tests, this variable is not available outside this package
-			continue
-		}
-		client.RegisterHandler(params.SendTransactionMethodName, unsupportedMethodHandler)
-		client.RegisterHandler(params.PersonalSignMethodName, unsupportedMethodHandler)
-		client.RegisterHandler(params.PersonalRecoverMethodName, unsupportedMethodHandler)
-	}
-
-	return nil
-}
-
-func unsupportedMethodHandler(_ context.Context, _ uint64, _ ...interface{}) (interface{}, error) {
-	return nil, ErrUnsupportedRPCMethod
 }
 
 // ConnectionChange handles network state changes logic.

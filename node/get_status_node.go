@@ -7,20 +7,23 @@ import (
 	"fmt"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/accounts"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/node"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
+	common2 "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/node/backup"
+	rpc2 "github.com/status-im/status-go/node/rpc"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/common"
@@ -49,11 +52,8 @@ import (
 
 // errors
 var (
-	ErrNodeRunning          = errors.New("node is already running")
-	ErrNoGethNode           = errors.New("geth node is not available")
-	ErrNoRunningNode        = errors.New("there is no running node")
-	ErrServiceUnknown       = errors.New("service unknown")
-	ErrRPCMethodUnavailable = `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"the method called does not exist/is not available"}}`
+	ErrNodeRunning   = errors.New("node is already running")
+	ErrNoRunningNode = errors.New("there is no running node")
 )
 
 // StatusNode abstracts contained geth node and provides helper methods to
@@ -65,9 +65,13 @@ type StatusNode struct {
 	multiaccountsDB *multiaccounts.Database
 	walletDB        *sql.DB
 
+	running atomic.Bool
+
 	config    *params.NodeConfig // Status node configuration
-	gethNode  *node.Node         // reference to Geth P2P stack/node
 	rpcClient *rpc.Client        // reference to an RPC client
+
+	services  []common2.StatusService
+	rpcServer *gethrpc.Server
 
 	downloader *ipfs.Downloader
 
@@ -117,6 +121,7 @@ func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagemen
 		logger:              logger,
 		publicMethods:       make(map[string]bool),
 		accountsPublisher:   pubsub.NewPublisher(),
+		rpcServer:           gethrpc.NewServer(),
 	}
 }
 
@@ -126,14 +131,6 @@ func (n *StatusNode) Config() *params.NodeConfig {
 	defer n.mu.RUnlock()
 
 	return n.config
-}
-
-// GethNode returns underlying geth node.
-func (n *StatusNode) GethNode() *node.Node {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	return n.gethNode
 }
 
 func (n *StatusNode) HTTPServer() *server.MediaServer {
@@ -146,7 +143,7 @@ func (n *StatusNode) HTTPServer() *server.MediaServer {
 // StartMediaServerWithoutDB starts media server without starting the node
 // The server can only handle requests that don't require appdb or IPFS downloader
 func (n *StatusNode) StartMediaServerWithoutDB() error {
-	if n.isRunning() {
+	if n.running.Load() {
 		n.logger.Debug("node is already running, no need to StartMediaServerWithoutDB")
 		return nil
 	}
@@ -181,7 +178,7 @@ func (n *StatusNode) Start(config *params.NodeConfig) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if n.isRunning() {
+	if !n.running.CompareAndSwap(false, true) {
 		n.logger.Debug("node is already running")
 		return ErrNodeRunning
 	}
@@ -259,11 +256,6 @@ func (n *StatusNode) SetMediaServerEnableTLS(enableTLS *bool) {
 }
 
 func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
-	var err error
-	n.gethNode, err = MakeNode(config)
-	if err != nil {
-		return err
-	}
 	n.config = config
 
 	if err := n.setupRPCClient(); err != nil {
@@ -297,23 +289,26 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 	if err := n.initServices(config, n.httpServer); err != nil {
 		return err
 	}
-	return n.startGethNode()
-}
 
-// startGethNode starts current StatusNode, will fail if it's already started.
-func (n *StatusNode) startGethNode() error {
-	return n.gethNode.Start()
+	for _, service := range n.services {
+		err = n.registerService(service)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, service := range n.services {
+		err := service.Start()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (n *StatusNode) setupRPCClient() (err error) {
-	// setup RPC client
-	gethNodeClient, err := n.gethNode.Attach()
-	if err != nil {
-		return
-	}
-
 	config := rpc.ClientConfig{
-		Client:            gethNodeClient,
 		UpstreamChainID:   n.config.NetworkID,
 		Networks:          n.config.Networks,
 		DB:                n.appDB,
@@ -332,8 +327,15 @@ func (n *StatusNode) Stop() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if !n.isRunning() {
+	if !n.running.CompareAndSwap(true, false) {
 		return ErrNoRunningNode
+	}
+
+	for _, service := range n.services {
+		err := service.Stop()
+		if err != nil {
+			return err
+		}
 	}
 
 	if n.localBackup != nil {
@@ -346,17 +348,10 @@ func (n *StatusNode) Stop() error {
 
 // stop will stop current StatusNode. A stopped node cannot be resumed.
 func (n *StatusNode) stop() error {
-	if err := n.gethNode.Close(); err != nil {
-		return err
-	}
-
 	n.accountsPublisher.Close()
 
 	n.rpcClient.Stop()
 	n.rpcClient = nil
-	// We need to clear `gethNode` because config is passed to `Start()`
-	// and may be completely different. Similarly with `config`.
-	n.gethNode = nil
 	n.config = nil
 
 	err := n.httpServer.Stop()
@@ -392,12 +387,7 @@ func (n *StatusNode) stop() error {
 func (n *StatusNode) IsRunning() bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-
-	return n.isRunning()
-}
-
-func (n *StatusNode) isRunning() bool {
-	return n.gethNode != nil && n.gethNode.Server() != nil
+	return n.running.Load()
 }
 
 func (n *StatusNode) ConnectionChanged(state connection.State) {
@@ -406,16 +396,10 @@ func (n *StatusNode) ConnectionChanged(state connection.State) {
 	}
 }
 
-// AccountsManager exposes reference to node's accounts manager
-func (n *StatusNode) AccountsManager() (*accounts.Manager, error) {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	if n.gethNode == nil {
-		return nil, ErrNoGethNode
-	}
-
-	return n.gethNode.AccountManager(), nil
+func (n *StatusNode) CallInternalRPC(inputJSON string) string {
+	codec := rpc2.NewSingleRequestCodec(inputJSON)
+	n.rpcServer.ServeCodec(codec.GethCodec(), 0)
+	return codec.Output()
 }
 
 // RPCClient exposes reference to RPC client connected to the running node.

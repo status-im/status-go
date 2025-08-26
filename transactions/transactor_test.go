@@ -66,7 +66,6 @@ func (s *TransactorSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	config := statusRpc.ClientConfig{
-		Client:          s.client,
 		UpstreamChainID: chainID,
 		Networks:        nil,
 		DB:              db,

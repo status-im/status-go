@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/appdatabase"
 	statusRPC "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/helpers"
@@ -34,7 +35,6 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	_ = client
 
 	config := statusRPC.ClientConfig{
-		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        nil,
 		DB:              db,

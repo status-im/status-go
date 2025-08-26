@@ -23,7 +23,6 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/ethereum/go-ethereum/common"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
 func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
@@ -45,11 +44,7 @@ func TestBlockedRoutesCall(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	gethRPCClient, err := gethrpc.Dial(ts.URL)
-	require.NoError(t, err)
-
 	config := ClientConfig{
-		Client:          gethRPCClient,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              db,
@@ -90,11 +85,7 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	gethRPCClient, err := gethrpc.Dial(ts.URL)
-	require.NoError(t, err)
-
 	config := ClientConfig{
-		Client:          gethRPCClient,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              db,
@@ -179,7 +170,6 @@ func TestGetClientsUsingCache(t *testing.T) {
 		security.NewSensitiveString(password))
 
 	config := ClientConfig{
-		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        networks,
 		DB:              db,
