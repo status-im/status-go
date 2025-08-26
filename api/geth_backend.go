@@ -996,14 +996,18 @@ func (b *GethStatusBackend) reEncryptKeyStoreDir(currentPassword string, newPass
 	return nil
 }
 
-func (b *GethStatusBackend) VerifyPassword(password string) (bool, error) {
-	return b.accountsManager.VerifyPassword(password)
-}
-
 func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
 	acc, err := b.multiaccountsDB.GetAccount(keyUID)
 	if err != nil {
 		return err
+	}
+
+	ok, err := b.accountsManager.VerifyPassword(password)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("Incorrect current password")
 	}
 
 	internalDbPath, err := dbsetup.GetDBFilename(b.appDB)

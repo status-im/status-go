@@ -1242,26 +1242,6 @@ func changeDatabasePasswordV2(requestJSON string) string {
 	return changeDatabasePassword(request.KeyUID, request.OldPassword, request.NewPassword)
 }
 
-func VerifyPassword(requestJSON string) string {
-	return callWithResponse(verifyPassword, requestJSON)
-}
-
-func verifyPassword(requestJSON string) string {
-	var request requests.VerifyPassword
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = request.Validate()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	ok, err := statusBackend.VerifyPassword(request.Password)
-	return prepareJSONResponse(ok, err)
-}
-
 // Deprecated: Use ConvertToKeycardAccountV2 instead.
 func ConvertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword string) string {
 	return convertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword)
