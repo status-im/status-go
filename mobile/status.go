@@ -22,6 +22,7 @@ import (
 
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/centralizedmetrics"
@@ -1230,7 +1231,7 @@ func changeDatabasePasswordV2(requestJSON string) string {
 	}
 
 	ok, err := statusBackend.VerifyProfilePassword(request.OldPassword)
-	if err != nil {
+	if err != nil && !errors.Is(err, keystore.ErrIncorrectPasswordProvided) {
 		return makeJSONResponse(err)
 	}
 	if !ok {
