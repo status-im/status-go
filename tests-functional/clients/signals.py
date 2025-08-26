@@ -27,14 +27,12 @@ class SignalType(Enum):
     LOCAL_PAIRING = "localPairing"
     DB_REENCRYPTION_STARTED = "db.reEncryption.started"
     DB_REENCRYPTION_FINISHED = "db.reEncryption.finished"
-
-    class Connector(Enum):
-        SEND_REQUEST_ACCOUNTS = "connector.sendRequestAccounts"
-        SEND_TRANSACTION = "connector.sendTransaction"
-        SIGN = "connector.sign"
-        DAPP_PERMISSION_GRANTED = "connector.dAppPermissionGranted"
-        DAPP_PERMISSION_REVOKED = "connector.dAppPermissionRevoked"
-        DAPP_CHAIN_ID_SWITCHED = "connector.dAppChainIdSwitched"
+    CONNECTOR_SEND_REQUEST_ACCOUNTS = "connector.sendRequestAccounts"
+    CONNECTOR_SEND_TRANSACTION = "connector.sendTransaction"
+    CONNECTOR_SIGN = "connector.sign"
+    CONNECTOR_DAPP_PERMISSION_GRANTED = "connector.dAppPermissionGranted"
+    CONNECTOR_DAPP_PERMISSION_REVOKED = "connector.dAppPermissionRevoked"
+    CONNECTOR_DAPP_CHAIN_ID_SWITCHED = "connector.dAppChainIdSwitched"
 
 
 class WalletEventType(Enum):

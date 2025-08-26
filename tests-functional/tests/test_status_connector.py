@@ -12,12 +12,12 @@ class TestStatusConnector:
 
     await_signals = [
         SignalType.NODE_LOGIN.value,
-        SignalType.Connector.SEND_REQUEST_ACCOUNTS.value,
-        SignalType.Connector.SEND_TRANSACTION.value,
-        SignalType.Connector.SIGN.value,
-        SignalType.Connector.DAPP_PERMISSION_GRANTED.value,
-        SignalType.Connector.DAPP_PERMISSION_REVOKED.value,
-        SignalType.Connector.DAPP_CHAIN_ID_SWITCHED.value,
+        SignalType.CONNECTOR_SEND_REQUEST_ACCOUNTS.value,
+        SignalType.CONNECTOR_SEND_TRANSACTION.value,
+        SignalType.CONNECTOR_SIGN.value,
+        SignalType.CONNECTOR_DAPP_PERMISSION_GRANTED.value,
+        SignalType.CONNECTOR_DAPP_PERMISSION_REVOKED.value,
+        SignalType.CONNECTOR_DAPP_CHAIN_ID_SWITCHED.value,
     ]
 
     @pytest.fixture
@@ -42,7 +42,7 @@ class TestStatusConnector:
         connector.get_accounts()
 
         # Expect SEND_REQUEST_ACCOUNTS signal, check dApp name
-        signal = backend.wait_for_signal(SignalType.Connector.SEND_REQUEST_ACCOUNTS.value)
+        signal = backend.wait_for_signal(SignalType.CONNECTOR_SEND_REQUEST_ACCOUNTS.value)
         event = signal.get("event")
         assert event.get("name") == connector.name
 
@@ -51,7 +51,7 @@ class TestStatusConnector:
         assert response.get("error") is None
 
         # Expect DAPP_PERMISSION_GRANTED signal, check dApp name, shared account and chain ID
-        signal = backend.wait_for_signal(SignalType.Connector.DAPP_PERMISSION_GRANTED.value)
+        signal = backend.wait_for_signal(SignalType.CONNECTOR_DAPP_PERMISSION_GRANTED.value)
         event = signal.get("event")
         assert event.get("name") == connector.name
         assert event.get("sharedAccount") == wallet_acc
