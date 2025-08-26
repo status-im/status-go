@@ -452,3 +452,15 @@ class StatusBackend(RpcClient, SignalClient):
     def free_os_memory(self):
         url = f"{self.base_url}/statusgo/debug/FreeOSMemory"
         requests.post(url)
+
+    def change_database_password(self, old_password, new_password):
+        method = "ChangeDatabasePasswordV2"
+        data = {
+            "keyUid": self.key_uid,
+            "oldPassword": old_password,
+            "newPassword": new_password,
+        }
+
+        # NOTE: api_valid_request should be here, but we expect errors in some tests
+        # This is a temporary solution until we have a better way to expect errors from api_valid_request.
+        return self.api_request(method, data)

@@ -17,7 +17,7 @@ class SignalType(Enum):
     NODE_READY = "node.ready"
     NODE_STARTED = "node.started"
     NODE_LOGIN = "node.login"
-    NODE_LOGOUT = "node.stopped"
+    NODE_STOPPED = "node.stopped"
     MEDIASERVER_STARTED = "mediaserver.started"
     WALLET = "wallet"
     WALLET_SUGGESTED_ROUTES = "wallet.suggested.routes"
@@ -25,6 +25,8 @@ class SignalType(Enum):
     WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED = "wallet.router.sending-transactions-started"
     WALLET_ROUTER_TRANSACTIONS_SENT = "wallet.router.transactions-sent"
     LOCAL_PAIRING = "localPairing"
+    DB_REENCRYPTION_STARTED = "db.reEncryption.started"
+    DB_REENCRYPTION_FINISHED = "db.reEncryption.finished"
 
 
 class WalletEventType(Enum):
@@ -141,7 +143,7 @@ class SignalClient:
         raise TimeoutError(f"Signal {signal_type} satisfying the predicate is not received in {timeout} seconds")
 
     def wait_for_logout(self):
-        signal = self.wait_for_signal(SignalType.NODE_LOGOUT.value)
+        signal = self.wait_for_signal(SignalType.NODE_STOPPED.value)
         return signal
 
     def find_signal_containing_pattern(self, signal_type, event_pattern, timeout=20):
@@ -187,7 +189,8 @@ class SignalClient:
         websocket_thread.start()
 
     def disconnect(self):
-        self.wsapp.close()
+        if hasattr(self, "wsapp") and self.wsapp is not None:
+            self.wsapp.close()
 
     def write_signal_to_file(self, signal_data):
         with open(self.signal_file_path, "a+") as file:

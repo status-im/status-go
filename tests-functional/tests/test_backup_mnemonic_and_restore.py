@@ -18,7 +18,7 @@ class TestBackupMnemonicAndRestore:
         SignalType.NODE_STARTED.value,
         SignalType.NODE_READY.value,
         SignalType.NODE_LOGIN.value,
-        SignalType.NODE_LOGOUT.value,
+        SignalType.NODE_STOPPED.value,
     ]
 
     @pytest.fixture(autouse=True)

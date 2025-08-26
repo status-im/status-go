@@ -1621,6 +1621,10 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 	return b.ChangeDatabasePassword(generatedAccountInfo.KeyUID, currPassword, newPassword)
 }
 
+func (b *GethStatusBackend) VerifyProfilePassword(password string) (bool, error) {
+	return b.statusNode.AccountService().VerifyPassword(password)
+}
+
 func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
 	kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(keyUID)
 	if err != nil {
