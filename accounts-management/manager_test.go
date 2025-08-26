@@ -20,7 +20,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
 
 	customerrors "github.com/status-im/status-go/accounts-management/errors"
 )
@@ -514,6 +514,79 @@ func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
 		s.Require().NoError(err)
 		s.Require().NotNil(account)
 	}
+}
+
+func (s *ManagerTestSuite) TestVerifySelectedChatAccountPassword() {
+	s.Run("success", func() {
+		s.createAndStoreProfileKeypair()
+
+		// Verify for a profile keypair (non-keycard) and selected chat account
+		s.persistence.EXPECT().GetProfileKeypair().Return(
+			&types.Keypair{KeyUID: s.masterAccount.KeyUID()},
+			nil,
+		).Times(1)
+
+		ok, err := s.accManager.VerifySelectedChatAccountPassword(s.password)
+		s.Require().NoError(err)
+		s.True(ok)
+	})
+
+	s.Run("wrong password", func() {
+		s.createAndStoreProfileKeypair()
+
+		s.persistence.EXPECT().GetProfileKeypair().Return(
+			&types.Keypair{KeyUID: s.masterAccount.KeyUID()},
+			nil,
+		).Times(1)
+
+		ok, err := s.accManager.VerifySelectedChatAccountPassword("wrong")
+		s.Require().Error(err)
+		s.False(ok)
+		if !errors.Is(err, keystore.ErrIncorrectPasswordProvided) {
+			var accountsErr *customerrors.AccountsError
+			if errors.As(err, &accountsErr) {
+				s.Contains(accountsErr.Error(), keystore.ErrIncorrectPasswordProvided.Error())
+			} else {
+				s.Equal(keystore.ErrIncorrectPasswordProvided, err)
+			}
+		}
+	})
+
+	s.Run("no selected account", func() {
+		// Ensure persistence returns a non-keycard keypair
+		s.persistence.EXPECT().GetProfileKeypair().Return(
+			&types.Keypair{KeyUID: s.masterAccount.KeyUID()},
+			nil,
+		).Times(1)
+
+		// Clear selected account
+		s.accManager.setChatAccountAndProfileKeyUID(nil, "")
+
+		ok, err := s.accManager.VerifySelectedChatAccountPassword(s.password)
+		s.Require().Error(err)
+		s.Equal(ErrNoAccountSelected, err)
+		s.False(ok)
+	})
+}
+
+func (s *ManagerTestSuite) TestVerifySelectedChatAccountPassword_keycard() {
+	// Return a keypair that has keycards -> treated as keycard keypair
+	s.persistence.EXPECT().GetProfileKeypair().Return(
+		&types.Keypair{
+			KeyUID: s.masterAccount.KeyUID(),
+			Keycards: []*types.Keycard{{
+				KeyUID:      s.masterAccount.KeyUID(),
+				KeycardUID:  "kc-uid",
+				KeycardName: "kc-name",
+			}},
+		},
+		nil,
+	).Times(1)
+
+	ok, err := s.accManager.VerifySelectedChatAccountPassword(s.password)
+	s.Require().Error(err)
+	s.Equal(ErrKeypairIsNotKeycard, err)
+	s.False(ok)
 }
 
 func (s *ManagerTestSuite) TestDeleteAccount() {
