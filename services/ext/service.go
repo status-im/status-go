@@ -16,9 +16,10 @@ import (
 	commongethtypes "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/status-im/go-wallet-sdk/pkg/ethclient"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/api/multiformat"
@@ -259,10 +260,12 @@ type verifyTransactionClient struct {
 
 func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash types.Hash) (coretypes.Message, coretypes.TransactionStatus, error) {
 	signer := gethtypes.NewLondonSigner(c.chainID)
-	client, err := ethclient.Dial(c.url)
+
+	rpcClient, err := gethrpc.DialContext(ctx, c.url)
 	if err != nil {
 		return coretypes.Message{}, coretypes.TransactionStatusPending, err
 	}
+	client := ethclient.NewClient(rpcClient)
 
 	transaction, pending, err := client.TransactionByHash(ctx, commongethtypes.BytesToHash(hash.Bytes()))
 	if err != nil {
