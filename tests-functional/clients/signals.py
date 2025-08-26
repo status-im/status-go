@@ -25,6 +25,8 @@ class SignalType(Enum):
     WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED = "wallet.router.sending-transactions-started"
     WALLET_ROUTER_TRANSACTIONS_SENT = "wallet.router.transactions-sent"
     LOCAL_PAIRING = "localPairing"
+    DB_REENCRYPTION_STARTED = "db.reEncryption.started"
+    DB_REENCRYPTION_FINISHED = "db.reEncryption.finished"
 
 
 class WalletEventType(Enum):
@@ -187,7 +189,8 @@ class SignalClient:
         websocket_thread.start()
 
     def disconnect(self):
-        self.wsapp.close()
+        if hasattr(self, "wsapp") and self.wsapp is not None:
+            self.wsapp.close()
 
     def write_signal_to_file(self, signal_data):
         with open(self.signal_file_path, "a+") as file:
