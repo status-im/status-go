@@ -3,7 +3,6 @@ package activityfetcher
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -88,12 +87,10 @@ func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, account get
 		return thirdparty.ActivityEntryContainer{}, errors.New("toBlock must be defined")
 	}
 
-	fmt.Println("Fetching activity", parameters)
 	activity, err := m.fetcher.FetchActivity(ctx, chainID, parameters, "", maxEntriesPerFetch)
 	if err != nil {
 		return thirdparty.ActivityEntryContainer{}, err
 	}
-	fmt.Println("Fetched activity", len(activity.Items))
 
 	duration := time.Since(startTime)
 	m.logger.Debug("Fetch activity completed",

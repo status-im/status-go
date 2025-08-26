@@ -40,7 +40,7 @@ type FilterDependencies struct {
 
 // getSentActivitiesEntries queries the route_* and tracked_transactions based on filter parameters and arguments
 // it returns metadata for all entries ordered by timestamp column
-func getSentActivitiesEntries(ctx context.Context, deps FilterDependencies, addresses []eth.Address, chainIDs []wCommon.ChainID, offset int, limit int) ([]Entry, error) {
+func getSentActivitiesEntries(ctx context.Context, deps FilterDependencies, addresses []eth.Address, chainIDs []wCommon.ChainID, afterTimestamp int64) ([]Entry, error) {
 	if len(addresses) == 0 {
 		return nil, ErrNoAddressesProvided
 	}
@@ -75,13 +75,10 @@ func getSentActivitiesEntries(ctx context.Context, deps FilterDependencies, addr
 
 	qConditions = append(qConditions, sq.Eq{"rpt.chain_id": chainIDs})
 	qConditions = append(qConditions, sq.Eq{"rip.from_address": addresses})
+	// Only fetch entries after the specified timestamp
+	qConditions = append(qConditions, sq.Gt{"tt.timestamp": afterTimestamp})
 
 	q = q.Where(qConditions)
-
-	if limit != ac.NoLimit {
-		q = q.Limit(uint64(limit))
-		q = q.Offset(uint64(offset))
-	}
 
 	query, args, err := q.ToSql()
 	if err != nil {
@@ -105,7 +102,12 @@ func getSentActivitiesEntries(ctx context.Context, deps FilterDependencies, addr
 		return nil, err
 	}
 
-	return sentEntryDataToEntriesV2(deps, data)
+	entries, err := sentEntryDataToEntriesV2(deps, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return entries, nil
 }
 
 func getSentActivitiesByHash(ctx context.Context, deps FilterDependencies, addresses []eth.Address, chainIDs []wCommon.ChainID, txIDs []TransactionID) (map[TransactionID]Entry, error) {
@@ -261,7 +263,8 @@ func getFetchedActivitiesEntries(ctx context.Context, deps FilterDependencies, a
 		end = len(allEntries)
 	}
 
-	return allEntries[start:end], nil
+	result := allEntries[start:end]
+	return result, nil
 }
 
 func thirdpartyActivityEntriesToEntries(deps FilterDependencies, activityEntries []thirdparty.ActivityEntry) []Entry {

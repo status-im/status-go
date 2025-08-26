@@ -71,6 +71,20 @@ func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, of
 		return nil, err
 	}
 
+	// Get the timestamp of most recent entry that was fetched
+	var mostRecentFetchedTimestamp int64
+	if len(fetchedEntries) > 0 {
+		mostRecentFetchedTimestamp = fetchedEntries[0].timestamp
+	}
+
+	// Get all activites that were saved but can't be fetched from 3rdparty yet
+	// probably they aren't processed yet but we send them so we know
+	recentlySavedEntries, err := getSentActivitiesEntries(ctx, s.getDeps(), f.addresses, f.chainIDs, mostRecentFetchedTimestamp)
+	if err != nil {
+		// Continue even if we can't get recently sent entries
+		recentlySavedEntries = []Entry{}
+	}
+
 	// Extract transaction IDs from fetched entries
 	txIDs := make([]TransactionID, 0)
 	for _, entry := range fetchedEntries {
@@ -90,9 +104,8 @@ func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, of
 		savedEntriesMap = make(map[TransactionID]Entry)
 	}
 
-	// Build result array: use saved entry if exists, otherwise use fetched entry
-	resultEntries := make([]Entry, 0, len(fetchedEntries))
-
+	// Build result array: start with recently sent entries, then add fetched entries
+	resultEntries := recentlySavedEntries
 	for _, fetchedEntry := range fetchedEntries {
 		// Check if we have a saved entry for this transaction
 		var entryToAdd Entry

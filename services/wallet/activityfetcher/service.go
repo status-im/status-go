@@ -2,6 +2,7 @@ package activityfetcher
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
@@ -17,6 +19,9 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
+	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/transactions"
 )
 
 const (
@@ -36,13 +41,16 @@ type Service struct {
 
 	networksPublisher *pubsub.Publisher
 	accountsPublisher *pubsub.Publisher
-	checkRefetchCh    chan struct{}
+	eventFeed         *event.Feed
+	checkRefetchCh    chan bool
 
 	cancelFnMap      map[fetcherID]context.CancelFunc
 	cancelFnMapMutex sync.RWMutex
 
-	logger *zap.Logger
-	stopCh chan struct{}
+	logger        *zap.Logger
+	stopCh        chan struct{}
+	subscriptions event.Subscription
+	ch            chan walletevent.Event
 }
 
 func NewService(
@@ -51,6 +59,7 @@ func NewService(
 	accountsGetter accounts.AccountsStorage,
 	accountsPublisher *pubsub.Publisher,
 	rpcClient rpc.ClientInterface,
+	eventFeed *event.Feed,
 ) *Service {
 	logger := logutils.ZapLogger().Named("ActivityFetcher")
 
@@ -61,9 +70,11 @@ func NewService(
 		rpcClient:              rpcClient,
 		networksPublisher:      networksGetter.GetPublisher(),
 		accountsPublisher:      accountsPublisher,
-		checkRefetchCh:         make(chan struct{}),
+		eventFeed:              eventFeed,
+		checkRefetchCh:         make(chan bool),
 		cancelFnMap:            make(map[fetcherID]context.CancelFunc),
 		logger:                 logger,
+		ch:                     make(chan walletevent.Event, 100),
 	}
 
 	return service
@@ -86,10 +97,48 @@ func (s *Service) startNetworkWatcher() {
 				if !ok {
 					return
 				}
-				s.triggerRefetch()
+				s.triggerRefetch(false)
 			}
 		}
 	}()
+}
+
+func (s *Service) startTransactionWatcher() {
+	if s.eventFeed == nil {
+		return
+	}
+
+	s.subscriptions = s.eventFeed.Subscribe(s.ch)
+	go func() {
+		defer gocommon.LogOnPanic()
+		for {
+			select {
+			case <-s.stopCh:
+				return
+			case event, ok := <-s.ch:
+				if !ok {
+					return
+				}
+				s.handleWalletEvent(event)
+			}
+		}
+	}()
+}
+
+func (s *Service) handleWalletEvent(event walletevent.Event) {
+	switch event.Type {
+	case transactions.EventPendingTransactionStatusChanged:
+		var payload transactions.StatusChangedPayload
+		if err := json.Unmarshal([]byte(event.Message), &payload); err != nil {
+			s.logger.Error("Failed to extract transaction status payload", zap.Error(err))
+			return
+		}
+
+		// Trigger immediate fetch when transaction succeeds - bypass interval check
+		if payload.Status == ac.Success {
+			s.triggerRefetch(true)
+		}
+	}
 }
 
 func (s *Service) startAccountWatcher() {
@@ -109,7 +158,7 @@ func (s *Service) startAccountWatcher() {
 				if !ok {
 					return
 				}
-				s.triggerRefetch()
+				s.triggerRefetch(false)
 			}
 		}
 	}()
@@ -126,7 +175,7 @@ func (s *Service) startAccountWatcher() {
 				if !ok {
 					return
 				}
-				s.triggerRefetch()
+				s.triggerRefetch(false)
 			}
 		}
 	}()
@@ -138,6 +187,7 @@ func (s *Service) Start(ctx context.Context) {
 
 	s.startNetworkWatcher()
 	s.startAccountWatcher()
+	s.startTransactionWatcher()
 
 	go func() {
 		defer gocommon.LogOnPanic()
@@ -152,18 +202,18 @@ func (s *Service) Start(ctx context.Context) {
 				return
 			case <-ticker.C:
 				s.fetchActivityForAllAccountsAndChains(ctx, false)
-			case <-s.checkRefetchCh:
-				s.fetchActivityForAllAccountsAndChains(ctx, true)
+			case bypassIntervalCheck := <-s.checkRefetchCh:
+				s.fetchActivityForAllAccountsAndChains(ctx, !bypassIntervalCheck)
 			}
 		}
 	}()
 
 	// Initial fetch on service start
-	s.triggerRefetch()
+	s.triggerRefetch(false)
 }
 
-func (s *Service) triggerRefetch() {
-	s.checkRefetchCh <- struct{}{}
+func (s *Service) triggerRefetch(bypassIntervalCheck bool) {
+	s.checkRefetchCh <- bypassIntervalCheck
 }
 
 func (s *Service) stop() {
@@ -172,6 +222,10 @@ func (s *Service) stop() {
 	if s.stopCh != nil {
 		close(s.stopCh)
 		s.stopCh = nil
+	}
+
+	if s.subscriptions != nil {
+		s.subscriptions.Unsubscribe()
 	}
 
 	s.removeAllCancelFns()
@@ -279,7 +333,6 @@ func (s *Service) getRunningFetcherIDs() ([]fetcherID, error) {
 }
 
 func (s *Service) fetchActivityForAllAccountsAndChains(ctx context.Context, checkLastTimestamp bool) {
-	fmt.Println("fetchActivityForAllAccountsAndChains")
 
 	desiredFetcherIDs, err := s.getDesiredFetcherIDs()
 	if err != nil {
