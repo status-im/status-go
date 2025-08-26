@@ -1002,14 +1002,6 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 		return err
 	}
 
-	ok, err := b.accountsManager.VerifyPassword(password)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return errors.New("Incorrect current password")
-	}
-
 	internalDbPath, err := dbsetup.GetDBFilename(b.appDB)
 	if err != nil {
 		return fmt.Errorf("failed to get database file name, %w", err)
@@ -1627,6 +1619,10 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 	}
 
 	return b.ChangeDatabasePassword(generatedAccountInfo.KeyUID, currPassword, newPassword)
+}
+
+func (b *GethStatusBackend) VerifyCurrentAccountPassword(password string) (bool, error) {
+	return b.accountsManager.VerifySelectedChatAccountPassword(password)
 }
 
 func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {

@@ -1218,17 +1218,6 @@ func importUnencryptedDatabaseV2(requestJSON string) string {
 	return makeJSONResponse(err)
 }
 
-// Deprecated: Use ChangeDatabasePasswordV2 instead.
-func ChangeDatabasePassword(keyUID, password, newPassword string) string {
-	return changeDatabasePassword(keyUID, password, newPassword)
-}
-
-// changeDatabasePassword changes the password of the database
-func changeDatabasePassword(keyUID, password, newPassword string) string {
-	err := statusBackend.ChangeDatabasePassword(keyUID, password, newPassword)
-	return makeJSONResponse(err)
-}
-
 func ChangeDatabasePasswordV2(requestJSON string) string {
 	return callWithResponse(changeDatabasePasswordV2, requestJSON)
 }
@@ -1239,7 +1228,17 @@ func changeDatabasePasswordV2(requestJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return changeDatabasePassword(request.KeyUID, request.OldPassword, request.NewPassword)
+
+	ok, err := statusBackend.VerifyCurrentAccountPassword(request.OldPassword)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	if !ok {
+		return makeJSONResponse(errors.New("incorrect current password"))
+	}
+
+	err = statusBackend.ChangeDatabasePassword(request.KeyUID, request.OldPassword, request.NewPassword)
+	return makeJSONResponse(err)
 }
 
 // Deprecated: Use ConvertToKeycardAccountV2 instead.
