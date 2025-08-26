@@ -17,7 +17,7 @@ class SignalType(Enum):
     NODE_READY = "node.ready"
     NODE_STARTED = "node.started"
     NODE_LOGIN = "node.login"
-    NODE_LOGOUT = "node.stopped"
+    NODE_STOPPED = "node.stopped"
     MEDIASERVER_STARTED = "mediaserver.started"
     WALLET = "wallet"
     WALLET_SUGGESTED_ROUTES = "wallet.suggested.routes"
@@ -141,7 +141,7 @@ class SignalClient:
         raise TimeoutError(f"Signal {signal_type} satisfying the predicate is not received in {timeout} seconds")
 
     def wait_for_logout(self):
-        signal = self.wait_for_signal(SignalType.NODE_LOGOUT.value)
+        signal = self.wait_for_signal(SignalType.NODE_STOPPED.value)
         return signal
 
     def find_signal_containing_pattern(self, signal_type, event_pattern, timeout=20):
