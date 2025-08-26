@@ -12,7 +12,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/status-im/go-wallet-sdk/pkg/ethclient"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
@@ -36,10 +38,12 @@ func (m *Verifier) ReverseResolve(address common.Address, rpcEndpoint string) (s
 	ctx, cancel := context.WithTimeout(context.Background(), contractQueryTimeout)
 	defer cancel()
 
-	ethClient, err := ethclient.DialContext(ctx, rpcEndpoint)
+	rpcClient, err := rpc.DialContext(ctx, rpcEndpoint)
 	if err != nil {
 		return "", err
 	}
+
+	ethClient := ethclient.NewClient(rpcClient)
 	return ens.ReverseResolve(ethClient, address)
 }
 
@@ -95,15 +99,17 @@ func (m *Verifier) CheckBatch(ensDetails []enstypes.ENSDetails, rpcEndpoint, con
 	ch := make(chan enstypes.ENSResponse)
 	response := make(map[string]enstypes.ENSResponse)
 
-	ethclient, err := ethclient.DialContext(ctx, rpcEndpoint)
+	rpcClient, err := rpc.DialContext(ctx, rpcEndpoint)
 	if err != nil {
 		return nil, err
 	}
 
+	ethClient := ethclient.NewClient(rpcClient)
+
 	for _, ensInfo := range ensDetails {
 		go func(info enstypes.ENSDetails) {
 			defer gocommon.LogOnPanic()
-			ch <- m.verifyENSName(info, ethclient)
+			ch <- m.verifyENSName(info, ethClient)
 		}(ensInfo)
 	}
 
