@@ -1229,7 +1229,7 @@ func changeDatabasePasswordV2(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	ok, err := statusBackend.VerifyCurrentAccountPassword(request.OldPassword)
+	ok, err := statusBackend.VerifyProfilePassword(request.OldPassword)
 	if err != nil {
 		return makeJSONResponse(err)
 	}

@@ -1621,7 +1621,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 	return b.ChangeDatabasePassword(generatedAccountInfo.KeyUID, currPassword, newPassword)
 }
 
-func (b *GethStatusBackend) VerifyCurrentAccountPassword(password string) (bool, error) {
+func (b *GethStatusBackend) VerifyProfilePassword(password string) (bool, error) {
 	return b.statusNode.AccountService().VerifyPassword(password)
 }
 
