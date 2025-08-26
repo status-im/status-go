@@ -332,67 +332,6 @@ func callPrivateRPC(inputJSON string) string {
 	return resp
 }
 
-// Deprecated: Use VerifyAccountPasswordV2 instead
-func VerifyAccountPassword(address, password string) string {
-	return verifyAccountPassword(address, password)
-}
-
-// verifyAccountPassword verifies account password.
-func verifyAccountPassword(address, password string) string {
-	_, err := statusBackend.AccountsManager().LoadAccount(types.HexToAddress(address), password)
-	return makeJSONResponse(err)
-}
-
-func VerifyAccountPasswordV2(requestJSON string) string {
-	return callWithResponse(verifyAccountPasswordV2, requestJSON)
-}
-
-func verifyAccountPasswordV2(requestJSON string) string {
-	var request requests.VerifyAccountPassword
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = request.Validate()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	_, err = statusBackend.AccountsManager().LoadAccount(types.HexToAddress(request.Address), request.Password)
-	return makeJSONResponse(err)
-}
-
-func VerifyDatabasePasswordV2(requestJSON string) string {
-	return callWithResponse(verifyDatabasePasswordV2, requestJSON)
-}
-
-func verifyDatabasePasswordV2(requestJSON string) string {
-	var request requests.VerifyDatabasePassword
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = request.Validate()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	err = statusBackend.VerifyDatabasePassword(request.KeyUID, request.Password)
-	return makeJSONResponse(err)
-}
-
-// Deprecated: use VerifyDatabasePasswordV2 instead
-func VerifyDatabasePassword(keyUID, password string) string {
-	return verifyDatabasePassword(keyUID, password)
-}
-
-// verifyDatabasePassword verifies database password.
-func verifyDatabasePassword(keyUID, password string) string {
-	err := statusBackend.VerifyDatabasePassword(keyUID, password)
-	return makeJSONResponse(err)
-}
-
 func MigrateKeyStoreDirV2(requestJSON string) string {
 	return callWithResponse(migrateKeyStoreDirV2, requestJSON)
 }
@@ -1301,6 +1240,26 @@ func changeDatabasePasswordV2(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 	return changeDatabasePassword(request.KeyUID, request.OldPassword, request.NewPassword)
+}
+
+func VerifyPassword(requestJSON string) string {
+	return callWithResponse(verifyPassword, requestJSON)
+}
+
+func verifyPassword(requestJSON string) string {
+	var request requests.VerifyPassword
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	ok, err := statusBackend.VerifyPassword(request.Password)
+	return prepareJSONResponse(ok, err)
 }
 
 // Deprecated: Use ConvertToKeycardAccountV2 instead.

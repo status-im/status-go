@@ -234,3 +234,23 @@ func (m *AccountsManager) GetVerifiedWalletAccount(address cryptotypes.Address, 
 
 	return account, nil
 }
+
+func (m *AccountsManager) VerifyPassword(password string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.persistence == nil {
+		return false, ErrKeystoreMissing
+	}
+
+	profileKeypair, err := m.persistence.GetProfileKeypair()
+	if err != nil {
+		return false, err
+	}
+
+	if profileKeypair.MigratedToKeycard() {
+		return false, ErrKeypairIsNotKeycard
+	}
+
+	return m.VerifyAccountPassword(m.selectedChatAccount.Address(), password)
+}
