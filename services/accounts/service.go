@@ -93,6 +93,10 @@ func (s *Service) AccountsAPI() *API {
 	return NewAccountsAPI(s.manager, s.config, s.db, &s.messenger, s.publisher)
 }
 
+func (s *Service) GetProfileKeypair() (*accounts.Keypair, error) {
+	return s.db.GetProfileKeypair()
+}
+
 func (s *Service) GetKeypairByKeyUID(keyUID string) (*accounts.Keypair, error) {
 
 	return s.db.GetKeypairByKeyUID(keyUID)
