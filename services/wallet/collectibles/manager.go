@@ -212,7 +212,7 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(ctx context.Context, ch
 			ret[contractAddress] = append(ret[contractAddress], balance)
 		}
 	} else {
-		// OpenSea could have provided, but returned error
+		// Some provider could have provided, but returned error
 		return nil, err
 	}
 

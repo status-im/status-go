@@ -1556,7 +1556,6 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 				"poktToken":                   "1234567890",
 				"infuraToken":                 "1234567890",
 				"infuraSecret":                "",
-				"openseaApiKey":               "",
 				"raribleMainnetApiKey":        "",
 				"raribleTestnetApiKey":        "",
 				"alchemyEthereumMainnetToken": "",

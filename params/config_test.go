@@ -212,17 +212,16 @@ func TestNodeConfigValidate(t *testing.T) {
 
 func TestMarshalWalletConfigJSON(t *testing.T) {
 	walletConfig := params.WalletConfig{
-		OpenseaAPIKey:        security.NewSensitiveString(gofakeit.LetterN(10)),
 		RaribleMainnetAPIKey: security.NewSensitiveString(gofakeit.LetterN(10)),
 	}
 	bytes, err := json.Marshal(walletConfig)
 	require.NoError(t, err)
 	// check if sensitive fields are not present
-	require.NotContains(t, string(bytes), "OpenseaAPIKey")
+	require.NotContains(t, string(bytes), "RaribleMainnetAPIKey")
 
 	// check if deserializing are still working with sensitive fields
 	walletConfig = params.WalletConfig{}
-	err = json.Unmarshal([]byte(`{"OpenseaAPIKey":"some-key"}`), &walletConfig)
+	err = json.Unmarshal([]byte(`{"RaribleMainnetAPIKey":"some-key"}`), &walletConfig)
 	require.NoError(t, err)
-	require.Equal(t, "some-key", walletConfig.OpenseaAPIKey.Reveal())
+	require.Equal(t, "some-key", walletConfig.RaribleMainnetAPIKey.Reveal())
 }

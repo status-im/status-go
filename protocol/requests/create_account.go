@@ -99,7 +99,6 @@ type WalletSecretsConfig struct {
 	PoktToken            security.SensitiveString `json:"poktToken"`
 	InfuraToken          security.SensitiveString `json:"infuraToken"`
 	InfuraSecret         security.SensitiveString `json:"infuraSecret"`
-	OpenseaAPIKey        security.SensitiveString `json:"openseaApiKey"`
 	RaribleMainnetAPIKey security.SensitiveString `json:"raribleMainnetApiKey"`
 	RaribleTestnetAPIKey security.SensitiveString `json:"raribleTestnetApiKey"`
 	AlchemyAPIKey        security.SensitiveString `json:"alchemyApiKey"`
