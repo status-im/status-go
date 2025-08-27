@@ -46,7 +46,6 @@ class StatusBackend(RpcClient, SignalClient):
             self.temp_dir = tempfile.TemporaryDirectory()
             self.data_dir = self.temp_dir.name
             if kwargs.get("connector_enabled", False):
-                self.connector_http_url = f"http://localhost:{constants.STATUS_CONNECTOR_HTTP_PORT}"
                 self.connector_ws_url = f"ws://localhost:{constants.STATUS_CONNECTOR_WS_PORT}"
         else:
             self.container = StatusBackendContainer(privileged, self.ipv6, **kwargs)
@@ -54,7 +53,6 @@ class StatusBackend(RpcClient, SignalClient):
             self.data_dir = self.container.data_dir()
             url = self.container.url
             if kwargs.get("connector_enabled", False):
-                self.connector_http_url = self.container.connector_http_url
                 self.connector_ws_url = self.container.connector_ws_url
 
         assert self.data_dir != ""
@@ -281,9 +279,9 @@ class StatusBackend(RpcClient, SignalClient):
             "apiConfig": {
                 "apiModules": "connector",
                 "connectorEnabled": kwargs.get("connector_enabled", False),
-                "httpEnabled": True,
+                "httpEnabled": False,
                 "httpHost": "0.0.0.0",
-                "httpPort": constants.STATUS_CONNECTOR_HTTP_PORT,
+                "httpPort": 0,
                 "wsEnabled": True,
                 "wsHost": "0.0.0.0",
                 "wsPort": constants.STATUS_CONNECTOR_WS_PORT,

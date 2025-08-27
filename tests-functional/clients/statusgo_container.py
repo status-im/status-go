@@ -340,7 +340,6 @@ class StatusBackendContainer(StatusGoContainer):
         connector_enabled = kwargs.get("connector_enabled", False)
 
         host_port = StatusGoContainer.acquire_port()
-        connector_http_port = StatusGoContainer.acquire_port() if connector_enabled else 0
         connector_ws_port = StatusGoContainer.acquire_port() if connector_enabled else 0
 
         container_port = 3333
@@ -361,21 +360,17 @@ class StatusBackendContainer(StatusGoContainer):
                 ]
             }
             if connector_enabled:
-                ports[f"{constants.STATUS_CONNECTOR_HTTP_PORT}/tcp"] = [{"HostIp": "::", "HostPort": str(connector_http_port)}]
                 ports[f"{constants.STATUS_CONNECTOR_WS_PORT}/tcp"] = [{"HostIp": "::", "HostPort": str(connector_ws_port)}]
 
             self.url = f"http://[::1]:{host_port}"
-            self.connector_http_url = f"http://[::1]:{connector_http_port}"
             self.connector_ws_url = f"ws://[::1]:{connector_ws_port}"
         else:
             ports = {
                 f"{container_port}/tcp": str(host_port),
             }
             if connector_enabled:
-                ports[f"{constants.STATUS_CONNECTOR_HTTP_PORT}/tcp"] = str(connector_http_port)
                 ports[f"{constants.STATUS_CONNECTOR_WS_PORT}/tcp"] = str(connector_ws_port)
             self.url = f"http://127.0.0.1:{host_port}"
-            self.connector_http_url = f"http://127.0.0.1:{connector_http_port}"
             self.connector_ws_url = f"ws://127.0.0.1:{connector_ws_port}"
 
         super().__init__(entrypoint, ports, privileged, container_name_suffix=f"-status-backend-{host_port}")

@@ -1,5 +1,4 @@
 import json
-import time
 import pytest
 
 from clients.connector import ConnectorClient
@@ -26,8 +25,7 @@ class TestStatusConnector:
 
     @pytest.fixture
     def connector(self, backend):
-        time.sleep(5)
-        client = ConnectorClient(backend.connector_http_url, backend.connector_ws_url)
+        client = ConnectorClient(backend.connector_ws_url)
         client.connect()
         yield client
         client.disconnect()
