@@ -122,6 +122,10 @@ type SyncProgress struct {
 
 	HealingTrienodes uint64 // Number of state trie nodes pending
 	HealingBytecode  uint64 // Number of bytecodes pending
+
+	// "transaction indexing" fields
+	TxIndexFinishedBlocks  uint64 // Number of blocks whose transactions are already indexed
+	TxIndexRemainingBlocks uint64 // Number of blocks whose transactions are not indexed yet
 }
 
 // ChainSyncReader wraps access to the node's current sync status. If there's no
@@ -142,6 +146,13 @@ type CallMsg struct {
 	Data      []byte          // input data, usually an ABI-encoded contract method invocation
 
 	AccessList types.AccessList // EIP-2930 access list.
+
+	// For BlobTxType
+	BlobGasFeeCap *big.Int
+	BlobHashes    []common.Hash
+
+	// For SetCodeTxType
+	AuthorizationList []struct{} // Dummy type to satisfy the interface
 }
 
 // A ContractCaller provides contract calls, essentially transactions that are executed by

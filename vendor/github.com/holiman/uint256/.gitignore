@@ -1,1 +1,7 @@
 /.idea
+
+
+# go output files
+*.test
+*.out
+*.pb.gz

@@ -9,7 +9,7 @@ github.com/PuerkitoBio/goquery
 github.com/RoaringBitmap/roaring
 github.com/RoaringBitmap/roaring/BitSliceIndexing
 github.com/RoaringBitmap/roaring/internal
-# github.com/VictoriaMetrics/fastcache v1.6.0
+# github.com/VictoriaMetrics/fastcache v1.12.2
 ## explicit; go 1.13
 github.com/VictoriaMetrics/fastcache
 # github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5
@@ -134,7 +134,7 @@ github.com/benbjohnson/immutable
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
-# github.com/bits-and-blooms/bitset v1.13.0
+# github.com/bits-and-blooms/bitset v1.20.0
 ## explicit; go 1.16
 github.com/bits-and-blooms/bitset
 # github.com/bits-and-blooms/bloom/v3 v3.7.0
@@ -147,7 +147,7 @@ github.com/bradfitz/iter
 ## explicit; go 1.21
 github.com/brianvoe/gofakeit/v6
 github.com/brianvoe/gofakeit/v6/data
-# github.com/brianvoe/gofakeit/v7 v7.2.1
+# github.com/brianvoe/gofakeit/v7 v7.3.0
 ## explicit; go 1.22
 github.com/brianvoe/gofakeit/v7
 github.com/brianvoe/gofakeit/v7/data
@@ -187,7 +187,7 @@ github.com/containerd/cgroups/stats/v1
 # github.com/coreos/go-systemd/v22 v22.5.0
 ## explicit; go 1.12
 github.com/coreos/go-systemd/v22/dbus
-# github.com/cpuguy83/go-md2man/v2 v2.0.4
+# github.com/cpuguy83/go-md2man/v2 v2.0.5
 ## explicit; go 1.11
 github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/cruxic/go-hmac-drbg v0.0.0-20170206035330-84c46983886d
@@ -219,7 +219,7 @@ github.com/edsrzf/mmap-go
 ## explicit; go 1.14
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.23
+# github.com/ethereum/go-ethereum v1.16.0 => github.com/status-im/go-ethereum v1.10.25-status.24
 ## explicit; go 1.22
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
@@ -304,7 +304,7 @@ github.com/getsentry/sentry-go/internal/otel/baggage
 github.com/getsentry/sentry-go/internal/otel/baggage/internal/baggage
 github.com/getsentry/sentry-go/internal/ratelimit
 github.com/getsentry/sentry-go/internal/traceparser
-# github.com/go-ole/go-ole v1.2.6
+# github.com/go-ole/go-ole v1.3.0
 ## explicit; go 1.12
 github.com/go-ole/go-ole
 github.com/go-ole/go-ole/oleutil
@@ -329,8 +329,8 @@ github.com/godbus/dbus/v5
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
-# github.com/golang-jwt/jwt/v4 v4.3.0
-## explicit; go 1.15
+# github.com/golang-jwt/jwt/v4 v4.5.1
+## explicit; go 1.16
 github.com/golang-jwt/jwt/v4
 # github.com/golang-migrate/migrate/v4 v4.15.2
 ## explicit; go 1.16
@@ -349,10 +349,10 @@ github.com/golang/groupcache/consistenthash
 github.com/golang/groupcache/groupcachepb
 github.com/golang/groupcache/lru
 github.com/golang/groupcache/singleflight
-# github.com/golang/protobuf v1.5.3
-## explicit; go 1.9
+# github.com/golang/protobuf v1.5.4
+## explicit; go 1.17
 github.com/golang/protobuf/proto
-# github.com/golang/snappy v0.0.4
+# github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb
 ## explicit
 github.com/golang/snappy
 # github.com/google/btree v1.0.1
@@ -401,8 +401,8 @@ github.com/hashicorp/golang-lru/v2/simplelru
 # github.com/holiman/bloomfilter/v2 v2.0.3
 ## explicit; go 1.15
 github.com/holiman/bloomfilter/v2
-# github.com/holiman/uint256 v1.2.0
-## explicit; go 1.13
+# github.com/holiman/uint256 v1.3.2
+## explicit; go 1.19
 github.com/holiman/uint256
 # github.com/huandu/xstrings v1.3.2
 ## explicit; go 1.12
@@ -447,8 +447,8 @@ github.com/json-iterator/go
 # github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
 ## explicit
 github.com/keighl/metabolize
-# github.com/kilic/bls12-381 v0.0.0-20200607163746-32e1441c8a9f
-## explicit; go 1.12
+# github.com/kilic/bls12-381 v0.1.0
+## explicit; go 1.13
 github.com/kilic/bls12-381
 # github.com/klauspost/compress v1.17.11
 ## explicit; go 1.21
@@ -1021,6 +1021,9 @@ github.com/status-im/doubleratchet
 # github.com/status-im/extkeys v1.3.0
 ## explicit; go 1.22
 github.com/status-im/extkeys
+# github.com/status-im/go-wallet-sdk v0.0.0-20250902115318-6340846c26ec
+## explicit; go 1.23.0
+github.com/status-im/go-wallet-sdk/pkg/ethclient
 # github.com/status-im/markdown v0.0.0-20250825083641-55c1df9bc05d
 ## explicit; go 1.12
 github.com/status-im/markdown
@@ -1083,13 +1086,13 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
-# github.com/tklauser/go-sysconf v0.3.6
+# github.com/tklauser/go-sysconf v0.3.12
 ## explicit; go 1.13
 github.com/tklauser/go-sysconf
-# github.com/tklauser/numcpus v0.2.2
-## explicit; go 1.11
+# github.com/tklauser/numcpus v0.6.1
+## explicit; go 1.13
 github.com/tklauser/numcpus
-# github.com/urfave/cli/v2 v2.27.2
+# github.com/urfave/cli/v2 v2.27.5
 ## explicit; go 1.18
 github.com/urfave/cli/v2
 # github.com/waku-org/go-discover v0.0.0-20240506173252-4912704efdc5
@@ -1215,8 +1218,8 @@ github.com/xeipuuv/gojsonreference
 # github.com/xeipuuv/gojsonschema v1.2.0
 ## explicit
 github.com/xeipuuv/gojsonschema
-# github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913
-## explicit; go 1.15.0
+# github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1
+## explicit; go 1.15
 github.com/xrash/smetrics
 # github.com/yeqown/go-qrcode/v2 v2.2.1
 ## explicit; go 1.18
@@ -1385,7 +1388,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.5.0
+# golang.org/x/time v0.9.0
 ## explicit; go 1.18
 golang.org/x/time/rate
 # golang.org/x/tools v0.36.0
@@ -1482,8 +1485,8 @@ google.golang.org/protobuf/types/pluginpb
 # gopkg.in/go-playground/validator.v9 v9.31.0
 ## explicit
 gopkg.in/go-playground/validator.v9
-# gopkg.in/natefinch/lumberjack.v2 v2.0.0
-## explicit
+# gopkg.in/natefinch/lumberjack.v2 v2.2.1
+## explicit; go 1.13
 gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 ## explicit

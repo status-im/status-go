@@ -91,7 +91,7 @@ func swuMapG2(e *fp2, u *fe2) (*fe2, *fe2) {
 		y2.set(gx2)
 	}
 	y := e.new()
-	e.sqrt(y, y2)
+	e.sqrtBLST(y, y2)
 	if y.sign() != u.sign() {
 		e.neg(y, y)
 	}
