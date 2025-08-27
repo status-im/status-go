@@ -22,7 +22,6 @@ var sensitiveKeys = []string{
 	"password",
 	"newPassword",
 	"mnemonic",
-	"openseaAPIKey",
 	"poktToken",
 	"infuraToken",
 	"infuraSecret",

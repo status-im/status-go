@@ -212,7 +212,6 @@ type NodeConfig struct {
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
 	Enabled                   bool
-	OpenseaAPIKey             security.SensitiveString `json:"OpenseaAPIKey"`
 	RaribleMainnetAPIKey      security.SensitiveString `json:"RaribleMainnetAPIKey"`
 	RaribleTestnetAPIKey      security.SensitiveString `json:"RaribleTestnetAPIKey"`
 	AlchemyAPIKey             security.SensitiveString `json:"AlchemyAPIKey"`

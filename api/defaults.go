@@ -160,10 +160,6 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 		walletConfig.StatusProxyStageName = request.StatusProxyStageName
 	}
 
-	if !request.OpenseaAPIKey.Empty() {
-		walletConfig.OpenseaAPIKey = request.OpenseaAPIKey
-	}
-
 	if !request.RaribleMainnetAPIKey.Empty() {
 		walletConfig.RaribleMainnetAPIKey = request.RaribleMainnetAPIKey
 	}
