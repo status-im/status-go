@@ -79,9 +79,15 @@ func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, of
 
 	// Get all activites that were saved but can't be fetched from 3rdparty yet
 	// probably they aren't processed yet but we send them so we know
-	recentlySavedEntries, err := getSentActivitiesEntries(ctx, s.getDeps(), f.addresses, f.chainIDs, mostRecentFetchedTimestamp)
-	if err != nil {
-		// Continue even if we can't get recently sent entries
+	// we add them only if this is a request with offset == 0, because this should
+	// return the earliest entries
+	var recentlySavedEntries []Entry
+	if offset == 0 {
+		recentlySavedEntries, err = getSentActivitiesEntries(ctx, s.getDeps(), f.addresses, f.chainIDs, mostRecentFetchedTimestamp)
+		if err != nil {
+			recentlySavedEntries = []Entry{}
+		}
+	} else {
 		recentlySavedEntries = []Entry{}
 	}
 

@@ -459,7 +459,7 @@ func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account get
 		return
 	}
 
-	activities, err := s.activityFetcherManager.FetchActivity(ctx, chainID, account, currentBlock)
+	_, err = s.activityFetcherManager.FetchActivity(ctx, chainID, account, currentBlock)
 	if err != nil {
 		s.logger.Error("Failed to fetch activity", zap.Error(err))
 		return
