@@ -229,6 +229,9 @@ class TestLocalBackup:
         assert group_chat_recovered, "Group chat was not restored correctly"
         assert one_on_one_chat_recovered, "One-to-one chat was not restored correctly"
 
+        # Change the backup path (Docker restricts access to a lot of folders)
+        backend_client.rpc_valid_request("settings_saveSetting", ["backup-path", "/usr/status-user/backups"])
+
         # Perform the backup
         response = backend_client.api_request_json("PerformLocalBackup", "")
         backup_path = response.get("filePath", "")
