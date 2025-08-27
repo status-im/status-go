@@ -230,6 +230,24 @@ func (n *StatusNode) StartLocalBackup() error {
 		return errors.New("local backup already started")
 	}
 
+	backupPath, err := n.accountsSrvc.GetBackupPath()
+	if err != nil {
+		return err
+	}
+	if backupPath == "" {
+		// No path set yet, set it to the user's config directory
+		dir, err := os.UserConfigDir()
+		// We do not return the error as it's not a major issue
+		if err != nil {
+			n.logger.Error("failed to get user config dir", zap.Error(err))
+		} else {
+			err = n.accountsSrvc.SetBackupPath(filepath.Join(dir, "Status", "backups"))
+			if err != nil {
+				n.logger.Error("failed to set backup path", zap.Error(err))
+			}
+		}
+	}
+
 	filenameGetter := func() (string, error) {
 		profileKeypair, err := n.accountsSrvc.GetProfileKeypair()
 		if err != nil {
