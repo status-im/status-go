@@ -3,7 +3,6 @@ package activityfetcher
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -46,6 +45,9 @@ type Service struct {
 
 	cancelFnMap      map[fetcherID]context.CancelFunc
 	cancelFnMapMutex sync.RWMutex
+
+	initialFetchComplete bool
+	initialFetchMutex    sync.RWMutex
 
 	logger        *zap.Logger
 	stopCh        chan struct{}
@@ -267,16 +269,12 @@ func (s *Service) cancelFetcherIDs(fetcherIDs []fetcherID) {
 	s.cancelFnMapMutex.Lock()
 	defer s.cancelFnMapMutex.Unlock()
 
-	fmt.Printf("cancelFetcherIDs fetcherIDs: %+v\n", fetcherIDs)
-	fmt.Printf("cancelFetcherIDs old cancelFnMap: %+v\n", s.cancelFnMap)
-
 	for _, fetcherID := range fetcherIDs {
 		if cancelFn, ok := s.cancelFnMap[fetcherID]; ok {
 			cancelFn()
 			delete(s.cancelFnMap, fetcherID)
 		}
 	}
-	fmt.Printf("cancelFetcherIDs new cancelFnMap: %+v\n", s.cancelFnMap)
 }
 
 func (s *Service) getCurrentChainIDs() ([]uint64, error) {
@@ -333,7 +331,6 @@ func (s *Service) getRunningFetcherIDs() ([]fetcherID, error) {
 }
 
 func (s *Service) fetchActivityForAllAccountsAndChains(ctx context.Context, checkLastTimestamp bool) {
-
 	desiredFetcherIDs, err := s.getDesiredFetcherIDs()
 	if err != nil {
 		s.logger.Error("Failed to get desired fetcher IDs", zap.Error(err))
@@ -359,7 +356,6 @@ func (s *Service) fetchActivityForAllAccountsAndChains(ctx context.Context, chec
 		}
 
 		if checkLastTimestamp {
-
 			_, lastFetchedTimestamp, err := s.activityFetcherManager.GetLastFetchedBlockAndTimestamp(ctx, fetcherID.chainID, fetcherID.account)
 			if err != nil {
 				s.logger.Error("Failed to get last fetched block and timestamp", zap.Error(err))
@@ -396,10 +392,6 @@ func (s *Service) runAndRemoveCancelFn(fetcherID fetcherID) {
 	s.cancelFnMapMutex.Lock()
 	defer s.cancelFnMapMutex.Unlock()
 
-	fmt.Println("runAndRemoveCancelFn", fetcherID)
-
-	fmt.Printf("cancelFnMap before: %+v\n", s.cancelFnMap)
-
 	var cancelFn context.CancelFunc
 	var ok bool
 	if cancelFn, ok = s.cancelFnMap[fetcherID]; !ok {
@@ -409,7 +401,27 @@ func (s *Service) runAndRemoveCancelFn(fetcherID fetcherID) {
 	cancelFn()
 	delete(s.cancelFnMap, fetcherID)
 
-	fmt.Printf("cancelFnMap after: %+v\n", s.cancelFnMap)
+	// Check if this was the last fetcher in the initial batch
+	if len(s.cancelFnMap) == 0 {
+		s.checkAndEmitInitialFetchComplete()
+	}
+}
+
+func (s *Service) checkAndEmitInitialFetchComplete() {
+	s.initialFetchMutex.Lock()
+	defer s.initialFetchMutex.Unlock()
+
+	// Only emit once
+	if !s.initialFetchComplete {
+		s.initialFetchComplete = true
+		// Emit event to notify that initial fetch is complete
+		if s.eventFeed != nil {
+			s.eventFeed.Send(walletevent.Event{
+				Type:    "wallet-activity-initial-fetch-complete",
+				Message: "{}",
+			})
+		}
+	}
 }
 
 func (s *Service) removeAllCancelFns() {
@@ -447,7 +459,7 @@ func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account get
 		return
 	}
 
-	_, err = s.activityFetcherManager.FetchActivity(ctx, chainID, account, currentBlock)
+	activities, err := s.activityFetcherManager.FetchActivity(ctx, chainID, account, currentBlock)
 	if err != nil {
 		s.logger.Error("Failed to fetch activity", zap.Error(err))
 		return
