@@ -50,9 +50,8 @@ type Service struct {
 
 	config *Config
 
-	rpcServer     *gethrpc.Server
-	wsServer      *http.Server
-	welcomeServer *http.Server
+	rpcServer *gethrpc.Server
+	wsServer  *http.Server
 }
 
 func (s *Service) Start() error {
@@ -67,9 +66,17 @@ func (s *Service) Start() error {
 	}
 
 	// Expose the RPC server over websocket
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead && r.URL.Path == "/" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		wsHandler := s.rpcServer.WebsocketHandler([]string{})
+		wsHandler.ServeHTTP(w, r)
+	})
 	s.wsServer = &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", s.config.WSHost, s.config.WSPort),
-		Handler:           s.rpcServer.WebsocketHandler([]string{}),
+		Handler:           handler,
 		ReadHeaderTimeout: time.Second * 10,
 	}
 
@@ -81,27 +88,6 @@ func (s *Service) Start() error {
 		}
 	}()
 
-	// Start a "welcome" server to detect if the connector is up
-	s.welcomeServer = &http.Server{
-		Addr: fmt.Sprintf("%s:%d", s.config.HTTPHost, s.config.HTTPPort),
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodHead {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-		}),
-		ReadHeaderTimeout: time.Second * 10,
-	}
-
-	go func() {
-		defer common.LogOnPanic()
-		err := s.welcomeServer.ListenAndServe()
-		if !errors.Is(err, http.ErrServerClosed) {
-			s.logger.Error("welcome server closed with error", zap.Error(err))
-		}
-	}()
-
 	return nil
 }
 
@@ -109,27 +95,17 @@ func (s *Service) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	var errs []error
-
-	if s.welcomeServer != nil {
-		err := s.welcomeServer.Shutdown(ctx)
-		if err != nil {
-			s.logger.Error("failed to stop welcome server", zap.Error(err))
-			err = s.welcomeServer.Close()
-			errs = append(errs, err)
-		}
+	if s.wsServer == nil {
+		return nil
 	}
 
-	if s.wsServer != nil {
-		err := s.wsServer.Shutdown(ctx)
-		if err != nil {
-			s.logger.Error("failed to stop status connector server", zap.Error(err))
-			err = s.wsServer.Close()
-			errs = append(errs, err)
-		}
+	err := s.wsServer.Shutdown(ctx)
+	if err == nil {
+		return nil
 	}
 
-	return errors.Join(errs...)
+	s.logger.Error("failed to stop status connector server", zap.Error(err))
+	return s.wsServer.Close()
 }
 
 func (s *Service) APIs() []gethrpc.API {
