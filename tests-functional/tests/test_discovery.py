@@ -49,6 +49,9 @@ class TestAppGeneral:
 
         logging.info("✅ All threads completed")
 
+        for i, node in enumerate(nodes):
+            assert node is not None, f"Node {i} is None"
+
         try:
             while True:
                 logging.info("--- updating peers")
