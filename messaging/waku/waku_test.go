@@ -104,7 +104,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 
 	require.Error(t, err)
 
-	w.discV5BootstrapNodes = []string{testStoreENRBootstrap}
+	w.cfg.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
 
 	options = func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 90 * time.Second
