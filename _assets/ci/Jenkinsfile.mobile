@@ -1,0 +1,104 @@
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.9.26'
+
+pipeline {
+  agent { label "${params.AGENT_LABEL} && nix-2.24" }
+
+  parameters {
+    string(
+      name: 'BRANCH',
+      defaultValue: 'develop',
+      description: 'Name of branch to build.'
+    )
+    string(
+      name: 'AGENT_LABEL',
+      description: 'Label for targetted CI slave host.',
+      defaultValue: params.AGENT_LABEL ?: jenkins.getAgentLabelFromJob(),
+    )
+    booleanParam(
+      name: 'RELEASE',
+      defaultValue: false,
+      description: 'Enable to create build for release.',
+    )
+  }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: 15, unit: 'MINUTES')
+    disableConcurrentBuilds()
+    disableRestartFromStage()
+    /* manage how many builds we keep */
+    buildDiscarder(logRotator(
+      numToKeepStr: '5',
+      daysToKeepStr: '30',
+      artifactNumToKeepStr: '1',
+    ))
+  }
+
+  environment {
+    PLATFORM  = "${getPlatform()}"
+    EXT       = "${getExtension()}"
+    TMPDIR    = "${WORKSPACE_TMP}"
+    GOPATH    = "${WORKSPACE_TMP}/go"
+    GOCACHE   = "${WORKSPACE_TMP}/gocache"
+    PATH      = "${PATH}:${GOPATH}/bin"
+    REPO_SRC  = "${GOPATH}/src/github.com/status-im/status-go"
+    VERSION   = sh(script: "./_assets/scripts/version.sh", returnStdout: true)
+    ARTIFACT  = utils.pkgFilename(
+      name:    'status-go',
+      type:    env.PLATFORM,
+      version: env.VERSION,
+      ext:     env.EXT
+    )
+    /* prevent sharing cache dir across different jobs */
+    GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
+  }
+
+  stages {
+    stage('Setup') {
+      steps { /* Go needs to find status-go in GOPATH. */
+        sh "mkdir -p \$(dirname ${REPO_SRC})"
+        sh "ln -s ${WORKSPACE} ${REPO_SRC}"
+      }
+    }
+
+    stage('Compile') {
+      steps { script {
+        nix.develop("make statusgo-${env.PLATFORM}-library", pure: false, sandbox: env.PLATFORM != 'ios')
+        sh "mv build/bin/libstatus.${env.EXT} ${ARTIFACT}"
+      } }
+    }
+
+    stage('Archive') {
+      steps { script {
+        archiveArtifacts(ARTIFACT)
+      } }
+    }
+
+    stage('Upload') {
+      steps { script {
+        env.PKG_URL = s5cmd.upload(ARTIFACT)
+      } }
+    }
+  } // stages
+  post {
+    success { script { github.notifyPR(true) } }
+    failure { script { github.notifyPR(false) } }
+    cleanup {
+      cleanWs()
+      dir("${env.WORKSPACE}@tmp") { deleteDir() }
+    }
+  } // post
+} // pipeline
+
+/* Extract mobile platform from agent label */
+def getPlatform(String label = params.AGENT_LABEL) {
+    return label.contains('linux') ? 'android' : 'ios'
+}
+
+/* Extract file extension from agent label */
+def getExtension(String label = params.AGENT_LABEL) {
+    return label.contains('linux') ? 'so' : 'a'
+}
