@@ -5,7 +5,6 @@ package ownership
 import (
 	"context"
 	"errors"
-	"math/big"
 	"sync/atomic"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 
@@ -28,7 +26,7 @@ type CollectibleOwnershipFetcher interface {
 
 type CollectibleOwnershipStorage interface {
 	GetOwnershipUpdateTimestamp(owner common.Address, chainID walletCommon.ChainID) (int64, error)
-	Update(chainID walletCommon.ChainID, ownerAddress common.Address, balances thirdparty.TokenBalancesPerContractAddress, timestamp int64) (removedIDs, updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID, err error)
+	Update(chainID walletCommon.ChainID, ownerAddress common.Address, balances []thirdparty.CollectibleIDBalance, timestamp int64) (removedIDs, updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID, err error)
 }
 
 type LoaderParams struct {
@@ -177,7 +175,7 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 				PartialOwnership: accumulatedOwnership,
 			}
 
-			_, _, partialEvent.Added, tmpErr = l.storage.Update(l.chainID, l.account, ownedTokensToTokenBalancesPerContractAddress(accumulatedOwnership), InvalidTimestamp)
+			_, _, partialEvent.Added, tmpErr = l.storage.Update(l.chainID, l.account, accumulatedOwnership, InvalidTimestamp)
 			if tmpErr != nil {
 				err = tmpErr
 				return nil, err
@@ -209,7 +207,7 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 		NewOwnership: accumulatedOwnership,
 	}
 
-	finishedEvent.Removed, finishedEvent.Updated, finishedEvent.Added, err = l.storage.Update(l.chainID, l.account, ownedTokensToTokenBalancesPerContractAddress(accumulatedOwnership), start.Unix())
+	finishedEvent.Removed, finishedEvent.Updated, finishedEvent.Added, err = l.storage.Update(l.chainID, l.account, accumulatedOwnership, start.Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -229,20 +227,4 @@ func (l *Loader) waitFor(ctx context.Context, delay time.Duration) (cancelled bo
 		return true
 	}
 	return false
-}
-
-func ownedTokensToTokenBalancesPerContractAddress(ownership []thirdparty.CollectibleIDBalance) thirdparty.TokenBalancesPerContractAddress {
-	ret := make(thirdparty.TokenBalancesPerContractAddress)
-	for _, idBalance := range ownership {
-		balanceBigInt := idBalance.Balance
-		if balanceBigInt == nil {
-			balanceBigInt = &bigint.BigInt{Int: big.NewInt(1)}
-		}
-		balance := thirdparty.TokenBalance{
-			TokenID: idBalance.ID.TokenID,
-			Balance: balanceBigInt,
-		}
-		ret[idBalance.ID.ContractID.Address] = append(ret[idBalance.ID.ContractID.Address], balance)
-	}
-	return ret
 }

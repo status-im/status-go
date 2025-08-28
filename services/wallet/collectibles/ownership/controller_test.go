@@ -411,7 +411,7 @@ func TestControllerTriggerLoad(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a realistic collectibles container with actual data for TriggerLoad test
-	balance1 := thirdparty.CollectibleIDBalance{
+	balance1a := thirdparty.CollectibleIDBalance{
 		ID: thirdparty.CollectibleUniqueID{
 			ContractID: thirdparty.ContractID{
 				Address: common.HexToAddress("0x1234567890123456789012345678901234567890"),
@@ -421,7 +421,7 @@ func TestControllerTriggerLoad(t *testing.T) {
 		},
 		Balance: &bigint.BigInt{Int: big.NewInt(5)},
 	}
-	balance2 := thirdparty.CollectibleIDBalance{
+	balance1b := thirdparty.CollectibleIDBalance{
 		ID: thirdparty.CollectibleUniqueID{
 			ContractID: thirdparty.ContractID{
 				Address: common.HexToAddress("0x0987654321098765432109876543210987654321"),
@@ -431,10 +431,28 @@ func TestControllerTriggerLoad(t *testing.T) {
 		},
 		Balance: &bigint.BigInt{Int: big.NewInt(1)},
 	}
-	collectiblesContainer := &thirdparty.CollectibleOwnershipContainer{
+	collectiblesContainer1 := &thirdparty.CollectibleOwnershipContainer{
 		Items: []thirdparty.CollectibleIDBalance{
-			balance1,
-			balance2,
+			balance1a,
+			balance1b,
+		},
+		NextCursor:     "",
+		PreviousCursor: "",
+		Provider:       "mockProvider",
+	}
+
+	collectiblesContainer999 := &thirdparty.CollectibleOwnershipContainer{
+		Items: []thirdparty.CollectibleIDBalance{
+			{
+				ID: thirdparty.CollectibleUniqueID{
+					ContractID: thirdparty.ContractID{
+						Address: common.HexToAddress("0x0987654321098765432109876543210987654321"),
+						ChainID: 999,
+					},
+					TokenID: &bigint.BigInt{Int: big.NewInt(1)},
+				},
+				Balance: &bigint.BigInt{Int: big.NewInt(5)},
+			},
 		},
 		NextCursor:     "",
 		PreviousCursor: "",
@@ -450,7 +468,7 @@ func TestControllerTriggerLoad(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
-	).Return(collectiblesContainer, nil).AnyTimes()
+	).Return(collectiblesContainer1, nil).AnyTimes()
 
 	// Expect call for the non-existing account/chain
 	ownershipFetcher.EXPECT().FetchCollectibleOwnershipByOwner(
@@ -460,7 +478,7 @@ func TestControllerTriggerLoad(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
-	).Return(collectiblesContainer, nil).Times(1)
+	).Return(collectiblesContainer999, nil).Times(1)
 
 	feed := new(event.Feed)
 	feedSub := mock_common.NewFeedSubscription(feed)
@@ -521,7 +539,7 @@ func TestControllerTriggerLoad(t *testing.T) {
 	// Check storage for the non-existing account/chain
 	balances2, err := ownershipDB.GetOwnedCollectibles([]walletCommon.ChainID{walletCommon.ChainID(999)}, []common.Address{common.Address(nonExistingAddress)}, 0, 100)
 	require.NoError(t, err)
-	require.Len(t, balances2, 2, "Should have 2 collectibles stored")
+	require.Len(t, balances2, 1, "Should have 1 collectible stored")
 
 	controller.Stop()
 }

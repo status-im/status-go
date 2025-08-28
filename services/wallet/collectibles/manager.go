@@ -366,13 +366,24 @@ func (o *Manager) fillMissingBalances(ctx context.Context, owner common.Address,
 			collectiblesToFetchPerTokenID := make(map[string]*thirdparty.FullCollectibleData)
 
 			for _, collectible := range contractCollectibles {
-				if collectible.AccountBalance == nil {
-					switch getContractType(*collectible) {
+				balanceMissing := true
+				for _, ownership := range collectible.Ownership {
+					if ownership.Address == owner && ownership.Balance != nil && ownership.Balance.Sign() > 0 {
+						balanceMissing = false
+						break
+					}
+				}
+				if balanceMissing {
+					switch getContractType(collectible) {
 					case walletCommon.ContractTypeERC1155:
 						collectiblesToFetchPerTokenID[collectible.CollectibleData.ID.TokenID.String()] = collectible
 					default:
 						// Any other type of collectible is non-fungible, balance is 1
-						collectible.AccountBalance = &bigint.BigInt{Int: big.NewInt(1)}
+						collectible.Ownership = append(collectible.Ownership, thirdparty.AccountBalance{
+							Address:     owner,
+							Balance:     &bigint.BigInt{Int: big.NewInt(1)},
+							TxTimestamp: ownership.InvalidTimestamp,
+						})
 					}
 				}
 			}
@@ -398,7 +409,11 @@ func (o *Manager) fillMissingBalances(ctx context.Context, owner common.Address,
 
 			for i := range balances {
 				collectible := collectiblesToFetchPerTokenID[tokenIDs[i].String()]
-				collectible.AccountBalance = balances[i]
+				collectible.Ownership = append(collectible.Ownership, thirdparty.AccountBalance{
+					Address:     owner,
+					Balance:     balances[i],
+					TxTimestamp: ownership.InvalidTimestamp,
+				})
 			}
 		}
 	}
@@ -419,7 +434,7 @@ func (o *Manager) FetchCollectibleOwnershipByOwner(ctx context.Context, chainID 
 	}
 	o.fillMissingBalances(ctx, owner, collectibles)
 
-	ret := assetContainer.ToOwnershipContainer()
+	ret := assetContainer.ToOwnershipContainer(owner)
 
 	return &ret, nil
 }
@@ -683,6 +698,14 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 		allIDs = append(allIDs, id)
 	}
 
+	// If original data contained ownership, store it
+	ownershipMap := make(map[string][]thirdparty.AccountBalance)
+	for _, asset := range assets {
+		if len(asset.Ownership) > 0 {
+			ownershipMap[asset.CollectibleData.ID.HashKey()] = asset.Ownership
+		}
+	}
+
 	// Detect community collectibles
 	for _, asset := range fullyFetchedAssets {
 		// Only check community ownership if metadata is empty
@@ -781,6 +804,14 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 	items, err := o.getCacheFullCollectibleData(allIDs)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Restore original ownership, if available
+	for i := range items {
+		item := &items[i]
+		if originalOwnership, ok := ownershipMap[item.CollectibleData.ID.HashKey()]; ok {
+			item.Ownership = originalOwnership
+		}
 	}
 
 	return processedIDs, items, nil

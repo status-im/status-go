@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -123,5 +124,26 @@ func filterOwnedCollectibles(ctx context.Context, db *sql.DB, chainIDs []wcommon
 	}
 	defer rows.Close()
 
-	return thirdparty.RowsToCollectibles(rows)
+	return rowsToCollectibles(rows)
+}
+
+func rowsToCollectibles(rows *sql.Rows) ([]thirdparty.CollectibleUniqueID, error) {
+	var ids []thirdparty.CollectibleUniqueID
+	for rows.Next() {
+		id := thirdparty.CollectibleUniqueID{
+			TokenID: &bigint.BigInt{Int: big.NewInt(0)},
+		}
+		err := rows.Scan(
+			&id.ContractID.ChainID,
+			&id.ContractID.Address,
+			(*bigint.SQLBigIntBytes)(id.TokenID.Int),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		ids = append(ids, id)
+	}
+
+	return ids, nil
 }

@@ -6,10 +6,12 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/collectibles/ownership"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 
@@ -164,6 +166,16 @@ type CollectionFilterContainer struct {
 	Filter CollectionFilter `json:"filter"`
 }
 
+type CollectibleWithOwnershipContainer struct {
+	Continuation string                         `json:"continuation"`
+	Collectibles []CollectibleWithOwnershipItem `json:"items"`
+}
+
+type CollectibleWithOwnershipItem struct {
+	Collectible Collectible          `json:"item"`
+	Ownership   CollectibleOwnership `json:"ownership"`
+}
+
 type CollectiblesContainer struct {
 	Continuation string        `json:"continuation"`
 	Collectibles []Collectible `json:"items"`
@@ -176,6 +188,11 @@ type Collectible struct {
 	Contract   string              `json:"contract"`
 	TokenID    *bigint.BigInt      `json:"tokenId"`
 	Metadata   CollectibleMetadata `json:"meta"`
+}
+
+type CollectibleOwnership struct {
+	Value     *bigint.BigInt `json:"value"`
+	CreatedAt *time.Time     `json:"createdAt"`
 }
 
 type CollectibleMetadata struct {
@@ -289,6 +306,22 @@ func raribleToCollectibleTraits(attributes []Attribute) []thirdparty.Collectible
 		}
 
 		ret = append(ret, dest)
+	}
+	return ret
+}
+
+func raribleToCollectiblesWithOwnershipData(l []CollectibleWithOwnershipItem, chainID walletCommon.ChainID, owner common.Address) []thirdparty.FullCollectibleData {
+	ret := make([]thirdparty.FullCollectibleData, 0, len(l))
+	for _, c := range l {
+		id, err := raribleCollectibleIDToUniqueID(c.Collectible.ID, chainID.IsMainnet())
+		if err != nil {
+			continue
+		}
+		if id.ContractID.ChainID != chainID {
+			continue
+		}
+		item := c.toCommon(id, owner)
+		ret = append(ret, item)
 	}
 	return ret
 }
@@ -427,5 +460,23 @@ func (c *Collectible) toCommon(id thirdparty.CollectibleUniqueID) thirdparty.Ful
 	return thirdparty.FullCollectibleData{
 		CollectibleData: c.toCollectibleData(id),
 		CollectionData:  nil,
+	}
+}
+
+func (c *CollectibleWithOwnershipItem) toCommon(id thirdparty.CollectibleUniqueID, owner common.Address) thirdparty.FullCollectibleData {
+	txTimestamp := ownership.InvalidTimestamp
+	if c.Ownership.CreatedAt != nil && !c.Ownership.CreatedAt.IsZero() {
+		txTimestamp = c.Ownership.CreatedAt.Unix()
+	}
+	return thirdparty.FullCollectibleData{
+		CollectibleData: c.Collectible.toCollectibleData(id),
+		CollectionData:  nil,
+		Ownership: []thirdparty.AccountBalance{
+			{
+				Address:     owner,
+				Balance:     c.Ownership.Value,
+				TxTimestamp: txTimestamp,
+			},
+		},
 	}
 }

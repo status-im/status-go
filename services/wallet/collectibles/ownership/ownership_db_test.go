@@ -9,7 +9,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 
@@ -24,34 +23,37 @@ func setupOwnershipDBTest(t *testing.T) (*OwnershipDB, func()) {
 	}
 }
 
-func generateTestCollectibles(offset int, count int) (result thirdparty.TokenBalancesPerContractAddress) {
-	result = make(thirdparty.TokenBalancesPerContractAddress)
+func generateTestCollectibles(chainID w_common.ChainID, offset int, count int) (result []thirdparty.CollectibleIDBalance) {
+	result = make([]thirdparty.CollectibleIDBalance, 0, count)
 	for i := offset; i < offset+count; i++ {
 		contractAddress := common.BigToAddress(big.NewInt(int64(i % 10)))
 		tokenID := &bigint.BigInt{Int: big.NewInt(int64(i))}
 
-		result[contractAddress] = append(result[contractAddress], thirdparty.TokenBalance{
-			TokenID: tokenID,
-			Balance: &bigint.BigInt{Int: big.NewInt(int64(i%5 + 1))},
+		result = append(result, thirdparty.CollectibleIDBalance{
+			ID: thirdparty.CollectibleUniqueID{
+				ContractID: thirdparty.ContractID{
+					ChainID: chainID,
+					Address: contractAddress,
+				},
+				TokenID: tokenID,
+			},
+			Balance:     &bigint.BigInt{Int: big.NewInt(int64(i%5 + 1))},
+			TxTimestamp: int64(i),
 		})
 	}
 	return result
 }
 
-func testCollectiblesToList(chainID w_common.ChainID, balances thirdparty.TokenBalancesPerContractAddress) (result []thirdparty.CollectibleUniqueID) {
-	result = make([]thirdparty.CollectibleUniqueID, 0, len(balances))
-	for contractAddress, balances := range balances {
-		for _, balance := range balances {
-			newCollectible := thirdparty.CollectibleUniqueID{
-				ContractID: thirdparty.ContractID{
-					ChainID: chainID,
-					Address: contractAddress,
-				},
-				TokenID: balance.TokenID,
-			}
-			result = append(result, newCollectible)
+func testCollectiblesToList(balances []thirdparty.CollectibleIDBalance) []thirdparty.CollectibleUniqueID {
+	result := make([]thirdparty.CollectibleUniqueID, 0, len(balances))
+	for _, balance := range balances {
+		newCollectible := thirdparty.CollectibleUniqueID{
+			ContractID: balance.ID.ContractID,
+			TokenID:    balance.ID.TokenID,
 		}
+		result = append(result, newCollectible)
 	}
+
 	return result
 }
 
@@ -64,58 +66,57 @@ func TestUpdateOwnership(t *testing.T) {
 	chainID2 := w_common.ChainID(2)
 
 	ownerAddress1 := common.HexToAddress("0x1234")
-	ownedBalancesChain0 := generateTestCollectibles(0, 10)
-	ownedListChain0 := testCollectiblesToList(chainID0, ownedBalancesChain0)
+	ownedBalancesChain0 := generateTestCollectibles(chainID0, 0, 10)
+	ownedListChain0 := testCollectiblesToList(ownedBalancesChain0)
 	timestampChain0 := int64(1234567890)
-	ownedBalancesChain1 := generateTestCollectibles(0, 15)
-	ownedListChain1 := testCollectiblesToList(chainID1, ownedBalancesChain1)
+	ownedBalancesChain1 := generateTestCollectibles(chainID1, 0, 15)
+	ownedListChain1 := testCollectiblesToList(ownedBalancesChain1)
 	timestampChain1 := int64(1234567891)
 
 	ownedList1 := append(ownedListChain0, ownedListChain1...)
 
 	ownerAddress2 := common.HexToAddress("0x5678")
-	ownedBalancesChain2 := generateTestCollectibles(0, 20)
-	ownedListChain2 := testCollectiblesToList(chainID2, ownedBalancesChain2)
+	ownedBalancesChain2 := generateTestCollectibles(chainID2, 0, 20)
+	ownedListChain2 := testCollectiblesToList(ownedBalancesChain2)
 	timestampChain2 := int64(1234567892)
 
 	ownedList2 := ownedListChain2
 
 	ownerAddress3 := common.HexToAddress("0xABCD")
-	ownedBalancesChain1b := generateTestCollectibles(len(ownedListChain1), 5)
-	ownedListChain1b := testCollectiblesToList(chainID1, ownedBalancesChain1b)
+	ownedBalancesChain1b := generateTestCollectibles(chainID1, len(ownedListChain1), 5)
+	ownedListChain1b := testCollectiblesToList(ownedBalancesChain1b)
 	timestampChain1b := timestampChain1 - 100
-	ownedBalancesChain2b := generateTestCollectibles(len(ownedListChain2), 20)
+	ownedBalancesChain2b := generateTestCollectibles(chainID2, len(ownedListChain2), 20)
 	// Add one collectible that is already owned by ownerAddress2
 	commonChainID := chainID2
-	var commonContractAddress common.Address
-	var commonTokenID *bigint.BigInt
-	var commonBalanceAddress2 *bigint.BigInt
+	commonBalance := ownedBalancesChain2[0]
+	commonContractAddress := commonBalance.ID.ContractID.Address
+	commonTokenID := commonBalance.ID.TokenID
+	commonBalanceAddress2 := commonBalance.Balance
 	commonBalanceAddress3 := &bigint.BigInt{Int: big.NewInt(5)}
 
-	for contractAddress, balances := range ownedBalancesChain2 {
-		for _, balance := range balances {
-			commonContractAddress = contractAddress
-			commonTokenID = balance.TokenID
-			commonBalanceAddress2 = balance.Balance
-
-			newBalance := thirdparty.TokenBalance{
-				TokenID: commonTokenID,
-				Balance: commonBalanceAddress3,
-			}
-			ownedBalancesChain2b[commonContractAddress] = append(ownedBalancesChain2b[commonContractAddress], newBalance)
-			break
-		}
-		break
+	newBalance := thirdparty.CollectibleIDBalance{
+		ID: thirdparty.CollectibleUniqueID{
+			ContractID: thirdparty.ContractID{
+				ChainID: chainID2,
+				Address: commonContractAddress,
+			},
+			TokenID: commonTokenID,
+		},
+		Balance: commonBalanceAddress3,
 	}
+	ownedBalancesChain2b = append(ownedBalancesChain2b, newBalance)
 
-	ownedListChain2b := testCollectiblesToList(chainID2, ownedBalancesChain2b)
+	ownedListChain2b := testCollectiblesToList(ownedBalancesChain2b)
 	timestampChain2b := timestampChain2 + 100
 
 	ownedList3 := append(ownedListChain1b, ownedListChain2b...)
 
 	allChains := []w_common.ChainID{chainID0, chainID1, chainID2}
 	allOwnerAddresses := []common.Address{ownerAddress1, ownerAddress2, ownerAddress3}
-	allCollectibles := append(ownedList1[1:], ownedList2...)
+	allCollectibles := make([]thirdparty.CollectibleUniqueID, 0, len(ownedList1)+len(ownedList2)+len(ownedList3))
+	allCollectibles = append(allCollectibles, ownedList1[1:]...)
+	allCollectibles = append(allCollectibles, ownedList2...)
 	allCollectibles = append(allCollectibles, ownedList3[:len(ownedList3)-1]...) // the last element of ownerdList3 is a duplicate of the first element of ownedList2
 
 	randomAddress := common.HexToAddress("0xFFFF")
@@ -269,14 +270,12 @@ func TestUpdateOwnership(t *testing.T) {
 
 	expectedOwnership := []thirdparty.AccountBalance{
 		{
-			Address:     ownerAddress2,
-			Balance:     commonBalanceAddress2,
-			TxTimestamp: InvalidTimestamp,
+			Address: ownerAddress2,
+			Balance: commonBalanceAddress2,
 		},
 		{
-			Address:     ownerAddress3,
-			Balance:     commonBalanceAddress3,
-			TxTimestamp: InvalidTimestamp,
+			Address: ownerAddress3,
+			Balance: commonBalanceAddress3,
 		},
 	}
 
@@ -302,8 +301,8 @@ func TestUpdateOwnershipChanges(t *testing.T) {
 
 	chainID0 := w_common.ChainID(0)
 	ownerAddress1 := common.HexToAddress("0x1234")
-	ownedBalancesChain0 := generateTestCollectibles(0, 10)
-	ownedListChain0 := testCollectiblesToList(chainID0, ownedBalancesChain0)
+	ownedBalancesChain0 := generateTestCollectibles(chainID0, 0, 10)
+	ownedListChain0 := testCollectiblesToList(ownedBalancesChain0)
 	timestampChain0 := int64(1234567890)
 
 	var err error
@@ -324,33 +323,25 @@ func TestUpdateOwnershipChanges(t *testing.T) {
 	// Remove one collectible and change balance of another
 	var removedID, updatedID thirdparty.CollectibleUniqueID
 
-	count := 0
-	for contractAddress, balances := range ownedBalancesChain0 {
-		for i, balance := range balances {
-			if count == 0 {
-				count++
-				ownedBalancesChain0[contractAddress] = ownedBalancesChain0[contractAddress][1:]
-				removedID = thirdparty.CollectibleUniqueID{
-					ContractID: thirdparty.ContractID{
-						ChainID: chainID0,
-						Address: contractAddress,
-					},
-					TokenID: balance.TokenID,
-				}
-			} else if count == 1 {
-				count++
-				ownedBalancesChain0[contractAddress][i].Balance = &bigint.BigInt{Int: big.NewInt(100)}
-				updatedID = thirdparty.CollectibleUniqueID{
-					ContractID: thirdparty.ContractID{
-						ChainID: chainID0,
-						Address: contractAddress,
-					},
-					TokenID: balance.TokenID,
-				}
-			}
-		}
+	removedID = thirdparty.CollectibleUniqueID{
+		ContractID: thirdparty.ContractID{
+			ChainID: chainID0,
+			Address: ownedBalancesChain0[0].ID.ContractID.Address,
+		},
+		TokenID: ownedBalancesChain0[0].ID.TokenID,
 	}
-	ownedListChain0 = testCollectiblesToList(chainID0, ownedBalancesChain0)
+	ownedBalancesChain0 = ownedBalancesChain0[1:]
+
+	updatedID = thirdparty.CollectibleUniqueID{
+		ContractID: thirdparty.ContractID{
+			ChainID: chainID0,
+			Address: ownedBalancesChain0[1].ID.ContractID.Address,
+		},
+		TokenID: ownedBalancesChain0[1].ID.TokenID,
+	}
+	ownedBalancesChain0[1].Balance = &bigint.BigInt{Int: big.NewInt(100)}
+
+	ownedListChain0 = testCollectiblesToList(ownedBalancesChain0)
 
 	removedIDs, updatedIDs, insertedIDs, err = oDB.Update(chainID0, ownerAddress1, ownedBalancesChain0, timestampChain0)
 	require.NoError(t, err)
@@ -373,15 +364,20 @@ func TestLargeTokenID(t *testing.T) {
 	tokenID := &bigint.BigInt{Int: big.NewInt(0).SetBytes([]byte("0x1234567890123456789012345678901234567890"))}
 	balance := &bigint.BigInt{Int: big.NewInt(100)}
 
-	ownedBalancesChain := thirdparty.TokenBalancesPerContractAddress{
-		contractAddress: []thirdparty.TokenBalance{
-			{
+	ownedBalancesChain := []thirdparty.CollectibleIDBalance{
+		{
+			ID: thirdparty.CollectibleUniqueID{
+				ContractID: thirdparty.ContractID{
+					ChainID: chainID,
+					Address: contractAddress,
+				},
 				TokenID: tokenID,
-				Balance: balance,
 			},
+			Balance:     balance,
+			TxTimestamp: InvalidTimestamp,
 		},
 	}
-	ownedListChain := testCollectiblesToList(chainID, ownedBalancesChain)
+	ownedListChain := testCollectiblesToList(ownedBalancesChain)
 
 	ownership := []thirdparty.AccountBalance{
 		{
@@ -421,8 +417,8 @@ func TestCollectibleTransferID(t *testing.T) {
 
 	chainID0 := w_common.ChainID(0)
 	ownerAddress1 := common.HexToAddress("0x1234")
-	ownedBalancesChain0 := generateTestCollectibles(0, 10)
-	ownedListChain0 := testCollectiblesToList(chainID0, ownedBalancesChain0)
+	ownedBalancesChain0 := generateTestCollectibles(chainID0, 0, 10)
+	ownedListChain0 := testCollectiblesToList(ownedBalancesChain0)
 	timestampChain0 := int64(1234567890)
 
 	var err error
@@ -469,31 +465,4 @@ func TestCollectibleTransferID(t *testing.T) {
 			require.Nil(t, loadedTransferID)
 		}
 	}
-
-	// Even though the first collectible has a TransferID set, since there's no matching entry in the transfers table it
-	// should return InvalidTimestamp
-	firstOwnership, err := oDB.GetOwnership(firstCollectibleID)
-	require.NoError(t, err)
-	require.Equal(t, InvalidTimestamp, firstOwnership[0].TxTimestamp)
-
-	trs, _, _ := transfer.GenerateTestTransfers(t, oDB.db, 1, 5)
-	trs[0].To = ownerAddress1
-	trs[0].ChainID = chainID0
-	trs[0].Hash = firstTxID
-
-	for i := range trs {
-		if i == 0 {
-			transfer.InsertTestTransferWithOptions(t, oDB.db, trs[i].To, &trs[i], &transfer.TestTransferOptions{
-				TokenAddress: firstCollectibleID.ContractID.Address,
-				TokenID:      firstCollectibleID.TokenID.Int,
-			})
-		} else {
-			transfer.InsertTestTransfer(t, oDB.db, trs[i].To, &trs[i])
-		}
-	}
-
-	// There should now be a valid timestamp
-	firstOwnership, err = oDB.GetOwnership(firstCollectibleID)
-	require.NoError(t, err)
-	require.Equal(t, trs[0].Timestamp, firstOwnership[0].TxTimestamp)
 }
