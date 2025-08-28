@@ -29,7 +29,6 @@ import (
 	rpc2 "github.com/status-im/status-go/node/rpc"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
@@ -202,14 +201,11 @@ func (n *StatusNode) StartLocalBackup() error {
 		return errors.New("local backup already started")
 	}
 
-	chatAccount, err := n.gethAccountsManager.SelectedChatAccount()
-	if err != nil {
-		return err
-	}
-
-	privateKey := chatAccount.PrivateKey()
 	filenameGetter := func() (string, error) {
-		accountIdentifier := common.PubkeyToHex(&privateKey.PublicKey)
+		profileKeypair, err := n.accountsSrvc.GetProfileKeypair()
+		if err != nil {
+			return "", err
+		}
 
 		backupPath, err := n.accountsSrvc.GetBackupPath()
 		if err != nil {
@@ -221,9 +217,16 @@ func (n *StatusNode) StartLocalBackup() error {
 		} else {
 			backupDir = filepath.Join(n.config.RootDataDir, "backups")
 		}
-		fullPath := filepath.Join(backupDir, fmt.Sprintf("%x_user_data.bkp", accountIdentifier[:4]))
+		fullPath := filepath.Join(backupDir, fmt.Sprintf("%x_user_data.bkp", profileKeypair.KeyUID[len(profileKeypair.KeyUID)-4:]))
 		return fullPath, nil
 	}
+
+	chatAccount, err := n.gethAccountsManager.SelectedChatAccount()
+	if err != nil {
+		return err
+	}
+
+	privateKey := chatAccount.PrivateKey()
 
 	n.localBackup, err = backup.NewController(backup.BackupConfig{
 		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
