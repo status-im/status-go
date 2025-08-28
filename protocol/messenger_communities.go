@@ -67,15 +67,15 @@ const (
 )
 
 const (
-	ErrOwnerTokenNeeded                     = "Owner token is needed" // #nosec G101
-	ErrMissingCommunityID                   = "CommunityID has to be provided"
-	ErrForbiddenProfileOrWatchOnlyAccount   = "Cannot join a community using profile chat or watch-only account"
-	ErrSigningJoinRequestForKeycardAccounts = "Signing a joining community request for accounts migrated to keycard must be done with a keycard"
-	ErrNotPartOfCommunity                   = "Not part of the community"
-	ErrNotAdminOrOwner                      = "Not admin or owner"
-	ErrSignerIsNil                          = "Signer can't be nil"
-	ErrSyncMessagesSentByNonControlNode     = "Accepted/requested to join sync messages can be send only by the control node"
-	ErrReceiverIsNil                        = "Receiver can't be nil"
+	ErrOwnerTokenNeeded                     = "owner token is needed" // #nosec G101
+	ErrMissingCommunityID                   = "communityID has to be provided"
+	ErrForbiddenProfileOrWatchOnlyAccount   = "cannot join a community using profile chat or watch-only account"
+	ErrSigningJoinRequestForKeycardAccounts = "signing a joining community request for accounts migrated to keycard must be done with a keycard"
+	ErrNotPartOfCommunity                   = "not part of the community"
+	ErrNotAdminOrOwner                      = "not admin or owner"
+	ErrSignerIsNil                          = "signer can't be nil"
+	ErrSyncMessagesSentByNonControlNode     = "accepted/requested to join sync messages can be send only by the control node"
+	ErrReceiverIsNil                        = "receiver can't be nil"
 )
 
 type FetchCommunityRequest struct {
@@ -2875,10 +2875,6 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
 	_, err = m.FetchCommunity(&FetchCommunityRequest{
 		CommunityKey:    community.IDString(),
 		Shard:           community.Shard(),
@@ -3735,7 +3731,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 			}
 		} else {
 			mr, err = m.leaveCommunity(syncCommunity.Id)
-			if err != nil {
+			if err != nil && err != communities.ErrNotPartOfCommunity {
 				logger.Debug("m.leaveCommunity error", zap.Error(err))
 				return err
 			}
