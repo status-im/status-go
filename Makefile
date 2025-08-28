@@ -1,4 +1,5 @@
 .PHONY: statusgo all test clean help
+.PHONY: statusgo-ios-library statusgo-android-library
 .PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
 
 # Clear any GOROOT set outside of the Nix shell
@@ -37,6 +38,31 @@ ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
  detected_OS := Windows
 else
  detected_OS := $(strip $(shell uname))
+endif
+
+ifeq ($(MAKECMDGOALS),statusgo-android-library)
+    ARCH ?= arm64
+    ANDROID_NDK_ROOT ?= $(shell find /nix/store -path "*android-sdk-ndk-27.2.12479018/libexec/android-sdk/ndk/27.2.12479018" -type d 2>/dev/null | head -1)
+    ANDROID_API ?= 28
+    HOST_OS ?= linux
+    ifeq ($(ARCH),x86_64)
+        MOBILE_GOARCH := amd64
+    else
+        MOBILE_GOARCH := $(ARCH)
+    endif
+    ANDROID_BUILD_FLAGS := CC="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/clang --target=aarch64-linux-android$(ANDROID_API) --sysroot=$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/sysroot" CGO_CFLAGS="-Os -flto -fembed-bitcode" CGO_LDFLAGS="-Os -flto" CGO_ENABLED=1 GOOS=android GOARCH=$(MOBILE_GOARCH)
+endif
+
+ifeq ($(MAKECMDGOALS),statusgo-ios-library)
+    ARCH ?= arm64
+    IPHONE_SDK ?= iphoneos
+    IOS_TARGET ?= 13.0
+    ifeq ($(ARCH),x86_64)
+        MOBILE_GOARCH := amd64
+    else
+        MOBILE_GOARCH := $(ARCH)
+    endif
+    IOS_BUILD_FLAGS := CC="$(shell xcrun --sdk $(IPHONE_SDK) --find clang)" CGO_CFLAGS="-Os -flto -arch $(ARCH) -isysroot $(shell xcrun --sdk $(IPHONE_SDK) --show-sdk-path) -miphoneos-version-min=$(IOS_TARGET) -fembed-bitcode" CGO_LDFLAGS="-Os -flto" CGO_ENABLED=1 GOOS=ios GOARCH=$(MOBILE_GOARCH)
 endif
 
 ifeq ($(detected_OS),Darwin)
@@ -177,11 +203,13 @@ status-go-deps:
 
 
 
-statusgo-library: generate
-statusgo-library: $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
+statusgo-c-bindings:
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
+
+statusgo-library: generate
+statusgo-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	go build \
 		-tags '$(BUILD_TAGS)' \
@@ -195,10 +223,7 @@ statusgo-library: $(LIBWAKU) ##@cross-compile Build status-go as static library 
 build-libwaku: $(LIBWAKU)
 
 statusgo-shared-library: generate
-statusgo-shared-library: $(LIBWAKU) ##@cross-compile Build status-go as shared library for current platform
-	## cmd/library/README.md explains the magic incantation behind this
-	mkdir -p build/bin/statusgo-lib
-	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
+statusgo-shared-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	$(GOBIN_SHARED_LIB_CFLAGS) $(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
@@ -215,6 +240,26 @@ ifeq ($(detected_OS),Linux)
 endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
+
+statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as Android mobile library
+	@echo "Building Android mobile library..."
+	@echo "MOBILE_GOARCH: $(MOBILE_GOARCH)"
+	@echo "Android build flags: $(ANDROID_BUILD_FLAGS)"
+	$(ANDROID_BUILD_FLAGS) go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
+		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
+	@echo "Android library built"
+	@file build/bin/libstatus.so
+
+statusgo-ios-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as iOS mobile library
+	@echo "Building iOS mobile library..."
+	@echo "MOBILE_GOARCH: $(MOBILE_GOARCH)"
+	@echo "iOS build flags: $(IOS_BUILD_FLAGS)"
+	$(IOS_BUILD_FLAGS) go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
+		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
+	@echo "iOS library built"
+	@file build/bin/libstatus.a
 
 docker-image: SHELL := /bin/sh
 docker-image: BUILD_TARGET ?= cmd
