@@ -2162,6 +2162,24 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	s.Require().Equal(1, numberInactiveChats)
 }
 
+func (s *MessengerCommunitiesSuite) TestLeaveCommunityTwice() {
+	community, _ := s.createCommunity()
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
+
+	_, err := s.alice.SpectateCommunity(community.ID())
+	s.Require().NoError(err)
+
+	response, err := s.alice.LeaveCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// Try to leave again
+	response, err = s.alice.LeaveCommunity(community.ID())
+	s.Require().Error(err)
+	s.Require().Equal(communities.ErrNotPartOfCommunity, err)
+	s.Require().Nil(response)
+}
+
 func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
@@ -3142,6 +3160,46 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_OutdatedDescription() {
 	community, err = aliceOtherDevice.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().True(community.Joined())
+	s.Require().False(community.Spectated())
+}
+
+func (s *MessengerCommunitiesSuite) TestSyncCommunity_LeftCommunity() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+
+	// Join community
+	s.joinCommunity(community, s.owner, s.alice)
+
+	// Update owner's community reference
+	community, err := s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.HasMember(s.alice.IdentityPublicKey()))
+
+	// Leave community
+	response, err := s.alice.LeaveCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().False(response.Communities()[0].Joined())
+
+	// Create another device
+	aliceOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, aliceOtherDevice)
+
+	// Create sync message
+	syncCommunityMsg, err := s.alice.buildSyncInstallationCommunity(response.Communities()[0], 1)
+	s.Require().NoError(err)
+	s.Require().False(syncCommunityMsg.Joined)
+	s.Require().False(syncCommunityMsg.Spectated)
+
+	// Then make other device handle sync message with outdated community description
+	messageState := aliceOtherDevice.buildMessageState()
+	err = aliceOtherDevice.handleSyncInstallationCommunity(messageState, syncCommunityMsg)
+	s.Require().NoError(err)
+
+	// Then community should not be joined
+	community, err = aliceOtherDevice.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(community.Joined())
 	s.Require().False(community.Spectated())
 }
 
