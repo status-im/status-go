@@ -86,6 +86,7 @@ var (
 	ErrTorrentTimedout                 = errors.New("torrent has timed out")
 	ErrCommunityRequestAlreadyRejected = errors.New("that user was already rejected from the community")
 	ErrInvalidClock                    = errors.New("invalid clock to cancel request to join")
+	ErrNotPartOfCommunity              = errors.New("not part of the community")
 )
 
 type MessageSigner interface {
@@ -3719,6 +3720,11 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
+	}
+
+	if !community.Joined() && !community.Spectated() {
+		// If we are not joined or spectating, there is nothing to leave
+		return nil, ErrNotPartOfCommunity
 	}
 
 	community.RemoveOurselvesFromOrg(&m.identity.PublicKey)
