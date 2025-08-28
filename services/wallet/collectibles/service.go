@@ -43,6 +43,8 @@ const (
 	EventOwnedCollectiblesFilteringDone walletevent.EventType = "wallet-owned-collectibles-filtering-done"
 	EventGetCollectiblesDetailsDone     walletevent.EventType = "wallet-get-collectibles-details-done"
 	EventGetCollectionSocialsDone       walletevent.EventType = "wallet-get-collection-socials-done"
+
+	EventWalletTickReload walletevent.EventType = "wallet-tick-reload"
 )
 
 type OwnershipUpdateMessage struct {
@@ -611,14 +613,16 @@ func (s *Service) startWalletEventsWatcher() {
 	}
 
 	walletEventCb := func(event walletevent.Event) {
-		if event.Type != transfer.EventInternalERC721TransferDetected &&
-			event.Type != transfer.EventInternalERC1155TransferDetected {
+		switch event.Type {
+		case transfer.EventInternalERC721TransferDetected, transfer.EventInternalERC1155TransferDetected:
+			chainID := walletCommon.ChainID(event.ChainID)
+			for _, account := range event.Accounts {
+				s.onCollectiblesTransfer(account, chainID, event.EventParams.([]transfer.Transfer))
+			}
+		case EventWalletTickReload:
+			s.RefetchOwnedCollectibles()
+		default:
 			return
-		}
-
-		chainID := walletCommon.ChainID(event.ChainID)
-		for _, account := range event.Accounts {
-			s.onCollectiblesTransfer(account, chainID, event.EventParams.([]transfer.Transfer))
 		}
 	}
 
