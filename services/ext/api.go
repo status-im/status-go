@@ -1629,5 +1629,5 @@ func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteComm
 }
 
 func (api *PublicAPI) PeerID() string {
-	return api.service.waku.PeerID().String()
+	return api.service.messaging.PeerID().String()
 }
