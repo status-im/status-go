@@ -292,7 +292,7 @@ generate-sds:  ##@ Build libsds third_party
 	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build
 
 generate-sds-android:  ##@ Build libsds third_party for Android
-	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make libsds-android
+	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build-android
 
 generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
 generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
