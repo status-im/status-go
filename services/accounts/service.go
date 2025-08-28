@@ -76,8 +76,11 @@ func (s *Service) AccountsAPI() *API {
 	return NewAccountsAPI(s.manager, s.config, s.db, s.feed, &s.messenger)
 }
 
-func (s *Service) GetKeypairByKeyUID(keyUID string) (*accounts.Keypair, error) {
+func (s *Service) GetProfileKeypair() (*accounts.Keypair, error) {
+	return s.db.GetProfileKeypair()
+}
 
+func (s *Service) GetKeypairByKeyUID(keyUID string) (*accounts.Keypair, error) {
 	return s.db.GetKeypairByKeyUID(keyUID)
 }
 
