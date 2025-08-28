@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
 
@@ -22,7 +20,6 @@ const AlchemyID = "alchemy"
 type Client struct {
 	ethClientGetter  rpc.EthClientGetter
 	connectionStatus *connection.Status
-	persistence      *Persistence
 }
 
 func (c *Client) ID() string {
@@ -38,24 +35,17 @@ func (c *Client) IsChainSupported(chainID wc.ChainID) bool {
 	return err == nil && client != nil
 }
 
-func NewClient(ethClientGetter rpc.EthClientGetter, persistence *Persistence) *Client {
+func NewClient(ethClientGetter rpc.EthClientGetter) *Client {
 	return &Client{
 		ethClientGetter:  ethClientGetter,
 		connectionStatus: connection.NewStatus(),
-		persistence:      persistence,
 	}
 }
 
-func (c *Client) GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address common.Address) (*geth_rpc.BlockNumber, *time.Time, error) {
-	return c.persistence.GetLastFetchedBlockAndTimestamp(ctx, chainID, address)
-}
-
-func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, cursor string, limit int) (thirdparty.ActivityEntryContainer, error) {
-	response := thirdparty.ActivityEntryContainer{
-		Provider:       c.ID(),
-		PreviousCursor: cursor,
-		NextCursor:     cursor,
-	}
+// FetchTransfers fetches transfer data from Alchemy API with cursor management for pagination.
+// It fetches both incoming and outgoing transfers separately and returns them together
+func (c *Client) FetchTransfers(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, cursor string, limit int) ([]Transfer, string, error) {
+	nextCursor := cursor
 
 	maxCount := MaxAssetTransfersCount
 	if limit > thirdparty.FetchNoLimit && limit < MaxAssetTransfersCount {
@@ -92,9 +82,9 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 
 	responseTransfers := make([]Transfer, 0, 2*maxCount)
 	for {
-		outgoingCursor, outgoingDone, incomingCursor, incomingDone, err := decodeCursor(response.NextCursor)
+		outgoingCursor, outgoingDone, incomingCursor, incomingDone, err := decodeCursor(nextCursor)
 		if err != nil {
-			return response, err
+			return nil, nextCursor, err
 		}
 
 		if !parameters.Direction.IncludesOutgoing() {
@@ -111,7 +101,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 			params.PageKey = outgoingCursor
 			tmpResponse, err := c.fetchActivity(ctx, chainID, params)
 			if err != nil {
-				return response, err
+				return nil, nextCursor, err
 			}
 			responseTransfers = append(responseTransfers, tmpResponse.Transfers...)
 			if tmpResponse.PageKey == "" {
@@ -129,7 +119,7 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 			params.PageKey = incomingCursor
 			tmpResponse, err := c.fetchActivity(ctx, chainID, params)
 			if err != nil {
-				return response, err
+				return nil, nextCursor, err
 			}
 			responseTransfers = append(responseTransfers, tmpResponse.Transfers...)
 			if tmpResponse.PageKey == "" {
@@ -141,19 +131,16 @@ func (c *Client) FetchActivity(ctx context.Context, chainID uint64, parameters t
 			}
 		}
 
-		response.NextCursor = encodeCursor(outgoingCursor, outgoingDone, incomingCursor, incomingDone)
-		if response.NextCursor == thirdparty.FetchFromStartCursor {
+		nextCursor = encodeCursor(outgoingCursor, outgoingDone, incomingCursor, incomingDone)
+		if nextCursor == thirdparty.FetchFromStartCursor {
 			break
 		}
-		if limit > thirdparty.FetchNoLimit && len(response.Items) >= limit {
+		if limit > thirdparty.FetchNoLimit && len(responseTransfers) >= limit {
 			break
 		}
 	}
 
-	c.persistence.SaveTransfers(responseTransfers, chainID, parameters.Address)
-	response.Items = TransfersToThirdpartyActivityEntries(responseTransfers, chainID, parameters.Address)
-
-	return response, nil
+	return responseTransfers, nextCursor, nil
 }
 
 func (c *Client) fetchActivity(ctx context.Context, chainID uint64, parameters GetAssetTransfersParams) (*GetAssetTranfersResponse, error) {

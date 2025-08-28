@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/activityfetcher"
+	alchemyservice "github.com/status-im/status-go/services/wallet/activityfetcher/alchemy"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	"github.com/status-im/status-go/services/wallet/community"
@@ -215,8 +216,9 @@ func NewService(
 
 	alchemyEthClientGetter := rpc.NewProviderChainClientGetter(common.SmartProxyAlchemy, rpcClient)
 	alchemyFetcherDb := activityfetcher_alchemy.NewPersistence(db)
-	alchemyFetcherClient := activityfetcher_alchemy.NewClient(alchemyEthClientGetter, alchemyFetcherDb)
-	activityFetcherManager := activityfetcher.NewManager(alchemyFetcherClient)
+	alchemyFetcherClient := activityfetcher_alchemy.NewClient(alchemyEthClientGetter)
+	alchemyFetcherService := alchemyservice.NewService(alchemyFetcherClient, alchemyFetcherDb)
+	activityFetcherManager := activityfetcher.NewManager(alchemyFetcherService)
 	activityFetcherService := activityfetcher.NewService(activityFetcherManager, rpcClient.GetNetworkManager(), accountsDB, accountsPublisher, rpcClient, feed)
 
 	return &Service{
