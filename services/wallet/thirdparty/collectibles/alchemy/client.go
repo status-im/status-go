@@ -236,6 +236,7 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 
 	queryParams["owner"] = []string{owner.String()}
 	queryParams["withMetadata"] = []string{"true"}
+	queryParams["orderBy"] = []string{"transferTime"}
 
 	if len(cursor) > 0 {
 		queryParams["pageKey"] = []string{cursor}
@@ -279,7 +280,7 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 			return nil, err
 		}
 
-		assets.Items = append(assets.Items, alchemyToCollectiblesData(chainID, container.OwnedNFTs)...)
+		assets.Items = append(assets.Items, alchemyToCollectiblesData(chainID, container.OwnedNFTs, &owner)...)
 		assets.NextCursor = container.PageKey
 
 		if len(assets.NextCursor) == 0 {
@@ -355,7 +356,7 @@ func (o *Client) fetchAssetsByBatchTokenIDs(ctx context.Context, chainID walletC
 		return nil, err
 	}
 
-	ret := alchemyToCollectiblesData(chainID, assets.NFTs)
+	ret := alchemyToCollectiblesData(chainID, assets.NFTs, nil)
 
 	return ret, nil
 }

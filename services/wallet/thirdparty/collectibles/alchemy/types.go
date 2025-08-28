@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/collectibles/ownership"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 
@@ -136,6 +138,11 @@ type Asset struct {
 	Raw         Raw            `json:"raw"`
 	TokenURI    string         `json:"tokenUri"`
 	Balance     *bigint.BigInt `json:"balance,omitempty"`
+	AcquiredAt  *AcquiredAt    `json:"acquiredAt,omitempty"`
+}
+
+type AcquiredAt struct {
+	BlockTimestamp *time.Time `json:"blockTimestamp"`
 }
 
 type OwnedNFTList struct {
@@ -223,16 +230,30 @@ func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty
 	}
 }
 
-func (c *Asset) toCommon(id thirdparty.CollectibleUniqueID) thirdparty.FullCollectibleData {
+func (c *Asset) toCommon(id thirdparty.CollectibleUniqueID, owner *common.Address) thirdparty.FullCollectibleData {
 	contractData := c.Contract.toCollectionData(id.ContractID)
+	txTimestamp := ownership.InvalidTimestamp
+	if c.AcquiredAt != nil && c.AcquiredAt.BlockTimestamp != nil && !c.AcquiredAt.BlockTimestamp.IsZero() {
+		txTimestamp = c.AcquiredAt.BlockTimestamp.Unix()
+	}
+	var ownership []thirdparty.AccountBalance
+	if owner != nil {
+		ownership = []thirdparty.AccountBalance{
+			{
+				Address:     *owner,
+				Balance:     c.Balance,
+				TxTimestamp: txTimestamp,
+			},
+		}
+	}
 	return thirdparty.FullCollectibleData{
 		CollectibleData: c.toCollectiblesData(id),
 		CollectionData:  &contractData,
-		AccountBalance:  c.Balance,
+		Ownership:       ownership,
 	}
 }
 
-func alchemyToCollectiblesData(chainID walletCommon.ChainID, l []Asset) []thirdparty.FullCollectibleData {
+func alchemyToCollectiblesData(chainID walletCommon.ChainID, l []Asset, owner *common.Address) []thirdparty.FullCollectibleData {
 	ret := make([]thirdparty.FullCollectibleData, 0, len(l))
 	for _, asset := range l {
 		id := thirdparty.CollectibleUniqueID{
@@ -242,7 +263,7 @@ func alchemyToCollectiblesData(chainID walletCommon.ChainID, l []Asset) []thirdp
 			},
 			TokenID: asset.TokenID,
 		}
-		item := asset.toCommon(id)
+		item := asset.toCommon(id, owner)
 		ret = append(ret, item)
 	}
 	return ret

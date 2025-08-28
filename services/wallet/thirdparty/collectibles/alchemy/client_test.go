@@ -41,6 +41,7 @@ func TestUnmarshallCollection(t *testing.T) {
 }
 
 func TestUnmarshallOwnedCollectibles(t *testing.T) {
+	owner := common.HexToAddress("0x1234567890123456789012345678901234567890")
 	expectedTokenID0, _ := big.NewInt(0).SetString("50659039041325838222074459099120411190538227963344971355684955900852972814336", 10)
 	expectedTokenID1, _ := big.NewInt(0).SetString("900", 10)
 
@@ -82,8 +83,12 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 				Traits:       make(map[string]thirdparty.CollectionTrait),
 				Socials:      &thirdparty.CollectionSocials{Website: "", TwitterHandle: "", Provider: "alchemy"},
 			},
-			AccountBalance: &bigint.BigInt{
-				Int: expectedBalance0,
+			Ownership: []thirdparty.AccountBalance{
+				{
+					Address:     owner,
+					Balance:     &bigint.BigInt{Int: expectedBalance0},
+					TxTimestamp: -1,
+				},
 			},
 		},
 		{
@@ -141,8 +146,12 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 				Traits:       make(map[string]thirdparty.CollectionTrait),
 				Socials:      &thirdparty.CollectionSocials{Website: "", TwitterHandle: "SimpsonPunksETH", Provider: "alchemy"},
 			},
-			AccountBalance: &bigint.BigInt{
-				Int: expectedBalance1,
+			Ownership: []thirdparty.AccountBalance{
+				{
+					Address:     owner,
+					Balance:     &bigint.BigInt{Int: expectedBalance1},
+					TxTimestamp: -1,
+				},
 			},
 		},
 	}
@@ -151,7 +160,7 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 	err := json.Unmarshal([]byte(ownedCollectiblesJSON), &container)
 	assert.NoError(t, err)
 
-	collectiblesData := alchemyToCollectiblesData(w_common.ChainID(w_common.EthereumMainnet), container.OwnedNFTs)
+	collectiblesData := alchemyToCollectiblesData(w_common.ChainID(w_common.EthereumMainnet), container.OwnedNFTs, &owner)
 
 	assert.Equal(t, expectedCollectiblesData, collectiblesData)
 }

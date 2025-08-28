@@ -23,7 +23,7 @@ func getNonCommunityCollectible() thirdparty.FullCollectibleData {
 
 func TestFullCollectibleToHeader(t *testing.T) {
 	communityCollectible := getCommunityCollectible()
-	communityHeader := fullCollectibleDataToHeader(communityCollectible)
+	communityHeader := fullCollectibleDataToHeader(&communityCollectible)
 
 	require.Equal(t, CollectibleDataTypeHeader, communityHeader.DataType)
 	require.Equal(t, communityCollectible.CollectibleData.ID, communityHeader.ID)
@@ -34,7 +34,7 @@ func TestFullCollectibleToHeader(t *testing.T) {
 	require.NotEmpty(t, communityHeader.Ownership)
 
 	nonCommunityCollectible := getNonCommunityCollectible()
-	nonCommunityHeader := fullCollectibleDataToHeader(nonCommunityCollectible)
+	nonCommunityHeader := fullCollectibleDataToHeader(&nonCommunityCollectible)
 
 	require.Equal(t, CollectibleDataTypeHeader, nonCommunityHeader.DataType)
 	require.Equal(t, nonCommunityCollectible.CollectibleData.ID, nonCommunityHeader.ID)
@@ -47,7 +47,7 @@ func TestFullCollectibleToHeader(t *testing.T) {
 
 func TestFullCollectibleToDetails(t *testing.T) {
 	communityCollectible := getCommunityCollectible()
-	communityDetails := fullCollectibleDataToDetails(communityCollectible)
+	communityDetails := fullCollectibleDataToDetails(&communityCollectible)
 
 	require.Equal(t, CollectibleDataTypeDetails, communityDetails.DataType)
 	require.Equal(t, communityCollectible.CollectibleData.ID, communityDetails.ID)
@@ -58,7 +58,7 @@ func TestFullCollectibleToDetails(t *testing.T) {
 	require.NotEmpty(t, communityDetails.Ownership)
 
 	nonCommunityCollectible := getNonCommunityCollectible()
-	nonCommunityDetails := fullCollectibleDataToDetails(nonCommunityCollectible)
+	nonCommunityDetails := fullCollectibleDataToDetails(&nonCommunityCollectible)
 
 	require.Equal(t, CollectibleDataTypeDetails, nonCommunityDetails.DataType)
 	require.Equal(t, nonCommunityCollectible.CollectibleData.ID, nonCommunityDetails.ID)

@@ -241,8 +241,7 @@ func (o *Client) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommon
 	assets := new(thirdparty.FullCollectibleDataContainer)
 
 	queryParams := url.Values{
-		"owner":       {fmt.Sprintf("%s:%s", ethereumString, owner.String())},
-		"blockchains": {chainIDToChainString(chainID)},
+		"owner": {fmt.Sprintf("%s:%s", ethereumString, owner.String())},
 	}
 
 	tmpLimit := ownedNFTLimit
@@ -264,7 +263,7 @@ func (o *Client) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommon
 	}
 
 	for {
-		url := fmt.Sprintf("%s/byOwner?%s", baseURL, queryParams.Encode())
+		url := fmt.Sprintf("%s/byOwnerWithOwnership?%s", baseURL, queryParams.Encode())
 
 		resp, err := o.doQuery(ctx, url, o.getAPIKey(chainID))
 		if err != nil {
@@ -287,13 +286,13 @@ func (o *Client) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommon
 			return nil, fmt.Errorf("invalid json: %s", string(body))
 		}
 
-		var container CollectiblesContainer
+		var container CollectibleWithOwnershipContainer
 		err = json.Unmarshal(body, &container)
 		if err != nil {
 			return nil, err
 		}
 
-		assets.Items = append(assets.Items, raribleToCollectiblesData(container.Collectibles, chainID.IsMainnet())...)
+		assets.Items = append(assets.Items, raribleToCollectiblesWithOwnershipData(container.Collectibles, chainID, owner)...)
 		assets.NextCursor = container.Continuation
 
 		if len(assets.NextCursor) == 0 {

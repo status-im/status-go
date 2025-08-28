@@ -4,9 +4,7 @@ package thirdparty
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/protocol/communities/token"
@@ -38,27 +36,6 @@ func (k *CollectibleUniqueID) HashKey() string {
 
 func (k *CollectibleUniqueID) Same(other *CollectibleUniqueID) bool {
 	return k.ContractID.ChainID == other.ContractID.ChainID && k.ContractID.Address == other.ContractID.Address && k.TokenID.Cmp(other.TokenID.Int) == 0
-}
-
-func RowsToCollectibles(rows *sql.Rows) ([]CollectibleUniqueID, error) {
-	var ids []CollectibleUniqueID
-	for rows.Next() {
-		id := CollectibleUniqueID{
-			TokenID: &bigint.BigInt{Int: big.NewInt(0)},
-		}
-		err := rows.Scan(
-			&id.ContractID.ChainID,
-			&id.ContractID.Address,
-			(*bigint.SQLBigIntBytes)(id.TokenID.Int),
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		ids = append(ids, id)
-	}
-
-	return ids, nil
 }
 
 func GroupCollectibleUIDsByChainID(uids []CollectibleUniqueID) map[w_common.ChainID][]CollectibleUniqueID {
@@ -190,8 +167,7 @@ type FullCollectibleData struct {
 	CollectionData           *CollectionData
 	CommunityInfo            *CommunityInfo
 	CollectibleCommunityInfo *CollectibleCommunityInfo
-	Ownership                []AccountBalance // This is a list of all the owners of the collectible
-	AccountBalance           *bigint.BigInt   // This is the balance of the collectible for the requested account
+	Ownership                []AccountBalance // This is a list of all the owners of the collectible (filtered according to query parameters)
 }
 
 type CollectiblesContainer[T any] struct {
@@ -207,21 +183,34 @@ type CollectibleDataContainer CollectiblesContainer[CollectibleData]
 type FullCollectibleDataContainer CollectiblesContainer[FullCollectibleData]
 
 // Tried to find a way to make this generic, but couldn't, so the code below is duplicated somewhere else
-func collectibleItemsToBalances(items []FullCollectibleData) []CollectibleIDBalance {
+func collectibleItemsToBalances(items []FullCollectibleData, owner common.Address) []CollectibleIDBalance {
 	ret := make([]CollectibleIDBalance, 0, len(items))
 	for _, item := range items {
 		balance := CollectibleIDBalance{
-			ID:      item.CollectibleData.ID,
-			Balance: item.AccountBalance,
+			ID: item.CollectibleData.ID,
+		}
+		for _, accBalance := range item.Ownership {
+			if accBalance.Address == owner {
+				balance.Balance = accBalance.Balance
+				balance.TxTimestamp = accBalance.TxTimestamp
+			}
 		}
 		ret = append(ret, balance)
 	}
 	return ret
 }
 
-func (c *FullCollectibleDataContainer) ToOwnershipContainer() CollectibleOwnershipContainer {
+func CollectibleBalancesToIDs(balances []CollectibleIDBalance) []CollectibleUniqueID {
+	ret := make([]CollectibleUniqueID, 0, len(balances))
+	for _, balance := range balances {
+		ret = append(ret, balance.ID)
+	}
+	return ret
+}
+
+func (c *FullCollectibleDataContainer) ToOwnershipContainer(owner common.Address) CollectibleOwnershipContainer {
 	return CollectibleOwnershipContainer{
-		Items:          collectibleItemsToBalances(c.Items),
+		Items:          collectibleItemsToBalances(c.Items, owner),
 		NextCursor:     c.NextCursor,
 		PreviousCursor: c.PreviousCursor,
 		Provider:       c.Provider,
@@ -229,8 +218,9 @@ func (c *FullCollectibleDataContainer) ToOwnershipContainer() CollectibleOwnersh
 }
 
 type CollectibleIDBalance struct {
-	ID      CollectibleUniqueID `json:"id"`
-	Balance *bigint.BigInt      `json:"balance"`
+	ID          CollectibleUniqueID `json:"id"`
+	Balance     *bigint.BigInt      `json:"balance"`
+	TxTimestamp int64               `json:"txTimestamp"`
 }
 
 type TokenBalance struct {

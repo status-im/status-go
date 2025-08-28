@@ -48,7 +48,7 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 
 	dataPerID := make(map[string]thirdparty.CollectibleData)
 	communityDataPerID := make(map[string]thirdparty.CollectibleCommunityInfo)
-	balancesPerChainIDAndOwner := make(map[w_common.ChainID]map[common.Address]thirdparty.TokenBalancesPerContractAddress)
+	balancesPerChainIDAndOwner := make(map[w_common.ChainID]map[common.Address][]thirdparty.CollectibleIDBalance)
 
 	var err error
 
@@ -72,22 +72,17 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 		ownerAddress := ownerAddresses[i%len(ownerAddresses)]
 
 		if _, ok := balancesPerChainIDAndOwner[chainID]; !ok {
-			balancesPerChainIDAndOwner[chainID] = make(map[common.Address]thirdparty.TokenBalancesPerContractAddress)
+			balancesPerChainIDAndOwner[chainID] = make(map[common.Address][]thirdparty.CollectibleIDBalance)
 		}
 		if _, ok := balancesPerChainIDAndOwner[chainID][ownerAddress]; !ok {
-			balancesPerChainIDAndOwner[chainID][ownerAddress] = make(thirdparty.TokenBalancesPerContractAddress)
+			balancesPerChainIDAndOwner[chainID][ownerAddress] = make([]thirdparty.CollectibleIDBalance, 0, len(data))
 		}
-
-		contractAddress := iData.ID.ContractID.Address
-		if _, ok := balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress]; !ok {
-			balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress] = make([]thirdparty.TokenBalance, 0, len(data))
+		balance := thirdparty.CollectibleIDBalance{
+			ID:          iData.ID,
+			Balance:     &bigint.BigInt{Int: big.NewInt(int64(i % 10))},
+			TxTimestamp: int64(i),
 		}
-
-		tokenBalance := thirdparty.TokenBalance{
-			TokenID: iData.ID.TokenID,
-			Balance: &bigint.BigInt{Int: big.NewInt(int64(i % 10))},
-		}
-		balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress] = append(balancesPerChainIDAndOwner[chainID][ownerAddress][contractAddress], tokenBalance)
+		balancesPerChainIDAndOwner[chainID][ownerAddress] = append(balancesPerChainIDAndOwner[chainID][ownerAddress], balance)
 	}
 
 	timestamp := int64(1234567890)

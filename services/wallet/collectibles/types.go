@@ -88,7 +88,7 @@ func thirdpartyCollectionDataToCollectionData(collectionData *thirdparty.Collect
 	return ret
 }
 
-func getContractType(c thirdparty.FullCollectibleData) w_common.ContractType {
+func getContractType(c *thirdparty.FullCollectibleData) w_common.ContractType {
 	if c.CollectibleData.ContractType != w_common.ContractTypeUnknown {
 		return c.CollectibleData.ContractType
 	}
@@ -98,7 +98,7 @@ func getContractType(c thirdparty.FullCollectibleData) w_common.ContractType {
 	return w_common.ContractTypeUnknown
 }
 
-func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) Collectible {
+func fullCollectibleDataToHeader(c *thirdparty.FullCollectibleData) Collectible {
 	ret := Collectible{
 		DataType:     CollectibleDataTypeHeader,
 		ID:           c.CollectibleData.ID,
@@ -126,14 +126,14 @@ func fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibleData) []Coll
 	res := make([]Collectible, 0, len(data))
 
 	for _, c := range data {
-		header := fullCollectibleDataToHeader(c)
+		header := fullCollectibleDataToHeader(&c)
 		res = append(res, header)
 	}
 
 	return res
 }
 
-func fullCollectibleDataToDetails(c thirdparty.FullCollectibleData) Collectible {
+func fullCollectibleDataToDetails(c *thirdparty.FullCollectibleData) Collectible {
 	ret := Collectible{
 		DataType:     CollectibleDataTypeDetails,
 		ID:           c.CollectibleData.ID,
@@ -163,7 +163,7 @@ func fullCollectiblesDataToDetails(data []thirdparty.FullCollectibleData) []Coll
 	res := make([]Collectible, 0, len(data))
 
 	for _, c := range data {
-		details := fullCollectibleDataToDetails(c)
+		details := fullCollectibleDataToDetails(&c)
 		res = append(res, details)
 	}
 
@@ -175,7 +175,7 @@ func fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCollectibleData
 
 	for _, localCollectibleData := range data {
 		// to satisfy gosec: C601 checks
-		c := localCollectibleData
+		c := &localCollectibleData
 		collectibleID := c.CollectibleData.ID
 		communityID := c.CollectibleData.CommunityID
 
