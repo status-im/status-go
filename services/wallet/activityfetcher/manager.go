@@ -5,12 +5,13 @@ import (
 	"errors"
 	"time"
 
+	"go.uber.org/zap"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"go.uber.org/zap"
 )
 
 const (
@@ -67,7 +68,7 @@ func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, account get
 		// Nothing to fetch
 		return thirdparty.ActivityEntryContainer{}, nil
 	} else {
-		fromBlock := gethrpc.BlockNumber(*lastFetchedBlock + 1)
+		fromBlock := *lastFetchedBlock + 1
 		parameters.FromBlock = &fromBlock
 	}
 

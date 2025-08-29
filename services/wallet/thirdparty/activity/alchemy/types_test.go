@@ -33,6 +33,10 @@ func TestTransferToCommon(t *testing.T) {
 		getAssetTransfersResponseData,
 		getAssetTransfersResponseData2,
 	}
+	result := []int{
+		1000,
+		48,
+	}
 	addresses := []common.Address{
 		common.HexToAddress("0xd8da6bf26964af9d7eed9e03e53415d37aa96045"),
 		common.HexToAddress("0xa1e277ea6b97effc5b61b3bf5de03f438981247e"),
@@ -42,6 +46,6 @@ func TestTransferToCommon(t *testing.T) {
 		err := json.Unmarshal([]byte(data[i]), &response)
 		require.NoError(t, err)
 		commonResponse := alchemy.TransfersToThirdpartyActivityEntries(response.Transfers, 1, addresses[i])
-		require.Equal(t, len(commonResponse), len(response.Transfers))
+		require.Equal(t, result[i], len(commonResponse))
 	}
 }

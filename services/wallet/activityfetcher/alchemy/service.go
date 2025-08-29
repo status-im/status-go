@@ -50,7 +50,10 @@ func (s *Service) FetchActivity(ctx context.Context, chainID uint64, parameters 
 		return thirdparty.ActivityEntryContainer{}, err
 	}
 
-	s.persistence.SaveTransfers(transfers, chainID, parameters.Address)
+	err = s.persistence.SaveTransfers(transfers, chainID, parameters.Address)
+	if err != nil {
+		return thirdparty.ActivityEntryContainer{}, err
+	}
 
 	items := alchemy.TransfersToThirdpartyActivityEntries(transfers, chainID, parameters.Address)
 

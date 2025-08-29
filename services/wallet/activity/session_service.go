@@ -77,7 +77,7 @@ func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, of
 		mostRecentFetchedTimestamp = fetchedEntries[0].timestamp
 	}
 
-	// Get all activites that were saved but can't be fetched from 3rdparty yet
+	// Get all activities that were saved but can't be fetched from 3rdparty yet
 	// probably they aren't processed yet but we send them so we know
 	// we add them only if this is a request with offset == 0, because this should
 	// return the earliest entries

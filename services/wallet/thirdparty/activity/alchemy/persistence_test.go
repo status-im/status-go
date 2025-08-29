@@ -25,7 +25,7 @@ var jsonTransfers = `[{
     "asset": "ETH",
     "blockNum": "0x15f3d0f",
     "category": "external",
-    "from": "0xe0798e0070d223bed269267bba11f4abffe27a88",
+    "from": "0xe0798e0070d223bed269267bba11f4abffe27a77",
     "hash": "0x90881ea417474e643fbd9c533f10a2277b6e52e99c218bd933baba7929fd1afa",
     "metadata": {
         "blockTimestamp": "2025-07-28T16:14:59Z"
@@ -54,7 +54,7 @@ var jsonTransfers = `[{
         "decimal": "0x12",
         "value": "0x3635c9adc5dea00000"
     },
-    "to": "0xe0798e0070d223bed269267bba11f4abffe27a88",
+    "to": "0xe0798e0070d223bed269267bba11f4abffe27a77",
     "tokenId": null,
     "uniqueId": "0x655f6d479253fc2c64f4f7d6e936d34c27c6f513bd26fd7501ff3d3127db6ca0:log:545",
     "value": 1000
@@ -75,7 +75,7 @@ func TestSaveTransfers(t *testing.T) {
 	defer walletDB.Close()
 
 	persistence := alchemy.NewPersistence(walletDB)
-	address1 := common.HexToAddress("0xe0798e0070d223bed269267bba11f4abffe27a88")
+	address1 := common.HexToAddress("0xe0798e0070d223bed269267bba11f4abffe27a77")
 
 	// Save the activity
 	err = persistence.SaveTransfers(transfers, 1, address1)
@@ -85,7 +85,7 @@ func TestSaveTransfers(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, lastFetchedBlock)
-	require.Equal(t, rpc.BlockNumber(17000001), *lastFetchedBlock)
+	require.Equal(t, rpc.BlockNumber(23018767), *lastFetchedBlock)
 	require.NotNil(t, lastFetchedTimestamp)
 
 	// Test retrieving activities for specific addresses and chain IDs

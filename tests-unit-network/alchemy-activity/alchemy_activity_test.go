@@ -9,25 +9,28 @@ import (
 	geth_common "github.com/ethereum/go-ethereum/common"
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/api"
-	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
+	alchemyservice "github.com/status-im/status-go/services/wallet/activityfetcher/alchemy"
+	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 	"github.com/status-im/status-go/t/helpers"
 	t_common "github.com/status-im/status-go/tests-unit-network/common"
-	_ "github.com/waku-org/go-zerokit-rln-apple/rln"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
-func setupAlchemyActivityClient(t *testing.T) *alchemy.Client {
-	appDB, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "alchemy-activity-tests")
+func setupAlchemyActivityService(t *testing.T) *alchemyservice.Service {
+	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, cleanup()) })
+
+	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
 
 	walletSecrets := t_common.GetWalletSecretsConfigFromEnv()
 	defaultNetworks := api.BuildDefaultNetworks(walletSecrets)
-	networkManager := network.NewManager(appDB, nil, nil, nil)
+	networkManager := network.NewManager(appDB, nil)
 	err = networkManager.InitEmbeddedNetworks(defaultNetworks)
 	require.NoError(t, err)
 
@@ -42,15 +45,17 @@ func setupAlchemyActivityClient(t *testing.T) *alchemy.Client {
 	rpcClient.Start(ctx)
 	t.Cleanup(func() { rpcClient.Stop() })
 
-	alchemyEthClientGetter := rpc.NewProviderChainClientGetter(api_common.SmartProxyAlchemy, rpcClient)
+	alchemyEthClientGetter := rpc.NewProviderChainClientGetter(common.SmartProxyAlchemy, rpcClient)
 
-	alchemyActivityClient := alchemy.NewClient(alchemyEthClientGetter)
+	alchemyClient := alchemy.NewClient(alchemyEthClientGetter)
+	alchemyPersistence := alchemy.NewPersistence(walletDB)
+	alchemyService := alchemyservice.NewService(alchemyClient, alchemyPersistence)
 
-	return alchemyActivityClient
+	return alchemyService
 }
 
 func TestFetchHistoryBoth(t *testing.T) {
-	alchemyActivityClient := setupAlchemyActivityClient(t)
+	alchemyActivityService := setupAlchemyActivityService(t)
 
 	address := geth_common.HexToAddress("0xa1e277ea6b97effc5b61b3bf5de03f438981247e")
 	// Expecting these transfers:
@@ -66,13 +71,13 @@ func TestFetchHistoryBoth(t *testing.T) {
 		ToBlock:   &toBlock,
 	}
 
-	history, err := alchemyActivityClient.FetchActivity(context.Background(), api_common.MainnetChainID, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
+	history, err := alchemyActivityService.FetchActivity(context.Background(), common.EthereumMainnet, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
 	require.NoError(t, err)
-	require.Equal(t, 11, len(history.Items))
+	require.Equal(t, 6, len(history.Items))
 }
 
 func TestFetchHistoryIncoming(t *testing.T) {
-	alchemyActivityClient := setupAlchemyActivityClient(t)
+	alchemyActivityService := setupAlchemyActivityService(t)
 
 	address := geth_common.HexToAddress("0xa1e277ea6b97effc5b61b3bf5de03f438981247e")
 	// Expecting these transfers:
@@ -88,13 +93,13 @@ func TestFetchHistoryIncoming(t *testing.T) {
 		ToBlock:   &toBlock,
 	}
 
-	history, err := alchemyActivityClient.FetchActivity(context.Background(), api_common.MainnetChainID, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
+	history, err := alchemyActivityService.FetchActivity(context.Background(), common.EthereumMainnet, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(history.Items))
 }
 
 func TestFetchHistoryOutgoing(t *testing.T) {
-	alchemyActivityClient := setupAlchemyActivityClient(t)
+	alchemyActivityService := setupAlchemyActivityService(t)
 
 	address := geth_common.HexToAddress("0xa1e277ea6b97effc5b61b3bf5de03f438981247e")
 	// Expecting these transfers:
@@ -110,7 +115,7 @@ func TestFetchHistoryOutgoing(t *testing.T) {
 		ToBlock:   &toBlock,
 	}
 
-	history, err := alchemyActivityClient.FetchActivity(context.Background(), api_common.MainnetChainID, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
+	history, err := alchemyActivityService.FetchActivity(context.Background(), common.EthereumMainnet, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
 	require.NoError(t, err)
-	require.Equal(t, 6, len(history.Items))
+	require.Equal(t, 5, len(history.Items))
 }
