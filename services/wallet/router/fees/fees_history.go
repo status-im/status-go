@@ -18,26 +18,6 @@ type FeeHistory struct {
 	Reward        [][]string `json:"reward,omitempty"`
 }
 
-func (fh *FeeHistory) isEIP1559Compatible(chainID uint64) bool {
-	// Since the Status Network is gasless chain, but EIP-1559 compatible, we should not rely on checking the BaseFeePerGas, that's why we have this special case.
-	eip1559Enabled, err := walletCommon.IsPartiallyOrFullyGaslessChainEIP1559Compatible(chainID)
-	if err == nil {
-		return eip1559Enabled
-	}
-
-	if len(fh.BaseFeePerGas) == 0 {
-		return false
-	}
-
-	for _, fee := range fh.BaseFeePerGas {
-		if fee != "0x0" {
-			return true
-		}
-	}
-
-	return false
-}
-
 func (f *FeeManager) getFeeHistory(ctx context.Context, chainID uint64, newestBlock string, rewardPercentiles []int) (*FeeHistory, error) {
 	blockCount := uint64(10) // use the last 10 blocks for L1 chains
 	if chainID != walletCommon.EthereumMainnet &&
