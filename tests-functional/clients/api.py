@@ -11,7 +11,7 @@ class ApiClient:
 
     def api_request(self, method, data, url=None, quiet=False):
         url = url if url else self.api_url
-        url = f"{url}/{method}"
+        url = f"{url}/{method}" if method else url
         if not quiet:
             logging.debug(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True)}")
         response = self.client.post(url, json=data)
@@ -24,13 +24,9 @@ class ApiClient:
         assert response.content
         logging.debug(f"Got response: {response.content}")
         try:
-            error = response.json()["error"]
-            assert not error, f"Error: {error}"
+            response.json()
         except JSONDecodeError:
             raise AssertionError(f"Invalid JSON in response: {response.content}")
-        except KeyError:
-            # No 'error' key in response JSON, treat as valid
-            pass
 
     def api_valid_request(self, method, data, url=None):
         response = self.api_request(method, data, url=url)

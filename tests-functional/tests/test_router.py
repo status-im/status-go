@@ -3,7 +3,7 @@ import pytest
 
 import resources.constants as constants
 from clients.anvil import Anvil
-from web3.types import Wei
+from web3.types import Wei  # type: ignore
 
 from clients.signals import SignalType
 from utils import wallet_utils
@@ -95,14 +95,14 @@ class TestRouter:
 
         # Step: update gas fee mode without providing path tx identity params via wallet_setFeeMode endpoint
         method = "wallet_setFeeMode"
-        response = self.rpc_client.rpc_request(method, [None, gas_fee_mode])
+        response = self.rpc_client.rpc_valid_request(method, [None, gas_fee_mode])
         self.rpc_client.verify_is_json_rpc_error(response)
 
         # Step: update gas fee mode with incomplete details for path tx identity params via wallet_setFeeMode endpoint
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
         }
-        response = self.rpc_client.rpc_request(method, [tx_identity_params, gas_fee_mode])
+        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
         self.rpc_client.verify_is_json_rpc_error(response)
 
         # Step: update gas fee mode to low
@@ -131,7 +131,7 @@ class TestRouter:
 
         # Step: try to set custom gas fee mode via wallet_setFeeMode endpoint
         gas_fee_mode = constants.gas_fee_mode_custom
-        response = self.rpc_client.rpc_request(method, [tx_identity_params, gas_fee_mode])
+        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
         self.rpc_client.verify_is_json_rpc_error(response)
 
     def test_setting_custom_fee_mode(self):
@@ -161,14 +161,14 @@ class TestRouter:
 
         # Step: try to set custom tx details with empty params via wallet_setCustomTxDetails endpoint
         method = "wallet_setCustomTxDetails"
-        response = self.rpc_client.rpc_request(method, [None, None])
+        response = self.rpc_client.rpc_valid_request(method, [None, None])
         self.rpc_client.verify_is_json_rpc_error(response)
 
         # Step: try to set custom tx details with incomplete details for path tx identity params via wallet_setCustomTxDetails endpoint
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
         }
-        response = self.rpc_client.rpc_request(method, [tx_identity_params, None])
+        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, None])
         self.rpc_client.verify_is_json_rpc_error(response)
 
         # Step: try to set custom tx details providing other than the custom gas fee mode via wallet_setCustomTxDetails endpoint
@@ -181,14 +181,14 @@ class TestRouter:
         tx_custom_params = {
             "gasFeeMode": constants.gas_fee_mode_low,
         }
-        response = self.rpc_client.rpc_request(method, [tx_identity_params, tx_custom_params])
+        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
         self.rpc_client.verify_is_json_rpc_error(response)
 
         # Step: try to set custom tx details without providing maxFeesPerGas via wallet_setCustomTxDetails endpoint
         tx_custom_params = {
             "gasFeeMode": gas_fee_mode,
         }
-        response = self.rpc_client.rpc_request(method, [tx_identity_params, tx_custom_params])
+        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
         self.rpc_client.verify_is_json_rpc_error(response)
 
         # Step: try to set custom tx details without providing PriorityFee via wallet_setCustomTxDetails endpoint
@@ -196,7 +196,7 @@ class TestRouter:
             "gasFeeMode": gas_fee_mode,
             "maxFeesPerGas": "0x77359400",
         }
-        response = self.rpc_client.rpc_request(method, [tx_identity_params, tx_custom_params])
+        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
         self.rpc_client.verify_is_json_rpc_error(response)
 
         # Step: try to set custom tx details via wallet_setCustomTxDetails endpoint

@@ -138,6 +138,6 @@ class TestSavedAddresses:
             self.rpc_client.rpc_valid_request("wakuext_upsertSavedAddress", [{"address": addresses[i], "name": f"test{i}", "isTest": is_test}])
 
         # Step: Verifying that capacity is now 0
-        response = self.rpc_client.rpc_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
+        response = self.rpc_client.rpc_valid_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
         self.rpc_client.verify_is_json_rpc_error(response)
         assert response.json()["error"]["message"] == "no more save addresses can be added"
