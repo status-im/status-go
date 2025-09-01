@@ -18,14 +18,14 @@ type FeeHistory struct {
 	Reward        [][]string `json:"reward,omitempty"`
 }
 
-func (f *FeeManager) getFeeHistory(ctx context.Context, chainID uint64, newestBlock string, rewardPercentiles []int) (*FeeHistory, error) {
-	blockCount := uint64(10) // use the last 10 blocks for L1 chains
-	if chainID != walletCommon.EthereumMainnet &&
-		chainID != walletCommon.EthereumSepolia &&
-		chainID != walletCommon.AnvilMainnet {
-		blockCount = 50 // use the last 50 blocks for L2 chains
+func getFeeHistoryBlockCount(chainID uint64) uint64 {
+	if chainID == walletCommon.EthereumMainnet || chainID == walletCommon.EthereumSepolia || chainID == walletCommon.AnvilMainnet {
+		return 10 // use the last 10 blocks for L1 chains
 	}
+	return 50 // use the last 50 blocks for L2 chains
+}
 
+func (f *FeeManager) getFeeHistory(ctx context.Context, chainID uint64, blockCount uint64, newestBlock string, rewardPercentiles []int) (*FeeHistory, error) {
 	feeHistory := &FeeHistory{}
 	err := f.RPCClient.Call(feeHistory, chainID, "eth_feeHistory", blockCount, newestBlock, rewardPercentiles)
 	return feeHistory, err
