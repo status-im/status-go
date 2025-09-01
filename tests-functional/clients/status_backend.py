@@ -18,6 +18,7 @@ from clients.services.settings import SettingsService
 from clients.services.connector import ConnectorService
 from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
+from clients.api import ApiClient
 from clients.metrics import Events, StatusGoMetrics
 from clients.expvar import ExpvarClient
 from clients.statusgo_container import StatusBackendContainer
@@ -28,7 +29,7 @@ from utils import keys
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
 
-class StatusBackend(RpcClient, SignalClient):
+class StatusBackend(RpcClient, SignalClient, ApiClient):
     container = None
 
     def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6, **kwargs):
@@ -72,6 +73,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.version = "unknown"
 
         RpcClient.__init__(self, self.rpc_url)
+        ApiClient.__init__(self, self.api_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
 
         self.wait_for_healthy()
@@ -113,33 +115,6 @@ class StatusBackend(RpcClient, SignalClient):
 
     def health(self):
         return self.api_request("health", data=[], url=self.base_url, quiet=True)
-
-    def api_request(self, method, data, url=None, quiet=False):
-        url = url if url else self.api_url
-        url = f"{url}/{method}"
-        if not quiet:
-            logging.debug(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True)}")
-        response = requests.post(url, json=data)
-        if not quiet:
-            logging.debug(f"Got response: {response.content}")
-        return response
-
-    def verify_is_valid_api_response(self, response):
-        assert response.status_code == 200, f"Got response {response.content}, status code {response.status_code}"
-        assert response.content
-        logging.debug(f"Got response: {response.content}")
-        try:
-            error = response.json()["error"]
-            assert not error, f"Error: {error}"
-        except json.JSONDecodeError:
-            raise AssertionError(f"Invalid JSON in response: {response.content}")
-        except KeyError:
-            pass
-
-    def api_valid_request(self, method, data, url=None):
-        response = self.api_request(method, data, url)
-        self.verify_is_valid_api_response(response)
-        return response
 
     def init_status_backend(self):
         if Config.logout:
