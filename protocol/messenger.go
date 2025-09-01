@@ -1813,6 +1813,10 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage messagingtyp
 		if err != nil {
 			return rawMessage, err
 		}
+		rawMessage.CommunityID, err = types.DecodeHex(chat.CommunityID)
+		if err != nil {
+			return rawMessage, err
+		}
 		isEncrypted := isCommunityEncrypted || isChannelEncrypted
 		if !isEncrypted {
 			id, err = m.messaging.SendPublic(ctx, rawMessage.ContentTopic, rawMessage)
@@ -1820,11 +1824,6 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage messagingtyp
 				return rawMessage, err
 			}
 		} else {
-			rawMessage.CommunityID, err = types.DecodeHex(chat.CommunityID)
-			if err != nil {
-				return rawMessage, err
-			}
-
 			if isChannelEncrypted {
 				rawMessage.HashRatchetGroupID = []byte(chat.ID)
 			} else {

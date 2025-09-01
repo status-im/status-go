@@ -1,6 +1,7 @@
 .PHONY: statusgo all test clean help
 .PHONY: statusgo-ios-library statusgo-android-library
 .PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
+.PHONY: build-libsds clean-libsds rebuild-libsds
 
 # Clear any GOROOT set outside of the Nix shell
 export GOROOT=
@@ -70,14 +71,17 @@ endif
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
  LIBWAKU_EXT := so
+ LIBSDS_EXT := so
  GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
  LIBWAKU_EXT := dll
+ LIBSDS_EXT := dll
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
 else
  GOBIN_SHARED_LIB_EXT := so
  LIBWAKU_EXT := so
+ LIBSDS_EXT := so
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
 endif
 
@@ -165,7 +169,7 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
-$(GO_CMD_BUILDS): generate
+$(GO_CMD_BUILDS): generate-sds generate
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
@@ -180,14 +184,20 @@ ifeq ($(USE_NWAKU),true)
 	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
 endif
 
+LIBSDS := $(CURDIR)/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/libsds.$(LIBSDS_EXT)
+$(LIBSDS):
+	@echo "Building libsds"
+	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/sds-go-bindings/sds SHELL=/bin/bash V=2
+
 statusgo: ##@build Build status-go as status-backend server
+statusgo: $(LIBSDS)
 statusgo: build/bin/status-backend
 
 status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend
 
 run-status-backend: PORT ?= 0
-run-status-backend: generate
+run-status-backend: generate-sds generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	go run ./cmd/status-backend --address localhost:${PORT}
 
@@ -203,9 +213,8 @@ status-go-deps:
 	go clean -modcache || true
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
-
-
-statusgo-c-bindings:
+statusgo-library: generate-sds generate
+statusgo-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
@@ -223,9 +232,10 @@ statusgo-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-g
 	@ls -la build/bin/libstatus.*
 
 build-libwaku: $(LIBWAKU)
+build-libsds: $(LIBSDS)
 
-statusgo-shared-library: generate
-statusgo-shared-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library: generate-sds generate
+statusgo-shared-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	$(GOBIN_SHARED_LIB_CFLAGS) $(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
@@ -286,12 +296,18 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
+generate-sds:  ##@ Build libsds third_party
+	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build
+
+generate-sds-android:  ##@ Build libsds third_party for Android
+	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build-android
+
 generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
 generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
-	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
+	@GOOS=$$(go env GOHOSTOS) GOARCH=$$(go env GOHOSTARCH) GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
 
 generate-contracts:
 	go generate ./contracts
@@ -323,9 +339,15 @@ clean-libwaku:
 
 rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
+clean-libsds:
+	@echo "Removing libsds"
+	rm $(LIBSDS)
+
+rebuild-libsds: | clean-libsds $(LIBSDS)
+
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit-prep: generate
+test-unit-prep: generate-sds generate
 test-unit-prep: export BUILD_TAGS ?=
 test-unit-prep: export UNIT_TEST_DRY_RUN ?= false
 test-unit-prep: export UNIT_TEST_COUNT ?= 1
@@ -353,7 +375,7 @@ test-unit-network: ##@tests Run unit and integration tests with network access
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
 
-test-functional: generate
+test-functional: generate-sds generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
@@ -364,10 +386,10 @@ benchmark:
 	@./_assets/scripts/run_benchmark.sh
 
 lint-panics: export GOFLAGS ?= -tags='$(BUILD_TAGS)'
-lint-panics: generate
+lint-panics: generate-sds generate
 	go run ./cmd/lint-panics -root="$(PWD)" -skip=./cmd -test=false ./...
 
-lint: generate lint-panics
+lint: generate-sds generate lint-panics
 	golangci-lint --build-tags '$(BUILD_TAGS)' run ./...
 
 clean: ##@other Cleanup
