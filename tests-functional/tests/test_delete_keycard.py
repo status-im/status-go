@@ -23,12 +23,14 @@ class TestDeleteKeycard:
         resp = self.account.accounts_service.delete_keycard("non-existent-keycard-uid-1234")
         assert resp.get("error").get("message") == "keycard: no keycard for the passed keycard uid"
 
-    def test_delete_keycard_accounts(self):  # doesn't seems to work, will need to create a bug I think
+    def test_delete_keycard_accounts(self):
         self.account.accounts_service.save_or_update_keycard(self.keycard)
-        del_resp = self.account.accounts_service.delete_keycard_accounts(self.keycard["keycard-uid"], self.keycard["accounts-addresses"][0])
+        keycards_after = self.account.accounts_service.get_all_known_keycards()
+        assert keycards_after.get("result")[0].get("accounts-addresses") == self.keycard["accounts-addresses"]
+        del_resp = self.account.accounts_service.delete_keycard_accounts(self.keycard["keycard-uid"], self.keycard["accounts-addresses"])
         assert del_resp["result"] is None
         keycards_after = self.account.accounts_service.get_all_known_keycards()
-        assert keycards_after["result"] == []
+        assert keycards_after.get("result")[0].get("accounts-addresses") == ["0x0000000000000000000000000000000000000000"]
 
     def test_delete_all_keycards_with_key_uid(self):
         self.account.accounts_service.save_or_update_keycard(self.keycard)

@@ -96,8 +96,8 @@ class AccountService(Service):
         response = self.rpc_request("updateAccount", params)
         return response
 
-    def save_or_update_keycard(self, keycard, accounts_coming_from_keycard=False):
-        params = [keycard, accounts_coming_from_keycard]
+    def save_or_update_keycard(self, keycard):
+        params = [keycard, ""]
         response = self.rpc_request("saveOrUpdateKeycard", params)
         return response
 
