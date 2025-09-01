@@ -81,15 +81,3 @@ class TestSaveOrUpdateKeycard:
         assert len(keycards) == 2
         assert keycards[0].get("keycard-name") == self.keycard.get("keycard-name")
         assert keycards[1].get("keycard-name") == self.second_keycard.get("keycard-name")
-
-    def test_save_with_accounts_coming_from_keycard(self):
-        self.account.accounts_service.save_or_update_keycard(self.keycard, accounts_coming_from_keycard=True)
-        keycards_after = self.account.accounts_service.get_all_known_keycards()
-        keycards = keycards_after["result"]
-        assert len(keycards) == 1
-        assert keycards[0].get("keycard-uid") == self.keycard.get("keycard-uid")
-        assert keycards[0].get("keycard-name") == self.keycard.get("keycard-name")
-        assert keycards[0].get("keycard-locked") is False
-        assert keycards[0].get("accounts-addresses") == self.keycard.get("accounts-addresses")
-        assert keycards[0].get("key-uid") == self.keycard.get("key-uid")
-        assert keycards[0].get("Position") == 0

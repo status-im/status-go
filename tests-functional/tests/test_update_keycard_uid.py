@@ -1,4 +1,5 @@
 import copy
+from time import sleep
 import pytest
 from resources.constants import keycard_1
 
@@ -18,6 +19,8 @@ class TestUpdateKeycardUID:
 
         old_uid = self.keycard["keycard-uid"]
         new_uid = "updated-kc-uid-1234"
+
+        sleep(1)
 
         # Update keycard uid
         resp = self.account.accounts_service.update_keycard_uid(old_uid, new_uid)
