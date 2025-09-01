@@ -36,7 +36,7 @@ const (
 )
 
 func (f *FeeManager) TransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Int) TransactionEstimation {
-	feeHistory, err := f.getFeeHistory(ctx, chainID, "latest", nil)
+	feeHistory, err := f.getFeeHistory(ctx, chainID, getFeeHistoryBlockCount(chainID), "latest", nil)
 	if err != nil {
 		return Unknown
 	}
@@ -167,7 +167,7 @@ func getBaseFeePercentileIndex(sortedBaseFees []*big.Int, percentile float64, ne
 
 // TransactionEstimatedTimeV2 returns the estimated time in seconds for a transaction to be included in a block
 func (f *FeeManager) TransactionEstimatedTimeV2(ctx context.Context, chainID uint64, maxFeePerGas *big.Int, priorityFee *big.Int) uint {
-	feeHistory, err := f.getFeeHistory(ctx, chainID, "latest", []int{RewardPercentiles2})
+	feeHistory, err := f.getFeeHistory(ctx, chainID, getFeeHistoryBlockCount(chainID), "latest", []int{RewardPercentiles2})
 	if err != nil {
 		return 0
 	}
