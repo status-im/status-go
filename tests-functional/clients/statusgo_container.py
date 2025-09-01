@@ -10,6 +10,7 @@ import docker
 import docker.errors
 from docker.errors import APIError
 
+import resources.constants as constants
 from clients.metrics import ContainerStats
 from utils.config import Config
 
@@ -307,6 +308,12 @@ class StatusGoContainer:
             logs = self.container.logs()
             f.write(logs)
 
+    @staticmethod
+    def acquire_port():
+        host_port = random.choice(Config.status_backend_port_range)
+        Config.status_backend_port_range.remove(host_port)
+        return host_port
+
 
 class PushNotificationServerContainer(StatusGoContainer):
     def __init__(self, identity, gorush_port):
@@ -329,7 +336,12 @@ class PushNotificationServerContainer(StatusGoContainer):
 
 
 class StatusBackendContainer(StatusGoContainer):
-    def __init__(self, host_port: int, privileged=False, ipv6=False, **kwargs):
+    def __init__(self, privileged=False, ipv6=False, **kwargs):
+        connector_enabled = kwargs.get("connector_enabled", False)
+
+        host_port = StatusGoContainer.acquire_port()
+        connector_ws_port = StatusGoContainer.acquire_port() if connector_enabled else 0
+
         container_port = 3333
         entrypoint = [
             "status-backend",
@@ -340,7 +352,6 @@ class StatusBackendContainer(StatusGoContainer):
         ]
 
         self.ipv6 = ipv6
-        self.url = f"http://{'[::1]' if ipv6 else '127.0.0.1'}:{host_port}"
 
         if ipv6:
             ports = {
@@ -348,10 +359,19 @@ class StatusBackendContainer(StatusGoContainer):
                     {"HostIp": "::", "HostPort": str(host_port)},
                 ]
             }
+            if connector_enabled:
+                ports[f"{constants.STATUS_CONNECTOR_WS_PORT}/tcp"] = [{"HostIp": "::", "HostPort": str(connector_ws_port)}]
+
+            self.url = f"http://[::1]:{host_port}"
+            self.connector_ws_url = f"ws://[::1]:{connector_ws_port}"
         else:
             ports = {
                 f"{container_port}/tcp": str(host_port),
             }
+            if connector_enabled:
+                ports[f"{constants.STATUS_CONNECTOR_WS_PORT}/tcp"] = str(connector_ws_port)
+            self.url = f"http://127.0.0.1:{host_port}"
+            self.connector_ws_url = f"ws://127.0.0.1:{connector_ws_port}"
 
         super().__init__(entrypoint, ports, privileged, container_name_suffix=f"-status-backend-{host_port}")
 

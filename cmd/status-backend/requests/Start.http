@@ -4,6 +4,7 @@ POST {{address}}/statusgo/CallRPC
 
 {
     "jsonrpc": "2.0",
+    "id": "{{$uuid}}",
     "method": "wakuext_startMessenger",
     "params": []
 }
@@ -14,6 +15,7 @@ POST {{address}}/statusgo/CallRPC
 
 {
     "jsonrpc": "2.0",
+    "id": "{{$uuid}}",
     "method": "wallet_startWallet",
     "params": []
 }
@@ -24,6 +26,7 @@ POST {{address}}/statusgo/CallRPC
 
 {
     "jsonrpc": "2.0",
+    "id": "{{$uuid}}",
     "method": "settings_getSettings",
     "params": []
 }

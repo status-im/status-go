@@ -113,3 +113,5 @@ gas_fee_mode_custom = 3
 processor_name_transfer = "Transfer"
 
 ANVIL_NETWORK_ID = 31337
+
+STATUS_CONNECTOR_WS_PORT = 8586
