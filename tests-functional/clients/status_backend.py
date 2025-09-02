@@ -379,8 +379,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 "clientConfig": {},
             },
         }
-        response = self.api_request_json(method, data)
-        return json.loads(response.content)
+        return self.api_request_json(method, data)
 
     def get_connection_string_for_being_bootstrapped(self):
         method = "GetConnectionStringForBeingBootstrapped"

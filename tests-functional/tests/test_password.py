@@ -36,12 +36,12 @@ class TestPassword:
         backend = backend_new_profile("user")
 
         # Try a wrong password
-        response = backend.change_database_password(backend.password + "-wrong", new_password)
+        response = backend.change_database_password(backend.password + "-wrong", new_password).json()
         assert response.get("error") is not None
         assert response.get("error") == "incorrect current password"
 
         # Try a correct password
-        response = backend.change_database_password(backend.password, new_password)
+        response = backend.change_database_password(backend.password, new_password).json()
         assert response.get("error") == ""
         backend.wait_for_signal(SignalType.DB_REENCRYPTION_STARTED.value)
         backend.wait_for_signal(SignalType.DB_REENCRYPTION_FINISHED.value)
