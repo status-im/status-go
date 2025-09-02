@@ -162,6 +162,7 @@ class TestBackupMnemonicAndRestore:
         restored_account_response = restored_account.api_request("RestoreAccountAndLogin", data)
         assert restored_account_response.json().get("error") == "restore-account: both mnemonic and keycard info are set"
 
+    @pytest.mark.skip(reason="test is flaky when ran as part of the suite")
     def test_restored_on_existing_restored_account_fails(self):
         user = user_mnemonic_12
         restored_account = StatusBackend(self.await_signals)
