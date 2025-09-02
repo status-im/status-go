@@ -313,7 +313,7 @@ func CallRPC(inputJSON string) string {
 
 // callRPC calls public APIs via RPC.
 func callRPC(inputJSON string) string {
-	return statusBackend.StatusNode().CallInternalRPC(inputJSON)
+	return callWithResponse(statusBackend.StatusNode().CallInternalRPC, inputJSON)
 }
 
 // Deprecated: Use CallRPC instead, the behaviour is the same.
