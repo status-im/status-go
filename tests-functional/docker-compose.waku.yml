@@ -15,19 +15,19 @@ services:
       "--lightpush=true",
       "--log-level=DEBUG",
       "--max-connections=18000",
-      "--nodekey=03ce9122016be1f80a23df36525103bed1c7c4b9a0ff7605d97553ed8ed96bcf",
+      "--nodekey=03ce9122016be1f80a23df36525103bed1c7c4b9a0ff7605d97553ed8ed96bcf",  # PeerID: 16Uiu2HAm3vFYHkGRURyJ6F7bwDyzMLtPEuCg4DU89T7km2u8Fjyb
       "--peer-exchange=true",
       "--relay=true",
       "--rest-address=0.0.0.0",
       "--rest-admin",
       "--shard=32",
       "--shard=64",
-      "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
-      "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
+#      "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi", # store
+#      "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",  # store
       "--tcp-port=60001"
     ]
-    depends_on:
-      - store
+#    depends_on:M
+#      - store
 
     healthcheck:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
@@ -41,7 +41,7 @@ services:
       "--discv5-discovery=true",
       "--discv5-enr-auto-update=True",
       "--discv5-udp-port=9000",
-      "--discv5-bootstrap-node=enr:-La4QKi-GOzezuylyUIOA_6MFpbMUvhcVLg7v1KCXLR37tO6c5hgjAF6nzUbGM_9HG4LEM69JjTenYH0ZNFwOPg-UXIBgmlkgnY0gmlwhKwTAASKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ",
+      "--discv5-bootstrap-node=enr:-La4QKi-GOzezuylyUIOA_6MFpbMUvhcVLg7v1KCXLR37tO6c5hgjAF6nzUbGM_9HG4LEM69JjTenYH0ZNFwOPg-UXIBgmlkgnY0gmlwhKwTAASKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ",  # -> boot-1
       "--cluster-id=16",
       # Docker DNS server
       "--dns-addrs-name-server=127.0.0.11",
@@ -51,85 +51,85 @@ services:
       "--lightpush=true",
       "--log-level=DEBUG",
       "--max-connections=18000",
-      "--nodekey=c71da918e785259ebf13a3cf2f18d6f7c1329983ca17636f473c9e80ae5dcafc",
+      "--nodekey=c71da918e785259ebf13a3cf2f18d6f7c1329983ca17636f473c9e80ae5dcafc",  # PeerID: 16Uiu2HAm5TrV8hjUQaqJ8VaHC1EL3EX8RdqP1gTrLxSCecWVN3xc
       "--peer-exchange=true",
       "--relay=true",
       "--rest-address=0.0.0.0",
       "--rest-admin",
       "--shard=32",
       "--shard=64",
-      "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
-      "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
+#      "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",  # store
+#      "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",   # store
       "--tcp-port=60004"
-    ]
-    healthcheck:
-      test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
-    ports:
-      - "8648:8645/tcp"
-
-  store:
-    image: wakuorg/nwaku:v0.34.0
-    entrypoint: [
-      "/usr/bin/wakunode",
-      "--discv5-discovery=true",
-      "--discv5-enr-auto-update=True",
-      "--discv5-udp-port=9000",
-      "--discv5-bootstrap-node=enr:-La4QKi-GOzezuylyUIOA_6MFpbMUvhcVLg7v1KCXLR37tO6c5hgjAF6nzUbGM_9HG4LEM69JjTenYH0ZNFwOPg-UXIBgmlkgnY0gmlwhKwTAASKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ",
-      "--cluster-id=16",
-      # Docker DNS server
-#      "--dns-discovery-name-server=127.0.0.11",
-      "--dns-addrs-name-server=127.0.0.11",
-      "--dns4-domain-name=store",
-      "--keep-alive=true",
-      "--log-level=DEBUG",
-      "--max-connections=18000",
-      "--nodekey=3190bc9b55b18dbc171997a7a67abcd5bbf0c81002ad9617b1cb67f2f15daa64",
-      "--peer-exchange=true",
-      "--relay=true",
-      "--rest-address=0.0.0.0",
-      "--rest-admin",
-      "--shard=32",
-      "--shard=64",
-#      "--staticnode=/dns4/boot-1/tcp/60001/p2p/16Uiu2HAm3vFYHkGRURyJ6F7bwDyzMLtPEuCg4DU89T7km2u8Fjyb",
-      "--store=true",
-      "--tcp-port=60002"
     ]
     healthcheck:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
     ports:
       - "8646:8645/tcp"
 
-#  node-1:
+#  store:
 #    image: wakuorg/nwaku:v0.34.0
 #    entrypoint: [
 #      "/usr/bin/wakunode",
 #      "--discv5-discovery=true",
 #      "--discv5-enr-auto-update=True",
 #      "--discv5-udp-port=9000",
-#      "--discv5-bootstrap-node=enr:-La4QKi-GOzezuylyUIOA_6MFpbMUvhcVLg7v1KCXLR37tO6c5hgjAF6nzUbGM_9HG4LEM69JjTenYH0ZNFwOPg-UXIBgmlkgnY0gmlwhKwTAASKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ",
+#      "--discv5-bootstrap-node=enr:-La4QKi-GOzezuylyUIOA_6MFpbMUvhcVLg7v1KCXLR37tO6c5hgjAF6nzUbGM_9HG4LEM69JjTenYH0ZNFwOPg-UXIBgmlkgnY0gmlwhKwTAASKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ",  # -> boot-1
 #      "--cluster-id=16",
 #      # Docker DNS server
+##      "--dns-discovery-name-server=127.0.0.11",
 #      "--dns-addrs-name-server=127.0.0.11",
-#      "--dns4-domain-name=node-1",
-#      "--filter=true",
+#      "--dns4-domain-name=store",
 #      "--keep-alive=true",
-#      "--lightpush=true",
 #      "--log-level=DEBUG",
 #      "--max-connections=18000",
-#      "--nodekey=451ee0adb90a7970dca8a757bca58e9a66c02dcf928e1c55e9b49319a2407ac0",
+#      "--nodekey=3190bc9b55b18dbc171997a7a67abcd5bbf0c81002ad9617b1cb67f2f15daa64",  # Peer ID: 16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi
 #      "--peer-exchange=true",
 #      "--relay=true",
 #      "--rest-address=0.0.0.0",
 #      "--rest-admin",
 #      "--shard=32",
 #      "--shard=64",
-#      "--tcp-port=60003"
+##      "--staticnode=/dns4/boot-1/tcp/60001/p2p/16Uiu2HAm3vFYHkGRURyJ6F7bwDyzMLtPEuCg4DU89T7km2u8Fjyb",
+#      "--store=true",
+#      "--tcp-port=60002"
 #    ]
-##    depends_on:
-##      store:
-##        condition: service_healthy
-#
 #    healthcheck:
 #      test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
 #    ports:
 #      - "8647:8645/tcp"
+
+  node-1:
+    image: wakuorg/nwaku:v0.34.0
+    entrypoint: [
+      "/usr/bin/wakunode",
+      "--discv5-discovery=true",
+      "--discv5-enr-auto-update=True",
+      "--discv5-udp-port=9000",
+      "--discv5-bootstrap-node=enr:-La4QKi-GOzezuylyUIOA_6MFpbMUvhcVLg7v1KCXLR37tO6c5hgjAF6nzUbGM_9HG4LEM69JjTenYH0ZNFwOPg-UXIBgmlkgnY0gmlwhKwTAASKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ",  # -> boot-1
+      "--cluster-id=16",
+      # Docker DNS server
+      "--dns-addrs-name-server=127.0.0.11",
+      "--dns4-domain-name=node-1",
+      "--filter=true",
+      "--keep-alive=true",
+      "--lightpush=true",
+      "--log-level=DEBUG",
+      "--max-connections=18000",
+      "--nodekey=451ee0adb90a7970dca8a757bca58e9a66c02dcf928e1c55e9b49319a2407ac0",  # PeerID: 16Uiu2HAmGqYFBfbKCQmhUagDFVo43dPBoEe4mcp2TThH93AAf55c
+      "--peer-exchange=true",
+      "--relay=true",
+      "--rest-address=0.0.0.0",
+      "--rest-admin",
+      "--shard=32",
+      "--shard=64",
+      "--tcp-port=60003"
+    ]
+#    depends_on:
+#      store:
+#        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
+    ports:
+      - "8648:8645/tcp"

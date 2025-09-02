@@ -29,6 +29,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/waku-org/go-discover/discover/v5wire"
 
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -699,24 +701,48 @@ func (t *UDPv5) getNode(id enode.ID) *enode.Node {
 
 // handle processes incoming packets according to their message type.
 func (t *UDPv5) handle(p v5wire.Packet, fromID enode.ID, fromAddr *net.UDPAddr) {
+	zap.L().Debug("<<< handle",
+		zap.Any("name", p.Name()),
+		zap.Any("kind", p.Kind()),
+		zap.Any("reqquestID", p.RequestID()),
+		zap.Stringer("fromID", fromID),
+		zap.Any("addr", fromAddr),
+		zap.Any("packet", p),
+	)
 	switch p := p.(type) {
 	case *v5wire.Unknown:
+		zap.L().Debug("<<< handle discv5 unknown", zap.Any("packet", p))
 		t.handleUnknown(p, fromID, fromAddr)
 	case *v5wire.Whoareyou:
+		zap.L().Debug("<<< handle discv5 whoareyou", zap.Any("packet", p))
 		t.handleWhoareyou(p, fromID, fromAddr)
 	case *v5wire.Ping:
+		zap.L().Debug("<<< handle discv5 ping",
+			zap.Uint64("ENRSeq", p.ENRSeq),
+		)
 		t.handlePing(p, fromID, fromAddr)
 	case *v5wire.Pong:
+		zap.L().Debug("<<< handle discv5 pong",
+			zap.Uint64("ENRSeq", p.ENRSeq),
+			zap.Any("toIP", p.ToIP),
+			zap.Uint16("toPort", p.ToPort),
+			)
 		if t.handleCallResponse(fromID, fromAddr, p) {
 			t.localNode.UDPEndpointStatement(fromAddr, &net.UDPAddr{IP: p.ToIP, Port: int(p.ToPort)})
 		}
 	case *v5wire.Findnode:
+		zap.L().Debug("<<< handle discv5 findnode", zap.Any("packet", p))
 		t.handleFindnode(p, fromID, fromAddr)
 	case *v5wire.Nodes:
+		zap.L().Debug("<<< handle discv5 nodes",
+			zap.Uint8("total", p.Total),
+			zap.Any("nodes", p.Nodes))
 		t.handleCallResponse(fromID, fromAddr, p)
 	case *v5wire.TalkRequest:
+		zap.L().Debug("<<< handle discv5 talkrequest", zap.Any("packet", p))
 		t.handleTalkRequest(p, fromID, fromAddr)
 	case *v5wire.TalkResponse:
+		zap.L().Debug("<<< handle discv5 talkresponse", zap.Any("packet", p))
 		t.handleCallResponse(fromID, fromAddr, p)
 	}
 }

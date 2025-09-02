@@ -17,7 +17,7 @@ known_nodes = {
 class TestAppGeneral:
 
     def test_discovery(self, backend_new_profile):
-        nodes_count = 2
+        nodes_count = 1
         nodes: list[StatusBackend | None] = [None] * nodes_count
         stop_event = threading.Event()
 
@@ -29,8 +29,8 @@ class TestAppGeneral:
             nodes[node_index] = backend
             logging.info(
                 f"✅ backend {node_index} ready."
-                + f"Container ID: {backend.container.short_id()}."
-                + f"API Port: {backend.container.host_port}."
+                # + f"Container ID: {backend.container.short_id()}."
+                # + f"API Port: {backend.container.host_port}."
                 + f"Peer ID: {peer_id}"
             )
 
@@ -61,7 +61,7 @@ class TestAppGeneral:
                     response = node.wakuext_service.peers(enable_logging=False)
                     peers = response["result"]
                     peers = [known_nodes.get(peer, peer[-5:]) for peer in peers]
-                    logging.info(f" {i}. Total peers count: {len(peers)}, peers: {peers}")
+                    logging.info(f"node {i}. Total peers count: {len(peers)}, peers: {peers}")
                 time.sleep(5)
         except KeyboardInterrupt:
             logging.warning("Keyboard interrupt received")

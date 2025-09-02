@@ -19,9 +19,9 @@ func gethAdapter(logger *zap.Logger) log.Handler {
 			return err
 		}
 		// Skip trace logs to not clutter the output
-		if level == traceLevel {
-			return nil
-		}
+		//if level == traceLevel {
+		//	return nil
+		//}
 		serializedLog := string(log.TerminalFormat(false).Format(r))
 		logger.Check(level, fmt.Sprintf("'%s'", strings.TrimSuffix(serializedLog, "\n"))).Write()
 		return nil

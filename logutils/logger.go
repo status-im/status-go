@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/protocol/zaputil"
 )
 
@@ -20,6 +21,9 @@ var (
 func ZapLogger() *zap.Logger {
 	_initZapLogger.Do(func() {
 		_zapLogger = defaultLogger()
+
+		// Set global logger
+		zap.ReplaceGlobals(_zapLogger)
 
 		// forward geth logs to zap logger
 		_gethLogger := _zapLogger.Named("geth")

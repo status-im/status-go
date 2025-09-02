@@ -157,10 +157,10 @@ func selectMostExternalAddress(addresses []ma.Multiaddr) (*net.TCPAddr, error) {
 		ipAddrs = append(ipAddrs, ipAddr)
 	}
 
-	externalIPs := filterIP(ipAddrs, isExternal)
-	if len(externalIPs) > 0 {
-		return externalIPs[0], nil
-	}
+	//externalIPs := filterIP(ipAddrs, isExternal)
+	//if len(externalIPs) > 0 {
+	//	return externalIPs[0], nil
+	//}
 
 	privateIPs := filterIP(ipAddrs, isPrivate)
 	if len(privateIPs) > 0 {

@@ -98,7 +98,7 @@ import (
 
 const messageQueueLimit = 1024
 const requestTimeout = 30 * time.Second
-const bootnodesQueryBackoffMs = 200
+const bootnodesQueryBackoffMs = 200000
 const bootnodesMaxRetries = 7
 const cacheTTL = 20 * time.Minute
 const maxRelayPeers = 300
