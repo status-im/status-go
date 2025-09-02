@@ -71,7 +71,9 @@ func (s *Service) Start() error {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		wsHandler := s.rpcServer.WebsocketHandler([]string{})
+		// FIXME: this is a temporary solution to allow all origins
+		origins := []string{"*"}
+		wsHandler := s.rpcServer.WebsocketHandler(origins)
 		wsHandler.ServeHTTP(w, r)
 	})
 	s.wsServer = &http.Server{
