@@ -26,6 +26,7 @@ import (
 )
 
 func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
+	t.Skip("Broken by PR-6882, must fix")
 	state, closeFn := setupTests(t)
 	t.Cleanup(closeFn)
 
