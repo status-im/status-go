@@ -14,7 +14,7 @@ class TestGetAccountByAddress:
     def test_get_account_for_existing_addresses(self):
         path = "m/44'/60'/0'/0/1"
         derived_addresses_response = self.account.wallet_service.get_derived_addresses_for_mnemonic(self.account.mnemonic, [path])
-        derived_addresses = derived_addresses_response.json()["result"]
+        derived_addresses = derived_addresses_response["result"]
         self.account_data["key-uid"] = self.account.key_uid  # keyuid of profile keypair
         self.account_data["path"] = path
         self.account_data["address"] = derived_addresses[0].get("address")

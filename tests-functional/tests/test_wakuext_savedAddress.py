@@ -63,18 +63,16 @@ class TestSavedAddresses:
         # TODO: Add more assertions on response
 
         # Step: Verifying the item is in the saved addresses list
-        assert any(params[0].items() <= item.items() for item in response.json()["result"]), f"{params[0]['name']} not found in getSavedAddresses"
+        assert any(params[0].items() <= item.items() for item in response["result"]), f"{params[0]['name']} not found in getSavedAddresses"
 
         # Step: Checking if the item is listed under mainnet saved addresses
         response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [False])
         # TODO: Add more assertions on response
-        assert any(
-            params[0].items() <= item.items() for item in response.json()["result"]
-        ), f"{params[0]['name']} not found in getSavedAddressesPerMode"
+        assert any(params[0].items() <= item.items() for item in response["result"]), f"{params[0]['name']} not found in getSavedAddressesPerMode"
 
         # Step: Ensuring the item is NOT in the testnet saved addresses list
         response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [True])
-        assert response.json()["result"] is None, "wakuext_getSavedAddressesPerMode for test mode is not empty"
+        assert response["result"] is None, "wakuext_getSavedAddressesPerMode for test mode is not empty"
 
     def test_delete_saved_address(self):
         """Test deleting a saved address and verifying its removal."""
@@ -94,14 +92,12 @@ class TestSavedAddresses:
 
         # Step: Verifying the item exists in testnet saved addresses
         response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [is_test])
-        assert any(
-            params[0].items() <= item.items() for item in response.json()["result"]
-        ), f"{params[0]['name']} not found in getSavedAddressesPerMode"
+        assert any(params[0].items() <= item.items() for item in response["result"]), f"{params[0]['name']} not found in getSavedAddressesPerMode"
 
         # Step: Deleting the item and verifying removal
         self.rpc_client.rpc_valid_request("wakuext_deleteSavedAddress", [address, is_test])
         response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [is_test])
-        assert response.json()["result"] is None, "getSavedAddressesPerMode for test mode is not empty"
+        assert response["result"] is None, "getSavedAddressesPerMode for test mode is not empty"
 
     def test_remaining_capacity_for_saved_addresses(self):
         """Test checking the remaining capacity for saved addresses."""
@@ -131,7 +127,7 @@ class TestSavedAddresses:
 
         # Step: Checking remaining capacity
         response = self.rpc_client.rpc_valid_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
-        remaining_capacity = response.json()["result"]
+        remaining_capacity = response["result"]
 
         # Step: adding  addresses to fill capacity
         for i in range(remaining_capacity):
@@ -139,5 +135,4 @@ class TestSavedAddresses:
 
         # Step: Verifying that capacity is now 0
         response = self.rpc_client.rpc_valid_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
-        self.rpc_client.verify_is_json_rpc_error(response)
-        assert response.json()["error"]["message"] == "no more save addresses can be added"
+        assert response["error"]["message"] == "no more save addresses can be added"

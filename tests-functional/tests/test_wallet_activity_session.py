@@ -11,7 +11,7 @@ from clients.smart_contract_runner import SmartContractRunner
 from clients.contract_deployers.snt import SNTDeployer, SNTV2_ABI, SNT_TOKEN_CONTROLLER_ABI
 from resources.constants import DEPLOYER_ACCOUNT
 from clients.contract_deployers.communities import CommunitiesDeployer
-from web3 import Web3
+from web3 import Web3  # type: ignore
 
 EventActivityFilteringDone = "wallet-activity-filtering-done"
 EventActivityFilteringUpdate = "wallet-activity-filtering-entries-updated"
@@ -128,7 +128,7 @@ class TestWalletActivitySession:
         event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
 
         # Check response
-        sessionID = int(response.json()["result"])
+        sessionID = int(response["result"])
         assert sessionID > 0
 
         # Check response event

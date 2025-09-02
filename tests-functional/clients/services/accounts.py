@@ -8,90 +8,90 @@ class AccountService(Service):
 
     def get_accounts(self):
         response = self.rpc_request("getAccounts")
-        return response.json()
+        return response
 
     def get_account_keypairs(self):
         response = self.rpc_request("getKeypairs")
-        return response.json()
+        return response
 
     def add_account(self, password, account_data):
         params = [password, account_data]
         response = self.rpc_request("addAccount", params)
-        return response.json()
+        return response
 
     def delete_account(self, account_address, password):
         params = [account_address, password]
         response = self.rpc_request("deleteAccount", params)
-        return response.json()
+        return response
 
     def import_mnemonic(self, mnemonic, password):
         params = [mnemonic, password]
         response = self.rpc_request("importMnemonic", params)
-        return response.json()
+        return response
 
     def add_keypair_via_seed_phrase(self, mnemonic, password, name, wallet_account):
         params = [mnemonic, password, name, wallet_account]
         response = self.rpc_request("addKeypairViaSeedPhrase", params)
-        return response.json()
+        return response
 
     def add_keypair_via_private_key(self, private_key, password, name, wallet_account):
         params = [private_key, password, name, wallet_account]
         response = self.rpc_request("addKeypairViaPrivateKey", params)
-        return response.json()
+        return response
 
     def verify_password(self, password):
         params = [password]
         response = self.rpc_request("verifyPassword", params)
-        return response.json()
+        return response
 
     def resolve_suggested_path_for_keypair(self, key_uid):
         params = [key_uid]
         response = self.rpc_request("resolveSuggestedPathForKeypair", params)
-        return response.json()
+        return response
 
     def has_paired_devices(self):
         response = self.rpc_request("hasPairedDevices", [])
-        return response.json()
+        return response
 
     def update_keypair_name(self, key_uid, name):
         params = [key_uid, name]
         response = self.rpc_request("updateKeypairName", params)
-        return response.json()
+        return response
 
     def move_wallet_account(self, from_position, to_position):
         params = [from_position, to_position]
         response = self.rpc_request("moveWalletAccount", params)
-        return response.json()
+        return response
 
     def update_token_preferences(self, preferences):
         params = [preferences]
         response = self.rpc_request("updateTokenPreferences", params)
-        return response.json()
+        return response
 
     def get_token_preferences(self):
         response = self.rpc_request("getTokenPreferences", [])
-        return response.json()
+        return response
 
     def update_collectible_preferences(self, preferences):
         params = [preferences]
         response = self.rpc_request("updateCollectiblePreferences", params)
-        return response.json()
+        return response
 
     def get_collectible_preferences(self):
         response = self.rpc_request("getCollectiblePreferences", [])
-        return response.json()
+        return response
 
     def get_account_by_address(self, address):
         params = [address]
         response = self.rpc_request("getAccountByAddress", params)
-        return response.json()
+        return response
 
     def get_keypair_by_key_uid(self, key_uid):
         params = [key_uid]
         response = self.rpc_request("getKeypairByKeyUID", params)
-        return response.json()
+        return response
 
     def update_account(self, account):
         params = [account]
         response = self.rpc_request("updateAccount", params)
-        return response.json()
+        return response

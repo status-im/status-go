@@ -60,7 +60,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.base_url = url
         self.api_url = f"{url}/statusgo"
         self.ws_url = f"{url}".replace("http", "ws")
-        self.rpc_url = f"{url}/statusgo/CallRPC"
         self.public_key = ""
         self.mnemonic = ""
         self.key_uid = ""
@@ -72,7 +71,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.events = Events()
         self.version = "unknown"
 
-        RpcClient.__init__(self, self.rpc_url)
+        RpcClient.__init__(self)
         ApiClient.__init__(self, self.api_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
 
@@ -136,7 +135,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "pushFleetsConfigFilePath": Config.push_fleets_config,
         }
 
-        return self.api_valid_request(method, data)
+        return self.api_request_json(method, data)
 
     def _set_networks(self, data, **kwargs):
         self.network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
@@ -273,14 +272,14 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self._set_display_name(**kwargs)
         method = "CreateAccountAndLogin"
         data = self._create_account_request(user, **kwargs)
-        return self.api_valid_request(method, data)
+        return self.api_request_json(method, data)
 
     def restore_account_and_login(self, user=user_1, **kwargs):
         self._set_display_name(**kwargs)
         method = "RestoreAccountAndLogin"
         data = self._create_account_request(user, **kwargs)
         data["mnemonic"] = user.passphrase
-        return self.api_valid_request(method, data)
+        return self.api_request_json(method, data)
 
     def login(self, keyUid, user=user_1):
         self.password = user.password
@@ -292,11 +291,11 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         }
         data = self._set_proxy_credentials(data)
         data = self._set_wallet_secrets(data)
-        return self.api_valid_request(method, data)
+        return self.api_request_json(method, data)
 
     def logout(self):
         method = "Logout"
-        return self.api_valid_request(method, {})
+        return self.api_request_json(method, {})
 
     def wait_for_login(self):
         signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
@@ -339,7 +338,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
     def wait_for_online(self, timeout=10):
         start_time = time.time()
         while time.time() - start_time <= timeout:
-            response = self.wakuext_service.peers(enable_logging=False)
+            response = self.wakuext_service.peers()
             if len(response["result"].keys()) == 0:
                 time.sleep(0.5)
                 continue
@@ -380,7 +379,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 "clientConfig": {},
             },
         }
-        response = self.api_valid_request(method, data)
+        response = self.api_request_json(method, data)
         return json.loads(response.content)
 
     def get_connection_string_for_being_bootstrapped(self):
@@ -452,6 +451,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "newPassword": new_password,
         }
 
-        # NOTE: api_valid_request should be here, but we expect errors in some tests
-        # This is a temporary solution until we have a better way to expect errors from api_valid_request.
+        # NOTE: api_request_json should be here, but we expect errors in some tests
+        # This is a temporary solution until we have a better way to expect errors from api_request_json.
         return self.api_request(method, data)

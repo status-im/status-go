@@ -111,7 +111,7 @@ sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
 - Functional tests are implemented in `./tests-functional/tests` based on [pytest](https://docs.pytest.org/en/8.2.x/)
 - Backend fixtures and test infrastructure are defined in `./tests-functional/tests/conftest.py`
 - Every test has the following verifications:
-    - `verify_is_valid_json_rpc_response()` checks for status code 200, non-empty response, JSON-RPC structure, presence of the `result` / `error` field, and expected ID.
+    - `validate_json_rpc_response()` checks for status code 200, non-empty response, JSON-RPC structure, presence of the `result` / `error` field, and expected ID.
 
 ### Backend Setup and Cleanup with Pytest Fixtures
 

@@ -15,7 +15,7 @@ class TestAddAccount:
         # add account on path m/44'/60'/0'/0/1 to profile keypair
         path = "m/44'/60'/0'/0/1"
         derived_addresses_response = self.account.wallet_service.get_derived_addresses_for_mnemonic(self.account.mnemonic, [path])
-        derived_addresses = derived_addresses_response.json()["result"]
+        derived_addresses = derived_addresses_response["result"]
 
         # update account being added with necessary details
         self.account_data["key-uid"] = self.account.key_uid  # keyuid of profile keypair
@@ -100,7 +100,7 @@ class TestAddAccount:
 
         path = "m/44'/60'/0'/0/1"
         derived_addresses_response = self.account.wallet_service.get_derived_addresses_for_mnemonic(used_mnemonic, [path])
-        derived_addresses = derived_addresses_response.json()["result"]
+        derived_addresses = derived_addresses_response["result"]
 
         # update account being added with necessary details
         self.account_data["key-uid"] = add_keypair_response["result"]["key-uid"]

@@ -12,7 +12,7 @@ def _get_activity_center_notifications(
     params = {"cursor": "", "limit": 20, "activityTypes": activity_types}
     if read_type:
         params["readType"] = read_type
-    return backend_instance.wakuext_service.rpc_request(method="activityCenterNotifications", params=[params]).json()
+    return backend_instance.wakuext_service.rpc_request(method="activityCenterNotifications", params=[params])
 
 
 @pytest.mark.rpc
@@ -58,37 +58,37 @@ class TestActivityCenterNotifications(MessengerSteps):
         self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
         response = self.receiver.wakuext_service.rpc_request(
             method="activityCenterNotificationsCount", params=[{"activityTypes": [1, 2, 3, 4, 5, 7, 8, 9, 10, 23, 24], "readType": 2}]
-        ).json()
+        )
         assert response["result"]["5"] == 1
         # TODO: Add more assertions on response
 
     def test_seen_unseen_activity_center_notifications(self):
         self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = self.receiver.wakuext_service.rpc_request(method="hasUnseenActivityCenterNotifications").json()
+        response = self.receiver.wakuext_service.rpc_request(method="hasUnseenActivityCenterNotifications")
         assert response["result"] is True
         # TODO: Add more assertions on response
 
-        response = self.receiver.wakuext_service.rpc_request(method="markAsSeenActivityCenterNotifications").json()
+        response = self.receiver.wakuext_service.rpc_request(method="markAsSeenActivityCenterNotifications")
         # TODO: Add more assertions on response
 
-        response = self.receiver.wakuext_service.rpc_request(method="hasUnseenActivityCenterNotifications").json()
+        response = self.receiver.wakuext_service.rpc_request(method="hasUnseenActivityCenterNotifications")
         assert response["result"] is False
         # TODO: Add more assertions on response
 
     def test_get_activity_center_state(self):
         self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = self.receiver.wakuext_service.rpc_request(method="getActivityCenterState").json()
+        response = self.receiver.wakuext_service.rpc_request(method="getActivityCenterState")
         assert response["result"]["hasSeen"] is False
         # TODO: Add more assertions on response
 
-        self.receiver.wakuext_service.rpc_request(method="markAsSeenActivityCenterNotifications").json()
+        self.receiver.wakuext_service.rpc_request(method="markAsSeenActivityCenterNotifications")
 
-        response = self.receiver.wakuext_service.rpc_request(method="getActivityCenterState").json()
+        response = self.receiver.wakuext_service.rpc_request(method="getActivityCenterState")
         assert response["result"]["hasSeen"] is True
 
     def test_mark_all_activity_center_notifications_read(self):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = self.receiver.wakuext_service.rpc_request(method="markAllActivityCenterNotificationsRead").json()
+        response = self.receiver.wakuext_service.rpc_request(method="markAllActivityCenterNotificationsRead")
         assert all(
             (
                 response["result"]["activityCenterState"]["hasSeen"] is True,
@@ -97,7 +97,7 @@ class TestActivityCenterNotifications(MessengerSteps):
             )
         )
 
-        response = self.receiver.wakuext_service.rpc_request(method="hasUnseenActivityCenterNotifications").json()
+        response = self.receiver.wakuext_service.rpc_request(method="hasUnseenActivityCenterNotifications")
         assert response["result"] is False
 
     def test_mark_activity_center_notifications_read_unread(self):
@@ -109,7 +109,7 @@ class TestActivityCenterNotifications(MessengerSteps):
                     message_id,
                 ],
             ],
-        ).json()
+        )
         assert all(
             (
                 response["result"]["activityCenterNotifications"][0]["id"] == message_id,
@@ -127,7 +127,7 @@ class TestActivityCenterNotifications(MessengerSteps):
                     message_id,
                 ],
             ],
-        ).json()
+        )
         assert all(
             (
                 response["result"]["activityCenterState"]["hasSeen"] is False,
@@ -148,7 +148,7 @@ class TestActivityCenterNotifications(MessengerSteps):
                     message_id,
                 ],
             ],
-        ).json()
+        )
         # TODO: Add assertions on response
 
         result = _get_activity_center_notifications(backend_instance=self.receiver)["result"]
@@ -163,7 +163,7 @@ class TestActivityCenterNotifications(MessengerSteps):
                     message_id,
                 ],
             ],
-        ).json()
+        )
         # TODO: Add more assertions on response
 
         result = _get_activity_center_notifications(backend_instance=self.receiver)["result"]
@@ -180,7 +180,7 @@ class TestActivityCenterNotifications(MessengerSteps):
                     message_id,
                 ],
             ],
-        ).json()
+        )
         # TODO: Add more assertions on response
         result = _get_activity_center_notifications(backend_instance=self.sender)["result"]
         assert not result["notifications"]
