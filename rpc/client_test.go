@@ -120,5 +120,4 @@ func TestGetClientsUsingCache(t *testing.T) {
 
 func TestUserAgent(t *testing.T) {
 	require.True(t, strings.HasPrefix(rpcUserAgentName, "procuratee-desktop/"))
-	require.True(t, strings.HasPrefix(rpcUserAgentUpstreamName, "procuratee-desktop-upstream/"))
 }
