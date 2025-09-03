@@ -27,7 +27,7 @@ class ConnectorClient:
         assert response.status_code == 404
 
         logging.debug(f"ConnectorClient: connecting to {self.url}")
-        origin = "https://www.example.com" # At the moment all origins are allowed
+        origin = "https://www.example.com"  # At the moment all origins are allowed
         self.ws_conn = create_connection(self.url, origin=origin)
         assert self.ws_conn is not None
         assert self.ws_conn.sock is not None
@@ -102,7 +102,6 @@ class ConnectorClient:
 
     def receive(self):
         assert self.ws_conn is not None
-
         response = self.ws_conn.recv()
         logging.debug(f"Got Connector response: {json.dumps(response, sort_keys=True)}")
 

@@ -273,3 +273,16 @@ class TestStatusConnector:
         # Expect DAPP_PERMISSION_REVOKED signal, check dApp name
         event = wait_event(backend, SignalType.CONNECTOR_DAPP_PERMISSION_REVOKED.value)
         assert event.get("name") == connector.name
+
+    def test_unavailable_statusgo_method(self, backend, connector, wallet_account):
+        # First, register the dApp by calling some proper command
+        connector.eth_accounts()
+        accept_connector(backend, connector, wallet_account)
+        connector.receive()  # Read out the message
+
+        # Test that connector_callRPC doesn't allow calling status-go services methods
+        connector._send("wakuext_joinedCommunities", [])
+
+        message = connector.receive()
+        assert message.get("error") is not None
+        assert "method wakuext_joinedCommunities is not allowed" in message.get("error").get("message")
