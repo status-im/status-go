@@ -112,7 +112,7 @@ class TestBackupMnemonicAndRestore:
     )
     def test_restore_with_arbitrary_size_mnemonics(self, mnemonic_size):
         # Restore with an arbitrary length mnemonic
-        user = user_mnemonic_12
+        user = copy.deepcopy(user_mnemonic_12)
         user.passphrase = " ".join("".join(random.choice(string.ascii_lowercase) for _ in range(random.randint(2, 10))) for _ in range(mnemonic_size))
 
         restored_account = StatusBackend(self.await_signals)
@@ -127,7 +127,7 @@ class TestBackupMnemonicAndRestore:
 
     def test_restore_with_mnemonic_with_special_chars(self):
         # Restore with an mnemonic with special chars
-        user = user_mnemonic_12
+        user = copy.deepcopy(user_mnemonic_12)
         user.passphrase = "<>?`~!@#$%^&*()_+1 $fgdg ^&*()"
 
         restored_account = StatusBackend(self.await_signals)
@@ -141,7 +141,7 @@ class TestBackupMnemonicAndRestore:
 
     def test_restore_with_empty_mnemonic(self):
         # Restore with empty mnemonic isn't allowed
-        user = user_mnemonic_12
+        user = copy.deepcopy(user_mnemonic_12)
 
         restored_account = StatusBackend(self.await_signals)
         restored_account.init_status_backend()
@@ -153,7 +153,7 @@ class TestBackupMnemonicAndRestore:
 
     def test_restore_with_both_mnemonic_and_keycard(self):
         # Restore with both keycard and mnemonic isn't allowed
-        user = user_mnemonic_12
+        user = copy.deepcopy(user_mnemonic_12)
         restored_account = StatusBackend(self.await_signals)
         restored_account.init_status_backend()
         restored_account._set_display_name()
@@ -165,7 +165,7 @@ class TestBackupMnemonicAndRestore:
 
     @pytest.mark.skip(reason="test is flaky when ran as part of the suite")
     def test_restored_on_existing_restored_account_fails(self):
-        user = user_mnemonic_12
+        user = copy.deepcopy(user_mnemonic_12)
         restored_account = StatusBackend(self.await_signals)
         restored_account.init_status_backend()
         restored_account.restore_account_and_login(user=user)
