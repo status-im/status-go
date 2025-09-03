@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -8,10 +9,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethTrie "github.com/ethereum/go-ethereum/trie"
+
 	"github.com/status-im/status-go/crypto/types"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	"github.com/status-im/status-go/services/connector/chainutils"
@@ -173,6 +176,8 @@ func TestForwardedRPCs(t *testing.T) {
 	state, closeFn := setupTests(t)
 	t.Cleanup(closeFn)
 
+	ethClientMock := mock_client.NewMockClientInterface(state.mockCtrl)
+
 	sharedAccount := types.BytesToAddress(types.FromHex("0x3d0ab2a774b74bb1d36f97700315adf962c69fct"))
 
 	testDAppData := signal.ConnectorDApp{
@@ -185,12 +190,12 @@ func TestForwardedRPCs(t *testing.T) {
 	request, err := commands.RPCRequestFromJSON(requestJson)
 	assert.NoError(t, err)
 	request.ChainID = 291
-	byteRequest, err := json.Marshal(request)
-	assert.NoError(t, err)
 
 	expectedResponse := "0xaa37dc"
 
-	state.rpcClient.EXPECT().CallRaw(string(byteRequest)).Times(0)
+	state.rpcClient.EXPECT().
+		EthClient(request.ChainID).
+		Times(0)
 
 	_, err = state.api.CallRPC(state.ctx, requestJson)
 	assert.Equal(t, commands.ErrDAppIsNotPermittedByUser, err)
@@ -198,14 +203,26 @@ func TestForwardedRPCs(t *testing.T) {
 	err = commands.PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
 	assert.NoError(t, err)
 
-	state.rpcClient.EXPECT().CallRaw(string(byteRequest)).Times(1).Return(fmt.Sprintf(`{"jsonrpc":"2.0","id":37,"result":"%s"}`, expectedResponse))
+	state.rpcClient.EXPECT().
+		EthClient(request.ChainID).
+		Return(ethClientMock, nil)
+
+	ethClientMock.EXPECT().
+		CallContext(gomock.All(), gomock.Any(), "eth_blockNumber", gomock.Eq([]interface{}{})).
+		Times(1).
+		Do(func(ctx context.Context, result interface{}, method string, args ...interface{}) {
+			response := fmt.Sprintf(`{"jsonrpc":"2.0","id":37,"result":"%s"}`, expectedResponse)
+			err := json.Unmarshal([]byte(response), result)
+			assert.NoError(t, err)
+		}).
+		Return(nil)
 
 	response, err := state.api.CallRPC(state.ctx, requestJson)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 }
 
-func TestRequestAccountsAfterPermisasionsRevokeTest(t *testing.T) {
+func TestRequestAccountsAfterPermissionsRevokeTest(t *testing.T) {
 	state, closeFn := setupTests(t)
 	t.Cleanup(closeFn)
 
