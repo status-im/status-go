@@ -46,6 +46,7 @@ import (
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/updates"
+	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/web3provider"
@@ -248,32 +249,35 @@ func (n *StatusNode) StartLocalBackup() error {
 		}
 	}
 
-	filenameGetter := func() (string, error) {
-		profileKeypair, err := n.accountsSrvc.GetProfileKeypair()
-		if err != nil {
-			return "", err
-		}
-
-		backupPath, err := n.accountsSrvc.GetBackupPath()
-		if err != nil {
-			return "", err
-		}
-		var backupDir string
-		if backupPath != "" {
-			backupDir = backupPath
-		} else {
-			backupDir = filepath.Join(n.config.RootDataDir, "backups")
-		}
-		fullPath := filepath.Join(backupDir, fmt.Sprintf("%x_user_data.bkp", profileKeypair.KeyUID[len(profileKeypair.KeyUID)-4:]))
-		return fullPath, nil
-	}
-
 	chatAccount, err := n.gethAccountsManager.SelectedChatAccount()
 	if err != nil {
 		return err
 	}
 
 	privateKey := chatAccount.PrivateKey()
+
+	filenameGetter := func() (string, error) {
+		backupPath, err := n.accountsSrvc.GetBackupPath()
+		if err != nil {
+			return "", err
+		}
+
+		compressedPubKey, err := utils.SerializePublicKey(crypto.CompressPubkey(&privateKey.PublicKey))
+		if err != nil {
+			return "", err
+		}
+
+		var backupDir string
+		if backupPath != "" {
+			backupDir = backupPath
+		} else {
+			backupDir = filepath.Join(n.config.RootDataDir, "backups")
+		}
+
+		fullPath := filepath.Join(backupDir, fmt.Sprintf("%s_user_data.bkp", compressedPubKey[len(compressedPubKey)-6:]))
+
+		return fullPath, nil
+	}
 
 	n.localBackup, err = backup.NewController(backup.BackupConfig{
 		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
