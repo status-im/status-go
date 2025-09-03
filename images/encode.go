@@ -10,8 +10,6 @@ import (
 	"io"
 	"regexp"
 	"strings"
-
-	"github.com/nfnt/resize"
 )
 
 type EncodeConfig struct {
@@ -78,12 +76,12 @@ func CompressToFileLimits(bb *bytes.Buffer, img image.Image, bounds FileSizeLimi
 	if img.Bounds().Max.X > img.Bounds().Max.Y {
 		// X is longer
 		if img.Bounds().Max.X > longSideMax {
-			img = resize.Resize(uint(longSideMax), 0, img, resize.Bilinear)
+			img = resizeImage(img, longSideMax, 0)
 		}
 	} else {
 		// Y is longer or equal
 		if img.Bounds().Max.Y > longSideMax {
-			img = resize.Resize(0, uint(longSideMax), img, resize.Bilinear)
+			img = resizeImage(img, 0, longSideMax)
 		}
 	}
 

@@ -34,7 +34,36 @@ func (c *Circle) At(x, y int) color.Color {
 	return color.Alpha{A: 0}
 }
 
+// Calculates scaling factors using old and new image dimensions.
+func calcFactors(width, height int, oldWidth, oldHeight float64) (scaleX, scaleY float64) {
+	if width == 0 {
+		if height == 0 {
+			scaleX = 1.0
+			scaleY = 1.0
+		} else {
+			scaleY = oldHeight / float64(height)
+			scaleX = scaleY
+		}
+	} else {
+		scaleX = oldWidth / float64(width)
+		if height == 0 {
+			scaleY = scaleX
+		} else {
+			scaleY = oldHeight / float64(height)
+		}
+	}
+	return
+}
+
 func resizeImage(img image.Image, width int, height int) image.Image {
+	scaleX, scaleY := calcFactors(width, height, float64(img.Bounds().Dx()), float64(img.Bounds().Dy()))
+	if width == 0 {
+		width = int(0.7 + float64(img.Bounds().Dx())/scaleX)
+	}
+	if height == 0 {
+		height = int(0.7 + float64(img.Bounds().Dy())/scaleY)
+	}
+
 	out := image.NewNRGBA(image.Rect(0, 0, width, height))
 	xdraw.BiLinear.Scale(out, out.Bounds(), img, img.Bounds(), draw.Over, nil)
 	return out
