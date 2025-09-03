@@ -22,6 +22,10 @@ func NewAPI(client *rpc.Client, accountsManager *accounts.AccountsManager) *API 
 
 // EstimateGas estimates gas for a given payload on a chain.
 func (a *API) EstimateGas(ctx context.Context, chainID uint64, payload any) (result string, err error) {
-	err = a.client.CallContextIgnoringLocalHandlers(ctx, &result, chainID, "eth_estimateGas", payload)
+	client, err := a.client.EthClient(chainID)
+	if err != nil {
+		return "", err
+	}
+	err = client.CallContext(ctx, &result, "eth_estimateGas", payload)
 	return
 }

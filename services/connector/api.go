@@ -2,7 +2,6 @@ package connector
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -71,7 +70,7 @@ func NewAPI(s *Service) *API {
 	}
 }
 
-func (api *API) forwardRPC(URL string, request commands.RPCRequest) (interface{}, error) {
+func (api *API) forwardRPC(ctx context.Context, URL string, request commands.RPCRequest) (interface{}, error) {
 	dApp, err := persistence.SelectDAppByUrl(api.s.db, URL)
 	if err != nil {
 		return "", err
@@ -84,18 +83,16 @@ func (api *API) forwardRPC(URL string, request commands.RPCRequest) (interface{}
 	if request.ChainID != dApp.ChainID {
 		request.ChainID = dApp.ChainID
 	}
-
-	var response map[string]interface{}
-	byteRequest, err := json.Marshal(request)
+	rpcClient, err := api.s.rpc.EthClient(request.ChainID)
 	if err != nil {
 		return "", err
 	}
 
-	rawResponse := api.s.rpc.CallRaw(string(byteRequest))
-	if err := json.Unmarshal([]byte(rawResponse), &response); err != nil {
+	var response map[string]interface{}
+	err = rpcClient.CallContext(ctx, &response, request.Method, request.Params)
+	if err != nil {
 		return "", err
 	}
-
 	if errorField, ok := response["error"]; ok {
 		errorMap, _ := errorField.(map[string]interface{})
 		errorCode, _ := errorMap["code"].(float64)
@@ -120,7 +117,11 @@ func (api *API) CallRPC(ctx context.Context, inputJSON string) (interface{}, err
 		return command.Execute(ctx, request)
 	}
 
-	return api.forwardRPC(request.URL, request)
+	if !dappRemoteMethodIsAllowed(request.Method) {
+		return nil, fmt.Errorf("method %s is not allowed", request.Method)
+	}
+
+	return api.forwardRPC(ctx, request.URL, request)
 }
 
 func (api *API) RecallDAppPermission(origin string) error {
