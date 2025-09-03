@@ -7,10 +7,8 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
-	"math"
 	"os"
 
-	"github.com/nfnt/resize"
 	"github.com/oliamb/cutter"
 	"go.uber.org/zap"
 	xdraw "golang.org/x/image/draw"
@@ -31,40 +29,46 @@ func (c *Circle) Bounds() image.Rectangle {
 func (c *Circle) At(x, y int) color.Color {
 	xx, yy, rr := float64(x-c.X)+0.5, float64(y-c.Y)+0.5, float64(c.R)
 	if xx*xx+yy*yy < rr*rr {
-		return color.Alpha{255}
+		return color.Alpha{A: 255}
 	}
-	return color.Alpha{0}
+	return color.Alpha{A: 0}
+}
+
+func resizeImage(img image.Image, width int, height int) image.Image {
+	out := image.NewNRGBA(image.Rect(0, 0, width, height))
+	xdraw.BiLinear.Scale(out, out.Bounds(), img, img.Bounds(), draw.Over, nil)
+	return out
 }
 
 func Resize(size ResizeDimension, img image.Image) image.Image {
-	var width, height uint
+	var width, height int
 
 	switch {
 	case img.Bounds().Max.X == img.Bounds().Max.Y:
-		width, height = uint(size), uint(size)
+		width, height = int(size), int(size)
 	case img.Bounds().Max.X > img.Bounds().Max.Y:
-		width, height = 0, uint(size)
+		width, height = 0, int(size)
 	default:
-		width, height = uint(size), 0
+		width, height = int(size), 0
 	}
 
 	logutils.ZapLogger().Info("resizing",
 		zap.Uint("size", uint(size)),
-		zap.Uint("width", width),
-		zap.Uint("height", height))
+		zap.Int("width", width),
+		zap.Int("height", height))
 
-	return resize.Resize(width, height, img, resize.Bilinear)
+	return resizeImage(img, width, height)
 }
 
-func ResizeTo(percent int, img image.Image) image.Image {
-	width := uint(img.Bounds().Max.X * percent / 100)
-	height := uint(img.Bounds().Max.Y * percent / 100)
+func Scale(percent int, img image.Image) image.Image {
+	width := img.Bounds().Max.X * percent / 100
+	height := img.Bounds().Max.Y * percent / 100
 
-	return resize.Resize(width, height, img, resize.Bilinear)
+	return resizeImage(img, width, height)
 }
 
 func ShrinkOnly(size ResizeDimension, img image.Image) image.Image {
-	finalSize := int(math.Min(float64(size), math.Min(float64(img.Bounds().Dx()), float64(img.Bounds().Dy()))))
+	finalSize := min(int(size), img.Bounds().Dx(), img.Bounds().Dy())
 	return Resize(ResizeDimension(finalSize), img)
 }
 

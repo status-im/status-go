@@ -97,7 +97,7 @@ func CompressToFileLimits(bb *bytes.Buffer, img image.Image, bounds FileSizeLimi
 			return err
 		}
 
-		img = ResizeTo(95, img)
+		img = Scale(95, img)
 	}
 }
 
