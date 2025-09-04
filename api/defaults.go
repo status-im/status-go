@@ -25,10 +25,9 @@ const (
 	defaultMnemonicLength    = 12
 	walletAccountDefaultName = "Account 1"
 
-	DefaultKeystoreRelativePath   = "keystore"
-	DefaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
-	DefaultDataDir                = "/ethereum/mainnet_rpc"
-	DefaultAPILogFile             = "api.log"
+	DefaultKeystoreRelativePath               = "keystore"
+	DefaultKeycardPairingDataFileRelativePath = "/keycard/pairings.json"
+	DefaultAPILogFile                         = "api.log"
 
 	DefaultLogLevel                 = "ERROR"
 	DefaultVerifyTransactionChainID = 1
@@ -270,8 +269,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	nodeConfig.LogFile = gocommon.TruncateWithDot(keyUID) + ".log"
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = DefaultLogLevel
-	nodeConfig.DataDir = DefaultDataDir
-	nodeConfig.KeycardPairingDataFile = DefaultKeycardPairingDataFile
+	nodeConfig.KeycardPairingDataFile = filepath.Join(nodeConfig.RootDataDir, DefaultKeycardPairingDataFileRelativePath)
 	if request.KeycardPairingDataFile != nil {
 		nodeConfig.KeycardPairingDataFile = *request.KeycardPairingDataFile
 	}

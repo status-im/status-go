@@ -22,7 +22,6 @@ import (
 var (
 	config = params.NodeConfig{
 		NetworkID: 10,
-		DataDir:   "test",
 	}
 
 	networks = json.RawMessage("{}")

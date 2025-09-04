@@ -32,7 +32,6 @@ func initSettings(appDb *sql.DB, autoRefreshEnabled bool) (*settings.Database, e
 	var (
 		config = params.NodeConfig{
 			NetworkID: 10,
-			DataDir:   "test",
 		}
 		networks    = json.RawMessage("{}")
 		settingsObj = settings.Settings{

@@ -14,8 +14,8 @@ import (
 
 var (
 	config = params.NodeConfig{
-		NetworkID: 10,
-		DataDir:   "test",
+		NetworkID:   10,
+		RootDataDir: "test",
 	}
 	networks    = json.RawMessage("{}")
 	settingsObj = settings.Settings{

@@ -29,7 +29,7 @@ func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig, includeConnector boo
 		browser_enabled, permissions_enabled`
 
 	args := []any{
-		c.NetworkID, c.DataDir, "", c.NodeKey, c.APIModules, true,
+		c.NetworkID, "", "", c.NodeKey, c.APIModules, true,
 		c.WalletConfig.Enabled, c.BrowsersConfig.Enabled,
 		c.PermissionsConfig.Enabled,
 	}
@@ -94,7 +94,7 @@ func insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO shhext_config (
 		pfs_enabled, installation_id, mailserver_confirmations,
-		verify_transaction_url, 
+		verify_transaction_url,
 		verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, bandwidth_stats_enabled, synthetic_id
 	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
 		c.ShhextConfig.PFSEnabled, c.ShhextConfig.InstallationID, c.ShhextConfig.MailServerConfirmations,
@@ -248,12 +248,12 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 
 	err := tx.QueryRow(`
 	SELECT
-		network_id, data_dir, node_key, api_modules,
+		network_id, node_key, api_modules,
 		wallet_enabled, browser_enabled, permissions_enabled,
 		connector_enabled FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.NetworkID, &nodecfg.DataDir, &nodecfg.NodeKey, &nodecfg.APIModules,
+		&nodecfg.NetworkID, &nodecfg.NodeKey, &nodecfg.APIModules,
 		&nodecfg.WalletConfig.Enabled, &nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled,
 		&nodecfg.ConnectorConfig.Enabled,
 	)
@@ -295,7 +295,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	err = tx.QueryRow(`
 	SELECT pfs_enabled, installation_id, mailserver_confirmations,
 	verify_transaction_url,
-	verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, 
+	verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id,
 	bandwidth_stats_enabled FROM shhext_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.ShhextConfig.PFSEnabled, &nodecfg.ShhextConfig.InstallationID, &nodecfg.ShhextConfig.MailServerConfirmations,
