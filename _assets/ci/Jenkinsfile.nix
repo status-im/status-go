@@ -31,15 +31,6 @@ pipeline {
         }
       }
     }
-
-    stage('Build Android library') {
-      when { expression { env.NODE_LABELS?.contains('linux') } }
-      steps {
-        script {
-          nix.flake("status-go-mobile-android")
-        }
-      }
-    }
   }
 
   post {

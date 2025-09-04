@@ -1,5 +1,4 @@
 .PHONY: statusgo all test clean help
-.PHONY: statusgo-android statusgo-ios
 .PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
 
 # Clear any GOROOT set outside of the Nix shell
@@ -170,9 +169,6 @@ push-notification-server: build/bin/push-notification-server
 cmd: ##@build Build all public apps in ./cmd
 cmd: status-backend push-notification-server
 
-statusgo-cross: statusgo-android statusgo-ios
-	@echo "Full cross compilation done."
-	@ls -ld build/bin/statusgo-*
 
 status-go-deps:
 	go clean -cache || true
@@ -181,35 +177,7 @@ status-go-deps:
 	go install github.com/kevinburke/go-bindata/v4/...@v4.0.2
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
-statusgo-android: generate
-statusgo-android: ##@cross-compile Build status-go for Android
-	@echo "Building status-go for Android..."
-	mkdir -p build/bin \
-	export GO111MODULE=on; \
-	export GOFLAGS="-mod=mod"; \
-	gomobile init; \
-	gomobile bind -v \
-		-target=android -ldflags="-s -w -checklinkname=0" \
-		-tags '$(BUILD_TAGS) disable_torrent' \
-		$(BUILD_FLAGS_MOBILE) \
-		--androidapi="23" \
-		-o build/bin/statusgo.aar \
-		github.com/status-im/status-go/mobile
-	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
-statusgo-ios: generate
-statusgo-ios: ##@cross-compile Build status-go for iOS
-	@echo "Building status-go for iOS..."
-	export GO111MODULE=on; \
-	export GOFLAGS="-mod=mod"; \
-	gomobile init; \
-	gomobile bind -v \
-		-target=ios -ldflags="-s -w" \
-		-tags 'nowatchdog $(BUILD_TAGS) disable_torrent' \
-		$(BUILD_FLAGS_MOBILE) \
-		-o build/bin/Statusgo.xcframework \
-		github.com/status-im/status-go/mobile
-	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
 statusgo-library: generate
 statusgo-library: $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
@@ -290,9 +258,6 @@ analyze-token-stores:
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
-	mv build/bin/statusgo.aar $(RELEASE_DIR)/status-go-android.aar
-	zip -r build/bin/Statusgo.xcframework.zip build/bin/Statusgo.xcframework
-	mv build/bin/Statusgo.xcframework.zip $(RELEASE_DIR)/status-go-ios.zip
 	zip -r $(RELEASE_DIR)/status-go-desktop.zip . -x *.git*
 	${MAKE} clean
 
