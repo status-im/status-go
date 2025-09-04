@@ -154,3 +154,8 @@ class AccountService(Service):
         params = [key_uid]
         response = self.rpc_request("getKeycardsWithSameKeyUID", params)
         return response
+
+    def verify_keystore_file_for_account(self, address, password):
+        params = [address, password]
+        response = self.rpc_request("verifyKeystoreFileForAccount", params)
+        return response

@@ -38,6 +38,12 @@ class TestMigrateNonProfileKeycardKeypairToApp:
         assert len(accounts_list) > 0
         kc["accounts-addresses"] = [a.get("address") for a in accounts_list]
 
+        all_accounts = self.account.accounts_service.get_accounts()
+
+        for account in all_accounts.get("result"):
+            resp = self.account.accounts_service.verify_keystore_file_for_account(account.get("address"), self.account.password)
+            assert resp.get("result") is True
+
         save_resp = self.account.accounts_service.save_or_update_keycard(kc)
         assert "error" not in save_resp
 
@@ -55,6 +61,10 @@ class TestMigrateNonProfileKeycardKeypairToApp:
         assert "error" not in migrate_resp
         # many RPC "void" actions return result None
         assert migrate_resp.get("result") is None
+
+        for account in all_accounts.get("result"):
+            resp = self.account.accounts_service.verify_keystore_file_for_account(account.get("address"), self.account.password)
+            assert resp.get("result") is True
 
         # 4) Verify the keypair still exists and that its keycards list is empty (i.e. migrated off keycard)
         kp_resp = self.account.accounts_service.get_keypair_by_key_uid(key_uid)
