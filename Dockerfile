@@ -44,7 +44,7 @@ LABEL source="https://github.com/status-im/status-go"
 LABEL description="status-go is an underlying part of Status - a browser, messenger, and gateway to a decentralized world."
 
 RUN apt-get update \
- && apt-get install -y ca-certificates bash curl \
+ && apt-get install -y ca-certificates bash curl python3 \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
@@ -54,6 +54,7 @@ RUN mkdir -p /static/configs
 
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/status-backend /usr/local/bin/
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/push-notification-server /usr/local/bin/
+COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/scripts/scan_waku_fleet.py /usr/local/bin
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
 
