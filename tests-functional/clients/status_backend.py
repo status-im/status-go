@@ -416,8 +416,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 "clientConfig": {},
             },
         }
-        response = self.api_request(method, data)
-        return json.loads(response.content)
+        return self.api_request_json(method, data)
 
     def gather_metrics(self):
         if not self.container:
@@ -449,7 +448,4 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "oldPassword": old_password,
             "newPassword": new_password,
         }
-
-        # NOTE: api_request_json should be here, but we expect errors in some tests
-        # This is a temporary solution until we have a better way to expect errors from api_request_json.
-        return self.api_request(method, data)
+        return self.api_request_json(method, data)
