@@ -14,3 +14,11 @@ class ConnectorService(Service):
         }
         response = self.rpc_request("requestAccountsAccepted", [params])
         return response.json()
+
+    def send_transaction_accepted(self, request_id: str, tx_hash: str):
+        params = {
+            "requestId": request_id,
+            "hash": tx_hash,
+        }
+        response = self.rpc_request("sendTransactionAccepted", [params])
+        return response.json()

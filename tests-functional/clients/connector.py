@@ -1,6 +1,7 @@
 import json
 import logging
 import requests
+from typing import Any, Dict, List
 import websocket
 from websocket import WebSocket
 from websocket import create_connection
@@ -38,16 +39,43 @@ class ConnectorClient:
         if self.ws_conn is not None:
             self.ws_conn.close()
 
-    def accounts(self):
-        self._send("eth_accounts")
-
-    def chain_id(self):
+    def eth_chain_id(self):
         self._send("eth_chainId")
 
-    def block_number(self):
+    def eth_accounts(self):
+        self._send("eth_accounts")
+
+    def eth_request_accounts(self):
+        self._send("eth_requestAccounts")
+
+    def eth_block_number(self):
         self._send("eth_blockNumber")
 
-    def revoke_permissions(self):
+    def eth_get_balance(self, address: str):
+        self._send("eth_getBalance", [address, "latest"])
+
+    def eth_get_transaction_count(self, address: str):
+        self._send("eth_getTransactionCount", [address, "latest"])
+
+    def eth_call(self, call_object: Dict[str, Any]):
+        params: List[Any] = [call_object, "latest"]
+        self._send("eth_call", params)
+
+    def eth_estimate_gas(self, tx_object: Dict[str, Any]):
+        params: List[Any] = [tx_object]
+        self._send("eth_estimateGas", params)
+
+    def eth_get_transaction_receipt(self, tx_hash: str):
+        self._send("eth_getTransactionReceipt", [tx_hash])
+
+    def eth_send_transaction(self, tx_object: Dict[str, Any]):
+        self._send("eth_sendTransaction", [tx_object])
+
+    def wallet_switch_ethereum_chain(self, chain_id: int):
+        hex_chain_id = hex(chain_id)
+        self._send("wallet_switchEthereumChain", [{"chainId": hex_chain_id}])
+
+    def wallet_revoke_permissions(self):
         self._send("wallet_revokePermissions")
 
     def _send(self, method, params=None):
