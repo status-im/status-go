@@ -70,6 +70,7 @@ class StatusGoContainer:
             "command": cmd,
             "ports": ports,
             "stop_signal": "SIGINT",
+            "network": self.network_name,
         }
 
         if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
@@ -86,9 +87,6 @@ class StatusGoContainer:
         StatusGoContainer.all_containers.append(self)
 
         logging.debug(f"Container {self.container.name} created. ID = {self.container.id}")
-
-        network = self.docker_client.networks.get(self.network_name)
-        network.connect(self.container)
 
     def get_waku_fleet_scan_command(self):
         """Returns the command string for scanning Waku fleet and generating config"""
