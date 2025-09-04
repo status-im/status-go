@@ -44,12 +44,12 @@ class TestMigrateNonProfileKeycardKeypairToApp:
             resp = self.account.accounts_service.verify_keystore_file_for_account(address, self.account.password)
             assert resp.get("result") is True
 
-        save_resp = self.account.accounts_service.save_or_update_keycard(kc)
+        save_resp = self.account.accounts_service.save_or_update_keycard(kc, self.account.password)
         assert "error" not in save_resp
 
         for address in addresses:
             resp = self.account.accounts_service.verify_keystore_file_for_account(address, self.account.password)
-            assert resp.get("result") is True
+            assert resp.get("result") is False
 
         # verify keycard present
         keycards_before = self.account.accounts_service.get_all_known_keycards()
