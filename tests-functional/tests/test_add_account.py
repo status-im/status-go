@@ -1,6 +1,8 @@
 import copy
+import re
 import pytest
 from resources.constants import new_account_data_1, user_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -41,37 +43,32 @@ class TestAddAccount:
         assert defaultAccount["wallet"] is True
 
         # Add the same account second time
-        add_account_response = self.account.accounts_service.add_account(self.account.password, defaultAccount)
-        assert add_account_response.get("error", {}).get("message", "") == "account already exists"
+        with pytest.raises(ApiResponseError, match=re.escape("account already exists")):
+            self.account.accounts_service.add_account(self.account.password, defaultAccount)
 
     def test_add_account_for_unknown_key_uid(self):
         self.account_data["key-uid"] = "0x3231d92c94548d14f097173765a50bebe28fbad8f2267c9e08cc4433a6f219a4"
-        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
-        assert add_account_response.get("error", {}).get("message", "") == "keypair is not found"
+        with pytest.raises(ApiResponseError, match=re.escape("keypair is not found")):
+            self.account.accounts_service.add_account(self.account.password, self.account_data)
 
     def test_add_account_for_empty_address(self):
         self.account_data["address"] = ""
-        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
-        assert add_account_response.get("error", {}).get("message", "") == "invalid argument 1: hex string has length 0, want 40 for types.Address"
+        with pytest.raises(ApiResponseError, match=re.escape("invalid argument 1: hex string has length 0, want 40 for types.Address")):
+            self.account.accounts_service.add_account(self.account.password, self.account_data)
 
     def test_add_account_for_empty_path(self):
         self.account_data["path"] = ""
-        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
-        expected_error = "[account] account mismatch"
-        expected_error_context = "address: " + self.account_data["address"]
-        error_message = add_account_response.get("error", {}).get("message", "")
-        assert expected_error in error_message
-        assert expected_error_context.lower() in error_message.lower()
+        with pytest.raises(ApiResponseError, match=re.escape("[account] account mismatch -  address:")):
+            self.account.accounts_service.add_account(self.account.password, self.account_data)
 
-    @pytest.mark.parametrize("key", ["wallet", "chat"])
-    def test_add_account_with_key_set_on_true__(self, key):
+    @pytest.mark.parametrize(
+        "key, error", [("wallet", "[database] cannot add default wallet account"), ("chat", "[database] cannot add default chat account")]
+    )
+    def test_add_account_with_key_set_on_true__(self, key, error):
         self.account_data["key-uid"] = self.account.key_uid
         self.account_data[key] = True
-        add_account_response = self.account.accounts_service.add_account(self.account.password, self.account_data)
-        if key == "wallet":
-            assert add_account_response.get("error", {}).get("message", "") == "[database] cannot add default wallet account"
-        else:
-            assert add_account_response.get("error", {}).get("message", "") == "[database] cannot add default chat account"
+        with pytest.raises(ApiResponseError, match=re.escape(error)):
+            self.account.accounts_service.add_account(self.account.password, self.account_data)
 
     def test_add_watch_account(self):
         self.account_data["type"] = "watch"
