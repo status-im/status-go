@@ -706,14 +706,13 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 
 	json := `{
 		"NetworkId": 3,
-		"DataDir": "` + testContext.config.DataDir + `",
-		"KeycardPairingDataFile": "` + path.Join(testContext.config.DataDir, "keycard/pairings.json") + `",
+		"KeycardPairingDataFile": "` + path.Join(testContext.config.RootDataDir, "keycard/pairings.json") + `",
 		"NoDiscovery": true,
 		"TorrentConfig": {
 			"Port": 9025,
 			"Enabled": false,
-			"DataDir": "` + testContext.config.DataDir + `/archivedata",
-			"TorrentDir": "` + testContext.config.DataDir + `/torrents"
+			"DataDir": "` + testContext.config.RootDataDir + `/archivedata",
+			"TorrentDir": "` + testContext.config.RootDataDir + `/torrents"
 		},
 		"RuntimeLogLevel": "INFO",
 		"LogLevel": "DEBUG"
@@ -730,7 +729,7 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 	require.NoError(t, err)
 
 	request := &requests.CreateAccount{
-		RootDataDir:   testContext.config.DataDir,
+		RootDataDir:   testContext.config.RootDataDir,
 		Password:      testPassword,
 		KdfIterations: 1,
 	}
@@ -771,8 +770,8 @@ func TestLoginAccount(t *testing.T) {
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
 		Password:           testPassword,
-		RootDataDir:        testContext.config.DataDir,
-		LogFilePath:        testContext.config.DataDir + "/log",
+		RootDataDir:        testContext.config.RootDataDir,
+		LogFilePath:        testContext.config.RootDataDir + "/log",
 		WakuV2Nameserver:   &nameserver,
 		WakuV2Fleet:        "status.staging",
 	}
@@ -804,7 +803,7 @@ func TestLoginAccount(t *testing.T) {
 	require.NoError(t, testContext.backend.Logout())
 	require.NoError(t, testContext.backend.StopNode())
 
-	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
+	testContext.backend.UpdateRootDataDir(testContext.config.RootDataDir)
 
 	accounts, err := testContext.backend.GetAccounts()
 	require.NoError(t, err)
@@ -830,7 +829,7 @@ func TestVerifyDatabasePassword(t *testing.T) {
 	testContext := setupTestContext(t, testPassword, false, false, false)
 
 	request := &requests.CreateAccount{
-		RootDataDir:   testContext.config.DataDir,
+		RootDataDir:   testContext.config.RootDataDir,
 		Password:      testPassword,
 		KdfIterations: 1,
 	}
@@ -854,7 +853,7 @@ func TestConvertAccount(t *testing.T) {
 	testContext := setupTestContext(t, testPassword, false, false, true)
 
 	request := &requests.CreateAccount{
-		RootDataDir:   testContext.config.DataDir,
+		RootDataDir:   testContext.config.RootDataDir,
 		Password:      testPassword,
 		KdfIterations: 1,
 	}
@@ -1016,7 +1015,7 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig, keyUID string) {
 
 	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 
-	b.UpdateRootDataDir(conf.DataDir)
+	b.UpdateRootDataDir(conf.RootDataDir)
 
 	require.NoError(t, b.OpenAccounts())
 
@@ -1107,7 +1106,7 @@ func TestChangeDatabasePassword(t *testing.T) {
 	err = testContext.backend.ChangeDatabasePassword(testContext.profileKeypair.KeyUID, testPassword, newPassword)
 	require.NoError(t, err)
 
-	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
+	testContext.backend.UpdateRootDataDir(testContext.config.RootDataDir)
 
 	// Test that keystore can be decrypted with the new password
 	ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, newPassword)
@@ -1132,8 +1131,8 @@ func TestCreateWallet(t *testing.T) {
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
 		Password:           testPassword,
-		RootDataDir:        testContext.config.DataDir,
-		LogFilePath:        testContext.config.DataDir + "/log",
+		RootDataDir:        testContext.config.RootDataDir,
+		LogFilePath:        testContext.config.RootDataDir + "/log",
 	}
 
 	c := make(chan interface{}, 10)
@@ -1194,8 +1193,8 @@ func TestSetFleet(t *testing.T) {
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
 		Password:           testPassword,
-		RootDataDir:        testContext.config.DataDir,
-		LogFilePath:        testContext.config.DataDir + "/log",
+		RootDataDir:        testContext.config.RootDataDir,
+		LogFilePath:        testContext.config.RootDataDir + "/log",
 	}
 
 	c := make(chan interface{}, 10)
@@ -1227,7 +1226,7 @@ func TestSetFleet(t *testing.T) {
 
 	require.NoError(t, testContext.backend.Logout())
 
-	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
+	testContext.backend.UpdateRootDataDir(testContext.config.RootDataDir)
 
 	loginAccountRequest := &requests.Login{
 		KeyUID:   newAccount.KeyUID,
@@ -1265,8 +1264,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
 		Password:           testPassword,
-		RootDataDir:        testContext.config.DataDir,
-		LogFilePath:        testContext.config.DataDir + "/log",
+		RootDataDir:        testContext.config.RootDataDir,
+		LogFilePath:        testContext.config.RootDataDir + "/log",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1295,7 +1294,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 		},
 	}
 
-	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
+	testContext.backend.UpdateRootDataDir(testContext.config.RootDataDir)
 
 	require.NoError(t, testContext.backend.LoginAccount(loginAccountRequest))
 	select {
@@ -1422,7 +1421,7 @@ func TestAcceptTerms(t *testing.T) {
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 
-	b.UpdateRootDataDir(conf.DataDir)
+	b.UpdateRootDataDir(conf.RootDataDir)
 	require.NoError(t, b.OpenAccounts())
 	nameserver := "8.8.8.8"
 	createAccountRequest := &requests.CreateAccount{
@@ -1572,7 +1571,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 			"torrentConfigEnabled":   false,
 			"torrentConfigPort":      0,
 			"keycardInstanceUID":     "a84599394887b742eed9a99d3834a797",
-			"keycardPairingDataFile": path.Join(tmpdir, DefaultKeycardPairingDataFile),
+			"keycardPairingDataFile": path.Join(tmpdir, DefaultKeycardPairingDataFileRelativePath),
 		},
 	}
 
@@ -1585,7 +1584,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 	require.NoError(t, err)
 
-	backend.UpdateRootDataDir(conf.DataDir)
+	backend.UpdateRootDataDir(conf.RootDataDir)
 
 	require.NoError(t, backend.OpenAccounts())
 

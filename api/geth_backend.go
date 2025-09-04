@@ -584,7 +584,6 @@ func (b *GethStatusBackend) workaroundToFixBadMigration(request *requests.Login)
 
 	// check if we saved a empty node config because of node config migration failed
 	if currentConf.NetworkID == 0 &&
-		currentConf.DataDir == "" &&
 		currentConf.NodeKey == "" {
 		// check if exist old node config
 		oldNodeConf := &params.NodeConfig{}
@@ -630,7 +629,6 @@ func (b *GethStatusBackend) overridePartialWithOldNodeConfig(conf *params.NodeCo
 	conf.LogFile = oldNodeConf.LogFile
 	conf.LogDir = oldNodeConf.LogDir
 	conf.LogLevel = oldNodeConf.LogLevel
-	conf.DataDir = oldNodeConf.DataDir
 	conf.NodeKey = oldNodeConf.NodeKey
 }
 
@@ -700,7 +698,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	defaultCfg := &params.NodeConfig{
 		// why we need this? relate PR: https://github.com/status-im/status-go/pull/4014
-		KeycardPairingDataFile: DefaultKeycardPairingDataFile,
+		KeycardPairingDataFile: filepath.Join(b.rootDataDir, DefaultKeycardPairingDataFileRelativePath),
 	}
 
 	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
@@ -1885,7 +1883,6 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	}
 
 	conf.RootDataDir = b.rootDataDir
-	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
 
 	if _, err = os.Stat(conf.RootDataDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(conf.RootDataDir, os.ModePerm); err != nil {
