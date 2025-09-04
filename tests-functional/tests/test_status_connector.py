@@ -237,7 +237,7 @@ class TestStatusConnector:
         assert message.get("error") is None
         assert message.get("result") == fake_hash
 
-    def test_wallet_switch_ethereum_chain(self, backend, connector, wallet_account):
+    def test_switch_ethereum_chain(self, backend, connector, wallet_account):
         # Switch chain not resolved before connection
         connector.wallet_switch_ethereum_chain(backend.network_id)
         message = connector.receive()
