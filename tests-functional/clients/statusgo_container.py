@@ -21,7 +21,7 @@ class StatusGoContainer:
     all_containers = []
     container = None
 
-    def __init__(self, entrypoint, ports=None, privileged=False, container_name_suffix=""):
+    def __init__(self, cmd, ports=None, privileged=False, container_name_suffix=""):
         if ports is None:
             ports = {}
 
@@ -56,6 +56,7 @@ class StatusGoContainer:
             "labels": {"com.docker.compose.project": docker_project_name},
             "environment": {
                 "GOCOVERDIR": "/coverage/binary",
+                "SCAN_WAKU_FLEET": self.get_waku_fleet_scan_command(),
             },
             "volumes": {
                 coverage_path: {
@@ -66,7 +67,7 @@ class StatusGoContainer:
             "extra_hosts": {
                 "host.docker.internal": "host-gateway",
             },
-            "entrypoint": entrypoint,
+            "command": cmd,
             "ports": ports,
             "stop_signal": "SIGINT",
         }
@@ -88,6 +89,24 @@ class StatusGoContainer:
 
         network = self.docker_client.networks.get(self.network_name)
         network.connect(self.container)
+
+    def get_waku_fleet_scan_command(self):
+        """Returns the command string for scanning Waku fleet and generating config"""
+
+        # Known node names from docker compose
+        bootstrap_nodes = "boot-1"
+        static_nodes = "boot-1"  # Add bootnode, otherwise metadata exchange doesn't happen, and Waku light mode doesn't work
+        store_nodes = "store"
+
+        return (
+            "python3 /usr/local/bin/scan_waku_fleet.py "
+            f"--fleet-name {Config.waku_fleet} "
+            f"--cluster-id 16 "  # Cluster ID matches docker-compose.waku.yml
+            f"--bootstrap-nodes {bootstrap_nodes} "
+            f"--store-nodes {store_nodes} "
+            f"--static-nodes {static_nodes} "
+            f"--output {Config.waku_fleets_config}"
+        )
 
     def __del__(self):
         self.stop()
@@ -374,37 +393,6 @@ class StatusBackendContainer(StatusGoContainer):
             self.connector_ws_url = f"ws://127.0.0.1:{connector_ws_port}"
 
         super().__init__(entrypoint, ports, privileged, container_name_suffix=f"-status-backend-{host_port}")
-
-        # Generate Waku fleet config inside the container right after it's created
-        try:
-            self._generate_waku_fleet_config()
-        except Exception as e:
-            # Do not fail container initialization immediately; raise a clear error
-            raise RuntimeError(f"Failed to generate Waku fleet config inside container: {e}")
-
-    def _generate_waku_fleet_config(self):
-        """Generate Waku fleet config inside the container using scan_waku_fleet.py"""
-        # Use defaults suitable for local docker-compose.waku.yml
-        # Fleet name is configurable via pytest option --waku-fleet
-        fleet = Config.waku_fleet or "status-go.test"
-        # Cluster ID matches docker-compose.waku.yml
-        cluster_id = 16
-        # Known node names from docker compose
-        bootstrap_nodes = "boot-1"
-        store_nodes = "store"
-        static_nodes = "boot-1"  # Add the bootnode, otherwise metadata exchange doesn't happen, and Waku light mode doesn't work
-
-        cmd = (
-            "python3 /usr/local/bin/scan_waku_fleet.py "
-            f"--fleet-name {fleet} "
-            f"--cluster-id {cluster_id} "
-            f"--bootstrap-nodes {bootstrap_nodes} "
-            f"--store-nodes {store_nodes} "
-            f"--static-nodes '{static_nodes}' "
-            f"--output {Config.waku_fleets_config}"
-        )
-        logging.debug(f"Generating Waku fleet config with command: {cmd}")
-        self.exec(cmd)
 
     def _change_ip(self, new_ipv4=None, new_ipv6=None):
         if not self.container:

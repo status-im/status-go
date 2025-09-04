@@ -58,7 +58,10 @@ COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/scri
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
 
+COPY _assets/scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # 30304 is used for Discovery v5
 EXPOSE 8080 8545 30303 30303/udp 30304/udp
-ENTRYPOINT ["status-backend"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["--help"]

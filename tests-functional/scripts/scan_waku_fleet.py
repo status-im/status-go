@@ -10,6 +10,16 @@ from urllib import request
 from typing import Dict, List, Optional, Tuple
 
 
+def print_config_options(args):
+    logging.info("Configuration options:")
+    logging.info(f"  Fleet name: {args.fleet_name}")
+    logging.info(f"  Cluster ID: {args.cluster_id}")
+    logging.info(f"  Static nodes: {args.static_nodes}")
+    logging.info(f"  Bootstrap nodes: {args.bootstrap_nodes}")
+    logging.info(f"  Store nodes: {args.store_nodes}")
+    logging.info(f"  Output path: {args.output}")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Scan Waku nodes and build wakufleetconfig.json using DNS-based ENRs")
     parser.add_argument("--fleet-name", required=True, help="Fleet name, e.g. status-go.test")
@@ -33,8 +43,9 @@ def parse_args():
     return parser.parse_args()
 
 
-def _fetch_debug_info(host: str, delay: float = 0.5) -> Optional[Dict]:
+def _fetch_debug_info(host: str) -> Optional[Dict]:
     url = f"http://{host}:8645/debug/v1/info"
+    logging.info(f"Fetching debug info from Waku node {url}")
     with request.urlopen(url, timeout=5.0) as resp:
         assert resp.status == 200
         data = resp.read()
@@ -73,6 +84,7 @@ def _scan_hosts(hosts: List[str]) -> Dict[str, Tuple[str, Optional[str]]]:
 def main():
     logging.basicConfig(level=logging.INFO, format="[scan_waku_fleet] %(message)s")
     args = parse_args()
+    print_config_options(args)
 
     def split_list(s: str) -> List[str]:
         return [x.strip() for x in s.split(",") if x.strip()] if s else []
