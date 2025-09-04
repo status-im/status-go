@@ -17,7 +17,7 @@ known_nodes = {
 class TestAppGeneral:
 
     def test_discovery(self, backend_new_profile):
-        nodes_count = 1
+        nodes_count = 2
         nodes: list[StatusBackend | None] = [None] * nodes_count
         stop_event = threading.Event()
 

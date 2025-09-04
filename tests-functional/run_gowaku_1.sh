@@ -23,4 +23,4 @@ $waku \
       --pubsub-topic=/waku/2/rs/16/32 \
       --pubsub-topic=/waku/2/rs/16/64 \
       --tcp-port=60004 \
-      --discv5-bootstrap-node=enr:-LO4QN67kmB27KpzGULjMop45yahFjHP1Q_r1RYd_B_JFLX_S5Fy3AHkOjsKvWny1_n_IuRIrP3zfkMKTAdQ93xNw0cCgmlkgnY0gmlwhH8AAAGKbXVsdGlhZGRyc4oACATAqAFyBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMphXdha3UyDQ
+      --discv5-bootstrap-node=enr:-LO4QMyeW03PjuZwMaVtJe9C-Tk-UPYE1jfdefDFyuR3eb89O8dTawtkwLoicuAQSxZ_OiHcIYELBkkmqGPKkDuadowCgmlkgnY0gmlwhH8AAAGKbXVsdGlhZGRyc4oACATAqClFBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMphXdha3UyDQ

@@ -1,6 +1,7 @@
 services:
   boot-1:
-    image: wakuorg/nwaku:v0.34.0
+#    image: wakuorg/nwaku:v0.34.0
+    image: nwaku-48e9ece5:latest
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
@@ -34,38 +35,38 @@ services:
     ports:
       - "8645:8645/tcp"
 
-  boot-2:
-    image: wakuorg/nwaku:v0.34.0
-    entrypoint: [
-      "/usr/bin/wakunode",
-      "--discv5-discovery=true",
-      "--discv5-enr-auto-update=True",
-      "--discv5-udp-port=9000",
-      "--discv5-bootstrap-node=enr:-La4QKi-GOzezuylyUIOA_6MFpbMUvhcVLg7v1KCXLR37tO6c5hgjAF6nzUbGM_9HG4LEM69JjTenYH0ZNFwOPg-UXIBgmlkgnY0gmlwhKwTAASKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ",  # -> boot-1
-      "--cluster-id=16",
-      # Docker DNS server
-      "--dns-addrs-name-server=127.0.0.11",
-      "--dns4-domain-name=boot-2",
-      "--filter=true",
-      "--keep-alive=true",
-      "--lightpush=true",
-      "--log-level=DEBUG",
-      "--max-connections=18000",
-      "--nodekey=c71da918e785259ebf13a3cf2f18d6f7c1329983ca17636f473c9e80ae5dcafc",  # PeerID: 16Uiu2HAm5TrV8hjUQaqJ8VaHC1EL3EX8RdqP1gTrLxSCecWVN3xc
-      "--peer-exchange=true",
-      "--relay=true",
-      "--rest-address=0.0.0.0",
-      "--rest-admin",
-      "--shard=32",
-      "--shard=64",
-#      "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",  # store
-#      "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",   # store
-      "--tcp-port=60004"
-    ]
-    healthcheck:
-      test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
-    ports:
-      - "8646:8645/tcp"
+#  boot-2:
+#    image: wakuorg/nwaku:v0.34.0
+#    entrypoint: [
+#      "/usr/bin/wakunode",
+#      "--discv5-discovery=true",
+#      "--discv5-enr-auto-update=True",
+#      "--discv5-udp-port=9000",
+#      "--discv5-bootstrap-node=enr:-La4QKi-GOzezuylyUIOA_6MFpbMUvhcVLg7v1KCXLR37tO6c5hgjAF6nzUbGM_9HG4LEM69JjTenYH0ZNFwOPg-UXIBgmlkgnY0gmlwhKwTAASKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ",  # -> boot-1
+#      "--cluster-id=16",
+#      # Docker DNS server
+#      "--dns-addrs-name-server=127.0.0.11",
+#      "--dns4-domain-name=boot-2",
+#      "--filter=true",
+#      "--keep-alive=true",
+#      "--lightpush=true",
+#      "--log-level=DEBUG",
+#      "--max-connections=18000",
+#      "--nodekey=c71da918e785259ebf13a3cf2f18d6f7c1329983ca17636f473c9e80ae5dcafc",  # PeerID: 16Uiu2HAm5TrV8hjUQaqJ8VaHC1EL3EX8RdqP1gTrLxSCecWVN3xc
+#      "--peer-exchange=true",
+#      "--relay=true",
+#      "--rest-address=0.0.0.0",
+#      "--rest-admin",
+#      "--shard=32",
+#      "--shard=64",
+##      "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",  # store
+##      "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",   # store
+#      "--tcp-port=60004"
+#    ]
+#    healthcheck:
+#      test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
+#    ports:
+#      - "8646:8645/tcp"
 
 #  store:
 #    image: wakuorg/nwaku:v0.34.0
@@ -99,37 +100,37 @@ services:
 #    ports:
 #      - "8647:8645/tcp"
 
-  node-1:
-    image: wakuorg/nwaku:v0.34.0
-    entrypoint: [
-      "/usr/bin/wakunode",
-      "--discv5-discovery=true",
-      "--discv5-enr-auto-update=True",
-      "--discv5-udp-port=9000",
-      "--discv5-bootstrap-node=enr:-La4QKi-GOzezuylyUIOA_6MFpbMUvhcVLg7v1KCXLR37tO6c5hgjAF6nzUbGM_9HG4LEM69JjTenYH0ZNFwOPg-UXIBgmlkgnY0gmlwhKwTAASKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ",  # -> boot-1
-      "--cluster-id=16",
-      # Docker DNS server
-      "--dns-addrs-name-server=127.0.0.11",
-      "--dns4-domain-name=node-1",
-      "--filter=true",
-      "--keep-alive=true",
-      "--lightpush=true",
-      "--log-level=DEBUG",
-      "--max-connections=18000",
-      "--nodekey=451ee0adb90a7970dca8a757bca58e9a66c02dcf928e1c55e9b49319a2407ac0",  # PeerID: 16Uiu2HAmGqYFBfbKCQmhUagDFVo43dPBoEe4mcp2TThH93AAf55c
-      "--peer-exchange=true",
-      "--relay=true",
-      "--rest-address=0.0.0.0",
-      "--rest-admin",
-      "--shard=32",
-      "--shard=64",
-      "--tcp-port=60003"
-    ]
-#    depends_on:
-#      store:
-#        condition: service_healthy
-
-    healthcheck:
-      test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
-    ports:
-      - "8648:8645/tcp"
+#  node-1:
+#    image: nwaku-48e9ece5:latest
+#    entrypoint: [
+#      "/usr/bin/wakunode",
+#      "--discv5-discovery=true",
+#      "--discv5-enr-auto-update=True",
+#      "--discv5-udp-port=9000",
+#      "--discv5-bootstrap-node=enr:-La4QLJkqonGtur0vUvVI8baT3WICAVD-UPPptEt0tEPmG0RGCaxyIIA9NmZUpHGoXqeos3efV5_xAPOnU3pYvxqraUCgmlkgnY0gmlwhKwTAAKKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ",  # -> boot-1
+#      "--cluster-id=16",
+#      # Docker DNS server
+#      "--dns-addrs-name-server=127.0.0.11",
+#      "--dns4-domain-name=node-1",
+#      "--filter=true",
+#      "--keep-alive=true",
+#      "--lightpush=true",
+#      "--log-level=DEBUG",
+#      "--max-connections=18000",
+#      "--nodekey=451ee0adb90a7970dca8a757bca58e9a66c02dcf928e1c55e9b49319a2407ac0",  # PeerID: 16Uiu2HAmGqYFBfbKCQmhUagDFVo43dPBoEe4mcp2TThH93AAf55c
+#      "--peer-exchange=true",
+#      "--relay=true",
+#      "--rest-address=0.0.0.0",
+#      "--rest-admin",
+#      "--shard=32",
+#      "--shard=64",
+#      "--tcp-port=60003"
+#    ]
+##    depends_on:
+##      store:
+##        condition: service_healthy
+#
+#    healthcheck:
+#      test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
+#    ports:
+#      - "8648:8645/tcp"

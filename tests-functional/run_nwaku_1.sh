@@ -5,7 +5,6 @@ nwaku=/Users/sirotin/Repositories/status/nwaku/build/wakunode2
 # PeerID: 16Uiu2HAm3vFYHkGRURyJ6F7bwDyzMLtPEuCg4DU89T7km2u8Fjyb
 $nwaku \
       --nat=extip:127.0.0.1 \
-      --listen-address=127.0.0.1 \
       --discv5-discovery=true \
       --discv5-enr-auto-update=True \
       --discv5-udp-port=9001 \

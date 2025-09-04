@@ -3,16 +3,9 @@
       "clusterId": 16,
       "wakuNodes": [],
       "discV5BootstrapNodes": [
-        "enr:-La4QKi-GOzezuylyUIOA_6MFpbMUvhcVLg7v1KCXLR37tO6c5hgjAF6nzUbGM_9HG4LEM69JjTenYH0ZNFwOPg-UXIBgmlkgnY0gmlwhKwTAASKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ",
-        "enr:-La4QHXjI7sOghFPIjWFsHyZWUM-tpjLr9VH0UrVDSIblHXrDGEOw9uCZFJf5anDA3ZaDmUf-IArfLVcd3u6NtqGeK4BgmlkgnY0gmlwhKwTAAOKbXVsdGlhZGRyc40ACzYGYm9vdC0yBupkgnJzhwAQAgAgAECJc2VjcDI1NmsxoQKVI-jvL4aCw09JTBtCTEZGwuqcfekX4fXHjIbH-QmlSYN0Y3CC6mSDdWRwgiMohXdha3UyDQ"
+        "enr:-La4QLJkqonGtur0vUvVI8baT3WICAVD-UPPptEt0tEPmG0RGCaxyIIA9NmZUpHGoXqeos3efV5_xAPOnU3pYvxqraUCgmlkgnY0gmlwhKwTAAKKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ"
       ],
       "storeNodes": [
-        {
-          "id": "store-1",
-          "enr": "enr:-LW4QK-uN7FmYgWHd7w8vbUbqBljJPpfZUqSCftH_YmmfGxmP4HmDDcDj-FGO7fbr7kBrKRnPQC5Ma3RnxTj4wUvAP0EgmlkgnY0gmlwhKwSAAKKbXVsdGlhZGRyc4wACjYFc3RvcmUG6mKCcnOHABACACAAQIlzZWNwMjU2azGhAvmO_1uGYSBbONMOibc2Q7Caq36O7fOVUNsMhMwTxHPHg3RjcILqYoN1ZHCCIyiFd2FrdTID",
-          "addr": "/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
-          "fleet": "status-go.test"
-        }
       ]
     }
   }
