@@ -61,14 +61,13 @@ class TestDiscovery:
         for thread in threads:
             thread.join()
 
-        for peer_id, node in nodes.items():
-            assert node is not None, f"Node {peer_id} is None"
+        assert len(nodes) == nodes_count, "Not all nodes created"
 
         # Wait for all nodes to discover each other
         start_time = time.time()
         while time.time() - start_time < DISCOVERY_TIMEOUT_SEC:
             if _all_nodes_discovered(nodes, known_nodes):
-                break
+                return
             time.sleep(0.5)
-        else:
-            pytest.fail(f"Nodes failed to discover each other within {DISCOVERY_TIMEOUT_SEC} seconds")
+
+        assert False, f"Nodes failed to discover each other within {DISCOVERY_TIMEOUT_SEC} seconds"
