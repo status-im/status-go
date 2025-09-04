@@ -1,4 +1,6 @@
+import re
 import pytest
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -134,5 +136,5 @@ class TestSavedAddresses:
             self.rpc_client.rpc_valid_request("wakuext_upsertSavedAddress", [{"address": addresses[i], "name": f"test{i}", "isTest": is_test}])
 
         # Step: Verifying that capacity is now 0
-        response = self.rpc_client.rpc_valid_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
-        assert response["error"]["message"] == "no more save addresses can be added"
+        with pytest.raises(ApiResponseError, match=re.escape("no more save addresses can be added")):
+            self.rpc_client.rpc_valid_request("wakuext_remainingCapacityForSavedAddresses", [is_test])

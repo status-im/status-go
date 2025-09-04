@@ -1,3 +1,4 @@
+import re
 import uuid as uuid_lib
 import pytest
 
@@ -8,6 +9,7 @@ from web3.types import Wei  # type: ignore
 from clients.signals import SignalType
 from utils import wallet_utils
 from resources.constants import user_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -95,15 +97,15 @@ class TestRouter:
 
         # Step: update gas fee mode without providing path tx identity params via wallet_setFeeMode endpoint
         method = "wallet_setFeeMode"
-        response = self.rpc_client.rpc_valid_request(method, [None, gas_fee_mode])
-        assert "transaction identity not provided" in response.get("error").get("message")
+        with pytest.raises(ApiResponseError, match=re.escape("transaction identity not provided")):
+            self.rpc_client.rpc_valid_request(method, [None, gas_fee_mode])
 
         # Step: update gas fee mode with incomplete details for path tx identity params via wallet_setFeeMode endpoint
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
         }
-        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
-        assert "Error:Field validation" in response.get("error").get("message")
+        with pytest.raises(ApiResponseError, match=re.escape("Error:Field validation")):
+            self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
 
         # Step: update gas fee mode to low
         gas_fee_mode = constants.gas_fee_mode_low
@@ -131,8 +133,8 @@ class TestRouter:
 
         # Step: try to set custom gas fee mode via wallet_setFeeMode endpoint
         gas_fee_mode = constants.gas_fee_mode_custom
-        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
-        assert "custom fee mode cannot be set this way" in response.get("error").get("message")
+        with pytest.raises(ApiResponseError, match=re.escape("custom fee mode cannot be set this way")):
+            self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
 
     def test_setting_custom_fee_mode(self):
         uuid = str(uuid_lib.uuid4())
@@ -161,15 +163,15 @@ class TestRouter:
 
         # Step: try to set custom tx details with empty params via wallet_setCustomTxDetails endpoint
         method = "wallet_setCustomTxDetails"
-        response = self.rpc_client.rpc_valid_request(method, [None, None])
-        assert "transaction identity not provided" in response.get("error").get("message")
+        with pytest.raises(ApiResponseError, match=re.escape("transaction identity not provided")):
+            self.rpc_client.rpc_valid_request(method, [None, None])
 
         # Step: try to set custom tx details with incomplete details for path tx identity params via wallet_setCustomTxDetails endpoint
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
         }
-        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, None])
-        assert "Error:Field validation" in response.get("error").get("message")
+        with pytest.raises(ApiResponseError, match=re.escape("Error:Field validation")):
+            self.rpc_client.rpc_valid_request(method, [tx_identity_params, None])
 
         # Step: try to set custom tx details providing other than the custom gas fee mode via wallet_setCustomTxDetails endpoint
         tx_identity_params = {
@@ -181,23 +183,23 @@ class TestRouter:
         tx_custom_params = {
             "gasFeeMode": constants.gas_fee_mode_low,
         }
-        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
-        assert "only custom fee mode can be set this way" in response.get("error").get("message")
+        with pytest.raises(ApiResponseError, match=re.escape("only custom fee mode can be set this way")):
+            self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
 
         # Step: try to set custom tx details without providing maxFeesPerGas via wallet_setCustomTxDetails endpoint
         tx_custom_params = {
             "gasFeeMode": gas_fee_mode,
         }
-        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
-        assert "only custom fee mode can be set this way" in response.get("error").get("message")
+        with pytest.raises(ApiResponseError, match=re.escape("only custom fee mode can be set this way")):
+            self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
 
         # Step: try to set custom tx details without providing PriorityFee via wallet_setCustomTxDetails endpoint
         tx_custom_params = {
             "gasFeeMode": gas_fee_mode,
             "maxFeesPerGas": "0x77359400",
         }
-        response = self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
-        assert "only custom fee mode can be set this way" in response.get("error").get("message")
+        with pytest.raises(ApiResponseError, match=re.escape("only custom fee mode can be set this way")):
+            self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
 
         # Step: try to set custom tx details via wallet_setCustomTxDetails endpoint
         gas_fee_mode = constants.gas_fee_mode_custom

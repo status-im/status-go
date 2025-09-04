@@ -3,6 +3,7 @@ from clients.rpc import RpcClient
 from clients.services.service import Service
 from resources.enums import MessageContentType
 from enum import Enum
+from clients.api import ApiResponseError
 
 
 class PushNotificationRegistrationTokenType(Enum):
@@ -85,12 +86,11 @@ class WakuextService(Service):
         super().__init__(client, "wakuext")
 
     def start_messenger(self):
-        response = self.rpc_request("startMessenger")
-
-        if "error" in response:
-            assert response["error"]["code"] == -32000
-            assert response["error"]["message"] == "messenger already started"
-            return
+        try:
+            self.rpc_request("startMessenger")
+        except ApiResponseError as e:
+            if "messenger already started" in str(e):
+                return
 
     def send_contact_request(self, contact_id: str, message: str):
         params = [{"id": contact_id, "message": message}]

@@ -1,6 +1,8 @@
 import copy
+import re
 import pytest
 from resources.constants import new_account_data_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -69,5 +71,5 @@ class TestUpdateAccount:
 
     def test_update_nonexistent_account(self):
         nonexisting = {"address": "0x0000000000000000000000000000000000000001", "name": "Nope"}
-        resp = self.account.accounts_service.update_account(nonexisting)
-        assert resp.get("error").get("message") == "cannot update non-existing account: accounts: account is not found"
+        with pytest.raises(ApiResponseError, match=re.escape("cannot update non-existing account: accounts: account is not found")):
+            self.account.accounts_service.update_account(nonexisting)

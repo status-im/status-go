@@ -1,6 +1,8 @@
 import copy
+import re
 import pytest
 from resources.constants import new_account_data_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -36,5 +38,5 @@ class TestGetAccountByAddress:
         ],
     )
     def test_get_account_by_invalid_address(self, address, error):
-        resp = self.account.accounts_service.get_account_by_address(address)
-        assert resp.get("error").get("message") == error
+        with pytest.raises(ApiResponseError, match=re.escape(error)):
+            self.account.accounts_service.get_account_by_address(address)

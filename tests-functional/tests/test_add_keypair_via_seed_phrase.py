@@ -1,5 +1,7 @@
+import re
 import pytest
 from resources.constants import user_1, user_2
+from clients.api import ApiResponseError
 
 KEYPAIR_NAME = "SeedPhraseImportedKeypair"
 WALLET_ACCOUNT_DETAILS = {
@@ -65,10 +67,8 @@ class TestAddKeypairViaSeedPhrase:
         )
 
         # same private key
-        resp2 = self.account.accounts_service.add_keypair_via_seed_phrase(
-            user_1.passphrase, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS
-        )
-        assert resp2.get("error").get("message") == f'[validation] keypair already added -  keyuid: {resp1.get("result").get("key-uid")}'
+        with pytest.raises(ApiResponseError, match=re.escape(f'[validation] keypair already added -  keyuid: {resp1.get("result").get("key-uid")}')):
+            self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
 
     def test_add_keypair_via_sp_with_wrong_path(self):
         details = {
@@ -77,12 +77,13 @@ class TestAddKeypairViaSeedPhrase:
             "emoji": "🔑",
             "colorId": "primary",
         }
-        resp = self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, self.account.password, KEYPAIR_NAME, details)
-        assert (
-            resp.get("error").get("message")
-            == f'[validation] unsupported profile or seed imported key pair wallet account -  path: {details["path"]} expected path: m/44\''
-        )
+        with pytest.raises(
+            ApiResponseError,
+            match=re.escape(
+                f'[validation] unsupported profile or seed imported key pair wallet account -  path: {details["path"]} expected path: m/44\''
+            ),
+        ):
+            self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, self.account.password, KEYPAIR_NAME, details)
 
     def test_add_keypair_via_sp_with_empty_password(self):
-        resp = self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, "", KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
-        assert "error" not in resp
+        self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, "", KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)

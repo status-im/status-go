@@ -1,7 +1,7 @@
 import requests
-from tenacity import retry, stop_after_delay, wait_fixed
+from tenacity import retry, stop_after_delay, wait_fixed, retry_if_exception_type
 
-from clients.api import ApiClient
+from clients.api import ApiClient, ApiDecodeError, ApiHTTPError
 
 
 class RpcClient(ApiClient):
@@ -26,7 +26,19 @@ class RpcClient(ApiClient):
                 raise AssertionError(f"no id in response {response}")
         return response
 
-    @retry(stop=stop_after_delay(10), wait=wait_fixed(0.5), reraise=True)
+    @retry(
+        retry=retry_if_exception_type(
+            (
+                ApiHTTPError,
+                ApiDecodeError,
+                requests.Timeout,
+                requests.ConnectionError,
+            )
+        ),
+        stop=stop_after_delay(10),
+        wait=wait_fixed(0.5),
+        reraise=True,
+    )
     def rpc_valid_request(self, method, params=None, _id=None):
         if not _id:
             request_id = self.request_counter
@@ -39,6 +51,6 @@ class RpcClient(ApiClient):
         data = {"jsonrpc": "2.0", "method": method, "id": request_id}
         if params:
             data["params"] = params
-        response = self.api_request_json("CallRPC", data, check_error=False)
+        response = self.api_request_json("CallRPC", data)
         self.validate_json_rpc_response(response, request_id)
         return response
