@@ -5,15 +5,16 @@ from json import JSONDecodeError
 
 
 class ApiError(Exception):
-    def __init__(self, message, *, method=None, status=None, payload=None):
+    def __init__(self, message, *, method=None, payload=None):
         super().__init__(message)
         self.method = method
-        self.status = status
         self.payload = payload
 
 
 class ApiHTTPError(ApiError):
-    pass
+    def __init__(self, message, *, method=None, status=None, payload=None):
+        super().__init__(message, method=method, payload=payload)
+        self.status = status
 
 
 class ApiDecodeError(ApiError):
@@ -56,10 +57,10 @@ class ApiClient:
         try:
             json_response = response.json()
         except JSONDecodeError:
-            raise ApiDecodeError("Invalid JSON in response", method=method, status=response.status_code, payload=response.content)
+            raise ApiDecodeError("Invalid JSON in response", method=method, payload=response.content)
 
         err = json_response.get("error")
         if err:
-            raise ApiResponseError(str(err), method=method, status=response.status_code, payload=json_response)
+            raise ApiResponseError(str(err), method=method, payload=json_response)
 
         return json_response

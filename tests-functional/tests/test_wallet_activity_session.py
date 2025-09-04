@@ -11,7 +11,7 @@ from clients.smart_contract_runner import SmartContractRunner
 from clients.contract_deployers.snt import SNTDeployer, SNTV2_ABI, SNT_TOKEN_CONTROLLER_ABI
 from resources.constants import DEPLOYER_ACCOUNT
 from clients.contract_deployers.communities import CommunitiesDeployer
-from web3 import Web3  # type: ignore
+from web3 import Web3
 
 EventActivityFilteringDone = "wallet-activity-filtering-done"
 EventActivityFilteringUpdate = "wallet-activity-filtering-entries-updated"
