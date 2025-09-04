@@ -168,9 +168,6 @@ type NodeConfig struct {
 
 	RootDataDir string `json:",omitempty"`
 
-	// DataDir is the file system folder the node should use for any data storage needs.
-	DataDir string `validate:"required"`
-
 	// KeycardPairingDataFile is the file where we keep keycard pairings data.
 	// It's specified by clients (and not in status-go) when creating a new account,
 	// because this file is initialized by status-keycard-go and we need to use it before initializing the node.
@@ -639,7 +636,6 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 	config := &NodeConfig{
 		NetworkID:              networkID,
 		RootDataDir:            dataDir,
-		DataDir:                dataDir,
 		KeycardPairingDataFile: keycardPairingDataFile,
 		HTTPHost:               "localhost",
 		HTTPPort:               8545,
@@ -804,11 +800,11 @@ func (c *NodeConfig) Save() error {
 		return err
 	}
 
-	if err := os.MkdirAll(c.DataDir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(c.RootDataDir, os.ModePerm); err != nil {
 		return err
 	}
 
-	configFilePath := filepath.Join(c.DataDir, "config.json")
+	configFilePath := filepath.Join(c.RootDataDir, "config.json")
 	//nolint:gosec
 	if err := ioutil.WriteFile(configFilePath, data, os.ModePerm); err != nil {
 		return err

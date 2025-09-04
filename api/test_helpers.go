@@ -101,11 +101,10 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 		})
 		require.NoError(t, err)
 		data.config.RootDataDir = tmpdir
-		data.config.DataDir = tmpdir
 	} else {
 		json := `{
 		"NetworkId": 3,
-		"DataDir": "` + tmpdir + `",
+		"RootDataDir": "` + tmpdir + `",
 		"KeycardPairingDataFile": "` + path.Join(tmpdir, "keycard/pairings.json") + `",
 		"NoDiscovery": true,
 		"TorrentConfig": {

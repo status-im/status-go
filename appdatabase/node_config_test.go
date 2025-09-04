@@ -117,7 +117,6 @@ func randomCustomNodes() map[string]string {
 func randomNodeConfig() *params.NodeConfig {
 	return &params.NodeConfig{
 		NetworkID:          uint64(int64(randomInt(math.MaxInt64))),
-		DataDir:            randomString(),
 		NodeKey:            randomString(),
 		APIModules:         randomString(),
 		WalletConfig:       params.WalletConfig{Enabled: randomBool()},

@@ -447,8 +447,9 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
 	cl := chainClient.Clients[txs[0].ChainID]
 
+	firstCall := true
 	cl.On("BatchCallContext", mock.Anything, mock.MatchedBy(func(b []rpc.BatchElem) bool {
-		if len(cl.Calls) == 0 {
+		if firstCall {
 			res := len(b) > 0 && b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[0].Hash
 			// If the first processing call picked up the second validate this case also
 			if len(b) == 2 {
@@ -460,7 +461,7 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 		return len(b) == 1 && (b[0].Method == GetTransactionReceiptRPCName && b[0].Args[0] == txs[1].Hash)
 	})).Return(nil).Twice().Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
-		if len(cl.Calls) == 2 {
+		if !firstCall {
 			firsDoneWG.Wait()
 		}
 		// Only first item is processed, second is left pending
@@ -469,6 +470,7 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 			BlockNumber: new(big.Int).SetUint64(1),
 			Status:      1,
 		}
+		firstCall = false
 	})
 
 	eventChan := make(chan walletevent.Event, 6)
@@ -517,16 +519,19 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 		statusEventCount++
 	}
 
-	for j := 0; j < 6; j++ {
+	timeout := time.After(5 * time.Second)
+	eventCount := 0
+	for eventCount < 6 {
 		select {
 		case we := <-eventChan:
+			eventCount++
 			if EventPendingTransactionUpdate == we.Type {
 				storeEventCount++
 			} else if EventPendingTransactionStatusChanged == we.Type {
 				validateStatusChange(&we)
 			}
-		case <-time.After(1 * time.Second):
-			t.Fatal("timeout waiting for the status update event")
+		case <-timeout:
+			t.Fatalf("timeout waiting for events (received %d events, expected 6, storeEventCount=%d, statusEventCount=%d)", eventCount, storeEventCount, statusEventCount)
 		}
 	}
 

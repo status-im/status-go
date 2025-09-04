@@ -281,7 +281,6 @@ func (tcmc *testCommunitiesMessengerConfig) complete() error {
 func defaultTestCommunitiesMessengerNodeConfig() *params.NodeConfig {
 	return &params.NodeConfig{
 		NetworkID: 10,
-		DataDir:   "test",
 	}
 }
 func defaultTestCommunitiesMessengerSettings() *settings.Settings {

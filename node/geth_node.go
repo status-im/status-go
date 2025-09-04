@@ -26,9 +26,9 @@ var (
 func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 	// If DataDir is empty, it means we want to create an ephemeral node
 	// keeping data only in memory.
-	if config.DataDir != "" {
+	if config.RootDataDir != "" {
 		// make sure data directory exists
-		if err := os.MkdirAll(filepath.Clean(config.DataDir), os.ModePerm); err != nil {
+		if err := os.MkdirAll(filepath.Clean(config.RootDataDir), os.ModePerm); err != nil {
 			return nil, fmt.Errorf("make node: make data directory: %v", err)
 		}
 
@@ -50,7 +50,7 @@ func MakeNode(config *params.NodeConfig) (*node.Node, error) {
 // newGethNodeConfig returns default stack configuration for mobile client node
 func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 	nc := &node.Config{
-		DataDir:           config.DataDir,
+		DataDir:           config.RootDataDir,
 		UseLightweightKDF: true,
 		NoUSB:             true,
 		P2P: p2p.Config{
