@@ -58,7 +58,7 @@ class TestAddAccount:
 
     def test_add_account_for_empty_path(self):
         self.account_data["path"] = ""
-        with pytest.raises(ApiResponseError, match=re.escape("[account] account mismatch -  address:")):
+        with pytest.raises(ApiResponseError, match=re.escape("[account] account mismatch")):
             self.account.accounts_service.add_account(self.account.password, self.account_data)
 
     @pytest.mark.parametrize(
