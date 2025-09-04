@@ -392,7 +392,7 @@ class StatusBackendContainer(StatusGoContainer):
         # Known node names from docker compose
         bootstrap_nodes = "boot-1"
         store_nodes = "store"
-        static_nodes = ""  # none by default
+        static_nodes = "boot-1"  # Add the bootnode, otherwise metadata exchange doesn't happen, and Waku light mode doesn't work
 
         cmd = (
             "python3 /usr/local/bin/scan_waku_fleet.py "
