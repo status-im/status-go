@@ -384,9 +384,6 @@ class StatusBackendContainer(StatusGoContainer):
 
     def _generate_waku_fleet_config(self):
         """Generate Waku fleet config inside the container using scan_waku_fleet.py"""
-        # Ensure configs directory exists
-        self.exec("mkdir -p /static/configs")
-
         # Use defaults suitable for local docker-compose.waku.yml
         # Fleet name is configurable via pytest option --waku-fleet
         fleet = Config.waku_fleet or "status-go.test"
@@ -404,7 +401,7 @@ class StatusBackendContainer(StatusGoContainer):
             f"--bootstrap-nodes {bootstrap_nodes} "
             f"--store-nodes {store_nodes} "
             f"--static-nodes '{static_nodes}' "
-            f"--output {Config.waku_fleets_config or '/static/configs/wakufleetconfig.json'}"
+            f"--output {Config.waku_fleets_config}"
         )
         logging.debug(f"Generating Waku fleet config with command: {cmd}")
         self.exec(cmd)
