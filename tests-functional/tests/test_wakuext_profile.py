@@ -65,12 +65,12 @@ class TestProfile:
 
         logging.info("Step: check that %s is %s by default " % (setting_name, default_value))
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
-        assert response.json()["result"][setting_name] == default_value
+        assert response["result"][setting_name] == default_value
 
         logging.info("Step: change %s to %s and check it is updated" % (setting_name, changed_value))
         self.rpc_client.rpc_valid_request(method, [setting_name, changed_value], _id)
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
-        assert response.json()["result"][setting_name] == changed_value
+        assert response["result"][setting_name] == changed_value
 
     # tests for `omitempty` params that are set to False or nil by default
     @pytest.mark.parametrize(
@@ -99,12 +99,12 @@ class TestProfile:
 
         logging.info("Step: assert that %s is not retrieved in settings before setting" % (setting_name))
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
-        assert setting_name not in response.json()["result"]
+        assert setting_name not in response["result"]
 
         logging.info("Step: change %s to %s and check it is updated" % (setting_name, set_value))
         self.rpc_client.rpc_valid_request(method, [setting_name, set_value], _id)
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
-        assert response.json()["result"][setting_name] == set_value
+        assert response["result"][setting_name] == set_value
 
     # tests for `omitempty` params that are not nil by default
     @pytest.mark.parametrize(
@@ -125,12 +125,12 @@ class TestProfile:
 
         logging.info("Step: assert that %s is  retrieved in settings before unsetting" % (setting_name))
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
-        assert setting_name in response.json()["result"]
+        assert setting_name in response["result"]
 
         logging.info("Step: change %s to %s and check it is updated and does not retrieve anymore" % (setting_name, set_value))
         self.rpc_client.rpc_valid_request(method, [setting_name, set_value], _id)
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
-        assert setting_name not in response.json()["result"]
+        assert setting_name not in response["result"]
 
 
 @pytest.mark.rpc

@@ -4,6 +4,7 @@ import copy
 from clients.status_backend import StatusBackend
 from clients.signals import SignalType
 import pytest
+from clients.api import ApiResponseError
 
 from resources.constants import user_mnemonic_12, user_mnemonic_15, user_mnemonic_24, user_keycard_1
 from resources.utils import assert_response_attributes
@@ -148,8 +149,8 @@ class TestBackupMnemonicAndRestore:
         restored_account._set_display_name()
         data = restored_account._create_account_request(user)
         data["mnemonic"] = ""
-        restored_account_response = restored_account.api_request("RestoreAccountAndLogin", data)
-        assert restored_account_response.json().get("error") == "restore-account: mnemonic is not set"
+        with pytest.raises(ApiResponseError, match=r"restore-account: mnemonic is not set"):
+            restored_account.api_request_json("RestoreAccountAndLogin", data)
 
     def test_restore_with_both_mnemonic_and_keycard(self):
         # Restore with both keycard and mnemonic isn't allowed
@@ -160,8 +161,8 @@ class TestBackupMnemonicAndRestore:
         data = restored_account._create_account_request(user)
         data["mnemonic"] = user.passphrase
         data["keycard"] = user_keycard_1
-        restored_account_response = restored_account.api_request("RestoreAccountAndLogin", data)
-        assert restored_account_response.json().get("error") == "restore-account: mnemonic is set for keycard account"
+        with pytest.raises(ApiResponseError, match=r"restore-account: mnemonic is set for keycard account"):
+            restored_account.api_request_json("RestoreAccountAndLogin", data)
 
     def test_restored_on_existing_restored_account_fails(self):
         user = copy.deepcopy(user_mnemonic_12)

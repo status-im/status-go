@@ -59,7 +59,7 @@ def sign_messages(rpc_client, hashes, address):
 
         response = rpc_client.rpc_valid_request(method, params)
 
-        result = response.json().get("result")
+        result = response.get("result")
         assert result and result.startswith("0x"), f"Invalid transaction signature for hash {hash}: {result}"
 
         tx_signature = result[2:]

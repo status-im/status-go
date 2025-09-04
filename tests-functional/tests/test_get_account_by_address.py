@@ -1,6 +1,8 @@
 import copy
+import re
 import pytest
 from resources.constants import new_account_data_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -14,7 +16,7 @@ class TestGetAccountByAddress:
     def test_get_account_for_existing_addresses(self):
         path = "m/44'/60'/0'/0/1"
         derived_addresses_response = self.account.wallet_service.get_derived_addresses_for_mnemonic(self.account.mnemonic, [path])
-        derived_addresses = derived_addresses_response.json()["result"]
+        derived_addresses = derived_addresses_response["result"]
         self.account_data["key-uid"] = self.account.key_uid  # keyuid of profile keypair
         self.account_data["path"] = path
         self.account_data["address"] = derived_addresses[0].get("address")
@@ -36,5 +38,5 @@ class TestGetAccountByAddress:
         ],
     )
     def test_get_account_by_invalid_address(self, address, error):
-        resp = self.account.accounts_service.get_account_by_address(address)
-        assert resp.get("error").get("message") == error
+        with pytest.raises(ApiResponseError, match=re.escape(error)):
+            self.account.accounts_service.get_account_by_address(address)

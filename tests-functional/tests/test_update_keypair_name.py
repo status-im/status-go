@@ -1,5 +1,7 @@
+import re
 import pytest
 from resources.constants import user_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -11,8 +13,8 @@ class TestUpdateKeypairName:
 
     def test_update_name_for_profile_keypair_isnt_allowed(self):
         new_name = "Updated Keypair Name"
-        response = self.account.accounts_service.update_keypair_name(self.account.key_uid, new_name)
-        assert response.get("error").get("message") == "cannot change profile keypair name"
+        with pytest.raises(ApiResponseError, match=re.escape("cannot change profile keypair name")):
+            self.account.accounts_service.update_keypair_name(self.account.key_uid, new_name)
 
     def test_update_keypair_name_for_seed_account(self):
         wallet_account_details = {

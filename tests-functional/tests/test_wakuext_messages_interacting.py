@@ -1,6 +1,8 @@
+import re
 import pytest
 from steps.messenger import MessengerSteps
 from clients.services.wakuext import SendPinMessagePayload
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -104,11 +106,8 @@ class TestInteractingWithChatMessages(MessengerSteps):
         response = self.sender.wakuext_service.delete_message(message_id)
         # TODO: Add more assertions on response
 
-        response = self.sender.wakuext_service.message_by_message_id(message_id)
-        error_code = response.get("error", {}).get("code", 0)
-        error_message = response.get("error", {}).get("message", "")
-        assert error_code == -32000
-        assert error_message == "record not found"
+        with pytest.raises(ApiResponseError, match=re.escape("record not found")):
+            self.sender.wakuext_service.message_by_message_id(message_id)
 
     def test_delete_message_and_send(self):
         _, responses = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)

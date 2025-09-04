@@ -13,7 +13,7 @@ class ConnectorService(Service):
             "chainId": chain_id,
         }
         response = self.rpc_request("requestAccountsAccepted", [params])
-        return response.json()
+        return response
 
     def send_transaction_accepted(self, request_id: str, tx_hash: str):
         params = {
@@ -21,4 +21,4 @@ class ConnectorService(Service):
             "hash": tx_hash,
         }
         response = self.rpc_request("sendTransactionAccepted", [params])
-        return response.json()
+        return response

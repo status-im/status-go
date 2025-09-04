@@ -128,7 +128,7 @@ class TestWalletActivitySession:
         event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
 
         # Check response
-        sessionID = int(response.json()["result"])
+        sessionID = int(response["result"])
         assert sessionID > 0
 
         # Check response event

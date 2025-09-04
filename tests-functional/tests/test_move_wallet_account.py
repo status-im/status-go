@@ -1,6 +1,8 @@
 import copy
+import re
 import pytest
 from resources.constants import new_account_data_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -15,7 +17,7 @@ class TestMoveWalletAccount:
         # Add new account
         path = "m/44'/60'/0'/0/1"
         derived_addresses_response = self.account.wallet_service.get_derived_addresses_for_mnemonic(self.account.mnemonic, [path])
-        derived_addresses = derived_addresses_response.json()["result"]
+        derived_addresses = derived_addresses_response["result"]
         self.account_data["key-uid"] = self.account.key_uid  # keyuid of profile keypair
         self.account_data["path"] = path
         self.account_data["address"] = derived_addresses[0].get("address")
@@ -60,7 +62,5 @@ class TestMoveWalletAccount:
         assert len(accounts_before) >= 2, "Need at least two accounts to test move"
 
         # Move wallet account from position 0 to position 1
-        move_accounts_response = self.account.accounts_service.move_wallet_account(
-            accounts_before[0].get("position"), accounts_before[1].get("position")
-        )
-        assert move_accounts_response.get("error").get("message") == "accounts: trying to move account to a wrong position"
+        with pytest.raises(ApiResponseError, match=re.escape("accounts: trying to move account to a wrong position")):
+            self.account.accounts_service.move_wallet_account(accounts_before[0].get("position"), accounts_before[1].get("position"))

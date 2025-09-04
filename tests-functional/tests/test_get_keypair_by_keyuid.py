@@ -1,5 +1,7 @@
+import re
 import pytest
 from resources.constants import user_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -30,8 +32,8 @@ class TestGetKeypairByKeyUID:
         assert accounts[0].get("key-uid") == accounts[1].get("key-uid")
 
     def test_get_keypair_by_nonexistent_keyuid(self):
-        resp = self.account.accounts_service.get_keypair_by_key_uid("0x6d462df35b97fabb8f792eac01240556e26fd2600753e5bbffa4713a9c95abc7")
-        assert "keypair is not found" in resp.get("error").get("message")
+        with pytest.raises(ApiResponseError, match=re.escape("keypair is not found")):
+            self.account.accounts_service.get_keypair_by_key_uid("0x6d462df35b97fabb8f792eac01240556e26fd2600753e5bbffa4713a9c95abc7")
 
     def test_get_newly_imported_keypair(self):
         keypair_name = "SeedImportedKeypair"

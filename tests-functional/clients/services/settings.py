@@ -8,4 +8,4 @@ class SettingsService(Service):
 
     def get_settings(self):
         response = self.rpc_request("getSettings")
-        return response.json()
+        return response

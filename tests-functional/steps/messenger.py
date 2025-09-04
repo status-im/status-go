@@ -170,8 +170,6 @@ class MessengerSteps(NetworkConditionsSteps):
                 response = admin.wakuext_service.accept_request_to_join_community(join_id)
                 if response.get("result"):
                     break
-                err = response.get("error") or "unknown error (no result and no error)"
-                raise Exception(err)
             except Exception as e:
                 logging.error(f"Attempt {attempt + 1}/{max_retries}: Unexpected error: {e}")
                 time.sleep(retry_interval)
