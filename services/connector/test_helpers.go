@@ -58,7 +58,6 @@ func setupTests(t *testing.T) (state testState, close func()) {
 
 	config := params.NodeConfig{
 		NetworkID: 10,
-		DataDir:   "test",
 	}
 	networks := json.RawMessage("{}")
 	settingsObj := settings.Settings{

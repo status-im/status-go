@@ -38,7 +38,6 @@ func setupTokenManager(t *testing.T) (*token.Manager, func()) {
 	require.NoError(t, err)
 	config := params.NodeConfig{
 		NetworkID: 10,
-		DataDir:   "test",
 	}
 	networks := json.RawMessage("{}")
 	settingsObj := settings.Settings{

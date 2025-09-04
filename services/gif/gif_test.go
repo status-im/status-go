@@ -25,7 +25,6 @@ func setupTestDB(t *testing.T, db *sql.DB) (*accounts.Database, func()) {
 	require.NoError(t, err)
 	config := params.NodeConfig{
 		NetworkID: 10,
-		DataDir:   "test",
 	}
 	networks := json.RawMessage("{}")
 	settingsObj := settings.Settings{

@@ -235,6 +235,9 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 			"0x134180d5a",
 			"0x134e32c33",
 			"0x137da8d22",
+			"0x12f0e070b",
+			"0x13f10da8b",
+			"0x126c30d5e",
 		},
 		GasUsedRatio: []float64{
 			0.7113286209349903,
@@ -244,6 +247,9 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 			0.5103012666666666,
 			0.538413,
 			0.16543626666666666,
+			0.7113286209349903,
+			0.19531163333333335,
+			0.7189235666666667,
 		},
 		OldestBlock: "0x1497d4b",
 		Reward: [][]string{
@@ -282,6 +288,21 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 				"0x39d10680",
 				"0x41d0a8d6",
 			},
+			{
+				"0x2faf080",
+				"0x39d10680",
+				"0x722d7ef5",
+			},
+			{
+				"0x5f5e100",
+				"0x3b9aca00",
+				"0x59682f00",
+			},
+			{
+				"0x342e4a2",
+				"0x39d10680",
+				"0x77359400",
+			},
 		},
 	}
 
@@ -308,13 +329,13 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 	assert.Equal(t, variadicFee1, variadicFee2)
 
 	assert.Equal(t, big.NewInt(0), suggestedFees.GasPrice)
-	assert.Equal(t, big.NewInt(5362838082), suggestedFees.BaseFee)
-	assert.Equal(t, big.NewInt(5362838082), suggestedFees.CurrentBaseFee)
-	assert.Equal(t, big.NewInt(5462838082), suggestedFees.MaxFeesLevels.Low.ToInt())
+	assert.Equal(t, big.NewInt(5068916557), suggestedFees.BaseFee)
+	assert.Equal(t, big.NewInt(5068916557), suggestedFees.CurrentBaseFee)
+	assert.Equal(t, big.NewInt(5168916557), suggestedFees.MaxFeesLevels.Low.ToInt())
 	assert.Equal(t, big.NewInt(100000000), suggestedFees.MaxFeesLevels.LowPriority.ToInt())
-	assert.Equal(t, big.NewInt(7795989313), suggestedFees.MaxFeesLevels.Medium.ToInt())
+	assert.Equal(t, big.NewInt(7451651202), suggestedFees.MaxFeesLevels.Medium.ToInt())
 	assert.Equal(t, big.NewInt(970000000), suggestedFees.MaxFeesLevels.MediumPriority.ToInt())
-	assert.Equal(t, big.NewInt(14104411640), suggestedFees.MaxFeesLevels.High.ToInt())
+	assert.Equal(t, big.NewInt(13466152004), suggestedFees.MaxFeesLevels.High.ToInt())
 	assert.Equal(t, big.NewInt(1915584245), suggestedFees.MaxFeesLevels.HighPriority.ToInt())
 	assert.Equal(t, suggestedFees.MaxFeesLevels.MediumPriority.ToInt(), suggestedFees.MaxPriorityFeePerGas)
 	assert.Equal(t, big.NewInt(100000000), suggestedFees.MaxPriorityFeeSuggestedBounds.Lower)

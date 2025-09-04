@@ -40,7 +40,7 @@ func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig, includeConnector boo
 		browser_enabled, permissions_enabled, mailservers_enabled`
 
 	args := []any{
-		c.NetworkID, c.DataDir, "", c.NodeKey, c.APIModules, true,
+		c.NetworkID, "", "", c.NodeKey, c.APIModules, true,
 		c.WalletConfig.Enabled, c.BrowsersConfig.Enabled,
 		c.PermissionsConfig.Enabled, c.MailserversConfig.Enabled,
 	}
@@ -358,12 +358,12 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	keystoreDir := "" // TODO: remove this from db
 	err := tx.QueryRow(`
 	SELECT
-		network_id, data_dir, keystore_dir, node_key, api_modules,
+		network_id, keystore_dir, node_key, api_modules,
 		wallet_enabled, browser_enabled, permissions_enabled,
 		mailservers_enabled, connector_enabled FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.NetworkID, &nodecfg.DataDir, &keystoreDir, &nodecfg.NodeKey, &nodecfg.APIModules,
+		&nodecfg.NetworkID, &keystoreDir, &nodecfg.NodeKey, &nodecfg.APIModules,
 		&nodecfg.WalletConfig.Enabled, &nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled,
 		&nodecfg.MailserversConfig.Enabled, &nodecfg.ConnectorConfig.Enabled,
 	)
