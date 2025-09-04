@@ -1,9 +1,10 @@
 import logging
 import random
+import re
 import string
 
 import pytest
-
+from clients.api import ApiResponseError
 from clients.signals import SignalType
 from resources.constants import Account
 
@@ -36,13 +37,11 @@ class TestPassword:
         backend = backend_new_profile("user")
 
         # Try a wrong password
-        response = backend.change_database_password(backend.password + "-wrong", new_password).json()
-        assert response.get("error") is not None
-        assert response.get("error") == "incorrect current password"
+        with pytest.raises(ApiResponseError, match=re.escape("incorrect current password")):
+            backend.change_database_password(backend.password + "-wrong", new_password)
 
         # Try a correct password
-        response = backend.change_database_password(backend.password, new_password).json()
-        assert response.get("error") == ""
+        backend.change_database_password(backend.password, new_password)
         backend.wait_for_signal(SignalType.DB_REENCRYPTION_STARTED.value)
         backend.wait_for_signal(SignalType.DB_REENCRYPTION_FINISHED.value)
         backend.wait_for_signal(SignalType.NODE_STOPPED.value)

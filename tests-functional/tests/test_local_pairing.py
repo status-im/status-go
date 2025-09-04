@@ -1,5 +1,6 @@
+import re
 import pytest
-
+from clients.api import ApiResponseError
 from clients.services.wakuext import ActivityCenterNotificationType, ContactRequestState
 from clients.signals import SignalType, LocalPairingEventType, LocalPairingEventAction
 from clients.status_backend import StatusBackend
@@ -129,8 +130,7 @@ def pair_server_as_sender(sender, receiver):
 
 def pair_server_as_receiver(sender, receiver):
     connection_string = receiver.get_connection_string_for_being_bootstrapped()
-    response = sender.input_connection_string_for_bootstrapping_another_device(connection_string)
-    assert response.get("error") in (None, "")
+    sender.input_connection_string_for_bootstrapping_another_device(connection_string)
 
     wait_for_action_of_type(sender, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value)
     wait_for_action_of_type(receiver, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value)
@@ -314,10 +314,9 @@ class TestLocalPairing(MessengerSteps):
 
         # Client receiver must be logged out
         connection_string = sender.get_connection_string_for_bootstrapping_another_device()
-        response = receiver.input_connection_string_for_bootstrapping(connection_string)
-        assert response["error"] is not None
+        receiver.input_connection_string_for_bootstrapping(connection_string)
 
         # Server receiver must be logged out
         connection_string = receiver.get_connection_string_for_being_bootstrapped()
-        response = sender.input_connection_string_for_bootstrapping_another_device(connection_string)
-        assert response["error"] is not None
+        with pytest.raises(ApiResponseError, match=re.escape("[client] status not ok when sending account data")):
+            sender.input_connection_string_for_bootstrapping_another_device(connection_string)
