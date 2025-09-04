@@ -1,7 +1,7 @@
 import json
 import logging
 import requests
-from typing import Any, Dict, List
+from typing import Any, Dict
 import websocket
 from websocket import WebSocket
 from websocket import create_connection
@@ -58,12 +58,10 @@ class ConnectorClient:
         self._send("eth_getTransactionCount", [address, "latest"])
 
     def eth_call(self, call_object: Dict[str, Any]):
-        params: List[Any] = [call_object, "latest"]
-        self._send("eth_call", params)
+        self._send("eth_call", [call_object, "latest"])
 
     def eth_estimate_gas(self, tx_object: Dict[str, Any]):
-        params: List[Any] = [tx_object]
-        self._send("eth_estimateGas", params)
+        self._send("eth_estimateGas", [tx_object])
 
     def eth_get_transaction_receipt(self, tx_hash: str):
         self._send("eth_getTransactionReceipt", [tx_hash])
@@ -72,8 +70,7 @@ class ConnectorClient:
         self._send("eth_sendTransaction", [tx_object])
 
     def wallet_switch_ethereum_chain(self, chain_id: int):
-        hex_chain_id = hex(chain_id)
-        self._send("wallet_switchEthereumChain", [{"chainId": hex_chain_id}])
+        self._send("wallet_switchEthereumChain", [{"chainId": hex(chain_id)}])
 
     def wallet_revoke_permissions(self):
         self._send("wallet_revokePermissions")
