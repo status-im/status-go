@@ -38,13 +38,13 @@ class ConnectorClient:
         if self.ws_conn is not None:
             self.ws_conn.close()
 
-    def get_accounts(self):
+    def accounts(self):
         self._send("eth_accounts")
 
-    def get_chain_id(self):
+    def chain_id(self):
         self._send("eth_chainId")
 
-    def get_block_number(self):
+    def block_number(self):
         self._send("eth_blockNumber")
 
     def revoke_permissions(self):
