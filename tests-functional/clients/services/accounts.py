@@ -109,37 +109,37 @@ class AccountService(Service):
     def delete_keycard_accounts(self, keycard_uid, account_addresses):
         params = [keycard_uid, account_addresses]
         response = self.rpc_request("deleteKeycardAccounts", params)
-        return response.json()
+        return response
 
     def delete_all_keycards_with_key_uid(self, key_uid):
         params = [key_uid]
         response = self.rpc_request("deleteAllKeycardsWithKeyUID", params)
-        return response.json()
+        return response
 
     def keycard_locked(self, keycard_uid):
         params = [keycard_uid]
         response = self.rpc_request("keycardLocked", params)
-        return response.json()
+        return response
 
     def keycard_unlocked(self, keycard_uid):
         params = [keycard_uid]
         response = self.rpc_request("keycardUnlocked", params)
-        return response.json()
+        return response
 
     def set_keycard_name(self, keycard_uid, kp_name):
         params = [keycard_uid, kp_name]
         response = self.rpc_request("setKeycardName", params)
-        return response.json()
+        return response
 
     def update_keycard_uid(self, old_keycard_uid, new_keycard_uid):
         params = [old_keycard_uid, new_keycard_uid]
         response = self.rpc_request("updateKeycardUID", params)
-        return response.json()
+        return response
 
     def migrate_non_profile_keycard_keypair_to_app(self, mnemonic, password):
         params = [mnemonic, password]
         response = self.rpc_request("migrateNonProfileKeycardKeypairToApp", params)
-        return response.json()
+        return response
 
     def get_all_known_keycards(self):
         response = self.rpc_request("getAllKnownKeycards", [])

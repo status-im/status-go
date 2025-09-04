@@ -1,6 +1,8 @@
 import copy
+import re
 import pytest
 from resources.constants import keycard_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -27,8 +29,8 @@ class TestGetKeycards:
         assert second_keycard.get("result").get("keycard-name") == self.second_keycard.get("keycard-name")
 
     def test_get_keycard_by_nonexistent_keycard_uid(self):
-        resp = self.account.accounts_service.get_keycard_by_keycard_uid("0x0000000000000000000000000000000000000000000000000000000000000000")
-        assert resp.get("error").get("message") == "keycard: no keycard for the passed keycard uid"
+        with pytest.raises(ApiResponseError, match=re.escape("keycard: no keycard for the passed keycard uid")):
+            self.account.accounts_service.get_keycard_by_keycard_uid("0x0000000000000000000000000000000000000000000000000000000000000000")
 
     def test_get_keycards_with_same_keyuid(self):
         resp = self.account.accounts_service.get_keycards_with_same_key_uid(self.account.key_uid)

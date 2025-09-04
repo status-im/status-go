@@ -1,6 +1,8 @@
 import copy
+import re
 import pytest
 from resources.constants import keycard_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -24,5 +26,5 @@ class TestSetKeycardName:
         assert keycards[0].get("keycard-name") == new_name
 
     def test_set_name_to_nonexistent_keycard(self):
-        resp = self.account.accounts_service.set_keycard_name("non-existent-keycard-uid-1234", "Name")
-        assert resp.get("error").get("message") == "keycard: no keycard for the passed keycard uid"
+        with pytest.raises(ApiResponseError, match=re.escape("keycard: no keycard for the passed keycard uid")):
+            self.account.accounts_service.set_keycard_name("non-existent-keycard-uid-1234", "Name")

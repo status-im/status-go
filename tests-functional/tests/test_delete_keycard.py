@@ -1,6 +1,8 @@
 import copy
+import re
 import pytest
 from resources.constants import keycard_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -20,8 +22,8 @@ class TestDeleteKeycard:
         assert keycards_after["result"] == []
 
     def test_delete_nonexistent_keycard(self):
-        resp = self.account.accounts_service.delete_keycard("non-existent-keycard-uid-1234")
-        assert resp.get("error").get("message") == "keycard: no keycard for the passed keycard uid"
+        with pytest.raises(ApiResponseError, match=re.escape("keycard: no keycard for the passed keycard uid")):
+            self.account.accounts_service.delete_keycard("non-existent-keycard-uid-1234")
 
     def test_delete_keycard_accounts(self):
         self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)

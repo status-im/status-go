@@ -1,5 +1,7 @@
+import re
 import pytest
 from resources.constants import keycard_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -31,9 +33,9 @@ class TestKeycardLockUnlock:
         assert keycards_after_unlock.get("result")[0].get("keycard-locked") is False
 
     def test_lock_nonexistent_keycard(self):
-        resp = self.account.accounts_service.keycard_locked("non-existent-keycard-uid-1234")
-        assert resp.get("error").get("message") == "keycard: no keycard for the passed keycard uid"
+        with pytest.raises(ApiResponseError, match=re.escape("keycard: no keycard for the passed keycard uid")):
+            self.account.accounts_service.keycard_locked("non-existent-keycard-uid-1234")
 
     def test_unlock_nonexistent_keycard(self):
-        resp = self.account.accounts_service.keycard_unlocked("non-existent-keycard-uid-1234")
-        assert resp.get("error").get("message") == "keycard: no keycard for the passed keycard uid"
+        with pytest.raises(ApiResponseError, match=re.escape("keycard: no keycard for the passed keycard uid")):
+            self.account.accounts_service.keycard_unlocked("non-existent-keycard-uid-1234")

@@ -1,7 +1,9 @@
 import copy
+import re
 from time import sleep
 import pytest
 from resources.constants import keycard_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -32,9 +34,9 @@ class TestUpdateKeycardUID:
         assert keycard_new.get("result").get("keycard-uid") == new_uid
 
         # Verify old uid no longer exists
-        keycard_old = self.account.accounts_service.get_keycard_by_keycard_uid(old_uid)
-        assert keycard_old.get("error").get("message") == "keycard: no keycard for the passed keycard uid"
+        with pytest.raises(ApiResponseError, match=re.escape("keycard: no keycard for the passed keycard uid")):
+            self.account.accounts_service.get_keycard_by_keycard_uid(old_uid)
 
     def test_update_keycard_uid_for_nonexistent_keycard(self):
-        resp = self.account.accounts_service.update_keycard_uid("non-existent-old-uid", "some-new-uid")
-        assert resp.get("error").get("message") == "keycard: no keycard for the passed keycard uid"
+        with pytest.raises(ApiResponseError, match=re.escape("keycard: no keycard for the passed keycard uid")):
+            self.account.accounts_service.update_keycard_uid("non-existent-old-uid", "some-new-uid")

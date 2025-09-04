@@ -1,6 +1,8 @@
 import copy
+import re
 import pytest
 from resources.constants import keycard_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -62,13 +64,13 @@ class TestSaveOrUpdateKeycard:
 
     def test_save_keycard_with_wrong_key_uid(self):
         self.keycard["key-uid"] = "0x91b0a565ccc994d62b4869984fd720c6f99827966f94cb6a9aff02bcbb86a069"
-        resp = self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
-        assert resp.get("error").get("message") == "[validation] keycard does not relate to any keypair: keypair is not found"
+        with pytest.raises(ApiResponseError, match=re.escape("[validation] keycard does not relate to any keypair: keypair is not found")):
+            self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
 
     def test_save_keycard_with_no_account_address(self):
         del self.keycard["accounts-addresses"]
-        resp = self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
-        assert resp.get("error").get("message") == "[validation] keycard does not have any accounts"
+        with pytest.raises(ApiResponseError, match=re.escape("[validation] keycard does not have any accounts")):
+            self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
 
     def test_update_keycards(self):
         self.test_save_multiple_keycards()
