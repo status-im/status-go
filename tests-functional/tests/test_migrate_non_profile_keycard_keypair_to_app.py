@@ -38,14 +38,18 @@ class TestMigrateNonProfileKeycardKeypairToApp:
         assert len(accounts_list) > 0
         kc["accounts-addresses"] = [a.get("address") for a in accounts_list]
 
-        all_accounts = self.account.accounts_service.get_accounts()
+        addresses = [kc["accounts-addresses"][0], add_result.get("derived-from")]
 
-        for account in all_accounts.get("result"):
-            resp = self.account.accounts_service.verify_keystore_file_for_account(account.get("address"), self.account.password)
+        for address in addresses:
+            resp = self.account.accounts_service.verify_keystore_file_for_account(address, self.account.password)
             assert resp.get("result") is True
 
         save_resp = self.account.accounts_service.save_or_update_keycard(kc)
         assert "error" not in save_resp
+
+        for address in addresses:
+            resp = self.account.accounts_service.verify_keystore_file_for_account(address, self.account.password)
+            assert resp.get("result") is True
 
         # verify keycard present
         keycards_before = self.account.accounts_service.get_all_known_keycards()
@@ -62,8 +66,8 @@ class TestMigrateNonProfileKeycardKeypairToApp:
         # many RPC "void" actions return result None
         assert migrate_resp.get("result") is None
 
-        for account in all_accounts.get("result"):
-            resp = self.account.accounts_service.verify_keystore_file_for_account(account.get("address"), self.account.password)
+        for address in addresses:
+            resp = self.account.accounts_service.verify_keystore_file_for_account(address, self.account.password)
             assert resp.get("result") is True
 
         # 4) Verify the keypair still exists and that its keycards list is empty (i.e. migrated off keycard)
