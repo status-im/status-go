@@ -13,12 +13,12 @@ class TestGetKeycards:
         self.account = backend_new_profile("sender")
         self.keycard = keycard_1
         self.keycard["key-uid"] = self.account.key_uid
-        self.account.accounts_service.save_or_update_keycard(self.keycard)
+        self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         self.second_keycard = copy.deepcopy(self.keycard)
         self.second_keycard["keycard-uid"] = "second_kc_uid"
         self.second_keycard["keycard-name"] = "second_kc_name"
         self.second_keycard["keycard-addresses"] = "0x2f49e5eff87892deb1fffeed666fa75ccb2dbbc2"
-        self.account.accounts_service.save_or_update_keycard(self.second_keycard)
+        self.account.accounts_service.save_or_update_keycard(self.second_keycard, self.account.password)
 
     def test_get_keycard_by_keycard_uid(self):
         first_keycard = self.account.accounts_service.get_keycard_by_keycard_uid(self.keycard.get("keycard-uid"))

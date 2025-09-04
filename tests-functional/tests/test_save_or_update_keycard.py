@@ -16,7 +16,7 @@ class TestSaveOrUpdateKeycard:
         keycards_before = self.account.accounts_service.get_all_known_keycards()
         assert keycards_before["result"] == []
 
-        resp = self.account.accounts_service.save_or_update_keycard(self.keycard)
+        resp = self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         assert resp["result"] is None
 
         keycards_after = self.account.accounts_service.get_all_known_keycards()
@@ -30,19 +30,19 @@ class TestSaveOrUpdateKeycard:
         assert keycards[0].get("Position") == 0
 
     def test_save_duplicate_keycard(self):
-        self.account.accounts_service.save_or_update_keycard(self.keycard)
-        self.account.accounts_service.save_or_update_keycard(self.keycard)
+        self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
+        self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         keycards_after = self.account.accounts_service.get_all_known_keycards()
         keycards = keycards_after.get("result")
         assert len(keycards) == 1  # only one keycard is saved
 
     def test_save_multiple_keycards(self):
-        self.account.accounts_service.save_or_update_keycard(self.keycard)
+        self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         self.second_keycard = copy.deepcopy(self.keycard)
         self.second_keycard["keycard-uid"] = "second_kc_uid"
         self.second_keycard["keycard-name"] = "second_kc_name"
         self.second_keycard["keycard-addresses"] = "0x2f49e5eff87892deb1fffeed666fa75ccb2dbbc2"
-        self.account.accounts_service.save_or_update_keycard(self.second_keycard)
+        self.account.accounts_service.save_or_update_keycard(self.second_keycard, self.account.password)
 
         keycards_after = self.account.accounts_service.get_all_known_keycards()
         keycards = keycards_after.get("result")
@@ -62,20 +62,20 @@ class TestSaveOrUpdateKeycard:
 
     def test_save_keycard_with_wrong_key_uid(self):
         self.keycard["key-uid"] = "0x91b0a565ccc994d62b4869984fd720c6f99827966f94cb6a9aff02bcbb86a069"
-        resp = self.account.accounts_service.save_or_update_keycard(self.keycard)
+        resp = self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         assert resp.get("error").get("message") == "[validation] keycard does not relate to any keypair: keypair is not found"
 
     def test_save_keycard_with_no_account_address(self):
         del self.keycard["accounts-addresses"]
-        resp = self.account.accounts_service.save_or_update_keycard(self.keycard)
+        resp = self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         assert resp.get("error").get("message") == "[validation] keycard does not have any accounts"
 
     def test_update_keycards(self):
         self.test_save_multiple_keycards()
         self.keycard["keycard-name"] = "UpdatedFirstKeycardName"
         self.second_keycard["keycard-name"] = "UpdatedSecondKeycardName"
-        self.account.accounts_service.save_or_update_keycard(self.keycard)
-        self.account.accounts_service.save_or_update_keycard(self.second_keycard)
+        self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
+        self.account.accounts_service.save_or_update_keycard(self.second_keycard, self.account.password)
         keycards_update = self.account.accounts_service.get_all_known_keycards()
         keycards = keycards_update.get("result")
         assert len(keycards) == 2

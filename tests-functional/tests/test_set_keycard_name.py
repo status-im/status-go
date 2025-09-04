@@ -13,7 +13,7 @@ class TestSetKeycardName:
         self.keycard["key-uid"] = self.account.key_uid
 
     def test_set_keycard_name_success(self):
-        self.account.accounts_service.save_or_update_keycard(self.keycard)
+        self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         new_name = "UpdatedKeycardName"
         resp = self.account.accounts_service.set_keycard_name(self.keycard["keycard-uid"], new_name)
         assert resp["result"] is None

@@ -15,7 +15,7 @@ class TestUpdateKeycardUID:
 
     def test_update_keycard_uid_success(self):
         # Save keycard first
-        self.account.accounts_service.save_or_update_keycard(self.keycard)
+        self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
 
         old_uid = self.keycard["keycard-uid"]
         new_uid = "updated-kc-uid-1234"

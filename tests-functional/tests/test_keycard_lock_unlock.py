@@ -12,7 +12,7 @@ class TestKeycardLockUnlock:
         self.keycard["key-uid"] = self.account.key_uid
 
     def test_keycard_lock_unlock_flow(self):
-        self.account.accounts_service.save_or_update_keycard(self.keycard)
+        self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
 
         # Lock the keycard
         resp_lock = self.account.accounts_service.keycard_locked(self.keycard["keycard-uid"])
