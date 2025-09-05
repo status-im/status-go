@@ -72,6 +72,14 @@ func createCoingeckoProxyClient(config params.MarketDataProxyConfig) *coingecko.
 	})
 }
 
+func ThirdpartyServicesEnabled(accountsDB *accounts.Database) bool {
+	enabled, err := accountsDB.ThirdpartyServicesEnabled()
+	if err != nil {
+		return true
+	}
+	return enabled
+}
+
 // NewService initializes service instance.
 func NewService(
 	db *sql.DB,
@@ -95,10 +103,6 @@ func NewService(
 	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
 
-	cryptoOnRampProviders := []onramp.Provider{
-		onramp.NewMoonPayProvider(),
-	}
-
 	featureFlags := &protocolCommon.FeatureFlags{}
 	if config.WalletConfig.EnableCelerBridge {
 		featureFlags.EnableCelerBridge = true
@@ -108,66 +112,89 @@ func NewService(
 		featureFlags.EnableMercuryoProvider = true
 	}
 
-	if featureFlags.EnableMercuryoProvider {
-		cryptoOnRampProviders = append(cryptoOnRampProviders, onramp.NewMercuryoProvider(tokenManager))
-	}
-
-	cryptoOnRampManager := onramp.NewManager(cryptoOnRampProviders)
-
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(transfer.NewMultiTransactionDB(db), gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	blockChainState := blockchainstate.NewBlockChainState()
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountsPublisher, transactionManager, blockChainState)
 
-	cryptoCompare := cryptocompare.NewClient()
-	coingeckoClient := coingecko.NewClient()
-	coingeckoProxy := createCoingeckoProxyClient(config.WalletConfig.MarketDataProxyConfig)
-	cryptoCompareProxy := cryptocompare.NewClientWithParams(cryptocompare.Params{
-		ID:       fmt.Sprintf("%s-proxy", cryptoCompare.ID()),
-		URL:      fmt.Sprintf("https://%s.api.status.im/cryptocompare/", statusProxyStageName),
-		User:     config.WalletConfig.StatusProxyMarketUser,
-		Password: config.WalletConfig.StatusProxyMarketPassword,
-	})
-	marketManager := market.NewManager([]thirdparty.MarketDataProvider{coingeckoProxy, coingeckoClient, cryptoCompare, cryptoCompareProxy}, tokenManager, feed)
+	thirdpartyServicesEnabled := ThirdpartyServicesEnabled(accountsDB)
+
+	var cryptoOnRampProviders []onramp.Provider = []onramp.Provider{}
+	var marketProviders []thirdparty.MarketDataProvider = []thirdparty.MarketDataProvider{}
+	var collectibleProviders thirdparty.CollectibleProviders = thirdparty.CollectibleProviders{}
+	var pathProcessors []pathprocessor.PathProcessor = []pathprocessor.PathProcessor{}
+	var leaderboardConfig leaderboard.ServiceConfig = leaderboard.NewDefaultServiceConfig()
+
+	if thirdpartyServicesEnabled {
+
+		cryptoOnRampProviders = []onramp.Provider{
+			onramp.NewMoonPayProvider(),
+		}
+
+		if featureFlags.EnableMercuryoProvider {
+			cryptoOnRampProviders = append(cryptoOnRampProviders, onramp.NewMercuryoProvider(tokenManager))
+		}
+
+		cryptoCompare := cryptocompare.NewClient()
+		coingeckoClient := coingecko.NewClient()
+		coingeckoProxy := createCoingeckoProxyClient(config.WalletConfig.MarketDataProxyConfig)
+		cryptoCompareProxy := cryptocompare.NewClientWithParams(cryptocompare.Params{
+			ID:       fmt.Sprintf("%s-proxy", cryptoCompare.ID()),
+			URL:      fmt.Sprintf("https://%s.api.status.im/cryptocompare/", statusProxyStageName),
+			User:     config.WalletConfig.StatusProxyMarketUser,
+			Password: config.WalletConfig.StatusProxyMarketPassword,
+		})
+		marketProviders = []thirdparty.MarketDataProvider{
+			coingeckoProxy, coingeckoClient, cryptoCompare, cryptoCompareProxy,
+		}
+
+		raribleClient := rarible.NewClient(config.WalletConfig.RaribleMainnetAPIKey, config.WalletConfig.RaribleTestnetAPIKey)
+		alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKey)
+
+		// Collectible providers in priority order (i.e. provider N+1 will be tried only if provider N fails)
+		contractOwnershipProviders := []thirdparty.CollectibleContractOwnershipProvider{
+			raribleClient,
+			alchemyClient,
+		}
+
+		accountOwnershipProviders := []thirdparty.CollectibleAccountOwnershipProvider{
+			raribleClient,
+			alchemyClient,
+		}
+
+		collectibleDataProviders := []thirdparty.CollectibleDataProvider{
+			raribleClient,
+			alchemyClient,
+		}
+
+		collectionDataProviders := []thirdparty.CollectionDataProvider{
+			raribleClient,
+			alchemyClient,
+		}
+
+		collectibleSearchProviders := []thirdparty.CollectibleSearchProvider{
+			raribleClient,
+		}
+
+		collectibleProviders = thirdparty.CollectibleProviders{
+			ContractOwnershipProviders: contractOwnershipProviders,
+			AccountOwnershipProviders:  accountOwnershipProviders,
+			CollectibleDataProviders:   collectibleDataProviders,
+			CollectionDataProviders:    collectionDataProviders,
+			SearchProviders:            collectibleSearchProviders,
+		}
+
+		pathProcessors = buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags)
+
+		leaderboardConfig = leaderboard.NewLeaderboardConfig(config.WalletConfig.MarketDataProxyConfig)
+	}
+
+	cryptoOnRampManager := onramp.NewManager(cryptoOnRampProviders)
+
+	marketManager := market.NewManager(marketProviders, tokenManager, feed)
 	reader := NewReader(tokenManager, marketManager, token.NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, accountsPublisher, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
-
-	raribleClient := rarible.NewClient(config.WalletConfig.RaribleMainnetAPIKey, config.WalletConfig.RaribleTestnetAPIKey)
-	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKey)
-
-	// Collectible providers in priority order (i.e. provider N+1 will be tried only if provider N fails)
-	contractOwnershipProviders := []thirdparty.CollectibleContractOwnershipProvider{
-		raribleClient,
-		alchemyClient,
-	}
-
-	accountOwnershipProviders := []thirdparty.CollectibleAccountOwnershipProvider{
-		raribleClient,
-		alchemyClient,
-	}
-
-	collectibleDataProviders := []thirdparty.CollectibleDataProvider{
-		raribleClient,
-		alchemyClient,
-	}
-
-	collectionDataProviders := []thirdparty.CollectionDataProvider{
-		raribleClient,
-		alchemyClient,
-	}
-
-	collectibleSearchProviders := []thirdparty.CollectibleSearchProvider{
-		raribleClient,
-	}
-
-	collectibleProviders := thirdparty.CollectibleProviders{
-		ContractOwnershipProviders: contractOwnershipProviders,
-		AccountOwnershipProviders:  accountOwnershipProviders,
-		CollectibleDataProviders:   collectibleDataProviders,
-		CollectionDataProviders:    collectionDataProviders,
-		SearchProviders:            collectibleSearchProviders,
-	}
 
 	collectiblesManager := collectibles.NewManager(
 		db,
@@ -183,14 +210,12 @@ func NewService(
 
 	router := router.NewRouter(rpcClient, transactor, tokenManager, marketManager, collectibles,
 		collectiblesManager)
-	pathProcessors := buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags)
 	for _, processor := range pathProcessors {
 		router.AddPathProcessor(processor)
 	}
 
 	routeExecutionManager := routeexecution.NewManager(db, feed, router, transactionManager, transferController)
 
-	leaderboardConfig := leaderboard.NewLeaderboardConfig(config.WalletConfig.MarketDataProxyConfig)
 	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, db, feed)
 
 	return &Service{
@@ -331,17 +356,20 @@ type Service struct {
 
 // Start signals transmitter.
 func (s *Service) Start() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancelWalletServiceCtx = cancel
+	if ThirdpartyServicesEnabled(s.accountsDB) {
+		ctx, cancel := context.WithCancel(context.Background())
+		s.cancelWalletServiceCtx = cancel
 
-	s.transferController.Start(ctx)
-	s.currency.Start(ctx)
-	err := s.signals.Start(ctx)
-	s.history.Start(ctx)
-	s.collectibles.Start(ctx)
-	s.leaderboardService.Start(ctx)
-	s.started = true
-	return err
+		s.transferController.Start(ctx)
+		s.currency.Start(ctx)
+		err := s.signals.Start(ctx)
+		s.history.Start(ctx)
+		s.collectibles.Start(ctx)
+		s.leaderboardService.Start(ctx)
+		s.started = true
+		return err
+	}
+	return nil
 }
 
 // Set external Collectibles community info provider

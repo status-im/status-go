@@ -43,7 +43,7 @@ func (s *OldMobileV1_10_UserLoginTest) TestLoginWithSuccessNodeConfigMigration()
 
 	b := NewGethStatusBackend(s.logger)
 	b.UpdateRootDataDir(s.tmpdir)
-	s.Require().NoError(b.OpenAccounts())
+	s.Require().NoError(b.OpenAccounts(true))
 	loginRequest := &requests.Login{
 		KeyUID:   v1_10_keyUID,
 		Password: v1_10_passwd,
@@ -67,7 +67,7 @@ func (s *OldMobileV1_10_UserLoginTest) TestLoginWithFailNodeConfigMigration() {
 
 	b := NewGethStatusBackend(s.logger)
 	b.UpdateRootDataDir(s.tmpdir)
-	s.Require().NoError(b.OpenAccounts())
+	s.Require().NoError(b.OpenAccounts(true))
 	loginRequest := &requests.Login{
 		KeyUID:   v1_10_keyUID,
 		Password: v1_10_passwd,

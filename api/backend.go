@@ -40,7 +40,7 @@ type StatusBackend interface {
 	UpdateRootDataDir(datadir string)
 
 	SelectAccount(loginParams LoginParams, privateKey *ecdsa.PrivateKey) error
-	OpenAccounts() error
+	OpenAccounts(thirdpartyServicesEnabled bool) error
 	GetAccounts() ([]multiaccounts.Account, error)
 	LocalPairingStarted() error
 	SaveAccount(account multiaccounts.Account) error

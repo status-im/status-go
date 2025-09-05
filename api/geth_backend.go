@@ -211,7 +211,7 @@ func (b *GethStatusBackend) GetMultiaccountDB() *multiaccounts.Database {
 	return b.multiaccountsDB
 }
 
-func (b *GethStatusBackend) OpenAccounts() error {
+func (b *GethStatusBackend) OpenAccounts(thirdpartyServicesEnabled bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.multiaccountsDB != nil {
@@ -224,10 +224,12 @@ func (b *GethStatusBackend) OpenAccounts() error {
 	}
 	b.multiaccountsDB = db
 
-	b.centralizedMetrics = centralizedmetrics.NewDefaultMetricService(b.multiaccountsDB.DB(), b.logger)
-	err = b.centralizedMetrics.EnsureStarted()
-	if err != nil {
-		return err
+	if thirdpartyServicesEnabled {
+		b.centralizedMetrics = centralizedmetrics.NewDefaultMetricService(b.multiaccountsDB.DB(), b.logger)
+		err = b.centralizedMetrics.EnsureStarted()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Probably we should iron out a bit better how to create/dispose of the status-service
@@ -534,8 +536,8 @@ func (b *GethStatusBackend) updateAccountColorHashAndColorID(keyUID string, acco
 	return multiAccount, nil
 }
 
-func (b *GethStatusBackend) overrideNetworks(conf *params.NodeConfig, request *requests.Login) {
-	conf.Networks = BuildDefaultNetworks(&request.WalletSecretsConfig)
+func (b *GethStatusBackend) overrideNetworks(conf *params.NodeConfig, request *requests.Login, thirdpartyServicesEnabled bool) {
+	conf.Networks = BuildDefaultNetworks(&request.WalletSecretsConfig, thirdpartyServicesEnabled)
 }
 
 func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
@@ -718,7 +720,12 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	b.config.ShhextConfig.BandwidthStatsEnabled = request.BandwidthStatsEnabled
 
-	b.overrideNetworks(b.config, request)
+	accountSettings, err := b.GetSettings()
+	if err != nil {
+		return errors.Wrap(err, "failed to load accountSettings")
+	}
+
+	b.overrideNetworks(b.config, request, accountSettings.ThirdpartyServicesEnabled)
 
 	if request.APIConfig != nil {
 		overrideApiConfig(b.config, request.APIConfig)
@@ -1363,7 +1370,7 @@ func (b *GethStatusBackend) generateDerivedAddresses(genAcc *generator.Account, 
 }
 
 func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, keyUID string, customizationColorClock uint64) (*multiaccounts.Account, error) {
-	err := b.OpenAccounts()
+	err := b.OpenAccounts(request.ThirdpartyServicesEnabled)
 	if err != nil {
 		return nil, err
 	}

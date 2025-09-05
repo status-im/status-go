@@ -148,7 +148,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 	data.backend = NewGethStatusBackend(tt.MustCreateTestLogger())
 	data.backend.UpdateRootDataDir(tmpdir)
 
-	err = data.backend.OpenAccounts()
+	err = data.backend.OpenAccounts(true)
 	require.NoError(t, err)
 
 	if storeMultiAcc {
