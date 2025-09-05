@@ -453,4 +453,4 @@ class WakuextService(Service):
     def peer_id(self):
         params = []
         response = self.rpc_request("peerID", params)
-        return response.json()["result"]
+        return response["result"]
