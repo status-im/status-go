@@ -1,6 +1,6 @@
 import pytest
 
-from clients.connector import ConnectorClient
+from clients.connector import ConnectorClient, ConnectorApiError
 from clients.signals import SignalType
 
 
@@ -92,8 +92,8 @@ class TestStatusConnector:
     def test_block_number(self, backend, connector, wallet_account):
         # Block Number not resolved before connection
         connector.eth_block_number()
-        message = connector.receive()
-        assert message.get("error").get("message") == "dApp is not permitted by user"
+        with pytest.raises(ConnectorApiError, match="dApp is not permitted by user"):
+            connector.receive()
 
         # Establish connection
         connector.eth_accounts()
@@ -111,8 +111,8 @@ class TestStatusConnector:
     def test_get_balance(self, backend, connector, wallet_account):
         # Get balance not resolved before connection
         connector.eth_get_balance(wallet_account)
-        message = connector.receive()
-        assert message.get("error").get("message") == "dApp is not permitted by user"
+        with pytest.raises(ConnectorApiError, match="dApp is not permitted by user"):
+            connector.receive()
 
         # Establish connection
         connector.eth_accounts()
@@ -130,8 +130,8 @@ class TestStatusConnector:
     def test_get_transaction_count(self, backend, connector, wallet_account):
         # Get transaction count not resolved before connection
         connector.eth_get_transaction_count(wallet_account)
-        message = connector.receive()
-        assert message.get("error").get("message") == "dApp is not permitted by user"
+        with pytest.raises(ConnectorApiError, match="dApp is not permitted by user"):
+            connector.receive()
 
         # Establish connection
         connector.eth_accounts()
@@ -150,8 +150,8 @@ class TestStatusConnector:
         # eth_call not resolved before connection
         call_object = {"to": "0x0000000000000000000000000000000000000000", "data": "0x"}
         connector.eth_call(call_object)
-        message = connector.receive()
-        assert message.get("error").get("message") == "dApp is not permitted by user"
+        with pytest.raises(ConnectorApiError, match="dApp is not permitted by user"):
+            connector.receive()
 
         # Establish connection
         connector.eth_accounts()
@@ -170,8 +170,8 @@ class TestStatusConnector:
         # Simple 0-value transfer to self
         tx = {"from": wallet_account, "to": wallet_account, "value": "0x0"}
         connector.eth_estimate_gas(tx)
-        message = connector.receive()
-        assert message.get("error").get("message") == "dApp is not permitted by user"
+        with pytest.raises(ConnectorApiError, match="dApp is not permitted by user"):
+            connector.receive()
 
         # Establish connection
         connector.eth_accounts()
@@ -190,8 +190,8 @@ class TestStatusConnector:
         # Get transaction receipt not resolved before connection
         fake_tx = "0x" + "0" * 64
         connector.eth_get_transaction_receipt(fake_tx)
-        message = connector.receive()
-        assert message.get("error").get("message") == "dApp is not permitted by user"
+        with pytest.raises(ConnectorApiError, match="dApp is not permitted by user"):
+            connector.receive()
 
         # Establish connection
         connector.eth_accounts()
@@ -212,8 +212,8 @@ class TestStatusConnector:
             "value": "0x0",
         }
         connector.eth_send_transaction(tx)
-        message = connector.receive()
-        assert message.get("error").get("message") == "dApp is not permitted by user"
+        with pytest.raises(ConnectorApiError, match="dApp is not permitted by user"):
+            connector.receive()
 
         # Establish connection
         connector.eth_accounts()
@@ -238,8 +238,8 @@ class TestStatusConnector:
     def test_switch_ethereum_chain(self, backend, connector, wallet_account):
         # Switch chain not resolved before connection
         connector.wallet_switch_ethereum_chain(backend.network_id)
-        message = connector.receive()
-        assert message.get("error").get("message") == "dApp is not permitted by user"
+        with pytest.raises(ConnectorApiError, match="dApp is not permitted by user"):
+            connector.receive()
 
         # Establish connection
         connector.eth_accounts()
@@ -283,6 +283,5 @@ class TestStatusConnector:
         # Test that connector_callRPC doesn't allow calling status-go services methods
         connector._send("wakuext_joinedCommunities", [])
 
-        message = connector.receive()
-        assert message.get("error") is not None
-        assert "method wakuext_joinedCommunities is not allowed" in message.get("error").get("message")
+        with pytest.raises(ConnectorApiError, match="method wakuext_joinedCommunities is not allowed"):
+            connector.receive()

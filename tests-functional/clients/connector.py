@@ -7,6 +7,12 @@ from websocket import WebSocket
 from websocket import create_connection
 
 
+class ConnectorApiError(Exception):
+    def __init__(self, message, code):
+        super().__init__(message)
+        self.code = code
+
+
 class ConnectorClient:
     def __init__(self, url: str):
         self.url = url
@@ -104,5 +110,8 @@ class ConnectorClient:
         assert self.ws_conn is not None
         response = self.ws_conn.recv()
         logging.debug(f"Got Connector response: {json.dumps(response, sort_keys=True)}")
-
-        return json.loads(response)
+        response = json.loads(response)
+        error = response.get("error")
+        if error is not None:
+            raise ConnectorApiError(error["message"], error["code"])
+        return response
