@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -191,7 +192,9 @@ func TestForwardedRPCs(t *testing.T) {
 	assert.NoError(t, err)
 	request.ChainID = 291
 
-	expectedResponse := "0xaa37dc"
+	expectedResult := "0xaa37dc"
+	expectedResultResponse, err := json.Marshal(expectedResult)
+	require.NoError(t, err)
 
 	state.rpcClient.EXPECT().
 		EthClient(request.ChainID).
@@ -211,15 +214,14 @@ func TestForwardedRPCs(t *testing.T) {
 		CallContext(gomock.All(), gomock.Any(), "eth_blockNumber", gomock.Eq([]interface{}{})).
 		Times(1).
 		Do(func(ctx context.Context, result interface{}, method string, args ...interface{}) {
-			response := fmt.Sprintf(`{"jsonrpc":"2.0","id":37,"result":"%s"}`, expectedResponse)
-			err := json.Unmarshal([]byte(response), result)
+			err := json.Unmarshal(expectedResultResponse, &result)
 			assert.NoError(t, err)
 		}).
 		Return(nil)
 
 	response, err := state.api.CallRPC(state.ctx, requestJson)
 	assert.NoError(t, err)
-	assert.Equal(t, expectedResponse, response)
+	assert.Equal(t, expectedResult, response)
 }
 
 func TestRequestAccountsAfterPermissionsRevokeTest(t *testing.T) {

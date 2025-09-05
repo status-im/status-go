@@ -2,7 +2,6 @@ package connector
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -89,7 +88,7 @@ func (api *API) forwardRPC(ctx context.Context, URL string, request commands.RPC
 		return "", err
 	}
 
-	var result json.RawMessage
+	var result interface{}
 	err = rpcClient.CallContext(ctx, &result, request.Method, request.Params...)
 	return result, err
 }
