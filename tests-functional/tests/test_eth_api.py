@@ -19,7 +19,7 @@ class TestEth:
 
     def test_estimate_gas(self, backend_recovered_profile):
         backend = backend_recovered_profile("sender", user=user_1)
-        response = backend.rpc_valid_request("eth_estimateGas", params=[31337, {"to": user_2.address, "value": 100}]).json()
+        response = backend.rpc_valid_request("eth_estimateGas", params=[31337, {"to": user_2.address, "value": 100}])
         assert response.get("error") is None
         assert response.get("result") is not None
         assert int(response.get("result"), 16) > 0
