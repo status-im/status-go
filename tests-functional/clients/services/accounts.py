@@ -95,3 +95,67 @@ class AccountService(Service):
         params = [account]
         response = self.rpc_request("updateAccount", params)
         return response
+
+    def save_or_update_keycard(self, keycard, password):
+        params = [keycard, password]
+        response = self.rpc_request("saveOrUpdateKeycard", params)
+        return response
+
+    def delete_keycard(self, keycard_uid):
+        params = [keycard_uid]
+        response = self.rpc_request("deleteKeycard", params)
+        return response
+
+    def delete_keycard_accounts(self, keycard_uid, account_addresses):
+        params = [keycard_uid, account_addresses]
+        response = self.rpc_request("deleteKeycardAccounts", params)
+        return response
+
+    def delete_all_keycards_with_key_uid(self, key_uid):
+        params = [key_uid]
+        response = self.rpc_request("deleteAllKeycardsWithKeyUID", params)
+        return response
+
+    def keycard_locked(self, keycard_uid):
+        params = [keycard_uid]
+        response = self.rpc_request("keycardLocked", params)
+        return response
+
+    def keycard_unlocked(self, keycard_uid):
+        params = [keycard_uid]
+        response = self.rpc_request("keycardUnlocked", params)
+        return response
+
+    def set_keycard_name(self, keycard_uid, kp_name):
+        params = [keycard_uid, kp_name]
+        response = self.rpc_request("setKeycardName", params)
+        return response
+
+    def update_keycard_uid(self, old_keycard_uid, new_keycard_uid):
+        params = [old_keycard_uid, new_keycard_uid]
+        response = self.rpc_request("updateKeycardUID", params)
+        return response
+
+    def migrate_non_profile_keycard_keypair_to_app(self, mnemonic, password):
+        params = [mnemonic, password]
+        response = self.rpc_request("migrateNonProfileKeycardKeypairToApp", params)
+        return response
+
+    def get_all_known_keycards(self):
+        response = self.rpc_request("getAllKnownKeycards", [])
+        return response
+
+    def get_keycard_by_keycard_uid(self, keycard_uid):
+        params = [keycard_uid]
+        response = self.rpc_request("getKeycardByKeycardUID", params)
+        return response
+
+    def get_keycards_with_same_key_uid(self, key_uid):
+        params = [key_uid]
+        response = self.rpc_request("getKeycardsWithSameKeyUID", params)
+        return response
+
+    def verify_keystore_file_for_account(self, address, password):
+        params = [address, password]
+        response = self.rpc_request("verifyKeystoreFileForAccount", params)
+        return response
