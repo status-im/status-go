@@ -5,7 +5,7 @@ import threading
 
 from clients.status_backend import StatusBackend
 
-DISCOVERY_TIMEOUT_SEC = 10
+DISCOVERY_TIMEOUT_SEC = 30
 
 
 def _all_nodes_discovered(nodes: dict[str, StatusBackend], known_peers: dict[str, str]) -> bool:
