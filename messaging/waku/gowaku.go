@@ -197,9 +197,6 @@ type Waku struct {
 	// goingOnline is channel that notifies when connectivity has changed from offline to online
 	goingOnline chan struct{}
 
-	// discV5BootstrapNodes is the ENR to be used to fetch bootstrap nodes for discovery
-	discV5BootstrapNodes []string
-
 	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
 	onPeerStats                     func(types.ConnStatus)
 
@@ -266,7 +263,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 		timesource:                      ts,
 		storeMsgIDsMu:                   sync.RWMutex{},
 		logger:                          logger,
-		discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
@@ -308,7 +304,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 	}
 
 	if cfg.EnableDiscV5 {
-		bootnodes, err := waku.getDiscV5BootstrapNodes(waku.ctx, cfg.DiscV5BootstrapNodes, false)
+		bootnodes, err := waku.getDiscV5BootstrapNodes(waku.ctx, false)
 		if err != nil {
 			logger.Error("failed to get bootstrap nodes", zap.Error(err))
 			return nil, err
@@ -397,7 +393,7 @@ func (w *Waku) GetNodeENRString() (string, error) {
 	return w.node.ENR().String(), nil
 }
 
-func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, useOnlyDnsDiscCache bool) ([]*enode.Node, error) {
+func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, useOnlyDnsDiscCache bool) ([]*enode.Node, error) {
 	wg := sync.WaitGroup{}
 	mu := sync.Mutex{}
 	var result []*enode.Node
@@ -413,7 +409,7 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, 
 		}
 	}
 
-	for _, addrString := range addresses {
+	for _, addrString := range w.cfg.DiscV5BootstrapNodes {
 		if addrString == "" {
 			continue
 		}
@@ -1867,7 +1863,7 @@ func (w *Waku) seedBootnodesForDiscV5() {
 func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
 	ctx, cancel := context.WithTimeout(w.ctx, 30*time.Second)
 	defer cancel()
-	bootnodes, err := w.getDiscV5BootstrapNodes(ctx, w.discV5BootstrapNodes, useOnlyDNSDiscCache)
+	bootnodes, err := w.getDiscV5BootstrapNodes(ctx, useOnlyDNSDiscCache)
 	if err != nil {
 		return err
 	}

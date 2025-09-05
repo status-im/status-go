@@ -14,6 +14,7 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/connection"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging/adapters"
@@ -223,6 +224,10 @@ func (a *API) PeerCount() int {
 
 func (a *API) Peers() types.PeerStats {
 	return adapters.FromWakuPeerStats(a.core.transport.Peers())
+}
+
+func (a *API) PeerID() peer.ID {
+	return a.core.waku.PeerID()
 }
 
 func (a *API) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {

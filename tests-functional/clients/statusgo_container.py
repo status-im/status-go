@@ -21,7 +21,7 @@ class StatusGoContainer:
     all_containers = []
     container = None
 
-    def __init__(self, entrypoint, ports=None, privileged=False, container_name_suffix=""):
+    def __init__(self, cmd, ports=None, privileged=False, container_name_suffix=""):
         if ports is None:
             ports = {}
 
@@ -53,9 +53,10 @@ class StatusGoContainer:
             "detach": True,
             "privileged": privileged,
             "name": self.container_name,
-            "labels": {"com.docker.compose.project": docker_project_name},  # TODO: Is this still needed?
+            "labels": {"com.docker.compose.project": docker_project_name},
             "environment": {
                 "GOCOVERDIR": "/coverage/binary",
+                "SCAN_WAKU_FLEET": self.get_waku_fleet_scan_command(),
             },
             "volumes": {
                 coverage_path: {
@@ -66,9 +67,10 @@ class StatusGoContainer:
             "extra_hosts": {
                 "host.docker.internal": "host-gateway",
             },
-            "entrypoint": entrypoint,
+            "command": cmd,
             "ports": ports,
             "stop_signal": "SIGINT",
+            "network": self.network_name,
         }
 
         if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
@@ -86,8 +88,23 @@ class StatusGoContainer:
 
         logging.debug(f"Container {self.container.name} created. ID = {self.container.id}")
 
-        network = self.docker_client.networks.get(self.network_name)
-        network.connect(self.container)
+    def get_waku_fleet_scan_command(self):
+        """Returns the command string for scanning Waku fleet and generating config"""
+
+        # Known node names from docker compose
+        bootstrap_nodes = "boot-1"
+        static_nodes = "boot-1"  # Add bootnode, otherwise metadata exchange doesn't happen, and Waku light mode doesn't work
+        store_nodes = "store"
+
+        return (
+            "python3 /usr/local/bin/scan_waku_fleet.py "
+            f"--fleet-name {Config.waku_fleet} "
+            f"--cluster-id 16 "  # Cluster ID matches docker-compose.waku.yml
+            f"--bootstrap-nodes {bootstrap_nodes} "
+            f"--store-nodes {store_nodes} "
+            f"--static-nodes {static_nodes} "
+            f"--output {Config.waku_fleets_config}"
+        )
 
     def __del__(self):
         self.stop()
