@@ -13,7 +13,7 @@ def _all_nodes_discovered(nodes: dict[str, StatusBackend], known_peers: dict[str
     for peer_id, node in nodes.items():
         if node is None:
             return False
-        response = node.wakuext_service.peers(enable_logging=False)
+        response = node.wakuext_service.peers()
         peers = response["result"]
 
         # Use shorter names for logging
@@ -61,7 +61,7 @@ class TestDiscovery:
         for thread in threads:
             thread.join()
 
-        assert len(nodes) == nodes_count, "Not all nodes created"
+        assert len(nodes.keys()) == nodes_count, "Not all nodes created"
 
         # Wait for all nodes to discover each other
         start_time = time.time()
