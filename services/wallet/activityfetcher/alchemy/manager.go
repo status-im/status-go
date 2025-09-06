@@ -1,4 +1,4 @@
-// Package alchemy provides an integration service that orchestrates the Alchemy API client
+// Package alchemy provides an integration manager that orchestrates the Alchemy API client
 // with persistence and type conversions to implement the activity fetcher interface.
 package alchemy
 
@@ -14,43 +14,43 @@ import (
 	alchemy "github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 )
 
-type Service struct {
+type Manager struct {
 	client      *alchemy.Client
 	persistence *alchemy.Persistence
 }
 
-func NewService(client *alchemy.Client, persistence *alchemy.Persistence) *Service {
-	return &Service{
+func NewManager(client *alchemy.Client, persistence *alchemy.Persistence) *Manager {
+	return &Manager{
 		client:      client,
 		persistence: persistence,
 	}
 }
 
-func (s *Service) ID() string {
+func (m *Manager) ID() string {
 	return alchemy.AlchemyID
 }
 
-func (s *Service) IsConnected() bool {
-	return s.client.IsConnected()
+func (m *Manager) IsConnected() bool {
+	return m.client.IsConnected()
 }
 
-func (s *Service) IsChainSupported(chainID wc.ChainID) bool {
-	return s.client.IsChainSupported(chainID)
+func (m *Manager) IsChainSupported(chainID wc.ChainID) bool {
+	return m.client.IsChainSupported(chainID)
 }
 
-func (s *Service) GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address common.Address) (*geth_rpc.BlockNumber, *time.Time, error) {
-	return s.persistence.GetLastFetchedBlockAndTimestamp(ctx, chainID, address)
+func (m *Manager) GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address common.Address) (*geth_rpc.BlockNumber, *time.Time, error) {
+	return m.persistence.GetLastFetchedBlockAndTimestamp(ctx, chainID, address)
 }
 
 // FetchActivity orchestrates fetching, persistence, and type conversion.
-func (s *Service) FetchActivity(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, cursor string, limit int) (thirdparty.ActivityEntryContainer, error) {
+func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, cursor string, limit int) (thirdparty.ActivityEntryContainer, error) {
 
-	transfers, nextCursor, err := s.client.FetchTransfers(ctx, chainID, parameters, cursor, limit)
+	transfers, nextCursor, err := m.client.FetchTransfers(ctx, chainID, parameters, cursor, limit)
 	if err != nil {
 		return thirdparty.ActivityEntryContainer{}, err
 	}
 
-	err = s.persistence.SaveTransfers(transfers, chainID, parameters.Address)
+	err = m.persistence.SaveTransfers(transfers, chainID, parameters.Address)
 	if err != nil {
 		return thirdparty.ActivityEntryContainer{}, err
 	}
@@ -58,7 +58,7 @@ func (s *Service) FetchActivity(ctx context.Context, chainID uint64, parameters 
 	items := alchemy.TransfersToThirdpartyActivityEntries(transfers, chainID, parameters.Address)
 
 	return thirdparty.ActivityEntryContainer{
-		Provider:       s.ID(),
+		Provider:       m.ID(),
 		Items:          items,
 		PreviousCursor: cursor,
 		NextCursor:     nextCursor,

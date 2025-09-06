@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
-	alchemyservice "github.com/status-im/status-go/services/wallet/activityfetcher/alchemy"
+	alchemymanager "github.com/status-im/status-go/services/wallet/activityfetcher/alchemy"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
@@ -21,7 +21,7 @@ import (
 	"github.com/status-im/status-go/walletdatabase"
 )
 
-func setupAlchemyActivityService(t *testing.T) *alchemyservice.Service {
+func setupAlchemyActivityManager(t *testing.T) *alchemymanager.Manager {
 	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
@@ -49,13 +49,13 @@ func setupAlchemyActivityService(t *testing.T) *alchemyservice.Service {
 
 	alchemyClient := alchemy.NewClient(alchemyEthClientGetter)
 	alchemyPersistence := alchemy.NewPersistence(walletDB)
-	alchemyService := alchemyservice.NewService(alchemyClient, alchemyPersistence)
+	alchemyManager := alchemymanager.NewManager(alchemyClient, alchemyPersistence)
 
-	return alchemyService
+	return alchemyManager
 }
 
 func TestFetchHistoryBoth(t *testing.T) {
-	alchemyActivityService := setupAlchemyActivityService(t)
+	alchemyActivityManager := setupAlchemyActivityManager(t)
 
 	address := geth_common.HexToAddress("0xa1e277ea6b97effc5b61b3bf5de03f438981247e")
 	// Expecting these transfers:
@@ -71,13 +71,13 @@ func TestFetchHistoryBoth(t *testing.T) {
 		ToBlock:   &toBlock,
 	}
 
-	history, err := alchemyActivityService.FetchActivity(context.Background(), common.EthereumMainnet, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
+	history, err := alchemyActivityManager.FetchActivity(context.Background(), common.EthereumMainnet, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
 	require.NoError(t, err)
 	require.Equal(t, 6, len(history.Items))
 }
 
 func TestFetchHistoryIncoming(t *testing.T) {
-	alchemyActivityService := setupAlchemyActivityService(t)
+	alchemyActivityManager := setupAlchemyActivityManager(t)
 
 	address := geth_common.HexToAddress("0xa1e277ea6b97effc5b61b3bf5de03f438981247e")
 	// Expecting these transfers:
@@ -93,13 +93,13 @@ func TestFetchHistoryIncoming(t *testing.T) {
 		ToBlock:   &toBlock,
 	}
 
-	history, err := alchemyActivityService.FetchActivity(context.Background(), common.EthereumMainnet, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
+	history, err := alchemyActivityManager.FetchActivity(context.Background(), common.EthereumMainnet, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(history.Items))
 }
 
 func TestFetchHistoryOutgoing(t *testing.T) {
-	alchemyActivityService := setupAlchemyActivityService(t)
+	alchemyActivityManager := setupAlchemyActivityManager(t)
 
 	address := geth_common.HexToAddress("0xa1e277ea6b97effc5b61b3bf5de03f438981247e")
 	// Expecting these transfers:
@@ -115,7 +115,7 @@ func TestFetchHistoryOutgoing(t *testing.T) {
 		ToBlock:   &toBlock,
 	}
 
-	history, err := alchemyActivityService.FetchActivity(context.Background(), common.EthereumMainnet, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
+	history, err := alchemyActivityManager.FetchActivity(context.Background(), common.EthereumMainnet, parameters, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(history.Items))
 }
