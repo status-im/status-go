@@ -24,9 +24,9 @@ class TestGetKeycards:
 
     def test_get_keycard_by_keycard_uid(self):
         first_keycard = self.account.accounts_service.get_keycard_by_keycard_uid(self.keycard.get("keycard-uid"))
-        assert first_keycard.get("result").get("keycard-name") == self.keycard.get("keycard-name")
+        assert first_keycard.get("keycard-name") == self.keycard.get("keycard-name")
         second_keycard = self.account.accounts_service.get_keycard_by_keycard_uid(self.second_keycard.get("keycard-uid"))
-        assert second_keycard.get("result").get("keycard-name") == self.second_keycard.get("keycard-name")
+        assert second_keycard.get("keycard-name") == self.second_keycard.get("keycard-name")
 
     def test_get_keycard_by_nonexistent_keycard_uid(self):
         with pytest.raises(ApiResponseError, match=re.escape("keycard: no keycard for the passed keycard uid")):
@@ -34,7 +34,7 @@ class TestGetKeycards:
 
     def test_get_keycards_with_same_keyuid(self):
         resp = self.account.accounts_service.get_keycards_with_same_key_uid(self.account.key_uid)
-        keycards = resp.get("result")
+        keycards = resp
         assert len(keycards) == 2
         assert keycards[0].get("keycard-uid") == self.keycard.get("keycard-uid")
         assert keycards[0].get("keycard-name") == self.keycard.get("keycard-name")
@@ -51,4 +51,4 @@ class TestGetKeycards:
 
     def test_get_keycards_with_same_nonexistent_keyuid(self):
         resp = self.account.accounts_service.get_keycards_with_same_key_uid("0x0000000000000000000000000000000000000000000000000000000000000000")
-        assert resp["result"] == []
+        assert resp == []

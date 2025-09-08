@@ -18,10 +18,10 @@ class TestSetKeycardName:
         self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         new_name = "UpdatedKeycardName"
         resp = self.account.accounts_service.set_keycard_name(self.keycard["keycard-uid"], new_name)
-        assert resp["result"] is None
+        assert resp is None
 
         keycards_after = self.account.accounts_service.get_all_known_keycards()
-        keycards = keycards_after.get("result")
+        keycards = keycards_after
         assert len(keycards) == 1
         assert keycards[0].get("keycard-name") == new_name
 

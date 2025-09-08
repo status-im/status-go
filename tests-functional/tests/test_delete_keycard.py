@@ -17,9 +17,9 @@ class TestDeleteKeycard:
     def test_delete_existing_keycard(self):
         self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         del_resp = self.account.accounts_service.delete_keycard(self.keycard["keycard-uid"])
-        assert del_resp["result"] is None
+        assert del_resp is None
         keycards_after = self.account.accounts_service.get_all_known_keycards()
-        assert keycards_after["result"] == []
+        assert keycards_after == []
 
     def test_delete_nonexistent_keycard(self):
         with pytest.raises(ApiResponseError, match=re.escape("keycard: no keycard for the passed keycard uid")):
@@ -28,11 +28,11 @@ class TestDeleteKeycard:
     def test_delete_keycard_accounts(self):
         self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         keycards_before = self.account.accounts_service.get_all_known_keycards()
-        assert keycards_before.get("result")[0].get("accounts-addresses") == self.keycard["accounts-addresses"]
+        assert keycards_before[0].get("accounts-addresses") == self.keycard["accounts-addresses"]
         del_resp = self.account.accounts_service.delete_keycard_accounts(self.keycard["keycard-uid"], self.keycard["accounts-addresses"])
-        assert del_resp["result"] is None
+        assert del_resp is None
         keycards_after = self.account.accounts_service.get_all_known_keycards()
-        assert keycards_after.get("result")[0].get("accounts-addresses") == ["0x0000000000000000000000000000000000000000"]
+        assert keycards_after[0].get("accounts-addresses") == ["0x0000000000000000000000000000000000000000"]
 
     def test_delete_all_keycards_with_key_uid(self):
         self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
@@ -42,10 +42,10 @@ class TestDeleteKeycard:
         self.account.accounts_service.save_or_update_keycard(second_keycard, self.account.password)
 
         keycards_before = self.account.accounts_service.get_all_known_keycards()
-        assert len(keycards_before.get("result")) == 2
+        assert len(keycards_before) == 2
 
         resp = self.account.accounts_service.delete_all_keycards_with_key_uid(self.account.key_uid)
-        assert resp["result"] is None
+        assert resp is None
 
         keycards_after = self.account.accounts_service.get_all_known_keycards()
-        assert keycards_after["result"] == []
+        assert keycards_after == []

@@ -19,7 +19,7 @@ class TestContactRequests(MessengerSteps):
         response = self.sender.wakuext_service.send_contact_request(self.receiver.public_key, message_text)
         # TODO: Add more assertions on response
 
-        contacts = response.get("result", {}).get("contacts", [])
+        contacts = response.get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
 
         contact_request_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)
@@ -34,7 +34,7 @@ class TestContactRequests(MessengerSteps):
         response = self.sender.wakuext_service.add_contact(self.receiver.public_key, self.receiver.display_name)
         # TODO: Add more assertions on response
 
-        contacts = response.get("result", {}).get("contacts", [])
+        contacts = response.get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.receiver.display_name
 
@@ -51,7 +51,7 @@ class TestContactRequests(MessengerSteps):
         response = self.receiver.wakuext_service.accept_contact_request(message_id)
         # TODO: Add more assertions on response
 
-        contacts = response.get("result", {}).get("contacts", [])
+        contacts = response.get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.sender.display_name
 
@@ -72,7 +72,7 @@ class TestContactRequests(MessengerSteps):
         response = self.receiver.wakuext_service.decline_contact_request(message_id)
         # TODO: Add more assertions on response
 
-        contacts = response.get("result", {}).get("contacts", [])
+        contacts = response.get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.sender.display_name
 
@@ -85,7 +85,7 @@ class TestContactRequests(MessengerSteps):
         response = self.receiver.wakuext_service.accept_latest_contact_request_for_contact(self.sender.public_key)
         # TODO: Add more assertions on response
 
-        contacts = response.get("result", {}).get("contacts", [])
+        contacts = response.get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.sender.display_name
 
@@ -106,7 +106,7 @@ class TestContactRequests(MessengerSteps):
         response = self.receiver.wakuext_service.dismiss_latest_contact_request_for_contact(self.sender.public_key)
         # TODO: Add more assertions on response
 
-        contacts = response.get("result", {}).get("contacts", [])
+        contacts = response.get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.sender.display_name
 
@@ -128,7 +128,7 @@ class TestContactRequests(MessengerSteps):
         response = self.sender.wakuext_service.retract_contact_request(self.receiver.public_key)
         # TODO: Add more assertions on response
 
-        contacts = response.get("result", {}).get("contacts", [])
+        contacts = response.get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
 
         retract_request_messages = self.get_message_by_content_type(
@@ -145,7 +145,7 @@ class TestContactRequests(MessengerSteps):
         response = self.sender.wakuext_service.remove_contact(self.receiver.public_key)
         # TODO: Add more assertions on response
 
-        contacts = response.get("result", {}).get("contacts", [])
+        contacts = response.get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
 
         retract_request_messages = self.get_message_by_content_type(
@@ -163,7 +163,7 @@ class TestContactRequests(MessengerSteps):
         response = self.sender.wakuext_service.set_contact_local_nickname(self.receiver.public_key, nickname)
         # TODO: Add more assertions on response
 
-        contacts = response.get("result", {}).get("contacts", [])
+        contacts = response.get("contacts", [])
         assert len(contacts) >= 1, "Expected response to have at least one contact"
         assert contacts[0].get("displayName") == self.receiver.display_name
         assert contacts[0].get("localNickname") == nickname

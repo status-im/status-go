@@ -15,8 +15,7 @@ def accept_connector(backend, connector, wallet_acc):
     assert event.get("name") == connector.name
 
     # Accept request
-    response = backend.connector_service.request_accounts_accepted(event.get("requestId"), wallet_acc, backend.network_id)
-    assert response.get("error") is None
+    backend.connector_service.request_accounts_accepted(event.get("requestId"), wallet_acc, backend.network_id)
 
     # Expect DAPP_PERMISSION_GRANTED signal, check dApp name, shared account and chain ID
     event = wait_event(backend, SignalType.CONNECTOR_DAPP_PERMISSION_GRANTED.value)
@@ -53,7 +52,7 @@ class TestStatusConnector:
     @pytest.fixture
     def wallet_account(self, backend):
         # Load actual wallet account directly from backend
-        accs = backend.accounts_service.get_accounts()["result"]
+        accs = backend.accounts_service.get_accounts()
         wallet_acc = next((acc.get("address") for acc in accs if acc.get("wallet") is True), None)
         assert wallet_acc is not None
         return wallet_acc
@@ -229,8 +228,7 @@ class TestStatusConnector:
         event = wait_event(backend, SignalType.CONNECTOR_SEND_TRANSACTION.value)
         request_id = event.get("requestId")
         fake_hash = "0x" + "1" * 64
-        response = backend.connector_service.send_transaction_accepted(request_id, fake_hash)
-        assert response.get("error") is None
+        backend.connector_service.send_transaction_accepted(request_id, fake_hash)
 
         # Connector should now receive the tx hash as result
         message = connector.receive()

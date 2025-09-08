@@ -13,8 +13,8 @@ class TestResolveSuggestedPath:
     )
     def test_resolve_suggested_path_for_random_key(self, key_uid):
         response = self.account.accounts_service.resolve_suggested_path_for_keypair(key_uid)
-        assert response.get("result") == "m/44'/60'/0'/0/0"
+        assert response == "m/44'/60'/0'/0/0"
 
     def test_resolve_suggested_path_for_used_key(self):
         response = self.account.accounts_service.resolve_suggested_path_for_keypair(self.account.key_uid)
-        assert response.get("result") == "m/44'/60'/0'/0/1"
+        assert response == "m/44'/60'/0'/0/1"

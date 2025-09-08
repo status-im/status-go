@@ -24,7 +24,7 @@ class TestMigrateNonProfileKeycardKeypairToApp:
             user_1.passphrase, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS
         )
         assert "error" not in add_resp
-        add_result = add_resp.get("result")
+        add_result = add_resp
         assert add_result is not None
         key_uid = add_result.get("key-uid")
         assert key_uid is not None
@@ -42,18 +42,17 @@ class TestMigrateNonProfileKeycardKeypairToApp:
 
         for address in addresses:
             resp = self.account.accounts_service.verify_keystore_file_for_account(address, self.account.password)
-            assert resp.get("result") is True
+            assert resp is True
 
-        save_resp = self.account.accounts_service.save_or_update_keycard(kc, self.account.password)
-        assert "error" not in save_resp
+        self.account.accounts_service.save_or_update_keycard(kc, self.account.password)
 
         for address in addresses:
             resp = self.account.accounts_service.verify_keystore_file_for_account(address, self.account.password)
-            assert resp.get("result") is False
+            assert resp is False
 
         # verify keycard present
         keycards_before = self.account.accounts_service.get_all_known_keycards()
-        kcs = keycards_before.get("result", [])
+        kcs = keycards_before
         matching = [x for x in kcs if x.get("keycard-uid") == kc["keycard-uid"]]
         assert len(matching) == 1
 
@@ -61,24 +60,20 @@ class TestMigrateNonProfileKeycardKeypairToApp:
 
         # 3) Migrate the non-profile keycard keypair to app (full flow)
         migrate_resp = self.account.accounts_service.migrate_non_profile_keycard_keypair_to_app(user_1.passphrase, self.account.password)
-        # RPC returns a JSON object; migration should not return an error
-        assert "error" not in migrate_resp
         # many RPC "void" actions return result None
-        assert migrate_resp.get("result") is None
+        assert migrate_resp is None
 
         for address in addresses:
             resp = self.account.accounts_service.verify_keystore_file_for_account(address, self.account.password)
-            assert resp.get("result") is True
+            assert resp is True
 
         # 4) Verify the keypair still exists and that its keycards list is empty (i.e. migrated off keycard)
         kp_resp = self.account.accounts_service.get_keypair_by_key_uid(key_uid)
-        assert "error" not in kp_resp
-        kp = kp_resp.get("result")
-        assert kp is not None
+        assert kp_resp is not None
         # after migration the keypair should no longer have keycards linked
-        assert isinstance(kp.get("keycards"), list)
-        assert len(kp.get("keycards")) == 0
+        assert isinstance(kp_resp.get("keycards"), list)
+        assert len(kp_resp.get("keycards")) == 0
 
         # accounts should still be present on the keypair
-        assert isinstance(kp.get("accounts"), list)
-        assert len(kp.get("accounts")) >= 1
+        assert isinstance(kp_resp.get("accounts"), list)
+        assert len(kp_resp.get("accounts")) >= 1

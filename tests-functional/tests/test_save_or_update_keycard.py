@@ -16,13 +16,13 @@ class TestSaveOrUpdateKeycard:
 
     def test_save_new_keycard(self):
         keycards_before = self.account.accounts_service.get_all_known_keycards()
-        assert keycards_before["result"] == []
+        assert keycards_before == []
 
         resp = self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
-        assert resp["result"] is None
+        assert resp is None
 
         keycards_after = self.account.accounts_service.get_all_known_keycards()
-        keycards = keycards_after["result"]
+        keycards = keycards_after
         assert len(keycards) == 1
         assert keycards[0].get("keycard-uid") == self.keycard.get("keycard-uid")
         assert keycards[0].get("keycard-name") == self.keycard.get("keycard-name")
@@ -35,7 +35,7 @@ class TestSaveOrUpdateKeycard:
         self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         keycards_after = self.account.accounts_service.get_all_known_keycards()
-        keycards = keycards_after.get("result")
+        keycards = keycards_after
         assert len(keycards) == 1  # only one keycard is saved
 
     def test_save_multiple_keycards(self):
@@ -47,7 +47,7 @@ class TestSaveOrUpdateKeycard:
         self.account.accounts_service.save_or_update_keycard(self.second_keycard, self.account.password)
 
         keycards_after = self.account.accounts_service.get_all_known_keycards()
-        keycards = keycards_after.get("result")
+        keycards = keycards_after
         assert len(keycards) == 2
         assert keycards[0].get("keycard-uid") == self.keycard.get("keycard-uid")
         assert keycards[0].get("keycard-name") == self.keycard.get("keycard-name")
@@ -79,7 +79,7 @@ class TestSaveOrUpdateKeycard:
         self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         self.account.accounts_service.save_or_update_keycard(self.second_keycard, self.account.password)
         keycards_update = self.account.accounts_service.get_all_known_keycards()
-        keycards = keycards_update.get("result")
+        keycards = keycards_update
         assert len(keycards) == 2
         assert keycards[0].get("keycard-name") == self.keycard.get("keycard-name")
         assert keycards[1].get("keycard-name") == self.second_keycard.get("keycard-name")

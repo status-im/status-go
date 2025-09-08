@@ -17,7 +17,7 @@ class TestMoveWalletAccount:
         # Add new account
         path = "m/44'/60'/0'/0/1"
         derived_addresses_response = self.account.wallet_service.get_derived_addresses_for_mnemonic(self.account.mnemonic, [path])
-        derived_addresses = derived_addresses_response["result"]
+        derived_addresses = derived_addresses_response
         self.account_data["key-uid"] = self.account.key_uid  # keyuid of profile keypair
         self.account_data["path"] = path
         self.account_data["address"] = derived_addresses[0].get("address")
@@ -26,19 +26,18 @@ class TestMoveWalletAccount:
 
         # Get all accounts to determine positions
         accounts_response = self.account.accounts_service.get_accounts()
-        accounts_before = [acc for acc in accounts_response.get("result", [])]
+        accounts_before = [acc for acc in accounts_response]
         assert len(accounts_before) >= 3, "Need at least two accounts to test move"
 
         # Move wallet account from position 1 to position 2
         move_accounts_response = self.account.accounts_service.move_wallet_account(
             accounts_before[1].get("position"), accounts_before[2].get("position")
         )
-        assert "result" in move_accounts_response
-        assert move_accounts_response.get("result") is None
+        assert move_accounts_response is None
 
         # Fetch the accounts again
         accounts_response_after = self.account.accounts_service.get_accounts()
-        accounts_after = [acc for acc in accounts_response_after.get("result", [])]
+        accounts_after = [acc for acc in accounts_response_after]
 
         # Checking the positions are still incremental after move
         assert accounts_before[0]["position"] == -1
@@ -58,7 +57,7 @@ class TestMoveWalletAccount:
     def test_move_profile_account_isnt_allowed(self):
         # Get all accounts to determine positions
         accounts_response = self.account.accounts_service.get_accounts()
-        accounts_before = [acc for acc in accounts_response.get("result", [])]
+        accounts_before = [acc for acc in accounts_response]
         assert len(accounts_before) >= 2, "Need at least two accounts to test move"
 
         # Move wallet account from position 0 to position 1
