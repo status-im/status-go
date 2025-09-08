@@ -191,8 +191,9 @@ func (s *Server) AddHandlers(handlers HandlerPatternMap) {
 }
 
 func (s *Server) MakeBaseURL() *url.URL {
+	isHTTPS := s.config != nil && s.config.Cert != nil
 	return &url.URL{
-		Scheme: map[bool]string{true: "http", false: "https"}[s.config.Cert != nil],
+		Scheme: map[bool]string{true: "http", false: "https"}[isHTTPS],
 		Host:   s.address.String(),
 	}
 }
