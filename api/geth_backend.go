@@ -1440,6 +1440,8 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, mne
 		s.Fleet = &request.WakuV2Fleet
 	}
 
+	s.ThirdpartyServicesEnabled = request.ThirdpartyServicesEnabled
+
 	return s, nil
 }
 

@@ -523,6 +523,11 @@ var (
 		dBColumnName:   "last_tokens_update",
 		valueHandler:   TimeHandler,
 	}
+	ThirdpartyServicesEnabled = SettingField{
+		reactFieldName: "thirdparty_services_enabled",
+		dBColumnName:   "thirdparty_services_enabled",
+		valueHandler:   BoolHandler,
+	}
 	SettingFieldRegister = []SettingField{
 		Appearance,
 		AutoMessageEnabled,
@@ -602,6 +607,7 @@ var (
 		WebviewAllowPermissionRequests,
 		AutoRefreshTokensEnabled,
 		LastTokensUpdate,
+		ThirdpartyServicesEnabled,
 	}
 )
 
