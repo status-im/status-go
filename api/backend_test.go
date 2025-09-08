@@ -676,7 +676,7 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 	require.Equal(t, "INFO", newConf.RuntimeLogLevel)
 
 	require.NoError(t, testContext.backend.OpenAccounts())
-	require.NotNil(t, testContext.backend.statusNode.HTTPServer())
+	require.NotNil(t, testContext.backend.statusNode.MediaServer())
 
 	err = testContext.backend.ensureDBsOpened(*testContext.multiAcc, testPassword)
 	require.NoError(t, err)
@@ -989,7 +989,7 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig, keyUID string) {
 
 	wg.Wait()
 	require.NoError(t, b.Logout())
-	require.NotNil(t, b.statusNode.HTTPServer())
+	require.NotNil(t, b.statusNode.MediaServer())
 	require.NoError(t, b.StopNode())
 
 }

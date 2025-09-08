@@ -5,8 +5,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
+	"net/netip"
 	"net/url"
 	"strconv"
+
+	"go.uber.org/zap"
+
+	errorspkg "github.com/pkg/errors"
 
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/logutils"
@@ -17,12 +23,29 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
-type MediaServerOption func(*MediaServer)
+type MediaServerOption func(*MediaServerConfig)
 
 func WithMediaServerDisableTLS(disableTLS bool) MediaServerOption {
-	return func(s *MediaServer) {
+	return func(s *MediaServerConfig) {
 		s.disableTLS = disableTLS
 	}
+}
+
+func WithMediaServerAddress(address string) MediaServerOption {
+	return func(s *MediaServerConfig) {
+		s.address = address
+	}
+}
+
+type MediaServerConfig struct {
+	// disableTLS controls whether the media server uses HTTP instead of HTTPS.
+	// Set to true to avoid TLS certificate issues with react-native-fast-image
+	// on Android, which has limitations with dynamic certificate updates.
+	// Pls check doc/use-status-backend-server.md in status-mobile for more details
+	disableTLS bool
+
+	// address is the address to bind the media server to. Defaults to "localhost:0".
+	address string
 }
 
 type MediaServer struct {
@@ -36,11 +59,7 @@ type MediaServer struct {
 	communityTokenReader        func(communityID string) ([]*protobuf.CommunityTokenMetadata, error)
 	communityImageVersionReader func(communityID string) uint32
 
-	// disableTLS controls whether the media server uses HTTP instead of HTTPS.
-	// Set to true to avoid TLS certificate issues with react-native-fast-image
-	// on Android, which has limitations with dynamic certificate updates.
-	// Pls check doc/use-status-backend-server.md in status-mobile for more details
-	disableTLS bool
+	config *MediaServerConfig
 }
 
 func initMediaCertificate(disableTLS bool) (*tls.Certificate, error) {
@@ -59,7 +78,10 @@ func initMediaCertificate(disableTLS bool) (*tls.Certificate, error) {
 func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiaccounts.Database, walletDB *sql.DB, opts ...MediaServerOption) (*MediaServer, error) {
 
 	s := &MediaServer{
-		disableTLS:      false,
+		config: &MediaServerConfig{
+			disableTLS: false,
+			address:    "localhost:0",
+		},
 		db:              db,
 		downloader:      downloader,
 		multiaccountsDB: multiaccountsDB,
@@ -67,18 +89,24 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 	}
 
 	for _, opt := range opts {
-		opt(s)
+		opt(s.config)
 	}
 
-	cert, err := initMediaCertificate(s.disableTLS)
+	addr, err := netip.ParseAddr(s.config.address)
+	if err != nil {
+		return nil, errorspkg.Wrap(err, "failed to parse media server address")
+	}
+
+	cert, err := initMediaCertificate(s.config.disableTLS)
 	if err != nil {
 		return nil, err
 	}
 	s.Server = NewServer(
-		cert,
-		Localhost,
-		signal.SendMediaServerStarted,
 		logutils.ZapLogger().Named("MediaServer"),
+		&Config{
+			Cert: cert,
+			Addr: &net.TCPAddr{IP: addr.AsSlice(), Port: 0},
+		},
 	)
 
 	s.SetHandlers(HandlerPatternMap{
@@ -104,11 +132,18 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 	return s, nil
 }
 
-func (s *MediaServer) MakeBaseURL() *url.URL {
-	return &url.URL{
-		Scheme: map[bool]string{true: "http", false: "https"}[s.disableTLS],
-		Host:   s.mustGetHost(),
+func (S *MediaServer) Start() error {
+	err := S.Server.Start()
+	if err != nil {
+		S.logger.Error("failed to start media server", zap.Error(err))
+		return err
 	}
+
+	port := S.Server.GetPort()
+	S.logger.Info("media server started", zap.Int("port", port))
+	signal.SendMediaServerStarted(port)
+
+	return nil
 }
 
 func (s *MediaServer) SetCommunityImageVersionReader(getFunc func(communityID string) uint32) {

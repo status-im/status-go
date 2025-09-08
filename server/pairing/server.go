@@ -43,10 +43,14 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 
 	bs := &BaseServer{
 		Server: server.NewServer(
-			config.Cert,
-			config.ListenIP.String(),
-			nil,
 			logger,
+			&server.Config{
+				Cert: config.Cert,
+				Addr: &net.TCPAddr{
+					IP:   config.ListenIP,
+					Port: 0,
+				},
+			},
 		),
 		challengeGiver: cg,
 		config:         *config,
@@ -57,7 +61,7 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 
 // MakeConnectionParams generates a *ConnectionParams based on the Server's current state
 func (s *BaseServer) MakeConnectionParams() (*ConnectionParams, error) {
-	return NewConnectionParams(s.config.IPAddresses, s.MustGetPort(), s.config.PK, s.config.EK, s.config.InstallationID, s.config.KeyUID), nil
+	return NewConnectionParams(s.config.IPAddresses, s.GetPort(), s.config.PK, s.config.EK, s.config.InstallationID, s.config.KeyUID), nil
 }
 
 func MakeServerConfig(config *ServerConfig) error {

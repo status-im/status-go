@@ -315,7 +315,7 @@ func (b *GethStatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Ac
 	for _, acc := range as {
 		if acc.KeyUID == keyUID {
 			for k, v := range acc.Images {
-				acc.Images[k].LocalURL = b.statusNode.HTTPServer().MakeAccountImageURL(acc.KeyUID, v.Name, v.Clock)
+				acc.Images[k].LocalURL = b.statusNode.MediaServer().MakeAccountImageURL(acc.KeyUID, v.Name, v.Clock)
 			}
 			return &acc, nil
 		}
@@ -1662,7 +1662,7 @@ func EnrichMultiAccountByPublicKey(account *multiaccounts.Account, chatPublicKey
 
 func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 	request *requests.CreateAccount,
-	mnemonic string, // empty mnemonic is used for keycard account, not empty for regular account
+	mnemonic string,                   // empty mnemonic is used for keycard account, not empty for regular account
 	keycardData *requests.KeycardData, // nil for regular account, not nil for account with already set keycard
 	restoreAccount bool,
 ) (*multiaccounts.Account, error) {
@@ -2331,7 +2331,7 @@ func (b *GethStatusBackend) initProtocol() error {
 		Identity:               identity,
 		AppDB:                  b.appDB,
 		WalletDB:               b.walletDB,
-		HTTPServer:             b.statusNode.HTTPServer(),
+		HTTPServer:             b.statusNode.MediaServer(),
 		MultiAccountDB:         b.multiaccountsDB,
 		Account:                acc,
 		AccountsManager:        b.accountsManager,
