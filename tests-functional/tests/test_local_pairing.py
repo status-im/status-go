@@ -202,9 +202,7 @@ class TestLocalPairing(MessengerSteps):
         login_paired_device(bob_second_device, bob.key_uid, bob.password)
 
         # Check that contact is synced
-        response = bob_second_device.wakuext_service.get_contacts()
-
-        contacts = response
+        contacts = bob_second_device.wakuext_service.get_contacts()
         assert len(contacts) == 1
         assert contacts[0]["id"] == alice.public_key
 
@@ -239,9 +237,7 @@ class TestLocalPairing(MessengerSteps):
         check_server_receiver_events(events)
 
         # Check that contact is synced
-        response = bob_second_device.wakuext_service.get_contacts()
-
-        contacts = response
+        contacts = bob_second_device.wakuext_service.get_contacts()
         assert len(contacts) == 1
         assert contacts[0]["id"] == alice.public_key
 
@@ -282,8 +278,7 @@ class TestLocalPairing(MessengerSteps):
 
         # Check that contacts and notifications are synced on all devices
         for bob_another_device in [bob2, bob3]:
-            response = bob_another_device.wakuext_service.get_contacts()
-            contacts = response
+            contacts = bob_another_device.wakuext_service.get_contacts()
             assert len(contacts) == 3
             contacts_dict = {contact["id"]: contact for contact in contacts}
             assert contacts_dict[user_accepted.public_key]["mutual"] is True

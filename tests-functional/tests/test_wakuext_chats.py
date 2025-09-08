@@ -22,8 +22,7 @@ class TestChatActions(MessengerSteps):
         self.sender.wakuext_service.send_chat_message(private_group_id, "test_message")
         self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
 
-        response = self.sender.wakuext_service.chats()
-        chats = response
+        chats = self.sender.wakuext_service.chats()
         assert len(chats) == 2
         assert chats[0].get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chats[1].get("chatType", 0) == ChatType.PRIVATE_GROUP_CHAT.value
@@ -32,8 +31,7 @@ class TestChatActions(MessengerSteps):
         sent_texts, _ = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
         chat_id = self.receiver.public_key
 
-        response = self.sender.wakuext_service.chat(chat_id)
-        chat = response
+        chat = self.sender.wakuext_service.chat(chat_id)
         assert chat.get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chat.get("lastMessage", {}).get("text", "") == sent_texts[0]
 
@@ -52,13 +50,11 @@ class TestChatActions(MessengerSteps):
         community_chat_id = self.join_community(member=self.receiver, admin=self.sender)
         self.sender.wakuext_service.send_chat_message(community_chat_id, "test_message_community")
 
-        response = self.sender.wakuext_service.chats_preview(ChatPreviewFilterType.Community.value)
-        chats_previews = response
+        chats_previews = self.sender.wakuext_service.chats_preview(ChatPreviewFilterType.Community.value)
         assert len(chats_previews) == 1
         assert chats_previews[0].get("id", "") == community_chat_id
 
-        response = self.sender.wakuext_service.chats_preview(ChatPreviewFilterType.NonCommunity.value)
-        chats_previews = response
+        chats_previews = self.sender.wakuext_service.chats_preview(ChatPreviewFilterType.NonCommunity.value)
         assert len(chats_previews) == 2
         assert chats_previews[0].get("id", "") == one_to_one_chat_id
         assert chats_previews[1].get("id", "") == private_group_chat_id
@@ -69,16 +65,13 @@ class TestChatActions(MessengerSteps):
         one_to_one_chat_id = self.receiver.public_key
         private_group_chat_id = self.join_private_group(admin=self.sender, member=self.receiver)
 
-        response = self.sender.wakuext_service.active_chats()
+        chats = self.sender.wakuext_service.active_chats()
         # TODO: Add more assertions on response
-        chats = response
         assert len(chats) == 2
 
         self.sender.wakuext_service.deactivate_chat(private_group_chat_id, False)
 
-        response = self.sender.wakuext_service.active_chats()
-
-        chats = response
+        chats = self.sender.wakuext_service.active_chats()
         assert len(chats) == 1
         assert chats[0].get("id", 0) == one_to_one_chat_id
 
@@ -86,12 +79,10 @@ class TestChatActions(MessengerSteps):
         self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
         chat_id = self.receiver.public_key
 
-        response = self.sender.wakuext_service.mute_chat(chat_id)
-        result = response
+        result = self.sender.wakuext_service.mute_chat(chat_id)
         assert result == "0001-01-01T00:00:00Z"
 
-        response = self.sender.wakuext_service.chat(chat_id)
-        chat = response
+        chat = self.sender.wakuext_service.chat(chat_id)
         assert chat.get("muted", False) is True
         assert chat.get("muteTill", "") == result
 
@@ -115,16 +106,14 @@ class TestChatActions(MessengerSteps):
         self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
         chat_id = self.receiver.public_key
 
-        response = self.sender.wakuext_service.mute_chat_v2(chat_id, mute_type)
-        result = response
+        result = self.sender.wakuext_service.mute_chat_v2(chat_id, mute_type)
         actual = datetime.strptime(result, "%Y-%m-%dT%H:%M:%SZ")
 
         expected = datetime.now() + time_delta
         diff = expected - actual
         assert diff.total_seconds() < 2  # 2sec margin
 
-        response = self.sender.wakuext_service.chat(chat_id)
-        chat = response
+        chat = self.sender.wakuext_service.chat(chat_id)
         assert chat.get("muted", False) is True
         assert chat.get("muteTill", "") == result
 
@@ -140,15 +129,13 @@ class TestChatActions(MessengerSteps):
         self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
         chat_id = self.receiver.public_key
 
-        response = self.sender.wakuext_service.mute_chat_v2(chat_id, mute_type)
-        result = response
+        result = self.sender.wakuext_service.mute_chat_v2(chat_id, mute_type)
         assert result == "0001-01-01T00:00:00Z"
 
         response = self.sender.wakuext_service.unmute_chat(chat_id)
         assert response is None
 
-        response = self.sender.wakuext_service.chat(chat_id)
-        chat = response
+        chat = self.sender.wakuext_service.chat(chat_id)
         assert chat.get("muted", True) is False
 
     def test_clear_history(self):
@@ -187,8 +174,7 @@ class TestChatActions(MessengerSteps):
         response = self.sender.wakuext_service.save_chat(chat_id, active=True)
         assert response is None
 
-        response = self.sender.wakuext_service.chat(chat_id)
-        chat = response
+        chat = self.sender.wakuext_service.chat(chat_id)
         assert chat.get("id", "") == chat_id
         assert chat.get("active", -1) is True
 

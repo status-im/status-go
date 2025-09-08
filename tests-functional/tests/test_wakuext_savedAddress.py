@@ -128,8 +128,7 @@ class TestSavedAddresses:
         ]
 
         # Step: Checking remaining capacity
-        response = self.rpc_client.rpc_valid_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
-        remaining_capacity = response
+        remaining_capacity = self.rpc_client.rpc_valid_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
 
         # Step: adding  addresses to fill capacity
         for i in range(remaining_capacity):

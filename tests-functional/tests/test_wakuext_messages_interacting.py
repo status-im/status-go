@@ -122,8 +122,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         assert len(removed_messages) == 1
         assert removed_messages[0].get("messageId") == message_id
 
-        response = self.sender.wakuext_service.message_by_message_id(message_id)
-        message = response
+        message = self.sender.wakuext_service.message_by_message_id(message_id)
         assert message.get("id", "") == message_id
         assert message.get("deleted", None) is True
 
@@ -153,8 +152,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         response = self.sender.wakuext_service.delete_message_for_me_and_sync(local_chat_id, message_id)
         # TODO: Add more assertions on response
 
-        response = self.sender.wakuext_service.message_by_message_id(message_id)
-        message = response
+        message = self.sender.wakuext_service.message_by_message_id(message_id)
         assert message.get("id", "") == message_id
         assert message.get("deletedForMe", None) is True
 

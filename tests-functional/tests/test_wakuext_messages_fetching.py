@@ -134,11 +134,10 @@ class TestFetchingChatMessages(MessengerSteps):
         sender_chat_id = self.receiver.public_key
         message_id = responses[0].get("messages", [])[0].get("id", "")
 
-        response = self.sender.wakuext_service.mark_message_as_unread(sender_chat_id, message_id)
+        self.sender.wakuext_service.mark_message_as_unread(sender_chat_id, message_id)
         # TODO: Add more assertions on response
 
-        response = self.sender.wakuext_service.first_unseen_message_id(sender_chat_id)
+        result = self.sender.wakuext_service.first_unseen_message_id(sender_chat_id)
         # TODO: Add more assertions on response
 
-        result = response
         assert result == message_id

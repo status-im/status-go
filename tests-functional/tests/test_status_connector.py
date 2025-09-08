@@ -15,8 +15,7 @@ def accept_connector(backend, connector, wallet_acc):
     assert event.get("name") == connector.name
 
     # Accept request
-    response = backend.connector_service.request_accounts_accepted(event.get("requestId"), wallet_acc, backend.network_id)
-    assert response.get("error") is None
+    backend.connector_service.request_accounts_accepted(event.get("requestId"), wallet_acc, backend.network_id)
 
     # Expect DAPP_PERMISSION_GRANTED signal, check dApp name, shared account and chain ID
     event = wait_event(backend, SignalType.CONNECTOR_DAPP_PERMISSION_GRANTED.value)
@@ -62,7 +61,7 @@ class TestStatusConnector:
         connector.eth_chain_id()
 
         message = connector.receive()
-        assert message == hex(backend.network_id)
+        assert message.get("result") == hex(backend.network_id)
 
     def test_connect_and_accounts(self, backend, connector, wallet_account):
         # Request accounts through connector
@@ -72,8 +71,8 @@ class TestStatusConnector:
 
         # Receive accounts on connector
         message = connector.receive()
-        assert message is not None
-        accounts = message
+        assert message.get("result") is not None
+        accounts = message.get("result")
         assert len(accounts) == 1
         assert accounts[0] == wallet_account
 
@@ -85,8 +84,8 @@ class TestStatusConnector:
 
         # Receive accounts on connector
         message = connector.receive()
-        assert message is not None
-        accounts = message
+        assert message.get("result") is not None
+        accounts = message.get("result")
         assert len(accounts) == 1
         assert accounts[0] == wallet_account
 
@@ -100,13 +99,13 @@ class TestStatusConnector:
         connector.eth_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
-        assert message is not None
+        assert message.get("result") is not None
 
         # Block Number is resolved after connection
         connector.eth_block_number()
 
         message = connector.receive()
-        result = message
+        result = message.get("result")
         assert int(result, 16) >= 0
 
     def test_get_balance(self, backend, connector, wallet_account):
@@ -119,12 +118,12 @@ class TestStatusConnector:
         connector.eth_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
-        assert message is not None
+        assert message.get("result") is not None
 
         # Get balance is resolved after connection
         connector.eth_get_balance(wallet_account)
         message = connector.receive()
-        result = message
+        result = message.get("result")
         assert result.startswith("0x")
         assert int(result, 16) >= 0
 
@@ -138,12 +137,12 @@ class TestStatusConnector:
         connector.eth_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
-        assert message is not None
+        assert message.get("result") is not None
 
         # Get transaction count is resolved after connection
         connector.eth_get_transaction_count(wallet_account)
         message = connector.receive()
-        result = message
+        result = message.get("result")
         assert result.startswith("0x")
         assert int(result, 16) >= 0
 
@@ -158,12 +157,12 @@ class TestStatusConnector:
         connector.eth_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
-        assert message is not None
+        assert message.get("result") is not None
 
         # eth_call is resolved after connection
         connector.eth_call(call_object)
         message = connector.receive()
-        result = message
+        result = message.get("result")
         assert result == "0x"
 
     def test_estimate_gas_resolved(self, backend, connector, wallet_account):
@@ -178,12 +177,12 @@ class TestStatusConnector:
         connector.eth_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
-        assert message is not None
+        assert message.get("result") is not None
 
         # Estimate gas is resolved after connection
         connector.eth_estimate_gas(tx)
         message = connector.receive()
-        result = message
+        result = message.get("result")
         assert result.startswith("0x")
         assert int(result, 16) == 21000  # minimum gas limit
 
@@ -198,7 +197,7 @@ class TestStatusConnector:
         connector.eth_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
-        assert message is not None
+        assert message.get("result") is not None
 
         # Query a non-existent tx receipt should return null result
         connector.eth_get_transaction_receipt(fake_tx)
@@ -220,7 +219,7 @@ class TestStatusConnector:
         connector.eth_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
-        assert message is not None
+        assert message.get("result") is not None
 
         # Initiate send transaction
         connector.eth_send_transaction(tx)
@@ -229,13 +228,12 @@ class TestStatusConnector:
         event = wait_event(backend, SignalType.CONNECTOR_SEND_TRANSACTION.value)
         request_id = event.get("requestId")
         fake_hash = "0x" + "1" * 64
-        response = backend.connector_service.send_transaction_accepted(request_id, fake_hash)
-        assert response.get("error") is None
+        backend.connector_service.send_transaction_accepted(request_id, fake_hash)
 
         # Connector should now receive the tx hash as result
         message = connector.receive()
         assert message.get("error") is None
-        assert message == fake_hash
+        assert message.get("result") == fake_hash
 
     def test_switch_ethereum_chain(self, backend, connector, wallet_account):
         # Switch chain not resolved before connection
@@ -247,7 +245,7 @@ class TestStatusConnector:
         connector.eth_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
-        assert message is not None
+        assert message.get("result") is not None
 
         # Switch to the same chain ID
         connector.wallet_switch_ethereum_chain(backend.network_id)
@@ -264,7 +262,7 @@ class TestStatusConnector:
         connector.eth_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
-        assert message is not None
+        assert message.get("result") is not None
 
         # Handle Revoke Permissions before disconnect
         connector.wallet_revoke_permissions()

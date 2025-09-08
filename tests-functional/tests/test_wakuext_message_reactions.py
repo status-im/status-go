@@ -30,12 +30,11 @@ class TestMessageReactions(MessengerSteps):
             timeout=60,
         )
 
-        response = self.sender.wakuext_service.rpc_request(
+        result = self.sender.wakuext_service.rpc_request(
             method="emojiReactionsByChatIDMessageID",
             params=[sender_chat_id, message_id],
         )
         # TODO: Add more assertions on response
-        result = response
         assert all(
             (
                 len(result) == 1,
@@ -88,9 +87,8 @@ class TestMessageReactions(MessengerSteps):
             timeout=60,
         )
         time.sleep(10)
-        response = self.sender.wakuext_service.rpc_request(method="emojiReactionsByChatID", params=[sender_chat_id, None, 20])
+        result = self.sender.wakuext_service.rpc_request(method="emojiReactionsByChatID", params=[sender_chat_id, None, 20])
         # TODO: Add more assertions on response
-        result = response
         assert len(result) == 2
         for item in result:
             assert all(
