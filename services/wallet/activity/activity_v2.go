@@ -3,30 +3,13 @@ package activity
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
-	"sort"
-	"time"
-
-	sq "github.com/Masterminds/squirrel"
+	"strings"
 
 	eth "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"go.uber.org/zap"
-
-	"github.com/status-im/status-go/logutils"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	wCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/requests"
-	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
-	"github.com/status-im/status-go/services/wallet/router/routes"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/sqlite"
 )
 
 type FilterDependencies struct {
@@ -39,71 +22,48 @@ type FilterDependencies struct {
 	currentTimestamp func() int64
 }
 
-// getSentActivitiesEntries queries the route_* and tracked_transactions based on filter parameters and arguments
-// it returns metadata for all entries ordered by timestamp column
-func getSentActivitiesEntries(ctx context.Context, deps FilterDependencies, addresses []eth.Address, chainIDs []wCommon.ChainID, afterTimestamp int64) ([]Entry, error) {
-	if len(addresses) == 0 {
-		return nil, ErrNoAddressesProvided
+type TransactionOrigin int
+
+const (
+	SentTransaction TransactionOrigin = iota
+	FetchedTransaction
+)
+
+func (s TransactionOrigin) String() string {
+	switch s {
+	case SentTransaction:
+		return "sent"
+	case FetchedTransaction:
+		return "fetched"
+	default:
+		return "unknown"
 	}
-	if len(chainIDs) == 0 {
-		return nil, ErrNoChainIDsProvided
+}
+
+type OrderedTransactionID struct {
+	ac.TransactionIdentity
+	Timestamp int64
+	Source    TransactionOrigin
+}
+
+// getActivityEntries is the main entry point for the implementation
+// using SQL-based unified ordering approach. It retrieves activity entries
+// for given addresses and chain IDs with pagination support.
+func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, offset int, limit int) ([]Entry, error) {
+	if f.version != V2 {
+		return nil, fmt.Errorf("unsupported version: %s, expected %s", f.version, V2)
 	}
 
-	q := sq.Select(`
-		st.tx_json,
-		rpt.tx_args_json,
-		rpt.is_approval,
-		rp.path_json,
-		rip.route_input_params_json,
-		tt.tx_status,
-		tt.timestamp
-		`).Distinct()
-	q = q.From("sent_transactions st").
-		LeftJoin(`route_path_transactions rpt ON
-			st.chain_id = rpt.chain_id AND
-			st.tx_hash = rpt.tx_hash`).
-		LeftJoin(`tracked_transactions tt ON
-			st.chain_id = tt.chain_id AND
-			st.tx_hash = tt.tx_hash`).
-		LeftJoin(`route_paths rp ON
-			rpt.uuid = rp.uuid AND
-			rpt.path_idx = rp.path_idx`).
-		LeftJoin(`route_input_parameters rip ON
-			rpt.uuid = rip.uuid`)
-	q = q.OrderBy("tt.timestamp DESC", "rpt.is_approval ASC")
-
-	qConditions := sq.And{}
-
-	qConditions = append(qConditions, sq.Eq{"rpt.chain_id": chainIDs})
-	qConditions = append(qConditions, sq.Eq{"rip.from_address": addresses})
-	// Only fetch entries after the specified timestamp
-	qConditions = append(qConditions, sq.Gt{"tt.timestamp": afterTimestamp})
-
-	q = q.Where(qConditions)
-
-	query, args, err := q.ToSql()
+	txIDs, _, err := getTransactionsOrder(ctx, s.getDeps().db, f.addresses, f.chainIDs, f.filter, offset, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	stmt, err := deps.db.Prepare(query)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.QueryContext(ctx, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	data, err := rowsToSentEntryData(rows)
-	if err != nil {
-		return nil, err
+	if len(txIDs) == 0 {
+		return []Entry{}, nil
 	}
 
-	entries, err := sentEntryDataToEntriesV2(deps, data)
+	entries, err := getEntriesByTransactionIDs(ctx, s.getDeps(), txIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -111,471 +71,192 @@ func getSentActivitiesEntries(ctx context.Context, deps FilterDependencies, addr
 	return entries, nil
 }
 
-func getSentActivitiesByHash(ctx context.Context, deps FilterDependencies, addresses []eth.Address, chainIDs []wCommon.ChainID, txIDs []TransactionID) (map[TransactionID]Entry, error) {
+// getTransactionsOrder returns deduplicated, ordered transaction IDs from both sent and fetched sources.
+// It returns the ordered list of transaction identities and total count for pagination.
+func getTransactionsOrder(ctx context.Context, db *sql.DB, addresses []eth.Address, chainIDs []wCommon.ChainID, filter Filter, offset int, limit int) ([]OrderedTransactionID, int64, error) {
+
 	if len(addresses) == 0 {
-		return nil, ErrNoAddressesProvided
+		return nil, 0, ErrNoAddressesProvided
 	}
 	if len(chainIDs) == 0 {
-		return nil, ErrNoChainIDsProvided
-	}
-	if len(txIDs) == 0 {
-		return make(map[TransactionID]Entry), nil
+		return nil, 0, ErrNoChainIDsProvided
 	}
 
-	// Extract hashes from txIDs
-	hashes := make([]eth.Hash, 0, len(txIDs))
-	for _, txID := range txIDs {
-		hashes = append(hashes, txID.Hash)
-	}
+	query := buildTransactionOrderQuery(len(chainIDs), len(addresses), limit != ac.NoLimit)
+	args := buildQueryArgs(chainIDs, addresses, limit, offset)
 
-	q := sq.Select(`
-		st.tx_json,
-		rpt.tx_args_json,
-		rpt.is_approval,
-		rp.path_json,
-		rip.route_input_params_json,
-		tt.tx_status,
-		tt.timestamp
-		`).Distinct()
-	q = q.From("sent_transactions st").
-		LeftJoin(`route_path_transactions rpt ON
-			st.chain_id = rpt.chain_id AND
-			st.tx_hash = rpt.tx_hash`).
-		LeftJoin(`tracked_transactions tt ON
-			st.chain_id = tt.chain_id AND
-			st.tx_hash = tt.tx_hash`).
-		LeftJoin(`route_paths rp ON
-			rpt.uuid = rp.uuid AND
-			rpt.path_idx = rp.path_idx`).
-		LeftJoin(`route_input_parameters rip ON
-			rpt.uuid = rip.uuid`)
-
-	qConditions := sq.And{}
-
-	qConditions = append(qConditions, sq.Eq{"st.chain_id": chainIDs})
-	qConditions = append(qConditions, sq.Eq{"st.tx_hash": hashes})
-	// Note: removing the address filter since sent_transactions might not have all addresses
-	// and we're already filtering by specific tx hashes
-
-	q = q.Where(qConditions)
-
-	query, args, err := q.ToSql()
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
-	}
-
-	stmt, err := deps.db.Prepare(query)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.QueryContext(ctx, args...)
-	if err != nil {
-		return nil, err
+		return nil, 0, fmt.Errorf("failed to query transactions order: %w", err)
 	}
 	defer rows.Close()
 
-	data, err := rowsToSentEntryData(rows)
-	if err != nil {
-		return nil, err
-	}
-
-	entries, err := sentEntryDataToEntriesV2(deps, data)
-	if err != nil {
-		return nil, err
-	}
-
-	// Build the result map
-	result := make(map[TransactionID]Entry)
-	for _, entry := range entries {
-		if len(entry.transactions) > 0 {
-			txID := TransactionID{
-				ChainID: entry.transactions[0].ChainID,
-				Hash:    entry.transactions[0].Hash,
-			}
-			result[txID] = entry
-		}
-	}
-
-	return result, nil
+	return extractTransactionIdentities(rows)
 }
 
-func getFetchedActivitiesEntries(ctx context.Context, deps FilterDependencies, addresses []eth.Address, chainIDs []wCommon.ChainID, offset int, limit int) ([]Entry, error) {
+// extractTransactionIdentities processes SQL result rows into TransactionID slice.
+func extractTransactionIdentities(rows *sql.Rows) ([]OrderedTransactionID, int64, error) {
+	var results []OrderedTransactionID
+	var totalCount int64
 
-	if len(addresses) == 0 {
-		return nil, ErrNoAddressesProvided
-	}
-	if len(chainIDs) == 0 {
-		return nil, ErrNoChainIDsProvided
-	}
+	for rows.Next() {
+		var txID OrderedTransactionID
+		var chainID uint64
+		var hashBytes []byte
+		var addressBytes []byte
 
-	q := sq.Select("e.transfer", "e.chain_id", "e.address").
-		From("fetched_alchemy_transfers e").
-		Where(sq.And{
-			sq.Eq{"e.chain_id": chainIDs},
-			sq.Eq{"e.address": addresses}})
-
-	query, args, err := q.ToSql()
-	if err != nil {
-		return nil, err
-	}
-
-	stmt, err := deps.db.Prepare(query)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.Query(args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	// Get transfers grouped by chainId and address
-	transfersMap, err := rowsToTransfersGrouped(rows)
-	if err != nil {
-		return nil, err
-	}
-
-	// Process all combinations of address and chain-id and accumulate activity entries
-	var allActivityEntries []thirdparty.ActivityEntry
-	for chainID, addressMap := range transfersMap {
-		for address, transfers := range addressMap {
-			activityEntries := alchemy.TransfersToThirdpartyActivityEntries(transfers, uint64(chainID), address)
-			allActivityEntries = append(allActivityEntries, activityEntries...)
+		err := rows.Scan(&chainID, &hashBytes, &txID.Timestamp, &txID.Source, &addressBytes, &totalCount)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to scan transaction row: %w", err)
 		}
+
+		txID.ChainID = wCommon.ChainID(chainID)
+		txID.Hash = eth.BytesToHash(hashBytes)
+		txID.Address = eth.BytesToAddress(addressBytes)
+		results = append(results, txID)
 	}
 
-	allEntries := thirdpartyActivityEntriesToEntries(deps, allActivityEntries)
-
-	// Sort entries by timestamp in descending order (most recent first)
-	sort.Slice(allEntries, func(i, j int) bool {
-		return allEntries[i].timestamp > allEntries[j].timestamp
-	})
-
-	// Apply offset and limit
-	if offset > len(allEntries) {
-		return []Entry{}, nil
-	}
-	start := offset
-	end := start + limit
-	if limit == ac.NoLimit || end > len(allEntries) {
-		end = len(allEntries)
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error iterating transaction rows: %w", err)
 	}
 
-	result := allEntries[start:end]
-	return result, nil
+	return results, totalCount, nil
 }
 
-func thirdpartyActivityEntriesToEntries(deps FilterDependencies, activityEntries []thirdparty.ActivityEntry) []Entry {
-	entries := make([]Entry, 0, len(activityEntries))
+// buildPlaceholders creates SQL placeholders for IN clauses
+func buildPlaceholders(count int) string {
+	if count == 0 {
+		return ""
+	}
+	result := strings.Repeat("?,", count)
+	return result[:len(result)-1] // Remove the trailing comma
+}
 
-	for _, ae := range activityEntries {
-		// Determine the main chain ID and set chainIDOut/chainIDIn
-		// uChainID := wCommon.UnknownChainID
-		var chainIDOut *wCommon.ChainID
-		var chainIDIn *wCommon.ChainID
-		if ae.ChainIDOut != nil {
-			chainIDOut = new(wCommon.ChainID)
-			*chainIDOut = wCommon.ChainID(*ae.ChainIDOut)
-		}
-		if ae.ChainIDIn != nil {
-			chainIDIn = new(wCommon.ChainID)
-			*chainIDIn = wCommon.ChainID(*ae.ChainIDIn)
-		}
-		var chainID wCommon.ChainID
-		if chainIDOut != nil {
-			chainID = *chainIDOut
-		} else if chainIDIn != nil {
-			chainID = *chainIDIn
-		} else {
-			chainID = wCommon.ChainID(wCommon.UnknownChainID)
-		}
+// buildTransactionOrderQuery constructs the query for getting transaction order.
+// This query merges sent and fetched transactions, deduplicates by preferring sent sources,
+// and applies ordering
+// String building used instead of Squirrel for this complex query because it is easier to comprehend this way
+func buildTransactionOrderQuery(chainIDCount, addressCount int, withPagination bool) string {
+	query := `
+    SELECT 
+        chain_id, 
+        tx_hash, 
+        timestamp, 
+        source, 
+        address,
+        COUNT(*) OVER () AS total_count
+    FROM (
+        SELECT
+            chain_id,
+            tx_hash,
+            timestamp,
+            source,
+            address,
+            ROW_NUMBER() OVER (
+                PARTITION BY chain_id, tx_hash, address
+                ORDER BY source, timestamp DESC
+            ) AS rn
+        FROM (
+            SELECT
+                st.chain_id,
+                st.tx_hash,
+                tt.timestamp,
+                0 AS source,
+                rip.from_address AS address
+            FROM sent_transactions st
+            JOIN tracked_transactions tt ON st.chain_id = tt.chain_id AND st.tx_hash = tt.tx_hash
+            JOIN route_path_transactions rpt ON st.chain_id = rpt.chain_id AND st.tx_hash = rpt.tx_hash
+            JOIN route_input_parameters rip ON rpt.uuid = rip.uuid
+            WHERE st.chain_id IN (` + buildPlaceholders(chainIDCount) + `)
+                AND rip.from_address IN (` + buildPlaceholders(addressCount) + `)
 
-		entry := Entry{
-			payloadType: ac.MultiTransactionPT,
-			transactions: []*ac.TransactionIdentity{
-				{
-					ChainID: chainID,
-					Hash:    ae.TxHash,
-					Address: ae.Sender,
-				},
-			},
-			timestamp:                 ae.Timestamp,
-			activityType:              ae.ActivityType,
-			activityStatus:            getActivityStatusFromTxStatus(ae.TxStatus, ae.Timestamp, chainID),
-			amountOut:                 ae.AmountOut,
-			amountIn:                  ae.AmountIn,
-			tokenOut:                  ae.TokenOut,
-			tokenIn:                   ae.TokenIn,
-			sender:                    &ae.Sender,
-			recipient:                 ae.Recipient,
-			chainIDOut:                chainIDOut,
-			chainIDIn:                 chainIDIn,
-			transferType:              getTransferTypeFromTokens(ae.TokenIn, ae.TokenOut),
-			interactedContractAddress: ae.ContractAddress,
-		}
+            UNION ALL
 
-		entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
-		entries = append(entries, entry)
+            SELECT
+                fat.chain_id,
+                CASE 
+                    WHEN substr(fat.hash, 1, 2) = '0x' THEN unhex(substr(fat.hash, 3))
+                    ELSE unhex(fat.hash)
+                END AS tx_hash,
+                CAST(strftime('%s', json_extract(fat.transfer, '$.metadata.blockTimestamp')) AS INTEGER) AS timestamp,
+                1 AS source,
+                fat.address AS address
+            FROM fetched_alchemy_transfers fat
+            WHERE fat.chain_id IN (` + buildPlaceholders(chainIDCount) + `)
+                AND fat.address IN (` + buildPlaceholders(addressCount) + `)
+        )
+    ) 
+    WHERE rn = 1
+    ORDER BY timestamp DESC, chain_id, tx_hash, address`
+
+	if withPagination {
+		query += `
+    LIMIT ? OFFSET ?`
+	}
+
+	return query
+}
+
+// buildQueryArgs constructs the arguments for the getTransactionsOrder query.
+func buildQueryArgs(chainIDs []wCommon.ChainID, addresses []eth.Address, limit int, offset int) []interface{} {
+	capacity := 2 * (len(chainIDs) + len(addresses))
+	if limit != ac.NoLimit {
+		capacity += 2
+	}
+	args := make([]interface{}, 0, capacity)
+
+	for _, chainID := range chainIDs {
+		args = append(args, uint64(chainID))
+	}
+	for _, addr := range addresses {
+		args = append(args, addr.Bytes())
+	}
+	for _, chainID := range chainIDs {
+		args = append(args, uint64(chainID))
+	}
+	for _, addr := range addresses {
+		args = append(args, addr.Bytes())
+	}
+	if limit > 0 {
+		args = append(args, limit, offset)
+	}
+
+	return args
+}
+
+// getEntriesByTransactionIDs fetches full entry details for given transaction IDs
+// maintaining the order from the input slice
+func getEntriesByTransactionIDs(ctx context.Context, deps FilterDependencies, txIDs []OrderedTransactionID) ([]Entry, error) {
+	sentEntries, err := getSentEntriesByIDs(ctx, deps, txIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	fetchedEntries, err := getFetchedEntriesByIDs(ctx, deps, txIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	entries := mergeAndOrderEntries(sentEntries, fetchedEntries, txIDs)
+
+	return entries, nil
+}
+
+// mergeAndOrderEntries combines entries from sent and fetched sources
+func mergeAndOrderEntries(sentEntries, fetchedEntries map[string]Entry, orderedIDs []OrderedTransactionID) []Entry {
+	entries := make([]Entry, 0, len(orderedIDs))
+
+	for _, txID := range orderedIDs {
+		key := txID.Key()
+
+		if entry, exists := sentEntries[key]; exists {
+			entries = append(entries, entry)
+		} else if entry, exists := fetchedEntries[key]; exists {
+			entries = append(entries, entry)
+		}
 	}
 
 	return entries
-}
-
-func getActivityStatusFromTxStatus(status ac.TxStatus, timestamp int64, chainID wCommon.ChainID) ac.Status {
-	switch status {
-	case ac.Pending:
-		return ac.PendingAS
-	case ac.Success:
-		now := time.Now().Unix()
-		if timestamp+getFinalizationPeriod(chainID) > now {
-			return ac.FinalizedAS
-		}
-		return ac.CompleteAS
-	case ac.Failed:
-		return ac.FailedAS
-	}
-
-	logutils.ZapLogger().Error("unhandled transaction status value")
-	return ac.FailedAS
-}
-
-func getTransferTypeFromTokens(tokenIn, tokenOut *ac.Token) *ac.TransferType {
-	var token *ac.Token
-	if tokenIn != nil {
-		token = tokenIn
-	} else if tokenOut != nil {
-		token = tokenOut
-	} else {
-		return nil
-	}
-
-	ret := new(ac.TransferType)
-	switch token.TokenType {
-	case ac.Native:
-		*ret = ac.TransferTypeEth
-	case ac.Erc20:
-		*ret = ac.TransferTypeErc20
-	case ac.Erc721:
-		*ret = ac.TransferTypeErc721
-	case ac.Erc1155:
-		*ret = ac.TransferTypeErc1155
-	default:
-		return nil
-	}
-
-	return ret
-}
-
-// rowsToTransfersGrouped returns transfers grouped by chainId and then by address
-func rowsToTransfersGrouped(rows *sql.Rows) (map[wCommon.ChainID]map[eth.Address][]alchemy.Transfer, error) {
-	transfersMap := make(map[wCommon.ChainID]map[eth.Address][]alchemy.Transfer)
-
-	var counter int = 0
-
-	for rows.Next() {
-		var transfer alchemy.Transfer
-		var chainID uint64
-		var address eth.Address
-		var transferJSON = sqlite.ToJSONBlob(&transfer)
-
-		err := rows.Scan(transferJSON, &chainID, &address)
-		if err != nil {
-			return nil, err
-		}
-		if !transferJSON.Valid {
-			return nil, errors.New("invalid entry")
-		}
-
-		// Initialize nested map if needed
-		wChainID := wCommon.ChainID(chainID)
-		if transfersMap[wChainID] == nil {
-			transfersMap[wChainID] = make(map[eth.Address][]alchemy.Transfer)
-		}
-		transfersMap[wChainID][address] = append(transfersMap[wChainID][address], transfer)
-		counter = counter + 1
-	}
-
-	return transfersMap, nil
-}
-
-func rowsToTransfers(rows *sql.Rows) ([]alchemy.Transfer, error) {
-	var transfers []alchemy.Transfer
-	for rows.Next() {
-		var transfer alchemy.Transfer
-		var transferJSON = sqlite.ToJSONBlob(&transfer)
-		err := rows.Scan(transferJSON)
-		fmt.Println("Scanned json:", transferJSON)
-		if err != nil {
-			return nil, err
-		}
-		if !transferJSON.Valid {
-			return nil, errors.New("invalid entry")
-		}
-		transfers = append(transfers, transfer)
-	}
-	return transfers, nil
-}
-
-type sentEntryDataV2 struct {
-	TxArgs           *wallettypes.SendTxArgs
-	Tx               *ethTypes.Transaction
-	IsApproval       bool
-	Status           ac.TxStatus
-	Timestamp        int64
-	Path             *routes.Path
-	RouteInputParams *requests.RouteInputParams
-}
-
-func newSentEntryDataV2() *sentEntryDataV2 {
-	return &sentEntryDataV2{
-		TxArgs:           new(wallettypes.SendTxArgs),
-		Tx:               new(ethTypes.Transaction),
-		Path:             new(routes.Path),
-		RouteInputParams: new(requests.RouteInputParams),
-	}
-}
-
-func rowsToSentEntryData(rows *sql.Rows) ([]*sentEntryDataV2, error) {
-	var ret []*sentEntryDataV2
-	for rows.Next() {
-		data := newSentEntryDataV2()
-
-		nullableTx := sqlite.JSONBlob{Data: data.Tx}
-		nullableTxArgs := sqlite.JSONBlob{Data: data.TxArgs}
-		nullableIsApproval := sql.NullBool{}
-		nullablePath := sqlite.JSONBlob{Data: data.Path}
-		nullableRouteInputParams := sqlite.JSONBlob{Data: data.RouteInputParams}
-		nullableStatus := sql.NullString{}
-		nullableTimestamp := sql.NullInt64{}
-
-		err := rows.Scan(
-			&nullableTx,
-			&nullableTxArgs,
-			&nullableIsApproval,
-			&nullablePath,
-			&nullableRouteInputParams,
-			&nullableStatus,
-			&nullableTimestamp,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Check all necessary fields are not null
-		if !nullableTxArgs.Valid ||
-			!nullableTx.Valid ||
-			!nullableIsApproval.Valid ||
-			!nullableStatus.Valid ||
-			!nullableTimestamp.Valid ||
-			!nullablePath.Valid ||
-			!nullableRouteInputParams.Valid {
-			logutils.ZapLogger().Warn("some fields missing in entryData")
-			continue
-		}
-
-		data.IsApproval = nullableIsApproval.Bool
-		data.Status = nullableStatus.String
-		data.Timestamp = nullableTimestamp.Int64
-
-		ret = append(ret, data)
-	}
-
-	return ret, nil
-}
-
-func sentEntryDataToEntriesV2(deps FilterDependencies, data []*sentEntryDataV2) ([]Entry, error) {
-	var ret []Entry
-
-	now := time.Now().Unix()
-
-	for _, d := range data {
-		chainID := wCommon.ChainID(d.Path.FromChain.ChainID)
-
-			entry := Entry{
-				payloadType: ac.SimpleTransactionPT,
-				transaction: &ac.TransactionIdentity{
-					ChainID: chainID,
-					Hash:    d.Tx.Hash(),
-					Address: d.RouteInputParams.AddrFrom,
-				},
-			},
-			timestamp:      d.Timestamp,
-			activityType:   getSentActivityType(d.Path.ProcessorName, d.IsApproval),
-			activityStatus: getSentActivityStatus(d.Status, d.Timestamp, now, getFinalizationPeriod(chainID)),
-			amountOut:      d.Path.AmountIn,  // Path and Activity have inverse perspective for amountIn and amountOut
-			amountIn:       d.Path.AmountOut, // Path has the Tx perspective, Activity has the Account perspective
-			tokenOut:       getToken(d.Path.FromToken, d.Path.ProcessorName),
-			tokenIn:        getToken(d.Path.ToToken, d.Path.ProcessorName),
-			sender:         &d.RouteInputParams.AddrFrom,
-			recipient:      &d.RouteInputParams.AddrTo,
-			transferType:   getTransferTypeFromSentTx(d.Path.FromToken, d.Path.ProcessorName),
-			//contractAddress:  // TODO: Handle community contract deployment
-			//communityID:
-		}
-
-		if d.Path.FromChain != nil {
-			chainID := wCommon.ChainID(d.Path.FromChain.ChainID)
-			entry.chainIDOut = &chainID
-		}
-		if d.Path.ToChain != nil {
-			chainID := wCommon.ChainID(d.Path.ToChain.ChainID)
-			entry.chainIDIn = &chainID
-		}
-
-		entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
-
-		if entry.transferType == nil || ac.TokenType(*entry.transferType) != ac.Native {
-			var interactedAddress eth.Address
-			if d.Tx.To() != nil {
-				interactedAddress = eth.BytesToAddress(d.Tx.To().Bytes())
-			}
-			entry.interactedContractAddress = &interactedAddress
-		}
-
-		if entry.activityType == ac.ApproveAT {
-			entry.approvalSpender = d.Path.ApprovalContractAddress
-		}
-
-		ret = append(ret, entry)
-	}
-
-	return ret, nil
-}
-
-func getSentActivityType(processorName string, isApproval bool) ac.Type {
-	if isApproval {
-		return ac.ApproveAT
-	}
-
-	switch processorName {
-	case pathProcessorCommon.ProcessorTransferName, pathProcessorCommon.ProcessorERC721Name, pathProcessorCommon.ProcessorERC1155Name:
-		return ac.SendAT
-	case pathProcessorCommon.ProcessorBridgeHopName:
-		return ac.BridgeAT
-	case pathProcessorCommon.ProcessorSwapParaswapName:
-		return ac.SwapAT
-	}
-	return ac.UnknownAT
-}
-
-func getSentActivityStatus(status ac.TxStatus, timestamp int64, now int64, finalizationDuration int64) ac.Status {
-	switch status {
-	case ac.Pending:
-		return ac.PendingAS
-	case ac.Success:
-		if timestamp+finalizationDuration > now {
-			return ac.FinalizedAS
-		}
-		return ac.CompleteAS
-	case ac.Failed:
-		return ac.FailedAS
-	}
-
-	logutils.ZapLogger().Error("unhandled transaction status value")
-	return ac.FailedAS
 }
 
 func getFinalizationPeriod(chainID wCommon.ChainID) int64 {
@@ -587,58 +268,6 @@ func getFinalizationPeriod(chainID wCommon.ChainID) int64 {
 	}
 
 	return ac.L2FinalizationDuration
-}
-
-func getTransferTypeFromSentTx(fromToken *tokenTypes.Token, processorName string) *ac.TransferType {
-	ret := new(ac.TransferType)
-
-	switch processorName {
-	case pathProcessorCommon.ProcessorTransferName:
-		if fromToken.IsNative() {
-			*ret = ac.TransferTypeEth
-			break
-		}
-		*ret = ac.TransferTypeErc20
-	case pathProcessorCommon.ProcessorERC721Name:
-		*ret = ac.TransferTypeErc721
-	case pathProcessorCommon.ProcessorERC1155Name:
-		*ret = ac.TransferTypeErc1155
-	default:
-		ret = nil
-	}
-
-	return ret
-}
-
-func getToken(token *tokenTypes.Token, processorName string) *ac.Token {
-	if token == nil {
-		return nil
-	}
-
-	ret := new(ac.Token)
-	ret.ChainID = wCommon.ChainID(token.ChainID)
-	if token.IsNative() {
-		ret.TokenType = ac.Native
-	} else {
-		ret.Address = token.Address
-		switch processorName {
-		case pathProcessorCommon.ProcessorERC721Name, pathProcessorCommon.ProcessorERC1155Name:
-			id, err := wCommon.GetTokenIdFromSymbol(token.Symbol)
-			if err != nil {
-				logutils.ZapLogger().Warn("malformed token symbol", zap.Error(err))
-				return nil
-			}
-			ret.TokenID = (*hexutil.Big)(id)
-			if processorName == pathProcessorCommon.ProcessorERC721Name {
-				ret.TokenType = ac.Erc721
-			} else {
-				ret.TokenType = ac.Erc1155
-			}
-		default:
-			ret.TokenType = ac.Erc20
-		}
-	}
-	return ret
 }
 
 // lookupAndFillInTokens ignores NFTs
