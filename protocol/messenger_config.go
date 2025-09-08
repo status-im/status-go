@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/wallet/token"
 
 	"go.uber.org/zap"
 
@@ -83,7 +84,8 @@ type config struct {
 	communityTokensService communities.CommunityTokensServiceInterface
 	httpServer             *server.MediaServer
 	rpcClient              *rpc.Client
-	tokenManager           communities.TokenManager
+	tokenManager           *token.Manager
+	communityTokenManager  communities.TokenManager
 	collectiblesManager    communities.CollectiblesManager
 	accountsManager        AccountsManager
 	signer                 communities.MessageSigner
@@ -294,7 +296,14 @@ func WithCommunityTokensService(s communities.CommunityTokensServiceInterface) O
 	}
 }
 
-func WithTokenManager(tokenManager communities.TokenManager) Option {
+func WithCommunityTokenManager(tokenManager communities.TokenManager) Option {
+	return func(c *config) error {
+		c.communityTokenManager = tokenManager
+		return nil
+	}
+}
+
+func WithTokenManager(tokenManager *token.Manager) Option {
 	return func(c *config) error {
 		c.tokenManager = tokenManager
 		return nil

@@ -55,8 +55,6 @@ import (
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/services/wallet/community"
-	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
 
 	_ "github.com/mmcdole/gofeed"
@@ -332,11 +330,11 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithCollectiblesManager(c.collectiblesManager))
 	}
 
-	if c.tokenManager != nil {
-		managerOptions = append(managerOptions, communities.WithTokenManager(c.tokenManager))
-	} else if c.rpcClient != nil {
-		tokenManager := token.NewTokenManager(c.walletDb, c.rpcClient, community.NewManager(database, c.httpServer, nil), c.rpcClient.GetNetworkManager(), database, c.httpServer, nil, nil, nil, token.NewPersistence(c.walletDb))
-		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager, c.rpcClient.GetNetworkManager())))
+	if c.communityTokenManager != nil {
+		managerOptions = append(managerOptions, communities.WithTokenManager(c.communityTokenManager))
+	} else if c.rpcClient != nil && c.tokenManager != nil {
+		managerOptions = append(managerOptions, communities.WithTokenManager(
+			communities.NewDefaultTokenManager(c.tokenManager, c.rpcClient.GetNetworkManager())))
 	}
 
 	if c.communityTokensService != nil {

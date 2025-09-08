@@ -2341,6 +2341,7 @@ func (b *GethStatusBackend) initProtocol() error {
 		AccountsPublisher:      b.statusNode.AccountsPublisher(),
 		TimeSource:             b.statusNode.TimeSource(),
 		MetricsEnabled:         b.prometheusMetrics != nil,
+		TokenManager:           b.statusNode.TokenManager(),
 	}
 	err = st.InitProtocol(params)
 	if err != nil {

@@ -15,9 +15,8 @@ import (
 
 	"go.uber.org/zap"
 
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/ethereum/go-ethereum/event"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	common2 "github.com/status-im/status-go/common"
@@ -25,6 +24,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node/backup"
 	rpc2 "github.com/status-im/status-go/node/rpc"
 	"github.com/status-im/status-go/params"
@@ -50,6 +50,8 @@ import (
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/community"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/transactions"
 )
@@ -81,6 +83,8 @@ type StatusNode struct {
 
 	mediaServerEnableTLS *bool
 	httpServer           *server.MediaServer
+
+	tokenManager *token.Manager
 
 	logger *zap.Logger
 
@@ -291,6 +295,10 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 		return err
 	}
 
+	if err := n.createAndStartTokenManager(); err != nil {
+		return err
+	}
+
 	if err := n.initServices(config, n.httpServer); err != nil {
 		return err
 	}
@@ -322,6 +330,34 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 		}
 	}
 
+	return nil
+}
+
+func (n *StatusNode) createAndStartTokenManager() error {
+	accDB, err := accounts.NewDB(n.appDB)
+	if err != nil {
+		return err
+	}
+
+	n.tokenManager = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.httpServer, nil),
+		n.rpcClient.GetNetworkManager(), n.appDB, n.httpServer, &n.walletFeed, n.accountsPublisher, accDB,
+		token.NewPersistence(n.walletDB))
+
+	const (
+		defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
+		defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
+	)
+
+	autoRefreshInterval := defaultAutoRefreshInterval
+	autoRefreshCheckInterval := defaultAutoRefreshCheckInterval
+	if n.config.WalletConfig.TokensListsAutoRefreshInterval > 0 &&
+		n.config.WalletConfig.TokensListsAutoRefreshCheckInterval > 0 &&
+		n.config.WalletConfig.TokensListsAutoRefreshInterval > n.config.WalletConfig.TokensListsAutoRefreshCheckInterval {
+		autoRefreshInterval = time.Duration(n.config.WalletConfig.TokensListsAutoRefreshInterval) * time.Second
+		autoRefreshCheckInterval = time.Duration(n.config.WalletConfig.TokensListsAutoRefreshCheckInterval) * time.Second
+	}
+
+	n.tokenManager.Start(context.Background(), autoRefreshInterval, autoRefreshCheckInterval)
 	return nil
 }
 
@@ -442,4 +478,8 @@ func (n *StatusNode) SetWalletDB(db *sql.DB) {
 
 func (n *StatusNode) GetWalletDB() *sql.DB {
 	return n.walletDB
+}
+
+func (n *StatusNode) TokenManager() *token.Manager {
+	return n.tokenManager
 }
