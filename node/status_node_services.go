@@ -291,6 +291,7 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB,
 			b.pendingTracker,
 			walletFeed,
 			b.httpServer,
+			b.tokenManager,
 			statusProxyStageName,
 		)
 	}

@@ -23,7 +23,9 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -144,6 +146,8 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 		"",
 	)
 
+	tokenManager := token.NewTokenManager(walletDb, nil, nil, network.NewManager(appDb, nil), appDb, nil, nil, nil, nil, token.NewPersistence(walletDb))
+
 	options := []Option{
 		WithCustomLogger(config.logger),
 		WithDatabase(appDb),
@@ -156,6 +160,7 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 		WithStubOnlineChecker(),
 		WithENSVerifier(ensVerifier),
 		WithMessageSigner(NewSignerStub()),
+		WithTokenManager(tokenManager),
 	}
 	options = append(options, config.extraOptions...)
 

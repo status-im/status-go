@@ -52,11 +52,6 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-const (
-	defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
-	defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
-)
-
 // TODO this is duplicated
 var (
 	ErrNotWatchOnlyAccount           = errors.New("an account is not a watch only account")
@@ -91,6 +86,7 @@ func NewService(
 	pendingTxManager *transactions.PendingTxTracker,
 	feed *event.Feed,
 	mediaServer *server.MediaServer,
+	tokenManager *token.Manager,
 	statusProxyStageName string,
 ) *Service {
 	signals := &walletevent.SignalsTransmitter{
@@ -98,7 +94,6 @@ func NewService(
 	}
 	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
-	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.GetNetworkManager(), appDB, mediaServer, feed, accountsPublisher, accountsDB, token.NewPersistence(db))
 
 	cryptoOnRampProviders := []onramp.Provider{
 		onramp.NewMoonPayProvider(),
@@ -339,16 +334,6 @@ func (s *Service) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancelWalletServiceCtx = cancel
 
-	autoRefreshInterval := defaultAutoRefreshInterval
-	autoRefreshCheckInterval := defaultAutoRefreshCheckInterval
-	if s.config.WalletConfig.TokensListsAutoRefreshInterval > 0 &&
-		s.config.WalletConfig.TokensListsAutoRefreshCheckInterval > 0 &&
-		s.config.WalletConfig.TokensListsAutoRefreshInterval > s.config.WalletConfig.TokensListsAutoRefreshCheckInterval {
-		autoRefreshInterval = time.Duration(s.config.WalletConfig.TokensListsAutoRefreshInterval) * time.Second
-		autoRefreshCheckInterval = time.Duration(s.config.WalletConfig.TokensListsAutoRefreshCheckInterval) * time.Second
-	}
-
-	s.tokenManager.Start(ctx, autoRefreshInterval, autoRefreshCheckInterval)
 	s.transferController.Start(ctx)
 	s.currency.Start(ctx)
 	err := s.signals.Start(ctx)

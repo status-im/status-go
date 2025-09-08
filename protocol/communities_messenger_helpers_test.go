@@ -313,7 +313,7 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 
 	options := []Option{
 		WithAccountsManager(accountsManagerMock),
-		WithTokenManager(tokenManagerMock),
+		WithCommunityTokenManager(tokenManagerMock),
 		WithMessageSigner(NewSignerStub()),
 		WithCollectiblesManager(config.collectiblesManager),
 		WithCommunityTokensService(config.collectiblesService),
