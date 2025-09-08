@@ -17,29 +17,27 @@ class TestAddAccount:
         # add account on path m/44'/60'/0'/0/1 to profile keypair
         path = "m/44'/60'/0'/0/1"
         derived_addresses_response = self.account.wallet_service.get_derived_addresses_for_mnemonic(self.account.mnemonic, [path])
-        derived_addresses = derived_addresses_response["result"]
 
         # update account being added with necessary details
         self.account_data["key-uid"] = self.account.key_uid  # keyuid of profile keypair
         self.account_data["path"] = path
-        self.account_data["address"] = derived_addresses[0].get("address")
-        self.account_data["public-key"] = derived_addresses[0].get("public-key")
+        self.account_data["address"] = derived_addresses_response[0].get("address")
+        self.account_data["public-key"] = derived_addresses_response[0].get("public-key")
 
         self.account.accounts_service.add_account(self.account.password, self.account_data)
         # TODO: Add more assertions on response
 
         # After adding the account check that the get accounts will retrieve the new account
         accounts_response = self.account.accounts_service.get_accounts()
-        accounts = accounts_response.get("result", [])
-        self.check_new_account_was_created(accounts, self.account_data)
+        self.check_new_account_was_created(accounts_response, self.account_data)
 
     def test_add_duplicate_account(self):
         # since default wallet account is already added by creating the backend profile, we can try just adding the same account again
         accounts_response = self.account.accounts_service.get_accounts()
-        assert len(accounts_response.get("result", [])) == 2
-        defaultAccount = accounts_response.get("result", [])[0]
+        assert len(accounts_response) == 2
+        defaultAccount = accounts_response[0]
         if not defaultAccount["wallet"]:
-            defaultAccount = accounts_response.get("result", [])[1]
+            defaultAccount = accounts_response[1]
         assert defaultAccount["wallet"] is True
 
         # Add the same account second time
@@ -77,7 +75,7 @@ class TestAddAccount:
 
         # After adding the account check that the get accounts will retrieve the new account
         accounts_response = self.account.accounts_service.get_accounts()
-        accounts = accounts_response.get("result", [])
+        accounts = accounts_response
         self.check_new_account_was_created(accounts, self.account_data)
 
     def test_add_account_to_seed_imported_keypair(self):
@@ -97,10 +95,10 @@ class TestAddAccount:
 
         path = "m/44'/60'/0'/0/1"
         derived_addresses_response = self.account.wallet_service.get_derived_addresses_for_mnemonic(used_mnemonic, [path])
-        derived_addresses = derived_addresses_response["result"]
+        derived_addresses = derived_addresses_response
 
         # update account being added with necessary details
-        self.account_data["key-uid"] = add_keypair_response["result"]["key-uid"]
+        self.account_data["key-uid"] = add_keypair_response["key-uid"]
         self.account_data["path"] = path
         self.account_data["address"] = derived_addresses[0].get("address")
         self.account_data["public-key"] = derived_addresses[0].get("public-key")
@@ -110,7 +108,7 @@ class TestAddAccount:
 
     def get_account_keypairs(self):
         keypairs_response = self.account.accounts_service.get_account_keypairs()
-        keypairs = keypairs_response.get("result", [])
+        keypairs = keypairs_response
         assert len(keypairs) > 0
         return keypairs
 

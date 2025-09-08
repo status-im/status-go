@@ -24,13 +24,13 @@ class TestPassword:
     def test_verify_correct_password(self, backend_new_profile):
         backend = backend_new_profile("sender")
         response = backend.accounts_service.verify_password(backend.password)
-        assert response.get("result") is True
+        assert response is True
 
     @pytest.mark.parametrize("password", ["testpassword", ""])
     def test_verify_wrong_password(self, password, backend_new_profile):
         backend = backend_new_profile("sender")
         response = backend.accounts_service.verify_password(password)
-        assert response.get("result") is False
+        assert response is False
 
     def test_change_password(self, backend_new_profile):
         new_password = "".join(random.choices(string.ascii_letters + string.digits, k=8))

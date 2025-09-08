@@ -14,7 +14,7 @@ def _all_nodes_discovered(nodes: dict[str, StatusBackend], known_peers: dict[str
         if node is None:
             return False
         response = node.wakuext_service.peers()
-        peers = response["result"]
+        peers = response
 
         # Use shorter names for logging
         peer_names = [known_peers.get(peer, peer[-5:]) for peer in peers]

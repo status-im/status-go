@@ -20,7 +20,7 @@ class TestUpdateAccount:
 
         # fetch all accounts(chat, wallet and watch) for update
         accounts_response_before = self.account.accounts_service.get_accounts()
-        accounts_before = accounts_response_before.get("result", [])
+        accounts_before = accounts_response_before
 
         for before in accounts_before:
             # modify account fields and send update for all existing accounts
@@ -30,11 +30,11 @@ class TestUpdateAccount:
             before["emoji"] = "✨"
             before["prodPreferredChainIds"] = "2:10:42161:8458"
             update_resp = self.account.accounts_service.update_account(before)
-            assert update_resp["result"] is None
+            assert update_resp is None
 
         # verify update persisted
         accounts_response_after = self.account.accounts_service.get_accounts()
-        accounts_after = accounts_response_after.get("result", [])
+        accounts_after = accounts_response_after
         assert len(accounts_before) == len(accounts_after)
         for before, after in zip(accounts_before, accounts_after):
             # making clocks equal so we can compare the entire account object
@@ -44,7 +44,7 @@ class TestUpdateAccount:
     def test_try_to_update_non_editable_fields(self):
         # fetch all accounts
         accounts_response_before = self.account.accounts_service.get_accounts()
-        accounts_before = accounts_response_before.get("result", [])
+        accounts_before = accounts_response_before
 
         for before in accounts_before:
             before_copy = copy.deepcopy(before)
@@ -62,7 +62,7 @@ class TestUpdateAccount:
 
         # verify that no update was made to non editable fields
         accounts_response_after = self.account.accounts_service.get_accounts()
-        accounts_after = accounts_response_after.get("result", [])
+        accounts_after = accounts_response_after
         assert len(accounts_before) == len(accounts_after)
         for before, after in zip(accounts_before, accounts_after):
             # making clocks equal so we can compare the entire account object

@@ -28,18 +28,17 @@ class TestUpdateKeypairName:
         )
 
         keypairs_response = self.account.accounts_service.get_account_keypairs()
-        keypairs = keypairs_response.get("result", [])
+        keypairs = keypairs_response
         assert len(keypairs) > 0
         seed_key_uid = keypairs[1].get("key-uid")
         new_name = "Updated Keypair Name"
 
         response = self.account.accounts_service.update_keypair_name(seed_key_uid, new_name)
-        assert "result" in response
-        assert response.get("result") is None
+        assert response is None
 
         # Verify the keypair name was updated by fetching keypairs again
         keypairs_response_after = self.account.accounts_service.get_account_keypairs()
-        keypairs_after = keypairs_response_after.get("result", [])
+        keypairs_after = keypairs_response_after
         updated_keypair = next((kp for kp in keypairs_after if kp.get("key-uid") == seed_key_uid), None)
         assert updated_keypair is not None
         assert updated_keypair.get("name") == new_name

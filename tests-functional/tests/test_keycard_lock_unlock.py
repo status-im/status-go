@@ -18,19 +18,19 @@ class TestKeycardLockUnlock:
 
         # Lock the keycard
         resp_lock = self.account.accounts_service.keycard_locked(self.keycard["keycard-uid"])
-        assert resp_lock["result"] is None
+        assert resp_lock is None
 
         # Verify the keycard is locked
         keycards_after_lock = self.account.accounts_service.get_all_known_keycards()
-        assert keycards_after_lock.get("result")[0].get("keycard-locked") is True
+        assert keycards_after_lock[0].get("keycard-locked") is True
 
         # Unlock the keycard
         resp_unlock = self.account.accounts_service.keycard_unlocked(self.keycard["keycard-uid"])
-        assert resp_unlock["result"] is None
+        assert resp_unlock is None
 
         # Verify the keycard is unlocked
         keycards_after_unlock = self.account.accounts_service.get_all_known_keycards()
-        assert keycards_after_unlock.get("result")[0].get("keycard-locked") is False
+        assert keycards_after_unlock[0].get("keycard-locked") is False
 
     def test_lock_nonexistent_keycard(self):
         with pytest.raises(ApiResponseError, match=re.escape("keycard: no keycard for the passed keycard uid")):

@@ -34,14 +34,14 @@ class TestAccounts:
             "multiaccounts_storeIdentityImage", [self.rpc_client.key_uid, "/tmp/images/test-image-200x200.jpg", 0, 0, 200, 200]
         )
 
-        result = response.get("result", {})
+        result = response
         assert result is not None, "Identity images were not stored (no result)"
         assert len(result) == 2, "Identity images were not stored (wrong count)"
         assert result[0]["localUrl"] is not None, "Local URL for identity image 1 is not set"
         assert result[1]["localUrl"] is not None, "Local URL for identity image 2 is not set"
 
         response = self.rpc_client.rpc_valid_request("multiaccounts_getIdentityImages", [self.rpc_client.key_uid])
-        result = response.get("result", {})
+        result = response
         assert result is not None, "Identity images were not retrieved (no result)"
         assert len(result) == 2, "Identity images were not retrieved (wrong count)"
         assert result[0]["localUrl"] is not None, "Local URL for identity image 1 is not set"

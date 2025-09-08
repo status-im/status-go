@@ -21,12 +21,12 @@ class TestSendingChatMessages(MessengerSteps):
         sent_texts, responses = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
         # TODO: Add more assertions on response
 
-        chat = responses[0]["result"]["chats"][0]
+        chat = responses[0]["chats"][0]
         assert chat["id"] == self.receiver.public_key
         assert chat["lastMessage"]["displayName"] == self.sender.display_name
 
         response = self.sender.wakuext_service.chat_messages(self.receiver.public_key)
-        messages = response.get("result", {}).get("messages", [])
+        messages = response.get("messages", [])
         assert len(messages) == 1
         actual_text = messages[0].get("text", "")
         assert actual_text == sent_texts[0]
@@ -40,7 +40,7 @@ class TestSendingChatMessages(MessengerSteps):
         # TODO: Add more assertions on response
 
         response = self.sender.wakuext_service.chat_messages(community_chat_id)
-        messages = response.get("result", {}).get("messages", [])
+        messages = response.get("messages", [])
         assert len(messages) == 1
         actual_text = messages[0].get("text", "")
         assert actual_text == text
@@ -69,7 +69,7 @@ class TestSendingChatMessages(MessengerSteps):
         # TODO: Add more assertions on response
 
         response = self.sender.wakuext_service.chat_messages(community_chat_id)
-        messages = response.get("result", {}).get("messages", [])
+        messages = response.get("messages", [])
         assert len(payload) == 5
 
         actual_texts = [m.get("text", "") for m in messages]
@@ -92,9 +92,9 @@ class TestSendingChatMessages(MessengerSteps):
         ]
         response = self.sender.wakuext_service.send_chat_messages(payload)
 
-        chats = response.get("result", {}).get("chats", [])
+        chats = response.get("chats", [])
         assert len(chats) == 2
-        messages = response.get("result", {}).get("messages", [])
+        messages = response.get("messages", [])
         assert len(messages) == 2
 
     def test_send_group_message(self):
@@ -117,23 +117,23 @@ class TestSendingChatMessages(MessengerSteps):
         self.make_contacts(self.sender, self.receiver)
 
         _, responses = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
-        message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+        message_id = responses[0].get("messages", [])[0].get("id", "")
         receiver_chat_id = self.sender.public_key
 
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id, timeout=5)
 
         response = self.receiver.wakuext_service.chat_messages(receiver_chat_id)
-        messages = response.get("result", {}).get("messages", [])
+        messages = response.get("messages", [])
         assert len(messages) == 4
 
         self.receiver.wakuext_service.delete_message(message_id)
         response = self.receiver.wakuext_service.chat_messages(receiver_chat_id)
-        messages = response.get("result", {}).get("messages", [])
+        messages = response.get("messages", [])
         assert len(messages) == 3
 
         self.sender.wakuext_service.resend_chat_message(message_id)
         sleep(5)
 
         response = self.receiver.wakuext_service.chat_messages(receiver_chat_id)
-        messages = response.get("result", {}).get("messages", [])
+        messages = response.get("messages", [])
         assert len(messages) == 4

@@ -204,15 +204,15 @@ class TestLocalPairing(MessengerSteps):
         # Check that contact is synced
         response = bob_second_device.wakuext_service.get_contacts()
 
-        contacts = response["result"]
+        contacts = response
         assert len(contacts) == 1
         assert contacts[0]["id"] == alice.public_key
 
         # Checking the paired devices using accounts_hasPairedDevices method
         alice_response = alice.accounts_service.has_paired_devices()
-        assert alice_response.get("result") is False
+        assert alice_response is False
         bob_response = bob.accounts_service.has_paired_devices()
-        assert bob_response.get("result") is True
+        assert bob_response is True
 
     def test_pairing_server_as_receiver(self):
         # Create users
@@ -241,15 +241,15 @@ class TestLocalPairing(MessengerSteps):
         # Check that contact is synced
         response = bob_second_device.wakuext_service.get_contacts()
 
-        contacts = response["result"]
+        contacts = response
         assert len(contacts) == 1
         assert contacts[0]["id"] == alice.public_key
 
         # Checking the paired devices using accounts_hasPairedDevices method
         alice_response = alice.accounts_service.has_paired_devices()
-        assert alice_response.get("result") is False
+        assert alice_response is False
         bob_response = bob.accounts_service.has_paired_devices()
-        assert bob_response.get("result") is True
+        assert bob_response is True
 
     def test_pairing_three_devices(self):
         # Create users
@@ -283,7 +283,7 @@ class TestLocalPairing(MessengerSteps):
         # Check that contacts and notifications are synced on all devices
         for bob_another_device in [bob2, bob3]:
             response = bob_another_device.wakuext_service.get_contacts()
-            contacts = response["result"]
+            contacts = response
             assert len(contacts) == 3
             contacts_dict = {contact["id"]: contact for contact in contacts}
             assert contacts_dict[user_accepted.public_key]["mutual"] is True
@@ -296,7 +296,7 @@ class TestLocalPairing(MessengerSteps):
             # Paired device will get notifications of requests that are not fulfilled (not mutual)
             notifications = bob_another_device.wakuext_service.get_activity_center_notifications(
                 activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_CONTACT_REQUEST]
-            )["result"]["notifications"]
+            )["notifications"]
             assert len(notifications) == 2
             notifications_dict = {notification["chatId"]: notification for notification in notifications}
             user_pending_notification = notifications_dict[user_pending.public_key]

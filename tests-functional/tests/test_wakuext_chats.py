@@ -23,7 +23,7 @@ class TestChatActions(MessengerSteps):
         self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
 
         response = self.sender.wakuext_service.chats()
-        chats = response.get("result", [])
+        chats = response
         assert len(chats) == 2
         assert chats[0].get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chats[1].get("chatType", 0) == ChatType.PRIVATE_GROUP_CHAT.value
@@ -33,7 +33,7 @@ class TestChatActions(MessengerSteps):
         chat_id = self.receiver.public_key
 
         response = self.sender.wakuext_service.chat(chat_id)
-        chat = response.get("result", {})
+        chat = response
         assert chat.get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chat.get("lastMessage", {}).get("text", "") == sent_texts[0]
 
@@ -53,12 +53,12 @@ class TestChatActions(MessengerSteps):
         self.sender.wakuext_service.send_chat_message(community_chat_id, "test_message_community")
 
         response = self.sender.wakuext_service.chats_preview(ChatPreviewFilterType.Community.value)
-        chats_previews = response.get("result", [])
+        chats_previews = response
         assert len(chats_previews) == 1
         assert chats_previews[0].get("id", "") == community_chat_id
 
         response = self.sender.wakuext_service.chats_preview(ChatPreviewFilterType.NonCommunity.value)
-        chats_previews = response.get("result", [])
+        chats_previews = response
         assert len(chats_previews) == 2
         assert chats_previews[0].get("id", "") == one_to_one_chat_id
         assert chats_previews[1].get("id", "") == private_group_chat_id
@@ -71,14 +71,14 @@ class TestChatActions(MessengerSteps):
 
         response = self.sender.wakuext_service.active_chats()
         # TODO: Add more assertions on response
-        chats = response.get("result", [])
+        chats = response
         assert len(chats) == 2
 
         self.sender.wakuext_service.deactivate_chat(private_group_chat_id, False)
 
         response = self.sender.wakuext_service.active_chats()
 
-        chats = response.get("result", [])
+        chats = response
         assert len(chats) == 1
         assert chats[0].get("id", 0) == one_to_one_chat_id
 
@@ -87,11 +87,11 @@ class TestChatActions(MessengerSteps):
         chat_id = self.receiver.public_key
 
         response = self.sender.wakuext_service.mute_chat(chat_id)
-        result = response.get("result", "")
+        result = response
         assert result == "0001-01-01T00:00:00Z"
 
         response = self.sender.wakuext_service.chat(chat_id)
-        chat = response.get("result", {})
+        chat = response
         assert chat.get("muted", False) is True
         assert chat.get("muteTill", "") == result
 
@@ -116,7 +116,7 @@ class TestChatActions(MessengerSteps):
         chat_id = self.receiver.public_key
 
         response = self.sender.wakuext_service.mute_chat_v2(chat_id, mute_type)
-        result = response.get("result", "")
+        result = response
         actual = datetime.strptime(result, "%Y-%m-%dT%H:%M:%SZ")
 
         expected = datetime.now() + time_delta
@@ -124,7 +124,7 @@ class TestChatActions(MessengerSteps):
         assert diff.total_seconds() < 2  # 2sec margin
 
         response = self.sender.wakuext_service.chat(chat_id)
-        chat = response.get("result", {})
+        chat = response
         assert chat.get("muted", False) is True
         assert chat.get("muteTill", "") == result
 
@@ -141,14 +141,14 @@ class TestChatActions(MessengerSteps):
         chat_id = self.receiver.public_key
 
         response = self.sender.wakuext_service.mute_chat_v2(chat_id, mute_type)
-        result = response.get("result", "")
+        result = response
         assert result == "0001-01-01T00:00:00Z"
 
         response = self.sender.wakuext_service.unmute_chat(chat_id)
-        assert response.get("result", "") is None
+        assert response is None
 
         response = self.sender.wakuext_service.chat(chat_id)
-        chat = response.get("result", {})
+        chat = response
         assert chat.get("muted", True) is False
 
     def test_clear_history(self):
@@ -156,12 +156,12 @@ class TestChatActions(MessengerSteps):
         chat_id = self.receiver.public_key
 
         response = self.sender.wakuext_service.chat(chat_id)
-        last_message = response.get("result", {}).get("lastMessage", -1)
+        last_message = response.get("lastMessage", -1)
         assert isinstance(last_message, dict)
 
         response = self.sender.wakuext_service.clear_history(chat_id)
         # TODO: Add more assertions on response
-        last_message = response.get("result", {}).get("chats", [])[0].get("lastMessage", -1)
+        last_message = response.get("chats", [])[0].get("lastMessage", -1)
         assert last_message is None
 
     @pytest.mark.parametrize(
@@ -178,24 +178,24 @@ class TestChatActions(MessengerSteps):
         response = self.sender.wakuext_service.deactivate_chat(chat_id, preserve_history)
         # TODO: Add more assertions on response
 
-        chat = response.get("result", {}).get("chats", [])[0]
+        chat = response.get("chats", [])[0]
         assert chat.get("active", -1) is False
         assert isinstance(chat.get("lastMessage", -1), expected)
 
     def test_save_chat(self):
         chat_id = "123"
         response = self.sender.wakuext_service.save_chat(chat_id, active=True)
-        assert response.get("result", -1) is None
+        assert response is None
 
         response = self.sender.wakuext_service.chat(chat_id)
-        chat = response.get("result", {})
+        chat = response
         assert chat.get("id", "") == chat_id
         assert chat.get("active", -1) is True
 
     def test_create_one_to_one_chat(self):
         chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.create_one_to_one_chat(chat_id, ens_name="")
-        chats = response.get("result", {}).get("chats", [])
+        chats = response.get("chats", [])
         assert len(chats) == 1
         chat = chats[0]
         assert chat.get("id", "") == chat_id

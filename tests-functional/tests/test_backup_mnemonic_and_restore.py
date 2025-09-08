@@ -36,7 +36,7 @@ class TestBackupMnemonicAndRestore:
 
         # Retrieve and verify the mnemonic
         settings = account.settings_service.get_settings()
-        mnemonic = settings.get("result", {}).get("mnemonic", None)
+        mnemonic = settings.get("mnemonic", None)
         assert mnemonic is not None
         assert isinstance(mnemonic, str)
         assert len(mnemonic.split()) == 12  # Basic check for mnemonic length
@@ -48,7 +48,7 @@ class TestBackupMnemonicAndRestore:
         original_account.create_account_and_login()
         original_account.wait_for_login()
         original_get_settings_response = original_account.settings_service.get_settings()
-        original_settings = original_get_settings_response.get("result", {})
+        original_settings = original_get_settings_response
         mnemonic = original_settings.get("mnemonic", None)
         assert mnemonic is not None
 
@@ -63,7 +63,7 @@ class TestBackupMnemonicAndRestore:
 
         # Verify mnemonic is not exposed after restore
         restored_get_settings_response = restored_account.settings_service.get_settings()
-        restored_settings = restored_get_settings_response.get("result", {})
+        restored_settings = restored_get_settings_response
         assert restored_settings.get("mnemonic", None) is None
 
         # Verify keys in the restored respone match the original respones
@@ -97,11 +97,11 @@ class TestBackupMnemonicAndRestore:
 
         # Request getAccounts and check restoreed accounts attributes.
         get_accounts_response = restored_account.accounts_service.get_accounts()
-        assert_response_attributes(get_accounts_response.get("result", {}), user_mnemonic.accounts)
+        assert_response_attributes(get_accounts_response, user_mnemonic.accounts)
 
         # Request getSettings and check restoreed profile data attributes.
         get_settings_response = restored_account.settings_service.get_settings()
-        restored_settings = get_settings_response.get("result", {})
+        restored_settings = get_settings_response
         assert_response_attributes(restored_settings, user_mnemonic.profile_data)
 
         assert restored_settings.get("mnemonic", None) is None
@@ -122,7 +122,7 @@ class TestBackupMnemonicAndRestore:
         restored_account.wait_for_login()
 
         get_settings_response = restored_account.settings_service.get_settings()
-        restored_settings = get_settings_response.get("result", {})
+        restored_settings = get_settings_response
         assert restored_settings.get("mnemonic", None) is None
         assert restored_settings.get("address", None)
 
@@ -136,7 +136,7 @@ class TestBackupMnemonicAndRestore:
         restored_account.restore_account_and_login(user=user)
         restored_account.wait_for_login()
         get_settings_response = restored_account.settings_service.get_settings()
-        restored_settings = get_settings_response.get("result", {})
+        restored_settings = get_settings_response
         assert restored_settings.get("mnemonic", None) is None
         assert restored_settings.get("address", None)
 

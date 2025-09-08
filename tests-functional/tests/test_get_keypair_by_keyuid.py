@@ -14,8 +14,8 @@ class TestGetKeypairByKeyUID:
     def test_get_keypair_by_existing_keyuid(self):
         get_account_keypairs_resp = self.account.accounts_service.get_account_keypairs()
         get_keypair_by_key_uid_resp = self.account.accounts_service.get_keypair_by_key_uid(self.account.key_uid)
-        keypair = get_keypair_by_key_uid_resp.get("result")
-        assert keypair == get_account_keypairs_resp.get("result")[0]
+        keypair = get_keypair_by_key_uid_resp
+        assert keypair == get_account_keypairs_resp[0]
         assert keypair.get("name") == self.account.display_name
         accounts = keypair.get("accounts")
         assert accounts[0].get("path") == "m/43'/60'/1581'/0'/0"
@@ -45,7 +45,7 @@ class TestGetKeypairByKeyUID:
         }
         self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, self.account.password, keypair_name, wallet_account_details)
         keypairs_response = self.account.accounts_service.get_account_keypairs()
-        imported_keypair = [keypair for keypair in keypairs_response.get("result", []) if keypair.get("name") == keypair_name][0]
+        imported_keypair = [keypair for keypair in keypairs_response if keypair.get("name") == keypair_name][0]
         imported_keypair_key_uid = imported_keypair.get("key-uid")
         resp = self.account.accounts_service.get_keypair_by_key_uid(imported_keypair_key_uid)
-        assert imported_keypair == resp.get("result")
+        assert imported_keypair == resp

@@ -339,7 +339,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         start_time = time.time()
         while time.time() - start_time <= timeout:
             response = self.wakuext_service.peers()
-            if len(response["result"].keys()) == 0:
+            if len(response.keys()) == 0:
                 time.sleep(0.5)
                 continue
             logging.info(f"StatusBackend is online after {time.time() - start_time} seconds")

@@ -38,4 +38,4 @@ class RpcClient(ApiClient):
             data["params"] = params
         response = self.api_request_json("CallRPC", data)
         self.validate_json_rpc_response(response, request_id)
-        return response
+        return response.get("result")
