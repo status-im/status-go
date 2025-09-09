@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"regexp"
 
 	"github.com/pkg/errors"
 
@@ -31,7 +32,8 @@ func ConvertEmojiIDToString(emojiID protobuf.EmojiReaction_Type) string {
 
 }
 
-func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*MessengerResponse, error) {
+// TODO remove emojiID once the client supports sending custom emojis
+func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type, emoji string) (*MessengerResponse, error) {
 	var response MessengerResponse
 
 	chat, ok := m.allChats.Load(chatID)
@@ -40,14 +42,28 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	}
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
+	if emoji == "" {
+		emoji = ConvertEmojiIDToString(emojiID)
+		if emoji == "" {
+			return nil, errors.New("invalid emojiID")
+		}
+	}
+
+	// Validate that the emoji is valid
+	// There is no foolproof way to validate emojis, but this regex should cover all standard emojis
+	// it will also allow some non-emoji unicode characters, but that's not a big issue
+	emojiRegex := regexp.MustCompile("(?:\u00A9|\u00AE|[\u2000-\u3300]|[\U0001F000-\U0001FBFF])")
+	if !emojiRegex.MatchString(emoji) {
+		return nil, errors.New("invalid emoji")
+	}
+
 	emojiR := &EmojiReaction{
 		EmojiReaction: &protobuf.EmojiReaction{
 			Clock:     clock,
 			MessageId: messageID,
 			ChatId:    chatID,
 			Type:      emojiID,
-			// TODO remove this conversion once the client supports sending custom emojis
-			Emoji: ConvertEmojiIDToString(emojiID),
+			Emoji:     emoji,
 		},
 		LocalChatID: chatID,
 		From:        types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
