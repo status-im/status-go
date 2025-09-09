@@ -142,6 +142,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		walletCommunityImagesPath:           s.handleWalletCommunityImages,
 		walletCollectionImagesPath:          s.handleWalletCollectionImages,
 		walletCollectibleImagesPath:         s.handleWalletCollectibleImages,
+		healthPath:                          s.handleHealth,
 	})
 
 	return s, nil
@@ -153,15 +154,17 @@ func (s *MediaServer) SetDataProviders(db *sql.DB, walletDB *sql.DB, downloader 
 	s.downloader = downloader
 }
 
-func (S *MediaServer) Start() error {
-	err := S.Server.Start()
+func (s *MediaServer) Start() error {
+	err := s.Server.Start()
 	if err != nil {
-		S.logger.Error("failed to start media server", zap.Error(err))
+		s.logger.Error("failed to start media server", zap.Error(err))
 		return err
 	}
 
-	port := S.Server.GetPort()
-	S.logger.Info("media server started", zap.Int("port", port))
+	port := s.Server.GetPort()
+	s.logger.Info("media server started",
+		zap.Int("listeningPort", port),
+		zap.String("advertisingAddress", s.Server.GetAddrPort()))
 	signal.SendMediaServerStarted(port)
 
 	return nil

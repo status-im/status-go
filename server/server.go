@@ -50,9 +50,21 @@ func NewServer(logger *zap.Logger, config *Config) Server {
 	}
 }
 
+func (s *Server) GetAddrPort() string {
+	host := s.address.IP.String()
+	if s.config != nil && s.config.AdvertizeHost != "" {
+		host = s.config.AdvertizeHost
+	}
+
+	return net.JoinHostPort(host, strconv.Itoa(s.GetPort()))
+}
+
 func (s *Server) GetPort() int {
 	if s.address == nil {
 		return 0
+	}
+	if s.config != nil && s.config.AdvertizePort != 0 {
+		return s.config.AdvertizePort
 	}
 	return s.address.Port
 }
@@ -212,18 +224,8 @@ func (s *Server) MakeBaseURL() *url.URL {
 		scheme = "https"
 	}
 
-	host := s.address.IP.String()
-	if s.config != nil && s.config.AdvertizeHost != "" {
-		host = s.config.AdvertizeHost
-	}
-
-	port := s.address.Port
-	if s.config != nil && s.config.AdvertizePort != 0 {
-		port = s.config.AdvertizePort
-	}
-
 	return &url.URL{
 		Scheme: scheme,
-		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
+		Host:   s.GetAddrPort(),
 	}
 }

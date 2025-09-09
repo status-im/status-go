@@ -50,6 +50,9 @@ const (
 	accountImagesPath   = "/accountImages"
 	accountInitialsPath = "/accountInitials"
 	contactImagesPath   = "/contactImages"
+
+	// Health
+	healthPath = "/health"
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
@@ -1226,4 +1229,8 @@ func (s *MediaServer) handleWalletCollectibleImages(w http.ResponseWriter, r *ht
 	if err != nil {
 		s.logger.Error("failed to write wallet collectible image", zap.Error(err))
 	}
+}
+
+func (s *MediaServer) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }
