@@ -1,4 +1,5 @@
 import logging
+from uuid import uuid4
 import pytest
 
 from resources.constants import USE_IPV6
@@ -49,13 +50,13 @@ def backend_factory(request):
         Returns:
             StatusBackend: Created backend instance
         """
-        test_name = request.cls.__name__ if hasattr(request, "cls") else "test"
+        test_name = request.node.name if hasattr(request, "cls") else str(uuid4)
         logging.debug(f"🔧 [SETUP] Creating {name} backend for {request.cls.__name__}")
         logging.debug(f"🔧 [SETUP] Creating {name} backend for {test_name}")
         logging.debug(f"📋 [SETUP] Parameters: privileged={privileged}, ipv6={ipv6}")
 
         # Create backend
-        backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6, **kwargs)
+        backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6, test_name=test_name, **kwargs)
         created_backends.append(backend)
         logging.debug(f"✅ [SETUP] {name.capitalize()} backend created")
 
@@ -159,7 +160,7 @@ def close_status_backend_containers(request):
     yield
     for container in StatusGoContainer.all_containers:
         try:
-            container.shutdown()  # pyright: ignore[reportAttributeAccessIssue]
+            container.shutdown(request.node.name)  # pyright: ignore[reportAttributeAccessIssue]
         except Exception as e:
             logging.error(f"Error cleaning up container: {e}")
     StatusGoContainer.all_containers = []

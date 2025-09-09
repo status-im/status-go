@@ -88,6 +88,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.settings_service = SettingsService(self)
         self.connector_service = ConnectorService(self)
         self.expvar_client = ExpvarClient(self.base_url)
+        self.test_name = kwargs.get("test_name", str(uuid.uuid4()))
 
     def __del__(self):
         self.shutdown()
@@ -96,7 +97,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         SignalClient.disconnect(self)
 
         if self.container:
-            self.container.shutdown()
+            self.container.shutdown(self.test_name)
 
         if self.temp_dir is not None:
             self.temp_dir.cleanup()
