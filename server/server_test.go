@@ -1,21 +1,12 @@
 package server
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/base64"
-	"encoding/pem"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/server/servertest"
 )
@@ -152,85 +143,4 @@ func (s *ServerURLSuite) TestServer_MakeContactImageURL() {
 	s.testNoPort(
 		baseURLWithDefaultPort+"/contactImages?clock=1&imageName=Test&publicKey=0x1",
 		s.serverNoPort.MakeContactImageURL("0x1", "Test", uint64(1)))
-}
-
-// TestQRCodeGeneration tests if we provide all the correct parameters to the media server
-// do we get a valid QR code or not as part of the response payload.
-// we have stored a generated QR code in tests folder, and we compare their bytes.
-func (s *ServerURLSuite) TestQRCodeGeneration() {
-
-	qrURL := "https://github.com/status-im/status-go/pull/3154"
-	generatedURL := base64.StdEncoding.EncodeToString([]byte(qrURL))
-	generatedURL = s.serverForQR.MakeQRURL(generatedURL, "false", "2", "200", "", "")
-
-	u, err := url.Parse(generatedURL)
-	if err != nil {
-		s.Require().NoError(err)
-	}
-
-	if u.Scheme == "" || u.Host == "" {
-		s.Require().Failf("generatedURL is not a valid URL: %s", generatedURL)
-	}
-
-	serverCert := s.serverForQR.cert
-	serverCertBytes := serverCert.Certificate[0]
-
-	certPem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: serverCertBytes})
-
-	rootCAs, err := x509.SystemCertPool()
-	if err != nil {
-		s.Require().NoError(err)
-	}
-
-	_ = rootCAs.AppendCertsFromPEM(certPem)
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			RootCAs:    rootCAs,
-		},
-	}
-
-	client := &http.Client{Transport: tr}
-
-	req, err := http.NewRequest(http.MethodGet, generatedURL, nil)
-	if err != nil {
-		s.Require().NoError(err)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		s.Require().NoError(err)
-	}
-
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		s.Require().Failf("Unexpected response status code: %d", fmt.Sprint(resp.StatusCode))
-	}
-
-	payload, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		s.Require().NoError(err)
-	}
-
-	s.Require().NotEmpty(payload)
-
-	expectedPayload, err := images.Asset("_assets/tests/qr/defaultQR.png")
-	require.Equal(s.T(), payload, expectedPayload)
-	s.Require().NoError(err)
-
-	//(siddarthkay) un-comment code block below to generate the file in tests folder
-	//f, err := os.Create("image.png")
-	//if err != nil {
-	//	s.Require().NoError(err)
-	//
-	//}
-	//defer f.Close()
-	//_, err = f.Write(payload)
-	//
-	//if err != nil {
-	//	s.Require().NoError(err)
-	//}
 }

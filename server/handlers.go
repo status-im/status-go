@@ -52,7 +52,6 @@ const (
 	accountImagesPath   = "/accountImages"
 	accountInitialsPath = "/accountInitials"
 	contactImagesPath   = "/contactImages"
-	generateQRCode      = "/GenerateQRCode"
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
@@ -915,28 +914,6 @@ func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) http.HandlerFun
 		_, err = w.Write(content)
 		if err != nil {
 			logger.Error("failed to write ipfs resource", zap.Error(err))
-		}
-	}
-}
-
-func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-
-		payload := generateQRBytes(params, logger, multiaccountsDB)
-		mime, err := images.GetProtobufImageMime(payload)
-
-		if err != nil {
-			logger.Error("could not generate image from payload", zap.Error(err))
-		}
-
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(payload)
-
-		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
 		}
 	}
 }
