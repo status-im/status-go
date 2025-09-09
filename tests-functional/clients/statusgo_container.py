@@ -207,7 +207,6 @@ class StatusGoContainer:
             log_prefix: Optional string for logging context
         """
         if not self.container:
-            logging.debug("No container to shutdown")
             return
 
         container_id = self.short_id()
@@ -358,6 +357,7 @@ class StatusBackendContainer(StatusGoContainer):
 
         host_port = StatusGoContainer.acquire_port()
         connector_ws_port = StatusGoContainer.acquire_port() if connector_enabled else 0
+        self.media_server_port = StatusGoContainer.acquire_port()
 
         container_port = 3333
         entrypoint = [
@@ -374,7 +374,10 @@ class StatusBackendContainer(StatusGoContainer):
             ports = {
                 f"{container_port}/tcp": [
                     {"HostIp": "::", "HostPort": str(host_port)},
-                ]
+                ],
+                f"{constants.STATUS_MEDIA_SERVER_PORT}/tcp": [
+                    {"HostIp": "::", "HostPort": str(self.media_server_port)},
+                ],
             }
             if connector_enabled:
                 ports[f"{constants.STATUS_CONNECTOR_WS_PORT}/tcp"] = [{"HostIp": "::", "HostPort": str(connector_ws_port)}]
@@ -384,6 +387,7 @@ class StatusBackendContainer(StatusGoContainer):
         else:
             ports = {
                 f"{container_port}/tcp": str(host_port),
+                f"{constants.STATUS_MEDIA_SERVER_PORT}/tcp": str(self.media_server_port),
             }
             if connector_enabled:
                 ports[f"{constants.STATUS_CONNECTOR_WS_PORT}/tcp"] = str(connector_ws_port)
