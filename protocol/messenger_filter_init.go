@@ -23,7 +23,7 @@ func (m *Messenger) InitFilters() error {
 	rand.Seed(time.Now().Unix())
 
 	// Community requests will arrive in this pubsub topic
-	// TODO depracate
+	// TODO remove once fully migrated to Global Community Control and Content Topic https://github.com/status-im/status-go/issues/6384
 	if err := m.SubscribeToPubsubTopic(messagingtypes.DefaultNonProtectedPubsubTopic()); err != nil {
 		return err
 	}

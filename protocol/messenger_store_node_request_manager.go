@@ -150,7 +150,7 @@ func (m *StoreNodeRequestManager) fetchCustomShard(ctx context.Context, communit
 		// not doing this concurrently to avoid two filters for the same CommunityShardInfoTopic, not a big deal since it is at most 2 shards and temporary
 		res := <-sub
 		if res.shard != nil {
-			return shard, nil
+			return res.shard, nil
 		}
 	}
 	return nil, nil
