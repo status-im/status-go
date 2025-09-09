@@ -12,6 +12,10 @@ from resources.enums import MessageContentType
 from steps.network_conditions import NetworkConditionsSteps
 from utils import fake
 
+from faker import Faker
+
+fake = Faker()
+
 
 class MessengerSteps(NetworkConditionsSteps):
 
