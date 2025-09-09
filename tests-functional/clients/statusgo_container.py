@@ -316,6 +316,8 @@ class StatusGoContainer:
             logging.debug("Save container logs skipped")
             return
 
+        os.makedirs(Config.logs_dir, exist_ok=True)
+
         file_path = os.path.join(Config.logs_dir, f"container_{log_sufix}_{self.short_id()}.log")
         logging.info(f"Saving logs to {file_path}")
 
