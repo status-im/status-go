@@ -36,7 +36,7 @@ import (
 	multicommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
 	statusRpc "github.com/status-im/status-go/rpc"
-	ethclient "github.com/status-im/status-go/rpc/chain/ethclient"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
@@ -1118,7 +1118,6 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 	}
 
 	config := statusRpc.ClientConfig{
-		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appDb,
@@ -1377,7 +1376,6 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	}
 
 	config := statusRpc.ClientConfig{
-		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
@@ -1488,7 +1486,6 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 		}
 
 		config := statusRpc.ClientConfig{
-			Client:          nil,
 			UpstreamChainID: 1,
 			Networks:        []params.Network{},
 			DB:              appdb,
@@ -1556,7 +1553,6 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 	require.NoError(t, err)
 
 	config := statusRpc.ClientConfig{
-		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
@@ -1677,7 +1673,6 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 	//tc.printPreparedData = true
 
 	config := statusRpc.ClientConfig{
-		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,
@@ -1804,7 +1799,6 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 	require.NoError(t, err)
 
 	config := statusRpc.ClientConfig{
-		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
 		DB:              appdb,

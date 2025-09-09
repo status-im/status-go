@@ -10,12 +10,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -23,7 +22,6 @@ import (
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/transactions/fake"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -403,12 +401,8 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 	accountsPublisher := pubsub.NewPublisher()
 	walletFeed := event.Feed{}
 	chainID := uint64(1)
-	txServiceMockCtrl := gomock.NewController(t)
-	server, _ := fake.NewTestServer(txServiceMockCtrl)
-	client := gethrpc.DialInProc(server)
 
 	config := rpc.ClientConfig{
-		Client:          client,
 		UpstreamChainID: chainID,
 		Networks:        nil,
 		DB:              appDB,
@@ -472,7 +466,5 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 	group.Wait()
 
 	// Stop service
-	txServiceMockCtrl.Finish()
-	server.Stop()
 	service.Stop()
 }

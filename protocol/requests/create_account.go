@@ -22,11 +22,12 @@ type ImageCropRectangle struct {
 }
 
 type APIConfig struct {
-	APIModules       string   `json:"apiModules"`
-	ConnectorEnabled bool     `json:"connectorEnabled"`
-	HTTPEnabled      bool     `json:"httpEnabled"`
-	HTTPHost         string   `json:"httpHost"`
-	HTTPPort         int      `json:"httpPort"`
+	APIModules       string `json:"apiModules"`
+	ConnectorEnabled bool   `json:"connectorEnabled"`
+	HTTPEnabled      bool   `json:"httpEnabled"`
+	HTTPHost         string `json:"httpHost"`
+	HTTPPort         int    `json:"httpPort"`
+	// Deprecated: HTTPVirtualHosts is deprecated. It was passed and not used, so nothing should be passed instead.
 	HTTPVirtualHosts []string `json:"httpVirtualHosts"`
 	WSEnabled        bool     `json:"wsEnabled"`
 	WSHost           string   `json:"wsHost"`

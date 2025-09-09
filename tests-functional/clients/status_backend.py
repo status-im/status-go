@@ -70,6 +70,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.node_login_event = {}
         self.events = Events()
         self.version = "unknown"
+        self.network_id = 1
 
         RpcClient.__init__(self)
         ApiClient.__init__(self, self.api_url)

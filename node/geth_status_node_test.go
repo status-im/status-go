@@ -20,7 +20,6 @@ func TestStatusNodeStart(t *testing.T) {
 	n := New(nil, nil, tt.MustCreateTestLogger())
 
 	// checks before node is started
-	require.Nil(t, n.GethNode())
 	require.Nil(t, n.Config())
 	require.Nil(t, n.RPCClient())
 
@@ -40,12 +39,9 @@ func TestStatusNodeStart(t *testing.T) {
 
 	// checks after node is started
 	require.True(t, n.IsRunning())
-	require.NotNil(t, n.GethNode())
 	require.NotNil(t, n.Config())
 	require.NotNil(t, n.RPCClient())
-	accountsManager, err := n.AccountsManager()
-	require.Nil(t, err)
-	require.NotNil(t, accountsManager)
+
 	// try to start already started node
 	require.EqualError(t, n.Start(config), ErrNodeRunning.Error())
 
@@ -55,7 +51,6 @@ func TestStatusNodeStart(t *testing.T) {
 	require.EqualError(t, n.Stop(), ErrNoRunningNode.Error())
 
 	// checks after node is stopped
-	require.Nil(t, n.GethNode())
 	require.Nil(t, n.RPCClient())
 }
 
