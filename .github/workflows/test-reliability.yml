@@ -63,7 +63,7 @@ jobs:
           --tb=short \
           --docker-image="statusgo-local" \
           --waku-fleet=status.staging \
-          --waku-fleets-config=""
+          --waku-fleets-config="" \
           --logs-dir=tests-functional/log
 
     - name: Test Report
