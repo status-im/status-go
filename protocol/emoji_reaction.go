@@ -70,6 +70,7 @@ func (e *EmojiReaction) MarshalJSON() ([]byte, error) {
 		MessageType protobuf.MessageType        `json:"messageType,omitempty"`
 		Retracted   bool                        `json:"retracted,omitempty"`
 		EmojiID     protobuf.EmojiReaction_Type `json:"emojiId,omitempty"`
+		Emoji       string                      `json:"emoji,omitempty"`
 	}{
 
 		ID:          e.ID(),
@@ -81,6 +82,7 @@ func (e *EmojiReaction) MarshalJSON() ([]byte, error) {
 		MessageType: e.MessageType,
 		Retracted:   e.Retracted,
 		EmojiID:     e.Type,
+		Emoji:       e.Emoji,
 	}
 
 	ext, err := common.ExtendStructWithPubKeyData(item.From, item)

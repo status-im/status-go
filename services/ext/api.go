@@ -1020,7 +1020,12 @@ func (api *PublicAPI) RegisteredForPushNotifications() (bool, error) {
 // Emoji
 
 func (api *PublicAPI) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SendEmojiReaction(ctx, chatID, messageID, emojiID)
+	return api.service.messenger.SendEmojiReaction(ctx, chatID, messageID, emojiID, "")
+}
+
+// TODO remove SendEmojiReaction and remove the 2 when the client supports sending custom emojis
+func (api *PublicAPI) SendEmojiReaction2(ctx context.Context, chatID, messageID string, emoji string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendEmojiReaction(ctx, chatID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, emoji)
 }
 
 func (api *PublicAPI) SendEmojiReactionRetraction(ctx context.Context, emojiReactionID string) (*protocol.MessengerResponse, error) {

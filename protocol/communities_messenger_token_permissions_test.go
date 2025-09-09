@@ -919,7 +919,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 	s.Require().True(community.IsMemberLikelyInChat(chat.CommunityChatID()))
 
 	// bob can/can't post reactions
-	response, err = s.bob.SendEmojiReaction(context.Background(), chat.ID, msg.ID, protobuf.EmojiReaction_THUMBS_UP)
+	response, err = s.bob.SendEmojiReaction(context.Background(), chat.ID, msg.ID, protobuf.EmojiReaction_THUMBS_UP, "")
 	if !viewersCanAddReactions {
 		s.Require().Error(err)
 	} else {

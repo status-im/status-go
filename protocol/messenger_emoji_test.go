@@ -65,11 +65,15 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 	messageID := response.Messages()[0].ID
 
 	// Respond with an emoji
-	response, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_SAD)
+	response, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_SAD, "")
 	s.Require().NoError(err)
 	s.Require().Len(response.EmojiReactions(), 1)
 
 	emojiID := response.EmojiReactions()[0].ID()
+
+	// Try sending a non-emoji reaction
+	_, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, "haha")
+	s.Require().Error(err)
 
 	// Wait for the emoji to arrive to alice
 	response, err = WaitOnMessengerResponse(
@@ -150,7 +154,7 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	s.Require().NoError(err)
 	messageID := response.Messages()[0].ID
 
-	_, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_SAD)
+	_, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_SAD, "")
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination

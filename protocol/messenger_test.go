@@ -2387,7 +2387,7 @@ func (s *MessengerSuite) TestResendExpiredEmojis() {
 	s.NoError(err)
 
 	//create emoji
-	_, err = s.m.SendEmojiReaction(context.Background(), chat.ID, inputMessage.ID, protobuf.EmojiReaction_SAD)
+	_, err = s.m.SendEmojiReaction(context.Background(), chat.ID, inputMessage.ID, protobuf.EmojiReaction_SAD, "")
 	s.Require().NoError(err)
 
 	ids, err := s.m.persistence.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
