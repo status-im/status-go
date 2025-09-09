@@ -20,7 +20,7 @@ message EmojiReaction {
   MessageType message_type = 4;
 
   // type the ID of the emoji the user wishes to react with
-  Type type = 5;
+  Type type = 5 [deprecated = true];
 
   enum Type {
     UNKNOWN_EMOJI_REACTION_TYPE = 0;
@@ -37,4 +37,6 @@ message EmojiReaction {
 
   // Grant for organisation chat messages
   bytes grant = 7 [deprecated = true];
+
+  string emoji = 8;
 }

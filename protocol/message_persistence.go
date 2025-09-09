@@ -1407,7 +1407,8 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 			    e.message_id,
 			    e.chat_id,
 			    e.local_chat_id,
-			    e.retracted
+			    e.retracted,
+				e.emoji
 			FROM
 				emoji_reactions e
 			WHERE NOT(e.retracted)
@@ -1438,7 +1439,9 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 			&emojiReaction.MessageId,
 			&emojiReaction.ChatId,
 			&emojiReaction.LocalChatID,
-			&emojiReaction.Retracted)
+			&emojiReaction.Retracted,
+			&emojiReaction.Emoji,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -1460,7 +1463,8 @@ func (db sqlitePersistence) EmojiReactionsByChatIDMessageID(chatID string, messa
 			    e.message_id,
 			    e.chat_id,
 			    e.local_chat_id,
-			    e.retracted
+			    e.retracted,
+				e.emoji
 			FROM
 				emoji_reactions e
 			WHERE NOT(e.retracted)
@@ -1488,7 +1492,9 @@ func (db sqlitePersistence) EmojiReactionsByChatIDMessageID(chatID string, messa
 			&emojiReaction.MessageId,
 			&emojiReaction.ChatId,
 			&emojiReaction.LocalChatID,
-			&emojiReaction.Retracted)
+			&emojiReaction.Retracted,
+			&emojiReaction.Emoji,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -1537,7 +1543,8 @@ func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor
 			    e.message_id,
 			    e.chat_id,
 			    e.local_chat_id,
-			    e.retracted
+			    e.retracted,
+				e.emoji
 			FROM
 				emoji_reactions e
 			WHERE NOT(e.retracted)
@@ -1568,7 +1575,9 @@ func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor
 			&emojiReaction.MessageId,
 			&emojiReaction.ChatId,
 			&emojiReaction.LocalChatID,
-			&emojiReaction.Retracted)
+			&emojiReaction.Retracted,
+			&emojiReaction.Emoji,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -2470,7 +2479,7 @@ func (db sqlitePersistence) SaveDiscordMessageAttachments(attachments []*protobu
 }
 
 func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err error) {
-	query := "INSERT INTO emoji_reactions(id,clock_value,source,emoji_id,message_id,chat_id,local_chat_id,retracted) VALUES (?,?,?,?,?,?,?,?)"
+	query := "INSERT INTO emoji_reactions(id,clock_value,source,emoji_id,message_id,chat_id,local_chat_id,retracted,emoji) VALUES (?,?,?,?,?,?,?,?,?)"
 	stmt, err := db.db.Prepare(query)
 	if err != nil {
 		return
@@ -2485,6 +2494,7 @@ func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err
 		emojiReaction.ChatId,
 		emojiReaction.LocalChatID,
 		emojiReaction.Retracted,
+		emojiReaction.Emoji,
 	)
 
 	return
@@ -2499,7 +2509,8 @@ func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error)
 			    message_id,
 			    chat_id,
 			    local_chat_id,
-			    retracted
+			    retracted,
+				emoji
 			FROM
 				emoji_reactions
 			WHERE
@@ -2514,6 +2525,7 @@ func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error)
 		&emojiReaction.ChatId,
 		&emojiReaction.LocalChatID,
 		&emojiReaction.Retracted,
+		&emojiReaction.Emoji,
 	)
 
 	switch err {

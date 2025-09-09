@@ -11,6 +11,26 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+func ConvertEmojiIDToString(emojiID protobuf.EmojiReaction_Type) string {
+	switch emojiID {
+	case protobuf.EmojiReaction_LOVE:
+		return "❤️"
+	case protobuf.EmojiReaction_THUMBS_UP:
+		return "👍"
+	case protobuf.EmojiReaction_THUMBS_DOWN:
+		return "👎"
+	case protobuf.EmojiReaction_LAUGH:
+		return "😂"
+	case protobuf.EmojiReaction_SAD:
+		return "😢"
+	case protobuf.EmojiReaction_ANGRY:
+		return "😠"
+	}
+
+	return ""
+
+}
+
 func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*MessengerResponse, error) {
 	var response MessengerResponse
 
@@ -26,6 +46,8 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 			MessageId: messageID,
 			ChatId:    chatID,
 			Type:      emojiID,
+			// TODO remove this conversion once the client supports sending custom emojis
+			Emoji: ConvertEmojiIDToString(emojiID),
 		},
 		LocalChatID: chatID,
 		From:        types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
