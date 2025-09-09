@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcutil/base58"
+	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 

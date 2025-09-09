@@ -162,8 +162,6 @@ type Messenger struct {
 
 	// flag to disable checking #hasPairedDevices
 	localPairing bool
-	// flag to enable backedup messages processing, false by default
-	processBackedupMessages bool
 
 	communityTokensService communities.CommunityTokensServiceInterface
 
@@ -179,8 +177,6 @@ type Messenger struct {
 	peersyncing         *peersyncing.PeerSyncing
 	peersyncingOffers   map[string]uint64
 	peersyncingRequests map[string]uint64
-
-	backedUpFetchingStatus *BackupFetchingStatus
 
 	newsFeedManager *newsfeed.NewsFeedManager
 }
@@ -502,10 +498,6 @@ func NewMessenger(
 	return messenger, nil
 }
 
-func (m *Messenger) EnableBackedupMessagesProcessing() {
-	m.processBackedupMessages = true
-}
-
 func (m *Messenger) processSentMessage(id string) error {
 	if m.connectionState.Offline {
 		return errors.New("Can't mark message as sent while offline")
@@ -608,9 +600,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchPendingCommunityRequestToJoin()
 	m.broadcastLatestUserStatus()
 	m.timeoutAutomaticStatusUpdates()
-	if !m.config.featureFlags.DisableCheckingForBackup {
-		m.startBackupLoop()
-	}
 	if !m.config.featureFlags.DisableAutoMessageLoop {
 		err = m.startAutoMessageLoop()
 		if err != nil {
@@ -701,18 +690,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		if err := m.SetDisplayName(replacementDisplayName); err != nil {
 			// We do not return the error as we do not want to block the login for it
 			m.logger.Warn("error setting display name", zap.Error(err))
-		}
-	}
-
-	if m.processBackedupMessages {
-		m.backedUpFetchingStatus = &BackupFetchingStatus{
-			dataProgress:      make(map[string]FetchingBackedUpDataTracking),
-			lastKnownMsgClock: 0,
-			fetchingCompleted: false,
-		}
-		err = m.startBackupFetchingTracking(response)
-		if err != nil {
-			return nil, err
 		}
 	}
 

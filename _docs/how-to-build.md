@@ -52,11 +52,11 @@ Once that is completed, you can start it straight away by running
 This will provide full API at http://localhost:12345. \
 Checkout [`status-backend docs`](../cmd/status-backend/README.md) for more details.
 
-### 5. Build a library for Android and iOS
+### 5. Build a library for current platform
 
 ```shell
-make install-gomobile
-make statusgo-cross # statusgo-android or statusgo-ios to build for specific platform
+make statusgo-library      # Build static library
+make statusgo-shared-library # Build shared library
 ```
 
 ## Build status-go with nix

@@ -162,7 +162,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, "owner", []Option{})
 
 	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, "bob", []Option{})
-	s.bob.EnableBackedupMessagesProcessing()
 
 	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{})
 
@@ -1949,8 +1948,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	backupMessage, err := s.bob.backupCommunity(community, clock)
 	s.Require().NoError(err)
 
-	err = s.bob.HandleBackup(s.bob.buildMessageState(), backupMessage, nil)
-	s.Require().NoError(err)
+	errs := s.bob.handleLocalBackupCommunities(s.bob.buildMessageState(), backupMessage.Communities)
+	s.Require().Len(errs, 0, fmt.Sprintf("expected no errors while handling backup communities. Errors: %v", errs))
 
 	// regenerate key for the channel in order to check that owner will send keys
 	// on bob request from `HandleBackup`

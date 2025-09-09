@@ -22,6 +22,7 @@ import (
 
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/centralizedmetrics"
@@ -330,67 +331,6 @@ func callPrivateRPC(inputJSON string) string {
 		return makeJSONResponse(err)
 	}
 	return resp
-}
-
-// Deprecated: Use VerifyAccountPasswordV2 instead
-func VerifyAccountPassword(address, password string) string {
-	return verifyAccountPassword(address, password)
-}
-
-// verifyAccountPassword verifies account password.
-func verifyAccountPassword(address, password string) string {
-	_, err := statusBackend.AccountsManager().LoadAccount(types.HexToAddress(address), password)
-	return makeJSONResponse(err)
-}
-
-func VerifyAccountPasswordV2(requestJSON string) string {
-	return callWithResponse(verifyAccountPasswordV2, requestJSON)
-}
-
-func verifyAccountPasswordV2(requestJSON string) string {
-	var request requests.VerifyAccountPassword
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = request.Validate()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	_, err = statusBackend.AccountsManager().LoadAccount(types.HexToAddress(request.Address), request.Password)
-	return makeJSONResponse(err)
-}
-
-func VerifyDatabasePasswordV2(requestJSON string) string {
-	return callWithResponse(verifyDatabasePasswordV2, requestJSON)
-}
-
-func verifyDatabasePasswordV2(requestJSON string) string {
-	var request requests.VerifyDatabasePassword
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = request.Validate()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	err = statusBackend.VerifyDatabasePassword(request.KeyUID, request.Password)
-	return makeJSONResponse(err)
-}
-
-// Deprecated: use VerifyDatabasePasswordV2 instead
-func VerifyDatabasePassword(keyUID, password string) string {
-	return verifyDatabasePassword(keyUID, password)
-}
-
-// verifyDatabasePassword verifies database password.
-func verifyDatabasePassword(keyUID, password string) string {
-	err := statusBackend.VerifyDatabasePassword(keyUID, password)
-	return makeJSONResponse(err)
 }
 
 func MigrateKeyStoreDirV2(requestJSON string) string {
@@ -1279,17 +1219,6 @@ func importUnencryptedDatabaseV2(requestJSON string) string {
 	return makeJSONResponse(err)
 }
 
-// Deprecated: Use ChangeDatabasePasswordV2 instead.
-func ChangeDatabasePassword(keyUID, password, newPassword string) string {
-	return changeDatabasePassword(keyUID, password, newPassword)
-}
-
-// changeDatabasePassword changes the password of the database
-func changeDatabasePassword(keyUID, password, newPassword string) string {
-	err := statusBackend.ChangeDatabasePassword(keyUID, password, newPassword)
-	return makeJSONResponse(err)
-}
-
 func ChangeDatabasePasswordV2(requestJSON string) string {
 	return callWithResponse(changeDatabasePasswordV2, requestJSON)
 }
@@ -1300,7 +1229,17 @@ func changeDatabasePasswordV2(requestJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return changeDatabasePassword(request.KeyUID, request.OldPassword, request.NewPassword)
+
+	ok, err := statusBackend.VerifyProfilePassword(request.OldPassword)
+	if err != nil && !errors.Is(err, keystore.ErrIncorrectPasswordProvided) {
+		return makeJSONResponse(err)
+	}
+	if !ok {
+		return makeJSONResponse(errors.New("incorrect current password"))
+	}
+
+	err = statusBackend.ChangeDatabasePassword(request.KeyUID, request.OldPassword, request.NewPassword)
+	return makeJSONResponse(err)
 }
 
 // Deprecated: Use ConvertToKeycardAccountV2 instead.

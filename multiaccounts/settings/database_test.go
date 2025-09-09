@@ -22,7 +22,6 @@ import (
 var (
 	config = params.NodeConfig{
 		NetworkID: 10,
-		DataDir:   "test",
 	}
 
 	networks = json.RawMessage("{}")
@@ -32,7 +31,6 @@ var (
 		DappsAddress:                        types.HexToAddress("0xD1300f99fDF7346986CbC766903245087394ecd0"),
 		InstallationID:                      "d3efcff6-cffa-560e-a547-21d3858cbc51",
 		KeyUID:                              "0x4e8129f3edfc004875be17bf468a784098a9f69b53c095be1f52deff286935ab",
-		BackupEnabled:                       true,
 		LatestDerivedPath:                   0,
 		Name:                                "Jittery Cornflowerblue Kingbird",
 		Networks:                            &networks,
@@ -53,6 +51,7 @@ var (
 		ShowCommunityAssetWhenSendingTokens: true,
 		NewsFeedEnabled:                     true,
 		NewsRSSEnabled:                      true,
+		ThirdpartyServicesEnabled:           true,
 	}
 )
 
@@ -319,4 +318,32 @@ func TestDatabase_BackupPath(t *testing.T) {
 	settings, err = db.GetSettings()
 	require.NoError(t, err)
 	require.Equal(t, testPath, settings.BackupPath)
+}
+
+func TestDatabase_ThirdpartyServicesEnabled(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	// By default, third-party services should be enabled
+	enabled, err := db.ThirdpartyServicesEnabled()
+	require.NoError(t, err)
+	require.True(t, enabled, "expected ThirdpartyServicesEnabled to be true by default")
+
+	// Disable third-party services
+	err = db.SaveSetting(ThirdpartyServicesEnabled.GetReactName(), false)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.False(t, settings.ThirdpartyServicesEnabled, "expected ThirdpartyServicesEnabled to be false after disabling")
+
+	// Re-enable third-party services
+	err = db.SaveSetting(ThirdpartyServicesEnabled.GetReactName(), true)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.True(t, settings.ThirdpartyServicesEnabled, "expected ThirdpartyServicesEnabled to be true after enabling")
 }

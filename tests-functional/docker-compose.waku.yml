@@ -1,6 +1,6 @@
 services:
   boot-1:
-    image: wakuorg/nwaku:v0.34.0
+    image: wakuorg/nwaku:v0.36.0
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
@@ -33,7 +33,7 @@ services:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
 
   store:
-    image: wakuorg/nwaku:v0.34.0
+    image: wakuorg/nwaku:v0.36.0
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",

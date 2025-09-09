@@ -1,5 +1,6 @@
+import re
 import pytest
-
+from clients.api import ApiResponseError
 from clients.services.wakuext import ActivityCenterNotificationType, ContactRequestState
 from clients.signals import SignalType, LocalPairingEventType, LocalPairingEventAction
 from clients.status_backend import StatusBackend
@@ -129,8 +130,7 @@ def pair_server_as_sender(sender, receiver):
 
 def pair_server_as_receiver(sender, receiver):
     connection_string = receiver.get_connection_string_for_being_bootstrapped()
-    response = sender.input_connection_string_for_bootstrapping_another_device(connection_string)
-    assert response.get("error") in (None, "")
+    sender.input_connection_string_for_bootstrapping_another_device(connection_string)
 
     wait_for_action_of_type(sender, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value)
     wait_for_action_of_type(receiver, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value)
@@ -156,7 +156,7 @@ class TestLocalPairing(MessengerSteps):
         SignalType.MESSAGES_NEW.value,
         SignalType.MESSAGE_DELIVERED.value,
         SignalType.NODE_LOGIN.value,
-        SignalType.NODE_LOGOUT.value,
+        SignalType.NODE_STOPPED.value,
         SignalType.LOCAL_PAIRING.value,
     ]
 
@@ -202,17 +202,15 @@ class TestLocalPairing(MessengerSteps):
         login_paired_device(bob_second_device, bob.key_uid, bob.password)
 
         # Check that contact is synced
-        response = bob_second_device.wakuext_service.get_contacts()
-
-        contacts = response["result"]
+        contacts = bob_second_device.wakuext_service.get_contacts()
         assert len(contacts) == 1
         assert contacts[0]["id"] == alice.public_key
 
         # Checking the paired devices using accounts_hasPairedDevices method
         alice_response = alice.accounts_service.has_paired_devices()
-        assert alice_response.get("result") is False
+        assert alice_response is False
         bob_response = bob.accounts_service.has_paired_devices()
-        assert bob_response.get("result") is True
+        assert bob_response is True
 
     def test_pairing_server_as_receiver(self):
         # Create users
@@ -239,17 +237,15 @@ class TestLocalPairing(MessengerSteps):
         check_server_receiver_events(events)
 
         # Check that contact is synced
-        response = bob_second_device.wakuext_service.get_contacts()
-
-        contacts = response["result"]
+        contacts = bob_second_device.wakuext_service.get_contacts()
         assert len(contacts) == 1
         assert contacts[0]["id"] == alice.public_key
 
         # Checking the paired devices using accounts_hasPairedDevices method
         alice_response = alice.accounts_service.has_paired_devices()
-        assert alice_response.get("result") is False
+        assert alice_response is False
         bob_response = bob.accounts_service.has_paired_devices()
-        assert bob_response.get("result") is True
+        assert bob_response is True
 
     def test_pairing_three_devices(self):
         # Create users
@@ -282,8 +278,7 @@ class TestLocalPairing(MessengerSteps):
 
         # Check that contacts and notifications are synced on all devices
         for bob_another_device in [bob2, bob3]:
-            response = bob_another_device.wakuext_service.get_contacts()
-            contacts = response["result"]
+            contacts = bob_another_device.wakuext_service.get_contacts()
             assert len(contacts) == 3
             contacts_dict = {contact["id"]: contact for contact in contacts}
             assert contacts_dict[user_accepted.public_key]["mutual"] is True
@@ -296,7 +291,7 @@ class TestLocalPairing(MessengerSteps):
             # Paired device will get notifications of requests that are not fulfilled (not mutual)
             notifications = bob_another_device.wakuext_service.get_activity_center_notifications(
                 activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_CONTACT_REQUEST]
-            )["result"]["notifications"]
+            )["notifications"]
             assert len(notifications) == 2
             notifications_dict = {notification["chatId"]: notification for notification in notifications}
             user_pending_notification = notifications_dict[user_pending.public_key]
@@ -314,10 +309,9 @@ class TestLocalPairing(MessengerSteps):
 
         # Client receiver must be logged out
         connection_string = sender.get_connection_string_for_bootstrapping_another_device()
-        response = receiver.input_connection_string_for_bootstrapping(connection_string)
-        assert response["error"] is not None
+        receiver.input_connection_string_for_bootstrapping(connection_string)
 
         # Server receiver must be logged out
         connection_string = receiver.get_connection_string_for_being_bootstrapped()
-        response = sender.input_connection_string_for_bootstrapping_another_device(connection_string)
-        assert response["error"] is not None
+        with pytest.raises(ApiResponseError, match=re.escape("[client] status not ok when sending account data")):
+            sender.input_connection_string_for_bootstrapping_another_device(connection_string)

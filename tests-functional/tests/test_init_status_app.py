@@ -50,7 +50,7 @@ def test_check_logs(log_enabled: bool, api_logging_enabled: bool, close_status_b
     data_dir = os.path.join(backend.data_dir, "data")
     logs_dir = os.path.join(backend.data_dir, "logs")
 
-    backend.api_valid_request(
+    backend.api_request_json(
         "InitializeApplication",
         {
             "dataDir": str(data_dir),

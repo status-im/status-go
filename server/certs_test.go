@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcutil/base58"
+	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/server/servertest"

@@ -1,6 +1,8 @@
 import copy
+import re
 import pytest
 from resources.constants import new_account_data_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -18,7 +20,7 @@ class TestUpdateAccount:
 
         # fetch all accounts(chat, wallet and watch) for update
         accounts_response_before = self.account.accounts_service.get_accounts()
-        accounts_before = accounts_response_before.get("result", [])
+        accounts_before = accounts_response_before
 
         for before in accounts_before:
             # modify account fields and send update for all existing accounts
@@ -28,11 +30,11 @@ class TestUpdateAccount:
             before["emoji"] = "✨"
             before["prodPreferredChainIds"] = "2:10:42161:8458"
             update_resp = self.account.accounts_service.update_account(before)
-            assert update_resp["result"] is None
+            assert update_resp is None
 
         # verify update persisted
         accounts_response_after = self.account.accounts_service.get_accounts()
-        accounts_after = accounts_response_after.get("result", [])
+        accounts_after = accounts_response_after
         assert len(accounts_before) == len(accounts_after)
         for before, after in zip(accounts_before, accounts_after):
             # making clocks equal so we can compare the entire account object
@@ -42,7 +44,7 @@ class TestUpdateAccount:
     def test_try_to_update_non_editable_fields(self):
         # fetch all accounts
         accounts_response_before = self.account.accounts_service.get_accounts()
-        accounts_before = accounts_response_before.get("result", [])
+        accounts_before = accounts_response_before
 
         for before in accounts_before:
             before_copy = copy.deepcopy(before)
@@ -60,7 +62,7 @@ class TestUpdateAccount:
 
         # verify that no update was made to non editable fields
         accounts_response_after = self.account.accounts_service.get_accounts()
-        accounts_after = accounts_response_after.get("result", [])
+        accounts_after = accounts_response_after
         assert len(accounts_before) == len(accounts_after)
         for before, after in zip(accounts_before, accounts_after):
             # making clocks equal so we can compare the entire account object
@@ -69,5 +71,5 @@ class TestUpdateAccount:
 
     def test_update_nonexistent_account(self):
         nonexisting = {"address": "0x0000000000000000000000000000000000000001", "name": "Nope"}
-        resp = self.account.accounts_service.update_account(nonexisting)
-        assert resp.get("error").get("message") == "cannot update non-existing account: accounts: account is not found"
+        with pytest.raises(ApiResponseError, match=re.escape("cannot update non-existing account: accounts: account is not found")):
+            self.account.accounts_service.update_account(nonexisting)

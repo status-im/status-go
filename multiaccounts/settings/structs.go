@@ -209,9 +209,6 @@ type Settings struct {
 	GifRecents                          *json.RawMessage              `json:"gifs/recent-gifs"`
 	GifFavorites                        *json.RawMessage              `json:"gifs/favorite-gifs"`
 	OpenseaEnabled                      bool                          `json:"opensea-enabled?,omitempty"`
-	LastBackup                          uint64                        `json:"last-backup,omitempty"`
-	BackupEnabled                       bool                          `json:"backup-enabled?,omitempty"`
-	BackupFetched                       bool                          `json:"backup-fetched?,omitempty"`
 	BackupPath                          string                        `json:"backup-path,omitempty"`
 	AutoMessageEnabled                  bool                          `json:"auto-message-enabled?,omitempty"`
 	GifAPIKey                           string                        `json:"gifs/api-key"`
@@ -227,6 +224,7 @@ type Settings struct {
 	PeerSyncingEnabled                  bool                          `json:"peer-syncing-enabled?,omitempty"`
 	AutoRefreshTokensEnabled            bool                          `json:"auto-refresh-tokens-enabled,omitempty"`
 	LastTokensUpdate                    time.Time                     `json:"last-tokens-update,omitempty"`
+	ThirdpartyServicesEnabled           bool                          `json:"thirdparty_services_enabled,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {

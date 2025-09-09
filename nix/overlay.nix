@@ -60,9 +60,4 @@ in rec {
   go-modvendor = callPackage ./pkgs/go-modvendor { };
   codecov-cli = callPackage ./pkgs/codecov-cli { };
   go-generate-fast = callPackage ./pkgs/go-generate-fast { };
-  # brough in gomobile derivation from https://github.com/NixOS/nixpkgs/commit/f5abef98e8b8c9f9e6da4bdab63f8be1e57ea8c0
-  # enabled CGO_ENABLED for status-mobile
-  # swapped --replace plag with --replace-queit in substituteInPlace block because its deprecated in newer nix versions
-  # swapped buildGoModule with buildGo122Module to ensure derivation is built with go 1.22
-  gomobile = callPackage ./pkgs/gomobile {};
 }

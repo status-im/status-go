@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/btcsuite/btcutil/base58"
+	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/server/pairing/versioning"

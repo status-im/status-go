@@ -43,7 +43,6 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
@@ -707,14 +706,13 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 
 	json := `{
 		"NetworkId": 3,
-		"DataDir": "` + testContext.config.DataDir + `",
-		"KeycardPairingDataFile": "` + path.Join(testContext.config.DataDir, "keycard/pairings.json") + `",
+		"KeycardPairingDataFile": "` + path.Join(testContext.config.RootDataDir, "keycard/pairings.json") + `",
 		"NoDiscovery": true,
 		"TorrentConfig": {
 			"Port": 9025,
 			"Enabled": false,
-			"DataDir": "` + testContext.config.DataDir + `/archivedata",
-			"TorrentDir": "` + testContext.config.DataDir + `/torrents"
+			"DataDir": "` + testContext.config.RootDataDir + `/archivedata",
+			"TorrentDir": "` + testContext.config.RootDataDir + `/torrents"
 		},
 		"RuntimeLogLevel": "INFO",
 		"LogLevel": "DEBUG"
@@ -731,7 +729,7 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 	require.NoError(t, err)
 
 	request := &requests.CreateAccount{
-		RootDataDir:   testContext.config.DataDir,
+		RootDataDir:   testContext.config.RootDataDir,
 		Password:      testPassword,
 		KdfIterations: 1,
 	}
@@ -740,7 +738,6 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 		request,
 		testContext.mnemonic,
 		nil,
-		false,
 		false,
 	)
 	require.NoError(t, err)
@@ -773,8 +770,8 @@ func TestLoginAccount(t *testing.T) {
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
 		Password:           testPassword,
-		RootDataDir:        testContext.config.DataDir,
-		LogFilePath:        testContext.config.DataDir + "/log",
+		RootDataDir:        testContext.config.RootDataDir,
+		LogFilePath:        testContext.config.RootDataDir + "/log",
 		WakuV2Nameserver:   &nameserver,
 		WakuV2Fleet:        "status.staging",
 	}
@@ -800,19 +797,13 @@ func TestLoginAccount(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, nameserver, testContext.backend.config.WakuV2Config.Nameserver)
 
-	accountsDB, err := testContext.backend.accountsDB()
-	require.NoError(t, err)
-	backupFecthed, err := accountsDB.BackupFetched()
-	require.NoError(t, err)
-	require.True(t, backupFecthed)
-
 	require.True(t, acc.HasAcceptedTerms)
 
 	waitForLogin(c)
 	require.NoError(t, testContext.backend.Logout())
 	require.NoError(t, testContext.backend.StopNode())
 
-	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
+	testContext.backend.UpdateRootDataDir(testContext.config.RootDataDir)
 
 	accounts, err := testContext.backend.GetAccounts()
 	require.NoError(t, err)
@@ -838,7 +829,7 @@ func TestVerifyDatabasePassword(t *testing.T) {
 	testContext := setupTestContext(t, testPassword, false, false, false)
 
 	request := &requests.CreateAccount{
-		RootDataDir:   testContext.config.DataDir,
+		RootDataDir:   testContext.config.RootDataDir,
 		Password:      testPassword,
 		KdfIterations: 1,
 	}
@@ -847,7 +838,6 @@ func TestVerifyDatabasePassword(t *testing.T) {
 		request,
 		testContext.mnemonic,
 		nil,
-		false,
 		false,
 	)
 	require.NoError(t, err)
@@ -863,7 +853,7 @@ func TestConvertAccount(t *testing.T) {
 	testContext := setupTestContext(t, testPassword, false, false, true)
 
 	request := &requests.CreateAccount{
-		RootDataDir:   testContext.config.DataDir,
+		RootDataDir:   testContext.config.RootDataDir,
 		Password:      testPassword,
 		KdfIterations: 1,
 	}
@@ -872,7 +862,6 @@ func TestConvertAccount(t *testing.T) {
 		request,
 		testContext.mnemonic,
 		nil,
-		false,
 		false,
 	)
 	require.NoError(t, err)
@@ -1026,7 +1015,7 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig, keyUID string) {
 
 	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 
-	b.UpdateRootDataDir(conf.DataDir)
+	b.UpdateRootDataDir(conf.RootDataDir)
 
 	require.NoError(t, b.OpenAccounts())
 
@@ -1117,7 +1106,7 @@ func TestChangeDatabasePassword(t *testing.T) {
 	err = testContext.backend.ChangeDatabasePassword(testContext.profileKeypair.KeyUID, testPassword, newPassword)
 	require.NoError(t, err)
 
-	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
+	testContext.backend.UpdateRootDataDir(testContext.config.RootDataDir)
 
 	// Test that keystore can be decrypted with the new password
 	ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, newPassword)
@@ -1142,8 +1131,8 @@ func TestCreateWallet(t *testing.T) {
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
 		Password:           testPassword,
-		RootDataDir:        testContext.config.DataDir,
-		LogFilePath:        testContext.config.DataDir + "/log",
+		RootDataDir:        testContext.config.RootDataDir,
+		LogFilePath:        testContext.config.RootDataDir + "/log",
 	}
 
 	c := make(chan interface{}, 10)
@@ -1204,8 +1193,8 @@ func TestSetFleet(t *testing.T) {
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
 		Password:           testPassword,
-		RootDataDir:        testContext.config.DataDir,
-		LogFilePath:        testContext.config.DataDir + "/log",
+		RootDataDir:        testContext.config.RootDataDir,
+		LogFilePath:        testContext.config.RootDataDir + "/log",
 	}
 
 	c := make(chan interface{}, 10)
@@ -1237,7 +1226,7 @@ func TestSetFleet(t *testing.T) {
 
 	require.NoError(t, testContext.backend.Logout())
 
-	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
+	testContext.backend.UpdateRootDataDir(testContext.config.RootDataDir)
 
 	loginAccountRequest := &requests.Login{
 		KeyUID:   newAccount.KeyUID,
@@ -1267,14 +1256,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 
 	poktToken := fakeToken()
 	infuraToken := fakeToken()
-	alchemyEthereumMainnetToken := fakeToken()
-	alchemyEthereumSepoliaToken := fakeToken()
-	alchemyArbitrumMainnetToken := fakeToken()
-	alchemyArbitrumSepoliaToken := fakeToken()
-	alchemyOptimismMainnetToken := fakeToken()
-	alchemyOptimismSepoliaToken := fakeToken()
-	alchemyBaseMainnetToken := fakeToken()
-	alchemyBaseSepoliaToken := fakeToken()
+	alchemyAPIKey := fakeToken()
 	raribleMainnetAPIKey := fakeToken()
 	raribleTestnetAPIKey := fakeToken()
 
@@ -1282,8 +1264,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
 		Password:           testPassword,
-		RootDataDir:        testContext.config.DataDir,
-		LogFilePath:        testContext.config.DataDir + "/log",
+		RootDataDir:        testContext.config.RootDataDir,
+		LogFilePath:        testContext.config.RootDataDir + "/log",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1304,22 +1286,15 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 		KeyUID:   newAccount.KeyUID,
 		Password: testPassword,
 		WalletSecretsConfig: requests.WalletSecretsConfig{
-			PoktToken:                   poktToken,
-			InfuraToken:                 infuraToken,
-			AlchemyEthereumMainnetToken: alchemyEthereumMainnetToken,
-			AlchemyEthereumSepoliaToken: alchemyEthereumSepoliaToken,
-			AlchemyArbitrumMainnetToken: alchemyArbitrumMainnetToken,
-			AlchemyArbitrumSepoliaToken: alchemyArbitrumSepoliaToken,
-			AlchemyOptimismMainnetToken: alchemyOptimismMainnetToken,
-			AlchemyOptimismSepoliaToken: alchemyOptimismSepoliaToken,
-			AlchemyBaseMainnetToken:     alchemyBaseMainnetToken,
-			AlchemyBaseSepoliaToken:     alchemyBaseSepoliaToken,
-			RaribleMainnetAPIKey:        raribleMainnetAPIKey,
-			RaribleTestnetAPIKey:        raribleTestnetAPIKey,
+			PoktToken:            poktToken,
+			InfuraToken:          infuraToken,
+			AlchemyAPIKey:        alchemyAPIKey,
+			RaribleMainnetAPIKey: raribleMainnetAPIKey,
+			RaribleTestnetAPIKey: raribleTestnetAPIKey,
 		},
 	}
 
-	testContext.backend.UpdateRootDataDir(testContext.config.DataDir)
+	testContext.backend.UpdateRootDataDir(testContext.config.RootDataDir)
 
 	require.NoError(t, testContext.backend.LoginAccount(loginAccountRequest))
 	select {
@@ -1331,14 +1306,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 
 	walletConfig := testContext.backend.config.WalletConfig
 	require.Equal(t, walletConfig.InfuraAPIKey, infuraToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.EthereumMainnet], alchemyEthereumMainnetToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.EthereumSepolia], alchemyEthereumSepoliaToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.ArbitrumMainnet], alchemyArbitrumMainnetToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.ArbitrumSepolia], alchemyArbitrumSepoliaToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.OptimismMainnet], alchemyOptimismMainnetToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.OptimismSepolia], alchemyOptimismSepoliaToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.BaseMainnet], alchemyBaseMainnetToken)
-	require.Equal(t, walletConfig.AlchemyAPIKeys[common.BaseSepolia], alchemyBaseSepoliaToken)
+	require.Equal(t, walletConfig.AlchemyAPIKey, alchemyAPIKey)
 	require.Equal(t, walletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
 	require.Equal(t, walletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
 
@@ -1399,8 +1367,7 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 
 	// Test case 1: Valid restore account request
 	restoreRequest := &requests.RestoreAccount{
-		Mnemonic:    "test test test test test test test test test test test test",
-		FetchBackup: false,
+		Mnemonic: "test test test test test test test test test test test test",
 		CreateAccount: requests.CreateAccount{
 			DisplayName:        "Account1",
 			DeviceName:         "StatusIM",
@@ -1434,8 +1401,7 @@ func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
 
 	// Test case: Valid restore account request without DisplayName
 	restoreRequest := &requests.RestoreAccount{
-		Mnemonic:    "test test test test test test test test test test test test",
-		FetchBackup: false,
+		Mnemonic: "test test test test test test test test test test test test",
 		CreateAccount: requests.CreateAccount{
 			DeviceName:         "StatusIM",
 			Password:           "password",
@@ -1455,7 +1421,7 @@ func TestAcceptTerms(t *testing.T) {
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 
-	b.UpdateRootDataDir(conf.DataDir)
+	b.UpdateRootDataDir(conf.RootDataDir)
 	require.NoError(t, b.OpenAccounts())
 	nameserver := "8.8.8.8"
 	createAccountRequest := &requests.CreateAccount{
@@ -1562,8 +1528,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	}
 
 	exampleRequest := map[string]interface{}{
-		"mnemonic":    "",
-		"fetchBackup": true,
+		"mnemonic": "",
 		"createAccountRequest": map[string]interface{}{
 			"rootDataDir":   tmpdir,
 			"kdfIterations": 256000,
@@ -1591,7 +1556,6 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 				"poktToken":                   "1234567890",
 				"infuraToken":                 "1234567890",
 				"infuraSecret":                "",
-				"openseaApiKey":               "",
 				"raribleMainnetApiKey":        "",
 				"raribleTestnetApiKey":        "",
 				"alchemyEthereumMainnetToken": "",
@@ -1606,7 +1570,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 			"torrentConfigEnabled":   false,
 			"torrentConfigPort":      0,
 			"keycardInstanceUID":     "a84599394887b742eed9a99d3834a797",
-			"keycardPairingDataFile": path.Join(tmpdir, DefaultKeycardPairingDataFile),
+			"keycardPairingDataFile": path.Join(tmpdir, DefaultKeycardPairingDataFileRelativePath),
 		},
 	}
 
@@ -1619,7 +1583,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 	require.NoError(t, err)
 
-	backend.UpdateRootDataDir(conf.DataDir)
+	backend.UpdateRootDataDir(conf.RootDataDir)
 
 	require.NoError(t, backend.OpenAccounts())
 

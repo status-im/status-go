@@ -3,8 +3,9 @@ package relay
 import (
 	"context"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"golang.org/x/exp/slices"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol"
 )
 
 // Subscription handles the details of a particular Topic subscription. There may be many subscriptions for a given topic.
@@ -54,4 +55,8 @@ func NewSubscription(contentFilter protocol.ContentFilter) *Subscription {
 		contentFilter: contentFilter,
 		subType:       subType,
 	}
+}
+
+func (s *Subscription) ContentFilter() protocol.ContentFilter {
+	return s.contentFilter
 }

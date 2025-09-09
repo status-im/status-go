@@ -44,7 +44,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/alchemy"
-	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/opensea"
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/rarible"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/coingecko"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -139,10 +138,8 @@ func NewService(
 	history := history.NewService(db, accountsDB, accountsPublisher, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 
-	openseaHTTPClient := opensea.NewHTTPClient()
-	openseaV2Client := opensea.NewClientV2(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient)
 	raribleClient := rarible.NewClient(config.WalletConfig.RaribleMainnetAPIKey, config.WalletConfig.RaribleTestnetAPIKey)
-	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
+	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKey)
 
 	// Collectible providers in priority order (i.e. provider N+1 will be tried only if provider N fails)
 	contractOwnershipProviders := []thirdparty.CollectibleContractOwnershipProvider{
@@ -153,19 +150,16 @@ func NewService(
 	accountOwnershipProviders := []thirdparty.CollectibleAccountOwnershipProvider{
 		raribleClient,
 		alchemyClient,
-		openseaV2Client,
 	}
 
 	collectibleDataProviders := []thirdparty.CollectibleDataProvider{
 		raribleClient,
 		alchemyClient,
-		openseaV2Client,
 	}
 
 	collectionDataProviders := []thirdparty.CollectionDataProvider{
 		raribleClient,
 		alchemyClient,
-		openseaV2Client,
 	}
 
 	collectibleSearchProviders := []thirdparty.CollectibleSearchProvider{
@@ -250,7 +244,7 @@ func buildPathProcessors(
 	transfer := pathprocessor.NewTransferProcessor(rpcClient, transactor)
 	ret = append(ret, transfer)
 
-	erc721Transfer := pathprocessor.NewERC721Processor(rpcClient, transactor)
+	erc721Transfer := pathprocessor.NewNFTProcessor(rpcClient, transactor)
 	ret = append(ret, erc721Transfer)
 
 	erc1155Transfer := pathprocessor.NewERC1155Processor(rpcClient, transactor)

@@ -13,6 +13,8 @@ import (
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
+
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
@@ -21,7 +23,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/service"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
-	"go.uber.org/zap"
 )
 
 // FilterSubscribeID_v20beta1 is the current Waku Filter protocol identifier for servers to
@@ -282,7 +283,7 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, logger *zap.Logge
 
 	stream, err := wf.h.NewStream(ctx, peerID, FilterPushID_v20beta1)
 	if err != nil {
-		if errors.Is(context.DeadlineExceeded, err) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			wf.metrics.RecordError(pushTimeoutFailure)
 		} else {
 			wf.metrics.RecordError(dialFailure)
@@ -297,7 +298,7 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, logger *zap.Logge
 	writer := pbio.NewDelimitedWriter(stream)
 	err = writer.WriteMsg(messagePush)
 	if err != nil {
-		if errors.Is(context.DeadlineExceeded, err) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			wf.metrics.RecordError(pushTimeoutFailure)
 		} else {
 			wf.metrics.RecordError(writeResponseFailure)

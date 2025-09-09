@@ -2,33 +2,17 @@ package holepunch
 
 import (
 	"context"
+	"slices"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr/net"
 )
 
-func containsPublicAddr(addrs []ma.Multiaddr) bool {
-	for _, addr := range addrs {
-		if isRelayAddress(addr) || !manet.IsPublicAddr(addr) {
-			continue
-		}
-		return true
-	}
-	return false
-}
-
 func removeRelayAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
-	result := make([]ma.Multiaddr, 0, len(addrs))
-	for _, addr := range addrs {
-		if !isRelayAddress(addr) {
-			result = append(result, addr)
-		}
-	}
-	return result
+	return slices.DeleteFunc(addrs, isRelayAddress)
 }
 
 func isRelayAddress(a ma.Multiaddr) bool {

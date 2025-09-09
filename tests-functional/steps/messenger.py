@@ -18,7 +18,7 @@ class MessengerSteps(NetworkConditionsSteps):
         SignalType.MESSAGES_NEW.value,
         SignalType.MESSAGE_DELIVERED.value,
         SignalType.NODE_LOGIN.value,
-        SignalType.NODE_LOGOUT.value,
+        SignalType.NODE_STOPPED.value,
     ]
 
     def send_contact_request_and_wait_for_signal_to_be_received(self, sender=None, receiver=None) -> str:
@@ -103,7 +103,7 @@ class MessengerSteps(NetworkConditionsSteps):
 
     def get_message_by_content_type(self, response, content_type, message_pattern=""):
         matched_messages = []
-        messages = response.get("result", {}).get("messages", [])
+        messages = response.get("messages", [])
         for message in messages:
             if message.get("contentType") != content_type:
                 continue
@@ -115,10 +115,10 @@ class MessengerSteps(NetworkConditionsSteps):
             raise ValueError(f"Failed to find a message with contentType '{content_type}' and message_pattern: `{message_pattern}` in response")
 
     def get_message_id(self, response, index=0):
-        return response.get("result", {}).get("messages", [])[index].get("id", "")
+        return response.get("messages", [])[index].get("id", "")
 
     def get_message_by_message_id(self, response, message_id: str):
-        messages = response.get("result", {}).get("messages", [])
+        messages = response.get("messages", [])
         matched_message = None
         for message in messages:
             if message.get("id", "") == message_id:
@@ -143,12 +143,12 @@ class MessengerSteps(NetworkConditionsSteps):
             event_pattern=expected_message.get("id"),
             timeout=60,
         )
-        return response.get("result", {}).get("chats", [])[0].get("id")
+        return response.get("chats", [])[0].get("id")
 
     def create_community(self, node):
         name = f"vac_qa_community_{''.join(random.choices(string.ascii_letters, k=10))}"
         response = node.wakuext_service.create_community(name)
-        self.community_id = response.get("result", {}).get("communities", [{}])[0].get("id")
+        self.community_id = response.get("communities", [{}])[0].get("id")
         return self.community_id
 
     def fetch_community(self, node, community_id=None):
@@ -159,7 +159,7 @@ class MessengerSteps(NetworkConditionsSteps):
     def join_community(self, member=None, admin=None):
         self.fetch_community(member)
         response_to_join = member.wakuext_service.request_to_join_community(self.community_id)
-        join_id = response_to_join.get("result", {}).get("requestsToJoinCommunity", [{}])[0].get("id")
+        join_id = response_to_join.get("requestsToJoinCommunity", [{}])[0].get("id")
 
         # I couldn't find any signal related to the requestToJoinCommunity request in the peer node.
         # That's why I need this retry logic for accepting the request to join the community.
@@ -168,17 +168,15 @@ class MessengerSteps(NetworkConditionsSteps):
         for attempt in range(max_retries):
             try:
                 response = admin.wakuext_service.accept_request_to_join_community(join_id)
-                if response.get("result"):
+                if response:
                     break
-                err = response.get("error") or "unknown error (no result and no error)"
-                raise Exception(err)
             except Exception as e:
                 logging.error(f"Attempt {attempt + 1}/{max_retries}: Unexpected error: {e}")
                 time.sleep(retry_interval)
         else:
             raise Exception(f"Failed to accept request to join community in {max_retries * retry_interval} seconds.")
 
-        chats = response.get("result", {}).get("communities", [{}])[0].get("chats", {})
+        chats = response.get("communities", [{}])[0].get("chats", {})
         chat_id = list(chats.keys())[0] if chats else None
         return self.community_id + chat_id
 
@@ -187,9 +185,9 @@ class MessengerSteps(NetworkConditionsSteps):
         if not community_id:
             community_id = self.community_id
         response = node.wakuext_service.leave_community(community_id)
-        target_community = [
-            existing_community for existing_community in response.get("result", {}).get("communities") if existing_community.get("id") == community_id
-        ][0]
+        target_community = [existing_community for existing_community in response.get("communities") if existing_community.get("id") == community_id][
+            0
+        ]
         assert target_community.get("joined") is False
 
     @retry(stop=stop_after_delay(20), wait=wait_fixed(2), reraise=True)
@@ -197,7 +195,7 @@ class MessengerSteps(NetworkConditionsSteps):
         if not community_id:
             community_id = self.community_id
         response = self.fetch_community(node, community_id)
-        assert response.get("result", {}).get("joined") is joined
+        assert response.get("joined") is joined
 
     def community_messages(self, message_chat_id, message_count, sender=None, receiver=None):
         sent_messages = []
@@ -222,7 +220,7 @@ class MessengerSteps(NetworkConditionsSteps):
 
     def one_to_one_message(self, message_count, sender=None, receiver=None):
         _, responses = self.send_multiple_one_to_one_messages(message_count, sender=sender, receiver=receiver)
-        messages = list(map(lambda r: r.get("result", {}).get("messages", [])[0], responses))
+        messages = list(map(lambda r: r.get("messages", [])[0], responses))
 
         for expected_message in messages:
             messages_new_event = receiver.find_signal_containing_pattern(

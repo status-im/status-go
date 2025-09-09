@@ -26,7 +26,6 @@ type StatusBackend interface {
 		mnemonic string, // empty mnemonic is used for keycard account, not empty for regular account
 		keycardData *requests.KeycardData, // nil for regular account, not nil for keycard account
 		restoreAccount bool,
-		fetchBackup bool,
 	) (*multiaccounts.Account, error)
 	StartNodeWithAccountAndInitialConfig(
 		multiAccount *multiaccounts.Account,

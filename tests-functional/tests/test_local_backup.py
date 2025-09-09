@@ -122,7 +122,7 @@ class TestLocalBackup:
         )
 
         # Create another community
-        response = backend_client.rpc_valid_request(
+        result = backend_client.rpc_valid_request(
             "wakuext_createCommunity",
             [
                 {
@@ -144,8 +144,6 @@ class TestLocalBackup:
                 }
             ],
         )
-        jsonResponse = response.json()
-        result = response.json().get("result", {})
         assert result is not None, "Community creation failed"
         communities = result.get("communities", [])
         assert communities is not None, "Community was not created (None)"
@@ -157,9 +155,7 @@ class TestLocalBackup:
         backend_client.rpc_valid_request("wakuext_leaveCommunity", [community_id])
 
         # Create chats
-        response = backend_client.rpc_valid_request("wakuext_createGroupChatWithMembers", [None, "test-group-chat", []])
-        jsonResponse = response.json()
-        result = response.json().get("result", {})
+        result = backend_client.rpc_valid_request("wakuext_createGroupChatWithMembers", [None, "test-group-chat", []])
         assert result is not None, "Group chat creation failed"
         chats = result.get("chats", [])
         assert chats is not None, "Group chat was not created (None)"
@@ -167,21 +163,18 @@ class TestLocalBackup:
         group_chat_id = chats[0].get("id", "")
         assert group_chat_id != "", "Group chat ID was not returned"
 
-        backend_client.rpc_valid_request(
+        result = backend_client.rpc_valid_request(
             "wakuext_createOneToOneChat",
             [{"id": test_one_to_one_chat_id}],
         )
-        jsonResponse = response.json()
-        result = response.json().get("result", {})
+
         assert result is not None, "One-to-one chat creation failed"
         chats = result.get("chats", [])
         assert chats is not None, "One-to-one chat was not created (None)"
         assert len(chats) == 1, "One-to-one chat was not created (empty)"
 
         # Validate settings on the first backend client
-        response = backend_client.rpc_valid_request("settings_getSettings", [])
-        jsonResponse = response.json()
-        result = response.json().get("result", {})
+        result = backend_client.rpc_valid_request("settings_getSettings", [])
         assert result is not None, "Settings were not set"
         assert result.get("display-name") == "myname", "Display name setting was not set"
         assert result.get("bio") == "new bio", "Bio setting was not set"
@@ -192,18 +185,14 @@ class TestLocalBackup:
         assert result.get("mnemonic-removed?") is True, "Mnemonic setting was not set"
 
         # Validate profile showcase preferences
-        response = backend_client.rpc_valid_request("wakuext_getProfileShowcasePreferences", [])
-        jsonResponse = response.json()
-        result = response.json().get("result", {})
+        result = backend_client.rpc_valid_request("wakuext_getProfileShowcasePreferences", [])
         assert result is not None, "Profile showcase preferences were not set"
         assert result.get("clock") > 0, "Clock is 0 in the profile showcase preferences"
         profile_showcase_preferences["clock"] = result.get("clock")  # override clock for simpler comparison
         assert result == profile_showcase_preferences, "Profile showcase preferences were not set correctly"
 
         # Validate watchonly account
-        response = backend_client.rpc_valid_request("accounts_getAccounts", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", [])
+        result = backend_client.rpc_valid_request("accounts_getAccounts", [])
         assert result is not None, "Accounts were not restored"
         assert len(result) == 3, "Watchonly account was not restored"
         assert result[2].get("name") == "test-watchonly-account", "Watchonly account name was not set correctly"
@@ -211,16 +200,12 @@ class TestLocalBackup:
         assert result[2].get("type") == "watch", "Watchonly account type was not set correctly"
 
         # Validate contacts
-        response = backend_client.rpc_valid_request("wakuext_contacts", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", [])
+        result = backend_client.rpc_valid_request("wakuext_contacts", [])
         assert result is not None, "Contacts were not restored"
         assert len(result) == 2, "Contacts were not restored"
 
         # Validate communities
-        response = backend_client.rpc_valid_request("wakuext_communities", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", [])
+        result = backend_client.rpc_valid_request("wakuext_communities", [])
         assert result is not None, "Communities were not restored"
         assert len(result) == 2, "Communities were not restored correctly"
         assert result[0].get("name") == "Test Community", "Community name was not restored correctly"
@@ -230,9 +215,7 @@ class TestLocalBackup:
         assert not result[1].get("joined"), "Second community was not left correctly"
 
         # Validate chats
-        response = backend_client.rpc_valid_request("wakuext_chats", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", [])
+        result = backend_client.rpc_valid_request("wakuext_chats", [])
         assert result is not None, "Chats were not restored"
         group_chat_recovered = False
         one_on_one_chat_recovered = False
@@ -247,9 +230,8 @@ class TestLocalBackup:
         assert one_on_one_chat_recovered, "One-to-one chat was not restored correctly"
 
         # Perform the backup
-        response = backend_client.api_valid_request("PerformLocalBackup", "")
-        jsonResponse = response.json()
-        backup_path = jsonResponse.get("filePath", "")
+        response = backend_client.api_request_json("PerformLocalBackup", "")
+        backup_path = response.get("filePath", "")
 
         # Extract the backup file from the container
         backup_file = backend_client.extract_data(backup_path)
@@ -277,19 +259,15 @@ class TestLocalBackup:
         backend_client2.import_data(backup_file, "/usr/status-user/backups")
 
         # Import the backup file
-        response = backend_client2.api_valid_request("LoadLocalBackup", {"filePath": backup_path})
+        backend_client2.api_request_json("LoadLocalBackup", {"filePath": backup_path})
 
         # Validate profile settings
-        response = backend_client2.rpc_valid_request("multiaccounts_getIdentityImages", [backend_client2.key_uid])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", {})
+        result = backend_client2.rpc_valid_request("multiaccounts_getIdentityImages", [backend_client2.key_uid])
         assert result is not None, "Identity images were not restored"
         assert len(result) == 2, "Identity image was not restored"
 
         # Validate settings
-        response = backend_client2.rpc_valid_request("settings_getSettings", [])
-        jsonResponse = response.json()
-        result = response.json().get("result", {})
+        result = backend_client2.rpc_valid_request("settings_getSettings", [])
         assert result is not None, "Settings were not restored"
         # FIXME display name doesn't work because we set the display name when creating the account
         # and the clock is somehow too low, so the display name is not updated
@@ -302,18 +280,14 @@ class TestLocalBackup:
         assert result.get("mnemonic-removed?") is True, "Mnemonic setting was not restored"
 
         # Validate profile showcase preferences
-        response = backend_client2.rpc_valid_request("wakuext_getProfileShowcasePreferences", [])
-        jsonResponse = response.json()
-        result = response.json().get("result", {})
+        result = backend_client2.rpc_valid_request("wakuext_getProfileShowcasePreferences", [])
         assert result is not None, "Profile showcase preferences were not restored"
         assert result.get("clock") > 0, "Clock is 0 in the restored profile showcase preferences"
         profile_showcase_preferences["clock"] = result.get("clock")  # override clock for simpler comparison
         assert result == profile_showcase_preferences, "Profile showcase preferences were not restored correctly"
 
         # Validate watchonly account
-        response = backend_client2.rpc_valid_request("accounts_getAccounts", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", [])
+        result = backend_client2.rpc_valid_request("accounts_getAccounts", [])
         assert result is not None, "Accounts were not restored"
         assert len(result) == 3, "Watchonly account was not restored"
         assert result[2].get("name") == "test-watchonly-account", "Watch only account name was not restored correctly"
@@ -321,25 +295,19 @@ class TestLocalBackup:
         assert result[2].get("type") == "watch", "Watch only account type was not restored correctly"
 
         # Validate contacts
-        response = backend_client2.rpc_valid_request("wakuext_contacts", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", [])
+        result = backend_client2.rpc_valid_request("wakuext_contacts", [])
         assert result is not None, "Contacts were not restored"
         assert len(result) == 2, "Contacts were not restored correctly"
 
         # Validate communities
-        response = backend_client2.rpc_valid_request("wakuext_joinedCommunities", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", {})
+        result = backend_client2.rpc_valid_request("wakuext_joinedCommunities", [])
         assert result is not None, "Communities were not restored"
         assert len(result) == 1, "Communities were not restored correctly"
         assert result[0].get("name") == "Test Community", "Community name was not restored correctly"
         assert result[0].get("description") == "This is a test community", "Community description was not restored correctly"
 
         # Validate chats
-        response = backend_client2.rpc_valid_request("wakuext_chats", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", [])
+        result = backend_client2.rpc_valid_request("wakuext_chats", [])
         assert result is not None, "Chats were not restored"
         group_chat_recovered = False
         one_on_one_chat_recovered = False
@@ -385,20 +353,14 @@ class TestLocalBackup:
         # Import the backup file
         # This is the old backup file that does not contain the BackedUpProfile protobuf
         # This means that the display name, identity image and profile showcase preferences will not be restored
-        response = backend_client.api_valid_request(
-            "LoadLocalBackup", {"filePath": os.path.join("/usr/status-user/backups", "test_old_user_data.bkp")}
-        )
+        backend_client.api_request_json("LoadLocalBackup", {"filePath": os.path.join("/usr/status-user/backups", "test_old_user_data.bkp")})
 
         # This "old" backup file does not contain the identity image, so we expect it to be empty
-        response = backend_client.rpc_valid_request("multiaccounts_getIdentityImages", [backend_client.key_uid])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", {})
+        result = backend_client.rpc_valid_request("multiaccounts_getIdentityImages", [backend_client.key_uid])
         assert result is None, "Identity images shouldn't be restored from the old backup file"
 
         # Profile showcase preferences were not set in the old backup file, so we expect it to be empty
-        response = backend_client.rpc_valid_request("wakuext_getProfileShowcasePreferences", [])
-        jsonResponse = response.json()
-        result = response.json().get("result", {})
+        result = backend_client.rpc_valid_request("wakuext_getProfileShowcasePreferences", [])
         assert result is not None, "Profile showcase preferences were not restored"
         assert result.get("clock") == 0, "Clock should be 0 as it was not set in the old backup file"
         assert result.get("accounts") is None, "Accounts should not be set in the old backup file"
@@ -410,9 +372,7 @@ class TestLocalBackup:
 
         # The rest of the data should be restored correctly, so we can check the settings, watchonly account, contacts, communities and chats
         # Validate settings
-        response = backend_client.rpc_valid_request("settings_getSettings", [])
-        jsonResponse = response.json()
-        result = response.json().get("result", {})
+        result = backend_client.rpc_valid_request("settings_getSettings", [])
         assert result is not None, "Settings were not restored"
         assert result.get("bio") == "new bio", "Bio setting was not restored"
         assert result.get("preferred-name") == "new-prefered-name", "Preferred name setting was not restored"
@@ -422,9 +382,7 @@ class TestLocalBackup:
         assert result.get("mnemonic-removed?") is True, "Mnemonic setting was not restored"
 
         # Validate watchonly account
-        response = backend_client.rpc_valid_request("accounts_getAccounts", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", [])
+        result = backend_client.rpc_valid_request("accounts_getAccounts", [])
         assert result is not None, "Accounts were not restored"
         assert len(result) == 3, "Watchonly account was not restored"
         assert result[2].get("name") == "test-watchonly-account", "Watch only account name was not restored correctly"
@@ -432,25 +390,19 @@ class TestLocalBackup:
         assert result[2].get("type") == "watch", "Watch only account type was not restored correctly"
 
         # Validate contacts
-        response = backend_client.rpc_valid_request("wakuext_contacts", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", [])
+        result = backend_client.rpc_valid_request("wakuext_contacts", [])
         assert result is not None, "Contacts were not restored"
         assert len(result) == 2, "Contacts were not restored correctly"
 
         # Validate communities
-        response = backend_client.rpc_valid_request("wakuext_joinedCommunities", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", {})
+        result = backend_client.rpc_valid_request("wakuext_joinedCommunities", [])
         assert result is not None, "Communities were not restored"
         assert len(result) == 1, "Communities were not restored correctly"
         assert result[0].get("name") == "Test Community", "Community name was not restored correctly"
         assert result[0].get("description") == "This is a test community", "Community description was not restored correctly"
 
         # Validate chats
-        response = backend_client.rpc_valid_request("wakuext_chats", [])
-        jsonResponse = response.json()
-        result = jsonResponse.get("result", [])
+        result = backend_client.rpc_valid_request("wakuext_chats", [])
         assert result is not None, "Chats were not restored"
         # Chat ids are hardcoded becuase they are in the backup file, so we can check them directly
         test_group_chat_id = "1fb5f429-1e23-4156-b216-2799fa430742-0x045b1f2d9bfbbeee1f6995a2086de353399074073d213079d3e0dc2ddc1593e7c50e56aead4a42e25a76effa4208f842f9356f1a5c16aaf16c179ed020277a9901"  # noqa: E501

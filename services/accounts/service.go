@@ -111,13 +111,12 @@ func (s *Service) GetMessenger() *protocol.Messenger {
 	return s.messenger
 }
 
-func (s *Service) VerifyPassword(password string) bool {
+func (s *Service) VerifyPassword(password string) (bool, error) {
 	address, err := s.db.GetChatAddress()
 	if err != nil {
-		return false
+		return false, err
 	}
-	ok, err := s.manager.VerifyAccountPassword(address, password)
-	return ok && err == nil
+	return s.manager.VerifyAccountPassword(address, password)
 }
 
 func (s *Service) prepareSyncSettingsMessages(currentClock uint64, prepareForBackup bool) (resultSync []*protobuf.SyncSetting, errorResult error) {

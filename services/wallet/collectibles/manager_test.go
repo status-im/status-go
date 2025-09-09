@@ -17,6 +17,7 @@ import (
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	mock_collectibles "github.com/status-im/status-go/services/wallet/collectibles/mock"
+	mock_ownership "github.com/status-im/status-go/services/wallet/collectibles/ownership/mock"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	mock_community "github.com/status-im/status-go/services/wallet/community/mock"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -130,7 +131,7 @@ func TestManager_FetchAllAssetsByOwner(t *testing.T) {
 	communityManager.EXPECT().FillCollectiblesMetadata(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	communityManager.EXPECT().GetCommunityInfo(gomock.Any()).Return(&thirdparty.CommunityInfo{}, nil, nil).AnyTimes()
 
-	ownershipDB := mock_collectibles.NewMockOwnershipStorage(mockCtrl)
+	ownershipDB := mock_ownership.NewMockOwnershipStorage(mockCtrl)
 	ownershipDB.EXPECT().GetLatestOwnershipUpdateTimestamp(gomock.Any()).Return(int64(0), nil).AnyTimes()
 	ownershipDB.EXPECT().GetOwnership(gomock.Any()).Return([]thirdparty.AccountBalance{}, nil).AnyTimes()
 

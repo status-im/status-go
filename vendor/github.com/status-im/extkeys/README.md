@@ -11,7 +11,7 @@ Implementation of the following BIPs:
 - https://bitcoin.org/en/developer-guide#hardened-keys
 
 ## Reference Implementations
-- https://github.com/btcsuite/btcutil/tree/master/hdkeychain
+- https://github.com/btcsuite/btcd/tree/master/btcutil/hdkeychain
 - https://github.com/WeMeetAgain/go-hdwallet
 - https://github.com/ConsenSys/eth-lightwallet/blob/master/lib/keystore.js
 - https://github.com/bitpay/bitcore-lib/tree/master/lib

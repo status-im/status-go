@@ -8,7 +8,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/btcsuite/btcutil/base58"
+	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/gorilla/sessions"
 	"go.uber.org/zap"
 )

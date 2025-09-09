@@ -9,12 +9,16 @@ import requests
 import os
 
 from tenacity import retry, stop_after_delay, wait_fixed
+
+import resources.constants as constants
 from clients.services.wallet import WalletService
 from clients.services.wakuext import WakuextService, PushNotificationRegistrationTokenType
 from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
+from clients.services.connector import ConnectorService
 from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
+from clients.api import ApiClient
 from clients.metrics import Events, StatusGoMetrics
 from clients.expvar import ExpvarClient
 from clients.statusgo_container import StatusBackendContainer
@@ -25,7 +29,7 @@ from utils import keys
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
 
-class StatusBackend(RpcClient, SignalClient):
+class StatusBackend(RpcClient, SignalClient, ApiClient):
     container = None
 
     def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6, **kwargs):
@@ -42,20 +46,20 @@ class StatusBackend(RpcClient, SignalClient):
             assert url != "", "not enough status-backend urls provided"
             self.temp_dir = tempfile.TemporaryDirectory()
             self.data_dir = self.temp_dir.name
+            if kwargs.get("connector_enabled", False):
+                self.connector_ws_url = f"ws://localhost:{constants.STATUS_CONNECTOR_WS_PORT}"
         else:
-            host_port = random.choice(Config.status_backend_port_range)
-            Config.status_backend_port_range.remove(host_port)
-
-            self.container = StatusBackendContainer(host_port, privileged, self.ipv6, **kwargs)
+            self.container = StatusBackendContainer(privileged, self.ipv6, **kwargs)
             self.temp_dir = None
             self.data_dir = self.container.data_dir()
             url = self.container.url
+            if kwargs.get("connector_enabled", False):
+                self.connector_ws_url = self.container.connector_ws_url
 
         assert self.data_dir != ""
         self.base_url = url
         self.api_url = f"{url}/statusgo"
         self.ws_url = f"{url}".replace("http", "ws")
-        self.rpc_url = f"{url}/statusgo/CallRPC"
         self.public_key = ""
         self.mnemonic = ""
         self.key_uid = ""
@@ -67,7 +71,8 @@ class StatusBackend(RpcClient, SignalClient):
         self.events = Events()
         self.version = "unknown"
 
-        RpcClient.__init__(self, self.rpc_url)
+        RpcClient.__init__(self)
+        ApiClient.__init__(self, self.api_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
 
         self.wait_for_healthy()
@@ -78,6 +83,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.wakuext_service = WakuextService(self)
         self.accounts_service = AccountService(self)
         self.settings_service = SettingsService(self)
+        self.connector_service = ConnectorService(self)
         self.expvar_client = ExpvarClient(self.base_url)
 
     def __del__(self):
@@ -109,33 +115,6 @@ class StatusBackend(RpcClient, SignalClient):
     def health(self):
         return self.api_request("health", data=[], url=self.base_url, quiet=True)
 
-    def api_request(self, method, data, url=None, quiet=False):
-        url = url if url else self.api_url
-        url = f"{url}/{method}"
-        if not quiet:
-            logging.debug(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True)}")
-        response = requests.post(url, json=data)
-        if not quiet:
-            logging.debug(f"Got response: {response.content}")
-        return response
-
-    def verify_is_valid_api_response(self, response):
-        assert response.status_code == 200, f"Got response {response.content}, status code {response.status_code}"
-        assert response.content
-        logging.debug(f"Got response: {response.content}")
-        try:
-            error = response.json()["error"]
-            assert not error, f"Error: {error}"
-        except json.JSONDecodeError:
-            raise AssertionError(f"Invalid JSON in response: {response.content}")
-        except KeyError:
-            pass
-
-    def api_valid_request(self, method, data, url=None):
-        response = self.api_request(method, data, url)
-        self.verify_is_valid_api_response(response)
-        return response
-
     def init_status_backend(self):
         if Config.logout:
             logging.warning("automatically logging out before InitializeApplication")
@@ -156,7 +135,7 @@ class StatusBackend(RpcClient, SignalClient):
             "pushFleetsConfigFilePath": Config.push_fleets_config,
         }
 
-        return self.api_valid_request(method, data)
+        return self.api_request_json(method, data)
 
     def _set_networks(self, data, **kwargs):
         self.network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
@@ -270,6 +249,17 @@ class StatusBackend(RpcClient, SignalClient):
             # Waku config
             "wakuV2LightClient": kwargs.get("waku_light_client", False),
             "wakuV2Fleet": Config.waku_fleet,
+            # Connector config
+            "apiConfig": {
+                "apiModules": "connector",
+                "connectorEnabled": kwargs.get("connector_enabled", False),
+                "httpEnabled": False,
+                "httpHost": "0.0.0.0",
+                "httpPort": 0,
+                "wsEnabled": True,
+                "wsHost": "0.0.0.0",
+                "wsPort": constants.STATUS_CONNECTOR_WS_PORT,
+            },
         }
         if not Config.disable_override_networks:
             self._set_networks(data, **kwargs)
@@ -282,14 +272,14 @@ class StatusBackend(RpcClient, SignalClient):
         self._set_display_name(**kwargs)
         method = "CreateAccountAndLogin"
         data = self._create_account_request(user, **kwargs)
-        return self.api_valid_request(method, data)
+        return self.api_request_json(method, data)
 
     def restore_account_and_login(self, user=user_1, **kwargs):
         self._set_display_name(**kwargs)
         method = "RestoreAccountAndLogin"
         data = self._create_account_request(user, **kwargs)
         data["mnemonic"] = user.passphrase
-        return self.api_valid_request(method, data)
+        return self.api_request_json(method, data)
 
     def login(self, keyUid, user=user_1):
         self.password = user.password
@@ -301,11 +291,11 @@ class StatusBackend(RpcClient, SignalClient):
         }
         data = self._set_proxy_credentials(data)
         data = self._set_wallet_secrets(data)
-        return self.api_valid_request(method, data)
+        return self.api_request_json(method, data)
 
     def logout(self):
         method = "Logout"
-        return self.api_valid_request(method, {})
+        return self.api_request_json(method, {})
 
     def wait_for_login(self):
         signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
@@ -348,8 +338,8 @@ class StatusBackend(RpcClient, SignalClient):
     def wait_for_online(self, timeout=10):
         start_time = time.time()
         while time.time() - start_time <= timeout:
-            response = self.wakuext_service.peers(enable_logging=False)
-            if len(response["result"].keys()) == 0:
+            response = self.wakuext_service.peers()
+            if len(response.keys()) == 0:
                 time.sleep(0.5)
                 continue
             logging.info(f"StatusBackend is online after {time.time() - start_time} seconds")
@@ -389,8 +379,7 @@ class StatusBackend(RpcClient, SignalClient):
                 "clientConfig": {},
             },
         }
-        response = self.api_valid_request(method, data)
-        return json.loads(response.content)
+        return self.api_request_json(method, data)
 
     def get_connection_string_for_being_bootstrapped(self):
         method = "GetConnectionStringForBeingBootstrapped"
@@ -427,8 +416,7 @@ class StatusBackend(RpcClient, SignalClient):
                 "clientConfig": {},
             },
         }
-        response = self.api_request(method, data)
-        return json.loads(response.content)
+        return self.api_request_json(method, data)
 
     def gather_metrics(self):
         if not self.container:
@@ -452,3 +440,12 @@ class StatusBackend(RpcClient, SignalClient):
     def free_os_memory(self):
         url = f"{self.base_url}/statusgo/debug/FreeOSMemory"
         requests.post(url)
+
+    def change_database_password(self, old_password, new_password):
+        method = "ChangeDatabasePasswordV2"
+        data = {
+            "keyUid": self.key_uid,
+            "oldPassword": old_password,
+            "newPassword": new_password,
+        }
+        return self.api_request_json(method, data)

@@ -113,19 +113,26 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 // - "latest", "earliest" or "pending" as strings
 // - other numbers as hex
 func (bn BlockNumber) MarshalText() ([]byte, error) {
+	return []byte(bn.String()), nil
+}
+
+func (bn BlockNumber) String() string {
 	switch bn {
 	case EarliestBlockNumber:
-		return []byte("earliest"), nil
+		return "earliest"
 	case LatestBlockNumber:
-		return []byte("latest"), nil
+		return "latest"
 	case PendingBlockNumber:
-		return []byte("pending"), nil
+		return "pending"
 	case FinalizedBlockNumber:
-		return []byte("finalized"), nil
+		return "finalized"
 	case SafeBlockNumber:
-		return []byte("safe"), nil
+		return "safe"
 	default:
-		return hexutil.Uint64(bn).MarshalText()
+		if bn < 0 {
+			return fmt.Sprintf("<invalid %d>", bn)
+		}
+		return hexutil.Uint64(bn).String()
 	}
 }
 

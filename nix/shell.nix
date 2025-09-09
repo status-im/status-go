@@ -12,11 +12,6 @@ let
       versions = [ ];
   };
 
-  /* Gomobile also needs the Xcode wrapper. */
-  gomobileMod = pkgs.gomobile.override {
-    inherit xcodeWrapper;
-    withAndroidPkgs = !isMacM1;
-  };
   /* Override the default SDK to enable darwin-x86_64 builds */
   appleSdk11Stdenv = pkgs.overrideSDK pkgs.stdenv "11.0";
   sdk11mkShell = pkgs.mkShell.override { stdenv = appleSdk11Stdenv; };
@@ -27,7 +22,7 @@ in mkShell {
 
   buildInputs = with pkgs; [
     git jq which
-    go golangci-lint go-junit-report gopls go-bindata gomobileMod codecov-cli go-generate-fast
+    go golangci-lint go-junit-report gopls go-bindata codecov-cli go-generate-fast
     mockgen protobuf3_24 protoc-gen-go gotestsum go-modvendor openjdk openssl
    ] ++ lib.optionals (stdenv.isDarwin) [ xcodeWrapper ];
 

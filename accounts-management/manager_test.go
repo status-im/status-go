@@ -20,7 +20,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
 
 	customerrors "github.com/status-im/status-go/accounts-management/errors"
 )

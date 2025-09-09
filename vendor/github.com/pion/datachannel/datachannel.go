@@ -35,6 +35,11 @@ type Writer interface {
 	WriteDataChannel([]byte, bool) (int, error)
 }
 
+// WriteDeadliner extends an io.Writer to expose setting a write deadline.
+type WriteDeadliner interface {
+	SetWriteDeadline(time.Time) error
+}
+
 // ReadWriteCloser is an extended io.ReadWriteCloser
 // that also implements our Reader and Writer.
 type ReadWriteCloser interface {
@@ -43,6 +48,14 @@ type ReadWriteCloser interface {
 	Reader
 	Writer
 	io.Closer
+}
+
+// ReadWriteCloserDeadliner is an extended ReadWriteCloser
+// that also implements r/w deadline.
+type ReadWriteCloserDeadliner interface {
+	ReadWriteCloser
+	ReadDeadliner
+	WriteDeadliner
 }
 
 // DataChannel represents a data channel
@@ -118,12 +131,7 @@ func Client(stream *sctp.Stream, config *Config) (*DataChannel, error) {
 			return nil, fmt.Errorf("failed to send ChannelOpen %w", err)
 		}
 	}
-	dc := newDataChannel(stream, config)
-
-	if err := dc.commitReliabilityParams(); err != nil {
-		return nil, err
-	}
-	return dc, nil
+	return newDataChannel(stream, config), nil
 }
 
 // Accept is used to accept incoming data channels over SCTP
@@ -229,6 +237,12 @@ func (c *DataChannel) SetReadDeadline(t time.Time) error {
 	return c.stream.SetReadDeadline(t)
 }
 
+// SetWriteDeadline sets a deadline for writes to return,
+// only available if the BlockWrite is enabled for sctp
+func (c *DataChannel) SetWriteDeadline(t time.Time) error {
+	return c.stream.SetWriteDeadline(t)
+}
+
 // MessagesSent returns the number of messages sent
 func (c *DataChannel) MessagesSent() uint32 {
 	return atomic.LoadUint32(&c.messagesSent)
@@ -285,6 +299,9 @@ func (c *DataChannel) handleDCEP(data []byte) error {
 
 	switch msg := msg.(type) {
 	case *channelAck:
+		if err := c.commitReliabilityParams(); err != nil {
+			return err
+		}
 		c.onOpenComplete()
 	default:
 		return fmt.Errorf("%w, wanted ACK got %v", ErrUnexpectedDataChannelType, msg)

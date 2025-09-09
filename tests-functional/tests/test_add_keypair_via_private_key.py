@@ -1,5 +1,7 @@
+import re
 import pytest
 from resources.constants import user_1, user_2
+from clients.api import ApiResponseError
 
 KEYPAIR_NAME = "PrivateKeyImportedKeypair"
 WALLET_ACCOUNT_DETAILS = {
@@ -21,7 +23,7 @@ class TestAddKeypairViaPrivateKey:
         add_keypair_response = self.account.accounts_service.add_keypair_via_private_key(
             user_1.private_key, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS
         )
-        add_keypair_result = add_keypair_response.get("result")
+        add_keypair_result = add_keypair_response
         accounts = add_keypair_result.get("accounts")
         assert len(accounts) == 1
         new_keypair = accounts[0]
@@ -43,7 +45,7 @@ class TestAddKeypairViaPrivateKey:
 
         # Fetch keypairs and ensure the imported one is present
         get_keypairs_response = self.account.accounts_service.get_account_keypairs()
-        imported_keypairs = [keypair for keypair in get_keypairs_response.get("result", []) if keypair.get("name") == KEYPAIR_NAME]
+        imported_keypairs = [keypair for keypair in get_keypairs_response if keypair.get("name") == KEYPAIR_NAME]
         assert len(imported_keypairs) == 1
         assert add_keypair_result.get("key-uid") == imported_keypairs[0].get("key-uid")
         assert add_keypair_result.get("type") == imported_keypairs[0].get("type")
@@ -56,7 +58,7 @@ class TestAddKeypairViaPrivateKey:
         self.account.accounts_service.add_keypair_via_private_key(user_2.private_key, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
 
         keypairs_response = self.account.accounts_service.get_account_keypairs()
-        imported_keypairs = [keypair for keypair in keypairs_response.get("result", []) if keypair.get("name") == KEYPAIR_NAME]
+        imported_keypairs = [keypair for keypair in keypairs_response if keypair.get("name") == KEYPAIR_NAME]
         assert len(imported_keypairs) == 2, "2 keypairs with the same name should be saved"
 
     def test_add_duplicate_keypair_via_pk(self):
@@ -65,10 +67,8 @@ class TestAddKeypairViaPrivateKey:
         )
 
         # same private key
-        resp2 = self.account.accounts_service.add_keypair_via_private_key(
-            user_1.private_key, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS
-        )
-        assert resp2.get("error").get("message") == f'[validation] keypair already added -  keyuid: {resp1.get("result").get("key-uid")}'
+        with pytest.raises(ApiResponseError, match=re.escape(f'[validation] keypair already added -  keyuid: {resp1.get("key-uid")}')):
+            self.account.accounts_service.add_keypair_via_private_key(user_1.private_key, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
 
     def test_add_keypair_via_pk_with_wrong_path(self):
         details = {
@@ -77,12 +77,11 @@ class TestAddKeypairViaPrivateKey:
             "emoji": "🔑",
             "colorId": "primary",
         }
-        resp = self.account.accounts_service.add_keypair_via_private_key(user_1.private_key, self.account.password, KEYPAIR_NAME, details)
-        assert (
-            resp.get("error").get("message")
-            == f'[validation] unsupported profile or seed imported key pair wallet account -  path: {details["path"]} expected path: m'
-        )
+        with pytest.raises(
+            ApiResponseError,
+            match=re.escape(f'[validation] unsupported profile or seed imported key pair wallet account -  path: {details["path"]} expected path: m'),
+        ):
+            self.account.accounts_service.add_keypair_via_private_key(user_1.private_key, self.account.password, KEYPAIR_NAME, details)
 
     def test_add_keypair_via_pk_with_empty_password(self):
-        resp = self.account.accounts_service.add_keypair_via_private_key(user_1.private_key, "", KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
-        assert "error" not in resp
+        self.account.accounts_service.add_keypair_via_private_key(user_1.private_key, "", KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)

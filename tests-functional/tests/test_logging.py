@@ -30,8 +30,8 @@ class TestLogging:
         backend_client.wait_for_login()
 
         # Configure logging
-        backend_client.api_valid_request("SetLogLevel", {"logLevel": "ERROR"})
-        backend_client.api_valid_request("SetLogNamespaces", {"logNamespaces": "test1.test2:debug,test1.test2.test3:info"})
+        backend_client.api_request_json("SetLogLevel", {"logLevel": "ERROR"})
+        backend_client.api_request_json("SetLogNamespaces", {"logNamespaces": "test1.test2:debug,test1.test2.test3:info"})
 
         log_pattern = [
             r"DEBUG\s+test1\.test2\s+",
@@ -54,13 +54,13 @@ class TestLogging:
         self.expect_logs(profile_log, "test message", log_pattern, count=1)
 
         # Disable logging
-        backend_client.api_valid_request("SetLogEnabled", {"enabled": False})
+        backend_client.api_request_json("SetLogEnabled", {"enabled": False})
         backend_client.rpc_valid_request("wakuext_logTest")
         profile_log = backend_client.extract_data(log_path)
         self.expect_logs(profile_log, "test message", log_pattern, count=1)
 
         # Enable logging
-        backend_client.api_valid_request("SetLogEnabled", {"enabled": True})
+        backend_client.api_request_json("SetLogEnabled", {"enabled": True})
         backend_client.rpc_valid_request("wakuext_logTest")
         profile_log = backend_client.extract_data(log_path)
         self.expect_logs(profile_log, "test message", log_pattern, count=2)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 )
@@ -20,8 +21,8 @@ func TestNewConfigFromJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	json := `{
 		"NetworkId": 3,
-		"DataDir": "` + tmpDir + `",
-		"KeycardPairingDataFile": "` + path.Join(tmpDir, "keycard/pairings.json") + `",
+		"RootDataDir": "` + tmpDir + `",
+		"KeycardPairingDataFile": "` + path.Join(tmpDir, api.DefaultKeycardPairingDataFileRelativePath) + `",
 		"TorrentConfig": {
 			"Port": 9025,
 			"Enabled": false,
@@ -33,7 +34,7 @@ func TestNewConfigFromJSON(t *testing.T) {
 	c, err := params.NewConfigFromJSON(json)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), c.NetworkID)
-	require.Equal(t, tmpDir, c.DataDir)
+	require.Equal(t, tmpDir, c.RootDataDir)
 	require.Equal(t, false, c.TorrentConfig.Enabled)
 	require.Equal(t, 9025, c.TorrentConfig.Port)
 	require.Equal(t, tmpDir+"/archivedata", c.TorrentConfig.DataDir)
@@ -55,7 +56,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"RootDataDir": "/tmp/data",
-				"DataDir": "/tmp/data",
 				"KeycardPairingDataFile": "/tmp/data/keycard/pairings.json"
 			}`,
 		},
@@ -74,7 +74,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{}`,
 			FieldErrors: map[string]string{
 				"NetworkID":              "required",
-				"DataDir":                "required",
 				"KeycardPairingDataFile": "required",
 			},
 		},
@@ -82,7 +81,7 @@ func TestNodeConfigValidate(t *testing.T) {
 			Name: "Validate that NodeKey is checked for validity",
 			Config: `{
 				"NetworkId": 1,
-				"DataDir": "/some/dir",
+				"RootDataDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"NodeKey": "foo"
 			}`,
@@ -92,7 +91,7 @@ func TestNodeConfigValidate(t *testing.T) {
 			Name: "Validate that UpstreamConfig.URL is not validated if UpstreamConfig is disabled",
 			Config: `{
 				"NetworkId": 1,
-				"DataDir": "/some/dir",
+				"RootDataDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"UpstreamConfig": {
 					"Enabled": false,
@@ -104,7 +103,7 @@ func TestNodeConfigValidate(t *testing.T) {
 			Name: "Validate that UpstreamConfig.URL validation passes if UpstreamConfig.URL is valid",
 			Config: `{
 				"NetworkId": 1,
-				"DataDir": "/some/dir",
+				"RootDataDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"UpstreamConfig": {
 					"Enabled": true,
@@ -116,7 +115,7 @@ func TestNodeConfigValidate(t *testing.T) {
 			Name: "Validate that PFSEnabled & InstallationID are checked for validity",
 			Config: `{
 				"NetworkId": 1,
-				"DataDir": "/some/dir",
+				"RootDataDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"ShhextConfig": {
 					"PFSEnabled": true
@@ -140,7 +139,7 @@ func TestNodeConfigValidate(t *testing.T) {
 			Name: "Set HTTP virtual hosts and CORS",
 			Config: `{
 				"NetworkId": 1,
-				"DataDir": "/some/dir",
+				"RootDataDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"HTTPVirtualHosts": ["my.domain.com"],
 				"HTTPCors": ["http://my.domain.com:8080"]
@@ -160,7 +159,7 @@ func TestNodeConfigValidate(t *testing.T) {
 		},
 		{
 			Name:   "Missing APIModules",
-			Config: `{"NetworkId": 1, "DataDir": "/tmp/data", "KeycardPairingDataFile": "/tmp/data/keycard/pairings.json", "APIModules" :""}`,
+			Config: `{"NetworkId": 1, "RootDataDir": "/tmp/data", "KeycardPairingDataFile": "/tmp/data/keycard/pairings.json", "APIModules" :""}`,
 			FieldErrors: map[string]string{
 				"APIModules": "required",
 			},
@@ -169,7 +168,7 @@ func TestNodeConfigValidate(t *testing.T) {
 			Name: "Validate that TorrentConfig.DataDir and TorrentConfig.TorrentDir can't be empty strings",
 			Config: `{
 				"NetworkId": 1,
-				"DataDir": "/some/dir",
+				"RootDataDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
         "TorrentConfig": {
           "Enabled": true,
@@ -213,17 +212,16 @@ func TestNodeConfigValidate(t *testing.T) {
 
 func TestMarshalWalletConfigJSON(t *testing.T) {
 	walletConfig := params.WalletConfig{
-		OpenseaAPIKey:        security.NewSensitiveString(gofakeit.LetterN(10)),
 		RaribleMainnetAPIKey: security.NewSensitiveString(gofakeit.LetterN(10)),
 	}
 	bytes, err := json.Marshal(walletConfig)
 	require.NoError(t, err)
 	// check if sensitive fields are not present
-	require.NotContains(t, string(bytes), "OpenseaAPIKey")
+	require.NotContains(t, string(bytes), "RaribleMainnetAPIKey")
 
 	// check if deserializing are still working with sensitive fields
 	walletConfig = params.WalletConfig{}
-	err = json.Unmarshal([]byte(`{"OpenseaAPIKey":"some-key"}`), &walletConfig)
+	err = json.Unmarshal([]byte(`{"RaribleMainnetAPIKey":"some-key"}`), &walletConfig)
 	require.NoError(t, err)
-	require.Equal(t, "some-key", walletConfig.OpenseaAPIKey.Reveal())
+	require.Equal(t, "some-key", walletConfig.RaribleMainnetAPIKey.Reveal())
 }

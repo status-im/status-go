@@ -1,6 +1,8 @@
 import copy
+import re
 import pytest
 from resources.constants import new_account_data_1
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -16,34 +18,34 @@ class TestDeleteAccount:
         self.account.accounts_service.add_account("", self.account_data)
 
         accounts_response = self.account.accounts_service.get_accounts()
-        assert len(accounts_response.get("result", [])) == 3
+        assert len(accounts_response) == 3
 
         resp = self.account.accounts_service.delete_account(self.account_data["address"], "")
-        assert resp["result"] is None
+        assert resp is None
 
         accounts_response = self.account.accounts_service.get_accounts()
-        assert len(accounts_response.get("result", [])) == 2
+        assert len(accounts_response) == 2
 
     def test_delete_default_chat_account(self):
         accounts_response = self.account.accounts_service.get_accounts()
-        assert len(accounts_response.get("result", [])) == 2
+        assert len(accounts_response) == 2
 
-        resp = self.account.accounts_service.delete_account(accounts_response.get("result")[0].get("address"), self.account.password)
-        assert resp.get("error").get("message") == "[database] cannot remove default chat account"
+        with pytest.raises(ApiResponseError, match=re.escape("[database] cannot remove default chat account")):
+            self.account.accounts_service.delete_account(accounts_response[0].get("address"), self.account.password)
 
         accounts_response = self.account.accounts_service.get_accounts()
-        assert len(accounts_response.get("result", [])) == 2
+        assert len(accounts_response) == 2
 
     def test_delete_default_wallet_account(self):
         accounts_response = self.account.accounts_service.get_accounts()
-        assert len(accounts_response.get("result", [])) == 2
+        assert len(accounts_response) == 2
 
-        resp = self.account.accounts_service.delete_account(accounts_response.get("result")[1].get("address"), self.account.password)
-        assert resp.get("error").get("message") == "[database] cannot remove default wallet account"
+        with pytest.raises(ApiResponseError, match=re.escape("[database] cannot remove default wallet account")):
+            self.account.accounts_service.delete_account(accounts_response[1].get("address"), self.account.password)
 
         accounts_response = self.account.accounts_service.get_accounts()
-        assert len(accounts_response.get("result", [])) == 2
+        assert len(accounts_response) == 2
 
     def test_delete_nonexistent_account(self):
-        resp = self.account.accounts_service.delete_account("0x0000000000000000000000000000000000000001", self.account.password)
-        assert resp.get("error").get("message") == "accounts: account is not found"
+        with pytest.raises(ApiResponseError, match=re.escape("accounts: account is not found")):
+            self.account.accounts_service.delete_account("0x0000000000000000000000000000000000000001", self.account.password)

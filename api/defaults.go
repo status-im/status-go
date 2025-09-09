@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -26,10 +25,9 @@ const (
 	defaultMnemonicLength    = 12
 	walletAccountDefaultName = "Account 1"
 
-	DefaultKeystoreRelativePath   = "keystore"
-	DefaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
-	DefaultDataDir                = "/ethereum/mainnet_rpc"
-	DefaultAPILogFile             = "api.log"
+	DefaultKeystoreRelativePath               = "keystore"
+	DefaultKeycardPairingDataFileRelativePath = "/keycard/pairings.json"
+	DefaultAPILogFile                         = "api.log"
 
 	DefaultLogLevel                 = "ERROR"
 	DefaultVerifyTransactionChainID = 1
@@ -48,7 +46,6 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	chatKeyString := derivedAddresses[accscommon.PathEIP1581Chat].PublicKey
 
 	s := &settings.Settings{}
-	s.BackupEnabled = true
 	logLevel := "INFO"
 	s.LogLevel = &logLevel
 	s.ProfilePicturesShowTo = settings.ProfilePicturesShowToEveryone
@@ -154,7 +151,6 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	walletConfig := params.WalletConfig{
 		Enabled:                true,
 		EnableMercuryoProvider: true,
-		AlchemyAPIKeys:         make(map[uint64]security.SensitiveString),
 
 		TokensListsAutoRefreshCheckInterval: walletRequest.TokensListsAutoRefreshCheckInterval,
 		TokensListsAutoRefreshInterval:      walletRequest.TokensListsAutoRefreshInterval,
@@ -162,10 +158,6 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 
 	if request.StatusProxyStageName != "" {
 		walletConfig.StatusProxyStageName = request.StatusProxyStageName
-	}
-
-	if !request.OpenseaAPIKey.Empty() {
-		walletConfig.OpenseaAPIKey = request.OpenseaAPIKey
 	}
 
 	if !request.RaribleMainnetAPIKey.Empty() {
@@ -184,30 +176,10 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 		walletConfig.InfuraAPIKeySecret = request.InfuraSecret
 	}
 
-	if !request.AlchemyEthereumMainnetToken.Empty() {
-		walletConfig.AlchemyAPIKeys[walletcommon.EthereumMainnet] = request.AlchemyEthereumMainnetToken
+	if !request.AlchemyAPIKey.Empty() {
+		walletConfig.AlchemyAPIKey = request.AlchemyAPIKey
 	}
-	if !request.AlchemyEthereumSepoliaToken.Empty() {
-		walletConfig.AlchemyAPIKeys[walletcommon.EthereumSepolia] = request.AlchemyEthereumSepoliaToken
-	}
-	if !request.AlchemyArbitrumMainnetToken.Empty() {
-		walletConfig.AlchemyAPIKeys[walletcommon.ArbitrumMainnet] = request.AlchemyArbitrumMainnetToken
-	}
-	if !request.AlchemyArbitrumSepoliaToken.Empty() {
-		walletConfig.AlchemyAPIKeys[walletcommon.ArbitrumSepolia] = request.AlchemyArbitrumSepoliaToken
-	}
-	if !request.AlchemyOptimismMainnetToken.Empty() {
-		walletConfig.AlchemyAPIKeys[walletcommon.OptimismMainnet] = request.AlchemyOptimismMainnetToken
-	}
-	if !request.AlchemyOptimismSepoliaToken.Empty() {
-		walletConfig.AlchemyAPIKeys[walletcommon.OptimismSepolia] = request.AlchemyOptimismSepoliaToken
-	}
-	if !request.AlchemyBaseMainnetToken.Empty() {
-		walletConfig.AlchemyAPIKeys[walletcommon.BaseMainnet] = request.AlchemyBaseMainnetToken
-	}
-	if !request.AlchemyBaseSepoliaToken.Empty() {
-		walletConfig.AlchemyAPIKeys[walletcommon.BaseSepolia] = request.AlchemyBaseSepoliaToken
-	}
+
 	if !request.StatusProxyMarketUser.Empty() {
 		walletConfig.StatusProxyMarketUser = request.StatusProxyMarketUser
 	}
@@ -293,9 +265,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	nodeConfig.LogFile = gocommon.TruncateWithDot(keyUID) + ".log"
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = DefaultLogLevel
-	nodeConfig.DataDir = DefaultDataDir
-	nodeConfig.ProcessBackedupMessages = false
-	nodeConfig.KeycardPairingDataFile = DefaultKeycardPairingDataFile
+	nodeConfig.KeycardPairingDataFile = filepath.Join(nodeConfig.RootDataDir, DefaultKeycardPairingDataFileRelativePath)
 	if request.KeycardPairingDataFile != nil {
 		nodeConfig.KeycardPairingDataFile = *request.KeycardPairingDataFile
 	}

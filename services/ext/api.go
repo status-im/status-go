@@ -1185,12 +1185,12 @@ func (api *PublicAPI) ToggleNewsRSSEnabled(value bool) error {
 	return m.ToggleNewsRSSEnabled(value)
 }
 
-func (api *PublicAPI) RequestAllHistoricMessages(forceFetchingBackup bool) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAllHistoricMessages(forceFetchingBackup, false)
+func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RequestAllHistoricMessages(false)
 }
 
-func (api *PublicAPI) RequestAllHistoricMessagesWithRetries(forceFetchingBackup bool) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAllHistoricMessages(forceFetchingBackup, true)
+func (api *PublicAPI) RequestAllHistoricMessagesWithRetries() (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RequestAllHistoricMessages(true)
 }
 
 // Echo is a method for testing purposes.
@@ -1300,10 +1300,6 @@ func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings.ProfilePicturesS
 	}
 
 	return api.service.messenger.PublishIdentityImage()
-}
-
-func (api *PublicAPI) BackupData() (uint64, error) {
-	return api.service.messenger.BackupData(context.Background())
 }
 
 func (api *PublicAPI) ImageServerURL() string {
@@ -1630,4 +1626,8 @@ func (api *PublicAPI) GetCommunityMemberAllMessages(request *requests.CommunityM
 // Delete a specific community member messages or all community member messages (based on provided parameters)
 func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
+}
+
+func (api *PublicAPI) PeerID() string {
+	return api.service.messaging.PeerID().String()
 }

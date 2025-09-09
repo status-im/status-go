@@ -10,6 +10,7 @@ import docker
 import docker.errors
 from docker.errors import APIError
 
+import resources.constants as constants
 from clients.metrics import ContainerStats
 from utils.config import Config
 
@@ -20,7 +21,7 @@ class StatusGoContainer:
     all_containers = []
     container = None
 
-    def __init__(self, entrypoint, ports=None, privileged=False, container_name_suffix=""):
+    def __init__(self, cmd, ports=None, privileged=False, container_name_suffix=""):
         if ports is None:
             ports = {}
 
@@ -52,9 +53,10 @@ class StatusGoContainer:
             "detach": True,
             "privileged": privileged,
             "name": self.container_name,
-            "labels": {"com.docker.compose.project": docker_project_name},  # TODO: Is this still needed?
+            "labels": {"com.docker.compose.project": docker_project_name},
             "environment": {
                 "GOCOVERDIR": "/coverage/binary",
+                "SCAN_WAKU_FLEET": self.get_waku_fleet_scan_command(),
             },
             "volumes": {
                 coverage_path: {
@@ -65,9 +67,10 @@ class StatusGoContainer:
             "extra_hosts": {
                 "host.docker.internal": "host-gateway",
             },
-            "entrypoint": entrypoint,
+            "command": cmd,
             "ports": ports,
             "stop_signal": "SIGINT",
+            "network": self.network_name,
         }
 
         if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
@@ -85,8 +88,23 @@ class StatusGoContainer:
 
         logging.debug(f"Container {self.container.name} created. ID = {self.container.id}")
 
-        network = self.docker_client.networks.get(self.network_name)
-        network.connect(self.container)
+    def get_waku_fleet_scan_command(self):
+        """Returns the command string for scanning Waku fleet and generating config"""
+
+        # Known node names from docker compose
+        bootstrap_nodes = "boot-1"
+        static_nodes = "boot-1"  # Add bootnode, otherwise metadata exchange doesn't happen, and Waku light mode doesn't work
+        store_nodes = "store"
+
+        return (
+            "python3 /usr/local/bin/scan_waku_fleet.py "
+            f"--fleet-name {Config.waku_fleet} "
+            f"--cluster-id 16 "  # Cluster ID matches docker-compose.waku.yml
+            f"--bootstrap-nodes {bootstrap_nodes} "
+            f"--store-nodes {store_nodes} "
+            f"--static-nodes {static_nodes} "
+            f"--output {Config.waku_fleets_config}"
+        )
 
     def __del__(self):
         self.stop()
@@ -307,6 +325,12 @@ class StatusGoContainer:
             logs = self.container.logs()
             f.write(logs)
 
+    @staticmethod
+    def acquire_port():
+        host_port = random.choice(Config.status_backend_port_range)
+        Config.status_backend_port_range.remove(host_port)
+        return host_port
+
 
 class PushNotificationServerContainer(StatusGoContainer):
     def __init__(self, identity, gorush_port):
@@ -329,7 +353,12 @@ class PushNotificationServerContainer(StatusGoContainer):
 
 
 class StatusBackendContainer(StatusGoContainer):
-    def __init__(self, host_port: int, privileged=False, ipv6=False, **kwargs):
+    def __init__(self, privileged=False, ipv6=False, **kwargs):
+        connector_enabled = kwargs.get("connector_enabled", False)
+
+        host_port = StatusGoContainer.acquire_port()
+        connector_ws_port = StatusGoContainer.acquire_port() if connector_enabled else 0
+
         container_port = 3333
         entrypoint = [
             "status-backend",
@@ -340,7 +369,6 @@ class StatusBackendContainer(StatusGoContainer):
         ]
 
         self.ipv6 = ipv6
-        self.url = f"http://{'[::1]' if ipv6 else '127.0.0.1'}:{host_port}"
 
         if ipv6:
             ports = {
@@ -348,10 +376,19 @@ class StatusBackendContainer(StatusGoContainer):
                     {"HostIp": "::", "HostPort": str(host_port)},
                 ]
             }
+            if connector_enabled:
+                ports[f"{constants.STATUS_CONNECTOR_WS_PORT}/tcp"] = [{"HostIp": "::", "HostPort": str(connector_ws_port)}]
+
+            self.url = f"http://[::1]:{host_port}"
+            self.connector_ws_url = f"ws://[::1]:{connector_ws_port}"
         else:
             ports = {
                 f"{container_port}/tcp": str(host_port),
             }
+            if connector_enabled:
+                ports[f"{constants.STATUS_CONNECTOR_WS_PORT}/tcp"] = str(connector_ws_port)
+            self.url = f"http://127.0.0.1:{host_port}"
+            self.connector_ws_url = f"ws://127.0.0.1:{connector_ws_port}"
 
         super().__init__(entrypoint, ports, privileged, container_name_suffix=f"-status-backend-{host_port}")
 
