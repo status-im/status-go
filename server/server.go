@@ -6,7 +6,9 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
+	"strconv"
 
 	"go.uber.org/zap"
 
@@ -14,8 +16,13 @@ import (
 )
 
 type Config struct {
-	Cert *tls.Certificate
-	Addr *net.TCPAddr
+	Cert     *tls.Certificate
+	AddrPort netip.AddrPort
+
+	// AdvertizeHost and AdvertizePort define the a different host/port to be advertized in media URLs than the one server listen on.
+	// Can be used when status-go is running behind a NAT/PAT. If empty/zero, the actual listening address is used.
+	AdvertizeHost string
+	AdvertizePort int
 }
 
 type Server struct {
@@ -61,16 +68,16 @@ func (s *Server) GetLogger() *zap.Logger {
 func (s *Server) createListener() (net.Listener, error) {
 	if s.config.Cert == nil {
 		// HTTP mode
-		return net.Listen("tcp", s.config.Addr.String())
+		return net.Listen("tcp", s.config.AddrPort.String())
 	}
 
 	// HTTPS mode
 	cfg := &tls.Config{
 		Certificates: []tls.Certificate{*s.config.Cert},
-		ServerName:   s.config.Addr.IP.String(),
+		ServerName:   s.config.AddrPort.Addr().String(),
 		MinVersion:   tls.VersionTLS12,
 	}
-	return tls.Listen("tcp", s.config.Addr.String(), cfg)
+	return tls.Listen("tcp", s.config.AddrPort.String(), cfg)
 }
 
 func (s *Server) listen() error {
@@ -101,6 +108,7 @@ func (s *Server) serve() {
 	s.isRunning = true
 	defer func() {
 		s.isRunning = false
+		s.address = nil
 	}()
 
 	err := s.server.Serve(s.listener)
@@ -132,6 +140,10 @@ func (s *Server) applyHandlers() {
 }
 
 func (s *Server) Start() error {
+	if s.isRunning {
+		return nil
+	}
+
 	// Once Shutdown has been called on a server, it may not be reused;
 	s.resetServer()
 	s.applyHandlers()
@@ -191,9 +203,27 @@ func (s *Server) AddHandlers(handlers HandlerPatternMap) {
 }
 
 func (s *Server) MakeBaseURL() *url.URL {
-	isHTTPS := s.config != nil && s.config.Cert != nil
+	if s.address == nil {
+		return &url.URL{}
+	}
+
+	scheme := "http"
+	if s.config != nil && s.config.Cert != nil {
+		scheme = "https"
+	}
+
+	host := s.address.IP.String()
+	if s.config != nil && s.config.AdvertizeHost != "" {
+		host = s.config.AdvertizeHost
+	}
+
+	port := s.address.Port
+	if s.config != nil && s.config.AdvertizePort != 0 {
+		port = s.config.AdvertizePort
+	}
+
 	return &url.URL{
-		Scheme: map[bool]string{true: "http", false: "https"}[isHTTPS],
-		Host:   s.address.String(),
+		Scheme: scheme,
+		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
 	}
 }

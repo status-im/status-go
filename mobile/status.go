@@ -109,7 +109,12 @@ func initializeApplication(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	statusBackend.StatusNode().SetMediaServerOptions(request.MediaServerAddress, request.MediaServerEnableTLS)
+	statusBackend.StatusNode().SetMediaServerOptions(
+		request.MediaServerAddress,
+		request.MediaServerEnableTLS,
+		request.MediaServerAdvertizeHost,
+		request.MediaServerAdvertizePort,
+	)
 	statusBackend.UpdateRootDataDir(request.DataDir)
 
 	err = statusBackend.OpenAccounts()

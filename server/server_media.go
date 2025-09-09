@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"net"
 	"net/netip"
 	"net/url"
 	"strconv"
@@ -37,6 +36,13 @@ func WithMediaServerAddress(address string) MediaServerOption {
 	}
 }
 
+func WithMediaServerAdvertizeAddress(host string, port int) MediaServerOption {
+	return func(s *MediaServerConfig) {
+		s.advertizeHost = host
+		s.advertizePort = port
+	}
+}
+
 type MediaServerConfig struct {
 	// disableTLS controls whether the media server uses HTTP instead of HTTPS.
 	// Set to true to avoid TLS certificate issues with react-native-fast-image
@@ -46,6 +52,11 @@ type MediaServerConfig struct {
 
 	// address is the address to bind the media server to. Defaults to "localhost:0".
 	address string
+
+	// AdvertizeHost and AdvertizePort define the a different host/port to be advertized.
+	// Check server.Config for more details.
+	advertizeHost string
+	advertizePort int
 }
 
 type MediaServer struct {
@@ -79,8 +90,10 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 
 	s := &MediaServer{
 		config: &MediaServerConfig{
-			disableTLS: false,
-			address:    "localhost:0",
+			disableTLS:    false,
+			address:       "127.0.0.1:0",
+			advertizeHost: "",
+			advertizePort: 0,
 		},
 		db:              db,
 		downloader:      downloader,
@@ -92,7 +105,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		opt(s.config)
 	}
 
-	addr, err := netip.ParseAddr(s.config.address)
+	addrPort, err := netip.ParseAddrPort(s.config.address)
 	if err != nil {
 		return nil, errorspkg.Wrap(err, "failed to parse media server address")
 	}
@@ -104,32 +117,40 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 	s.Server = NewServer(
 		logutils.ZapLogger().Named("MediaServer"),
 		&Config{
-			Cert: cert,
-			Addr: &net.TCPAddr{IP: addr.AsSlice(), Port: 0},
+			Cert:          cert,
+			AddrPort:      addrPort,
+			AdvertizeHost: s.config.advertizeHost,
+			AdvertizePort: s.config.advertizePort,
 		},
 	)
 
 	s.SetHandlers(HandlerPatternMap{
-		accountImagesPath:                   handleAccountImages(s.multiaccountsDB, s.logger),
-		accountInitialsPath:                 handleAccountInitials(s.multiaccountsDB, s.logger),
-		audioPath:                           handleAudio(s.db, s.logger),
-		contactImagesPath:                   handleContactImages(s.db, s.logger),
-		discordAttachmentsPath:              handleDiscordAttachment(s.db, s.logger),
-		discordAuthorsPath:                  handleDiscordAuthorAvatar(s.db, s.logger),
-		imagesPath:                          handleImage(s.db, s.logger),
-		ipfsPath:                            handleIPFS(s.downloader, s.logger),
-		LinkPreviewThumbnailPath:            handleLinkPreviewThumbnail(s.db, s.logger),
-		LinkPreviewFaviconPath:              handleLinkPreviewFavicon(s.db, s.logger),
-		StatusLinkPreviewThumbnailPath:      handleStatusLinkPreviewThumbnail(s.db, s.logger),
-		communityTokenImagesPath:            handleCommunityTokenImages(s.db, s.logger),
-		communityDescriptionImagesPath:      handleCommunityDescriptionImagesPath(s.db, s.getCommunityImage, s.logger),
-		communityDescriptionTokenImagesPath: handleCommunityDescriptionTokenImagesPath(s.db, s.getCommunityTokens, s.logger),
-		walletCommunityImagesPath:           handleWalletCommunityImages(s.walletDB, s.logger),
-		walletCollectionImagesPath:          handleWalletCollectionImages(s.walletDB, s.logger),
-		walletCollectibleImagesPath:         handleWalletCollectibleImages(s.walletDB, s.logger),
+		accountImagesPath:                   s.handleAccountImages,
+		accountInitialsPath:                 s.handleAccountInitials,
+		audioPath:                           s.handleAudio,
+		contactImagesPath:                   s.handleContactImages,
+		discordAttachmentsPath:              s.handleDiscordAttachment,
+		discordAuthorsPath:                  s.handleDiscordAuthorAvatar,
+		imagesPath:                          s.handleImage,
+		ipfsPath:                            s.handleIPFS,
+		LinkPreviewThumbnailPath:            s.handleLinkPreviewThumbnail,
+		LinkPreviewFaviconPath:              s.handleLinkPreviewFavicon,
+		StatusLinkPreviewThumbnailPath:      s.handleStatusLinkPreviewThumbnail,
+		communityTokenImagesPath:            s.handleCommunityTokenImages,
+		communityDescriptionImagesPath:      s.handleCommunityDescriptionImages,
+		communityDescriptionTokenImagesPath: s.handleCommunityDescriptionTokenImages,
+		walletCommunityImagesPath:           s.handleWalletCommunityImages,
+		walletCollectionImagesPath:          s.handleWalletCollectionImages,
+		walletCollectibleImagesPath:         s.handleWalletCollectibleImages,
 	})
 
 	return s, nil
+}
+
+func (s *MediaServer) SetDataProviders(db *sql.DB, walletDB *sql.DB, downloader *ipfs.Downloader) {
+	s.db = db
+	s.walletDB = walletDB
+	s.downloader = downloader
 }
 
 func (S *MediaServer) Start() error {

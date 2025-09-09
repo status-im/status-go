@@ -2237,11 +2237,9 @@ func (s *MessengerSuite) TestLastSentField() {
 // }
 
 func (s *MessengerSuite) TestSendMessageWithPreviews() {
-	httpServer, err := server.NewMediaServer(s.m.database, nil, nil, nil)
+	mediaServer, err := server.NewMediaServer(s.m.database, nil, nil, nil)
 	s.Require().NoError(err)
-	err = httpServer.SetPort(9876)
-	s.NoError(err)
-	s.m.SetMediaServer(httpServer)
+	s.m.SetMediaServer(mediaServer)
 
 	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	err = s.m.SaveChat(chat)
@@ -2306,7 +2304,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	s.Require().Equal(preview.Thumbnail.DataURI, expectedDataURI)
 
 	s.Require().Equal(
-		httpServer.MakeLinkPreviewThumbnailURL(inputMsg.ID, preview.URL),
+		mediaServer.MakeLinkPreviewThumbnailURL(inputMsg.ID, preview.URL),
 		savedMsg.LinkPreviews[0].Thumbnail.URL,
 	)
 
@@ -2344,7 +2342,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	s.Require().NotNil(savedContact.Icon)
 	s.Require().Equal(sentContactPreview.Contact.Icon.Width, savedContact.Icon.Width)
 	s.Require().Equal(sentContactPreview.Contact.Icon.Height, savedContact.Icon.Height)
-	expectedIconURL := httpServer.MakeStatusLinkPreviewThumbnailURL(inputMsg.ID, sentContactPreview.URL, "contact-icon")
+	expectedIconURL := mediaServer.MakeStatusLinkPreviewThumbnailURL(inputMsg.ID, sentContactPreview.URL, "contact-icon")
 	s.Require().Equal(expectedIconURL, savedContact.Icon.URL)
 }
 

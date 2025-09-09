@@ -6,9 +6,11 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"net"
+	"net/netip"
 	"runtime"
 	"time"
 
+	errorspkg "github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/timesource"
@@ -41,15 +43,17 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 		return nil, err
 	}
 
+	addr, ok := netip.AddrFromSlice(config.ListenIP)
+	if !ok {
+		return nil, errorspkg.New("invalid listen IP")
+	}
+
 	bs := &BaseServer{
 		Server: server.NewServer(
 			logger,
 			&server.Config{
-				Cert: config.Cert,
-				Addr: &net.TCPAddr{
-					IP:   config.ListenIP,
-					Port: 0,
-				},
+				Cert:     config.Cert,
+				AddrPort: netip.AddrPortFrom(addr, 0),
 			},
 		),
 		challengeGiver: cg,

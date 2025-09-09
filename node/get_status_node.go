@@ -82,9 +82,11 @@ type StatusNode struct {
 
 	downloader *ipfs.Downloader
 
-	mediaServerAddress   *string
-	mediaServerEnableTLS *bool
-	mediaServer          *server.MediaServer
+	mediaServerAddress       *string
+	mediaServerAdvertizeHost string
+	mediaServerAdvertizePort int
+	mediaServerEnableTLS     *bool
+	mediaServer              *server.MediaServer
 
 	tokenManager *token.Manager
 
@@ -151,7 +153,7 @@ func (n *StatusNode) MediaServer() *server.MediaServer {
 	return n.mediaServer
 }
 
-func (n *StatusNode) startMediaServer(db *sql.DB, downloader *ipfs.Downloader, walletDB *sql.DB) error {
+func (n *StatusNode) startMediaServer() error {
 	if n.mediaServer != nil {
 		if err := n.mediaServer.Stop(); err != nil {
 			return err
@@ -165,7 +167,8 @@ func (n *StatusNode) startMediaServer(db *sql.DB, downloader *ipfs.Downloader, w
 	if n.mediaServerAddress != nil {
 		opts = append(opts, server.WithMediaServerAddress(*n.mediaServerAddress))
 	}
-	mediaServer, err := server.NewMediaServer(db, downloader, n.multiaccountsDB, walletDB, opts...)
+	opts = append(opts, server.WithMediaServerAdvertizeAddress(n.mediaServerAdvertizeHost, n.mediaServerAdvertizePort))
+	mediaServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB, nil, opts...)
 	if err != nil {
 		return err
 	}
@@ -187,7 +190,7 @@ func (n *StatusNode) StartMediaServerWithoutDB() error {
 		return nil
 	}
 
-	return n.startMediaServer(nil, nil, nil)
+	return n.startMediaServer()
 }
 
 // StartWithOptions starts current StatusNode, failing if it's already started.
@@ -294,8 +297,11 @@ func (n *StatusNode) LoadLocalBackup(filePath string) error {
 	return n.localBackup.LoadBackup(filePath)
 }
 
-func (n *StatusNode) SetMediaServerOptions(address *string, enableTLS *bool) {
+func (n *StatusNode) SetMediaServerOptions(address *string, enableTLS *bool, advertizeHost string, advertizePort int) {
+	n.mediaServerAddress = address
 	n.mediaServerEnableTLS = enableTLS
+	n.mediaServerAdvertizeHost = advertizeHost
+	n.mediaServerAdvertizePort = advertizePort
 }
 
 func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
@@ -307,9 +313,12 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 
 	n.downloader = ipfs.NewDownloader(config.RootDataDir)
 
-	if err := n.startMediaServer(n.appDB, n.downloader, n.walletDB); err != nil {
-		return err
+	if n.mediaServer == nil {
+		if err := n.startMediaServer(); err != nil {
+			return err
+		}
 	}
+	n.mediaServer.SetDataProviders(n.appDB, n.walletDB, n.downloader)
 
 
 	if err := n.createAndStartTokenManager(); err != nil {
