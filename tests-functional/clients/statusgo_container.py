@@ -199,7 +199,7 @@ class StatusGoContainer:
         if self.health_monitor.is_alive():
             logging.warning("Health monitoring thread didn't stop gracefully")
 
-    def shutdown(self, log_sufix=None):
+    def shutdown(self, log_sufix=""):
         """
         Stops, saves logs, and removes a container with error handling.
         Args:
@@ -309,16 +309,14 @@ class StatusGoContainer:
     def get_name(self):
         return self.container.name if self.container else None
 
-    def save_logs(self, log_sufix=None):
-        if not log_sufix:
-            log_sufix = self.short_id()
+    def save_logs(self, log_sufix="test"):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
         if Config.logs_dir == "":
             logging.debug("Save container logs skipped")
             return
 
-        file_path = os.path.join(Config.logs_dir, f"container_{log_sufix}.log")
+        file_path = os.path.join(Config.logs_dir, f"container_{log_sufix}_{self.short_id()}.log")
         logging.info(f"Saving logs to {file_path}")
 
         with open(file_path, "wb") as f:
