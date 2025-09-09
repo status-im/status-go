@@ -136,7 +136,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "apiLoggingEnabled": True,
             "wakuFleetsConfigFilePath": Config.waku_fleets_config,
             "pushFleetsConfigFilePath": Config.push_fleets_config,
-            "mediaServerAddress": f"{"0.0.0.0" if self.container else "127.0.0.1"}:{constants.STATUS_MEDIA_SERVER_PORT}",
+            "mediaServerAddress": f"""{"0.0.0.0" if self.container else "127.0.0.1"}:{constants.STATUS_MEDIA_SERVER_PORT}""",
             "mediaServerAdvertizeHost": "127.0.0.1" if self.container else "",
             "mediaServerAdvertizePort": self.container.media_server_port if self.container else 0,
         }

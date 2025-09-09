@@ -38,6 +38,7 @@ type HandlersSuite struct {
 	suite.Suite
 	db     *sql.DB
 	logger *zap.Logger
+	server *MediaServer
 }
 
 func (s *HandlersSuite) SetupTest() {
@@ -49,6 +50,13 @@ func (s *HandlersSuite) SetupTest() {
 
 	s.logger = tt.MustCreateTestLogger()
 	s.db = db
+
+	s.server = &MediaServer{
+		db: s.db,
+		Server: Server{
+			logger: s.logger,
+		},
+	}
 }
 
 func (s *HandlersSuite) saveUserMessage(msg *common.Message) {
@@ -199,7 +207,7 @@ func (s *HandlersSuite) TestHandleLinkPreviewThumbnail() {
 		},
 	}
 
-	handler := handleLinkPreviewThumbnail(s.db, s.logger)
+	handler := s.server.handleLinkPreviewThumbnail
 
 	for _, tc := range testCases {
 		s.Run(tc.Name, func() {
@@ -541,7 +549,7 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 		},
 	}
 
-	handler := handleStatusLinkPreviewThumbnail(s.db, s.logger)
+	handler := s.server.handleStatusLinkPreviewThumbnail
 
 	for _, tc := range testCases {
 		s.Run(tc.Name, func() {
@@ -573,6 +581,8 @@ func (s *HandlersSuite) TestHandleAccountInitialsImpl() {
 	db, err := multiaccounts.InitializeDB(dbFile)
 	s.Require().NoError(err)
 	defer db.Close()
+	s.server.multiaccountsDB = db
+
 	keyUID := "0x1"
 	name := "Lopsided Goodnatured Bedbug"
 	expected := multiaccounts.Account{Name: name, KeyUID: keyUID, CustomizationColor: mc.CustomizationColorBlue, ColorHash: nil, ColorID: 10, KDFIterations: dbsetup.ReducedKDFIterationsNumber, Timestamp: 1712856359}
@@ -617,6 +627,8 @@ func (s *HandlersSuite) TestHandleAccountImagesImpl() {
 	db, err := multiaccounts.InitializeDB(dbFile)
 	s.Require().NoError(err)
 	defer db.Close()
+	s.server.multiaccountsDB = db
+
 	keyUID := "0x1"
 	name := "Lopsided Goodnatured Bedbug"
 	expected := multiaccounts.Account{
@@ -651,7 +663,7 @@ func (s *HandlersSuite) TestHandleAccountImagesImpl() {
 		UppercaseRatio: 1.0,
 		ImageName:      images.LargeDimName,
 	}
-	handleAccountImagesImpl(db, s.logger, w, p)
+	s.server.handleAccountImagesImpl(w, p)
 	s.validateResponse(w)
 
 	// pass a public key to generate ring
@@ -659,6 +671,6 @@ func (s *HandlersSuite) TestHandleAccountImagesImpl() {
 	s.Require().NoError(err)
 	p.PublicKey = common.PubkeyToHex(&k.PublicKey)
 	w = httptest.NewRecorder()
-	handleAccountImagesImpl(db, s.logger, w, p)
+	s.server.handleAccountImagesImpl(w, p)
 	s.Require().Equal(http.StatusOK, w.Code)
 }

@@ -25,7 +25,7 @@ type ServerURLSuite struct {
 func (s *ServerURLSuite) SetupTest() {
 	port := gofakeit.Number(1000, 65535)
 	ip := gofakeit.IPv4Address()
-	s.baseURL = fmt.Sprintf("https://%s:%d", ip, port)
+	s.baseURL = fmt.Sprintf("http://%s:%d", ip, port)
 
 	s.server = &MediaServer{
 		Server: Server{

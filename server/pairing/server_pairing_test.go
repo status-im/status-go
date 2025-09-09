@@ -17,6 +17,8 @@ import (
 	"github.com/status-im/status-go/server"
 )
 
+var ipRegex = regexp.MustCompile("(https://(?:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|\\[[:0-9a-fA-F:]+\\]):\\d{1,5})")
+
 func TestPairingServerSuite(t *testing.T) {
 	suite.Run(t, new(PairingServerSuite))
 }
@@ -39,7 +41,7 @@ func (s *PairingServerSuite) TestMultiBackgroundForeground() {
 	s.SS.ToBackground()
 	s.SS.ToForeground()
 	s.SS.ToForeground()
-	s.Require().Regexp(regexp.MustCompile("(https://\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{1,5})"), s.SS.MakeBaseURL().String()) // nolint: gosimple
+	s.Require().Regexp(ipRegex, s.SS.MakeBaseURL().String()) // nolint: gosimple
 }
 
 func (s *PairingServerSuite) TestMultiTimeout() {
@@ -55,7 +57,7 @@ func (s *PairingServerSuite) TestMultiTimeout() {
 	s.SS.ToForeground()
 	s.SS.ToForeground()
 
-	s.Require().Regexp(regexp.MustCompile("(https://\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{1,5})"), s.SS.MakeBaseURL().String()) // nolint: gosimple
+	s.Require().Regexp(ipRegex, s.SS.MakeBaseURL().String()) // nolint: gosimple
 
 	time.Sleep(7 * time.Millisecond)
 	s.SS.ToBackground()

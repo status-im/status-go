@@ -1626,10 +1626,10 @@ func (m *Manager) UpdatePubsubTopicPrivateKey(topic string, privKey *ecdsa.Priva
 }
 
 // Managing the version of community images is necessary because image URLs are "constant"
-// For eg: https://Localhost:46739/communityDescriptionImages?communityID=[ID]&name=thumbnail
+// For eg: https://localhost:46739/communityDescriptionImages?communityID=[ID]&name=thumbnail
 // So the clients have no way of knowing that they need to reload the image
 // Having a version number makes it so that the URL changes on image updates
-// eg: https://Localhost:46739/communityDescriptionImages?communityID=[ID]&name=thumbnail&version=1
+// eg: https://localhost:46739/communityDescriptionImages?communityID=[ID]&name=thumbnail&version=1
 func (m *Manager) incrementCommunityImageVersion(communityID string) {
 	m.communityImageVersions[communityID] = m.communityImageVersions[communityID] + 1
 }

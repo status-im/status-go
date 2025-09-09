@@ -19,7 +19,7 @@ class TestMediaServer:
     def backend(self, backend_new_profile) -> StatusBackend:
         return backend_new_profile("sender")
 
-    def test_media_server(self, backend):
+    def test_media_server_health(self, backend):
         signal = backend.wait_for_signal(SignalType.MEDIASERVER_STARTED.value)
         event = signal["event"]
 

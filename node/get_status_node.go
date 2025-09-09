@@ -185,7 +185,7 @@ func (n *StatusNode) startMediaServer() error {
 // StartMediaServerWithoutDB starts media server without starting the node
 // The server can only handle requests that don't require appdb or IPFS downloader
 func (n *StatusNode) StartMediaServerWithoutDB() error {
-	if n.isRunning() {
+	if n.IsRunning() {
 		n.logger.Debug("node is already running, no need to StartMediaServerWithoutDB")
 		return nil
 	}
@@ -320,19 +320,18 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 	}
 	n.mediaServer.SetDataProviders(n.appDB, n.walletDB, n.downloader)
 
-
 	if err := n.createAndStartTokenManager(); err != nil {
 		return err
 	}
 
-	if err := n.initServices(config, n.httpServer); err != nil {
+	if err := n.initServices(config, n.mediaServer); err != nil {
 		return err
 	}
 
 	// Register services
 
 	for _, service := range n.services {
-		err = n.registerService(service)
+		err := n.registerService(service)
 		if err != nil {
 			name := reflect.TypeOf(service).Name()
 			text := fmt.Sprintf("failed to register service '%s'", name)
@@ -342,7 +341,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 
 	// Start services
 
-	err = n.timeSourceSrvc.Start(context.Background())
+	err := n.timeSourceSrvc.Start(context.Background())
 	if err != nil {
 		return errorspkg.Wrap(err, "failed to start time source")
 	}
@@ -365,8 +364,8 @@ func (n *StatusNode) createAndStartTokenManager() error {
 		return err
 	}
 
-	n.tokenManager = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.httpServer, nil),
-		n.rpcClient.GetNetworkManager(), n.appDB, n.httpServer, &n.walletFeed, n.accountsPublisher, accDB,
+	n.tokenManager = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.mediaServer, nil),
+		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsPublisher, accDB,
 		token.NewPersistence(n.walletDB))
 
 	const (
@@ -432,11 +431,7 @@ func (n *StatusNode) Stop() error {
 	n.rpcClient = nil
 	n.config = nil
 
-	err := n.mediaServer.Stop()
-	if err != nil {
-		errs = append(errs, err)
-	}
-	n.mediaServer = nil
+	n.mediaServer.SetDataProviders(nil, nil, nil)
 
 	n.downloader.Stop()
 	n.downloader = nil

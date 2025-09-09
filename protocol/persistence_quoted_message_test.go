@@ -109,7 +109,7 @@ func (s *TestMessengerPrepareMessageSuite) testMessageContainsImage(testAlbum bo
 	s.Require().NoError(err)
 
 	mediaServerImageLink := func(messageID string) string {
-		return fmt.Sprintf(`https://Localhost:%d/messages/images?messageId=%s`,
+		return fmt.Sprintf(`https://localhost:%d/messages/images?messageId=%s`,
 			mediaServer.GetPort(),
 			messageID)
 	}
@@ -224,5 +224,5 @@ func (s *TestMessengerPrepareMessageSuite) Test_WHEN_MessageContainsImage_THEN_P
 	s.Require().NoError(err)
 
 	// THEN: message contains image link
-	s.Require().True(strings.HasPrefix(loadedMessage.ImageLocalURL, "https://Localhost"))
+	s.Require().True(strings.HasPrefix(loadedMessage.ImageLocalURL, "https://localhost"))
 }

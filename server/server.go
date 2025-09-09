@@ -51,7 +51,14 @@ func NewServer(logger *zap.Logger, config *Config) Server {
 }
 
 func (s *Server) GetAddrPort() string {
+	if s.address == nil {
+		return ""
+	}
+
 	host := s.address.IP.String()
+	if s.config != nil && s.config.Cert != nil && len(s.config.Cert.Leaf.DNSNames) > 0 {
+		host = s.config.Cert.Leaf.DNSNames[0]
+	}
 	if s.config != nil && s.config.AdvertizeHost != "" {
 		host = s.config.AdvertizeHost
 	}
@@ -84,9 +91,14 @@ func (s *Server) createListener() (net.Listener, error) {
 	}
 
 	// HTTPS mode
+	serverName := s.config.AddrPort.Addr().String()
+	if len(s.config.Cert.Leaf.DNSNames) > 0 {
+		serverName = s.config.Cert.Leaf.DNSNames[0]
+	}
+
 	cfg := &tls.Config{
 		Certificates: []tls.Certificate{*s.config.Cert},
-		ServerName:   s.config.AddrPort.Addr().String(),
+		ServerName:   serverName,
 		MinVersion:   tls.VersionTLS12,
 	}
 	return tls.Listen("tcp", s.config.AddrPort.String(), cfg)
