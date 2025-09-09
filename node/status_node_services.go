@@ -164,10 +164,8 @@ func (b *StatusNode) connectorService() *connector.Service {
 			b.rpcClient,
 			b.rpcClient.GetNetworkManager(),
 			&connector.Config{
-				HTTPHost: b.config.HTTPHost,
-				HTTPPort: b.config.HTTPPort,
-				WSHost:   b.config.WSHost,
-				WSPort:   b.config.WSPort,
+				WSHost: b.config.WSHost,
+				WSPort: b.config.WSPort,
 			},
 		)
 	}

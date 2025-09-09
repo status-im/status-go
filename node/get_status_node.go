@@ -295,6 +295,8 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 		return err
 	}
 
+	// Register services
+
 	for _, service := range n.services {
 		err = n.registerService(service)
 		if err != nil {
@@ -303,6 +305,8 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 			return errorspkg.Wrap(err, text)
 		}
 	}
+
+	// Start services
 
 	err = n.timeSourceSrvc.Start(context.Background())
 	if err != nil {
@@ -398,8 +402,6 @@ func (n *StatusNode) Stop() error {
 
 // IsRunning confirm that node is running.
 func (n *StatusNode) IsRunning() bool {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
 	return n.running.Load()
 }
 
@@ -409,7 +411,7 @@ func (n *StatusNode) ConnectionChanged(state connection.State) {
 	}
 }
 
-func (n *StatusNode) CallInternalRPC(inputJSON string) string {
+func (n *StatusNode) CallInProcessRPC(inputJSON string) string {
 	codec := rpc2.NewSingleRequestCodec(inputJSON)
 	n.rpcServer.ServeCodec(codec.GethCodec(), 0)
 	return codec.Output()

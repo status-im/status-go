@@ -20,10 +20,8 @@ import (
 const serviceName = "connector"
 
 type Config struct {
-	HTTPHost string
-	HTTPPort int
-	WSHost   string
-	WSPort   int
+	WSHost string
+	WSPort int
 }
 
 func NewService(logger *zap.Logger, db *sql.DB, rpc rpc.ClientInterface, nm *network.Manager, config *Config) *Service {

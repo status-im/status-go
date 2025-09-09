@@ -1985,8 +1985,8 @@ func (b *GethStatusBackend) RestartNode() error {
 }
 
 // CallRPC executes public RPC requests on node's in-proc RPC server.
-func (b *GethStatusBackend) CallInternalRPC(inputJSON string) string {
-	return b.statusNode.CallInternalRPC(inputJSON)
+func (b *GethStatusBackend) CallInProcessRPC(inputJSON string) string {
+	return b.statusNode.CallInProcessRPC(inputJSON)
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.

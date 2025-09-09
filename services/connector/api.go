@@ -80,10 +80,7 @@ func (api *API) forwardRPC(ctx context.Context, URL string, request commands.RPC
 		return "", commands.ErrDAppIsNotPermittedByUser
 	}
 
-	if request.ChainID != dApp.ChainID {
-		request.ChainID = dApp.ChainID
-	}
-	rpcClient, err := api.s.rpc.EthClient(request.ChainID)
+	rpcClient, err := api.s.rpc.EthClient(dApp.ChainID)
 	if err != nil {
 		return "", err
 	}

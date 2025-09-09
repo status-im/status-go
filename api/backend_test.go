@@ -353,7 +353,7 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(idx int) {
-			result := backend.CallInternalRPC(fmt.Sprintf(
+			result := backend.CallInProcessRPC(fmt.Sprintf(
 				`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":%d}`,
 				idx+1,
 			))
@@ -363,7 +363,7 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 
 		wg.Add(1)
 		go func(idx int) {
-			result := backend.CallInternalRPC(fmt.Sprintf(
+			result := backend.CallInProcessRPC(fmt.Sprintf(
 				`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":%d}`,
 				idx+1,
 			))
@@ -410,12 +410,12 @@ func TestAppStateChange(t *testing.T) {
 func TestCallRPCWithStoppedNode(t *testing.T) {
 	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 
-	resp := backend.CallInternalRPC(
+	resp := backend.CallInProcessRPC(
 		`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":1}`,
 	)
 	assert.Contains(t, resp, "error")
 
-	resp = backend.CallInternalRPC(
+	resp = backend.CallInProcessRPC(
 		`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":1}`,
 	)
 	assert.Contains(t, resp, "error")
