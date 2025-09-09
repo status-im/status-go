@@ -876,9 +876,38 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Insert normal emoji reaction
-	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
+	reaction := &EmojiReaction{
 		EmojiReaction: &protobuf.EmojiReaction{
 			Clock:     1,
+			MessageId: id3,
+			ChatId:    chatID,
+			Emoji:     "😀",
+		},
+		LocalChatID: chatID,
+		From:        from1,
+	}
+	require.NoError(t, p.SaveEmojiReaction(reaction))
+
+	// Retract emoji reaction
+	retractedReaction := &EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{
+			Clock:     2,
+			MessageId: id3,
+			ChatId:    chatID,
+			Emoji:     "😀",
+			Retracted: true,
+		},
+		LocalChatID: chatID,
+		From:        from1,
+	}
+	require.NoError(t, p.SaveEmojiReaction(retractedReaction))
+
+	require.Equal(t, reaction.ID(), retractedReaction.ID())
+
+	// Insert old emoji reaction (with only type)
+	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{
+			Clock:     2,
 			MessageId: id3,
 			ChatId:    chatID,
 			Type:      protobuf.EmojiReaction_SAD,
@@ -890,7 +919,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 	// Insert retracted emoji reaction
 	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
 		EmojiReaction: &protobuf.EmojiReaction{
-			Clock:     1,
+			Clock:     2,
 			MessageId: id3,
 			ChatId:    chatID,
 			Type:      protobuf.EmojiReaction_SAD,

@@ -32,9 +32,13 @@ func NewEmojiReaction() *EmojiReaction {
 	return &EmojiReaction{EmojiReaction: &protobuf.EmojiReaction{}}
 }
 
-// ID is the Keccak256() contatenation of From-MessageID-EmojiType
+// ID is the Keccak256() contatenation of From-MessageID-Emoji
 func (e *EmojiReaction) ID() string {
-	return types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d", e.From, e.MessageId, e.Type))))
+	// Backwards compatibility: old versions will not have the string Emoji, use Type instead
+	if e.Emoji == "" {
+		return types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d", e.From, e.MessageId, e.Type))))
+	}
+	return types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%s", e.From, e.MessageId, e.Emoji))))
 }
 
 // GetSigPubKey returns an ecdsa encoded public key

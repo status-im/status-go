@@ -1,0 +1,1 @@
+ALTER TABLE emoji_reactions ADD COLUMN emoji VARCHAR DEFAULT "";

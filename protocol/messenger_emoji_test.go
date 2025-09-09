@@ -64,8 +64,7 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 
 	messageID := response.Messages()[0].ID
 
-	// Respond with an emoji, donald trump style
-
+	// Respond with an emoji
 	response, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_SAD)
 	s.Require().NoError(err)
 	s.Require().Len(response.EmojiReactions(), 1)
@@ -83,6 +82,7 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 	s.Require().Len(response.EmojiReactions(), 1)
 	s.Require().Equal(response.EmojiReactions()[0].ID(), emojiID)
 	s.Require().Equal(response.EmojiReactions()[0].Type, protobuf.EmojiReaction_SAD)
+	s.Require().Equal(response.EmojiReactions()[0].Emoji, "😢")
 
 	// Retract the emoji
 	response, err = bob.SendEmojiReactionRetraction(context.Background(), emojiID)
