@@ -67,7 +67,7 @@ jobs:
           make lint-panics
 
   migration-check:
-    name: SQL migrations check
+    name: Check SQL migrations order
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
