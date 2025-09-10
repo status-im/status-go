@@ -9,7 +9,6 @@ import (
 	"image/png"
 	"os"
 
-	"github.com/oliamb/cutter"
 	"go.uber.org/zap"
 	xdraw "golang.org/x/image/draw"
 
@@ -111,11 +110,14 @@ func Crop(img image.Image, rect image.Rectangle) (image.Image, error) {
 		)
 	}
 
-	return cutter.Crop(img, cutter.Config{
-		Width:  rect.Dx(),
-		Height: rect.Dy(),
-		Anchor: rect.Min,
-	})
+	// Use standard library cropping via SubImage on an RGBA buffer
+	// Ensure the requested rectangle is within the image bounds (checked above)
+	// Create a new RGBA of the crop size and draw from the source offset by rect.Min
+	cropW, cropH := rect.Dx(), rect.Dy()
+	out := image.NewRGBA(image.Rect(0, 0, cropW, cropH))
+	// Source point corresponds to rect.Min in the original image
+	draw.Draw(out, out.Bounds(), img, rect.Min, draw.Src)
+	return out, nil
 }
 
 // CropCenter takes an image, usually downloaded from a URL
