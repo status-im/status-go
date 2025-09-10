@@ -98,7 +98,7 @@ func TestCompressToFileLimits(t *testing.T) {
 	bb := bytes.NewBuffer([]byte{})
 	err = CompressToFileLimits(bb, img, FileSizeLimits{50000, 350000})
 	require.NoError(t, err)
-	require.Equal(t, 291645, bb.Len())
+	require.Equal(t, 292395, bb.Len())
 }
 
 func TestGetPayloadFromURI(t *testing.T) {

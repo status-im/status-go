@@ -7,11 +7,8 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
-	"math"
 	"os"
 
-	"github.com/nfnt/resize"
-	"github.com/oliamb/cutter"
 	"go.uber.org/zap"
 	xdraw "golang.org/x/image/draw"
 
@@ -31,40 +28,75 @@ func (c *Circle) Bounds() image.Rectangle {
 func (c *Circle) At(x, y int) color.Color {
 	xx, yy, rr := float64(x-c.X)+0.5, float64(y-c.Y)+0.5, float64(c.R)
 	if xx*xx+yy*yy < rr*rr {
-		return color.Alpha{255}
+		return color.Alpha{A: 255}
 	}
-	return color.Alpha{0}
+	return color.Alpha{A: 0}
+}
+
+// Calculates scaling factors using old and new image dimensions.
+func calcFactors(width, height int, oldWidth, oldHeight float64) (scaleX, scaleY float64) {
+	if width == 0 {
+		if height == 0 {
+			scaleX = 1.0
+			scaleY = 1.0
+		} else {
+			scaleY = oldHeight / float64(height)
+			scaleX = scaleY
+		}
+	} else {
+		scaleX = oldWidth / float64(width)
+		if height == 0 {
+			scaleY = scaleX
+		} else {
+			scaleY = oldHeight / float64(height)
+		}
+	}
+	return
+}
+
+func resizeImage(img image.Image, width int, height int) image.Image {
+	scaleX, scaleY := calcFactors(width, height, float64(img.Bounds().Dx()), float64(img.Bounds().Dy()))
+	if width == 0 {
+		width = int(0.7 + float64(img.Bounds().Dx())/scaleX)
+	}
+	if height == 0 {
+		height = int(0.7 + float64(img.Bounds().Dy())/scaleY)
+	}
+
+	out := image.NewNRGBA(image.Rect(0, 0, width, height))
+	xdraw.BiLinear.Scale(out, out.Bounds(), img, img.Bounds(), draw.Over, nil)
+	return out
 }
 
 func Resize(size ResizeDimension, img image.Image) image.Image {
-	var width, height uint
+	var width, height int
 
 	switch {
 	case img.Bounds().Max.X == img.Bounds().Max.Y:
-		width, height = uint(size), uint(size)
+		width, height = int(size), int(size)
 	case img.Bounds().Max.X > img.Bounds().Max.Y:
-		width, height = 0, uint(size)
+		width, height = 0, int(size)
 	default:
-		width, height = uint(size), 0
+		width, height = int(size), 0
 	}
 
 	logutils.ZapLogger().Info("resizing",
 		zap.Uint("size", uint(size)),
-		zap.Uint("width", width),
-		zap.Uint("height", height))
+		zap.Int("width", width),
+		zap.Int("height", height))
 
-	return resize.Resize(width, height, img, resize.Bilinear)
+	return resizeImage(img, width, height)
 }
 
-func ResizeTo(percent int, img image.Image) image.Image {
-	width := uint(img.Bounds().Max.X * percent / 100)
-	height := uint(img.Bounds().Max.Y * percent / 100)
+func Scale(percent int, img image.Image) image.Image {
+	width := img.Bounds().Max.X * percent / 100
+	height := img.Bounds().Max.Y * percent / 100
 
-	return resize.Resize(width, height, img, resize.Bilinear)
+	return resizeImage(img, width, height)
 }
 
 func ShrinkOnly(size ResizeDimension, img image.Image) image.Image {
-	finalSize := int(math.Min(float64(size), math.Min(float64(img.Bounds().Dx()), float64(img.Bounds().Dy()))))
+	finalSize := min(int(size), img.Bounds().Dx(), img.Bounds().Dy())
 	return Resize(ResizeDimension(finalSize), img)
 }
 
@@ -78,11 +110,14 @@ func Crop(img image.Image, rect image.Rectangle) (image.Image, error) {
 		)
 	}
 
-	return cutter.Crop(img, cutter.Config{
-		Width:  rect.Dx(),
-		Height: rect.Dy(),
-		Anchor: rect.Min,
-	})
+	// Use standard library cropping via SubImage on an RGBA buffer
+	// Ensure the requested rectangle is within the image bounds (checked above)
+	// Create a new RGBA of the crop size and draw from the source offset by rect.Min
+	cropW, cropH := rect.Dx(), rect.Dy()
+	out := image.NewRGBA(image.Rect(0, 0, cropW, cropH))
+	// Source point corresponds to rect.Min in the original image
+	draw.Draw(out, out.Bounds(), img, rect.Min, draw.Src)
+	return out, nil
 }
 
 // CropCenter takes an image, usually downloaded from a URL

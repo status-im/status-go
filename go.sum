@@ -1611,8 +1611,6 @@ github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn
 github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
-github.com/oliamb/cutter v0.2.2 h1:Lfwkya0HHNU1YLnGv2hTkzHfasrSMkgv4Dn+5rmlk3k=
-github.com/oliamb/cutter v0.2.2/go.mod h1:4BenG2/4GuRBDbVm/OPahDVqbrOemzpPiG5mi1iryBU=
 github.com/onsi/ginkgo v0.0.0-20151202141238-7f8ab55aaf3b/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v0.0.0-20170829012221-11459a886d9c/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
@@ -2076,8 +2074,6 @@ github.com/status-im/mvds v0.0.27-0.20241031073756-b192c603a75d h1:+eBm+aBGFgXsJ
 github.com/status-im/mvds v0.0.27-0.20241031073756-b192c603a75d/go.mod h1:2fiAx0q9XYIPKYRq2B1oiO9zZESy/n4D32gWw6lMDsE=
 github.com/status-im/notify v1.0.2-status h1:x8wev0Sh8H8KAf4bVcv+L0dVHldBESOKUlqRqRY7uL8=
 github.com/status-im/notify v1.0.2-status/go.mod h1:gF3zSOrafR9DQEWSE8TjfI9NkooDxbyT4UgRGKZA0lc=
-github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088 h1:ClCAP2FPCvl8hGMhbUx/tq/sOu2wibztAa5jAvQEe4Q=
-github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088/go.mod h1:+92j1tN27DypDeBFxkg0uzkqfh1bNHTZe3Bv2PjvxpM=
 github.com/status-im/tcp-shaker v1.1.1-status h1:TnVeeWlq2SKCWotHc4Vi6qZQfY8TTe3VLmu1xpEFYhg=
 github.com/status-im/tcp-shaker v1.1.1-status/go.mod h1:RYo/itke1oU5k/6sj9DNM3QAwtE5rZSgg5JnkOv83hk=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857 h1:sPkzT7Z7uLmejOsBRlZ0kwDWpqjpHJsp834o5nbhqho=

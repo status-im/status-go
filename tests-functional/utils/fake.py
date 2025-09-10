@@ -5,7 +5,8 @@ _faker = Faker("en")
 
 
 def community_name() -> str:
-    return _faker.company()
+    ALLOWED_SPECIAL_CHARS = (".", "_", "-", " ")
+    return _faker.word() + _faker.random_element(ALLOWED_SPECIAL_CHARS) + str(_faker.random_number())
 
 
 def community_description() -> str:
