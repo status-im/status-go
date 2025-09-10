@@ -24,7 +24,6 @@ check_migration_order() {
   local prev_migration=""
 
   for file in "$@"; do
-    [[ -z "$file" ]] && continue
     local current_migration
     current_migration=$(basename "$file")
 
@@ -62,7 +61,7 @@ for MIGRATION_DIR in "${MIGRATION_DIRS[@]}"; do
 
   # Collect files from base and from current diff
   base_files=$(git ls-tree -r --name-only ${BASE_COMMIT} ${MIGRATION_DIR}/*.sql | sort)
-  new_files=$(git diff --name-only ${BASE_COMMIT} -- ${MIGRATION_DIR}/*.sql | sort || true)
+  new_files=$(git diff --name-only ${BASE_COMMIT} ${MIGRATION_DIR}/*.sql | sort)
   all_files=$(echo -e "$base_files\n$new_files")
 
   # Regex validation: ONLY verify newly added/changed files match ^[0-9]{10}_ prefix
