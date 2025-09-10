@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/protocol/tt"
 	v1 "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -36,7 +37,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 )
 
 func TestManagerSuite(t *testing.T) {
@@ -58,8 +58,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	logger, err := zap.NewDevelopment()
-	s.Require().NoError(err)
+	logger := tt.MustCreateTestLogger()
 
 	m, err := NewManager(key, "", db, logger, nil, ownerVerifier, nil, &TimeSourceStub{}, nil, nil)
 	s.Require().NoError(err)
@@ -408,6 +407,10 @@ func (s *ManagerSuite) TestEditCommunity() {
 		Description: "status community description",
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Image:       "../../_assets/tests/elephant.jpg",
+		ImageAx:     10,
+		ImageAy:     10,
+		ImageBx:     70,
+		ImageBy:     70,
 	}
 
 	community, err := s.manager.CreateCommunity(createRequest, true)
@@ -420,8 +423,10 @@ func (s *ManagerSuite) TestEditCommunity() {
 			Name:        "statusEdited",
 			Description: "status community description edited",
 			Image:       "../../_assets/tests/status.png",
-			ImageBx:     5,
-			ImageBy:     5,
+			ImageAx:     40,
+			ImageAy:     40,
+			ImageBx:     200,
+			ImageBy:     200,
 		},
 	}
 
