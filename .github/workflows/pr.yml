@@ -65,3 +65,20 @@ jobs:
       - name: lint-panics
         run: |
           make lint-panics
+
+  migration-check:
+    name: SQL migrations check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run migration check
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          bash _assets/scripts/migration_check.sh
