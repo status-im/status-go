@@ -3,6 +3,7 @@ from typing import TypedDict, Union
 
 from clients.rpc import RpcClient
 from clients.services.service import Service
+from utils.image_utils import ImageCropRect
 from resources.enums import MessageContentType
 
 
@@ -79,6 +80,17 @@ class SendChatMessagePayload(TypedDict):
     chat_id: str
     text: str
     content_type: int
+
+
+class CommunityPermissionsAccess(Enum):
+    UNKNOWN = 0
+    AUTO_ACCEPT = 1
+    MANUAL_ACCEPT = 3
+
+
+class Error(Exception):
+    def __init__(self, message):
+        self.message = message
 
 
 class WakuextService(Service):
@@ -206,9 +218,52 @@ class WakuextService(Service):
         response = self.rpc_request("sendGroupChatInvitationRejection", params)
         return response
 
-    def create_community(self, name, description, color="#ffffff", membership=3):
-        params = [{"membership": membership, "name": name, "color": color, "description": description}]
-        response = self.rpc_request("createCommunity", params)
+    def create_community(
+        self,
+        name,
+        description,
+        color="#ffffff",
+        membership: CommunityPermissionsAccess = CommunityPermissionsAccess.AUTO_ACCEPT,
+        image="",
+        image_rect=ImageCropRect(),
+    ):
+        params = {
+            "membership": membership.value,
+            "name": name,
+            "color": color,
+            "description": description,
+            "image": image,
+            "imageAx": image_rect.ax,
+            "imageAy": image_rect.ay,
+            "imageBx": image_rect.bx,
+            "imageBy": image_rect.by,
+        }
+        response = self.rpc_request("createCommunity", [params])
+        return response
+
+    def edit_community(
+        self,
+        community_id,
+        name,
+        color="#ffffff",
+        membership: CommunityPermissionsAccess = CommunityPermissionsAccess.AUTO_ACCEPT,
+        description="",
+        image="",
+        image_rect=ImageCropRect(),
+    ):
+        params = {
+            "CommunityID": community_id,
+            "membership": membership.value,
+            "name": name,
+            "color": color,
+            "description": description,
+            "image": image,
+            "imageAx": image_rect.ax,
+            "imageAy": image_rect.ay,
+            "imageBx": image_rect.bx,
+            "imageBy": image_rect.by,
+        }
+        response = self.rpc_request("editCommunity", [params])
         return response
 
     def fetch_community(self, community_key):
