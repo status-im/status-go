@@ -69,7 +69,7 @@ def backend_factory(request):
 
     for i, backend in enumerate(reversed(created_backends)):
         logging.debug(f"🧹 [TEARDOWN] Cleaning up backend {len(created_backends) - i}...")
-        backend.shutdown()
+        backend.shutdown(log_sufix=request.node.name)
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -160,7 +160,7 @@ def close_status_backend_containers(request):
     yield
     for container in StatusGoContainer.all_containers:
         try:
-            container.shutdown(request.node.name)  # pyright: ignore[reportAttributeAccessIssue]
+            container.shutdown(log_sufix=request.node.name)  # pyright: ignore[reportAttributeAccessIssue]
         except Exception as e:
             logging.error(f"Error cleaning up container: {e}")
     StatusGoContainer.all_containers = []
