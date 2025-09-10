@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"regexp"
 
 	"github.com/pkg/errors"
 
@@ -50,9 +49,6 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	}
 
 	// Validate that the emoji is valid
-	// There is no foolproof way to validate emojis, but this regex should cover all standard emojis
-	// it will also allow some non-emoji unicode characters, but that's not a big issue
-	emojiRegex := regexp.MustCompile("(?:\u00A9|\u00AE|[\u2000-\u3300]|[\U0001F000-\U0001FBFF])")
 	if !emojiRegex.MatchString(emoji) {
 		return nil, errors.New("invalid emoji")
 	}

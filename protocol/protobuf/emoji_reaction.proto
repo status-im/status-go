@@ -23,6 +23,7 @@ message EmojiReaction {
   Type type = 5 [deprecated = true];
 
   enum Type {
+    option deprecated = true;
     UNKNOWN_EMOJI_REACTION_TYPE = 0;
     LOVE = 1;
     THUMBS_UP = 2;
