@@ -1682,9 +1682,6 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 
 	// Edit the community values
 	community.Edit(newDescription)
-	if err != nil {
-		return nil, err
-	}
 
 	if imageModified {
 		m.incrementCommunityImageVersion(community.IDString())
