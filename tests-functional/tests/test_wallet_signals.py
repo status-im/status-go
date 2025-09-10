@@ -1,9 +1,9 @@
 import json
-import random
+
 import pytest
 
-from resources.constants import user_1
 from clients.signals import SignalType
+from resources.constants import user_1
 
 
 @pytest.mark.wallet
@@ -13,7 +13,6 @@ class TestWalletSignals:
 
     @pytest.fixture(autouse=True)
     def setup_backend(self, backend_recovered_profile):
-        self.request_id = str(random.randint(1, 8888))
         self.rpc_client = backend_recovered_profile(name="rpc_client", user=user_1)
 
     @pytest.mark.skip  # TODO: returns empty response in most of the cases, so needs to be fixed with attention of required signals in signal_response
@@ -31,7 +30,7 @@ class TestWalletSignals:
             1,
             {"fetch-type": 2, "max-cache-age-seconds": 3600},
         ]
-        self.rpc_client.rpc_valid_request(method, params, self.request_id)
+        self.rpc_client.rpc_valid_request(method, params)
         signal_response = self.rpc_client.wait_for_signal(SignalType.WALLET.value, timeout=60)
         # TODO: Add more assertions on response
         assert signal_response["event"]["type"] == "wallet-owned-collectibles-filtering-done"
