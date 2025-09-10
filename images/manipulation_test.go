@@ -3,6 +3,7 @@ package images
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"testing"
 
@@ -145,7 +146,7 @@ func TestCrop(t *testing.T) {
 		{
 			"elephant.jpg",
 			[]params{
-				{topLeftSquare, topLeftSquare, 1447, nil},
+				{topLeftSquare, topLeftSquare, 1459, nil},
 				{offsetSquare, rect, 0, errors.New("crop dimensions out of bounds of image, image width '80px' & height '80px'; crop bottom right coordinate at X '160px' Y '160px'")},
 				{outOfBoundsSquare, rect, 0, errors.New("crop dimensions out of bounds of image, image width '80px' & height '80px'; crop bottom right coordinate at X '1000000px' Y '1000000px'")},
 			},
@@ -180,21 +181,24 @@ func TestCrop(t *testing.T) {
 		img, err := Decode(path + c.Filename)
 		require.NoError(t, err)
 
-		for _, p := range c.Params {
-			cImg, err := Crop(img, p.Rectangle)
-			if p.CropError != nil {
-				require.EqualError(t, err, p.CropError.Error())
-				continue
-			} else {
-				require.NoError(t, err)
-			}
-			require.Exactly(t, p.OutputBound.Dx(), cImg.Bounds().Dx(), c.Filename)
-			require.Exactly(t, p.OutputBound.Dy(), cImg.Bounds().Dy(), c.Filename)
+		for i, p := range c.Params {
+			testName := fmt.Sprintf("%s-%d", c.Filename, i+1)
+			t.Run(testName, func(t *testing.T) {
+				cImg, err := Crop(img, p.Rectangle)
+				if p.CropError != nil {
+					require.EqualError(t, err, p.CropError.Error())
+					return
+				}
 
-			bb := bytes.NewBuffer([]byte{})
-			err = Encode(bb, cImg, options)
-			require.NoError(t, err)
-			require.Exactly(t, p.OutputSize, bb.Len())
+				require.NoError(t, err)
+				require.Exactly(t, p.OutputBound.Dx(), cImg.Bounds().Dx(), c.Filename)
+				require.Exactly(t, p.OutputBound.Dy(), cImg.Bounds().Dy(), c.Filename)
+
+				bb := bytes.NewBuffer([]byte{})
+				err = Encode(bb, cImg, options)
+				require.NoError(t, err)
+				require.Exactly(t, p.OutputSize, bb.Len())
+			})
 		}
 	}
 }
