@@ -315,7 +315,7 @@ func (b *GethStatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Ac
 	for _, acc := range as {
 		if acc.KeyUID == keyUID {
 			for k, v := range acc.Images {
-				acc.Images[k].LocalURL = b.statusNode.HTTPServer().MakeAccountImageURL(acc.KeyUID, v.Name, v.Clock)
+				acc.Images[k].LocalURL = b.statusNode.MediaServer().MakeAccountImageURL(acc.KeyUID, v.Name, v.Clock)
 			}
 			return &acc, nil
 		}
@@ -2214,6 +2214,7 @@ func (b *GethStatusBackend) Logout() error {
 		b.logger.Error("failed to start media server without app db", zap.Error(err))
 		return err
 	}
+
 	return nil
 }
 
@@ -2331,7 +2332,7 @@ func (b *GethStatusBackend) initProtocol() error {
 		Identity:               identity,
 		AppDB:                  b.appDB,
 		WalletDB:               b.walletDB,
-		HTTPServer:             b.statusNode.HTTPServer(),
+		HTTPServer:             b.statusNode.MediaServer(),
 		MultiAccountDB:         b.multiaccountsDB,
 		Account:                acc,
 		AccountsManager:        b.accountsManager,

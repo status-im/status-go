@@ -228,7 +228,7 @@ func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
 
 func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
 	if b.stickersSrvc == nil {
-		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountsManager, b.config, b.downloader, b.httpServer, b.pendingTracker)
+		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountsManager, b.config, b.downloader, b.mediaServer, b.pendingTracker)
 	}
 	return b.stickersSrvc
 }
@@ -290,7 +290,7 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB,
 			b.ensService(b.timeSourceNow()).API().EnsResolver(),
 			b.pendingTracker,
 			walletFeed,
-			b.httpServer,
+			b.mediaServer,
 			b.tokenManager,
 			statusProxyStageName,
 		)

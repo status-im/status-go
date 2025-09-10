@@ -48,7 +48,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/server/pairing"
-	"github.com/status-im/status-go/server/pairing/preflight"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -110,7 +109,12 @@ func initializeApplication(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	statusBackend.StatusNode().SetMediaServerEnableTLS(request.MediaServerEnableTLS)
+	statusBackend.StatusNode().SetMediaServerOptions(
+		request.MediaServerAddress,
+		request.MediaServerEnableTLS,
+		request.MediaServerAdvertizeHost,
+		request.MediaServerAdvertizePort,
+	)
 	statusBackend.UpdateRootDataDir(request.DataDir)
 
 	err = statusBackend.OpenAccounts()
@@ -151,7 +155,7 @@ func initializeApplication(requestJSON string) string {
 
 	for i, acc := range accs {
 		for j, images := range acc.Images {
-			accs[i].Images[j].LocalURL = statusBackend.StatusNode().HTTPServer().MakeAccountImageURL(acc.KeyUID, images.Name, images.Clock)
+			accs[i].Images[j].LocalURL = statusBackend.StatusNode().MediaServer().MakeAccountImageURL(acc.KeyUID, images.Name, images.Clock)
 		}
 	}
 
@@ -1448,20 +1452,6 @@ func generateImages(filepath string, aX, aY, bX, bY int) string {
 		return makeJSONResponse(fmt.Errorf("Error marshalling to json: %v", err))
 	}
 	return string(data)
-}
-
-func LocalPairingPreflightOutboundCheck() string {
-	return callWithResponse(localPairingPreflightOutboundCheck)
-}
-
-// localPairingPreflightOutboundCheck creates a local tls server accessible via an outbound network address.
-// The function creates a client and makes an outbound network call to the local server. This function should be
-// triggered to ensure that the device has permissions to access its LAN or to make outbound network calls.
-//
-// In addition, the functionality attempts to address an issue with iOS devices https://stackoverflow.com/a/64242745
-func localPairingPreflightOutboundCheck() string {
-	err := preflight.CheckOutbound()
-	return makeJSONResponse(err)
 }
 
 func StartSearchForLocalPairingPeers() string {

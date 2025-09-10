@@ -3,10 +3,12 @@ package pairing
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"sort"
 	"strconv"
 	"testing"
 
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/server"
@@ -31,6 +33,7 @@ type ConnectionParamsSuite struct {
 	servertest.TestLoggerComponents
 
 	server *BaseServer
+	port   uint16
 }
 
 func (s *ConnectionParamsSuite) SetupSuite() {
@@ -54,8 +57,19 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 		KeyUID:         "some-key-uid",
 	}
 
-	bs := server.NewServer(&cert, net.IPv4zero.String(), nil, s.Logger)
-	err = bs.SetPort(port)
+	s.port = gofakeit.Uint16()
+	host, ok := netip.AddrFromSlice(net.IPv4zero)
+	s.Require().True(ok)
+
+	bs := server.NewServer(s.Logger, &server.Config{
+		Cert:     &cert,
+		AddrPort: netip.AddrPortFrom(host, s.port),
+		// Use AdvertizePort to test the port in our hard-coded connection string.
+		// AdvertizeHost is not used in production pairing.
+		AdvertizePort: port,
+	})
+
+	err = bs.Start()
 	s.Require().NoError(err)
 
 	s.server = &BaseServer{

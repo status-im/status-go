@@ -105,25 +105,33 @@ func checkForFetchImageError(err error, logger *zap.Logger, parsedImageParams Im
 	}
 }
 
-func handleLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		parsed := validateAndReturnImageParams(r, w, logger)
-		if parsed.URL != "" {
-			thumbnail, err := getThumbnailPayload(db, parsed.MessageID, parsed.URL)
-			checkForFetchImageError(err, logger, parsed, w, "thumbnail")
-			getMimeTypeAndWriteImage(w, logger, thumbnail)
-		}
+func (s *MediaServer) handleLinkPreviewThumbnail(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		s.logger.Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	parsed := validateAndReturnImageParams(r, w, s.logger)
+	if parsed.URL != "" {
+		thumbnail, err := getThumbnailPayload(s.db, parsed.MessageID, parsed.URL)
+		checkForFetchImageError(err, s.logger, parsed, w, "thumbnail")
+		getMimeTypeAndWriteImage(w, s.logger, thumbnail)
 	}
 }
 
-func handleLinkPreviewFavicon(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		parsed := validateAndReturnImageParams(r, w, logger)
-		if parsed.URL != "" {
-			favicon, err := getFaviconPayload(db, parsed.MessageID, parsed.URL)
-			checkForFetchImageError(err, logger, parsed, w, "favicon")
-			getMimeTypeAndWriteImage(w, logger, favicon)
-		}
+func (s *MediaServer) handleLinkPreviewFavicon(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		s.logger.Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	parsed := validateAndReturnImageParams(r, w, s.logger)
+	if parsed.URL != "" {
+		favicon, err := getFaviconPayload(s.db, parsed.MessageID, parsed.URL)
+		checkForFetchImageError(err, s.logger, parsed, w, "favicon")
+		getMimeTypeAndWriteImage(w, s.logger, favicon)
 	}
 }
 
@@ -216,44 +224,42 @@ func getStatusLinkPreviewThumbnail(db *sql.DB, messageID string, URL string, ima
 	return nil, http.StatusBadRequest, fmt.Errorf("no link preview found for given url")
 }
 
-func handleStatusLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		parsed := ParseImageParams(logger, params)
+func (s *MediaServer) handleStatusLinkPreviewThumbnail(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+	parsed := ParseImageParams(s.logger, params)
 
-		if parsed.MessageID == "" {
-			http.Error(w, "missing query parameter 'message-id'", http.StatusBadRequest)
-			return
-		}
+	if parsed.MessageID == "" {
+		http.Error(w, "missing query parameter 'message-id'", http.StatusBadRequest)
+		return
+	}
 
-		if parsed.URL == "" {
-			http.Error(w, "missing query parameter 'url'", http.StatusBadRequest)
-			return
-		}
+	if parsed.URL == "" {
+		http.Error(w, "missing query parameter 'url'", http.StatusBadRequest)
+		return
+	}
 
-		if parsed.ImageID == "" {
-			http.Error(w, "missing query parameter 'image-id'", http.StatusBadRequest)
-			return
-		}
+	if parsed.ImageID == "" {
+		http.Error(w, "missing query parameter 'image-id'", http.StatusBadRequest)
+		return
+	}
 
-		thumbnail, httpsStatusCode, err := getStatusLinkPreviewThumbnail(db, parsed.MessageID, parsed.URL, common.MediaServerImageID(parsed.ImageID))
-		if err != nil {
-			http.Error(w, err.Error(), httpsStatusCode)
-			return
-		}
+	thumbnail, httpsStatusCode, err := getStatusLinkPreviewThumbnail(s.db, parsed.MessageID, parsed.URL, common.MediaServerImageID(parsed.ImageID))
+	if err != nil {
+		http.Error(w, err.Error(), httpsStatusCode)
+		return
+	}
 
-		mimeType, err := images.GetMimeType(thumbnail)
-		if err != nil {
-			http.Error(w, "mime type not supported", http.StatusNotImplemented)
-			return
-		}
+	mimeType, err := images.GetMimeType(thumbnail)
+	if err != nil {
+		http.Error(w, "mime type not supported", http.StatusNotImplemented)
+		return
+	}
 
-		w.Header().Set("Content-Type", "image/"+mimeType)
-		w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "image/"+mimeType)
+	w.Header().Set("Cache-Control", "no-store")
 
-		_, err = w.Write(thumbnail)
-		if err != nil {
-			logger.Error("failed to write response", zap.Error(err))
-		}
+	_, err = w.Write(thumbnail)
+	if err != nil {
+		s.logger.Error("failed to write response", zap.Error(err))
 	}
 }

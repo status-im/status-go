@@ -82,8 +82,11 @@ type StatusNode struct {
 
 	downloader *ipfs.Downloader
 
-	mediaServerEnableTLS *bool
-	httpServer           *server.MediaServer
+	mediaServerAddress       *string
+	mediaServerAdvertizeHost string
+	mediaServerAdvertizePort int
+	mediaServerEnableTLS     *bool
+	mediaServer              *server.MediaServer
 
 	tokenManager *token.Manager
 
@@ -143,23 +146,16 @@ func (n *StatusNode) Config() *params.NodeConfig {
 	return n.config
 }
 
-func (n *StatusNode) HTTPServer() *server.MediaServer {
+func (n *StatusNode) MediaServer() *server.MediaServer {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	return n.httpServer
+	return n.mediaServer
 }
 
-// StartMediaServerWithoutDB starts media server without starting the node
-// The server can only handle requests that don't require appdb or IPFS downloader
-func (n *StatusNode) StartMediaServerWithoutDB() error {
-	if n.running.Load() {
-		n.logger.Debug("node is already running, no need to StartMediaServerWithoutDB")
-		return nil
-	}
-
-	if n.httpServer != nil {
-		if err := n.httpServer.Stop(); err != nil {
+func (n *StatusNode) startMediaServer() error {
+	if n.mediaServer != nil {
+		if err := n.mediaServer.Stop(); err != nil {
 			return err
 		}
 	}
@@ -168,18 +164,33 @@ func (n *StatusNode) StartMediaServerWithoutDB() error {
 	if n.mediaServerEnableTLS != nil {
 		opts = append(opts, server.WithMediaServerDisableTLS(!*n.mediaServerEnableTLS))
 	}
-	httpServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB, nil, opts...)
+	if n.mediaServerAddress != nil {
+		opts = append(opts, server.WithMediaServerAddress(*n.mediaServerAddress))
+	}
+	opts = append(opts, server.WithMediaServerAdvertizeAddress(n.mediaServerAdvertizeHost, n.mediaServerAdvertizePort))
+	mediaServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB, nil, opts...)
 	if err != nil {
 		return err
 	}
 
-	n.httpServer = httpServer
+	n.mediaServer = mediaServer
 
-	if err := n.httpServer.Start(); err != nil {
+	if err := n.mediaServer.Start(); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// StartMediaServerWithoutDB starts media server without starting the node
+// The server can only handle requests that don't require appdb or IPFS downloader
+func (n *StatusNode) StartMediaServerWithoutDB() error {
+	if n.IsRunning() {
+		n.logger.Debug("node is already running, no need to StartMediaServerWithoutDB")
+		return nil
+	}
+
+	return n.startMediaServer()
 }
 
 // StartWithOptions starts current StatusNode, failing if it's already started.
@@ -286,8 +297,11 @@ func (n *StatusNode) LoadLocalBackup(filePath string) error {
 	return n.localBackup.LoadBackup(filePath)
 }
 
-func (n *StatusNode) SetMediaServerEnableTLS(enableTLS *bool) {
+func (n *StatusNode) SetMediaServerOptions(address *string, enableTLS *bool, advertizeHost string, advertizePort int) {
+	n.mediaServerAddress = address
 	n.mediaServerEnableTLS = enableTLS
+	n.mediaServerAdvertizeHost = advertizeHost
+	n.mediaServerAdvertizePort = advertizePort
 }
 
 func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
@@ -299,40 +313,25 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 
 	n.downloader = ipfs.NewDownloader(config.RootDataDir)
 
-	if n.httpServer != nil {
-		if err := n.httpServer.Stop(); err != nil {
+	if n.mediaServer == nil {
+		if err := n.startMediaServer(); err != nil {
 			return err
 		}
 	}
-
-	var opts []server.MediaServerOption
-	if n.mediaServerEnableTLS != nil {
-		opts = append(opts, server.WithMediaServerDisableTLS(!*n.mediaServerEnableTLS))
-	}
-
-	httpServer, err := server.NewMediaServer(n.appDB, n.downloader, n.multiaccountsDB, n.walletDB, opts...)
-	if err != nil {
-		return err
-	}
-
-	n.httpServer = httpServer
-
-	if err := n.httpServer.Start(); err != nil {
-		return err
-	}
+	n.mediaServer.SetDataProviders(n.appDB, n.walletDB, n.downloader)
 
 	if err := n.createAndStartTokenManager(); err != nil {
 		return err
 	}
 
-	if err := n.initServices(config, n.httpServer); err != nil {
+	if err := n.initServices(config, n.mediaServer); err != nil {
 		return err
 	}
 
 	// Register services
 
 	for _, service := range n.services {
-		err = n.registerService(service)
+		err := n.registerService(service)
 		if err != nil {
 			name := reflect.TypeOf(service).Name()
 			text := fmt.Sprintf("failed to register service '%s'", name)
@@ -342,7 +341,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 
 	// Start services
 
-	err = n.timeSourceSrvc.Start(context.Background())
+	err := n.timeSourceSrvc.Start(context.Background())
 	if err != nil {
 		return errorspkg.Wrap(err, "failed to start time source")
 	}
@@ -365,8 +364,8 @@ func (n *StatusNode) createAndStartTokenManager() error {
 		return err
 	}
 
-	n.tokenManager = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.httpServer, nil),
-		n.rpcClient.GetNetworkManager(), n.appDB, n.httpServer, &n.walletFeed, n.accountsPublisher, accDB,
+	n.tokenManager = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.mediaServer, nil),
+		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsPublisher, accDB,
 		token.NewPersistence(n.walletDB))
 
 	const (
@@ -432,11 +431,7 @@ func (n *StatusNode) Stop() error {
 	n.rpcClient = nil
 	n.config = nil
 
-	err := n.httpServer.Stop()
-	if err != nil {
-		errs = append(errs, err)
-	}
-	n.httpServer = nil
+	n.mediaServer.SetDataProviders(nil, nil, nil)
 
 	n.downloader.Stop()
 	n.downloader = nil

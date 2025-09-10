@@ -3,95 +3,118 @@ package server
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
+	"errors"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
+	"strconv"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
 )
 
-type Server struct {
-	isRunning bool
-	server    *http.Server
-	logger    *zap.Logger
-	cert      *tls.Certificate
-	hostname  string
-	handlers  HandlerPatternMap
+type Config struct {
+	Cert     *tls.Certificate
+	AddrPort netip.AddrPort
 
-	portManger
+	// AdvertizeHost and AdvertizePort define the a different host/port to be advertized in media URLs than the one server listen on.
+	// Can be used when status-go is running behind a NAT/PAT. If empty/zero, the actual listening address is used.
+	AdvertizeHost string
+	AdvertizePort int
+}
+
+type Server struct {
+	listener net.Listener
+	server   *http.Server
+	logger   *zap.Logger
+	handlers HandlerPatternMap
+
+	config *Config
+
+	// address is the host and port the server is listening on
+	address *net.TCPAddr
+
+	// isRunning is true if the server was started and is running
+	isRunning bool
+
 	*timeoutManager
 }
 
-func NewServer(cert *tls.Certificate, hostname string, afterPortChanged func(int), logger *zap.Logger) Server {
+func NewServer(logger *zap.Logger, config *Config) Server {
 	return Server{
 		logger:         logger,
-		cert:           cert,
-		hostname:       hostname,
-		portManger:     newPortManager(logger.Named("Server"), afterPortChanged),
+		config:         config,
 		timeoutManager: newTimeoutManager(),
 	}
 }
 
-func (s *Server) getHost() string {
-	return fmt.Sprintf("%s:%d", s.hostname, s.GetPort())
+func (s *Server) GetAddrPort() string {
+	if s.address == nil {
+		return ""
+	}
+
+	host := s.address.IP.String()
+	if s.config != nil && s.config.Cert != nil && len(s.config.Cert.Leaf.DNSNames) > 0 {
+		host = s.config.Cert.Leaf.DNSNames[0]
+	}
+	if s.config != nil && s.config.AdvertizeHost != "" {
+		host = s.config.AdvertizeHost
+	}
+
+	return net.JoinHostPort(host, strconv.Itoa(s.GetPort()))
 }
 
-func (s *Server) GetHostname() string {
-	return s.hostname
+func (s *Server) GetPort() int {
+	if s.address == nil {
+		return 0
+	}
+	if s.config != nil && s.config.AdvertizePort != 0 {
+		return s.config.AdvertizePort
+	}
+	return s.address.Port
 }
 
 func (s *Server) GetCert() *tls.Certificate {
-	return s.cert
+	return s.config.Cert
 }
 
 func (s *Server) GetLogger() *zap.Logger {
 	return s.logger
 }
 
-func (s *Server) mustGetHost() string {
-	return fmt.Sprintf("%s:%d", s.hostname, s.MustGetPort())
-}
-
 func (s *Server) createListener() (net.Listener, error) {
-	host := s.getHost()
-	if s.cert == nil {
+	if s.config.Cert == nil {
 		// HTTP mode
-		return net.Listen("tcp", host)
+		return net.Listen("tcp", s.config.AddrPort.String())
 	}
 
 	// HTTPS mode
+	serverName := s.config.AddrPort.Addr().String()
+	if len(s.config.Cert.Leaf.DNSNames) > 0 {
+		serverName = s.config.Cert.Leaf.DNSNames[0]
+	}
+
 	cfg := &tls.Config{
-		Certificates: []tls.Certificate{*s.cert},
-		ServerName:   s.hostname,
+		Certificates: []tls.Certificate{*s.config.Cert},
+		ServerName:   serverName,
 		MinVersion:   tls.VersionTLS12,
 	}
-	return tls.Listen("tcp", host, cfg)
+	return tls.Listen("tcp", s.config.AddrPort.String(), cfg)
 }
 
-func (s *Server) listenAndServe() {
-	defer common.LogOnPanic()
+func (s *Server) listen() error {
+	s.address = nil
 
-	listener, err := s.createListener()
+	var err error
+	s.listener, err = s.createListener()
 	if err != nil {
-		s.logger.Error("failed to start server, retrying", zap.Error(err))
-		s.ResetPort()
-		err = s.Start()
-		if err != nil {
-			s.logger.Error("server start failed, giving up", zap.Error(err))
-		}
-		return
+		s.logger.Error("failed to start server", zap.Error(err))
+		return err
 	}
 
-	err = s.SetPort(listener.Addr().(*net.TCPAddr).Port)
-	if err != nil {
-		s.logger.Error("failed to set Server.port", zap.Error(err))
-		return
-	}
-
-	s.isRunning = true
+	s.address = s.listener.Addr().(*net.TCPAddr)
 
 	s.StartTimeout(func() {
 		err := s.Stop()
@@ -100,22 +123,32 @@ func (s *Server) listenAndServe() {
 		}
 	})
 
-	err = s.server.Serve(listener)
-	if err != http.ErrServerClosed {
-		s.logger.Error("server failed unexpectedly, restarting", zap.Error(err))
-		err = s.Start()
-		if err != nil {
-			s.logger.Error("server start failed, giving up", zap.Error(err))
-		}
+	return nil
+}
+
+func (s *Server) serve() {
+	defer common.LogOnPanic()
+
+	s.isRunning = true
+	defer func() {
+		s.isRunning = false
+		s.address = nil
+	}()
+
+	err := s.server.Serve(s.listener)
+	if errors.Is(err, http.ErrServerClosed) {
 		return
 	}
-	s.isRunning = false
+
+	s.logger.Error("server failed unexpectedly, restarting", zap.Error(err))
+	return
+
 }
 
 func (s *Server) resetServer() {
 	s.StopTimeout()
 	s.server = new(http.Server)
-	s.ResetPort()
+	s.address = nil
 }
 
 func (s *Server) applyHandlers() {
@@ -131,10 +164,20 @@ func (s *Server) applyHandlers() {
 }
 
 func (s *Server) Start() error {
+	if s.isRunning {
+		return nil
+	}
+
 	// Once Shutdown has been called on a server, it may not be reused;
 	s.resetServer()
 	s.applyHandlers()
-	go s.listenAndServe()
+
+	err := s.listen()
+	if err != nil {
+		return err
+	}
+
+	go s.serve()
 	return nil
 }
 
@@ -184,8 +227,17 @@ func (s *Server) AddHandlers(handlers HandlerPatternMap) {
 }
 
 func (s *Server) MakeBaseURL() *url.URL {
+	if s.address == nil {
+		return &url.URL{}
+	}
+
+	scheme := "http"
+	if s.config != nil && s.config.Cert != nil {
+		scheme = "https"
+	}
+
 	return &url.URL{
-		Scheme: "https",
-		Host:   s.mustGetHost(),
+		Scheme: scheme,
+		Host:   s.GetAddrPort(),
 	}
 }

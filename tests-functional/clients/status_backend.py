@@ -48,6 +48,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             self.data_dir = self.temp_dir.name
             if kwargs.get("connector_enabled", False):
                 self.connector_ws_url = f"ws://localhost:{constants.STATUS_CONNECTOR_WS_PORT}"
+            self.media_server_port = constants.STATUS_MEDIA_SERVER_PORT
         else:
             self.container = StatusBackendContainer(privileged, self.ipv6, **kwargs)
             self.temp_dir = None
@@ -55,6 +56,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             url = self.container.url
             if kwargs.get("connector_enabled", False):
                 self.connector_ws_url = self.container.connector_ws_url
+            self.media_server_port = self.container.media_server_port
 
         assert self.data_dir != ""
         self.base_url = url
@@ -134,6 +136,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "apiLoggingEnabled": True,
             "wakuFleetsConfigFilePath": Config.waku_fleets_config,
             "pushFleetsConfigFilePath": Config.push_fleets_config,
+            "mediaServerAddress": f"""{"0.0.0.0" if self.container else "127.0.0.1"}:{constants.STATUS_MEDIA_SERVER_PORT}""",
+            "mediaServerAdvertizeHost": "127.0.0.1" if self.container else "",
+            "mediaServerAdvertizePort": self.container.media_server_port if self.container else 0,
         }
 
         return self.api_request_json(method, data)
@@ -450,3 +455,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "newPassword": new_password,
         }
         return self.api_request_json(method, data)
+
+    def image_server_tls_cert(self):
+        method = "ImageServerTLSCert"
+        response = self.api_request(method, {})
+        return response.content.decode("utf-8")

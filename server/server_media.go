@@ -5,8 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"strconv"
+
+	"go.uber.org/zap"
+
+	errorspkg "github.com/pkg/errors"
 
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/logutils"
@@ -17,12 +22,41 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
-type MediaServerOption func(*MediaServer)
+type MediaServerOption func(*MediaServerConfig)
 
 func WithMediaServerDisableTLS(disableTLS bool) MediaServerOption {
-	return func(s *MediaServer) {
+	return func(s *MediaServerConfig) {
 		s.disableTLS = disableTLS
 	}
+}
+
+func WithMediaServerAddress(address string) MediaServerOption {
+	return func(s *MediaServerConfig) {
+		s.address = address
+	}
+}
+
+func WithMediaServerAdvertizeAddress(host string, port int) MediaServerOption {
+	return func(s *MediaServerConfig) {
+		s.advertizeHost = host
+		s.advertizePort = port
+	}
+}
+
+type MediaServerConfig struct {
+	// disableTLS controls whether the media server uses HTTP instead of HTTPS.
+	// Set to true to avoid TLS certificate issues with react-native-fast-image
+	// on Android, which has limitations with dynamic certificate updates.
+	// Pls check doc/use-status-backend-server.md in status-mobile for more details
+	disableTLS bool
+
+	// address is the address to bind the media server to. Defaults to "localhost:0".
+	address string
+
+	// AdvertizeHost and AdvertizePort define the a different host/port to be advertized.
+	// Check server.Config for more details.
+	advertizeHost string
+	advertizePort int
 }
 
 type MediaServer struct {
@@ -36,11 +70,7 @@ type MediaServer struct {
 	communityTokenReader        func(communityID string) ([]*protobuf.CommunityTokenMetadata, error)
 	communityImageVersionReader func(communityID string) uint32
 
-	// disableTLS controls whether the media server uses HTTP instead of HTTPS.
-	// Set to true to avoid TLS certificate issues with react-native-fast-image
-	// on Android, which has limitations with dynamic certificate updates.
-	// Pls check doc/use-status-backend-server.md in status-mobile for more details
-	disableTLS bool
+	config *MediaServerConfig
 }
 
 func initMediaCertificate(disableTLS bool) (*tls.Certificate, error) {
@@ -59,7 +89,12 @@ func initMediaCertificate(disableTLS bool) (*tls.Certificate, error) {
 func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiaccounts.Database, walletDB *sql.DB, opts ...MediaServerOption) (*MediaServer, error) {
 
 	s := &MediaServer{
-		disableTLS:      false,
+		config: &MediaServerConfig{
+			disableTLS:    false,
+			address:       "127.0.0.1:0",
+			advertizeHost: "",
+			advertizePort: 0,
+		},
 		db:              db,
 		downloader:      downloader,
 		multiaccountsDB: multiaccountsDB,
@@ -67,48 +102,72 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 	}
 
 	for _, opt := range opts {
-		opt(s)
+		opt(s.config)
 	}
 
-	cert, err := initMediaCertificate(s.disableTLS)
+	addrPort, err := netip.ParseAddrPort(s.config.address)
+	if err != nil {
+		return nil, errorspkg.Wrap(err, "failed to parse media server address")
+	}
+
+	cert, err := initMediaCertificate(s.config.disableTLS)
 	if err != nil {
 		return nil, err
 	}
 	s.Server = NewServer(
-		cert,
-		Localhost,
-		signal.SendMediaServerStarted,
 		logutils.ZapLogger().Named("MediaServer"),
+		&Config{
+			Cert:          cert,
+			AddrPort:      addrPort,
+			AdvertizeHost: s.config.advertizeHost,
+			AdvertizePort: s.config.advertizePort,
+		},
 	)
 
 	s.SetHandlers(HandlerPatternMap{
-		accountImagesPath:                   handleAccountImages(s.multiaccountsDB, s.logger),
-		accountInitialsPath:                 handleAccountInitials(s.multiaccountsDB, s.logger),
-		audioPath:                           handleAudio(s.db, s.logger),
-		contactImagesPath:                   handleContactImages(s.db, s.logger),
-		discordAttachmentsPath:              handleDiscordAttachment(s.db, s.logger),
-		discordAuthorsPath:                  handleDiscordAuthorAvatar(s.db, s.logger),
-		imagesPath:                          handleImage(s.db, s.logger),
-		ipfsPath:                            handleIPFS(s.downloader, s.logger),
-		LinkPreviewThumbnailPath:            handleLinkPreviewThumbnail(s.db, s.logger),
-		LinkPreviewFaviconPath:              handleLinkPreviewFavicon(s.db, s.logger),
-		StatusLinkPreviewThumbnailPath:      handleStatusLinkPreviewThumbnail(s.db, s.logger),
-		communityTokenImagesPath:            handleCommunityTokenImages(s.db, s.logger),
-		communityDescriptionImagesPath:      handleCommunityDescriptionImagesPath(s.db, s.getCommunityImage, s.logger),
-		communityDescriptionTokenImagesPath: handleCommunityDescriptionTokenImagesPath(s.db, s.getCommunityTokens, s.logger),
-		walletCommunityImagesPath:           handleWalletCommunityImages(s.walletDB, s.logger),
-		walletCollectionImagesPath:          handleWalletCollectionImages(s.walletDB, s.logger),
-		walletCollectibleImagesPath:         handleWalletCollectibleImages(s.walletDB, s.logger),
+		accountImagesPath:                   s.handleAccountImages,
+		accountInitialsPath:                 s.handleAccountInitials,
+		audioPath:                           s.handleAudio,
+		contactImagesPath:                   s.handleContactImages,
+		discordAttachmentsPath:              s.handleDiscordAttachment,
+		discordAuthorsPath:                  s.handleDiscordAuthorAvatar,
+		imagesPath:                          s.handleImage,
+		ipfsPath:                            s.handleIPFS,
+		LinkPreviewThumbnailPath:            s.handleLinkPreviewThumbnail,
+		LinkPreviewFaviconPath:              s.handleLinkPreviewFavicon,
+		StatusLinkPreviewThumbnailPath:      s.handleStatusLinkPreviewThumbnail,
+		communityTokenImagesPath:            s.handleCommunityTokenImages,
+		communityDescriptionImagesPath:      s.handleCommunityDescriptionImages,
+		communityDescriptionTokenImagesPath: s.handleCommunityDescriptionTokenImages,
+		walletCommunityImagesPath:           s.handleWalletCommunityImages,
+		walletCollectionImagesPath:          s.handleWalletCollectionImages,
+		walletCollectibleImagesPath:         s.handleWalletCollectibleImages,
+		healthPath:                          s.handleHealth,
 	})
 
 	return s, nil
 }
 
-func (s *MediaServer) MakeBaseURL() *url.URL {
-	return &url.URL{
-		Scheme: map[bool]string{true: "http", false: "https"}[s.disableTLS],
-		Host:   s.mustGetHost(),
+func (s *MediaServer) SetDataProviders(db *sql.DB, walletDB *sql.DB, downloader *ipfs.Downloader) {
+	s.db = db
+	s.walletDB = walletDB
+	s.downloader = downloader
+}
+
+func (s *MediaServer) Start() error {
+	err := s.Server.Start()
+	if err != nil {
+		s.logger.Error("failed to start media server", zap.Error(err))
+		return err
 	}
+
+	port := s.Server.GetPort()
+	s.logger.Info("media server started",
+		zap.Int("listeningPort", port),
+		zap.String("advertisingAddress", s.Server.GetAddrPort()))
+	signal.SendMediaServerStarted(port)
+
+	return nil
 }
 
 func (s *MediaServer) SetCommunityImageVersionReader(getFunc func(communityID string) uint32) {
