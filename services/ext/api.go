@@ -1023,8 +1023,8 @@ func (api *PublicAPI) SendEmojiReaction(ctx context.Context, chatID, messageID s
 	return api.service.messenger.SendEmojiReaction(ctx, chatID, messageID, emojiID, "")
 }
 
-// TODO remove SendEmojiReaction and remove the 2 when the client supports sending custom emojis
-func (api *PublicAPI) SendEmojiReaction2(ctx context.Context, chatID, messageID string, emoji string) (*protocol.MessengerResponse, error) {
+// TODO remove SendEmojiReaction and remove the V2 when the client supports sending custom emojis
+func (api *PublicAPI) SendEmojiReactionV2(ctx context.Context, chatID, messageID string, emoji string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendEmojiReaction(ctx, chatID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, emoji)
 }
 
