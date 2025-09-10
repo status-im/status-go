@@ -13,3 +13,4 @@ pytest-rerunfailures==13.0
 web3~=7.9.0
 matplotlib>=3.5.0
 eth-typing~=5.2.1
+faker~=37.6.0
