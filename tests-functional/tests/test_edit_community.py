@@ -6,11 +6,10 @@ import requests
 
 from clients.signals import SignalType
 from clients.status_backend import StatusBackend
-from faker import Faker
+from utils import fake
 from utils.image_utils import ImageCropRect
 from clients.services.wakuext import CommunityPermissionsAccess
 
-fake = Faker()
 
 ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "_assets", "tests")
 ELEPHANT = os.path.join(ASSETS_DIR, "elephant.jpg")
@@ -78,8 +77,8 @@ class TestEditCommunity:
 
         # Create a community with initial image
         create_resp = backend.wakuext_service.create_community(
-            name=fake.company(),
-            description=fake.sentence(),
+            name=fake.community_name(),
+            description=fake.community_description(),
             membership=CommunityPermissionsAccess.AUTO_ACCEPT,
             image=elephant_path,
             image_rect=ImageCropRect(10, 10, 70, 70),
@@ -91,8 +90,8 @@ class TestEditCommunity:
         # Edit community to change image
         edit_resp = backend.wakuext_service.edit_community(
             community_id=community["id"],
-            name=fake.company(),
-            description=fake.sentence(),
+            name=fake.community_name(),
+            description=fake.community_description(),
             membership=CommunityPermissionsAccess.AUTO_ACCEPT,
             image=status_path,
             image_rect=ImageCropRect(40, 40, 200, 200),
