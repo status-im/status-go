@@ -1,5 +1,5 @@
-import random
 import pytest
+
 from resources.constants import user_1
 
 
@@ -82,7 +82,5 @@ class TestRpc:
         ],
     )
     def test_(self, method, params):
-        _id = str(random.randint(1, 8888))
-
-        self.rpc_client.rpc_valid_request(method, params, _id)
+        self.rpc_client.rpc_valid_request(method, params)
         # TODO: Add more assertions on response

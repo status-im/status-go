@@ -1,7 +1,6 @@
-import random
+import logging
 
 import pytest
-import logging
 
 from clients.signals import SignalType
 from steps.messenger import MessengerSteps
@@ -35,8 +34,7 @@ class TestProfile:
         ],
     )
     def test_wakuext_(self, method, params):
-        _id = str(random.randint(1, 8888))
-        self.rpc_client.rpc_valid_request(method, params, _id)
+        self.rpc_client.rpc_valid_request(method, params)
 
     @pytest.mark.parametrize(
         "method, setting_name, default_value, changed_value",
@@ -61,14 +59,12 @@ class TestProfile:
         ],
     )
     def test_settings_(self, method, setting_name, default_value, changed_value):
-        _id = str(random.randint(1, 8888))
-
         logging.info("Step: check that %s is %s by default " % (setting_name, default_value))
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
         assert response[setting_name] == default_value
 
         logging.info("Step: change %s to %s and check it is updated" % (setting_name, changed_value))
-        self.rpc_client.rpc_valid_request(method, [setting_name, changed_value], _id)
+        self.rpc_client.rpc_valid_request(method, [setting_name, changed_value])
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
         assert response[setting_name] == changed_value
 
@@ -95,14 +91,12 @@ class TestProfile:
         ],
     )
     def test_omitempty_false_(self, method, setting_name, set_value):
-        _id = str(random.randint(1, 8888))
-
         logging.info("Step: assert that %s is not retrieved in settings before setting" % (setting_name))
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
         assert setting_name not in response
 
         logging.info("Step: change %s to %s and check it is updated" % (setting_name, set_value))
-        self.rpc_client.rpc_valid_request(method, [setting_name, set_value], _id)
+        self.rpc_client.rpc_valid_request(method, [setting_name, set_value])
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
         assert response[setting_name] == set_value
 
@@ -121,14 +115,12 @@ class TestProfile:
         ],
     )
     def test_omitempty_true_(self, method, setting_name, set_value):
-        _id = str(random.randint(1, 8888))
-
         logging.info("Step: assert that %s is  retrieved in settings before unsetting" % (setting_name))
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
         assert setting_name in response
 
         logging.info("Step: change %s to %s and check it is updated and does not retrieve anymore" % (setting_name, set_value))
-        self.rpc_client.rpc_valid_request(method, [setting_name, set_value], _id)
+        self.rpc_client.rpc_valid_request(method, [setting_name, set_value])
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
         assert setting_name not in response
 
