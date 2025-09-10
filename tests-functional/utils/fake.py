@@ -4,18 +4,18 @@ from faker import Faker
 _faker = Faker("en")
 
 
-def CommunityName() -> str:
+def community_name() -> str:
     return _faker.company()
 
 
-def CommunityDescription() -> str:
+def community_description() -> str:
     return _faker.sentence()
 
 
-def ProfileName() -> str:
+def profile_name() -> str:
     return _faker.user_name()
 
 
-def ProfilePassword(length: int = 8) -> str:
+def profile_password(length: int = 8) -> str:
     # Letters + digits; no special characters to keep compatibility
     return _faker.password(length=length, special_chars=False)

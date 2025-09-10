@@ -236,7 +236,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             dst.write(src.read())
 
     def _set_display_name(self, **kwargs):
-        self.display_name = kwargs.get("display_name", fake.ProfileName())
+        self.display_name = kwargs.get("display_name", fake.profile_name())
 
     def _create_account_request(self, user, **kwargs):
         self.password = kwargs.get("password", user.password)

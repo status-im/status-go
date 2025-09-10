@@ -33,7 +33,7 @@ class TestPassword:
         assert response is False
 
     def test_change_password(self, backend_new_profile):
-        new_password = fake.ProfilePassword(8)
+        new_password = fake.profile_password(8)
         backend = backend_new_profile("user")
 
         # Try a wrong password
