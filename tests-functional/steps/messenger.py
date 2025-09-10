@@ -1,15 +1,16 @@
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportAttributeAccessIssue=false
 import logging
-import random
-import string
 import time
 from uuid import uuid4
+
 import pytest
 from tenacity import retry, stop_after_delay, wait_fixed
+
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 from steps.network_conditions import NetworkConditionsSteps
+from utils import fake
 
 
 class MessengerSteps(NetworkConditionsSteps):
@@ -146,8 +147,7 @@ class MessengerSteps(NetworkConditionsSteps):
         return response.get("chats", [])[0].get("id")
 
     def create_community(self, node):
-        name = f"vac_qa_community_{''.join(random.choices(string.ascii_letters, k=10))}"
-        response = node.wakuext_service.create_community(name)
+        response = node.wakuext_service.create_community(fake.CommunityName(), fake.CommunityDescription())
         self.community_id = response.get("communities", [{}])[0].get("id")
         return self.community_id
 

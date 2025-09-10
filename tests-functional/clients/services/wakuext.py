@@ -1,8 +1,9 @@
+from enum import Enum
 from typing import TypedDict, Union
+
 from clients.rpc import RpcClient
 from clients.services.service import Service
 from resources.enums import MessageContentType
-from enum import Enum
 
 
 class PushNotificationRegistrationTokenType(Enum):
@@ -205,8 +206,8 @@ class WakuextService(Service):
         response = self.rpc_request("sendGroupChatInvitationRejection", params)
         return response
 
-    def create_community(self, name, color="#ffffff", membership=3):
-        params = [{"membership": membership, "name": name, "color": color, "description": name}]
+    def create_community(self, name, description, color="#ffffff", membership=3):
+        params = [{"membership": membership, "name": name, "color": color, "description": description}]
         response = self.rpc_request("createCommunity", params)
         return response
 

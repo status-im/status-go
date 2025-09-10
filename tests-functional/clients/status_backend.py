@@ -1,30 +1,32 @@
 import json
 import logging
-import string
+import os
 import tempfile
 import time
-import random
 import uuid
-import requests
-import os
 
+import requests
 from tenacity import retry, stop_after_delay, wait_fixed
 
 import resources.constants as constants
-from clients.services.wallet import WalletService
-from clients.services.wakuext import WakuextService, PushNotificationRegistrationTokenType
-from clients.services.accounts import AccountService
-from clients.services.settings import SettingsService
-from clients.services.connector import ConnectorService
-from clients.signals import SignalClient, SignalType
-from clients.rpc import RpcClient
 from clients.api import ApiClient
-from clients.metrics import Events, StatusGoMetrics
 from clients.expvar import ExpvarClient
+from clients.metrics import Events, StatusGoMetrics
+from clients.rpc import RpcClient
+from clients.services.accounts import AccountService
+from clients.services.connector import ConnectorService
+from clients.services.settings import SettingsService
+from clients.services.wakuext import (
+    WakuextService,
+    PushNotificationRegistrationTokenType,
+)
+from clients.services.wallet import WalletService
+from clients.signals import SignalClient, SignalType
 from clients.statusgo_container import StatusBackendContainer
-from utils.config import Config
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
+from utils import fake
 from utils import keys
+from utils.config import Config
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
@@ -234,10 +236,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             dst.write(src.read())
 
     def _set_display_name(self, **kwargs):
-        self.display_name = kwargs.get(
-            "display_name",
-            f"DISP_NAME_{''.join(random.choices(string.ascii_letters + string.digits + '_-', k=10))}",
-        )
+        self.display_name = kwargs.get("display_name", fake.ProfileName())
 
     def _create_account_request(self, user, **kwargs):
         self.password = kwargs.get("password", user.password)
