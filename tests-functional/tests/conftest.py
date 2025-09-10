@@ -39,6 +39,8 @@ def backend_factory(request):
     # Store created backends for cleanup
     created_backends: list[StatusBackend] = []
 
+    test_name = request.node.name if hasattr(request, "cls") else str(uuid4)
+
     def factory(name, **kwargs) -> StatusBackend:
         """
         Create a single backend with the given name.
@@ -50,13 +52,12 @@ def backend_factory(request):
         Returns:
             StatusBackend: Created backend instance
         """
-        test_name = request.node.name if hasattr(request, "cls") else str(uuid4)
         logging.debug(f"🔧 [SETUP] Creating {name} backend for {request.cls.__name__}")
         logging.debug(f"🔧 [SETUP] Creating {name} backend for {test_name}")
         logging.debug(f"📋 [SETUP] Parameters: privileged={privileged}, ipv6={ipv6}")
 
         # Create backend
-        backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6, test_name=test_name, **kwargs)
+        backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6, **kwargs)
         created_backends.append(backend)
         logging.debug(f"✅ [SETUP] {name.capitalize()} backend created")
 
@@ -69,7 +70,7 @@ def backend_factory(request):
 
     for i, backend in enumerate(reversed(created_backends)):
         logging.debug(f"🧹 [TEARDOWN] Cleaning up backend {len(created_backends) - i}...")
-        backend.shutdown(log_sufix=request.node.name)
+        backend.shutdown(log_sufix=test_name)
 
 
 @pytest.fixture(scope="function", autouse=False)
