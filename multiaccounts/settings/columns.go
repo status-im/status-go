@@ -186,7 +186,7 @@ var (
 		dBColumnName:   "log_level",
 	}
 	MessagesBackupEnabled = SettingField{
-		reactFieldName: "messages-backup-enabled",
+		reactFieldName: "messages-backup-enabled?",
 		dBColumnName:   "messages_backup_enabled",
 		valueHandler:   BoolHandler,
 	}
