@@ -2,6 +2,8 @@ module github.com/status-im/status-go
 
 go 1.24.0
 
+tool go.uber.org/mock/mockgen
+
 replace github.com/ethereum/go-ethereum v1.16.0 => github.com/status-im/go-ethereum v1.10.25-status.24
 
 replace github.com/rjeczalik/notify => github.com/status-im/notify v1.0.2-status
