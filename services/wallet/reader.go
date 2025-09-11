@@ -1,6 +1,6 @@
 package wallet
 
-//go:generate mockgen -package=mock_reader -source=reader.go -destination=mock/reader/reader.go
+//go:generate go tool mockgen -package=mock_reader -source=reader.go -destination=mock/reader/reader.go
 
 import (
 	"context"

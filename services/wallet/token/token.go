@@ -1,6 +1,6 @@
 package token
 
-//go:generate mockgen -source=token.go -destination=mock/token/tokenmanager.go
+//go:generate go tool mockgen -source=token.go -destination=mock/token/tokenmanager.go
 
 import (
 	"context"

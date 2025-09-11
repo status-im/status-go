@@ -1,6 +1,6 @@
 package ethclient
 
-//go:generate mockgen -package=mock_ethclient -source=rps_limited_eth_client.go -destination=mock/client/ethclient/rps_limited_eth_client.go
+//go:generate go tool mockgen -package=mock_ethclient -source=rps_limited_eth_client.go -destination=mock/client/ethclient/rps_limited_eth_client.go
 
 import (
 	"strings"

@@ -1,6 +1,6 @@
 package thirdparty
 
-//go:generate mockgen -package=mock_thirdparty -source=decoder_types.go -destination=mock/decoder_types.go
+//go:generate go tool mockgen -package=mock_thirdparty -source=decoder_types.go -destination=mock/decoder_types.go
 
 type DataParsed struct {
 	Name      string            `json:"name"`

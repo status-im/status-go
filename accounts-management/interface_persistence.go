@@ -1,6 +1,6 @@
 package accountsmanagement
 
-//go:generate mockgen -package=mock_persistence -source=interface_persistence.go -destination=./mock/persistence.go
+//go:generate go tool mockgen -package=mock_persistence -source=interface_persistence.go -destination=./mock/persistence.go
 
 import (
 	"github.com/status-im/status-go/accounts-management/types"

@@ -1,6 +1,6 @@
 package rpc
 
-//go:generate mockgen -package=mock_rpcclient -source=client.go -destination=mock/client/client.go
+//go:generate go tool mockgen -package=mock_rpcclient -source=client.go -destination=mock/client/client.go
 
 import (
 	"context"
