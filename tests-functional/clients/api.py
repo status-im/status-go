@@ -1,7 +1,8 @@
 import json
 import logging
-import requests
 from json import JSONDecodeError
+
+import requests
 
 
 class ApiError(Exception):
@@ -30,12 +31,12 @@ class ApiClient:
         self.client = client
         self.api_url = api_url
 
-    def api_request(self, method, data, url=None, quiet=False):
+    def api_request(self, method, data, url=None, quiet=False, **kwargs):
         url = url if url else self.api_url
         url = f"{url}/{method}" if method else url
         if not quiet:
             logging.debug(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True)}")
-        response = self.client.post(url, json=data)
+        response = self.client.post(url, json=data, **kwargs)
 
         if response.status_code != 200:
             raise ApiHTTPError(
@@ -52,8 +53,8 @@ class ApiClient:
             logging.debug(f"Got response: {response.content}")
         return response
 
-    def api_request_json(self, method, data):
-        response = self.api_request(method, data)
+    def api_request_json(self, method, data, **kwargs):
+        response = self.api_request(method, data, **kwargs)
         try:
             json_response = response.json()
         except JSONDecodeError:
