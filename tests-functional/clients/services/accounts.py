@@ -159,6 +159,67 @@ class AccountService(Service):
         response = self.rpc_request("getKeycardsWithSameKeyUID", params)
         return response
 
+    def add_keypair_stored_to_keycard(self, key_uid, master_address, name, wallet_accounts):
+        params = [key_uid, master_address, name, wallet_accounts]
+        response = self.rpc_request("addKeypairStoredToKeycard", params)
+        return response
+
+    def update_keypair(self, keypair):
+        params = [keypair]
+        response = self.rpc_request("updateKeypair", params)
+        return response
+
+    def get_watch_only_accounts(self):
+        response = self.rpc_request("getWatchOnlyAccounts", [])
+        return response
+
+    def delete_keypair(self, key_uid, password):
+        params = [key_uid, password]
+        response = self.rpc_request("deleteKeypair", params)
+        return response
+
+    def remaining_account_capacity(self):
+        response = self.rpc_request("remainingAccountCapacity", [])
+        return response
+
+    def remaining_keypair_capacity(self):
+        response = self.rpc_request("remainingKeypairCapacity", [])
+        return response
+
+    def remaining_watch_only_account_capacity(self):
+        response = self.rpc_request("remainingWatchOnlyAccountCapacity", [])
+        return response
+
+    def make_private_key_keypair_fully_operable(self, private_key, password):
+        params = [private_key, password]
+        response = self.rpc_request("makePrivateKeyKeypairFullyOperable", params)
+        return response
+
+    def clean_keystore_files(self, password):
+        params = [password]
+        response = self.rpc_request("cleanKeystoreFiles", params)
+        return response
+
+    def make_partially_operable_accounts_fully_operable(self, password):
+        params = [password]
+        response = self.rpc_request("makePartiallyOperableAccoutsFullyOperable", params)
+        return response
+
+    def make_seed_phrase_keypair_fully_operable(self, mnemonic, password):
+        params = [mnemonic, password]
+        response = self.rpc_request("makeSeedPhraseKeypairFullyOperable", params)
+        return response
+
+    def address_was_shown(self, address):
+        params = [address]
+        response = self.rpc_request("addressWasShown", params)
+        return response
+
+    def get_num_of_addresses_to_generate_for_keypair(self, key_uid):
+        params = [key_uid]
+        response = self.rpc_request("getNumOfAddressesToGenerateForKeypair", params)
+        return response
+
     def verify_keystore_file_for_account(self, address, password):
         params = [address, password]
         response = self.rpc_request("verifyKeystoreFileForAccount", params)

@@ -1,7 +1,7 @@
 import copy
 import re
 import pytest
-from resources.constants import new_account_data_1, user_1
+from resources.constants import new_account_data_1, user_1, wallet_account_details_derivation, keypair_name
 from clients.api import ApiResponseError
 
 
@@ -81,16 +81,8 @@ class TestAddAccount:
     def test_add_account_to_seed_imported_keypair(self):
         used_mnemonic = user_1.passphrase
         profile_password = self.account.password
-
-        keypair_name = "SeedImportedKeypair"
-        wallet_account_details = {
-            "name": "SeedImportedAccount",
-            "path": "m/44'/60'/0'/0/0",
-            "emoji": "🔑",
-            "colorId": "primary",
-        }
         add_keypair_response = self.account.accounts_service.add_keypair_via_seed_phrase(
-            used_mnemonic, profile_password, keypair_name, wallet_account_details
+            used_mnemonic, profile_password, keypair_name, wallet_account_details_derivation
         )
 
         path = "m/44'/60'/0'/0/1"

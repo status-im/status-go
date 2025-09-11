@@ -1,15 +1,7 @@
 import re
 import pytest
-from resources.constants import user_1, user_2
+from resources.constants import user_1, user_2, wallet_account_details_derivation, wallet_account_details_root, keypair_name
 from clients.api import ApiResponseError
-
-KEYPAIR_NAME = "SeedPhraseImportedKeypair"
-WALLET_ACCOUNT_DETAILS = {
-    "name": KEYPAIR_NAME,
-    "path": "m/44'/60'/0'/0/0",
-    "emoji": "🔑",
-    "colorId": "primary",
-}
 
 
 @pytest.mark.rpc
@@ -21,7 +13,7 @@ class TestAddKeypairViaSeedPhrase:
 
     def test_add_valid_keypair_via_seed_phrase(self):
         add_keypair_response = self.account.accounts_service.add_keypair_via_seed_phrase(
-            user_1.passphrase, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS
+            user_1.passphrase, self.account.password, keypair_name, wallet_account_details_derivation
         )
         add_keypair_result = add_keypair_response
         accounts = add_keypair_result.get("accounts")
@@ -30,13 +22,13 @@ class TestAddKeypairViaSeedPhrase:
         assert new_keypair.get("address").lower() == user_1.address.lower()
         assert new_keypair.get("chat") is False
         assert new_keypair.get("clock") == 0
-        assert new_keypair.get("colorId") == WALLET_ACCOUNT_DETAILS.get("colorId")
+        assert new_keypair.get("colorId") == wallet_account_details_derivation.get("colorId")
         assert new_keypair.get("createdAt") == 0
-        assert new_keypair.get("emoji") == WALLET_ACCOUNT_DETAILS.get("emoji")
+        assert new_keypair.get("emoji") == wallet_account_details_derivation.get("emoji")
         assert new_keypair.get("hidden") is False
-        assert new_keypair.get("name") == KEYPAIR_NAME
+        assert new_keypair.get("name") == keypair_name
         assert new_keypair.get("operable") == "fully"
-        assert new_keypair.get("path") == WALLET_ACCOUNT_DETAILS.get("path")
+        assert new_keypair.get("path") == wallet_account_details_derivation.get("path")
         assert new_keypair.get("position") == 1
         assert new_keypair.get("removed") is False
         assert new_keypair.get("type") == ""
@@ -45,45 +37,48 @@ class TestAddKeypairViaSeedPhrase:
 
         # Fetch keypairs and ensure the imported one is present
         get_keypairs_response = self.account.accounts_service.get_account_keypairs()
-        imported_keypairs = [keypair for keypair in get_keypairs_response if keypair.get("name") == KEYPAIR_NAME]
+        imported_keypairs = [keypair for keypair in get_keypairs_response if keypair.get("name") == keypair_name]
         assert len(imported_keypairs) == 1
         assert add_keypair_result.get("key-uid") == imported_keypairs[0].get("key-uid")
         assert add_keypair_result.get("type") == imported_keypairs[0].get("type")
         assert add_keypair_result.get("derived-from") == imported_keypairs[0].get("derived-from")
 
     def test_add_a_second_keypair_via_sp_with_same_details(self):
-        self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
+        self.account.accounts_service.add_keypair_via_seed_phrase(
+            user_1.passphrase, self.account.password, keypair_name, wallet_account_details_derivation
+        )
 
         # different private key but same details
-        self.account.accounts_service.add_keypair_via_seed_phrase(user_2.private_key, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
+        self.account.accounts_service.add_keypair_via_seed_phrase(
+            user_2.private_key, self.account.password, keypair_name, wallet_account_details_derivation
+        )
 
         keypairs_response = self.account.accounts_service.get_account_keypairs()
-        imported_keypairs = [keypair for keypair in keypairs_response if keypair.get("name") == KEYPAIR_NAME]
+        imported_keypairs = [keypair for keypair in keypairs_response if keypair.get("name") == keypair_name]
         assert len(imported_keypairs) == 2, "2 keypairs with the same name should be saved"
 
     def test_add_duplicate_keypair_via_sp(self):
         resp1 = self.account.accounts_service.add_keypair_via_seed_phrase(
-            user_1.passphrase, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS
+            user_1.passphrase, self.account.password, keypair_name, wallet_account_details_derivation
         )
 
         # same private key
         with pytest.raises(ApiResponseError, match=re.escape(f'[validation] keypair already added -  keyuid: {resp1.get("key-uid")}')):
-            self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, self.account.password, KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
+            self.account.accounts_service.add_keypair_via_seed_phrase(
+                user_1.passphrase, self.account.password, keypair_name, wallet_account_details_derivation
+            )
 
     def test_add_keypair_via_sp_with_wrong_path(self):
-        details = {
-            "name": "name",
-            "path": "m",
-            "emoji": "🔑",
-            "colorId": "primary",
-        }
         with pytest.raises(
             ApiResponseError,
             match=re.escape(
-                f'[validation] unsupported profile or seed imported key pair wallet account -  path: {details["path"]} expected path: m/44\''
+                f"[validation] unsupported profile or seed imported key pair wallet account - "
+                f"path: {wallet_account_details_root["path"]} expected path: m/44'"
             ),
         ):
-            self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, self.account.password, KEYPAIR_NAME, details)
+            self.account.accounts_service.add_keypair_via_seed_phrase(
+                user_1.passphrase, self.account.password, keypair_name, wallet_account_details_root
+            )
 
     def test_add_keypair_via_sp_with_empty_password(self):
-        self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, "", KEYPAIR_NAME, WALLET_ACCOUNT_DETAILS)
+        self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, "", keypair_name, wallet_account_details_derivation)

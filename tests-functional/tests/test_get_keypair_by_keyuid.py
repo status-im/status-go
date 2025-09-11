@@ -1,6 +1,6 @@
 import re
 import pytest
-from resources.constants import user_1
+from resources.constants import user_1, keypair_name, wallet_account_details_derivation
 from clients.api import ApiResponseError
 
 
@@ -36,14 +36,9 @@ class TestGetKeypairByKeyUID:
             self.account.accounts_service.get_keypair_by_key_uid("0x6d462df35b97fabb8f792eac01240556e26fd2600753e5bbffa4713a9c95abc7")
 
     def test_get_newly_imported_keypair(self):
-        keypair_name = "SeedImportedKeypair"
-        wallet_account_details = {
-            "name": "SeedImportedAccount",
-            "path": "m/44'/60'/0'/0/0",
-            "emoji": "🔑",
-            "colorId": "primary",
-        }
-        self.account.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, self.account.password, keypair_name, wallet_account_details)
+        self.account.accounts_service.add_keypair_via_seed_phrase(
+            user_1.passphrase, self.account.password, keypair_name, wallet_account_details_derivation
+        )
         keypairs_response = self.account.accounts_service.get_account_keypairs()
         imported_keypair = [keypair for keypair in keypairs_response if keypair.get("name") == keypair_name][0]
         imported_keypair_key_uid = imported_keypair.get("key-uid")

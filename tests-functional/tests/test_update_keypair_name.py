@@ -1,6 +1,6 @@
 import re
 import pytest
-from resources.constants import user_1
+from resources.constants import user_1, wallet_account_details_derivation, keypair_name
 from clients.api import ApiResponseError
 
 
@@ -17,14 +17,8 @@ class TestUpdateKeypairName:
             self.account.accounts_service.update_keypair_name(self.account.key_uid, new_name)
 
     def test_update_keypair_name_for_seed_account(self):
-        wallet_account_details = {
-            "name": "SeedImportedAccount",
-            "path": "m/44'/60'/0'/0/0",
-            "emoji": "🔑",
-            "colorId": "primary",
-        }
         self.account.accounts_service.add_keypair_via_seed_phrase(
-            user_1.passphrase, self.account.password, "SeedImportedKeypair", wallet_account_details
+            user_1.passphrase, self.account.password, keypair_name, wallet_account_details_derivation
         )
 
         keypairs_response = self.account.accounts_service.get_account_keypairs()
