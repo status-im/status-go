@@ -1,6 +1,7 @@
+from datetime import datetime, timedelta
+
 import pytest
 
-from datetime import datetime, timedelta
 from resources.enums import ChatType, ChatPreviewFilterType, MuteType
 from steps.messenger import MessengerSteps
 
@@ -24,8 +25,14 @@ class TestChatActions(MessengerSteps):
 
         chats = self.sender.wakuext_service.chats()
         assert len(chats) == 2
-        assert chats[0].get("chatType", 0) == ChatType.ONE_TO_ONE.value
-        assert chats[1].get("chatType", 0) == ChatType.PRIVATE_GROUP_CHAT.value
+
+        private_group_chat = next((chat for chat in chats if chat.get("id") == private_group_id), None)
+        assert private_group_chat is not None
+        assert private_group_chat.get("chatType", "") == ChatType.PRIVATE_GROUP_CHAT.value
+
+        one_to_one_chat = next((chat for chat in chats if chat.get("id") == self.receiver.public_key), None)
+        assert one_to_one_chat is not None
+        assert one_to_one_chat.get("chatType", "") == ChatType.ONE_TO_ONE.value
 
     def test_chat_by_chat_id(self):
         sent_texts, _ = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
@@ -56,8 +63,7 @@ class TestChatActions(MessengerSteps):
 
         chats_previews = self.sender.wakuext_service.chats_preview(ChatPreviewFilterType.NonCommunity.value)
         assert len(chats_previews) == 2
-        assert chats_previews[0].get("id", "") == one_to_one_chat_id
-        assert chats_previews[1].get("id", "") == private_group_chat_id
+        assert {chat.get("id", "") for chat in chats_previews} == {one_to_one_chat_id, private_group_chat_id}
 
     def test_active_chats(self):
         self.make_contacts(self.sender, self.receiver)
