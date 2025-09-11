@@ -7,13 +7,13 @@
 }:
 
 let
-  goPackagePath = "github.com/status-im/status-go";
   optionalString = pkgs.lib.optionalString;
-in pkgs.buildGoPackage {
+in pkgs.buildGoModule {
   pname = "status-go";
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
+  vendorHash = null;
 
-  inherit meta version goPackagePath;
+  inherit meta version;
 
   nativeBuildInputs = let
     # Fixes fatal: not a git repository (or any of the parent directories): .git
@@ -40,10 +40,8 @@ in pkgs.buildGoPackage {
   allowGoReference = true;
 
   preBuild = ''
-    pushd go/src/$goPackagePath
     go run cmd/library/*.go > $NIX_BUILD_TOP/main.go
     make generate SHELL=$SHELL GO111MODULE=on GO_GENERATE_CMD='go generate'
-    popd
   '';
 
   # Build the Go library
