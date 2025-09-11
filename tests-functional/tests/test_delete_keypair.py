@@ -22,3 +22,7 @@ class TestDeleteKeypair:
 
         with pytest.raises(ApiResponseError, match=re.escape("keypair is not found")):
             self.account.accounts_service.get_keypair_by_key_uid(key_uid)
+
+    def test_delete_non_existent_keypair(self):
+        with pytest.raises(ApiResponseError, match=re.escape("keypair is not found")):
+            self.account.accounts_service.delete_keypair("key_uid", self.account.password)
