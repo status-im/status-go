@@ -31,7 +31,6 @@ jobs:
       - name: Install Go dependencies
         if: steps.cache-go-deps.outputs.cache-hit != 'true'
         run: |
-          go install go.uber.org/mock/mockgen@v0.4.0
           go install github.com/kevinburke/go-bindata/v4/...@v4.0.2
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
           go install golang.org/x/tools/gopls@latest
