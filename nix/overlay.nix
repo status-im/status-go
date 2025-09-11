@@ -27,7 +27,6 @@ in rec {
 
   go = prev.go_1_24;
   buildGoModule = prev.buildGo124Module;
-  buildGoPackage = prev.buildGo124Package;
 
   golangci-lint = prev.golangci-lint.override {
     buildGoModule = args: prev.buildGo124Module ( args // rec {
