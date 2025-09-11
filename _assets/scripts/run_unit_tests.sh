@@ -47,6 +47,14 @@ run_test_for_packages() {
   local exit_code_file="exit_code_${iteration}.txt"
   local timeout="$(( single_timeout * count))m"
 
+  rm $output_file 2>/dev/null || true
+  rm $report_file 2>/dev/null || true
+  rm $rerun_report_file 2>/dev/null || true
+  rm $exit_code_file 2>/dev/null || true
+  rm $coverage_file 2>/dev/null || true
+  rm coverage_merged.out 2>/dev/null || true
+  rm test-coverage.html 2>/dev/null || true
+
   if [[ "${UNIT_TEST_DRY_RUN}" == 'true' ]]; then
     echo -e "${GRN}Dry run ${iteration}. message:${RST} ${log_message}\n"\
     "${YLW}Dry run ${iteration}. packages:${RST} ${packages}\n"\
@@ -69,6 +77,13 @@ run_test_for_packages() {
 
   # Cleanup previous coverage reports
   rm -f "${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.*"
+
+  echo "gotestsum --packages=\"${packages}\" ${gotestsum_flags} --raw-command -- \
+    ./_assets/scripts/test-with-coverage.sh \
+    ${GOTEST_EXTRAFLAGS} \
+    -timeout \"${timeout}\" \
+    -tags \"${BUILD_TAGS}\" | \
+    redirect_stdout \"${output_file}\""
 
   # Run tests
   gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
@@ -115,14 +130,21 @@ if [[ $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
 else
   # Spawn a process to test all packages except `protocol`
   UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES}" | tr ' ' '\n' | grep -v '/protocol$' | tr '\n' ' ')
-  run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
+  # echo "UNIT_TEST_PACKAGES=${UNIT_TEST_PACKAGES}"
+  # echo "------------------------------------------------------"
+  # echo "UNIT_TEST_PACKAGES_FILTERED=${UNIT_TEST_PACKAGES_FILTERED}"
+  run_test_for_packages github.com/status-im/status-go/protocol/communities "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "ONLY 'protocol/communities'" &
   bg_pids+=("$!")
+  # run_test_for_packages github.com/status-im/status-go/wakuv2 "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "ONLY 'wakuv2'" &
+  # bg_pids+=("$!")
+  # run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
+  # bg_pids+=("$!")
 
   # Spawn separate processes to run `protocol` package
-  for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-    run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
-    bg_pids+=("$!")
-  done
+  # for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
+  #   run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
+  #   bg_pids+=("$!")
+  # done
 fi
 
 # Wait for jobs and handle failfast
