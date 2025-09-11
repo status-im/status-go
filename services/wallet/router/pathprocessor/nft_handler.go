@@ -21,7 +21,7 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-//go:generate mockgen -source=nft_handler.go -destination=nft_handler_mock_test.go -package=pathprocessor NFTHandler
+//go:generate go tool mockgen -source=nft_handler.go -destination=nft_handler_mock_test.go -package=pathprocessor NFTHandler
 
 // NFTHandler handling different types of NFT transfers
 type NFTHandler interface {

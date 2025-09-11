@@ -1,6 +1,6 @@
 package ownership
 
-//go:generate mockgen -package=mock_ownership -source=ownership_db.go -destination=mock/ownership_db.go
+//go:generate go tool mockgen -package=mock_ownership -source=ownership_db.go -destination=mock/ownership_db.go
 
 import (
 	"database/sql"

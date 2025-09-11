@@ -1,6 +1,6 @@
 package ownership
 
-//go:generate mockgen -package=mock_ownership -source=controller.go -destination=mock/controller.go
+//go:generate go tool mockgen -package=mock_ownership -source=controller.go -destination=mock/controller.go
 
 import (
 	"context"

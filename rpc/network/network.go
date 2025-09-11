@@ -18,7 +18,7 @@ import (
 	persistence "github.com/status-im/status-go/rpc/network/db"
 )
 
-//go:generate mockgen -package=mock -source=network.go -destination=mock/network.go
+//go:generate go tool mockgen -package=mock -source=network.go -destination=mock/network.go
 
 const MaxActiveNetworks = 5
 

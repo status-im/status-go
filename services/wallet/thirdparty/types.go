@@ -1,6 +1,6 @@
 package thirdparty
 
-//go:generate mockgen -package=mock_thirdparty -source=types.go -destination=mock/types.go
+//go:generate go tool mockgen -package=mock_thirdparty -source=types.go -destination=mock/types.go
 
 import (
 	"errors"
