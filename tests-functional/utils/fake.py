@@ -1,3 +1,5 @@
+import random
+
 from faker import Faker
 
 # Use a single English locale to minimize provider loading
@@ -14,7 +16,8 @@ def community_description() -> str:
 
 
 def profile_name() -> str:
-    return _faker.user_name()
+    length = random.randint(5, 24)
+    return _faker.pystr(min_chars=length, max_chars=length)
 
 
 def profile_password(length: int = 8) -> str:
