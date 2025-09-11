@@ -3,6 +3,7 @@ package pathprocessor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	netUrl "net/url"
@@ -16,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/hop"
@@ -69,7 +71,7 @@ func (bf *BonderFee) UnmarshalJSON(data []byte) error {
 		Error string `json:"error"`
 	}
 	if err := json.Unmarshal(data, &errorResponse); err == nil && errorResponse.Error != "" {
-		return createBridgeHopErrorResponse(fmt.Errorf(errorResponse.Error))
+		return createBridgeHopErrorResponse(errors.New(errorResponse.Error))
 	}
 
 	type Alias BonderFee
