@@ -351,7 +351,7 @@ tidy:
 vendor: generate
 	go mod tidy
 	go mod vendor
-	modvendor -copy="**/*.c **/*.h" -v
+	go tool modvendor -copy="**/*.c **/*.h" -v
 .PHONY: vendor
 
 migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql

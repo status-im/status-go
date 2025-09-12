@@ -56,7 +56,6 @@ in rec {
   };
 
   # Custom packages
-  go-modvendor = callPackage ./pkgs/go-modvendor { };
   codecov-cli = callPackage ./pkgs/codecov-cli { };
   go-generate-fast = callPackage ./pkgs/go-generate-fast { };
 }
