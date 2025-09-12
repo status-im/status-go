@@ -219,7 +219,7 @@ github.com/edsrzf/mmap-go
 ## explicit; go 1.14
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.16.0 => github.com/status-im/go-ethereum v1.10.25-status.24
+# github.com/ethereum/go-ethereum v1.16.3 => github.com/status-im/go-ethereum v1.10.25-status.24
 ## explicit; go 1.22
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
@@ -329,7 +329,7 @@ github.com/godbus/dbus/v5
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
-# github.com/golang-jwt/jwt/v4 v4.5.1
+# github.com/golang-jwt/jwt/v4 v4.5.2
 ## explicit; go 1.16
 github.com/golang-jwt/jwt/v4
 # github.com/golang-migrate/migrate/v4 v4.15.2
@@ -1015,7 +1015,7 @@ github.com/status-im/doubleratchet
 # github.com/status-im/extkeys v1.3.0
 ## explicit; go 1.22
 github.com/status-im/extkeys
-# github.com/status-im/go-wallet-sdk v0.0.0-20250902115318-6340846c26ec
+# github.com/status-im/go-wallet-sdk v0.0.0-20250912130226-d334ec9bff18
 ## explicit; go 1.23.0
 github.com/status-im/go-wallet-sdk/pkg/ethclient
 # github.com/status-im/markdown v0.0.0-20250825083641-55c1df9bc05d
