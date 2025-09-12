@@ -6,7 +6,7 @@ import time
 import uuid
 
 import requests
-from tenacity import retry, stop_after_delay, wait_fixed
+from tenacity import retry, stop_after_delay, wait_fixed, wait_exponential, retry_if_exception_type
 
 import resources.constants as constants
 from clients.api import ApiClient
@@ -103,19 +103,17 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         if self.temp_dir is not None:
             self.temp_dir.cleanup()
 
-    def wait_for_healthy(self, timeout=10):
-        start_time = time.time()
-        while time.time() - start_time <= timeout:
-            try:
-                response = self.health()
-                response = json.loads(response.content)
-                self.version = response.get("version", "unknown")
-                logging.debug(f"StatusBackend is healthy after {time.time() - start_time} seconds")
-                return
-            except Exception as ex:
-                logging.debug(f"StatusBackend error: {ex}")
-                time.sleep(0.1)
-        raise TimeoutError(f"StatusBackend was not healthy after {timeout} seconds")
+    @retry(
+        stop=stop_after_delay(10),
+        wait=wait_exponential(multiplier=1, min=0.1, max=5),
+        retry=retry_if_exception_type((ConnectionError, requests.RequestException)),
+        reraise=True,
+    )
+    def wait_for_healthy(self):
+        response = self.health()
+        response = json.loads(response.content)
+        self.version = response.get("version", "unknown")
+        logging.debug("StatusBackend is healthy")
 
     def health(self):
         return self.api_request("health", data=[], url=self.base_url, quiet=True)
@@ -298,9 +296,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = self._set_wallet_secrets(data)
         return self.api_request_json(method, data)
 
-    def logout(self):
+    def logout(self, **kwargs):
         method = "Logout"
-        return self.api_request_json(method, {})
+        return self.api_request_json(method, {}, **kwargs)
 
     def wait_for_login(self):
         signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)

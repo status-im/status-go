@@ -1,10 +1,11 @@
 import logging
 from uuid import uuid4
 import pytest
+from requests import ReadTimeout
 
-from resources.constants import USE_IPV6
 from clients.status_backend import StatusBackend
 from clients.statusgo_container import StatusGoContainer
+from resources.constants import USE_IPV6
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -96,7 +97,10 @@ def backend_new_profile(request, backend_factory):
     yield _backend_new_profile
 
     for backend in backends:
-        backend.logout()
+        try:
+            backend.logout(timeout=10)
+        except ReadTimeout as e:
+            logging.warning(f"Failed to logout during shutdown: {e}")
 
 
 @pytest.fixture(scope="function", autouse=False)
