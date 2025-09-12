@@ -94,11 +94,11 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
     def __del__(self):
         self.shutdown()
 
-    def shutdown(self):
+    def shutdown(self, log_sufix=""):
         SignalClient.disconnect(self)
 
         if self.container:
-            self.container.shutdown()
+            self.container.shutdown(log_sufix)
 
         if self.temp_dir is not None:
             self.temp_dir.cleanup()
