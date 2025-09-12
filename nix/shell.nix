@@ -23,7 +23,7 @@ in mkShell {
   buildInputs = with pkgs; [
     git jq which
     go golangci-lint go-junit-report gopls go-bindata codecov-cli go-generate-fast
-    mockgen protobuf3_24 protoc-gen-go gotestsum go-modvendor openjdk openssl
+    protobuf3_24 protoc-gen-go gotestsum go-modvendor openjdk openssl
    ] ++ lib.optionals (stdenv.isDarwin) [ xcodeWrapper ];
 
    shellHook = lib.optionalString (!isMacM1) ''
