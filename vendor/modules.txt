@@ -447,6 +447,10 @@ github.com/json-iterator/go
 # github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
 ## explicit
 github.com/keighl/metabolize
+# github.com/kevinburke/go-bindata/v4 v4.0.2
+## explicit; go 1.20
+github.com/kevinburke/go-bindata/v4
+github.com/kevinburke/go-bindata/v4/go-bindata
 # github.com/kilic/bls12-381 v0.1.0
 ## explicit; go 1.13
 github.com/kilic/bls12-381
