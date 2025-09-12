@@ -1,3 +1,3 @@
 package cbridge
 
-//go:generate sh -c "PATH=\"$(go list -m -f '{{.Dir}}')/_assets/scripts:$PATH\" protoc --go_out=. ./cbridge.proto ./gateway.proto ./query.proto"
+//go:generate protoc --plugin=../../../../../_assets/scripts/protoc-gen-go --go_out=. ./cbridge.proto ./gateway.proto ./query.proto

@@ -20,7 +20,7 @@ import (
 	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
 )
 
-//go:generate sh -c "PATH=\"$(go list -m -f '{{.Dir}}')/_assets/scripts:$PATH\" protoc --go_out=. ./protocol_message.proto"
+//go:generate protoc --plugin=../../../_assets/scripts/protoc-gen-go --go_out=. ./protocol_message.proto
 
 const (
 	protocolVersion                = 1
