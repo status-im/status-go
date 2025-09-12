@@ -1305,6 +1305,8 @@ github.com/karrick/godirwalk v1.10.3/go.mod h1:RoGL9dQei4vP9ilrpETWE8CLOZ1kiN0Lh
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51/go.mod h1:CzGEWj7cYgsdH8dAjBGEr58BoE7ScuLd+fwFZ44+/x8=
 github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034 h1:1ijjWJbbN7za3tZ7eXUO5fVcC9ogGYShQh+zM6YiCYE=
 github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034/go.mod h1:xxAJtNhpzBtSWAYybYGKfMFYx71aqCyNe/8FraO/1ac=
+github.com/kevinburke/go-bindata/v4 v4.0.2 h1:6qQI0nNTL27wM1En8zQHGBEPp3ETzgFU6hVdSjlkrfE=
+github.com/kevinburke/go-bindata/v4 v4.0.2/go.mod h1:M/CkBqw2qCZ1Ztv5JyKgocGYWyUkYlDqkqXS1ktLe5c=
 github.com/kilic/bls12-381 v0.1.0 h1:encrdjqKMEvabVQ7qYOKu1OvhqpK4s47wDYtNiPtlp4=
 github.com/kilic/bls12-381 v0.1.0/go.mod h1:vDTTHJONJ6G+P2R74EhnyotQDTliQDnFEwhdmfzw1ig=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
