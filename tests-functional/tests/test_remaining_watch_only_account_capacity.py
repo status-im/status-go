@@ -26,7 +26,8 @@ class TestRemainingWatchOnlyAccountCapacity:
 
     @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6922")
     def test_no_more_watch_only_accounts_can_be_added(self):
-        for _ in range(3):
+        initial_capacity = self.account.accounts_service.remaining_watch_only_account_capacity()
+        for _ in range(initial_capacity):
             self.account.accounts_service.add_account(self.account.password, self.account_data)
             self.account_data["address"] = "0x" + secrets.token_hex(20)
 
