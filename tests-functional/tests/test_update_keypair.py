@@ -37,7 +37,7 @@ class TestUpdateKeypair:
         key_uid = add_resp.get("key-uid")
 
         kp_modified = self.account.accounts_service.get_keypair_by_key_uid(key_uid)
-        kp_modified["type"] = "213214"
+        kp_modified["key-uid"] = "213214"
 
         with pytest.raises(ApiResponseError, match=re.escape("cannot update non-existing keypair: keypair is not found")):
             self.account.accounts_service.update_keypair(kp_modified)

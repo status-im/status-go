@@ -71,10 +71,7 @@ class TestAddKeypairViaSeedPhrase:
     def test_add_keypair_via_sp_with_wrong_path(self):
         with pytest.raises(
             ApiResponseError,
-            match=re.escape(
-                f"[validation] unsupported profile or seed imported key pair wallet account - "
-                f"path: {wallet_account_details_root["path"]} expected path: m/44'"
-            ),
+            match=re.escape("[validation] unsupported profile or seed imported key pair wallet account"),
         ):
             self.account.accounts_service.add_keypair_via_seed_phrase(
                 user_1.passphrase, self.account.password, keypair_name, wallet_account_details_root

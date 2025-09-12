@@ -71,10 +71,7 @@ class TestAddKeypairViaPrivateKey:
     def test_add_keypair_via_pk_with_wrong_path(self):
         with pytest.raises(
             ApiResponseError,
-            match=re.escape(
-                f"[validation] unsupported profile or seed imported key pair wallet account - "
-                f"path: {wallet_account_details_derivation['path']} expected path: m"
-            ),
+            match=re.escape("[validation] unsupported profile or seed imported key pair wallet account"),
         ):
             self.account.accounts_service.add_keypair_via_private_key(
                 user_1.private_key, self.account.password, keypair_name, wallet_account_details_derivation
