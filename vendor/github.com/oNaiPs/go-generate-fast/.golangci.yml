@@ -1,0 +1,7 @@
+run:
+  skip-files:
+    - ".*\\.pb\\.go$"
+  skip-dirs:
+    - e2e/
+  build-tags:
+    - test
