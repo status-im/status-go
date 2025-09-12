@@ -190,16 +190,6 @@ class AccountService(Service):
         response = self.rpc_request("remainingWatchOnlyAccountCapacity", [])
         return response
 
-    def clean_keystore_files(self, password):
-        params = [password]
-        response = self.rpc_request("cleanKeystoreFiles", params)
-        return response
-
-    def address_was_shown(self, address):
-        params = [address]
-        response = self.rpc_request("addressWasShown", params)
-        return response
-
     def get_num_of_addresses_to_generate_for_keypair(self, key_uid):
         params = [key_uid]
         response = self.rpc_request("getNumOfAddressesToGenerateForKeypair", params)
