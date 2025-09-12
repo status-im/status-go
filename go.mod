@@ -2,7 +2,10 @@ module github.com/status-im/status-go
 
 go 1.24.0
 
-tool go.uber.org/mock/mockgen
+tool (
+	github.com/kevinburke/go-bindata/v4/go-bindata
+	go.uber.org/mock/mockgen
+)
 
 replace github.com/ethereum/go-ethereum v1.16.0 => github.com/status-im/go-ethereum v1.10.25-status.24
 
@@ -183,6 +186,7 @@ require (
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kevinburke/go-bindata/v4 v4.0.2 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/koron/go-ssdp v0.0.5 // indirect
