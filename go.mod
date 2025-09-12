@@ -6,6 +6,7 @@ tool (
 	github.com/goware/modvendor
 	github.com/kevinburke/go-bindata/v4/go-bindata
 	go.uber.org/mock/mockgen
+	google.golang.org/protobuf/cmd/protoc-gen-go
 )
 
 replace github.com/ethereum/go-ethereum v1.16.0 => github.com/status-im/go-ethereum v1.10.25-status.24

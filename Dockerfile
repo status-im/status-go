@@ -19,7 +19,6 @@ WORKDIR /go/src/github.com/status-im/status-go
 
 ADD go.mod go.sum ./
 RUN go mod download -x
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
 ADD . .
 ARG cache_id='local'

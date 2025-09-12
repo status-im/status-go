@@ -173,7 +173,6 @@ cmd: status-backend push-notification-server
 status-go-deps:
 	go clean -cache || true
 	go clean -modcache || true
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
 
 

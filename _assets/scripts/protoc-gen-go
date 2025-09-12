@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# This script is used as a wrapper for `protoc-gen-go` plugin.
+# Because `protoc` expects `protoc-gen-go` to be in PATH, but we want to use `go tool protoc-gen-go`.
+
+exec go tool protoc-gen-go "$@"
