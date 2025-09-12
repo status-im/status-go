@@ -190,24 +190,9 @@ class AccountService(Service):
         response = self.rpc_request("remainingWatchOnlyAccountCapacity", [])
         return response
 
-    def make_private_key_keypair_fully_operable(self, private_key, password):
-        params = [private_key, password]
-        response = self.rpc_request("makePrivateKeyKeypairFullyOperable", params)
-        return response
-
     def clean_keystore_files(self, password):
         params = [password]
         response = self.rpc_request("cleanKeystoreFiles", params)
-        return response
-
-    def make_partially_operable_accounts_fully_operable(self, password):
-        params = [password]
-        response = self.rpc_request("makePartiallyOperableAccoutsFullyOperable", params)
-        return response
-
-    def make_seed_phrase_keypair_fully_operable(self, mnemonic, password):
-        params = [mnemonic, password]
-        response = self.rpc_request("makeSeedPhraseKeypairFullyOperable", params)
         return response
 
     def address_was_shown(self, address):
