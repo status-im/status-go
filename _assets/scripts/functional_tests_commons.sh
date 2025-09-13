@@ -25,7 +25,7 @@ set_pyenv() {
 }
 
 discover_tests() {
-  pytest --collect-only -q -m rpc -c "${root_path}/pytest.ini" -k "$1"
+  pytest --collect-only -q -m rpc -c "${root_path}/pytest.ini" "$1"
 }
 
 start_services() {
@@ -87,25 +87,32 @@ wait_for_services() {
 }
 
 list_tests_and_confirm() {
-  # Discover tests first
-  echo -e "${GRN}Discovering selected tests...${RST}"
-  collected_output=$(discover_tests "$1")
+  local selected_test="${1:+-k $1}"
+  echo -e "${GRN}Discovering tests to be run...${RST}"
+  collected_output=$(discover_tests "$selected_test")
   test_count=$(echo "$collected_output" | grep -c "^\s*<Function test_.*>$")
-
-  echo -e "${GRN}Found ${test_count} tests matching:${RST} $1"
-
-  # Early exit if no tests found
-  if [ "$test_count" -eq "0" ]; then
+  if [ -z "$selected_test" ]; then
+    if [ "$test_count" -eq "0" ]; then
+      echo -e "${RED}No tests found!${RST}"
+      exit 1
+    fi
+    echo -e "${RED}No test pattern provided. This will run all ${test_count} tests!${RST}"
+  else
+    # Early exit if no tests found
+    if [ "$test_count" -eq "0" ]; then
       echo -e "${RED}No tests found matching: $1${RST}"
       exit 1
+    fi
+    
+    echo -e "${GRN}Found ${test_count} tests matching:${RST} $1"
+
+    # Show the tests that will run
+    echo -e "${GRN}Tests to execute:${RST}"
+    echo "$collected_output" \
+    | grep -oP "^\s*<Function \Ktest_[^>]*(?=>$)" \
+    | nl -w2 -s') '
   fi
-
-  # Show the tests that will run
-  echo -e "${GRN}Tests to execute:${RST}"
-  echo "$collected_output" \
-  | grep -oP "^\s*<Function \Ktest_[^>]*(?=>$)" \
-  | nl -w2 -s') '
-
+  
   read -p "Continue with execution? (y/n): " -n 1 -r
   echo
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then

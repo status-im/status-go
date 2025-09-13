@@ -18,9 +18,11 @@ image_name="statusgo-${identifier}"
 
 source "${GIT_ROOT}/_assets/scripts/functional_tests_commons.sh"
 
+test_pattern="${1-}"
+
 set_pyenv
 
-list_tests_and_confirm "$1"
+list_tests_and_confirm "${test_pattern}"
 
 remove_old_logs
 
@@ -30,7 +32,7 @@ start_services
 
 wait_for_services 60
 
-run_tests "$1"
+run_tests "${test_pattern}"
 
 # Cleanup will be handled automatically by the trap
 echo -e "${GRN}Testing finished${RST}"
