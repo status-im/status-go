@@ -507,10 +507,10 @@ func (t *Transport) ConnectionChanged(state connection.State) {
 }
 
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
-func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKeys *ecdsa.PublicKey) error {
+func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
 	var pubKey *ecdsa.PublicKey
-	if optPublicKeys != nil {
-		pubKey = optPublicKeys
+	if optPublicKey != nil {
+		pubKey = optPublicKey
 	} else {
 		// try to retrieve pubkey for pubsubtopic if none provided
 		privK, err := t.RetrievePubsubTopicKey(topic)
