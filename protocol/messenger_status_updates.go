@@ -86,7 +86,7 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 	}
 	for _, community := range joinedCommunities {
 		rawMessage.LocalChatID = community.StatusUpdatesChannelID()
-		rawMessage.PubsubTopic = community.PubsubTopic()
+		rawMessage.PubsubTopic = community.PubsubTopic(messagingtypes.GlobalCommunityControlPubsubTopic())
 		_, err = m.messaging.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 		if err != nil {
 			return err
@@ -175,7 +175,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 		MessageType: protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
 		ResendType:  messagingtypes.ResendTypeNone, // does this need to be resent?
 		Ephemeral:   statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
-		PubsubTopic: community.PubsubTopic(),
+		PubsubTopic: community.PubsubTopic(messagingtypes.GlobalCommunityControlPubsubTopic()),
 		Priority:    &messagingtypes.LowPriority,
 	}
 

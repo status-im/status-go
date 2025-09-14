@@ -175,7 +175,7 @@ func (m *Messenger) sendDatasyncOffersForCommunities() error {
 			Payload:             payload,
 			Ephemeral:           true,
 			SkipApplicationWrap: true,
-			PubsubTopic:         community.PubsubTopic(),
+			PubsubTopic:         community.PubsubTopic(messagingtypes.GlobalCommunityControlPubsubTopic()),
 			Priority:            &messagingtypes.LowPriority,
 		}
 		_, err = m.messaging.SendPublic(context.Background(), community.IDString(), rawMessage)
