@@ -153,14 +153,26 @@ func thirdpartyActivityEntriesToEntries(deps FilterDependencies, activityEntries
 			chainID = wCommon.ChainID(wCommon.UnknownChainID)
 		}
 
+		var payloadType ac.PayloadType
+		if ae.ActivityType == ac.SwapAT || ae.ActivityType == ac.BridgeAT {
+			payloadType = ac.MultiTransactionPT
+		} else {
+			payloadType = ac.SimpleTransactionPT
+		}
+
 		entry := Entry{
-			payloadType: ac.MultiTransactionPT,
+			payloadType: payloadType,
 			transactions: []*ac.TransactionIdentity{
 				{
 					ChainID: chainID,
 					Hash:    ae.TxHash,
 					Address: ae.Sender,
 				},
+			},
+			transaction: &ac.TransactionIdentity{
+				ChainID: chainID,
+				Hash:    ae.TxHash,
+				Address: ae.Sender,
 			},
 			timestamp:                 ae.Timestamp,
 			activityType:              ae.ActivityType,
