@@ -5,25 +5,31 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	errorspkg "github.com/pkg/errors"
 
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/node"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
+	common2 "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node/backup"
+	rpc2 "github.com/status-im/status-go/node/rpc"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
@@ -33,6 +39,7 @@ import (
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/permissions"
@@ -41,19 +48,19 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/updates"
+	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/community"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/transactions"
 )
 
 // errors
 var (
-	ErrNodeRunning          = errors.New("node is already running")
-	ErrNoGethNode           = errors.New("geth node is not available")
-	ErrNoRunningNode        = errors.New("there is no running node")
-	ErrServiceUnknown       = errors.New("service unknown")
-	ErrRPCMethodUnavailable = `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"the method called does not exist/is not available"}}`
+	ErrNodeRunning   = errors.New("node is already running")
+	ErrNoRunningNode = errors.New("there is no running node")
 )
 
 // StatusNode abstracts contained geth node and provides helper methods to
@@ -65,14 +72,23 @@ type StatusNode struct {
 	multiaccountsDB *multiaccounts.Database
 	walletDB        *sql.DB
 
+	running atomic.Bool
+
 	config    *params.NodeConfig // Status node configuration
-	gethNode  *node.Node         // reference to Geth P2P stack/node
 	rpcClient *rpc.Client        // reference to an RPC client
+
+	services  []common2.StatusService
+	rpcServer *gethrpc.Server
 
 	downloader *ipfs.Downloader
 
-	mediaServerEnableTLS *bool
-	httpServer           *server.MediaServer
+	mediaServerAddress       *string
+	mediaServerAdvertizeHost string
+	mediaServerAdvertizePort int
+	mediaServerEnableTLS     *bool
+	mediaServer              *server.MediaServer
+
+	tokenManager *token.Manager
 
 	logger *zap.Logger
 
@@ -101,6 +117,7 @@ type StatusNode struct {
 	pendingTracker         *transactions.PendingTxTracker
 	connectorSrvc          *connector.Service
 	appGeneralSrvc         *appgeneral.Service
+	ethSrvc                *eth.Service
 
 	walletFeed        event.Feed
 	accountsPublisher *pubsub.Publisher
@@ -117,6 +134,7 @@ func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagemen
 		logger:              logger,
 		publicMethods:       make(map[string]bool),
 		accountsPublisher:   pubsub.NewPublisher(),
+		rpcServer:           gethrpc.NewServer(),
 	}
 }
 
@@ -128,31 +146,16 @@ func (n *StatusNode) Config() *params.NodeConfig {
 	return n.config
 }
 
-// GethNode returns underlying geth node.
-func (n *StatusNode) GethNode() *node.Node {
+func (n *StatusNode) MediaServer() *server.MediaServer {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	return n.gethNode
+	return n.mediaServer
 }
 
-func (n *StatusNode) HTTPServer() *server.MediaServer {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	return n.httpServer
-}
-
-// StartMediaServerWithoutDB starts media server without starting the node
-// The server can only handle requests that don't require appdb or IPFS downloader
-func (n *StatusNode) StartMediaServerWithoutDB() error {
-	if n.isRunning() {
-		n.logger.Debug("node is already running, no need to StartMediaServerWithoutDB")
-		return nil
-	}
-
-	if n.httpServer != nil {
-		if err := n.httpServer.Stop(); err != nil {
+func (n *StatusNode) startMediaServer() error {
+	if n.mediaServer != nil {
+		if err := n.mediaServer.Stop(); err != nil {
 			return err
 		}
 	}
@@ -161,18 +164,33 @@ func (n *StatusNode) StartMediaServerWithoutDB() error {
 	if n.mediaServerEnableTLS != nil {
 		opts = append(opts, server.WithMediaServerDisableTLS(!*n.mediaServerEnableTLS))
 	}
-	httpServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB, nil, opts...)
+	if n.mediaServerAddress != nil {
+		opts = append(opts, server.WithMediaServerAddress(*n.mediaServerAddress))
+	}
+	opts = append(opts, server.WithMediaServerAdvertizeAddress(n.mediaServerAdvertizeHost, n.mediaServerAdvertizePort))
+	mediaServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB, nil, opts...)
 	if err != nil {
 		return err
 	}
 
-	n.httpServer = httpServer
+	n.mediaServer = mediaServer
 
-	if err := n.httpServer.Start(); err != nil {
+	if err := n.mediaServer.Start(); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// StartMediaServerWithoutDB starts media server without starting the node
+// The server can only handle requests that don't require appdb or IPFS downloader
+func (n *StatusNode) StartMediaServerWithoutDB() error {
+	if n.IsRunning() {
+		n.logger.Debug("node is already running, no need to StartMediaServerWithoutDB")
+		return nil
+	}
+
+	return n.startMediaServer()
 }
 
 // StartWithOptions starts current StatusNode, failing if it's already started.
@@ -181,7 +199,7 @@ func (n *StatusNode) Start(config *params.NodeConfig) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if n.isRunning() {
+	if !n.running.CompareAndSwap(false, true) {
 		n.logger.Debug("node is already running")
 		return ErrNodeRunning
 	}
@@ -196,26 +214,51 @@ func (n *StatusNode) StartLocalBackup() error {
 		return errors.New("local backup already started")
 	}
 
+	backupPath, err := n.accountsSrvc.GetBackupPath()
+	if err != nil {
+		return err
+	}
+	if backupPath == "" {
+		// No path set yet, set it to the user's config directory
+		dir, err := os.UserConfigDir()
+		// We do not return the error as it's not a major issue
+		if err != nil {
+			n.logger.Error("failed to get user config dir", zap.Error(err))
+		} else {
+			err = n.accountsSrvc.SetBackupPath(filepath.Join(dir, "Status", "backups"))
+			if err != nil {
+				n.logger.Error("failed to set backup path", zap.Error(err))
+			}
+		}
+	}
+
 	chatAccount, err := n.gethAccountsManager.SelectedChatAccount()
 	if err != nil {
 		return err
 	}
 
 	privateKey := chatAccount.PrivateKey()
-	filenameGetter := func() (string, error) {
-		accountIdentifier := common.PubkeyToHex(&privateKey.PublicKey)
 
+	filenameGetter := func() (string, error) {
 		backupPath, err := n.accountsSrvc.GetBackupPath()
 		if err != nil {
 			return "", err
 		}
+
+		compressedPubKey, err := utils.SerializePublicKey(crypto.CompressPubkey(&privateKey.PublicKey))
+		if err != nil {
+			return "", err
+		}
+
 		var backupDir string
 		if backupPath != "" {
 			backupDir = backupPath
 		} else {
 			backupDir = filepath.Join(n.config.RootDataDir, "backups")
 		}
-		fullPath := filepath.Join(backupDir, fmt.Sprintf("%x_user_data.bkp", accountIdentifier[:4]))
+
+		fullPath := filepath.Join(backupDir, fmt.Sprintf("%s_user_data.bkp", compressedPubKey[len(compressedPubKey)-6:]))
+
 		return fullPath, nil
 	}
 
@@ -254,16 +297,14 @@ func (n *StatusNode) LoadLocalBackup(filePath string) error {
 	return n.localBackup.LoadBackup(filePath)
 }
 
-func (n *StatusNode) SetMediaServerEnableTLS(enableTLS *bool) {
+func (n *StatusNode) SetMediaServerOptions(address *string, enableTLS *bool, advertizeHost string, advertizePort int) {
+	n.mediaServerAddress = address
 	n.mediaServerEnableTLS = enableTLS
+	n.mediaServerAdvertizeHost = advertizeHost
+	n.mediaServerAdvertizePort = advertizePort
 }
 
 func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
-	var err error
-	n.gethNode, err = MakeNode(config)
-	if err != nil {
-		return err
-	}
 	n.config = config
 
 	if err := n.setupRPCClient(); err != nil {
@@ -272,48 +313,81 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 
 	n.downloader = ipfs.NewDownloader(config.RootDataDir)
 
-	if n.httpServer != nil {
-		if err := n.httpServer.Stop(); err != nil {
+	if n.mediaServer == nil {
+		if err := n.startMediaServer(); err != nil {
 			return err
 		}
 	}
+	n.mediaServer.SetDataProviders(n.appDB, n.walletDB, n.downloader)
 
-	var opts []server.MediaServerOption
-	if n.mediaServerEnableTLS != nil {
-		opts = append(opts, server.WithMediaServerDisableTLS(!*n.mediaServerEnableTLS))
+	if err := n.createAndStartTokenManager(); err != nil {
+		return err
 	}
 
-	httpServer, err := server.NewMediaServer(n.appDB, n.downloader, n.multiaccountsDB, n.walletDB, opts...)
+	if err := n.initServices(config, n.mediaServer); err != nil {
+		return err
+	}
+
+	// Register services
+
+	for _, service := range n.services {
+		err := n.registerService(service)
+		if err != nil {
+			name := reflect.TypeOf(service).Name()
+			text := fmt.Sprintf("failed to register service '%s'", name)
+			return errorspkg.Wrap(err, text)
+		}
+	}
+
+	// Start services
+
+	err := n.timeSourceSrvc.Start(context.Background())
+	if err != nil {
+		return errorspkg.Wrap(err, "failed to start time source")
+	}
+
+	for _, service := range n.services {
+		err := service.Start()
+		if err != nil {
+			name := reflect.TypeOf(service).Name()
+			text := fmt.Sprintf("failed to start service '%s'", name)
+			return errorspkg.Wrap(err, text)
+		}
+	}
+
+	return nil
+}
+
+func (n *StatusNode) createAndStartTokenManager() error {
+	accDB, err := accounts.NewDB(n.appDB)
 	if err != nil {
 		return err
 	}
 
-	n.httpServer = httpServer
+	n.tokenManager = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.mediaServer, nil),
+		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsPublisher, accDB,
+		token.NewPersistence(n.walletDB))
 
-	if err := n.httpServer.Start(); err != nil {
-		return err
+	const (
+		defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
+		defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
+	)
+
+	autoRefreshInterval := defaultAutoRefreshInterval
+	autoRefreshCheckInterval := defaultAutoRefreshCheckInterval
+	if n.config.WalletConfig.TokensListsAutoRefreshInterval > 0 &&
+		n.config.WalletConfig.TokensListsAutoRefreshCheckInterval > 0 &&
+		n.config.WalletConfig.TokensListsAutoRefreshInterval > n.config.WalletConfig.TokensListsAutoRefreshCheckInterval {
+		autoRefreshInterval = time.Duration(n.config.WalletConfig.TokensListsAutoRefreshInterval) * time.Second
+		autoRefreshCheckInterval = time.Duration(n.config.WalletConfig.TokensListsAutoRefreshCheckInterval) * time.Second
 	}
 
-	if err := n.initServices(config, n.httpServer); err != nil {
-		return err
-	}
-	return n.startGethNode()
-}
-
-// startGethNode starts current StatusNode, will fail if it's already started.
-func (n *StatusNode) startGethNode() error {
-	return n.gethNode.Start()
+	n.tokenManager.Start(context.Background(), autoRefreshInterval, autoRefreshCheckInterval)
+	return nil
 }
 
 func (n *StatusNode) setupRPCClient() (err error) {
-	// setup RPC client
-	gethNodeClient, err := n.gethNode.Attach()
-	if err != nil {
-		return
-	}
-
 	config := rpc.ClientConfig{
-		Client:            gethNodeClient,
 		UpstreamChainID:   n.config.NetworkID,
 		Networks:          n.config.Networks,
 		DB:                n.appDB,
@@ -332,8 +406,18 @@ func (n *StatusNode) Stop() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if !n.isRunning() {
+	n.logger.Debug("stopping")
+
+	if !n.running.CompareAndSwap(true, false) {
 		return ErrNoRunningNode
+	}
+
+	var errs []error
+	n.timeSourceSrvc.Stop()
+
+	for _, service := range n.services {
+		err := service.Stop()
+		errs = append(errs, err)
 	}
 
 	if n.localBackup != nil {
@@ -341,29 +425,13 @@ func (n *StatusNode) Stop() error {
 		n.localBackup = nil
 	}
 
-	return n.stop()
-}
-
-// stop will stop current StatusNode. A stopped node cannot be resumed.
-func (n *StatusNode) stop() error {
-	if err := n.gethNode.Close(); err != nil {
-		return err
-	}
-
 	n.accountsPublisher.Close()
 
 	n.rpcClient.Stop()
 	n.rpcClient = nil
-	// We need to clear `gethNode` because config is passed to `Start()`
-	// and may be completely different. Similarly with `config`.
-	n.gethNode = nil
 	n.config = nil
 
-	err := n.httpServer.Stop()
-	if err != nil {
-		return err
-	}
-	n.httpServer = nil
+	n.mediaServer.SetDataProviders(nil, nil, nil)
 
 	n.downloader.Stop()
 	n.downloader = nil
@@ -384,20 +452,14 @@ func (n *StatusNode) stop() error {
 	n.publicMethods = make(map[string]bool)
 	n.pendingTracker = nil
 	n.appGeneralSrvc = nil
+
 	n.logger.Debug("status node stopped")
-	return nil
+	return errors.Join(errs...)
 }
 
 // IsRunning confirm that node is running.
 func (n *StatusNode) IsRunning() bool {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	return n.isRunning()
-}
-
-func (n *StatusNode) isRunning() bool {
-	return n.gethNode != nil && n.gethNode.Server() != nil
+	return n.running.Load()
 }
 
 func (n *StatusNode) ConnectionChanged(state connection.State) {
@@ -406,16 +468,10 @@ func (n *StatusNode) ConnectionChanged(state connection.State) {
 	}
 }
 
-// AccountsManager exposes reference to node's accounts manager
-func (n *StatusNode) AccountsManager() (*accounts.Manager, error) {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	if n.gethNode == nil {
-		return nil, ErrNoGethNode
-	}
-
-	return n.gethNode.AccountManager(), nil
+func (n *StatusNode) CallInProcessRPC(inputJSON string) string {
+	codec := rpc2.NewSingleRequestCodec(inputJSON)
+	n.rpcServer.ServeCodec(codec.GethCodec(), 0)
+	return codec.Output()
 }
 
 // RPCClient exposes reference to RPC client connected to the running node.
@@ -443,4 +499,8 @@ func (n *StatusNode) SetWalletDB(db *sql.DB) {
 
 func (n *StatusNode) GetWalletDB() *sql.DB {
 	return n.walletDB
+}
+
+func (n *StatusNode) TokenManager() *token.Manager {
+	return n.tokenManager
 }

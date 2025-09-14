@@ -6,9 +6,11 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"net"
+	"net/netip"
 	"runtime"
 	"time"
 
+	errorspkg "github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/timesource"
@@ -41,12 +43,18 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 		return nil, err
 	}
 
+	addr, ok := netip.AddrFromSlice(config.ListenIP)
+	if !ok {
+		return nil, errorspkg.New("invalid listen IP")
+	}
+
 	bs := &BaseServer{
 		Server: server.NewServer(
-			config.Cert,
-			config.ListenIP.String(),
-			nil,
 			logger,
+			&server.Config{
+				Cert:     config.Cert,
+				AddrPort: netip.AddrPortFrom(addr, 0),
+			},
 		),
 		challengeGiver: cg,
 		config:         *config,
@@ -57,7 +65,7 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 
 // MakeConnectionParams generates a *ConnectionParams based on the Server's current state
 func (s *BaseServer) MakeConnectionParams() (*ConnectionParams, error) {
-	return NewConnectionParams(s.config.IPAddresses, s.MustGetPort(), s.config.PK, s.config.EK, s.config.InstallationID, s.config.KeyUID), nil
+	return NewConnectionParams(s.config.IPAddresses, s.GetPort(), s.config.PK, s.config.EK, s.config.InstallationID, s.config.KeyUID), nil
 }
 
 func MakeServerConfig(config *ServerConfig) error {

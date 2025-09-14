@@ -14,6 +14,14 @@ type InitializeApplication struct {
 	DataDir       string `json:"dataDir"`
 	MixpanelAppID string `json:"mixpanelAppId"`
 	MixpanelToken string `json:"mixpanelToken"`
+
+	// MediaServerAddress specifies the URL of the media server used for file storage and retrieval.
+	// The address should be in the format "hostname:port" or a complete URL. If not provided, defaults to "localhost:0".
+	MediaServerAddress *string `json:"mediaServerAddress"`
+	// MediaServerAdvertizeHost sets a different host/port to be advertized in media URLs than the one media server listen on.
+	MediaServerAdvertizeHost string `json:"mediaServerAdvertizeHost"`
+	// MediaServerAdvertizePort sets a different port to be advertized in media URLs than the one media server listen on.
+	MediaServerAdvertizePort int `json:"mediaServerAdvertizePort"`
 	// MediaServerEnableTLS is optional, if not provided, media server will use TLS by default
 	MediaServerEnableTLS *bool  `json:"mediaServerEnableTLS"`
 	SentryDSN            string `json:"sentryDSN"`

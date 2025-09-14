@@ -1,12 +1,12 @@
 import logging
-import random
 import re
-import string
 
 import pytest
+
 from clients.api import ApiResponseError
 from clients.signals import SignalType
 from resources.constants import Account
+from utils import fake
 
 
 @pytest.mark.rpc
@@ -33,7 +33,7 @@ class TestPassword:
         assert response is False
 
     def test_change_password(self, backend_new_profile):
-        new_password = "".join(random.choices(string.ascii_letters + string.digits, k=8))
+        new_password = fake.profile_password(8)
         backend = backend_new_profile("user")
 
         # Try a wrong password

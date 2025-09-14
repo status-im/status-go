@@ -11,7 +11,28 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*MessengerResponse, error) {
+func ConvertEmojiIDToString(emojiID protobuf.EmojiReaction_Type) string {
+	switch emojiID {
+	case protobuf.EmojiReaction_LOVE:
+		return "❤️"
+	case protobuf.EmojiReaction_THUMBS_UP:
+		return "👍"
+	case protobuf.EmojiReaction_THUMBS_DOWN:
+		return "👎"
+	case protobuf.EmojiReaction_LAUGH:
+		return "😂"
+	case protobuf.EmojiReaction_SAD:
+		return "😢"
+	case protobuf.EmojiReaction_ANGRY:
+		return "😠"
+	}
+
+	return ""
+
+}
+
+// TODO remove emojiID once the client supports sending custom emojis
+func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type, emoji string) (*MessengerResponse, error) {
 	var response MessengerResponse
 
 	chat, ok := m.allChats.Load(chatID)
@@ -20,12 +41,25 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	}
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
+	if emoji == "" {
+		emoji = ConvertEmojiIDToString(emojiID)
+		if emoji == "" {
+			return nil, errors.New("invalid emojiID")
+		}
+	}
+
+	// Validate that the emoji is valid
+	if !emojiRegex.MatchString(emoji) {
+		return nil, errors.New("invalid emoji")
+	}
+
 	emojiR := &EmojiReaction{
 		EmojiReaction: &protobuf.EmojiReaction{
 			Clock:     clock,
 			MessageId: messageID,
 			ChatId:    chatID,
 			Type:      emojiID,
+			Emoji:     emoji,
 		},
 		LocalChatID: chatID,
 		From:        types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),

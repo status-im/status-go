@@ -1,5 +1,5 @@
 # Build status-go in a Go builder container
-FROM golang:1.23.10-bookworm AS builder
+FROM golang:1.24.7-bookworm AS builder
 
 # Set environment variables to use Clang
 ENV CC=clang

@@ -129,7 +129,8 @@ func (f *FeeManager) IsEIP1559Enabled(ctx context.Context, chainID uint64) (bool
 }
 
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address ethCommon.Address) (suggestedFees *SuggestedFees, noBaseFee bool, noPriorityFee bool, err error) {
-	feeHistory, err := f.getFeeHistory(ctx, chainID, "latest", []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3})
+	blockCount := getFeeHistoryBlockCount(chainID)
+	feeHistory, err := f.getFeeHistory(ctx, chainID, blockCount, "latest", []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3})
 	if err != nil {
 		suggestedFees, err = f.getNonEIP1559SuggestedFees(ctx, chainID)
 		return
@@ -155,7 +156,7 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address 
 		noPriorityFee = lowPriorityFeePerGasLowerBound == nil || lowPriorityFeePerGasLowerBound.Cmp(common.ZeroBigIntValue()) == 0
 	} else {
 		lowPriorityFeePerGasLowerBound, mediumPriorityFeePerGas, maxPriorityFeePerGasUpperBound, baseFee, err = getEIP1559SuggestedFees(chainID, feeHistory)
-		if err != nil {
+		if err != nil || len(feeHistory.Reward) < int(blockCount) {
 			suggestedFees, err = f.getNonEIP1559SuggestedFees(ctx, chainID)
 			return
 		}
@@ -220,13 +221,19 @@ func (f *FeeManager) SuggestedFeesGwei(ctx context.Context, chainID uint64) (*Su
 	if err != nil {
 		return nil, err
 	}
-	return &SuggestedFeesGwei{
-		GasPrice:             common.WeiToGwei(fees.GasPrice),
-		BaseFee:              common.WeiToGwei(fees.BaseFee),
-		MaxPriorityFeePerGas: common.WeiToGwei(fees.MaxPriorityFeePerGas),
-		MaxFeePerGasLow:      common.WeiToGwei(fees.MaxFeesLevels.Low.ToInt()),
-		MaxFeePerGasMedium:   common.WeiToGwei(fees.MaxFeesLevels.Medium.ToInt()),
-		MaxFeePerGasHigh:     common.WeiToGwei(fees.MaxFeesLevels.High.ToInt()),
-		EIP1559Enabled:       fees.EIP1559Enabled,
-	}, nil
+	feesGwei := &SuggestedFeesGwei{
+		EIP1559Enabled: fees.EIP1559Enabled,
+	}
+	if feesGwei.EIP1559Enabled {
+		feesGwei.GasPrice = common.WeiToGwei(fees.GasPrice)
+		feesGwei.BaseFee = common.WeiToGwei(fees.BaseFee)
+		feesGwei.MaxPriorityFeePerGas = common.WeiToGwei(fees.MaxPriorityFeePerGas)
+		feesGwei.MaxFeePerGasLow = common.WeiToGwei(fees.MaxFeesLevels.Low.ToInt())
+		feesGwei.MaxFeePerGasMedium = common.WeiToGwei(fees.MaxFeesLevels.Medium.ToInt())
+		feesGwei.MaxFeePerGasHigh = common.WeiToGwei(fees.MaxFeesLevels.High.ToInt())
+	} else {
+		feesGwei.GasPrice = common.WeiToGwei(fees.NonEIP1559Fees.GasPrice.ToInt())
+	}
+
+	return feesGwei, nil
 }

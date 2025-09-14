@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"database/sql"
 	"errors"
 	"image"
 	"image/color"
@@ -22,7 +21,6 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/ring"
@@ -52,22 +50,12 @@ const (
 	accountImagesPath   = "/accountImages"
 	accountInitialsPath = "/accountInitials"
 	contactImagesPath   = "/contactImages"
-	generateQRCode      = "/GenerateQRCode"
+
+	// Health
+	healthPath = "/health"
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
-
-func handleRequestDBMissing(logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger.Error("can't handle media request without appdb")
-	}
-}
-
-func handleRequestDownloaderMissing(logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger.Error("can't handle media request without ipfs downloader")
-	}
-}
 
 type ImageParams struct {
 	KeyUID                string
@@ -305,25 +293,31 @@ func ParseImageParams(logger *zap.Logger, params url.Values) ImageParams {
 	return parsed
 }
 
-func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *zap.Logger, w http.ResponseWriter, parsed ImageParams) {
+func (s *MediaServer) handleAccountImagesImpl(w http.ResponseWriter, parsed ImageParams) {
+	if s.multiaccountsDB == nil {
+		s.logger.Error("handleAccountImagesImpl: no multiaccountsDB")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	if parsed.KeyUID == "" {
-		logger.Error("handleAccountImagesImpl: no keyUid")
+		s.logger.Error("handleAccountImagesImpl: no keyUid")
 		return
 	}
 
 	if parsed.ImageName == "" {
-		logger.Error("handleAccountImagesImpl: no imageName")
+		s.logger.Error("handleAccountImagesImpl: no imageName")
 		return
 	}
 
-	identityImage, err := multiaccountsDB.GetIdentityImage(parsed.KeyUID, parsed.ImageName)
+	identityImage, err := s.multiaccountsDB.GetIdentityImage(parsed.KeyUID, parsed.ImageName)
 	if err != nil {
-		logger.Error("handleAccountImagesImpl: failed to load image.", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.String("imageName", parsed.ImageName), zap.Error(err))
+		s.logger.Error("handleAccountImagesImpl: failed to load image.", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.String("imageName", parsed.ImageName), zap.Error(err))
 		return
 	}
 
 	if parsed.Ring && parsed.RingWidth == 0 {
-		logger.Error("handleAccountImagesImpl: no ringWidth.")
+		s.logger.Error("handleAccountImagesImpl: no ringWidth.")
 		return
 	}
 
@@ -333,16 +327,16 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 
 	payload, err := images.RoundCrop(identityImage.Payload)
 	if err != nil {
-		logger.Error("handleAccountImagesImpl: failed to crop image.", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.String("imageName", parsed.ImageName), zap.Error(err))
+		s.logger.Error("handleAccountImagesImpl: failed to crop image.", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.String("imageName", parsed.ImageName), zap.Error(err))
 		return
 	}
 
 	enlargeRatio := float64(identityImage.Width) / float64(parsed.BgSize)
 
 	if parsed.Ring {
-		account, err := multiaccountsDB.GetAccount(parsed.KeyUID)
+		account, err := s.multiaccountsDB.GetAccount(parsed.KeyUID)
 		if err != nil {
-			logger.Error("handleAccountImagesImpl: failed to GetAccount .", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
+			s.logger.Error("handleAccountImagesImpl: failed to GetAccount .", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
 			return
 		}
 
@@ -350,12 +344,12 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 
 		if accColorHash == nil {
 			if parsed.PublicKey == "" {
-				logger.Error("handleAccountImagesImpl: no public key for color hash", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)))
+				s.logger.Error("handleAccountImagesImpl: no public key for color hash", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)))
 			}
 
 			accColorHash, err = colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
-				logger.Error("handleAccountImagesImpl: could not generate color hash", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
+				s.logger.Error("handleAccountImagesImpl: could not generate color hash", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
 			}
 		}
 
@@ -364,7 +358,7 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 				Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: identityImage.Height, Width: identityImage.Width, RingWidth: parsed.RingWidth * enlargeRatio,
 			})
 			if err != nil {
-				logger.Error("handleAccountImagesImpl: failed to draw ring for account identity", zap.Error(err))
+				s.logger.Error("handleAccountImagesImpl: failed to draw ring for account identity", zap.Error(err))
 				return
 			}
 		}
@@ -375,19 +369,19 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 		// or we get a bad quality identity image
 		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeRatio, parsed.IndicatorBorder*enlargeRatio, parsed.IndicatorCenterToEdge*enlargeRatio)
 		if err != nil {
-			logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
+			s.logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
 			return
 		}
 	}
 
 	if len(payload) == 0 {
-		logger.Error("handleAccountImagesImpl: empty image")
+		s.logger.Error("handleAccountImagesImpl: empty image")
 		return
 	}
 
 	mime, err := images.GetProtobufImageMime(payload)
 	if err != nil {
-		logger.Error("failed to get mime", zap.Error(err))
+		s.logger.Error("failed to get mime", zap.Error(err))
 	}
 
 	w.Header().Set("Content-Type", mime)
@@ -395,19 +389,19 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 
 	_, err = w.Write(payload)
 	if err != nil {
-		logger.Error("handleAccountImagesImpl: failed to write image", zap.Error(err))
+		s.logger.Error("handleAccountImagesImpl: failed to write image", zap.Error(err))
 	}
 }
 
-func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, parsed ImageParams) {
+func (s *MediaServer) handleAccountImagesPlaceholder(w http.ResponseWriter, parsed ImageParams) {
 	if parsed.ImagePath == "" {
-		logger.Error("handleAccountImagesPlaceholder: no imagePath")
+		s.logger.Error("handleAccountImagesPlaceholder: no imagePath")
 		return
 	}
 
 	payload, im, err := images.ImageToBytesAndImage(parsed.ImagePath)
 	if err != nil {
-		logger.Error("handleAccountImagesPlaceholder: failed to load image from disk", zap.String("imageName", parsed.ImagePath))
+		s.logger.Error("handleAccountImagesPlaceholder: failed to load image from disk", zap.String("imageName", parsed.ImagePath))
 		return
 	}
 	width := im.Bounds().Dx()
@@ -417,7 +411,7 @@ func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, p
 
 	payload, err = images.RoundCrop(payload)
 	if err != nil {
-		logger.Error("handleAccountImagesPlaceholder: failed to crop image.", zap.String("imageName", parsed.ImagePath), zap.Error(err))
+		s.logger.Error("handleAccountImagesPlaceholder: failed to crop image.", zap.String("imageName", parsed.ImagePath), zap.Error(err))
 		return
 	}
 
@@ -425,19 +419,19 @@ func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, p
 		enlargeIndicatorRatio := float64(width / parsed.BgSize)
 		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeIndicatorRatio, parsed.IndicatorBorder*enlargeIndicatorRatio, parsed.IndicatorCenterToEdge)
 		if err != nil {
-			logger.Error("handleAccountImagesPlaceholder: failed to draw status-indicator for initials", zap.Error(err))
+			s.logger.Error("handleAccountImagesPlaceholder: failed to draw status-indicator for initials", zap.Error(err))
 			return
 		}
 	}
 
 	if len(payload) == 0 {
-		logger.Error("handleAccountImagesPlaceholder: empty image")
+		s.logger.Error("handleAccountImagesPlaceholder: empty image")
 		return
 	}
 
 	mime, err := images.GetProtobufImageMime(payload)
 	if err != nil {
-		logger.Error("failed to get mime", zap.Error(err))
+		s.logger.Error("failed to get mime", zap.Error(err))
 	}
 
 	w.Header().Set("Content-Type", mime)
@@ -445,21 +439,19 @@ func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, p
 
 	_, err = w.Write(payload)
 	if err != nil {
-		logger.Error("handleAccountImagesPlaceholder: failed to write image", zap.Error(err))
+		s.logger.Error("handleAccountImagesPlaceholder: failed to write image", zap.Error(err))
 	}
 }
 
 // handleAccountImages render multiaccounts custom profile image
-func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		parsed := ParseImageParams(logger, params)
+func (s *MediaServer) handleAccountImages(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+	parsed := ParseImageParams(s.logger, params)
 
-		if parsed.KeyUID == "" {
-			handleAccountImagesPlaceholder(logger, w, parsed)
-		} else {
-			handleAccountImagesImpl(multiaccountsDB, logger, w, parsed)
-		}
+	if parsed.KeyUID == "" {
+		s.handleAccountImagesPlaceholder(w, parsed)
+	} else {
+		s.handleAccountImagesImpl(w, parsed)
 	}
 }
 
@@ -585,132 +577,130 @@ func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter,
 }
 
 // handleAccountInitials render multiaccounts/contacts initials avatar image
-func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		parsed := ParseImageParams(logger, params)
+func (s *MediaServer) handleAccountInitials(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+	parsed := ParseImageParams(s.logger, params)
 
-		if parsed.FontFile == "" {
-			logger.Error("handleAccountInitials: no fontFile")
-			return
-		}
-		if parsed.FontSize == 0 {
-			logger.Error("handleAccountInitials: no fontSize")
-			return
-		}
-		if parsed.Color == color.Transparent {
-			logger.Error("handleAccountInitials: no color")
-			return
-		}
-		if parsed.BgSize == 0 {
-			logger.Error("handleAccountInitials: no size")
-			return
-		}
-		if parsed.BgColor == color.Transparent {
-			logger.Error("handleAccountInitials: no bgColor")
-			return
-		}
+	if parsed.FontFile == "" {
+		s.logger.Error("handleAccountInitials: no fontFile")
+		return
+	}
+	if parsed.FontSize == 0 {
+		s.logger.Error("handleAccountInitials: no fontSize")
+		return
+	}
+	if parsed.Color == color.Transparent {
+		s.logger.Error("handleAccountInitials: no color")
+		return
+	}
+	if parsed.BgSize == 0 {
+		s.logger.Error("handleAccountInitials: no size")
+		return
+	}
+	if parsed.BgColor == color.Transparent {
+		s.logger.Error("handleAccountInitials: no bgColor")
+		return
+	}
 
-		if parsed.KeyUID == "" && parsed.PublicKey == "" {
-			handleAccountInitialsPlaceholder(logger, w, parsed)
-		} else {
-			handleAccountInitialsImpl(multiaccountsDB, logger, w, parsed)
-		}
+	if parsed.KeyUID == "" && parsed.PublicKey == "" {
+		handleAccountInitialsPlaceholder(s.logger, w, parsed)
+	} else {
+		handleAccountInitialsImpl(s.multiaccountsDB, s.logger, w, parsed)
 	}
 }
 
 // handleContactImages render contacts custom profile image
-func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	if db == nil {
-		return handleRequestDBMissing(logger)
+func (s *MediaServer) handleContactImages(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		s.logger.Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		parsed := ParseImageParams(logger, params)
+	params := r.URL.Query()
+	parsed := ParseImageParams(s.logger, params)
 
-		if parsed.PublicKey == "" {
-			logger.Error("no publicKey")
-			return
-		}
+	if parsed.PublicKey == "" {
+		s.logger.Error("no publicKey")
+		return
+	}
 
-		if parsed.ImageName == "" {
-			logger.Error("no imageName")
-			return
-		}
+	if parsed.ImageName == "" {
+		s.logger.Error("no imageName")
+		return
+	}
 
-		if parsed.Ring && parsed.RingWidth == 0 {
-			logger.Error("handleContactImages: no ringWidth.")
-			return
-		}
+	if parsed.Ring && parsed.RingWidth == 0 {
+		s.logger.Error("handleContactImages: no ringWidth.")
+		return
+	}
 
-		var payload []byte
-		err := db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, parsed.PublicKey, parsed.ImageName).Scan(&payload)
+	var payload []byte
+	err := s.db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, parsed.PublicKey, parsed.ImageName).Scan(&payload)
+	if err != nil {
+		s.logger.Error("failed to load image.", zap.String("contact id", gocommon.TruncateWithDot(parsed.PublicKey)), zap.String("image type", parsed.ImageName), zap.Error(err))
+		return
+	}
+
+	img, _, err := image.Decode(bytes.NewReader(payload))
+	if err != nil {
+		s.logger.Error("failed to decode config.", zap.String("contact id", gocommon.TruncateWithDot(parsed.PublicKey)), zap.String("image type", parsed.ImageName), zap.Error(err))
+		return
+	}
+	width := img.Bounds().Dx()
+
+	if parsed.BgSize == 0 {
+		parsed.BgSize = width
+	}
+
+	payload, err = images.RoundCrop(payload)
+	if err != nil {
+		s.logger.Error("handleContactImages: failed to crop image.", zap.Error(err))
+		return
+	}
+
+	enlargeRatio := float64(width) / float64(parsed.BgSize)
+
+	if parsed.Ring {
+		colorHash, err := colorhash.GenerateFor(parsed.PublicKey)
 		if err != nil {
-			logger.Error("failed to load image.", zap.String("contact id", gocommon.TruncateWithDot(parsed.PublicKey)), zap.String("image type", parsed.ImageName), zap.Error(err))
+			s.logger.Error("could not generate color hash")
 			return
 		}
 
-		img, _, err := image.Decode(bytes.NewReader(payload))
+		payload, err = ring.DrawRing(&ring.DrawRingParam{
+			Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: payload, Height: width, Width: width, RingWidth: parsed.RingWidth * enlargeRatio,
+		})
+
 		if err != nil {
-			logger.Error("failed to decode config.", zap.String("contact id", gocommon.TruncateWithDot(parsed.PublicKey)), zap.String("image type", parsed.ImageName), zap.Error(err))
+			s.logger.Error("failed to draw ring for contact image.", zap.Error(err))
 			return
 		}
-		width := img.Bounds().Dx()
+	}
 
-		if parsed.BgSize == 0 {
-			parsed.BgSize = width
-		}
-
-		payload, err = images.RoundCrop(payload)
+	if parsed.IndicatorSize != 0 {
+		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeRatio, parsed.IndicatorBorder*enlargeRatio, parsed.IndicatorCenterToEdge*enlargeRatio)
 		if err != nil {
-			logger.Error("handleContactImages: failed to crop image.", zap.Error(err))
+			s.logger.Error("handleContactImages: failed to draw status-indicator for initials", zap.Error(err))
 			return
 		}
+	}
 
-		enlargeRatio := float64(width) / float64(parsed.BgSize)
+	if len(payload) == 0 {
+		s.logger.Error("empty image")
+		return
+	}
+	mime, err := images.GetProtobufImageMime(payload)
+	if err != nil {
+		s.logger.Error("failed to get mime", zap.Error(err))
+	}
 
-		if parsed.Ring {
-			colorHash, err := colorhash.GenerateFor(parsed.PublicKey)
-			if err != nil {
-				logger.Error("could not generate color hash")
-				return
-			}
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
 
-			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: payload, Height: width, Width: width, RingWidth: parsed.RingWidth * enlargeRatio,
-			})
-
-			if err != nil {
-				logger.Error("failed to draw ring for contact image.", zap.Error(err))
-				return
-			}
-		}
-
-		if parsed.IndicatorSize != 0 {
-			payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeRatio, parsed.IndicatorBorder*enlargeRatio, parsed.IndicatorCenterToEdge*enlargeRatio)
-			if err != nil {
-				logger.Error("handleContactImages: failed to draw status-indicator for initials", zap.Error(err))
-				return
-			}
-		}
-
-		if len(payload) == 0 {
-			logger.Error("empty image")
-			return
-		}
-		mime, err := images.GetProtobufImageMime(payload)
-		if err != nil {
-			logger.Error("failed to get mime", zap.Error(err))
-		}
-
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(payload)
-		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
-		}
+	_, err = w.Write(payload)
+	if err != nil {
+		s.logger.Error("failed to write image", zap.Error(err))
 	}
 }
 
@@ -733,532 +723,514 @@ func getTheme(params url.Values, logger *zap.Logger) ring.Theme {
 	return theme
 }
 
-func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	if db == nil {
-		return handleRequestDBMissing(logger)
+func (s *MediaServer) handleDiscordAuthorAvatar(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		s.logger.Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		parsed := ParseImageParams(logger, params)
+	params := r.URL.Query()
+	parsed := ParseImageParams(s.logger, params)
 
-		if parsed.AuthorID == "" {
-			logger.Error("no authorIDs")
-			return
-		}
-
-		var image []byte
-		err := db.QueryRow(`SELECT avatar_image_payload FROM discord_message_authors WHERE id = ?`, parsed.AuthorID).Scan(&image)
-		if err != nil {
-			logger.Error("failed to find image", zap.Error(err))
-			return
-		}
-		if len(image) == 0 {
-			logger.Error("empty image")
-			return
-		}
-		mime, err := images.GetProtobufImageMime(image)
-		if err != nil {
-			logger.Error("failed to get mime", zap.Error(err))
-		}
-
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(image)
-		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
-		}
-	}
-}
-
-func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	if db == nil {
-		return handleRequestDBMissing(logger)
+	if parsed.AuthorID == "" {
+		s.logger.Error("no authorIDs")
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		parsed := ParseImageParams(logger, params)
+	var image []byte
+	err := s.db.QueryRow(`SELECT avatar_image_payload FROM discord_message_authors WHERE id = ?`, parsed.AuthorID).Scan(&image)
+	if err != nil {
+		s.logger.Error("failed to find image", zap.Error(err))
+		return
+	}
+	if len(image) == 0 {
+		s.logger.Error("empty image")
+		return
+	}
+	mime, err := images.GetProtobufImageMime(image)
+	if err != nil {
+		s.logger.Error("failed to get mime", zap.Error(err))
+	}
 
-		if parsed.MessageID == "" {
-			logger.Error("no messageID")
-			return
-		}
-		if parsed.AttachmentID == "" {
-			logger.Error("no attachmentID")
-			return
-		}
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
 
-		var image []byte
-		err := db.QueryRow(`SELECT payload FROM discord_message_attachments WHERE discord_message_id = ? AND id = ?`, parsed.MessageID, parsed.AttachmentID).Scan(&image)
-		if err != nil {
-			logger.Error("failed to find image", zap.Error(err))
-			return
-		}
-		if len(image) == 0 {
-			logger.Error("empty image")
-			return
-		}
-		mime, err := images.GetProtobufImageMime(image)
-		if err != nil {
-			logger.Error("failed to get mime", zap.Error(err))
-		}
-
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(image)
-		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
-		}
+	_, err = w.Write(image)
+	if err != nil {
+		s.logger.Error("failed to write image", zap.Error(err))
 	}
 }
 
-func handleImage(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	if db == nil {
-		return handleRequestDBMissing(logger)
+func (s *MediaServer) handleDiscordAttachment(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		s.logger.Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		parsed := ParseImageParams(logger, params)
+	params := r.URL.Query()
+	parsed := ParseImageParams(s.logger, params)
 
-		if parsed.MessageID == "" {
-			logger.Error("no messageID")
-			return
-		}
-
-		var image []byte
-		err := db.QueryRow(`SELECT image_payload FROM user_messages WHERE id = ?`, parsed.MessageID).Scan(&image)
-		if err != nil {
-			logger.Error("failed to find image", zap.Error(err))
-			return
-		}
-		if len(image) == 0 {
-			logger.Error("empty image")
-			return
-		}
-		mime, err := images.GetProtobufImageMime(image)
-		if err != nil {
-			logger.Error("failed to get mime", zap.Error(err))
-		}
-
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(image)
-		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
-		}
+	if parsed.MessageID == "" {
+		s.logger.Error("no messageID")
+		return
 	}
-}
-
-func handleAudio(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	if db == nil {
-		return handleRequestDBMissing(logger)
+	if parsed.AttachmentID == "" {
+		s.logger.Error("no attachmentID")
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		parsed := ParseImageParams(logger, params)
+	var image []byte
+	err := s.db.QueryRow(`SELECT payload FROM discord_message_attachments WHERE discord_message_id = ? AND id = ?`, parsed.MessageID, parsed.AttachmentID).Scan(&image)
+	if err != nil {
+		s.logger.Error("failed to find image", zap.Error(err))
+		return
+	}
+	if len(image) == 0 {
+		s.logger.Error("empty image")
+		return
+	}
+	mime, err := images.GetProtobufImageMime(image)
+	if err != nil {
+		s.logger.Error("failed to get mime", zap.Error(err))
+	}
 
-		if parsed.MessageID == "" {
-			logger.Error("no messageID")
-			return
-		}
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
 
-		var audio []byte
-		err := db.QueryRow(`SELECT audio_payload FROM user_messages WHERE id = ?`, parsed.MessageID).Scan(&audio)
-		if err != nil {
-			logger.Error("failed to find image", zap.Error(err))
-			return
-		}
-		if len(audio) == 0 {
-			logger.Error("empty audio")
-			return
-		}
-
-		w.Header().Set("Content-Type", "audio/aac")
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(audio)
-		if err != nil {
-			logger.Error("failed to write audio", zap.Error(err))
-		}
+	_, err = w.Write(image)
+	if err != nil {
+		s.logger.Error("failed to write image", zap.Error(err))
 	}
 }
 
-func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) http.HandlerFunc {
-	if downloader == nil {
-		return handleRequestDownloaderMissing(logger)
+func (s *MediaServer) handleImage(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		s.logger.Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		parsed := ParseImageParams(logger, params)
+	params := r.URL.Query()
+	parsed := ParseImageParams(s.logger, params)
 
-		if parsed.Hash == "" {
-			logger.Error("no hash")
-			return
-		}
-
-		content, err := downloader.Get(parsed.Hash, parsed.Download)
-		if err != nil {
-			logger.Error("could not download hash", zap.Error(err))
-			return
-		}
-
-		w.Header().Set("Cache-Control", "max-age:290304000, public")
-		w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
-
-		_, err = w.Write(content)
-		if err != nil {
-			logger.Error("failed to write ipfs resource", zap.Error(err))
-		}
+	if parsed.MessageID == "" {
+		s.logger.Error("no messageID")
+		return
 	}
-}
 
-func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
+	var image []byte
+	err := s.db.QueryRow(`SELECT image_payload FROM user_messages WHERE id = ?`, parsed.MessageID).Scan(&image)
+	if err != nil {
+		s.logger.Error("failed to find image", zap.Error(err))
+		return
+	}
+	if len(image) == 0 {
+		s.logger.Error("empty image")
+		return
+	}
+	mime, err := images.GetProtobufImageMime(image)
+	if err != nil {
+		s.logger.Error("failed to get mime", zap.Error(err))
+	}
 
-		payload := generateQRBytes(params, logger, multiaccountsDB)
-		mime, err := images.GetProtobufImageMime(payload)
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
 
-		if err != nil {
-			logger.Error("could not generate image from payload", zap.Error(err))
-		}
-
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(payload)
-
-		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
-		}
+	_, err = w.Write(image)
+	if err != nil {
+		s.logger.Error("failed to write image", zap.Error(err))
 	}
 }
 
-func handleCommunityTokenImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	if db == nil {
-		return handleRequestDBMissing(logger)
+func (s *MediaServer) handleAudio(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		s.logger.Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
+	params := r.URL.Query()
+	parsed := ParseImageParams(s.logger, params)
 
-		if len(params["communityID"]) == 0 {
-			logger.Error("no communityID")
-			return
-		}
-		if len(params["chainID"]) == 0 {
-			logger.Error("no chainID")
-			return
-		}
-		if len(params["symbol"]) == 0 {
-			logger.Error("no symbol")
-			return
-		}
+	if parsed.MessageID == "" {
+		s.logger.Error("no messageID")
+		return
+	}
 
-		chainID, err := strconv.ParseUint(params["chainID"][0], 10, 64)
-		if err != nil {
-			logger.Error("invalid chainID in community token image", zap.Error(err))
-			return
-		}
+	var audio []byte
+	err := s.db.QueryRow(`SELECT audio_payload FROM user_messages WHERE id = ?`, parsed.MessageID).Scan(&audio)
+	if err != nil {
+		s.logger.Error("failed to find image", zap.Error(err))
+		return
+	}
+	if len(audio) == 0 {
+		s.logger.Error("empty audio")
+		return
+	}
 
-		var base64Image string
-		err = db.QueryRow("SELECT image_base64 FROM community_tokens WHERE community_id = ? AND chain_id = ? AND symbol = ?", params["communityID"][0], chainID, params["symbol"][0]).Scan(&base64Image)
-		if err != nil {
-			logger.Error("failed to find community token image", zap.Error(err))
-			return
-		}
-		if len(base64Image) == 0 {
-			logger.Error("empty community token image")
-			return
-		}
-		imagePayload, err := images.GetPayloadFromURI(base64Image)
-		if err != nil {
-			logger.Error("failed to get community token image payload", zap.Error(err))
-			return
-		}
-		mime, err := images.GetProtobufImageMime(imagePayload)
-		if err != nil {
-			logger.Error("failed to get community token image mime", zap.Error(err))
-		}
+	w.Header().Set("Content-Type", "audio/aac")
+	w.Header().Set("Cache-Control", "no-store")
 
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(imagePayload)
-		if err != nil {
-			logger.Error("failed to write community token image", zap.Error(err))
-		}
+	_, err = w.Write(audio)
+	if err != nil {
+		s.logger.Error("failed to write audio", zap.Error(err))
 	}
 }
 
-func handleCommunityDescriptionImagesPath(db *sql.DB, getCommunityImages func(communityID string) (map[string]*protobuf.IdentityImage, error), logger *zap.Logger) http.HandlerFunc {
-	if db == nil {
-		return handleRequestDBMissing(logger)
+func (s *MediaServer) handleIPFS(w http.ResponseWriter, r *http.Request) {
+	if s.downloader == nil {
+		s.logger.Warn("can't handle media request without ipfs downloader")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
+	params := r.URL.Query()
+	parsed := ParseImageParams(s.logger, params)
 
-		if len(params["communityID"]) == 0 {
-			logger.Error("[handleCommunityDescriptionImagesPath] no communityID")
-			return
-		}
-		communityID := params["communityID"][0]
+	if parsed.Hash == "" {
+		s.logger.Error("no hash")
+		return
+	}
 
-		name := ""
-		if len(params["name"]) > 0 {
-			name = params["name"][0]
-		}
+	content, err := s.downloader.Get(parsed.Hash, parsed.Download)
+	if err != nil {
+		s.logger.Error("could not download hash", zap.Error(err))
+		return
+	}
 
-		communityImages, err := getCommunityImages(communityID)
-		if err != nil {
-			return
-		}
+	w.Header().Set("Cache-Control", "max-age:290304000, public")
+	w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
 
-		var imagePayload []byte
-		for t, i := range communityImages {
-			if t == name {
-				imagePayload = i.Payload
-			}
-		}
-		if imagePayload == nil {
-			logger.Error("can't find community description image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("name", name))
-			return
-		}
-
-		mime, err := images.GetProtobufImageMime(imagePayload)
-		if err != nil {
-			logger.Error("failed to get community image mime", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.Error(err))
-		}
-
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-		_, err = w.Write(imagePayload)
-		if err != nil {
-			logger.Error("failed to write community image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.Error(err))
-		}
+	_, err = w.Write(content)
+	if err != nil {
+		s.logger.Error("failed to write ipfs resource", zap.Error(err))
 	}
 }
 
-func handleCommunityDescriptionTokenImagesPath(db *sql.DB, getCommunityTokens func(communityID string) ([]*protobuf.CommunityTokenMetadata, error), logger *zap.Logger) http.HandlerFunc {
-	if db == nil {
-		return handleRequestDBMissing(logger)
+func (s *MediaServer) handleCommunityTokenImages(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		s.logger.Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
+	params := r.URL.Query()
 
-		if len(params["communityID"]) == 0 {
-			logger.Error("[handleCommunityDescriptionTokenImagesPath] no communityID")
-			return
-		}
-		communityID := params["communityID"][0]
-
-		if len(params["symbol"]) == 0 {
-			logger.Error("[handleCommunityDescriptionTokenImagesPath] no symbol")
-			return
-		}
-		symbol := params["symbol"][0]
-
-		communityTokens, err := getCommunityTokens(communityID)
-		if err != nil {
-			return
-		}
-
-		var foundToken *protobuf.CommunityTokenMetadata
-		for _, m := range communityTokens {
-			if m.GetSymbol() == symbol {
-				foundToken = m
-			}
-		}
-		if foundToken == nil {
-			logger.Error("can't find community description token image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("symbol", symbol))
-			return
-		}
-
-		imagePayload, err := images.GetPayloadFromURI(foundToken.Image)
-		if err != nil {
-			logger.Error("failed to get community description token image payload", zap.Error(err))
-			return
-		}
-		mime, err := images.GetProtobufImageMime(imagePayload)
-		if err != nil {
-			logger.Error("failed to get community description token image mime", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("symbol", symbol), zap.Error(err))
-		}
-
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-		_, err = w.Write(imagePayload)
-		if err != nil {
-			logger.Error("failed to write community description token image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("symbol", symbol), zap.Error(err))
-		}
+	if len(params["communityID"]) == 0 {
+		s.logger.Error("no communityID")
+		return
 	}
-}
-
-func handleWalletCommunityImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	if db == nil {
-		return handleRequestDBMissing(logger)
+	if len(params["chainID"]) == 0 {
+		s.logger.Error("no chainID")
+		return
+	}
+	if len(params["symbol"]) == 0 {
+		s.logger.Error("no symbol")
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
+	chainID, err := strconv.ParseUint(params["chainID"][0], 10, 64)
+	if err != nil {
+		s.logger.Error("invalid chainID in community token image", zap.Error(err))
+		return
+	}
 
-		if len(params["communityID"]) == 0 {
-			logger.Error("no communityID")
-			return
-		}
+	var base64Image string
+	err = s.db.QueryRow("SELECT image_base64 FROM community_tokens WHERE community_id = ? AND chain_id = ? AND symbol = ?", params["communityID"][0], chainID, params["symbol"][0]).Scan(&base64Image)
+	if err != nil {
+		s.logger.Error("failed to find community token image", zap.Error(err))
+		return
+	}
+	if len(base64Image) == 0 {
+		s.logger.Error("empty community token image")
+		return
+	}
+	imagePayload, err := images.GetPayloadFromURI(base64Image)
+	if err != nil {
+		s.logger.Error("failed to get community token image payload", zap.Error(err))
+		return
+	}
+	mime, err := images.GetProtobufImageMime(imagePayload)
+	if err != nil {
+		s.logger.Error("failed to get community token image mime", zap.Error(err))
+	}
 
-		var image []byte
-		err := db.QueryRow(`SELECT image_payload FROM community_data_cache WHERE id = ?`, params["communityID"][0]).Scan(&image)
-		if err != nil {
-			logger.Error("failed to find wallet community image", zap.Error(err))
-			return
-		}
-		if len(image) == 0 {
-			logger.Error("empty wallet community image")
-			return
-		}
-		mime, err := images.GetProtobufImageMime(image)
-		if err != nil {
-			logger.Error("failed to get wallet community image mime", zap.Error(err))
-		}
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
 
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(image)
-		if err != nil {
-			logger.Error("failed to write wallet community image", zap.Error(err))
-		}
+	_, err = w.Write(imagePayload)
+	if err != nil {
+		s.logger.Error("failed to write community token image", zap.Error(err))
 	}
 }
 
-func handleWalletCollectionImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	if db == nil {
-		return handleRequestDBMissing(logger)
+func (s *MediaServer) handleCommunityDescriptionImages(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		s.logger.Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
+	params := r.URL.Query()
 
-		if len(params["chainID"]) == 0 {
-			logger.Error("no chainID")
-			return
-		}
+	if len(params["communityID"]) == 0 {
+		s.logger.Error("[handleCommunityDescriptionImagesPath] no communityID")
+		return
+	}
+	communityID := params["communityID"][0]
 
-		if len(params["contractAddress"]) == 0 {
-			logger.Error("no contractAddress")
-			return
-		}
+	name := ""
+	if len(params["name"]) > 0 {
+		name = params["name"][0]
+	}
 
-		chainID, err := strconv.ParseUint(params["chainID"][0], 10, 64)
-		if err != nil {
-			logger.Error("invalid chainID in wallet collectible image", zap.Error(err))
-			return
-		}
-		contractAddress := eth_common.HexToAddress(params["contractAddress"][0])
-		if len(contractAddress) == 0 {
-			logger.Error("invalid contractAddress in wallet collectible image", zap.Error(err))
-			return
-		}
+	communityImages, err := s.getCommunityImage(communityID)
+	if err != nil {
+		return
+	}
 
-		var image []byte
-		err = db.QueryRow(`SELECT image_payload FROM collection_data_cache WHERE chain_id = ? AND contract_address = ?`,
-			chainID,
-			contractAddress).Scan(&image)
-		if err != nil {
-			logger.Error("failed to find wallet collection image", zap.Error(err))
-			return
+	var imagePayload []byte
+	for t, i := range communityImages {
+		if t == name {
+			imagePayload = i.Payload
 		}
-		if len(image) == 0 {
-			logger.Error("empty wallet collection image")
-			return
-		}
-		mime, err := images.GetProtobufImageMime(image)
-		if err != nil {
-			logger.Error("failed to get wallet collection image mime", zap.Error(err))
-		}
+	}
+	if imagePayload == nil {
+		s.logger.Error("can't find community description image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("name", name))
+		return
+	}
 
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
+	mime, err := images.GetProtobufImageMime(imagePayload)
+	if err != nil {
+		s.logger.Error("failed to get community image mime", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.Error(err))
+	}
 
-		_, err = w.Write(image)
-		if err != nil {
-			logger.Error("failed to write wallet collection image", zap.Error(err))
-		}
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
+	_, err = w.Write(imagePayload)
+	if err != nil {
+		s.logger.Error("failed to write community image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 	}
 }
 
-func handleWalletCollectibleImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-	if db == nil {
-		return handleRequestDBMissing(logger)
+func (s *MediaServer) handleCommunityDescriptionTokenImages(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		s.logger.Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
+	params := r.URL.Query()
 
-		if len(params["chainID"]) == 0 {
-			logger.Error("no chainID")
-			return
-		}
+	if len(params["communityID"]) == 0 {
+		s.logger.Error("[handleCommunityDescriptionTokenImagesPath] no communityID")
+		return
+	}
+	communityID := params["communityID"][0]
 
-		if len(params["contractAddress"]) == 0 {
-			logger.Error("no contractAddress")
-			return
-		}
+	if len(params["symbol"]) == 0 {
+		s.logger.Error("[handleCommunityDescriptionTokenImagesPath] no symbol")
+		return
+	}
+	symbol := params["symbol"][0]
 
-		if len(params["tokenID"]) == 0 {
-			logger.Error("no tokenID")
-			return
-		}
+	communityTokens, err := s.getCommunityTokens(communityID)
+	if err != nil {
+		return
+	}
 
-		chainID, err := strconv.ParseUint(params["chainID"][0], 10, 64)
-		if err != nil {
-			logger.Error("invalid chainID in wallet collectible image", zap.Error(err))
-			return
-		}
-		contractAddress := eth_common.HexToAddress(params["contractAddress"][0])
-		if len(contractAddress) == 0 {
-			logger.Error("invalid contractAddress in wallet collectible image", zap.Error(err))
-			return
-		}
-		tokenID, ok := big.NewInt(0).SetString(params["tokenID"][0], 10)
-		if !ok {
-			logger.Error("invalid tokenID in wallet collectible image", zap.Error(err))
-			return
-		}
-
-		var image []byte
-		err = db.QueryRow(`SELECT image_payload FROM collectible_data_cache WHERE chain_id = ? AND contract_address = ? AND token_id = ?`,
-			chainID,
-			contractAddress,
-			(*bigint.SQLBigIntBytes)(tokenID)).Scan(&image)
-		if err != nil {
-			logger.Error("failed to find wallet collectible image", zap.Error(err))
-			return
-		}
-		if len(image) == 0 {
-			logger.Error("empty image")
-			return
-		}
-		mime, err := images.GetProtobufImageMime(image)
-		if err != nil {
-			logger.Error("failed to get wallet collectible image mime", zap.Error(err))
-		}
-
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(image)
-		if err != nil {
-			logger.Error("failed to write wallet collectible image", zap.Error(err))
+	var foundToken *protobuf.CommunityTokenMetadata
+	for _, m := range communityTokens {
+		if m.GetSymbol() == symbol {
+			foundToken = m
 		}
 	}
+	if foundToken == nil {
+		s.logger.Error("can't find community description token image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("symbol", symbol))
+		return
+	}
+
+	imagePayload, err := images.GetPayloadFromURI(foundToken.Image)
+	if err != nil {
+		s.logger.Error("failed to get community description token image payload", zap.Error(err))
+		return
+	}
+	mime, err := images.GetProtobufImageMime(imagePayload)
+	if err != nil {
+		s.logger.Error("failed to get community description token image mime", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("symbol", symbol), zap.Error(err))
+	}
+
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
+	_, err = w.Write(imagePayload)
+	if err != nil {
+		s.logger.Error("failed to write community description token image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("symbol", symbol), zap.Error(err))
+	}
+}
+
+func (s *MediaServer) handleWalletCommunityImages(w http.ResponseWriter, r *http.Request) {
+	if s.walletDB == nil {
+		s.logger.Warn("can't handle media request without wallet db")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	params := r.URL.Query()
+
+	if len(params["communityID"]) == 0 {
+		s.logger.Error("no communityID")
+		return
+	}
+
+	var image []byte
+	err := s.walletDB.QueryRow(`SELECT image_payload FROM community_data_cache WHERE id = ?`, params["communityID"][0]).Scan(&image)
+	if err != nil {
+		s.logger.Error("failed to find wallet community image", zap.Error(err))
+		return
+	}
+	if len(image) == 0 {
+		s.logger.Error("empty wallet community image")
+		return
+	}
+	mime, err := images.GetProtobufImageMime(image)
+	if err != nil {
+		s.logger.Error("failed to get wallet community image mime", zap.Error(err))
+	}
+
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
+
+	_, err = w.Write(image)
+	if err != nil {
+		s.logger.Error("failed to write wallet community image", zap.Error(err))
+	}
+}
+
+func (s *MediaServer) handleWalletCollectionImages(w http.ResponseWriter, r *http.Request) {
+	if s.walletDB == nil {
+		s.logger.Warn("can't handle media request without wallet db")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	params := r.URL.Query()
+
+	if len(params["chainID"]) == 0 {
+		s.logger.Error("no chainID")
+		return
+	}
+
+	if len(params["contractAddress"]) == 0 {
+		s.logger.Error("no contractAddress")
+		return
+	}
+
+	chainID, err := strconv.ParseUint(params["chainID"][0], 10, 64)
+	if err != nil {
+		s.logger.Error("invalid chainID in wallet collectible image", zap.Error(err))
+		return
+	}
+	contractAddress := eth_common.HexToAddress(params["contractAddress"][0])
+	if len(contractAddress) == 0 {
+		s.logger.Error("invalid contractAddress in wallet collectible image", zap.Error(err))
+		return
+	}
+
+	var image []byte
+	err = s.walletDB.QueryRow(`SELECT image_payload FROM collection_data_cache WHERE chain_id = ? AND contract_address = ?`,
+		chainID,
+		contractAddress).Scan(&image)
+	if err != nil {
+		s.logger.Error("failed to find wallet collection image", zap.Error(err))
+		return
+	}
+	if len(image) == 0 {
+		s.logger.Error("empty wallet collection image")
+		return
+	}
+	mime, err := images.GetProtobufImageMime(image)
+	if err != nil {
+		s.logger.Error("failed to get wallet collection image mime", zap.Error(err))
+	}
+
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
+
+	_, err = w.Write(image)
+	if err != nil {
+		s.logger.Error("failed to write wallet collection image", zap.Error(err))
+	}
+}
+
+func (s *MediaServer) handleWalletCollectibleImages(w http.ResponseWriter, r *http.Request) {
+	if s.walletDB == nil {
+		s.logger.Warn("can't handle media request without wallet db")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	params := r.URL.Query()
+
+	if len(params["chainID"]) == 0 {
+		s.logger.Error("no chainID")
+		return
+	}
+
+	if len(params["contractAddress"]) == 0 {
+		s.logger.Error("no contractAddress")
+		return
+	}
+
+	if len(params["tokenID"]) == 0 {
+		s.logger.Error("no tokenID")
+		return
+	}
+
+	chainID, err := strconv.ParseUint(params["chainID"][0], 10, 64)
+	if err != nil {
+		s.logger.Error("invalid chainID in wallet collectible image", zap.Error(err))
+		return
+	}
+	contractAddress := eth_common.HexToAddress(params["contractAddress"][0])
+	if len(contractAddress) == 0 {
+		s.logger.Error("invalid contractAddress in wallet collectible image", zap.Error(err))
+		return
+	}
+	tokenID, ok := big.NewInt(0).SetString(params["tokenID"][0], 10)
+	if !ok {
+		s.logger.Error("invalid tokenID in wallet collectible image", zap.Error(err))
+		return
+	}
+
+	var image []byte
+	err = s.walletDB.QueryRow(`SELECT image_payload FROM collectible_data_cache WHERE chain_id = ? AND contract_address = ? AND token_id = ?`,
+		chainID,
+		contractAddress,
+		(*bigint.SQLBigIntBytes)(tokenID)).Scan(&image)
+	if err != nil {
+		s.logger.Error("failed to find wallet collectible image", zap.Error(err))
+		return
+	}
+	if len(image) == 0 {
+		s.logger.Error("empty image")
+		return
+	}
+	mime, err := images.GetProtobufImageMime(image)
+	if err != nil {
+		s.logger.Error("failed to get wallet collectible image mime", zap.Error(err))
+	}
+
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
+
+	_, err = w.Write(image)
+	if err != nil {
+		s.logger.Error("failed to write wallet collectible image", zap.Error(err))
+	}
+}
+
+func (s *MediaServer) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }

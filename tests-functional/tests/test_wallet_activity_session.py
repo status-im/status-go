@@ -1,17 +1,21 @@
 import json
-import random
-from utils import wallet_utils
 import uuid as uuid_lib
-import pytest
 
-from resources.constants import user_1, user_2
-from clients.signals import SignalType
-from clients.anvil import Anvil
-from clients.smart_contract_runner import SmartContractRunner
-from clients.contract_deployers.snt import SNTDeployer, SNTV2_ABI, SNT_TOKEN_CONTROLLER_ABI
-from resources.constants import DEPLOYER_ACCOUNT
-from clients.contract_deployers.communities import CommunitiesDeployer
+import pytest
 from web3 import Web3
+
+from clients.anvil import Anvil
+from clients.contract_deployers.communities import CommunitiesDeployer
+from clients.contract_deployers.snt import (
+    SNTDeployer,
+    SNTV2_ABI,
+    SNT_TOKEN_CONTROLLER_ABI,
+)
+from clients.signals import SignalType
+from clients.smart_contract_runner import SmartContractRunner
+from resources.constants import DEPLOYER_ACCOUNT
+from resources.constants import user_1, user_2
+from utils import wallet_utils
 
 EventActivityFilteringDone = "wallet-activity-filtering-done"
 EventActivityFilteringUpdate = "wallet-activity-filtering-entries-updated"
@@ -74,7 +78,6 @@ class TestWalletActivitySession:
         # Create backend
         self.rpc_client = backend_recovered_profile(name="rpc_client", user=user_1, token_overrides=token_overrides)
 
-        self.request_id = str(random.randint(1, 8888))
         self.mint_snt(user_1.address, 1000000000000000000000000)
 
     def test_wallet_start_activity_filter_session(self):
@@ -124,7 +127,7 @@ class TestWalletActivitySession:
             1,
             lambda signal: signal["event"]["type"] == EventActivityFilteringDone,
         )
-        response = self.rpc_client.rpc_valid_request(method, params, self.request_id)
+        response = self.rpc_client.rpc_valid_request(method, params)
         event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
 
         # Check response
@@ -181,7 +184,7 @@ class TestWalletActivitySession:
             1,
             lambda signal: signal["event"]["type"] == EventActivityFilteringDone and signal["event"]["requestId"] == sessionID,
         )
-        response = self.rpc_client.rpc_valid_request(method, params, self.request_id)
+        response = self.rpc_client.rpc_valid_request(method, params)
         event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
 
         # Check response event

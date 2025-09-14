@@ -63,7 +63,8 @@ jobs:
           --tb=short \
           --docker-image="statusgo-local" \
           --waku-fleet=status.staging \
-          --waku-fleets-config=""
+          --waku-fleets-config="" \
+          --logs-dir=tests-functional/log
 
     - name: Test Report
       if: always()
@@ -75,6 +76,7 @@ jobs:
         use-actions-summary: 'true'
 
     - uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: status-backend-logs
-        path: tests-functional/logs
+        name: status-backend-logs_${{ matrix.config.name }}
+        path: tests-functional/log

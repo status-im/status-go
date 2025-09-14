@@ -4558,7 +4558,7 @@ func (s *MessengerCommunitiesSuite) TestMemberMessagesHasImageLink() {
 		s.Require().Equal(1, len(storedMessages))
 		memberMessage := storedMessages[0]
 		s.Require().Equal(sentMessage.ID, memberMessage.ID)
-		s.Require().True(strings.HasPrefix(memberMessage.ImageLocalURL, "https://Localhost"))
+		s.Require().True(strings.HasPrefix(memberMessage.ImageLocalURL, "https://localhost"))
 	}
 	communityID := community.IDString()
 	alicePubKey := s.alice.IdentityPublicKeyString()

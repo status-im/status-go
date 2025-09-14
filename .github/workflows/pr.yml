@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.23
+          go-version: 1.24
 
       - name: Cache Go dependencies
         uses: actions/cache@v4
@@ -65,3 +65,20 @@ jobs:
       - name: lint-panics
         run: |
           make lint-panics
+
+  migration-check:
+    name: Check SQL migrations order
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run migration check
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          bash _assets/scripts/migration_check.sh

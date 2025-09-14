@@ -1,21 +1,18 @@
 package node
 
 import (
-	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
-	"reflect"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/transactions"
 
 	"github.com/ethereum/go-ethereum/event"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -71,6 +68,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = appendIf(config.ConnectorConfig.Enabled, services, b.connectorService())
 	services = append(services, b.gifService(accDB))
 	services = append(services, b.ChatService(accDB))
+	services = append(services, b.ethService())
 
 	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
 	// Keep this initialization before the other two
@@ -105,33 +103,25 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	}
 	services = append(services, lns)
 
-	for i := range services {
-		b.RegisterLifecycle(services[i])
+	b.services = services
+
+	return nil
+}
+
+func (b *StatusNode) registerService(s common.StatusService) error {
+	for _, api := range s.APIs() {
+		b.logger.Debug("registering service api", zap.String("namespace", api.Namespace))
+		err := b.rpcServer.RegisterName(api.Namespace, api.Service)
+		if err != nil {
+			b.logger.Error("Failed to register API", zap.String("namespace", api.Namespace), zap.Error(err))
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (b *StatusNode) RegisterLifecycle(s common.StatusService) {
-	b.addPublicMethods(s.APIs())
-	b.gethNode.RegisterAPIs(s.APIs())
-	b.gethNode.RegisterLifecycle(s)
-}
-
-// Add through reflection a list of public methods so we can check when the
-// user makes a call if they are allowed
-func (b *StatusNode) addPublicMethods(apis []gethrpc.API) {
-	for _, api := range apis {
-		if api.Public {
-			addSuitableCallbacks(reflect.ValueOf(api.Service), api.Namespace, b.publicMethods)
-		}
-	}
-}
-
 func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Service, error) {
-	if b.gethNode == nil {
-		return nil, errors.New("geth node not initialized")
-	}
 	if b.wakuV2ExtSrvc == nil {
 		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.rpcClient, b.logger.Named("protocol"))
 	}
@@ -168,7 +158,16 @@ func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
 
 func (b *StatusNode) connectorService() *connector.Service {
 	if b.connectorSrvc == nil {
-		b.connectorSrvc = connector.NewService(b.walletDB, b.rpcClient, b.rpcClient.GetNetworkManager())
+		b.connectorSrvc = connector.NewService(
+			b.logger.Named("connector"),
+			b.walletDB,
+			b.rpcClient,
+			b.rpcClient.GetNetworkManager(),
+			&connector.Config{
+				WSHost: b.config.WSHost,
+				WSPort: b.config.WSPort,
+			},
+		)
 	}
 	return b.connectorSrvc
 }
@@ -229,7 +228,7 @@ func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
 
 func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
 	if b.stickersSrvc == nil {
-		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountsManager, b.config, b.downloader, b.httpServer, b.pendingTracker)
+		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountsManager, b.config, b.downloader, b.mediaServer, b.pendingTracker)
 	}
 	return b.stickersSrvc
 }
@@ -291,11 +290,19 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB,
 			b.ensService(b.timeSourceNow()).API().EnsResolver(),
 			b.pendingTracker,
 			walletFeed,
-			b.httpServer,
+			b.mediaServer,
+			b.tokenManager,
 			statusProxyStageName,
 		)
 	}
 	return b.walletSrvc
+}
+
+func (b *StatusNode) ethService() *eth.Service {
+	if b.ethSrvc == nil {
+		b.ethSrvc = eth.NewService(b.rpcClient, b.gethAccountsManager)
+	}
+	return b.ethSrvc
 }
 
 func (b *StatusNode) localNotificationsService(network uint64) (*localnotifications.Service, error) {
@@ -365,16 +372,8 @@ func (b *StatusNode) personalService() *personal.Service {
 }
 
 func (b *StatusNode) TimeSource() *timesource.NTPTimeSource {
-
 	if b.timeSourceSrvc == nil {
 		b.timeSourceSrvc = timesource.Default()
-		go func() {
-			defer common.LogOnPanic()
-			err := b.timeSourceSrvc.Start(context.Background())
-			if err != nil {
-				panic("could not obtain timesource: " + err.Error())
-			}
-		}()
 	}
 	return b.timeSourceSrvc
 }
@@ -410,40 +409,4 @@ func (b *StatusNode) Cleanup() error {
 	}
 
 	return nil
-}
-
-type RPCCall struct {
-	Method string `json:"method"`
-}
-
-func (b *StatusNode) CallPrivateRPC(inputJSON string) (string, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.rpcClient == nil {
-		return "", ErrRPCClientUnavailable
-	}
-
-	return b.rpcClient.CallRaw(inputJSON), nil
-}
-
-// CallRPC calls public methods on the node, we register public methods
-// in a map and check if they can be called in this function
-func (b *StatusNode) CallRPC(inputJSON string) (string, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.rpcClient == nil {
-		return "", ErrRPCClientUnavailable
-	}
-
-	rpcCall := &RPCCall{}
-	err := json.Unmarshal([]byte(inputJSON), rpcCall)
-	if err != nil {
-		return "", err
-	}
-
-	if rpcCall.Method == "" || !b.publicMethods[rpcCall.Method] {
-		return ErrRPCMethodUnavailable, nil
-	}
-
-	return b.rpcClient.CallRaw(inputJSON), nil
 }

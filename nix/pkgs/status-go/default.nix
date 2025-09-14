@@ -30,10 +30,6 @@ let
     "-w" # -w disables DWARF debugging information
   ];
 in rec {
-  mobile = pkgs.callPackage ./mobile {
-    inherit self pkgs meta goBuildLdFlags version;
-  };
-
   library = pkgs.callPackage ./library {
     inherit self pkgs meta version;
   };

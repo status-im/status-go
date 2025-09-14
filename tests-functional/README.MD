@@ -50,6 +50,11 @@ Functional tests for status-go
     pytest -m rpc
    ```
 
+   You can run a single test with the `-k` argument. Eg:
+   ```sh
+   pytest -k test_logging
+   ```
+
 ### Running against a `status-backend` binary
 
 By default, tests will spawn containers with `status-backend` when and as needed.

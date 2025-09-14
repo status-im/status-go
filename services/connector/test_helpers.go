@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 
@@ -88,7 +89,7 @@ func setupTests(t *testing.T) (state testState, close func()) {
 
 	state.rpcClient.EXPECT().GetNetworkManager().AnyTimes().Return(networkManager)
 
-	state.service = NewService(state.walletDb, state.rpcClient, state.rpcClient.GetNetworkManager())
+	state.service = NewService(zap.NewNop(), state.walletDb, state.rpcClient, state.rpcClient.GetNetworkManager(), &Config{})
 
 	state.api = NewAPI(state.service)
 

@@ -119,15 +119,6 @@ pipeline {
       } }
     }
 
-    stage('Migration') {
-      when { // https://github.com/status-im/status-go/issues/4993#issuecomment-2022685544
-        expression { isPRJob() }
-      }
-      steps { script {
-        nix.develop('make migration-check', pure: false)
-      } }
-    }
-
     stage('Unit Tests') {
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"

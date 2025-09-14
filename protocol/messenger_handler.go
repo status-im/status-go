@@ -2901,6 +2901,16 @@ func (m *Messenger) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR *p
 
 	from := state.CurrentMessageState.Contact.ID
 
+	// Backwards compatibility: old versions will not have the string Emoji, convert it
+	if pbEmojiR.Emoji == "" {
+		pbEmojiR.Emoji = ConvertEmojiIDToString(pbEmojiR.Type)
+	}
+
+	// Validate that the emoji is valid
+	if !emojiRegex.MatchString(pbEmojiR.Emoji) {
+		return errors.New("invalid emoji")
+	}
+
 	emojiReaction := &EmojiReaction{
 		EmojiReaction: pbEmojiR,
 		From:          from,

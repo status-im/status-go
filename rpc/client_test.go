@@ -23,7 +23,6 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/ethereum/go-ethereum/common"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
 func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
@@ -32,86 +31,6 @@ func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
 	return db, func() { require.NoError(t, cleanup()) }
 }
 
-func TestBlockedRoutesCall(t *testing.T) {
-	db, close := setupTestNetworkDB(t)
-	defer close()
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, `{
-			"id": 1,
-			"jsonrpc": "2.0",
-			"result": "0x234234e22b9ffc2387e18636e0534534a3d0c56b0243567432453264c16e78a2adc"
-		}`)
-	}))
-	defer ts.Close()
-
-	gethRPCClient, err := gethrpc.Dial(ts.URL)
-	require.NoError(t, err)
-
-	config := ClientConfig{
-		Client:          gethRPCClient,
-		UpstreamChainID: 1,
-		Networks:        []params.Network{},
-		DB:              db,
-	}
-	c, err := NewClient(config)
-	require.NoError(t, err)
-
-	for _, m := range blockedMethods {
-		var (
-			result interface{}
-			err    error
-		)
-
-		err = c.Call(&result, 1, m)
-		require.EqualError(t, err, ErrMethodNotFound.Error())
-		require.Nil(t, result)
-
-		err = c.CallContext(context.Background(), &result, 1, m)
-		require.EqualError(t, err, ErrMethodNotFound.Error())
-		require.Nil(t, result)
-
-		err = c.CallContextIgnoringLocalHandlers(context.Background(), &result, 1, m)
-		require.EqualError(t, err, ErrMethodNotFound.Error())
-		require.Nil(t, result)
-	}
-}
-
-func TestBlockedRoutesRawCall(t *testing.T) {
-	db, close := setupTestNetworkDB(t)
-	defer close()
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, `{
-			"id": 1,
-			"jsonrpc": "2.0",
-			"result": "0x234234e22b9ffc2387e18636e0534534a3d0c56b0243567432453264c16e78a2adc"
-		}`)
-	}))
-	defer ts.Close()
-
-	gethRPCClient, err := gethrpc.Dial(ts.URL)
-	require.NoError(t, err)
-
-	config := ClientConfig{
-		Client:          gethRPCClient,
-		UpstreamChainID: 1,
-		Networks:        []params.Network{},
-		DB:              db,
-	}
-	c, err := NewClient(config)
-	require.NoError(t, err)
-
-	for _, m := range blockedMethods {
-		rawResult := c.CallRaw(fmt.Sprintf(`{
-			"jsonrpc": "2.0",
-			"id": 1,
-			"method": "%s",
-			"params": ["0xc862bf3cf4565d46abcbadaf4712a8940bfea729a91b9b0e338eab5166341ab5"]
-		}`, m))
-		require.Contains(t, rawResult, fmt.Sprintf(`{"code":-32700,"message":"%s"}`, ErrMethodNotFound))
-	}
-}
 func TestGetClientsUsingCache(t *testing.T) {
 	db, close := setupTestNetworkDB(t)
 	defer close()
@@ -179,7 +98,6 @@ func TestGetClientsUsingCache(t *testing.T) {
 		security.NewSensitiveString(password))
 
 	config := ClientConfig{
-		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        networks,
 		DB:              db,
@@ -202,5 +120,4 @@ func TestGetClientsUsingCache(t *testing.T) {
 
 func TestUserAgent(t *testing.T) {
 	require.True(t, strings.HasPrefix(rpcUserAgentName, "procuratee-desktop/"))
-	require.True(t, strings.HasPrefix(rpcUserAgentUpstreamName, "procuratee-desktop-upstream/"))
 }

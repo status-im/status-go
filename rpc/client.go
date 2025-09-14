@@ -5,16 +5,12 @@ package rpc
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
-
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	appCommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"
@@ -40,35 +36,20 @@ const (
 	// rpcUserAgentFormat 'procurator': *an agent representing others*, aka a "proxy"
 	// allows for the rpc client to have a dedicated user agent, which is useful for the proxy server logs.
 	rpcUserAgentFormat = "procuratee-%s/%s"
-
-	// rpcUserAgentUpstreamFormat a separate user agent format for upstream, because we should not be using upstream
-	// if we see this user agent in the logs that means parts of the application are using a malconfigured http client
-	rpcUserAgentUpstreamFormat = "procuratee-%s-upstream/%s"
-)
-
-// List of RPC client errors.
-var (
-	ErrMethodNotFound = fmt.Errorf("the method does not exist/is not available")
 )
 
 var (
 	// rpcUserAgentName the user agent
-	rpcUserAgentName         = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS", version.Version())
-	rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, "no-GOOS", version.Version())
+	rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS", version.Version())
 )
 
 func init() {
 	if appCommon.IsMobilePlatform() {
 		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, mobile, version.Version())
-		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, mobile, version.Version())
 	} else {
 		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, desktop, version.Version())
-		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, desktop, version.Version())
 	}
 }
-
-// Handler defines handler for RPC methods.
-type Handler func(context.Context, uint64, ...interface{}) (interface{}, error)
 
 type ClientInterface interface {
 	AbstractEthClient(chainID common.ChainID) (ethclient.BatchCallClient, error)
@@ -76,7 +57,6 @@ type ClientInterface interface {
 	EthClients(chainIDs []uint64) (map[uint64]chain.ClientInterface, error)
 	CallContext(context context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error
 	Call(result interface{}, chainID uint64, method string, args ...interface{}) error
-	CallRaw(body string) string
 	GetNetworkManager() *network.Manager
 }
 
@@ -88,13 +68,11 @@ type Client struct {
 
 	UpstreamChainID uint64
 
-	local              *gethrpc.Client
 	rpcClientsMutex    sync.RWMutex
 	rpcClients         map[uint64]chain.ClientInterface
 	rpsLimiterMutex    sync.RWMutex
 	limiterPerProvider map[string]*rpclimiter.RPCRpsLimiter
 
-	router         *router
 	networkManager *network.Manager
 
 	healthMgr          *healthmanager.BlockchainHealthManager
@@ -102,9 +80,7 @@ type Client struct {
 	accountsPublisher  *pubsub.Publisher
 	signalsTransmitter *SignalsTransmitter
 
-	handlersMx sync.RWMutex       // mx guards handlers
-	handlers   map[string]Handler // locally registered handlers
-	logger     *zap.Logger
+	logger *zap.Logger
 }
 
 // Is initialized in a build-tag-dependent module
@@ -112,7 +88,6 @@ var verifProxyInitFn func(c *Client)
 
 // ClientConfig holds the configuration for initializing a new Client.
 type ClientConfig struct {
-	Client            *gethrpc.Client
 	UpstreamChainID   uint64
 	Networks          []params.Network
 	DB                *sql.DB
@@ -137,9 +112,7 @@ func NewClient(config ClientConfig) (*Client, error) {
 	}
 
 	c := Client{
-		local:              config.Client,
 		networkManager:     networkManager,
-		handlers:           make(map[string]Handler),
 		rpcClients:         make(map[uint64]chain.ClientInterface),
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		logger:             logger,
@@ -149,7 +122,6 @@ func NewClient(config ClientConfig) (*Client, error) {
 	}
 
 	c.UpstreamChainID = config.UpstreamChainID
-	c.router = newRouter(true)
 
 	if verifProxyInitFn != nil {
 		verifProxyInitFn(&c)
@@ -354,146 +326,20 @@ func (c *Client) SetClient(chainID uint64, client chain.ClientInterface) {
 	c.rpcClients[chainID] = client
 }
 
-// Call performs a JSON-RPC call with the given arguments and unmarshals into
-// result if no error occurred.
-//
-// The result must be a pointer so that package json can unmarshal into it. You
-// can also pass nil, in which case the result is ignored.
-//
-// It uses custom routing scheme for calls.
+// Call is a wrapper around CallContext with background context
 func (c *Client) Call(result interface{}, chainID uint64, method string, args ...interface{}) error {
 	ctx := context.Background()
 	return c.CallContext(ctx, result, chainID, method, args...)
 }
 
-// CallContext performs a JSON-RPC call with the given arguments. If the context is
-// canceled before the call has successfully returned, CallContext returns immediately.
-//
-// The result must be a pointer so that package json can unmarshal into it. You
-// can also pass nil, in which case the result is ignored.
-//
-// It uses custom routing scheme for calls.
-// If there are any local handlers registered for this call, they will handle it.
+// CallContext selects an EthClient and calls CallContext on it.
 func (c *Client) CallContext(ctx context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error {
 	rpcstats.CountCall(method)
-	if c.router.routeBlocked(method) {
-		return ErrMethodNotFound
-	}
 
-	// check locally registered handlers first
-	if handler, ok := c.handler(method); ok {
-		return c.callMethod(ctx, result, chainID, handler, args...)
-	}
-
-	return c.CallContextIgnoringLocalHandlers(ctx, result, chainID, method, args...)
-}
-
-// CallContextIgnoringLocalHandlers performs a JSON-RPC call with the given
-// arguments.
-//
-// If there are local handlers registered for this call, they would
-// be ignored. It is useful if the call is happening from within a local
-// handler itself.
-// Upstream calls routing will be used anyway.
-func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error {
-	if c.router.routeBlocked(method) {
-		return ErrMethodNotFound
-	}
-
-	if c.router.routeRemote(method) {
-		client, err := c.getClientUsingCache(chainID)
-		if err != nil {
-			return err
-		}
-		return client.CallContext(ctx, result, method, args...)
-	}
-
-	if c.local == nil {
-		c.logger.Warn("Local JSON-RPC endpoint missing", zap.String("method", method))
-		return errors.New("missing local JSON-RPC endpoint")
-	}
-	return c.local.CallContext(ctx, result, method, args...)
-}
-
-// RegisterHandler registers local handler for specific RPC method.
-//
-// If method is registered, it will be executed with given handler and
-// never routed to the upstream or local servers.
-func (c *Client) RegisterHandler(method string, handler Handler) {
-	c.handlersMx.Lock()
-	defer c.handlersMx.Unlock()
-
-	c.handlers[method] = handler
-}
-
-// UnregisterHandler removes a previously registered handler.
-func (c *Client) UnregisterHandler(method string) {
-	c.handlersMx.Lock()
-	defer c.handlersMx.Unlock()
-
-	delete(c.handlers, method)
-}
-
-// callMethod calls registered RPC handler with given args and pointer to result.
-// It handles proper params and result converting
-//
-// TODO(divan): use cancellation via context here?
-func (c *Client) callMethod(ctx context.Context, result interface{}, chainID uint64, handler Handler, args ...interface{}) error {
-	response, err := handler(ctx, chainID, args...)
+	client, err := c.EthClient(chainID)
 	if err != nil {
 		return err
 	}
 
-	// if result is nil, just ignore result -
-	// the same way as gethrpc.CallContext() caller would expect
-	if result == nil {
-		return nil
-	}
-
-	return setResultFromRPCResponse(result, response)
-}
-
-// handler is a concurrently safe method to get registered handler by name.
-func (c *Client) handler(method string) (Handler, bool) {
-	c.handlersMx.RLock()
-	defer c.handlersMx.RUnlock()
-	handler, ok := c.handlers[method]
-	return handler, ok
-}
-
-// setResultFromRPCResponse tries to set result value from response using reflection
-// as concrete types are unknown.
-func setResultFromRPCResponse(result, response interface{}) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("invalid result type: %s", r)
-		}
-	}()
-
-	responseValue := reflect.ValueOf(response)
-
-	// If it is called via CallRaw, result has type json.RawMessage and
-	// we should marshal the response before setting it.
-	// Otherwise, it is called with CallContext and result is of concrete type,
-	// thus we should try to set it as it is.
-	// If response type and result type are incorrect, an error should be returned.
-	// TODO(divan): add additional checks for result underlying value, if needed:
-	// some example: https://golang.org/src/encoding/json/decode.go#L596
-	switch reflect.ValueOf(result).Elem().Type() {
-	case reflect.TypeOf(json.RawMessage{}), reflect.TypeOf([]byte{}):
-		data, err := json.Marshal(response)
-		if err != nil {
-			return err
-		}
-
-		responseValue = reflect.ValueOf(data)
-	}
-
-	value := reflect.ValueOf(result).Elem()
-	if !value.CanSet() {
-		return errors.New("can't assign value to result")
-	}
-	value.Set(responseValue)
-
-	return nil
+	return client.CallContext(ctx, result, method, args...)
 }

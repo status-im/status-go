@@ -25,12 +25,11 @@ in rec {
 
   openjdk = prev.openjdk17_headless;
 
-  go = prev.go_1_23;
-  buildGoModule = prev.buildGo123Module;
-  buildGoPackage = prev.buildGo123Package;
+  go = prev.go_1_24;
+  buildGoModule = prev.buildGo124Module;
 
   golangci-lint = prev.golangci-lint.override {
-    buildGoModule = args: prev.buildGo123Module ( args // rec {
+    buildGoModule = args: prev.buildGo124Module ( args // rec {
       version = "2.3.1";
       src = prev.fetchFromGitHub {
         owner = "golangci";

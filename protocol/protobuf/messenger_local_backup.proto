@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 import "pairing.proto";
+import "chat_message.proto";
+import "enums.proto";
 
 option go_package = "./;protobuf";
 package protobuf;
@@ -13,4 +15,47 @@ message MessengerLocalBackup {
   repeated SyncInstallationCommunity communities = 3;
   repeated SyncChat chats = 4;
   BackedUpProfile profile = 5;
+  repeated BackedUpMessage messages = 6;
+}
+
+message BackedUpMessage {
+  // Lamport timestamp of the chat message
+  uint64 clock = 1;
+
+  // ID generated from the sender's public key and the message payload
+  string id = 2;
+  // The public key of the sender of the message
+  string from = 3;
+
+  // Unix timestamps in milliseconds, currently not used as we use whisper as
+  // more reliable, but here so that we don't rely on it
+  uint64 timestamp = 4;
+  // Text of the message
+  string text = 5;
+  // Id of the message that we are replying to
+  string response_to = 6;
+  // Chat id, this field is symmetric for public-chats and private group chats,
+  // but asymmetric in case of one-to-ones, as the sender will use the chat-id
+  // of the received, while the receiver will use the chat-id of the sender.
+  // Probably should be the concatenation of sender-pk & receiver-pk in
+  // alphabetical order
+  string chat_id = 7;
+
+  // The type of message (public/one-to-one/private-group-chat)
+  MessageType message_type = 8;
+  // The type of the content of the message
+  int64 content_type = 9;
+
+  oneof payload {
+    StickerMessage sticker = 10;
+    ImageMessage image = 11;
+  }
+
+  repeated UnfurledLink unfurled_links = 12;
+
+  UnfurledStatusLinks unfurled_status_links = 13;
+
+  repeated PaymentRequest payment_requests = 14;
+
+  string pinned_by = 15;
 }

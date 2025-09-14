@@ -39,7 +39,7 @@ import (
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/communities/token"
+	communitiestoken "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
@@ -54,6 +54,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -111,6 +112,7 @@ type InitProtocolParams struct {
 	AccountsPublisher      *pubsub.Publisher
 	TimeSource             timesource.TimeSource
 	MetricsEnabled         bool
+	TokenManager           *token.Manager
 }
 
 func (s *Service) InitProtocol(params InitProtocolParams) error {
@@ -193,7 +195,10 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		s.config.ShhextConfig.VerifyENSContractAddress,
 	)
 
-	options, err := buildMessengerOptions(s.config, params.Identity, params.AppDB, params.WalletDB, params.HTTPServer, s.rpcClient, s.multiAccountsDB, params.Account, envelopeEventsConfig, s.accountsDB, params.WalletService, params.CommunityTokensService, s.logger, &MessengerSignalsHandler{}, params.AccountsManager, params.AccountsPublisher, ensVerifier)
+	options, err := buildMessengerOptions(s.config, params.Identity, params.AppDB, params.WalletDB, params.HTTPServer,
+		s.rpcClient, s.multiAccountsDB, params.Account, envelopeEventsConfig, s.accountsDB, params.WalletService,
+		params.CommunityTokensService, s.logger, &MessengerSignalsHandler{}, params.AccountsManager, params.AccountsPublisher,
+		ensVerifier, params.TokenManager)
 	if err != nil {
 		return err
 	}
@@ -430,6 +435,7 @@ func buildMessengerOptions(
 	accountsManager *accsmanagement.AccountsManager,
 	accountsPublisher *pubsub.Publisher,
 	ensVerifier *ens.Verifier,
+	tokenManager *token.Manager,
 ) ([]protocol.Option, error) {
 	personalService := personal.New()
 	options := []protocol.Option{
@@ -455,6 +461,7 @@ func buildMessengerOptions(
 		protocol.WithAccountsPublisher(accountsPublisher),
 		protocol.WithNewsFeed(),
 		protocol.WithMessageSigner(personalService),
+		protocol.WithTokenManager(tokenManager),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {
@@ -586,7 +593,7 @@ func (s *Service) FillCollectibleMetadata(community *communities.Community, coll
 
 	permission := fetchCommunityCollectiblePermission(community, id)
 
-	privilegesLevel := token.CommunityLevel
+	privilegesLevel := communitiestoken.CommunityLevel
 	if permission != nil {
 		privilegesLevel = permissionTypeToPrivilegesLevel(permission.GetType())
 	}
@@ -621,14 +628,14 @@ func (s *Service) FillCollectibleMetadata(community *communities.Community, coll
 	return nil
 }
 
-func permissionTypeToPrivilegesLevel(permissionType protobuf.CommunityTokenPermission_Type) token.PrivilegesLevel {
+func permissionTypeToPrivilegesLevel(permissionType protobuf.CommunityTokenPermission_Type) communitiestoken.PrivilegesLevel {
 	switch permissionType {
 	case protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER:
-		return token.OwnerLevel
+		return communitiestoken.OwnerLevel
 	case protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER:
-		return token.MasterLevel
+		return communitiestoken.MasterLevel
 	default:
-		return token.CommunityLevel
+		return communitiestoken.CommunityLevel
 	}
 }
 
@@ -720,7 +727,7 @@ func (s *Service) fetchCommunityInfoForCollectibles(communityID string, ids []th
 	return community, nil
 }
 
-func (s *Service) fetchCommunityToken(communityID string, contractID thirdparty.ContractID) (*token.CommunityToken, error) {
+func (s *Service) fetchCommunityToken(communityID string, contractID thirdparty.ContractID) (*communitiestoken.CommunityToken, error) {
 	if s.messenger == nil {
 		return nil, fmt.Errorf("messenger not ready")
 	}
@@ -826,7 +833,7 @@ func boolToString(value bool) string {
 	return "No"
 }
 
-func getCollectibleCommunityTraits(token *token.CommunityToken) []thirdparty.CollectibleTrait {
+func getCollectibleCommunityTraits(token *communitiestoken.CommunityToken) []thirdparty.CollectibleTrait {
 	if token == nil {
 		return make([]thirdparty.CollectibleTrait, 0)
 	}

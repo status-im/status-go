@@ -347,3 +347,21 @@ func TestDatabase_ThirdpartyServicesEnabled(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, settings.ThirdpartyServicesEnabled, "expected ThirdpartyServicesEnabled to be true after enabling")
 }
+
+func TestDatabase_MessagesBackupEnabled(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	enabled, err := db.MessagesBackupEnabled()
+	require.NoError(t, err)
+	require.Equal(t, false, enabled)
+
+	err = db.SaveSetting(MessagesBackupEnabled.GetReactName(), true)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, true, settings.MessagesBackupEnabled)
+}

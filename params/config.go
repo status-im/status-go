@@ -113,7 +113,7 @@ type NodeConfig struct {
 	// remote peer identification as well as network traffic encryption.
 	NodeKey string
 
-	// APIModules is a comma-separated list of API modules exposed via *any* (HTTP/WS/IPC) RPC interface.
+	// Deprecated: APIModules is a comma-separated list of API modules exposed via *any* (HTTP/WS/IPC) RPC interface.
 	APIModules string `validate:"required"`
 
 	// HTTPEnabled specifies whether the http RPC server is to be enabled by default.
@@ -135,7 +135,7 @@ type NodeConfig struct {
 	// WSPort is the TCP port number on which to start the Geth's Websocket RPC server.
 	WSPort int
 
-	// HTTPVirtualHosts is the list of virtual hostnames which are allowed on incoming requests.
+	// Deprecated: HTTPVirtualHosts is the list of virtual hostnames which are allowed on incoming requests.
 	// This is by default {'localhost'}. Using this prevents attacks like
 	// DNS rebinding, which bypasses SOP by simply masquerading as being within the same
 	// origin. These attacks do not utilize CORS, since they are not cross-domain.
@@ -144,7 +144,7 @@ type NodeConfig struct {
 	// Requests using an IP address directly are not affected.
 	HTTPVirtualHosts []string
 
-	// HTTPCors is the Cross-Origin Resource Sharing header to send to requesting
+	// Deprecated: HTTPCors is the Cross-Origin Resource Sharing header to send to requesting
 	// clients. Please be aware that CORS is a browser enforced security, it's fully
 	// useless for custom HTTP clients.
 	HTTPCors []string

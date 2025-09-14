@@ -65,10 +65,16 @@ func CopyMapGeneric(original interface{}, deepCopyValueFn func(interface{}) inte
 }
 
 func GweiToEth(val *big.Float) *big.Float {
+	if val == nil {
+		return nil
+	}
 	return new(big.Float).Quo(val, big.NewFloat(1000000000))
 }
 
 func WeiToGwei(val *big.Int) *big.Float {
+	if val == nil {
+		return nil
+	}
 	result := new(big.Float)
 	result.SetInt(val)
 

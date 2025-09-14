@@ -95,7 +95,6 @@ func (s *Service) AccountsAPI() *API {
 }
 
 func (s *Service) GetKeypairByKeyUID(keyUID string) (*accsmanagementtypes.Keypair, error) {
-
 	return s.db.GetKeypairByKeyUID(keyUID)
 }
 
@@ -105,6 +104,10 @@ func (s *Service) GetSettings() (settings.Settings, error) {
 
 func (s *Service) GetBackupPath() (string, error) {
 	return s.db.BackupPath()
+}
+
+func (s *Service) SetBackupPath(path string) error {
+	return s.db.SaveSettingField(settings.BackupPath, path)
 }
 
 func (s *Service) GetMessenger() *protocol.Messenger {

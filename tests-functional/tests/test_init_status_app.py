@@ -1,3 +1,5 @@
+import logging
+
 from clients.status_backend import StatusBackend
 import pytest
 from clients.signals import SignalType
@@ -37,8 +39,9 @@ def assert_file_first_line(path, pattern: str, expected: bool):
     assert os.path.exists(path)
     with open(path) as file:
         line = file.readline()
+        logging.info(f"Checking pattern '{pattern}': {line}")
         line_found = line.find(pattern) >= 0
-        assert line_found == expected
+        assert line_found == expected, f"""Expected {pattern} to be {"found" if expected else "not found"} as first line in {path}"""
 
 
 @pytest.mark.rpc
@@ -68,6 +71,6 @@ def test_check_logs(log_enabled: bool, api_logging_enabled: bool, close_status_b
 
     assert_file_first_line(
         path=local_api_log,
-        pattern='"method": "InitializeApplication"',
+        pattern='"type": "mediaserver.started"',
         expected=api_logging_enabled,
     )

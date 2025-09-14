@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/requests"
+	"github.com/status-im/status-go/services/wallet/token"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/t/helpers"
@@ -149,7 +150,6 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	require.NotEmpty(t, networks)
 
 	config := rpc.ClientConfig{
-		Client:          nil,
 		UpstreamChainID: chainID,
 		Networks:        networks,
 		DB:              appDB,
@@ -157,7 +157,9 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)
 
-	service := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, "")
+	tokenManager := token.NewTokenManager(db, c, nil, nil, appDB, nil, nil, nil, accountsDb, token.NewPersistence(db))
+
+	service := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, tokenManager, "")
 
 	api := &API{
 		s: service,
@@ -237,7 +239,6 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 		},
 	}
 	config := rpc.ClientConfig{
-		Client:          nil,
 		UpstreamChainID: chainID,
 		Networks:        networks,
 		DB:              appDB,

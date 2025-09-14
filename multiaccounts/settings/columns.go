@@ -166,6 +166,11 @@ var (
 		reactFieldName: "log-level",
 		dBColumnName:   "log_level",
 	}
+	MessagesBackupEnabled = SettingField{
+		reactFieldName: "messages-backup-enabled?",
+		dBColumnName:   "messages_backup_enabled",
+		valueHandler:   BoolHandler,
+	}
 	MessagesFromContactsOnly = SettingField{
 		reactFieldName: "messages-from-contacts-only",
 		dBColumnName:   "messages_from_contacts_only",
@@ -560,6 +565,7 @@ var (
 		LinkPreviewRequestEnabled,
 		LinkPreviewsEnabledSites,
 		LogLevel,
+		MessagesBackupEnabled,
 		MessagesFromContactsOnly,
 		Mnemonic,
 		MnemonicRemoved,

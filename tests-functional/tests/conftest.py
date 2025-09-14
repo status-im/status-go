@@ -1,9 +1,11 @@
 import logging
+from uuid import uuid4
 import pytest
+from requests import ReadTimeout
 
-from resources.constants import USE_IPV6
 from clients.status_backend import StatusBackend
 from clients.statusgo_container import StatusGoContainer
+from resources.constants import USE_IPV6
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -38,6 +40,8 @@ def backend_factory(request):
     # Store created backends for cleanup
     created_backends: list[StatusBackend] = []
 
+    test_name = request.node.name if hasattr(request, "cls") else str(uuid4)
+
     def factory(name, **kwargs) -> StatusBackend:
         """
         Create a single backend with the given name.
@@ -49,7 +53,6 @@ def backend_factory(request):
         Returns:
             StatusBackend: Created backend instance
         """
-        test_name = request.cls.__name__ if hasattr(request, "cls") else "test"
         logging.debug(f"🔧 [SETUP] Creating {name} backend for {request.cls.__name__}")
         logging.debug(f"🔧 [SETUP] Creating {name} backend for {test_name}")
         logging.debug(f"📋 [SETUP] Parameters: privileged={privileged}, ipv6={ipv6}")
@@ -68,7 +71,7 @@ def backend_factory(request):
 
     for i, backend in enumerate(reversed(created_backends)):
         logging.debug(f"🧹 [TEARDOWN] Cleaning up backend {len(created_backends) - i}...")
-        backend.shutdown()
+        backend.shutdown(log_sufix=test_name)
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -94,7 +97,10 @@ def backend_new_profile(request, backend_factory):
     yield _backend_new_profile
 
     for backend in backends:
-        backend.logout()
+        try:
+            backend.logout(timeout=10)
+        except ReadTimeout as e:
+            logging.warning(f"Failed to logout during shutdown: {e}")
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -159,7 +165,7 @@ def close_status_backend_containers(request):
     yield
     for container in StatusGoContainer.all_containers:
         try:
-            container.shutdown()  # pyright: ignore[reportAttributeAccessIssue]
+            container.shutdown(log_sufix=request.node.name)  # pyright: ignore[reportAttributeAccessIssue]
         except Exception as e:
             logging.error(f"Error cleaning up container: {e}")
     StatusGoContainer.all_containers = []

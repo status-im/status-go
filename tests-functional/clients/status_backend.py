@@ -1,30 +1,32 @@
 import json
 import logging
-import string
+import os
 import tempfile
 import time
-import random
 import uuid
-import requests
-import os
 
-from tenacity import retry, stop_after_delay, wait_fixed
+import requests
+from tenacity import retry, stop_after_delay, wait_fixed, wait_exponential, retry_if_exception_type
 
 import resources.constants as constants
-from clients.services.wallet import WalletService
-from clients.services.wakuext import WakuextService, PushNotificationRegistrationTokenType
-from clients.services.accounts import AccountService
-from clients.services.settings import SettingsService
-from clients.services.connector import ConnectorService
-from clients.signals import SignalClient, SignalType
-from clients.rpc import RpcClient
 from clients.api import ApiClient
-from clients.metrics import Events, StatusGoMetrics
 from clients.expvar import ExpvarClient
+from clients.metrics import Events, StatusGoMetrics
+from clients.rpc import RpcClient
+from clients.services.accounts import AccountService
+from clients.services.connector import ConnectorService
+from clients.services.settings import SettingsService
+from clients.services.wakuext import (
+    WakuextService,
+    PushNotificationRegistrationTokenType,
+)
+from clients.services.wallet import WalletService
+from clients.signals import SignalClient, SignalType
 from clients.statusgo_container import StatusBackendContainer
-from utils.config import Config
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
+from utils import fake
 from utils import keys
+from utils.config import Config
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
@@ -48,6 +50,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             self.data_dir = self.temp_dir.name
             if kwargs.get("connector_enabled", False):
                 self.connector_ws_url = f"ws://localhost:{constants.STATUS_CONNECTOR_WS_PORT}"
+            self.media_server_port = constants.STATUS_MEDIA_SERVER_PORT
         else:
             self.container = StatusBackendContainer(privileged, self.ipv6, **kwargs)
             self.temp_dir = None
@@ -55,6 +58,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             url = self.container.url
             if kwargs.get("connector_enabled", False):
                 self.connector_ws_url = self.container.connector_ws_url
+            self.media_server_port = self.container.media_server_port
 
         assert self.data_dir != ""
         self.base_url = url
@@ -70,6 +74,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.node_login_event = {}
         self.events = Events()
         self.version = "unknown"
+        self.network_id = 1
 
         RpcClient.__init__(self)
         ApiClient.__init__(self, self.api_url)
@@ -89,28 +94,26 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
     def __del__(self):
         self.shutdown()
 
-    def shutdown(self):
+    def shutdown(self, log_sufix=""):
         SignalClient.disconnect(self)
 
         if self.container:
-            self.container.shutdown()
+            self.container.shutdown(log_sufix)
 
         if self.temp_dir is not None:
             self.temp_dir.cleanup()
 
-    def wait_for_healthy(self, timeout=10):
-        start_time = time.time()
-        while time.time() - start_time <= timeout:
-            try:
-                response = self.health()
-                response = json.loads(response.content)
-                self.version = response.get("version", "unknown")
-                logging.debug(f"StatusBackend is healthy after {time.time() - start_time} seconds")
-                return
-            except Exception as ex:
-                logging.debug(f"StatusBackend error: {ex}")
-                time.sleep(0.1)
-        raise TimeoutError(f"StatusBackend was not healthy after {timeout} seconds")
+    @retry(
+        stop=stop_after_delay(10),
+        wait=wait_exponential(multiplier=1, min=0.1, max=5),
+        retry=retry_if_exception_type((ConnectionError, requests.RequestException)),
+        reraise=True,
+    )
+    def wait_for_healthy(self):
+        response = self.health()
+        response = json.loads(response.content)
+        self.version = response.get("version", "unknown")
+        logging.debug("StatusBackend is healthy")
 
     def health(self):
         return self.api_request("health", data=[], url=self.base_url, quiet=True)
@@ -133,6 +136,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "apiLoggingEnabled": True,
             "wakuFleetsConfigFilePath": Config.waku_fleets_config,
             "pushFleetsConfigFilePath": Config.push_fleets_config,
+            "mediaServerAddress": f"""{"0.0.0.0" if self.container else "localhost"}:{constants.STATUS_MEDIA_SERVER_PORT}""",
+            "mediaServerAdvertizeHost": "localhost" if self.container else "",
+            "mediaServerAdvertizePort": self.container.media_server_port if self.container else 0,
         }
 
         return self.api_request_json(method, data)
@@ -228,10 +234,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             dst.write(src.read())
 
     def _set_display_name(self, **kwargs):
-        self.display_name = kwargs.get(
-            "display_name",
-            f"DISP_NAME_{''.join(random.choices(string.ascii_letters + string.digits + '_-', k=10))}",
-        )
+        self.display_name = kwargs.get("display_name", fake.profile_name())
 
     def _create_account_request(self, user, **kwargs):
         self.password = kwargs.get("password", user.password)
@@ -293,9 +296,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = self._set_wallet_secrets(data)
         return self.api_request_json(method, data)
 
-    def logout(self):
+    def logout(self, **kwargs):
         method = "Logout"
-        return self.api_request_json(method, {})
+        return self.api_request_json(method, {}, **kwargs)
 
     def wait_for_login(self):
         signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
@@ -449,3 +452,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "newPassword": new_password,
         }
         return self.api_request_json(method, data)
+
+    def image_server_tls_cert(self):
+        method = "ImageServerTLSCert"
+        response = self.api_request(method, {})
+        return response.content.decode("utf-8")

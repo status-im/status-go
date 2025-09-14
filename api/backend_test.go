@@ -39,7 +39,6 @@ import (
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
@@ -354,22 +353,20 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(idx int) {
-			result, err := backend.CallRPC(fmt.Sprintf(
-				`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":%d}`,
+			result := backend.CallInProcessRPC(fmt.Sprintf(
+				`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":%d}`,
 				idx+1,
 			))
-			assert.NoError(t, err)
 			assert.NotContains(t, result, "error")
 			wg.Done()
 		}(i)
 
 		wg.Add(1)
 		go func(idx int) {
-			result, err := backend.CallPrivateRPC(fmt.Sprintf(
-				`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":%d}`,
+			result := backend.CallInProcessRPC(fmt.Sprintf(
+				`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":%d}`,
 				idx+1,
 			))
-			assert.NoError(t, err)
 			assert.NotContains(t, result, "error")
 			wg.Done()
 		}(i)
@@ -410,62 +407,18 @@ func TestAppStateChange(t *testing.T) {
 	}
 }
 
-func TestBlockedRPCMethods(t *testing.T) {
-	utils.Init()
-
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	require.NoError(t, err)
-
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
-	require.NoError(t, err)
-
-	err = backend.StartNode(config)
-	require.NoError(t, err)
-	defer func() { require.NoError(t, backend.StopNode()) }()
-
-	for idx, m := range rpc.BlockedMethods() {
-		result, err := backend.CallRPC(fmt.Sprintf(
-			`{"jsonrpc":"2.0","method":"%s","params":[],"id":%d}`,
-			m,
-			idx+1,
-		))
-		assert.NoError(t, err)
-		assert.Contains(t, result, fmt.Sprintf(`{"code":-32700,"message":"%s"}`, rpc.ErrMethodNotFound))
-	}
-}
-
 func TestCallRPCWithStoppedNode(t *testing.T) {
 	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 
-	resp, err := backend.CallRPC(
-		`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}`,
+	resp := backend.CallInProcessRPC(
+		`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":1}`,
 	)
-	assert.Equal(t, ErrRPCClientUnavailable, err)
-	assert.Equal(t, "", resp)
+	assert.Contains(t, resp, "error")
 
-	resp, err = backend.CallPrivateRPC(
-		`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}`,
+	resp = backend.CallInProcessRPC(
+		`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":1}`,
 	)
-	assert.Equal(t, ErrRPCClientUnavailable, err)
-	assert.Equal(t, "", resp)
+	assert.Contains(t, resp, "error")
 }
 
 // TODO(adam): add concurrent tests for: SendTransaction
@@ -723,7 +676,7 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 	require.Equal(t, "INFO", newConf.RuntimeLogLevel)
 
 	require.NoError(t, testContext.backend.OpenAccounts())
-	require.NotNil(t, testContext.backend.statusNode.HTTPServer())
+	require.NotNil(t, testContext.backend.statusNode.MediaServer())
 
 	err = testContext.backend.ensureDBsOpened(*testContext.multiAcc, testPassword)
 	require.NoError(t, err)
@@ -1036,7 +989,7 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig, keyUID string) {
 
 	wg.Wait()
 	require.NoError(t, b.Logout())
-	require.NotNil(t, b.statusNode.HTTPServer())
+	require.NotNil(t, b.statusNode.MediaServer())
 	require.NoError(t, b.StopNode())
 
 }

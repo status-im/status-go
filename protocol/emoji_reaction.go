@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
+	"regexp"
 
 	"github.com/golang/protobuf/proto"
 
@@ -12,6 +13,10 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
+
+// There is no foolproof way to validate emojis, but this regex should cover all standard emojis
+// it will also allow some non-emoji unicode characters, but that's not a big issue
+var emojiRegex = regexp.MustCompile("(?:\u00A9|\u00AE|[\u2000-\u3300]|[\U0001F000-\U0001FBFF])")
 
 // EmojiReaction represents an emoji reaction from a user in the application layer, used for persistence, querying and
 // signaling
@@ -32,9 +37,16 @@ func NewEmojiReaction() *EmojiReaction {
 	return &EmojiReaction{EmojiReaction: &protobuf.EmojiReaction{}}
 }
 
-// ID is the Keccak256() contatenation of From-MessageID-EmojiType
+// ID is the Keccak256() contatenation of From-MessageID-Emoji
 func (e *EmojiReaction) ID() string {
-	return types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d", e.From, e.MessageId, e.Type))))
+	// Backwards compatibility: old versions will not have the string Emoji, use Type instead
+	var data string
+	if e.Emoji == "" {
+		data = fmt.Sprintf("%s%s%d", e.From, e.MessageId, e.Type)
+	} else {
+		data = fmt.Sprintf("%s%s%s", e.From, e.MessageId, e.Emoji)
+	}
+	return types.EncodeHex(crypto.Keccak256([]byte(data)))
 }
 
 // GetSigPubKey returns an ecdsa encoded public key
@@ -66,6 +78,7 @@ func (e *EmojiReaction) MarshalJSON() ([]byte, error) {
 		MessageType protobuf.MessageType        `json:"messageType,omitempty"`
 		Retracted   bool                        `json:"retracted,omitempty"`
 		EmojiID     protobuf.EmojiReaction_Type `json:"emojiId,omitempty"`
+		Emoji       string                      `json:"emoji,omitempty"`
 	}{
 
 		ID:          e.ID(),
@@ -77,6 +90,7 @@ func (e *EmojiReaction) MarshalJSON() ([]byte, error) {
 		MessageType: e.MessageType,
 		Retracted:   e.Retracted,
 		EmojiID:     e.Type,
+		Emoji:       e.Emoji,
 	}
 
 	ext, err := common.ExtendStructWithPubKeyData(item.From, item)
