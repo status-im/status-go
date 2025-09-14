@@ -719,7 +719,7 @@ func (f *FiltersManager) GetNegotiated(identity *ecdsa.PublicKey) *Filter {
 // toCommunityFilterKey creates a unique key for filters map using chatID and pubsubTopic
 //
 // to allow one chat to have multiple filters in different pubsubTopics so that we can migrate the communities to 128 and 256 shards
-func toCommunityFilterKey(chatID string, pubsubTopic string) string {
+func concatFilterKey(chatID string, pubsubTopic string) string {
 	if pubsubTopic == "" {
 		return chatID
 	}
