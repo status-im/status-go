@@ -103,7 +103,7 @@ func (f *FiltersManager) Init(
 
 	// Add public, one-to-one and negotiated filters.
 	for _, fi := range filtersToInit {
-		_, err := f.LoadPublic(fi.ChatID, fi.PubsubTopic)
+		_, err := f.LoadPublic(fi.ChatID, fi.PubsubTopic, false)
 		if err != nil {
 			return nil, err
 		}
@@ -137,7 +137,7 @@ func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitia
 	var filters []*Filter
 	// Add public, one-to-one and negotiated filters.
 	for _, pf := range publicFiltersToInit {
-		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic, pf.IsCommunity)
+		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic, pf.DistinctByPubsub)
 		if err != nil {
 			return nil, err
 		}
@@ -548,8 +548,8 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, distinctB
 	defer f.mutex.Unlock()
 
 	filterKey := chatID
-	if len(isCommunity) > 0 && isCommunity[0] {
-		filterKey = toCommunityFilterKey(chatID, pubsubTopic)
+	if distinctByPubsub {
+		filterKey = concatFilterKey(chatID, pubsubTopic)
 	}
 
 	if chat, ok := f.filters[filterKey]; ok {
@@ -587,7 +587,7 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, distinctB
 	f.logger.Debug("registering filter for",
 		zap.String("chatID", chatID),
 		zap.String("filterKey", filterKey),
-		zap.Bool("isCommunity", len(isCommunity) > 0 && isCommunity[0]),
+		zap.Bool("distinctByPubsub", distinctByPubsub),
 		zap.String("type", "public"),
 		zap.String("ContentTopic", filterAndTopic.Topic.String()),
 		zap.String("PubsubTopic", pubsubTopic),

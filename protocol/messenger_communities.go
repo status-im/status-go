@@ -1032,7 +1032,7 @@ func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *messagi
 	if !m.started {
 		return nil
 	}
-	return m.messaging.SubscribeToPubsubTopic(shard.PubsubTopic())
+	return m.messaging.SubscribeToPubsubTopic(shard.PubsubTopic(), nil)
 }
 
 func (m *Messenger) unsubscribeFromShard(shard *messagingtypes.Shard) error {

@@ -3,7 +3,6 @@ package transport
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
 	"sync"
 	"time"
 
@@ -186,7 +185,7 @@ func (t *Transport) ProcessNegotiatedSecret(secret ethtypes.NegotiatedSecret) (*
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
-	return t.filters.LoadPublic(chatID, "")
+	return t.filters.LoadPublic(chatID, "", false)
 }
 
 func (t *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) (*Filter, error) {
@@ -268,7 +267,7 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *wakutypes.NewMes
 		return nil, err
 	}
 
-	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic)
+	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic, false)
 	if err != nil {
 		return nil, err
 	}
@@ -508,13 +507,10 @@ func (t *Transport) ConnectionChanged(state connection.State) {
 }
 
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
-func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKeys ...*ecdsa.PublicKey) error {
-	if len(optPublicKeys) > 1 {
-		return fmt.Errorf("at most one public key can be passed, pub keys: %v", len(optPublicKeys))
-	}
+func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKeys *ecdsa.PublicKey) error {
 	var pubKey *ecdsa.PublicKey
-	if len(optPublicKeys) == 1 {
-		pubKey = optPublicKeys[0]
+	if optPublicKeys != nil {
+		pubKey = optPublicKeys
 	} else {
 		// try to retrieve pubkey for pubsubtopic if none provided
 		privK, err := t.RetrievePubsubTopicKey(topic)

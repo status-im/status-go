@@ -278,8 +278,8 @@ func (a *API) ConnectionChanged(state connection.State) {
 	a.core.connectionChanged(state)
 }
 
-func (a *API) SubscribeToPubsubTopic(topic string, optPublicKey ...*ecdsa.PublicKey) error {
-	return a.core.transport.SubscribeToPubsubTopic(topic, optPublicKey...)
+func (a *API) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
+	return a.core.transport.SubscribeToPubsubTopic(topic, optPublicKey)
 }
 
 func (a *API) UnsubscribeFromPubsubTopic(topic string) error {
