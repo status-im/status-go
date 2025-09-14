@@ -543,7 +543,7 @@ func (f *FiltersManager) PersonalTopicFilter() *Filter {
 }
 
 // LoadPublic adds a filter for a public chat with specific pubsubTopic
-func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, isCommunity ...bool) (*Filter, error) {
+func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, distinctByPubsub bool) (*Filter, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
