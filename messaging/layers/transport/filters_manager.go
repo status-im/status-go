@@ -130,7 +130,7 @@ type FiltersToInitialize struct {
 	ChatID      string
 	PubsubTopic string
 	// TODO (#6384) temporary flag while migrating community shards
-	IsCommunity bool
+	DistinctByPubsub bool
 }
 
 func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitialize) ([]*Filter, error) {
