@@ -185,7 +185,7 @@ func (t *Transport) ProcessNegotiatedSecret(secret ethtypes.NegotiatedSecret) (*
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
-	return t.filters.LoadPublic(chatID, "")
+	return t.filters.LoadPublic(chatID, "", false)
 }
 
 func (t *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) (*Filter, error) {
@@ -267,7 +267,7 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *wakutypes.NewMes
 		return nil, err
 	}
 
-	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic)
+	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic, false)
 	if err != nil {
 		return nil, err
 	}
@@ -348,7 +348,7 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *wakuty
 	}
 
 	// We load the filter to make sure we can post on it
-	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic)
+	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic, true)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +508,21 @@ func (t *Transport) ConnectionChanged(state connection.State) {
 
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
 func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
-	return t.waku.SubscribeToPubsubTopic(topic, optPublicKey)
+	var pubKey *ecdsa.PublicKey
+	if optPublicKey != nil {
+		pubKey = optPublicKey
+	} else {
+		// try to retrieve pubkey for pubsubtopic if none provided
+		privK, err := t.RetrievePubsubTopicKey(topic)
+		if err != nil {
+			return err
+		}
+		if privK != nil {
+			pubKey = &privK.PublicKey
+		}
+	}
+	t.logger.Debug("subscribing to protected pubsub topic", zap.String("pubsubtopic", topic), zap.Any("pubkey", pubKey))
+	return t.waku.SubscribeToPubsubTopic(topic, pubKey)
 }
 
 // Unsubscribe from a pubsub topic

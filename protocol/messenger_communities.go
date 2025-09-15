@@ -939,10 +939,10 @@ func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {
 
 func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Chat, error) {
 	logger := m.logger.Named("initCommunityChats")
-	publicChatsToInit := m.DefaultFilters(community)
 
 	chats := CreateCommunityChats(community, m.getTimesource())
 
+	publicChatsToInit := m.DefaultFilters(community)
 	filters, err := m.messaging.InitPublicChats(publicChatsToInit)
 	if err != nil {
 		logger.Debug("InitPublicChats error", zap.Error(err))
@@ -1032,20 +1032,7 @@ func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *messagi
 	if !m.started {
 		return nil
 	}
-	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
-	pubsubTopic := shard.PubsubTopic()
-
-	privK, err := m.messaging.RetrievePubsubTopicKey(pubsubTopic)
-	if err != nil {
-		return err
-	}
-
-	var pubK *ecdsa.PublicKey
-	if privK != nil {
-		pubK = &privK.PublicKey
-	}
-
-	return m.messaging.SubscribeToPubsubTopic(pubsubTopic, pubK)
+	return m.messaging.SubscribeToPubsubTopic(shard.PubsubTopic(), nil)
 }
 
 func (m *Messenger) unsubscribeFromShard(shard *messagingtypes.Shard) error {
@@ -2453,11 +2440,15 @@ func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.Chat
 	communityPubsubTopic := o.PubsubTopic()
 
 	chats := messagingtypes.ChatsToInitialize{
-		{ChatID: cID, PubsubTopic: communityPubsubTopic},
-		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
-		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.DefaultNonProtectedPubsubTopic()},
+		{ChatID: cID, PubsubTopic: communityPubsubTopic, IsCommunity: true},
+		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic, IsCommunity: true},
+		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.DefaultNonProtectedPubsubTopic(), IsCommunity: true},
+		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.GlobalCommunityContentPubsubTopic(), IsCommunity: true},
 	}
-
+	if communityPubsubTopic == "" {
+		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: cID, PubsubTopic: messagingtypes.GlobalCommunityControlPubsubTopic(), IsCommunity: true})
+		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: memberUpdateChannelID, PubsubTopic: messagingtypes.GlobalCommunityContentPubsubTopic(), IsCommunity: true})
+	}
 	return chats
 }
 

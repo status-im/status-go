@@ -7,6 +7,8 @@ import (
 type ChatToInitialize struct {
 	ChatID      string
 	PubsubTopic string
+	// TODO (#6384) temporary flag while migrating community shards
+	IsCommunity bool
 }
 
 type ChatsToInitialize []*ChatToInitialize
