@@ -626,6 +626,32 @@ func (s *MessageValidatorSuite) TestValidateEmojiReaction() {
 				Type:        protobuf.EmojiReaction_LOVE,
 			},
 		},
+		{
+			Name:             "no emoji and unknown type",
+			Valid:            false,
+			WhisperTimestamp: 30,
+			Message: &protobuf.EmojiReaction{
+				Clock:       30,
+				ChatId:      "chat-id",
+				MessageId:   "message-id",
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				Type:        protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE,
+				Emoji:       "",
+			},
+		},
+		{
+			Name:             "unknown type but has an emoji",
+			Valid:            true,
+			WhisperTimestamp: 30,
+			Message: &protobuf.EmojiReaction{
+				Clock:       30,
+				ChatId:      "chat-id",
+				MessageId:   "message-id",
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				Type:        protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE,
+				Emoji:       "🏁",
+			},
+		},
 	}
 	for _, tc := range testCases {
 		s.Run(tc.Name, func() {

@@ -364,7 +364,7 @@ func ValidateReceivedEmojiReaction(emoji *protobuf.EmojiReaction, whisperTimesta
 		return errors.New("chat-id can't be empty")
 	}
 
-	if emoji.Type == protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE {
+	if emoji.Type == protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE && emoji.Emoji == "" {
 		return errors.New("unknown emoji reaction type")
 	}
 
