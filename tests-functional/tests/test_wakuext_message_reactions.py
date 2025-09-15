@@ -22,6 +22,7 @@ class TestMessageReactions(MessengerSteps):
         message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id, sender_chat_id = message["id"], message["chatId"]
         receiver_chat_id = self.receiver.wakuext_service.rpc_request(method="chats")[0]["id"]
+        # Send emoji reaction (V1)
         response = self.receiver.wakuext_service.rpc_request(method="sendEmojiReaction", params=[receiver_chat_id, message_id, 1])
         # TODO: Add more assertions on response
         self.sender.find_signal_containing_pattern(
@@ -40,7 +41,7 @@ class TestMessageReactions(MessengerSteps):
                 len(result) == 1,
                 result[0]["chatId"] == receiver_chat_id,
                 result[0]["messageId"] == message_id,
-                result[0]["emojiId"] == 1,
+                result[0]["emoji"] == "❤️",
             )
         )
         emoji_id = result[0]["id"]
@@ -67,7 +68,8 @@ class TestMessageReactions(MessengerSteps):
 
         response = self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, "test_message 1")
         message_1 = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
-        emoji_1_id = self.receiver.wakuext_service.rpc_request(method="sendEmojiReaction", params=[receiver_chat_id, message_1["id"], 2])[
+        # Send emoji reaction (V2)
+        emoji_1_id = self.receiver.wakuext_service.rpc_request(method="sendEmojiReactionV2", params=[receiver_chat_id, message_1["id"], "🙂"])[
             "emojiReactions"
         ][0]["id"]
         self.sender.find_signal_containing_pattern(
@@ -78,7 +80,7 @@ class TestMessageReactions(MessengerSteps):
 
         response = self.receiver.wakuext_service.send_one_to_one_message(self.sender.public_key, "test_message 2")
         message_2 = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
-        emoji_2_id = self.sender.wakuext_service.rpc_request(method="sendEmojiReaction", params=[sender_chat_id, message_2["id"], 3])[
+        emoji_2_id = self.sender.wakuext_service.rpc_request(method="sendEmojiReactionV2", params=[sender_chat_id, message_2["id"], "🙁"])[
             "emojiReactions"
         ][0]["id"]
         self.receiver.find_signal_containing_pattern(
@@ -95,12 +97,12 @@ class TestMessageReactions(MessengerSteps):
                 (
                     item["chatId"] == sender_chat_id,
                     item["messageId"] == message_2["id"],
-                    item["emojiId"] == 3,
+                    item["emoji"] == "🙁",
                 )
             ) or all(
                 (
                     item["chatId"] == receiver_chat_id,
                     item["messageId"] == message_1["id"],
-                    item["emojiId"] == 2,
+                    item["emoji"] == "🙂",
                 )
             )
