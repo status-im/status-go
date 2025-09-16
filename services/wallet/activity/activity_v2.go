@@ -74,7 +74,6 @@ func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, of
 // getTransactionsOrder returns deduplicated, ordered transaction IDs from both sent and fetched sources.
 // It returns the ordered list of transaction identities and total count for pagination.
 func getTransactionsOrder(ctx context.Context, db *sql.DB, addresses []eth.Address, chainIDs []wCommon.ChainID, filter Filter, offset int, limit int) ([]OrderedTransactionID, int64, error) {
-
 	if len(addresses) == 0 {
 		return nil, 0, ErrNoAddressesProvided
 	}

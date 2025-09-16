@@ -44,6 +44,7 @@ type Session struct {
 	addresses []eth.Address
 	chainIDs  []common.ChainID
 	filter    Filter
+	pageSize  int
 
 	// model is a mirror of the data model presentation has (sent by EventActivityFilteringDone)
 	model []EntryIdentity

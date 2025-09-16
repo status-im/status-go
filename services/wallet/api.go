@@ -669,31 +669,28 @@ func (api *API) StartActivityFilterSessionV2(addresses []common.Address, chainID
 	return api.s.activity.StartFilterSession(addresses, chainIDs, filter, firstPageCount, activity.V2), nil
 }
 
-func (api *API) UpdateActivityFilterForSession(sessionID activity.SessionID, filter activity.Filter, firstPageCount int) error {
+func (api *API) UpdateActivityFilterForSession(sessionID activity.SessionID, filter activity.Filter) error {
 	logutils.ZapLogger().Debug("wallet.api.UpdateActivityFilterForSession",
 		zap.Int32("sessionID", int32(sessionID)),
-		zap.Int("firstPageCount", firstPageCount),
 	)
 
-	return api.s.activity.UpdateFilterForSession(sessionID, filter, firstPageCount)
+	return api.s.activity.UpdateFilterForSession(sessionID, filter)
 }
 
-func (api *API) ResetActivityFilterSession(id activity.SessionID, firstPageCount int) error {
+func (api *API) ResetActivityFilterSession(id activity.SessionID) error {
 	logutils.ZapLogger().Debug("wallet.api.ResetActivityFilterSession",
 		zap.Int32("id", int32(id)),
-		zap.Int("firstPageCount", firstPageCount),
 	)
 
-	return api.s.activity.ResetFilterSession(id, firstPageCount)
+	return api.s.activity.ResetFilterSession(id)
 }
 
-func (api *API) GetMoreForActivityFilterSession(id activity.SessionID, pageCount int) error {
+func (api *API) GetMoreForActivityFilterSession(id activity.SessionID) error {
 	logutils.ZapLogger().Debug("wallet.api.GetMoreForActivityFilterSession",
 		zap.Int32("id", int32(id)),
-		zap.Int("pageCount", pageCount),
 	)
 
-	return api.s.activity.GetMoreForFilterSession(id, pageCount)
+	return api.s.activity.GetMoreForFilterSession(id)
 }
 
 func (api *API) StopActivityFilterSession(id activity.SessionID) {

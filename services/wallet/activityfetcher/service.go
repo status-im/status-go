@@ -27,6 +27,10 @@ const (
 	activityFetchInterval = 10 * time.Minute
 )
 
+const (
+	EventActivityFetchComplete walletevent.EventType = "wallet-activity-fetch-complete"
+)
+
 type fetcherID struct {
 	account gethcommon.Address
 	chainID uint64
@@ -45,9 +49,6 @@ type Service struct {
 
 	cancelFnMap      map[fetcherID]context.CancelFunc
 	cancelFnMapMutex sync.RWMutex
-
-	initialFetchComplete bool
-	initialFetchMutex    sync.RWMutex
 
 	logger        *zap.Logger
 	stopCh        chan struct{}
@@ -401,26 +402,20 @@ func (s *Service) runAndRemoveCancelFn(fetcherID fetcherID) {
 	cancelFn()
 	delete(s.cancelFnMap, fetcherID)
 
-	// Check if this was the last fetcher in the initial batch
+	// Check if all fetchers have completed
 	if len(s.cancelFnMap) == 0 {
-		s.checkAndEmitInitialFetchComplete()
+		s.emitFetchComplete()
 	}
 }
 
-func (s *Service) checkAndEmitInitialFetchComplete() {
-	s.initialFetchMutex.Lock()
-	defer s.initialFetchMutex.Unlock()
-
-	// Only emit once
-	if !s.initialFetchComplete {
-		s.initialFetchComplete = true
-		// Emit event to notify that initial fetch is complete
-		if s.eventFeed != nil {
-			s.eventFeed.Send(walletevent.Event{
-				Type:    "wallet-activity-initial-fetch-complete",
-				Message: "{}",
-			})
-		}
+func (s *Service) emitFetchComplete() {
+	// Emit event to notify that activity fetch is complete
+	// This happens both on initial fetch and periodic fetches
+	if s.eventFeed != nil {
+		s.eventFeed.Send(walletevent.Event{
+			Type:    EventActivityFetchComplete,
+			Message: "{}",
+		})
 	}
 }
 
