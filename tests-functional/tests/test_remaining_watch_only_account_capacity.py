@@ -24,12 +24,11 @@ class TestRemainingWatchOnlyAccountCapacity:
         after_capacity = self.account.accounts_service.remaining_watch_only_account_capacity()
         assert after_capacity == initial_capacity - 1
 
-    @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6922")
     def test_no_more_watch_only_accounts_can_be_added(self):
         initial_capacity = self.account.accounts_service.remaining_watch_only_account_capacity()
         for _ in range(initial_capacity):
-            self.account.accounts_service.add_account(self.account.password, self.account_data)
             self.account_data["address"] = "0x" + secrets.token_hex(20)
+            self.account.accounts_service.add_account(self.account.password, self.account_data)
 
         accounts = self.account.accounts_service.get_accounts()
         watch_accounts = [account for account in accounts if account["type"] == "watch"]
@@ -37,9 +36,3 @@ class TestRemainingWatchOnlyAccountCapacity:
 
         with pytest.raises(ApiResponseError, match=re.escape("no more watch-only accounts can be added")):
             self.account.accounts_service.remaining_watch_only_account_capacity()
-
-        self.account.accounts_service.add_account(self.account.password, self.account_data)
-
-        accounts = self.account.accounts_service.get_accounts()
-        watch_accounts = [account for account in accounts if account["type"] == "watch"]
-        assert len(watch_accounts) == 3

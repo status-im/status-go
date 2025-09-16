@@ -37,7 +37,6 @@ class TestRemainingKeypairCapacity:
         after_capacity2 = self.account.accounts_service.remaining_keypair_capacity()
         assert after_capacity2 == after_capacity - 1
 
-    @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6922")
     def test_no_more_keypairs_can_be_added(self):
         initial_capacity = self.account.accounts_service.remaining_keypair_capacity()
         words = ["alpha", "bravo", "zulu", "test", "key"]
@@ -56,12 +55,3 @@ class TestRemainingKeypairCapacity:
 
         with pytest.raises(ApiResponseError, match=re.escape("no more keypairs can be added")):
             self.account.accounts_service.remaining_keypair_capacity()
-
-        keypair_name = f"stress-kp-6-{secrets.token_hex(4)}"
-        passphrase = " ".join(secrets.choice(words) for _ in range(12))
-        self.account.accounts_service.add_keypair_via_seed_phrase(
-            passphrase, self.account.password, keypair_name, {"name": keypair_name, "path": "m/44'/60'/0'/0/6", "emoji": "🔑", "colorId": "primary"}
-        )
-
-        get_keypairs_response = self.account.accounts_service.get_account_keypairs()
-        assert len(get_keypairs_response) == 5

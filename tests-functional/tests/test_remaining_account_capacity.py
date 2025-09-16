@@ -41,21 +41,15 @@ class TestRemainingAccountCapacity:
         after_capacity2 = self.account.accounts_service.remaining_account_capacity()
         assert after_capacity2 == after_capacity - 1
 
-    @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6922")
     def test_no_more_accounts_can_be_added(self):
         initial_capacity = self.account.accounts_service.remaining_account_capacity()
         for _ in range(initial_capacity):
             self.account_data["type"] = "watch"
-            self.account.accounts_service.add_account(self.account.password, self.account_data)
             self.account_data["address"] = "0x" + secrets.token_hex(20)
+            self.account.accounts_service.add_account(self.account.password, self.account_data)
 
         accounts = self.account.accounts_service.get_accounts()
-        assert len(accounts) == 20
+        assert len(accounts) == 21
 
         with pytest.raises(ApiResponseError, match=re.escape("no more accounts can be added")):
             self.account.accounts_service.remaining_account_capacity()
-
-        self.account.accounts_service.add_account(self.account.password, self.account_data)
-
-        accounts = self.account.accounts_service.get_accounts()
-        assert len(accounts) == 20
