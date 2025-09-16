@@ -81,7 +81,7 @@ run_test_for_packages() {
   local go_test_exit=$?
 
   # Merge package coverage results
-  go run ./cmd/test-coverage-utils/gocovmerge.go ${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.* > ${coverage_file}
+  go tool gocovmerge ${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.* > ${coverage_file}
   rm -f "${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.*"
 
   echo "${go_test_exit}" > "${exit_code_file}"
@@ -169,7 +169,7 @@ coverage_reports=$(find . -iname "*.coverage.out")
 rm -f ${merged_coverage_report}
 
 echo -e "${GRN}Gathering test coverage results: ${RST} output: ${merged_coverage_report}, input: ${coverage_reports}"
-echo $coverage_reports | xargs go run ./cmd/test-coverage-utils/gocovmerge.go > ${merged_coverage_report}
+echo $coverage_reports | xargs go tool gocovmerge > ${merged_coverage_report}
 
 # Generate HTML coverage report
 convert_coverage_to_html ${merged_coverage_report} "test-coverage.html"

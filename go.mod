@@ -5,6 +5,7 @@ go 1.24.0
 tool (
 	github.com/goware/modvendor
 	github.com/kevinburke/go-bindata/v4/go-bindata
+	github.com/wadey/gocovmerge
 	go.uber.org/mock/mockgen
 )
 
@@ -280,6 +281,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/urfave/cli/v2 v2.27.5 // indirect
+	github.com/wadey/gocovmerge v0.0.0-20160331181800-b5bfa59ec0ad // indirect
 	github.com/waku-org/go-discover v0.0.0-20240506173252-4912704efdc5 // indirect
 	github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0 // indirect
 	github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 // indirect
