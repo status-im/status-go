@@ -7,5 +7,5 @@ CREATE TABLE IF NOT EXISTS fetched_alchemy_transfers (
     block_number TEXT AS (json_extract(transfer, '$.blockNum'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_fetched_transfers_chain_address ON fetched_alchemy_transfers (chain_id, address);
-CREATE INDEX IF NOT EXISTS idx_fetched_transfers_hash ON fetched_alchemy_transfers (hash);
+CREATE INDEX IF NOT EXISTS idx_fetched_transfers_activity ON fetched_alchemy_transfers (chain_id, address, hash);
+CREATE INDEX IF NOT EXISTS idx_fetched_transfers_lookup ON fetched_alchemy_transfers (chain_id, hash);
