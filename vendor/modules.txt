@@ -1100,6 +1100,9 @@ github.com/tklauser/numcpus
 # github.com/urfave/cli/v2 v2.27.5
 ## explicit; go 1.18
 github.com/urfave/cli/v2
+# github.com/wadey/gocovmerge v0.0.0-20160331181800-b5bfa59ec0ad
+## explicit
+github.com/wadey/gocovmerge
 # github.com/waku-org/go-discover v0.0.0-20240506173252-4912704efdc5
 ## explicit; go 1.15
 github.com/waku-org/go-discover/discover
