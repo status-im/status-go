@@ -254,11 +254,10 @@ func TestGetTransactionsOrder_SenderView(t *testing.T) {
 	addresses := []eth.Address{senderAddr}
 	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
 
-	results, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
 	require.NoError(t, err)
-	require.Equal(t, int64(2), totalCount, "Should have 2 transactions for sender")
-	require.Len(t, results, 2)
+	require.Len(t, results, 2, "Should have 2 transactions for sender")
 
 	foundSent := false
 	foundOther := false
@@ -316,11 +315,10 @@ func TestGetTransactionsOrder_ReceiverView(t *testing.T) {
 	addresses := []eth.Address{receiverAddr}
 	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
 
-	results, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
 	require.NoError(t, err)
-	require.Equal(t, int64(2), totalCount, "Should have 2 transactions for receiver")
-	require.Len(t, results, 2)
+	require.Len(t, results, 2, "Should have 2 transactions for receiver")
 
 	foundReceived := false
 	foundOther := false
@@ -391,11 +389,10 @@ func TestGetTransactionsOrder_AggregatedView(t *testing.T) {
 	addresses := []eth.Address{senderAddr, receiverAddr}
 	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
 
-	results, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
 	require.NoError(t, err)
-	require.Equal(t, int64(4), totalCount, "Should have exactly 4 transactions (2 perspectives of internal + 2 external)")
-	require.Len(t, results, 4)
+	require.Len(t, results, 4, "Should have exactly 4 transactions (2 perspectives of internal + 2 external)")
 
 	foundInternalSender := false
 	foundInternalReceiver := false
@@ -479,11 +476,10 @@ func TestGetTransactionsOrder_PendingPriority(t *testing.T) {
 	addresses := []eth.Address{senderAddr}
 	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
 
-	results, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
 	require.NoError(t, err)
-	require.Equal(t, int64(3), totalCount, "Should have 3 transactions (1 pending + 2 fetched)")
-	require.Len(t, results, 3)
+	require.Len(t, results, 3, "Should have 3 transactions (1 pending + 2 fetched)")
 
 	foundPending := false
 	foundOther1 := false
@@ -561,11 +557,10 @@ func TestGetTransactionsOrder_MixedStatusOrdering(t *testing.T) {
 	addresses := []eth.Address{senderAddr}
 	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
 
-	results, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
 	require.NoError(t, err)
-	require.Equal(t, int64(3), totalCount, "Should have 3 transactions")
-	require.Len(t, results, 3)
+	require.Len(t, results, 3, "Should have 3 transactions")
 
 	require.Equal(t, fetchedTxHash, results[0].Hash, "Fetched transaction (newest) should be first")
 	require.Equal(t, FetchedTransaction, results[0].Source, "Should be fetched")
@@ -599,11 +594,10 @@ func TestGetTransactionsOrder_EmptyResults(t *testing.T) {
 	addresses := []eth.Address{TestSenderAddr, TestReceiverAddr}
 	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
 
-	results, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
 	require.NoError(t, err)
-	require.Equal(t, int64(0), totalCount, "Should have 0 transactions")
-	require.Len(t, results, 0, "Results array should be empty")
+	require.Len(t, results, 0, "Should have 0 transactions")
 }
 
 // TestGetTransactionsOrder_EmptyAddressList tests behavior when empty address
@@ -631,12 +625,11 @@ func TestGetTransactionsOrder_EmptyAddressList(t *testing.T) {
 	addresses := []eth.Address{} // Empty address list
 	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
 
-	results, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
 	require.Error(t, err, "Should return error for empty address list")
 	require.Contains(t, err.Error(), "no addresses provided", "Error should mention no addresses provided")
-	require.Equal(t, int64(0), totalCount, "Total count should be 0 when error occurs")
-	require.Len(t, results, 0, "Results array should be empty when error occurs")
+	require.Nil(t, results, "Results should be nil when error occurs")
 }
 
 // TestGetTransactionsOrder_Pagination tests pagination functionality with deduplication.
@@ -683,27 +676,24 @@ func TestGetTransactionsOrder_Pagination(t *testing.T) {
 	addresses := []eth.Address{senderAddr, receiverAddr}
 	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
 
-	allResults, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, 10)
+	allResults, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, 10)
 	require.NoError(t, err)
-	expectedTotal := totalCount
+	expectedTotal := len(allResults)
 
-	firstPageResults, firstPageCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, 3)
+	firstPageResults, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, 3)
 	require.NoError(t, err)
-	require.Equal(t, expectedTotal, firstPageCount, "Total count should be consistent")
 	require.Len(t, firstPageResults, 3, "Should return 3 results for first page")
 
-	secondPageResults, secondPageCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 3, 3)
+	secondPageResults, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 3, 3)
 	require.NoError(t, err)
-	require.Equal(t, expectedTotal, secondPageCount, "Total count should be consistent")
 
-	thirdPageResults, thirdPageCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 6, 3)
+	thirdPageResults, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 6, 3)
 	require.NoError(t, err)
-	require.Equal(t, expectedTotal, thirdPageCount, "Total count should be consistent")
 
 	combinedResults := append(firstPageResults, secondPageResults...)
 	combinedResults = append(combinedResults, thirdPageResults...)
 
-	require.Equal(t, len(allResults), len(combinedResults), "Paginated results should equal full results")
+	require.Equal(t, expectedTotal, len(combinedResults), "Paginated results should equal full results")
 
 	for i := 0; i < len(allResults) && i < len(combinedResults); i++ {
 		require.Equal(t, allResults[i].Hash, combinedResults[i].Hash, "Transaction order should be maintained across pages")
@@ -739,23 +729,22 @@ func TestGetTransactionsOrder_PaginationEdgeCases(t *testing.T) {
 	addresses := []eth.Address{senderAddr, receiverAddr}
 	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
 
-	normalResults, expectedTotal, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, 10)
+	normalResults, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, 10)
 	require.NoError(t, err)
-	require.Greater(t, expectedTotal, int64(0), "Should have some transactions for edge case testing")
+	expectedTotal := len(normalResults)
+	require.Greater(t, expectedTotal, 0, "Should have some transactions for edge case testing")
 
-	offsetTooLarge, _, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 1000, 10)
+	offsetTooLarge, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 1000, 10)
 	require.NoError(t, err)
 	require.Len(t, offsetTooLarge, 0, "Should return empty results when offset > total")
 
-	limitZero, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, ac.NoLimit)
+	limitZero, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, ac.NoLimit)
 	require.NoError(t, err)
-	require.Equal(t, expectedTotal, totalCount, "Total count should be consistent even with NoLimit")
-	require.Len(t, limitZero, int(expectedTotal), "NoLimit should return all results (treated as no limit)")
+	require.Len(t, limitZero, expectedTotal, "NoLimit should return all results (treated as no limit)")
 
-	largeLimitResults, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, 1000)
+	largeLimitResults, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, 1000)
 	require.NoError(t, err)
-	require.Equal(t, expectedTotal, totalCount, "Total count should be consistent with large limit")
-	require.Len(t, largeLimitResults, len(normalResults), "Large limit should return all available results")
+	require.Len(t, largeLimitResults, expectedTotal, "Large limit should return all available results")
 }
 
 // TestGetTransactionsOrder_MultipleChains tests transaction filtering across different chain IDs.
@@ -790,24 +779,21 @@ func TestGetTransactionsOrder_MultipleChains(t *testing.T) {
 
 	addresses := []eth.Address{senderAddr}
 
-	ethOnlyResults, ethCount, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{walletCommon.ChainID(ethereumChainID)}, Filter{}, DefaultOffset, DefaultLimit)
+	ethOnlyResults, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{walletCommon.ChainID(ethereumChainID)}, Filter{}, DefaultOffset, DefaultLimit)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), ethCount, "Should have 1 transaction on Ethereum")
-	require.Len(t, ethOnlyResults, 1)
+	require.Len(t, ethOnlyResults, 1, "Should have 1 transaction on Ethereum")
 	require.Equal(t, ethTxHash, ethOnlyResults[0].Hash, "Should be Ethereum transaction")
 	require.Equal(t, walletCommon.ChainID(ethereumChainID), ethOnlyResults[0].ChainID, "Should have correct chain ID")
 
-	polygonOnlyResults, polygonCount, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{walletCommon.ChainID(polygonChainID)}, Filter{}, DefaultOffset, DefaultLimit)
+	polygonOnlyResults, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{walletCommon.ChainID(polygonChainID)}, Filter{}, DefaultOffset, DefaultLimit)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), polygonCount, "Should have 1 transaction on Polygon")
-	require.Len(t, polygonOnlyResults, 1)
+	require.Len(t, polygonOnlyResults, 1, "Should have 1 transaction on Polygon")
 	require.Equal(t, polygonTxHash, polygonOnlyResults[0].Hash, "Should be Polygon transaction")
 	require.Equal(t, walletCommon.ChainID(polygonChainID), polygonOnlyResults[0].ChainID, "Should have correct chain ID")
 
-	allChainsResults, allCount, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{walletCommon.ChainID(ethereumChainID), walletCommon.ChainID(polygonChainID)}, Filter{}, DefaultOffset, DefaultLimit)
+	allChainsResults, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{walletCommon.ChainID(ethereumChainID), walletCommon.ChainID(polygonChainID)}, Filter{}, DefaultOffset, DefaultLimit)
 	require.NoError(t, err)
-	require.Equal(t, int64(2), allCount, "Should have 2 transactions across all chains")
-	require.Len(t, allChainsResults, 2)
+	require.Len(t, allChainsResults, 2, "Should have 2 transactions across all chains")
 
 	require.Equal(t, ethTxHash, allChainsResults[0].Hash, "Ethereum transaction should be first (newer timestamp)")
 	require.Equal(t, polygonTxHash, allChainsResults[1].Hash, "Polygon transaction should be second")
@@ -844,11 +830,10 @@ func TestGetTransactionsOrder_SameHashDifferentChains(t *testing.T) {
 	addresses := []eth.Address{senderAddr}
 	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(ethereumChainID), walletCommon.ChainID(polygonChainID)}
 
-	results, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
 	require.NoError(t, err)
-	require.Equal(t, int64(2), totalCount, "Should have 2 transactions with same hash on different chains")
-	require.Len(t, results, 2)
+	require.Len(t, results, 2, "Should have 2 transactions with same hash on different chains")
 
 	foundEthereumTx := false
 	foundPolygonTx := false
@@ -889,10 +874,9 @@ func TestGetTransactionsOrder_EmptyChainList(t *testing.T) {
 	addresses := []eth.Address{senderAddr}
 	chainIDs := []walletCommon.ChainID{} // Empty chain ID list
 
-	results, totalCount, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
 	require.Error(t, err, "Should return error for empty chain ID list")
 	require.Contains(t, err.Error(), "no chainIDs provided", "Error should mention no chainIDs provided")
-	require.Equal(t, int64(0), totalCount, "Total count should be 0 when error occurs")
-	require.Len(t, results, 0, "Results array should be empty when error occurs")
+	require.Nil(t, results, "Results should be nil when error occurs")
 }

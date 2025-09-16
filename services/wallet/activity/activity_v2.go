@@ -54,7 +54,7 @@ func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, of
 		return nil, fmt.Errorf("unsupported version: %s, expected %s", f.version, V2)
 	}
 
-	txIDs, _, err := getTransactionsOrder(ctx, s.getDeps().db, f.addresses, f.chainIDs, f.filter, offset, limit)
+	txIDs, err := getTransactionsOrder(ctx, s.getDeps().db, f.addresses, f.chainIDs, f.filter, offset, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -72,13 +72,12 @@ func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, of
 }
 
 // getTransactionsOrder returns deduplicated, ordered transaction IDs from both sent and fetched sources.
-// It returns the ordered list of transaction identities and total count for pagination.
-func getTransactionsOrder(ctx context.Context, db *sql.DB, addresses []eth.Address, chainIDs []wCommon.ChainID, filter Filter, offset int, limit int) ([]OrderedTransactionID, int64, error) {
+func getTransactionsOrder(ctx context.Context, db *sql.DB, addresses []eth.Address, chainIDs []wCommon.ChainID, filter Filter, offset int, limit int) ([]OrderedTransactionID, error) {
 	if len(addresses) == 0 {
-		return nil, 0, ErrNoAddressesProvided
+		return nil, ErrNoAddressesProvided
 	}
 	if len(chainIDs) == 0 {
-		return nil, 0, ErrNoChainIDsProvided
+		return nil, ErrNoChainIDsProvided
 	}
 
 	query := buildTransactionOrderQuery(len(chainIDs), len(addresses), limit != ac.NoLimit)
@@ -86,7 +85,7 @@ func getTransactionsOrder(ctx context.Context, db *sql.DB, addresses []eth.Addre
 
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to query transactions order: %w", err)
+		return nil, fmt.Errorf("failed to query transactions order: %w", err)
 	}
 	defer rows.Close()
 
@@ -94,9 +93,8 @@ func getTransactionsOrder(ctx context.Context, db *sql.DB, addresses []eth.Addre
 }
 
 // extractTransactionIdentities processes SQL result rows into TransactionID slice.
-func extractTransactionIdentities(rows *sql.Rows) ([]OrderedTransactionID, int64, error) {
+func extractTransactionIdentities(rows *sql.Rows) ([]OrderedTransactionID, error) {
 	var results []OrderedTransactionID
-	var totalCount int64
 
 	for rows.Next() {
 		var txID OrderedTransactionID
@@ -104,9 +102,9 @@ func extractTransactionIdentities(rows *sql.Rows) ([]OrderedTransactionID, int64
 		var hashBytes []byte
 		var addressBytes []byte
 
-		err := rows.Scan(&chainID, &hashBytes, &txID.Timestamp, &txID.Source, &addressBytes, &totalCount)
+		err := rows.Scan(&chainID, &hashBytes, &txID.Timestamp, &txID.Source, &addressBytes)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to scan transaction row: %w", err)
+			return nil, fmt.Errorf("failed to scan transaction row: %w", err)
 		}
 
 		txID.ChainID = wCommon.ChainID(chainID)
@@ -116,10 +114,10 @@ func extractTransactionIdentities(rows *sql.Rows) ([]OrderedTransactionID, int64
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("error iterating transaction rows: %w", err)
+		return nil, fmt.Errorf("error iterating transaction rows: %w", err)
 	}
 
-	return results, totalCount, nil
+	return results, nil
 }
 
 // buildPlaceholders creates SQL placeholders for IN clauses
@@ -137,13 +135,12 @@ func buildPlaceholders(count int) string {
 // String building used instead of Squirrel for this complex query because it is easier to comprehend this way
 func buildTransactionOrderQuery(chainIDCount, addressCount int, withPagination bool) string {
 	query := `
-    SELECT 
-        chain_id, 
-        tx_hash, 
-        timestamp, 
-        source, 
-        address,
-        COUNT(*) OVER () AS total_count
+    SELECT
+        chain_id,
+        tx_hash,
+        timestamp,
+        source,
+        address
     FROM (
         SELECT
             chain_id,
