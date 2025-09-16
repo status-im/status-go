@@ -1,0 +1,18 @@
+name: TEMP
+
+on:
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  golangci:
+    name: test go tool
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.21
+      - name: lint-panics
+        run: |
+          go tool -n compile
