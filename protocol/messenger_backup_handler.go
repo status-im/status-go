@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/wakusync"
 	ensservice "github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/signal"
 )
 
 const (
@@ -57,6 +58,8 @@ func (m *Messenger) handleLocalBackup(state *ReceivedMessageState, backup *proto
 		if err != nil {
 			errors = append(errors, err)
 		}
+
+		signal.LocalMessageBackupDone()
 	}
 
 	return errors
