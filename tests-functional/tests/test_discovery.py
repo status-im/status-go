@@ -42,6 +42,15 @@ class TestDiscovery:
         def create_node(node_index: int):
             """Function to run in each thread - waits for wakuv2.peerstats signal"""
             backend = backend_new_profile(f"node_{node_index}")
+            # For the discovery test we want containers to use only the compose network.
+            # Disconnect from the default bridge network if connected so discovery uses the compose network exclusively.
+            try:
+                bridge_net = backend.container.docker_client.networks.get("bridge")
+                # use force=True to ensure disconnection even if there are active endpoints
+                bridge_net.disconnect(backend.container, force=True)
+                logging.info(f"Disconnected container {backend.container.name} from bridge network for discovery test")
+            except Exception as e:
+                logging.warning(f"Failed to disconnect container from bridge network: {e}")
             peer_id = backend.wakuext_service.peer_id()
             known_nodes[peer_id] = f"backend_{node_index}"
             nodes[peer_id] = backend

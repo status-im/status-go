@@ -84,6 +84,25 @@ class StatusGoContainer:
             raise RuntimeError(f"Docker image '{image_name}' not found")
 
         self.container = self.docker_client.containers.run(**container_args)
+
+        try:
+            self.container.reload()
+            networks_attached = set(self.container.attrs.get("NetworkSettings", {}).get("Networks", {}).keys() or [])
+            if "bridge" not in networks_attached:
+                try:
+                    bridge_net = self.docker_client.networks.get("bridge")
+                    bridge_net.connect(self.container)
+                    logging.info(f"Connected container {self.container.name} to bridge network")
+                except docker.errors.APIError as e:
+                    # If the endpoint already exists or permission denied, log and continue.
+                    msg = str(e).lower()
+                    if "already exists" in msg:
+                        logging.debug(f"Bridge endpoint already exists for {self.container.name}")
+                    else:
+                        logging.warning(f"Failed to connect container to bridge network: {e}")
+        except Exception as e:
+            logging.warning(f"Bridge network attach check failed: {e}")
+
         StatusGoContainer.all_containers.append(self)
 
         logging.debug(f"Container {self.container.name} created. ID = {self.container.id}")
