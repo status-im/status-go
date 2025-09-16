@@ -1,5 +1,8 @@
 name: TEMP
 
+permissions:
+  contents: read
+
 on:
   pull_request:
     branches:
@@ -10,7 +13,7 @@ jobs:
     name: test go tool
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v4
         with:
           go-version: '1.21.0'
       - name: go tool
