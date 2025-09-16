@@ -39,6 +39,9 @@ const (
 	// EventNewMessages is triggered when we receive new messages
 	EventNewMessages = "messages.new"
 
+	// EventLocalMessageBackupDone is triggered when a local message backup is completed
+	EventLocalMessageBackupDone = "local.message.backup.done"
+
 	// EventHistoryRequestStarted is triggered before processing a store request
 	EventHistoryRequestStarted = "history.request.started"
 
@@ -211,6 +214,10 @@ func SendBundleAdded(identity string, installationID string) {
 
 func SendNewMessages(obj json.Marshaler) {
 	send(EventNewMessages, obj)
+}
+
+func LocalMessageBackupDone() {
+	send(EventLocalMessageBackupDone, interface{}(nil))
 }
 
 func sendMailserverSignal(ms *wakutypes.Mailserver, event string) {
