@@ -173,8 +173,6 @@ cmd: status-backend push-notification-server
 status-go-deps:
 	go clean -cache || true
 	go clean -modcache || true
-	go install go.uber.org/mock/mockgen@v0.4.0
-	go install github.com/kevinburke/go-bindata/v4/...@v4.0.2
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
 
@@ -353,7 +351,7 @@ tidy:
 vendor: generate
 	go mod tidy
 	go mod vendor
-	modvendor -copy="**/*.c **/*.h" -v
+	go tool modvendor -copy="**/*.c **/*.h" -v
 .PHONY: vendor
 
 migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql

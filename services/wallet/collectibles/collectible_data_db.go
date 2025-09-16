@@ -1,6 +1,6 @@
 package collectibles
 
-//go:generate mockgen -package=mock_collectibles -source=collectible_data_db.go -destination=mock/collectible_data_db.go
+//go:generate go tool mockgen -package=mock_collectibles -source=collectible_data_db.go -destination=mock/collectible_data_db.go
 
 import (
 	"database/sql"

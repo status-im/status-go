@@ -20,7 +20,6 @@ in pkgs.buildGoModule {
     fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
   in
     with pkgs; [
-      go-bindata
       mockgen
       protoc-gen-go
       protobuf3_24

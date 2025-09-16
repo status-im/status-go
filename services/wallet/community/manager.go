@@ -1,6 +1,6 @@
 package community
 
-//go:generate mockgen -package=mock_community -source=manager.go -destination=mock/manager.go
+//go:generate go tool mockgen -package=mock_community -source=manager.go -destination=mock/manager.go
 
 import (
 	"database/sql"

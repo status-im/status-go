@@ -1,6 +1,6 @@
 package fake
 
-//go:generate mockgen -package=fake -source=txservice.go -destination=mock.go
+//go:generate go tool mockgen -package=fake -source=txservice.go -destination=mock.go
 
 import (
 	"context"

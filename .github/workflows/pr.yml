@@ -24,15 +24,13 @@ jobs:
         id: cache-go-deps
         with:
           path: ~/go/bin
-          key: go-deps-${{ runner.os }}-mockgen-v0.4.0-go-bindata-v4.0.2-protoc-gen-go-v1.34.1-gopls-latest
+          key: go-deps-${{ runner.os }}-v4.0.2-protoc-gen-go-v1.34.1-gopls-latest
           restore-keys: |
             go-deps-${{ runner.os }}-
 
       - name: Install Go dependencies
         if: steps.cache-go-deps.outputs.cache-hit != 'true'
         run: |
-          go install go.uber.org/mock/mockgen@v0.4.0
-          go install github.com/kevinburke/go-bindata/v4/...@v4.0.2
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
           go install golang.org/x/tools/gopls@latest
           which gopls

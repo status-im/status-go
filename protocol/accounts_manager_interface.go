@@ -6,7 +6,7 @@ import (
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
 
-//go:generate mockgen -package=mock_protocol_accounts_manager -source=accounts_manager_interface.go -destination=mock/messenger_accounts_manager.go
+//go:generate go tool mockgen -package=mock_protocol_accounts_manager -source=accounts_manager_interface.go -destination=mock/messenger_accounts_manager.go
 
 // AccountsManager interface for mocking purposes
 type AccountsManager interface {
