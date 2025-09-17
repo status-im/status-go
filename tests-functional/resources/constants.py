@@ -104,6 +104,23 @@ keycard_1 = {
     "key-uid": "",
 }
 
+keypair_name = "ImportedKeypairName"
+
+wallet_account_details_root = {
+    "name": keypair_name,
+    "path": "m",
+    "emoji": "🔑",
+    "colorId": "primary",
+}
+
+wallet_account_details_derivation = {
+    "name": keypair_name,
+    "path": "m/44'/60'/0'/0/0",
+    "emoji": "🔑",
+    "colorId": "primary",
+}
+
+
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 TESTS_DIR = os.path.join(PROJECT_ROOT, "tests-functional")
 SIGNALS_DIR = os.path.join(TESTS_DIR, "signals")

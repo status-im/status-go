@@ -141,6 +141,10 @@ class AccountService(Service):
         response = self.rpc_request("migrateNonProfileKeycardKeypairToApp", params)
         return response
 
+    def get_random_mnemonic(self):
+        response = self.rpc_request("getRandomMnemonic", [])
+        return response
+
     def get_all_known_keycards(self):
         response = self.rpc_request("getAllKnownKeycards", [])
         return response
@@ -153,6 +157,42 @@ class AccountService(Service):
     def get_keycards_with_same_key_uid(self, key_uid):
         params = [key_uid]
         response = self.rpc_request("getKeycardsWithSameKeyUID", params)
+        return response
+
+    def add_keypair_stored_to_keycard(self, key_uid, master_address, name, wallet_accounts):
+        params = [key_uid, master_address, name, wallet_accounts]
+        response = self.rpc_request("addKeypairStoredToKeycard", params)
+        return response
+
+    def update_keypair(self, keypair):
+        params = [keypair]
+        response = self.rpc_request("updateKeypair", params)
+        return response
+
+    def get_watch_only_accounts(self):
+        response = self.rpc_request("getWatchOnlyAccounts", [])
+        return response
+
+    def delete_keypair(self, key_uid, password):
+        params = [key_uid, password]
+        response = self.rpc_request("deleteKeypair", params)
+        return response
+
+    def remaining_account_capacity(self):
+        response = self.rpc_request("remainingAccountCapacity", [])
+        return response
+
+    def remaining_keypair_capacity(self):
+        response = self.rpc_request("remainingKeypairCapacity", [])
+        return response
+
+    def remaining_watch_only_account_capacity(self):
+        response = self.rpc_request("remainingWatchOnlyAccountCapacity", [])
+        return response
+
+    def get_num_of_addresses_to_generate_for_keypair(self, key_uid):
+        params = [key_uid]
+        response = self.rpc_request("getNumOfAddressesToGenerateForKeypair", params)
         return response
 
     def verify_keystore_file_for_account(self, address, password):
