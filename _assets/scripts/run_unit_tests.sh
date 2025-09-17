@@ -133,12 +133,12 @@ else
   # echo "UNIT_TEST_PACKAGES=${UNIT_TEST_PACKAGES}"
   # echo "------------------------------------------------------"
   # echo "UNIT_TEST_PACKAGES_FILTERED=${UNIT_TEST_PACKAGES_FILTERED}"
-  run_test_for_packages github.com/status-im/status-go/protocol/communities "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "ONLY 'protocol/communities'" &
-  bg_pids+=("$!")
+  # run_test_for_packages github.com/status-im/status-go/protocol/communities "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "ONLY 'protocol/communities'" &
+  # bg_pids+=("$!")
   # run_test_for_packages github.com/status-im/status-go/wakuv2 "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "ONLY 'wakuv2'" &
   # bg_pids+=("$!")
-  # run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
-  # bg_pids+=("$!")
+  run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
+  bg_pids+=("$!")
 
   # Spawn separate processes to run `protocol` package
   # for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
