@@ -234,17 +234,12 @@ func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*a
 			}
 			for _, e := range entryList {
 				data := &ac.EntryData{
-					Key:     e.Key(),
-					NftName: nftName,
-					NftURL:  nftURL,
+					Key:         e.Key(),
+					NftName:     nftName,
+					NftURL:      nftURL,
+					Transaction: e.transaction,
+					PayloadType: e.payloadType,
 				}
-				if e.payloadType == ac.MultiTransactionPT {
-					data.ID = w_common.NewAndSet(e.id)
-				} else {
-					data.Transaction = e.transaction
-				}
-
-				data.PayloadType = e.payloadType
 				res = append(res, data)
 			}
 		}

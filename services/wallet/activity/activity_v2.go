@@ -181,14 +181,11 @@ func dataToEntriesV2(deps FilterDependencies, data []*entryDataV2) ([]Entry, err
 		chainID := wCommon.ChainID(d.Path.FromChain.ChainID)
 
 		entry := Entry{
-			payloadType: ac.MultiTransactionPT, // Temporary, to keep compatibility with clients
-			id:          d.TxArgs.MultiTransactionID,
-			transactions: []*ac.TransactionIdentity{
-				{
-					ChainID: chainID,
-					Hash:    d.Tx.Hash(),
-					Address: d.RouteInputParams.AddrFrom,
-				},
+			payloadType: ac.SimpleTransactionPT,
+			transaction: &ac.TransactionIdentity{
+				ChainID: chainID,
+				Hash:    d.Tx.Hash(),
+				Address: d.RouteInputParams.AddrFrom,
 			},
 			timestamp:      d.Timestamp,
 			activityType:   getActivityTypeV2(d.Path.ProcessorName, d.IsApproval),

@@ -14,7 +14,6 @@ const nilStr = "nil"
 type EntryIdentity struct {
 	payloadType ac.PayloadType
 	transaction *ac.TransactionIdentity
-	id          common.MultiTransactionIDType
 }
 
 func (e EntryIdentity) same(a EntryIdentity) bool {
@@ -22,8 +21,7 @@ func (e EntryIdentity) same(a EntryIdentity) bool {
 		((a.transaction == nil && e.transaction == nil) ||
 			(a.transaction.ChainID == e.transaction.ChainID &&
 				a.transaction.Hash == e.transaction.Hash &&
-				a.transaction.Address == e.transaction.Address)) &&
-		a.id == e.id
+				a.transaction.Address == e.transaction.Address))
 }
 
 func (e EntryIdentity) key() string {
@@ -31,7 +29,7 @@ func (e EntryIdentity) key() string {
 	if e.transaction != nil {
 		txID = strconv.FormatUint(uint64(e.transaction.ChainID), 10) + e.transaction.Hash.Hex() + e.transaction.Address.Hex()
 	}
-	return strconv.Itoa(e.payloadType) + txID + strconv.FormatInt(int64(e.id), 16)
+	return strconv.Itoa(e.payloadType) + txID
 }
 
 type SessionID int32

@@ -132,50 +132,6 @@ Returns avaiable transfers in a given range.
 ]
 ```
 
-### wallet_watchTransaction
-
-Starts watching for transaction confirmation/rejection. If transaction was not confirmed/rejected in 10 minutes the call is timed out with error.
-
-#### Parameters
-
-- `tx-id`: `HEX` - transaction hash
-
-#### Example
-
-```json
-{
-  "jsonrpc":"2.0",
-  "id":7,
-  "method":"wallet_watchTransaction",
-  "params":[
-    "0xaaaaaaaa11111112222233333333"
-  ]
-}
-```
-
-### wallet_watchTransactionByChainID
-
-Starts watching for transaction confirmation/rejection. If transaction was not confirmed/rejected in 10 minutes the call is timed out with error.
-
-#### Parameters
-
-- `chainID`: `HEX` - ethereum chain id
-- `tx-id`: `HEX` - transaction hash
-
-#### Example
-
-```json
-{
-  "jsonrpc":"2.0",
-  "id":7,
-  "method":"wallet_watchTransactionByChainID",
-  "params":[
-    1,
-    "0xaaaaaaaa11111112222233333333"
-  ]
-}
-```
-
 ### `wallet_checkRecentHistory`
 
 #### Parameters
@@ -614,8 +570,3 @@ When a new multiaccount is created corresponding address will not contain any tr
 1. Call `wallet_checkRecentHistory`
 2. On `recent-history-ready` request transactions via `wallet_getTransfersByAddress`
 3. Repeat `wallet_checkRecentHistory` in N minutes (currently 20 minutes in `status-mobile` for upstream RPC node. If a custom node is used interval can be arbitrary)
-
-### Watching transaction
-1. Call `wallet_watchTransaction`
-2. On success call `wallet_checkRecentHistory`
-3. On `recent-history-ready` request transactions via `wallet_getTransfersByAddress`

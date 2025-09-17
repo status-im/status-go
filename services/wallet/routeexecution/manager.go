@@ -3,11 +3,9 @@ package routeexecution
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
 	status_common "github.com/status-im/status-go/common"
@@ -170,38 +168,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			return
 		}
 
-		//////////////////////////////////////////////////////////////////////////////
-		// prepare multitx
-		var mtType transfer.MultiTransactionType = transfer.MultiTransactionSend
-		if routeInputParams.SendType == sendtype.Bridge {
-			mtType = transfer.MultiTransactionBridge
-		} else if routeInputParams.SendType == sendtype.Swap {
-			mtType = transfer.MultiTransactionSwap
-		}
-
-		multiTx := transfer.NewMultiTransaction(
-			/* Timestamp:     */ uint64(time.Now().Unix()),
-			/* FromNetworkID: */ 0,
-			/* ToNetworkID:	  */ 0,
-			/* FromTxHash:    */ common.Hash{},
-			/* ToTxHash:      */ common.Hash{},
-			/* FromAddress:   */ routeInputParams.AddrFrom,
-			/* ToAddress:     */ routeInputParams.AddrTo,
-			/* FromAsset:     */ routeInputParams.TokenID,
-			/* ToAsset:       */ routeInputParams.ToTokenID,
-			/* FromAmount:    */ routeInputParams.AmountIn,
-			/* ToAmount:      */ routeInputParams.AmountOut,
-			/* Type:		  */ mtType,
-			/* CrossTxID:	  */ "",
-		)
-
-		_, err = m.transactionManager.InsertMultiTransaction(multiTx)
-		if err != nil {
-			return
-		}
-		//////////////////////////////////////////////////////////////////////////////
-
-		response.SentTransactions, fromChainID, toChainID, err = m.transactionManager.SendRouterTransactions(ctx, multiTx)
+		response.SentTransactions, fromChainID, toChainID, err = m.transactionManager.SendRouterTransactions(ctx)
 		if err != nil {
 			response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
 			logutils.ZapLogger().Error("Error sending router transactions", zap.Error(err))
