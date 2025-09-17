@@ -44,7 +44,6 @@ func deepCopyTransactionBridgeWithTransferTx(tx *pathprocessor.MultipathProcesso
 		ChainID:           tx.ChainID,
 		TransferTx:        deepCopy(tx.TransferTx),
 		HopTx:             tx.HopTx,
-		CbridgeTx:         tx.CbridgeTx,
 		ERC721TransferTx:  tx.ERC721TransferTx,
 		ERC1155TransferTx: tx.ERC1155TransferTx,
 		SwapTx:            tx.SwapTx,

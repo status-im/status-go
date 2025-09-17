@@ -115,10 +115,6 @@ func updateDataFromMultiTx(data []*pathprocessor.MultipathProcessorTxArgs, multi
 			tx.HopTx.MultiTransactionID = multiTransaction.ID
 			tx.HopTx.Symbol = multiTransaction.FromAsset
 		}
-		if tx.CbridgeTx != nil {
-			tx.CbridgeTx.MultiTransactionID = multiTransaction.ID
-			tx.CbridgeTx.Symbol = multiTransaction.FromAsset
-		}
 		if tx.ERC721TransferTx != nil {
 			tx.ERC721TransferTx.MultiTransactionID = multiTransaction.ID
 			tx.ERC721TransferTx.Symbol = multiTransaction.FromAsset

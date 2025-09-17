@@ -24,9 +24,6 @@ type FeatureFlags struct {
 	// Peersyncing indicates whether we should advertise and sync messages with other peers
 	Peersyncing bool
 
-	// EnableCelerBridge indicates whether we should enable the Celer bridge in the Router
-	EnableCelerBridge bool
-
 	// EnableMercuryoProvider indicates whether we should enable the Mercuryo provider in the Wallet
 	EnableMercuryoProvider bool
 

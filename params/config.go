@@ -225,7 +225,6 @@ type WalletConfig struct {
 	StatusProxyBlockchainPassword security.SensitiveString `json:"StatusProxyBlockchainPassword"`
 
 	StatusProxyStageName   string                   `json:"StatusProxyStageName"`
-	EnableCelerBridge      bool                     `json:"EnableCelerBridge"`
 	EnableMercuryoProvider bool                     `json:"EnableMercuryoProvider"`
 	EthRpcProxyUrl         security.SensitiveString `json:"EthRpcProxyUrl"`
 	EthRpcProxyUser        security.SensitiveString `json:"EthRpcProxyUser"`
@@ -249,13 +248,11 @@ type MarketDataProxyConfig struct {
 func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Enabled                             bool `json:"Enabled"`
-		EnableCelerBridge                   bool `json:"EnableCelerBridge"`
 		EnableMercuryoProvider              bool `json:"EnableMercuryoProvider"`
 		TokensListsAutoRefreshInterval      int  `json:"TokensListsAutoRefreshInterval"`
 		TokensListsAutoRefreshCheckInterval int  `json:"TokensListsAutoRefreshCheckInterval"`
 	}{
 		Enabled:                             wc.Enabled,
-		EnableCelerBridge:                   wc.EnableCelerBridge,
 		EnableMercuryoProvider:              wc.EnableMercuryoProvider,
 		TokensListsAutoRefreshInterval:      wc.TokensListsAutoRefreshInterval,
 		TokensListsAutoRefreshCheckInterval: wc.TokensListsAutoRefreshCheckInterval,
