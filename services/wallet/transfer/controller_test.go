@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto/types"
@@ -18,7 +17,6 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -36,8 +34,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	accountsPublisher := pubsub.NewPublisher()
 
 	bcstate := blockchainstate.NewBlockChainState()
-	SetMultiTransactionIDGenerator(StaticIDCounter()) // to have different multi-transaction IDs even with fast execution
-	transactionManager := NewTransactionManager(NewInMemMultiTransactionStorage(), nil, nil, nil, accountsDB, nil, nil)
+	transactionManager := NewTransactionManager(nil, nil, nil, accountsDB, nil, nil)
 	c := NewTransferController(
 		walletDB,
 		accountsDB,
@@ -91,73 +88,6 @@ func TestController_watchAccountsChanges(t *testing.T) {
 	}, false)
 	require.NoError(t, err)
 
-	// Self multi transaction
-	midSelf, err := transactionManager.InsertMultiTransaction(NewMultiTransaction(
-		/* Timestamp:     */ 1,
-		/* FromNetworkID: */ 1,
-		/* ToNetworkID:	  */ 1,
-		/* FromTxHash:    */ common.Hash{},
-		/* ToTxHash:      */ common.Hash{},
-		/* FromAddress:   */ address,
-		/* ToAddress:     */ address,
-		/* FromAsset:     */ "ETH",
-		/* ToAsset:       */ "DAI",
-		/* FromAmount:    */ &hexutil.Big{},
-		/* ToAmount:      */ &hexutil.Big{},
-		/* Type:		  */ MultiTransactionSend,
-		/* CrossTxID:	  */ "",
-	))
-
-	require.NoError(t, err)
-	mtxs, err := transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{midSelf})
-	require.NoError(t, err)
-	require.Len(t, mtxs, 1)
-
-	// Send multi transaction
-	mt := NewMultiTransaction(
-		/* Timestamp:     */ 2,
-		/* FromNetworkID: */ 1,
-		/* ToNetworkID:	  */ 1,
-		/* FromTxHash:    */ common.Hash{},
-		/* ToTxHash:      */ common.Hash{},
-		/* FromAddress:   */ address,
-		/* ToAddress:     */ counterparty,
-		/* FromAsset:     */ "ETH",
-		/* ToAsset:       */ "DAI",
-		/* FromAmount:    */ &hexutil.Big{},
-		/* ToAmount:      */ &hexutil.Big{},
-		/* Type:		  */ MultiTransactionSend,
-		/* CrossTxID:	  */ "",
-	)
-	mid, err := transactionManager.InsertMultiTransaction(mt)
-
-	require.NoError(t, err)
-	mtxs, err = transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{midSelf, mid})
-	require.NoError(t, err)
-	require.Len(t, mtxs, 2)
-
-	// Another Send multi-transaction where sender and receiver are inverted (both accounts are in accounts DB)
-	midReverse, err := transactionManager.InsertMultiTransaction(NewMultiTransaction(
-		/* Timestamp:     */ mt.Timestamp+1,
-		/* FromNetworkID: */ 1,
-		/* ToNetworkID:	  */ 1,
-		/* FromTxHash:    */ common.Hash{},
-		/* ToTxHash:      */ common.Hash{},
-		/* FromAddress:   */ mt.ToAddress,
-		/* ToAddress:     */ mt.FromAddress,
-		/* FromAsset:     */ mt.FromAsset,
-		/* ToAsset:       */ mt.ToAsset,
-		/* FromAmount:    */ mt.FromAmount,
-		/* ToAmount:      */ mt.ToAmount,
-		/* Type:		  */ MultiTransactionSend,
-		/* CrossTxID:	  */ "",
-	))
-
-	require.NoError(t, err)
-	mtxs, err = transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{midSelf, mid, midReverse})
-	require.NoError(t, err)
-	require.Len(t, mtxs, 3)
-
 	c.Start(context.Background())
 
 	// Start watching accounts
@@ -194,10 +124,6 @@ func TestController_watchAccountsChanges(t *testing.T) {
 		require.Nil(t, ranges.tokens.LastKnown)
 		require.Nil(t, ranges.tokens.Start)
 
-		mtxs, err := transactionManager.GetMultiTransactions(context.Background(), []wallet_common.MultiTransactionIDType{mid, midSelf, midReverse})
-		require.NoError(t, err)
-		require.Len(t, mtxs, 1)
-		require.Equal(t, midReverse, mtxs[0].ID)
 	}()
 	defer unsubFn()
 
@@ -237,7 +163,7 @@ func TestController_cleanupAccountLeftovers(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, storedAccs, 1)
 
-	transactionManager := NewTransactionManager(NewMultiTransactionDB(walletDB), nil, nil, nil, accountsDB, nil, nil)
+	transactionManager := NewTransactionManager(nil, nil, nil, accountsDB, nil, nil)
 	bcstate := blockchainstate.NewBlockChainState()
 	c := NewTransferController(
 		walletDB,

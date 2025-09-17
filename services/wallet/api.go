@@ -227,21 +227,6 @@ func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.Pen
 	return rst, err
 }
 
-// @deprecated
-// TODO - #11861: Remove this and replace with EventPendingTransactionStatusChanged event and Delete to confirm the transaction where it is needed
-func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) (err error) {
-	logutils.ZapLogger().Debug("wallet.api.WatchTransactionByChainID", zap.Uint64("chainID", chainID), zap.Stringer("transactionHash", transactionHash))
-	defer func() {
-		logutils.ZapLogger().Debug("wallet.api.WatchTransactionByChainID",
-			zap.Error(err),
-			zap.Uint64("chainID", chainID),
-			zap.Stringer("transactionHash", transactionHash),
-		)
-	}()
-
-	return api.s.transactionManager.WatchTransaction(ctx, chainID, transactionHash)
-}
-
 func (api *API) GetCryptoOnRamps(ctx context.Context) ([]onramp.CryptoOnRamp, error) {
 	logutils.ZapLogger().Debug("call to GetCryptoOnRamps")
 	return api.s.cryptoOnRampManager.GetProviders(ctx)
@@ -697,20 +682,6 @@ func (api *API) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 	api.s.routeExecutionManager.BuildTransactionsFromRoute(ctx, uuid)
 }
 
-// Deprecated: `ProceedWithTransactionsSignatures` is the endpoint used in the old way of sending transactions and should not be used anymore.
-//
-// The flow that should be used instead:
-// - call `BuildTransactionsFromRoute`
-// - wait for the `wallet.router.sign-transactions` signal
-// - sign received hashes using `SignMessage` call or sign on keycard
-// - call `SendRouterTransactionsWithSignatures` with the signatures of signed hashes from the previous step
-//
-// TODO: remove this struct once mobile switches to the new approach
-func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signatures map[string]requests.SignatureDetails) (*transfer.MultiTransactionCommandResult, error) {
-	logutils.ZapLogger().Debug("[WalletAPI:: ProceedWithTransactionsSignatures] sign with signatures and send multi transaction")
-	return api.s.transactionManager.ProceedWithTransactionsSignatures(ctx, signatures)
-}
-
 func (api *API) SendRouterTransactionsWithSignatures(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
 	logutils.ZapLogger().Debug("[WalletAPI:: SendRouterTransactionsWithSignatures] sign with signatures and send")
 	api.s.routeExecutionManager.SendRouterTransactionsWithSignatures(ctx, sendInputParams)
@@ -720,11 +691,6 @@ func (api *API) SendRouterTransactionsWithSignatures(ctx context.Context, sendIn
 func (api *API) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *requests.PathTxIdentity) error {
 	logutils.ZapLogger().Debug("wallet.api.ReevaluateRouterPath")
 	return api.s.routeExecutionManager.ReevaluateRouterPath(ctx, pathTxIdentity)
-}
-
-func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []wcommon.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {
-	logutils.ZapLogger().Debug("wallet.api.GetMultiTransactions", zap.Int("IDs.len", len(transactionIDs)))
-	return api.s.transactionManager.GetMultiTransactions(ctx, transactionIDs)
 }
 
 func (api *API) GetCachedCurrencyFormats() (currency.FormatPerSymbol, error) {

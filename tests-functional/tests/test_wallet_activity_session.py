@@ -23,8 +23,8 @@ EventActivitySessionUpdated = "wallet-activity-session-updated"
 
 
 def validate_entry(entry, tx_data):
-    assert entry["transactions"][0]["chainId"] == tx_data["tx_status"]["chainId"]
-    assert entry["transactions"][0]["hash"] == tx_data["tx_status"]["hash"]
+    assert entry["transaction"]["chainId"] == tx_data["tx_status"]["chainId"]
+    assert entry["transaction"]["hash"] == tx_data["tx_status"]["hash"]
 
 
 @pytest.mark.wallet

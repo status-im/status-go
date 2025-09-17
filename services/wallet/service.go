@@ -112,7 +112,7 @@ func NewService(
 	cryptoOnRampManager := onramp.NewManager(cryptoOnRampProviders)
 
 	savedAddressesManager := &SavedAddressesManager{db: db}
-	transactionManager := transfer.NewTransactionManager(transfer.NewMultiTransactionDB(db), gethManager, transactor, config, accountsDB, pendingTxManager, feed)
+	transactionManager := transfer.NewTransactionManager(gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	blockChainState := blockchainstate.NewBlockChainState()
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountsPublisher, transactionManager, blockChainState)
 

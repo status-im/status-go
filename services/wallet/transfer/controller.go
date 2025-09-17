@@ -195,11 +195,6 @@ func (c *Controller) cleanUpRemovedAccount(address common.Address) {
 		logutils.ZapLogger().Error("Failed to delete blocks ranges sequential", zap.Error(err))
 	}
 
-	err = c.transactionManager.removeMultiTransactionByAddress(address)
-	if err != nil {
-		logutils.ZapLogger().Error("Failed to delete multitransactions", zap.Error(err))
-	}
-
 	rpcLimitsStorage := rpclimiter.NewLimitsDBStorage(c.db.client)
 	err = rpcLimitsStorage.Delete(accountLimiterTag(address))
 	if err != nil {

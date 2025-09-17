@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"time"
 
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
@@ -16,22 +15,11 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
 
-// TODO: remove this struct once mobile switches to the new approach
-type TransactionDescription struct {
-	chainID   uint64
-	from      common.Address
-	builtTx   *ethTypes.Transaction
-	signature []byte
-}
-
 type TransactionManager struct {
-	storage        MultiTransactionStorage
 	gethManager    *accsmanagement.AccountsManager
 	transactor     transactions.TransactorIface
 	config         *params.NodeConfig
@@ -39,24 +27,11 @@ type TransactionManager struct {
 	pendingTracker *transactions.PendingTxTracker
 	eventFeed      *event.Feed
 
-	// TODO: remove this struct once mobile switches to the new approach
-	multiTransactionForKeycardSigning *MultiTransaction
-	multipathTransactionsData         []*pathprocessor.MultipathProcessorTxArgs
-	transactionsForKeycardSigning     map[common.Hash]*TransactionDescription
-
 	// used in a new approach
 	routerTransactions []*wallettypes.RouterTransactionDetails
 }
 
-type MultiTransactionStorage interface {
-	CreateMultiTransaction(tx *MultiTransaction) error
-	ReadMultiTransactions(details *MultiTxDetails) ([]*MultiTransaction, error)
-	UpdateMultiTransaction(tx *MultiTransaction) error
-	DeleteMultiTransaction(id wallet_common.MultiTransactionIDType) error
-}
-
 func NewTransactionManager(
-	storage MultiTransactionStorage,
 	gethManager *accsmanagement.AccountsManager,
 	transactor transactions.TransactorIface,
 	config *params.NodeConfig,
@@ -65,7 +40,6 @@ func NewTransactionManager(
 	eventFeed *event.Feed,
 ) *TransactionManager {
 	return &TransactionManager{
-		storage:        storage,
 		gethManager:    gethManager,
 		transactor:     transactor,
 		config:         config,
@@ -79,48 +53,6 @@ var (
 	emptyHash = common.Hash{}
 )
 
-type MultiTransactionType uint8
-
-const (
-	MultiTransactionSend = iota
-	MultiTransactionSwap
-	MultiTransactionBridge
-	MultiTransactionApprove
-	MultiTransactionTypeInvalid = 255
-)
-
-type MultiTransaction struct {
-	ID            wallet_common.MultiTransactionIDType `json:"id"`
-	Timestamp     uint64                               `json:"timestamp"`
-	FromNetworkID uint64                               `json:"fromNetworkID"`
-	ToNetworkID   uint64                               `json:"toNetworkID"`
-	FromTxHash    common.Hash                          `json:"fromTxHash"`
-	ToTxHash      common.Hash                          `json:"toTxHash"`
-	FromAddress   common.Address                       `json:"fromAddress"`
-	ToAddress     common.Address                       `json:"toAddress"`
-	FromAsset     string                               `json:"fromAsset"`
-	ToAsset       string                               `json:"toAsset"`
-	FromAmount    *hexutil.Big                         `json:"fromAmount"`
-	ToAmount      *hexutil.Big                         `json:"toAmount"`
-	Type          MultiTransactionType                 `json:"type"`
-	CrossTxID     string
-}
-
-type MultiTransactionCommand struct {
-	FromAddress common.Address       `json:"fromAddress"`
-	ToAddress   common.Address       `json:"toAddress"`
-	FromAsset   string               `json:"fromAsset"`
-	ToAsset     string               `json:"toAsset"`
-	FromAmount  *hexutil.Big         `json:"fromAmount"`
-	ToAmount    *hexutil.Big         `json:"toAmount"`
-	Type        MultiTransactionType `json:"type"`
-}
-
-type MultiTransactionCommandResult struct {
-	ID     int64                   `json:"id"`
-	Hashes map[uint64][]types.Hash `json:"hashes"`
-}
-
 type TxResponse struct {
 	KeyUID        string                 `json:"keyUid,omitempty"`
 	Address       types.Address          `json:"address,omitempty"`
@@ -131,29 +63,6 @@ type TxResponse struct {
 	TxArgs        wallettypes.SendTxArgs `json:"txArgs,omitempty"`
 	RawTx         string                 `json:"rawTx,omitempty"`
 	TxHash        common.Hash            `json:"txHash,omitempty"`
-}
-
-func NewMultiTransaction(timestamp uint64, fromNetworkID, toNetworkID uint64, fromTxHash, toTxHash common.Hash, fromAddress, toAddress common.Address, fromAsset, toAsset string, fromAmount, toAmount *hexutil.Big, txType MultiTransactionType, crossTxID string) *MultiTransaction {
-	if timestamp == 0 {
-		timestamp = uint64(time.Now().Unix())
-	}
-
-	return &MultiTransaction{
-		ID:            multiTransactionIDGenerator(),
-		Timestamp:     timestamp,
-		FromNetworkID: fromNetworkID,
-		ToNetworkID:   toNetworkID,
-		FromTxHash:    fromTxHash,
-		ToTxHash:      toTxHash,
-		FromAddress:   fromAddress,
-		ToAddress:     toAddress,
-		FromAsset:     fromAsset,
-		ToAsset:       toAsset,
-		FromAmount:    fromAmount,
-		ToAmount:      toAmount,
-		Type:          txType,
-		CrossTxID:     crossTxID,
-	}
 }
 
 func (tm *TransactionManager) SignMessage(message types.HexBytes, privateKey *ecdsa.PrivateKey) (string, error) {
