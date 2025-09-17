@@ -20,7 +20,6 @@ func TestPlainError(t *testing.T) {
 		common.ProcessorTransferName,
 		common.ProcessorTransferName,
 		common.ProcessorBridgeHopName,
-		common.ProcessorBridgeCelerName,
 		common.ProcessorSwapParaswapName,
 		common.ProcessorERC721Name,
 		common.ProcessorERC1155Name,

@@ -38,21 +38,21 @@ var (
 	ErrERC721TransferCustomError      = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-026"), Details: "ERC721Transfer custom error"}
 	ErrERC1155TransferCustomError     = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-027"), Details: "ERC1155Transfer custom error"}
 	ErrBridgeHopCustomError           = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-028"), Details: "Hop custom error"}
-	ErrBridgeCellerCustomError        = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-029"), Details: "CBridge custom error"}
-	ErrSwapParaswapCustomError        = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-030"), Details: "Paraswap custom error"}
-	ErrENSRegisterCustomError         = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-031"), Details: "ENSRegister custom error"}
-	ErrENSReleaseCustomError          = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-032"), Details: "ENSRelease custom error"}
-	ErrENSPublicKeyCustomError        = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-033"), Details: "ENSPublicKey custom error"}
-	ErrStickersBuyCustomError         = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-034"), Details: "StickersBuy custom error"}
-	ErrContextCancelled               = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-035"), Details: "context cancelled"}
-	ErrContextDeadlineExceeded        = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-036"), Details: "context deadline exceeded"}
-	ErrPriceTimeout                   = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-037"), Details: "price timeout"}
-	ErrNotEnoughLiquidity             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-038"), Details: "not enough liquidity"}
-	ErrPriceImpactTooHigh             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-039"), Details: "price impact too high"}
-	ErrBurnAmountTooHigh              = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-040"), Details: "burn amount too high"}
-	ErrCommunityTokenType             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-041"), Details: "invalid community token type"}
-	ErrIncorrectSignatureFormat       = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-042"), Details: "incorrect signature length: got %d, want %d"}
-	ErrTransactionNotFound            = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-043"), Details: "transaction not found"}
+	// reserved //	ErrBridgeCellerCustomError        = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-029"), Details: "CBridge custom error"}
+	ErrSwapParaswapCustomError  = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-030"), Details: "Paraswap custom error"}
+	ErrENSRegisterCustomError   = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-031"), Details: "ENSRegister custom error"}
+	ErrENSReleaseCustomError    = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-032"), Details: "ENSRelease custom error"}
+	ErrENSPublicKeyCustomError  = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-033"), Details: "ENSPublicKey custom error"}
+	ErrStickersBuyCustomError   = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-034"), Details: "StickersBuy custom error"}
+	ErrContextCancelled         = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-035"), Details: "context cancelled"}
+	ErrContextDeadlineExceeded  = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-036"), Details: "context deadline exceeded"}
+	ErrPriceTimeout             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-037"), Details: "price timeout"}
+	ErrNotEnoughLiquidity       = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-038"), Details: "not enough liquidity"}
+	ErrPriceImpactTooHigh       = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-039"), Details: "price impact too high"}
+	ErrBurnAmountTooHigh        = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-040"), Details: "burn amount too high"}
+	ErrCommunityTokenType       = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-041"), Details: "invalid community token type"}
+	ErrIncorrectSignatureFormat = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-042"), Details: "incorrect signature length: got %d, want %d"}
+	ErrTransactionNotFound      = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-043"), Details: "transaction not found"}
 )
 
 func createErrorResponse(processorName string, err error) error {
@@ -83,8 +83,6 @@ func createErrorResponse(processorName string, err error) error {
 		customErrResp = ErrERC1155TransferCustomError
 	case pathProcessorCommon.ProcessorBridgeHopName:
 		customErrResp = ErrBridgeHopCustomError
-	case pathProcessorCommon.ProcessorBridgeCelerName:
-		customErrResp = ErrBridgeCellerCustomError
 	case pathProcessorCommon.ProcessorSwapParaswapName:
 		customErrResp = ErrSwapParaswapCustomError
 	case pathProcessorCommon.ProcessorENSRegisterName:
@@ -118,7 +116,6 @@ func IsCustomError(err error) bool {
 		ErrERC721TransferCustomError,
 		ErrERC1155TransferCustomError,
 		ErrBridgeHopCustomError,
-		ErrBridgeCellerCustomError,
 		ErrSwapParaswapCustomError,
 		ErrENSRegisterCustomError,
 		ErrENSReleaseCustomError,
