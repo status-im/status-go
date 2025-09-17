@@ -128,7 +128,7 @@ func (p *Persistence) GetLastFetchedBlockAndTimestamp(ctx context.Context, chain
 		Where(sq.And{
 			sq.Eq{"fat.chain_id": chainID},
 			sq.Eq{"fat.address": address},
-		}).OrderBy("fat.retrieved_at DESC").Limit(1)
+		}).OrderBy("LENGTH(fat.block_number) DESC, fat.block_number DESC").Limit(1)
 
 	query, args, err := q.ToSql()
 	if err != nil {
