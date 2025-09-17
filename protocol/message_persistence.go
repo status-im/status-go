@@ -1846,6 +1846,52 @@ func (db sqlitePersistence) EmojiReactionsByChatIDMessageID(chatID string, messa
 	return result, nil
 }
 
+// EmojiReactionCountByChatIDMessageID returns the count of different emoji types on a message.
+func (db sqlitePersistence) EmojiReactionCountByChatIDMessageID(chatID string, messageID string) (int, error) {
+	args := []interface{}{chatID, messageID}
+	query := `SELECT
+			    COUNT(DISTINCT e.emoji)
+			FROM
+				emoji_reactions e
+			WHERE NOT(e.retracted)
+			AND
+			e.local_chat_id = ?
+			AND
+			e.message_id = ?`
+
+	var count int
+	err := db.db.QueryRow(query, args...).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+// EmojiReactionExistsOnMessage checks if a particular emoji type has already been added to a specific message.
+func (db sqlitePersistence) EmojiReactionExistsOnMessage(chatID string, messageID string, emoji string) (bool, error) {
+	args := []interface{}{chatID, messageID, emoji}
+	query := `SELECT
+			    COUNT(*)
+			FROM
+				emoji_reactions e
+			WHERE NOT(e.retracted)
+			AND
+			e.local_chat_id = ?
+			AND
+			e.message_id = ?
+			AND
+			e.emoji = ?`
+
+	var count int
+	err := db.db.QueryRow(query, args...).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
 // EmojiReactionsByChatIDs returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
 // NOTE: This is not completely accurate, as the messages in the database might have change since the last call to `MessageByChatID`.
 func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor string, limit int) ([]*EmojiReaction, error) {

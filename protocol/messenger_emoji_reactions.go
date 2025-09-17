@@ -11,6 +11,10 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+var ErrTooManyEmojiReactionsForMessage = errors.New("too many emoji reactions for message")
+
+const maxEmojiReactionsPerMessage = 20
+
 func ConvertEmojiIDToString(emojiID protobuf.EmojiReaction_Type) string {
 	switch emojiID {
 	case protobuf.EmojiReaction_LOVE:
@@ -29,6 +33,27 @@ func ConvertEmojiIDToString(emojiID protobuf.EmojiReaction_Type) string {
 
 	return ""
 
+}
+
+func (m *Messenger) CheckMaxNumberOfEmojiReactionsPerMessage(chatID string, messageID string, emoji string) error {
+	// Limit the amount of emoji reactions per message to avoid spam
+	numberOfEmojis, err := m.persistence.EmojiReactionCountByChatIDMessageID(chatID, messageID)
+	if err != nil {
+		return err
+	}
+
+	if numberOfEmojis < maxEmojiReactionsPerMessage {
+		return nil
+	}
+	// We need to check if it's an emoji that was already applied. If not, then we throw an error
+	exists, err := m.persistence.EmojiReactionExistsOnMessage(chatID, messageID, emoji)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrTooManyEmojiReactionsForMessage
+	}
+	return nil
 }
 
 // TODO remove emojiID once the client supports sending custom emojis
@@ -51,6 +76,11 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	// Validate that the emoji is valid
 	if !emojiRegex.MatchString(emoji) {
 		return nil, errors.New("invalid emoji")
+	}
+
+	err := m.CheckMaxNumberOfEmojiReactionsPerMessage(chatID, messageID, emoji)
+	if err != nil {
+		return nil, err
 	}
 
 	emojiR := &EmojiReaction{
