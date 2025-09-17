@@ -56,7 +56,7 @@ func TestSendType_CategoryMethods(t *testing.T) {
 func TestSendType_CanUseProcessor(t *testing.T) {
 	tests := map[SendType][]string{
 		Transfer:                    {pathProcessorCommon.ProcessorTransferName},
-		Bridge:                      {pathProcessorCommon.ProcessorBridgeHopName, pathProcessorCommon.ProcessorBridgeCelerName},
+		Bridge:                      {pathProcessorCommon.ProcessorBridgeHopName},
 		Swap:                        {pathProcessorCommon.ProcessorSwapParaswapName},
 		ERC721Transfer:              {pathProcessorCommon.ProcessorERC721Name},
 		ERC1155Transfer:             {pathProcessorCommon.ProcessorERC1155Name},
@@ -74,7 +74,7 @@ func TestSendType_CanUseProcessor(t *testing.T) {
 	}
 
 	allProcessors := []string{
-		pathProcessorCommon.ProcessorTransferName, pathProcessorCommon.ProcessorBridgeHopName, pathProcessorCommon.ProcessorBridgeCelerName,
+		pathProcessorCommon.ProcessorTransferName, pathProcessorCommon.ProcessorBridgeHopName,
 		pathProcessorCommon.ProcessorSwapParaswapName, pathProcessorCommon.ProcessorERC721Name, pathProcessorCommon.ProcessorERC1155Name,
 		pathProcessorCommon.ProcessorENSRegisterName, pathProcessorCommon.ProcessorENSReleaseName, pathProcessorCommon.ProcessorENSPublicKeyName, pathProcessorCommon.ProcessorStickersBuyName,
 		pathProcessorCommon.ProcessorCommunityBurnName, pathProcessorCommon.ProcessorCommunityDeployAssetsName,

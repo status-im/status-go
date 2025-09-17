@@ -241,7 +241,7 @@ func getActivityTypeV2(processorName string, isApproval bool) ac.Type {
 	switch processorName {
 	case pathProcessorCommon.ProcessorTransferName, pathProcessorCommon.ProcessorERC721Name, pathProcessorCommon.ProcessorERC1155Name:
 		return ac.SendAT
-	case pathProcessorCommon.ProcessorBridgeHopName, pathProcessorCommon.ProcessorBridgeCelerName:
+	case pathProcessorCommon.ProcessorBridgeHopName:
 		return ac.BridgeAT
 	case pathProcessorCommon.ProcessorSwapParaswapName:
 		return ac.SwapAT

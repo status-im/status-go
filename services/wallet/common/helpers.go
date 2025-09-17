@@ -15,7 +15,7 @@ import (
 )
 
 func IsProcessorBridge(name string) bool {
-	return name == pathProcessorCommon.ProcessorBridgeHopName || name == pathProcessorCommon.ProcessorBridgeCelerName
+	return name == pathProcessorCommon.ProcessorBridgeHopName
 }
 
 func IsProcessorSwap(name string) bool {

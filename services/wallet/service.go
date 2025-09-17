@@ -100,9 +100,6 @@ func NewService(
 	}
 
 	featureFlags := &protocolCommon.FeatureFlags{}
-	if config.WalletConfig.EnableCelerBridge {
-		featureFlags.EnableCelerBridge = true
-	}
 
 	if config.WalletConfig.EnableMercuryoProvider {
 		featureFlags.EnableMercuryoProvider = true
@@ -247,12 +244,6 @@ func buildPathProcessors(
 
 	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager, rpcClient.GetNetworkManager())
 	ret = append(ret, hop)
-
-	if featureFlags.EnableCelerBridge {
-		// TODO: Celar Bridge is out of scope for 2.30, check it thoroughly once we decide to include it again
-		cbridge := pathprocessor.NewCelerBridgeProcessor(rpcClient, transactor, tokenManager)
-		ret = append(ret, cbridge)
-	}
 
 	paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
 	ret = append(ret, paraswap)
