@@ -176,6 +176,7 @@ class TestWalletActivitySession:
         assert message["hasNewOnTop"]  # New entries reported
 
         # Reset activity session
+        params = [sessionID]
         self.rpc_client.prepare_wait_for_signal(
             "wallet",
             1,
