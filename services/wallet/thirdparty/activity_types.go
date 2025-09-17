@@ -12,7 +12,7 @@ import (
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 )
 
-//go:generate mockgen -package=mock_thirdparty -source=activity_types.go -destination=mock/activity_types.go
+//go:generate go tool mockgen -package=mock_thirdparty -source=activity_types.go -destination=mock/activity_types.go
 
 type ActivityProvider interface {
 	ChainProvider
