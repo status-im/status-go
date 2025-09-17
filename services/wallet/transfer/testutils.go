@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	eth_common "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -19,15 +18,14 @@ import (
 )
 
 type TestTransaction struct {
-	Hash               eth_common.Hash
-	ChainID            common.ChainID
-	From               eth_common.Address // [sender]
-	Timestamp          int64
-	BlkNumber          int64
-	Success            bool
-	Nonce              uint64
-	Contract           eth_common.Address
-	MultiTransactionID common.MultiTransactionIDType
+	Hash      eth_common.Hash
+	ChainID   common.ChainID
+	From      eth_common.Address // [sender]
+	Timestamp int64
+	BlkNumber int64
+	Success   bool
+	Nonce     uint64
+	Contract  eth_common.Address
 }
 
 type TestTransfer struct {
@@ -68,8 +66,7 @@ func generateTestTransaction(seed int) TestTransaction {
 		Success:   true,
 		Nonce:     uint64(seed),
 		// In practice this is last20Bytes(Keccak256(RLP(From, nonce)))
-		Contract:           eth_common.HexToAddress(fmt.Sprintf("0x4%d", seed)),
-		MultiTransactionID: common.NoMultiTransactionID,
+		Contract: eth_common.HexToAddress(fmt.Sprintf("0x4%d", seed)),
 	}
 }
 
@@ -104,62 +101,6 @@ func generateTestCollectibleTransfer(seed int) TestCollectibleTransfer {
 	}
 	tr.TestTransaction.ChainID = collectible.ChainID
 	return tr
-}
-
-func GenerateTestSendMultiTransaction(tr TestTransfer) MultiTransaction {
-	return MultiTransaction{
-		ID:          multiTransactionIDGenerator(),
-		Type:        MultiTransactionSend,
-		FromAddress: tr.From,
-		ToAddress:   tr.To,
-		FromAsset:   tr.Token.Symbol,
-		ToAsset:     tr.Token.Symbol,
-		FromAmount:  (*hexutil.Big)(big.NewInt(tr.Value)),
-		ToAmount:    (*hexutil.Big)(big.NewInt(0)),
-		Timestamp:   uint64(tr.Timestamp),
-	}
-}
-
-func GenerateTestSwapMultiTransaction(tr TestTransfer, toToken string, toAmount int64) MultiTransaction {
-	return MultiTransaction{
-		ID:          multiTransactionIDGenerator(),
-		Type:        MultiTransactionSwap,
-		FromAddress: tr.From,
-		ToAddress:   tr.To,
-		FromAsset:   tr.Token.Symbol,
-		ToAsset:     toToken,
-		FromAmount:  (*hexutil.Big)(big.NewInt(tr.Value)),
-		ToAmount:    (*hexutil.Big)(big.NewInt(toAmount)),
-		Timestamp:   uint64(tr.Timestamp),
-	}
-}
-
-func GenerateTestBridgeMultiTransaction(fromTr, toTr TestTransfer) MultiTransaction {
-	return MultiTransaction{
-		ID:          multiTransactionIDGenerator(),
-		Type:        MultiTransactionBridge,
-		FromAddress: fromTr.From,
-		ToAddress:   toTr.To,
-		FromAsset:   fromTr.Token.Symbol,
-		ToAsset:     toTr.Token.Symbol,
-		FromAmount:  (*hexutil.Big)(big.NewInt(fromTr.Value)),
-		ToAmount:    (*hexutil.Big)(big.NewInt(toTr.Value)),
-		Timestamp:   uint64(fromTr.Timestamp),
-	}
-}
-
-func GenerateTestApproveMultiTransaction(tr TestTransfer) MultiTransaction {
-	return MultiTransaction{
-		ID:          multiTransactionIDGenerator(),
-		Type:        MultiTransactionApprove,
-		FromAddress: tr.From,
-		ToAddress:   tr.To,
-		FromAsset:   tr.Token.Symbol,
-		ToAsset:     tr.Token.Symbol,
-		FromAmount:  (*hexutil.Big)(big.NewInt(tr.Value)),
-		ToAmount:    (*hexutil.Big)(big.NewInt(0)),
-		Timestamp:   uint64(tr.Timestamp),
-	}
 }
 
 // GenerateTestTransfers will generate transaction based on the TestTokens index and roll over if there are more than
@@ -373,7 +314,7 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 		sender:             tr.From,
 		transferType:       common.Type(tokenType),
 		timestamp:          uint64(tr.Timestamp),
-		multiTransactionID: tr.MultiTransactionID,
+		multiTransactionID: common.NoMultiTransactionID,
 		baseGasFees:        "0x0",
 		receiptStatus:      &receiptStatus,
 		txValue:            big.NewInt(tr.Value),
@@ -395,109 +336,11 @@ func InsertTestPendingTransaction(tb testing.TB, db *sql.DB, tr *TestTransfer) {
 		INSERT INTO pending_transactions (network_id, hash, timestamp, from_address, to_address,
 			symbol, gas_price, gas_limit, value, data, type, additional_data, multi_transaction_id
 		) VALUES (?, ?, ?, ?, ?, 'ETH', 0, 0, ?, '', 'eth', '', ?)`,
-		tr.ChainID, tr.Hash, tr.Timestamp, tr.From, tr.To, (*bigint.SQLBigIntBytes)(big.NewInt(tr.Value)), tr.MultiTransactionID)
+		tr.ChainID, tr.Hash, tr.Timestamp, tr.From, tr.To, (*bigint.SQLBigIntBytes)(big.NewInt(tr.Value)), common.NoMultiTransactionID)
 	require.NoError(tb, err)
-}
-
-func InsertTestMultiTransaction(tb testing.TB, db *sql.DB, tr *MultiTransaction) common.MultiTransactionIDType {
-	if tr.FromAsset == "" {
-		tr.FromAsset = testutils.EthSymbol
-	}
-	if tr.ToAsset == "" {
-		tr.ToAsset = testutils.EthSymbol
-	}
-
-	tr.ID = multiTransactionIDGenerator()
-	multiTxDB := NewMultiTransactionDB(db)
-	err := multiTxDB.CreateMultiTransaction(tr)
-	require.NoError(tb, err)
-	return tr.ID
 }
 
 // For using in tests only outside the package
 func SaveTransfersMarkBlocksLoaded(database *Database, chainID uint64, address eth_common.Address, transfers []Transfer, blocks []*big.Int) error {
 	return saveTransfersMarkBlocksLoaded(database.client, chainID, address, transfers, blocks)
-}
-
-func SetMultiTransactionIDGenerator(f func() common.MultiTransactionIDType) {
-	multiTransactionIDGenerator = f
-}
-
-func StaticIDCounter() (f func() common.MultiTransactionIDType) {
-	var i int
-	f = func() common.MultiTransactionIDType {
-		i++
-		return common.MultiTransactionIDType(i)
-	}
-	return
-}
-
-type InMemMultiTransactionStorage struct {
-	storage map[common.MultiTransactionIDType]*MultiTransaction
-}
-
-func NewInMemMultiTransactionStorage() *InMemMultiTransactionStorage {
-	return &InMemMultiTransactionStorage{
-		storage: make(map[common.MultiTransactionIDType]*MultiTransaction),
-	}
-}
-
-func (s *InMemMultiTransactionStorage) CreateMultiTransaction(multiTx *MultiTransaction) error {
-	s.storage[multiTx.ID] = multiTx
-	return nil
-}
-
-func (s *InMemMultiTransactionStorage) GetMultiTransaction(id common.MultiTransactionIDType) (*MultiTransaction, error) {
-	multiTx, ok := s.storage[id]
-	if !ok {
-		return nil, nil
-	}
-	return multiTx, nil
-}
-
-func (s *InMemMultiTransactionStorage) UpdateMultiTransaction(multiTx *MultiTransaction) error {
-	s.storage[multiTx.ID] = multiTx
-	return nil
-}
-
-func (s *InMemMultiTransactionStorage) DeleteMultiTransaction(id common.MultiTransactionIDType) error {
-	delete(s.storage, id)
-	return nil
-}
-
-func (s *InMemMultiTransactionStorage) ReadMultiTransactions(details *MultiTxDetails) ([]*MultiTransaction, error) {
-	var multiTxs []*MultiTransaction
-	for _, multiTx := range s.storage {
-		if len(details.IDs) > 0 && !testutils.SliceContains(details.IDs, multiTx.ID) {
-			continue
-		}
-
-		if (details.AnyAddress != eth_common.Address{}) &&
-			(multiTx.FromAddress != details.AnyAddress && multiTx.ToAddress != details.AnyAddress) {
-			continue
-		}
-
-		if (details.FromAddress != eth_common.Address{}) && multiTx.FromAddress != details.FromAddress {
-			continue
-		}
-
-		if (details.ToAddress != eth_common.Address{}) && multiTx.ToAddress != details.ToAddress {
-			continue
-		}
-
-		if details.ToChainID != 0 && multiTx.ToNetworkID != details.ToChainID {
-			continue
-		}
-
-		if details.Type != MultiTransactionDBTypeInvalid && multiTx.Type != mtDBTypeToMTType(details.Type) {
-			continue
-		}
-
-		if details.CrossTxID != "" && multiTx.CrossTxID != details.CrossTxID {
-			continue
-		}
-
-		multiTxs = append(multiTxs, multiTx)
-	}
-	return multiTxs, nil
 }

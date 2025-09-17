@@ -101,7 +101,6 @@ func mirrorIdentities(entries []Entry) []EntryIdentity {
 		model = append(model, EntryIdentity{
 			payloadType: a.payloadType,
 			transaction: a.transaction,
-			id:          a.id,
 		})
 	}
 	return model
@@ -261,7 +260,6 @@ func (s *Service) GetMoreForFilterSession(id SessionID, pageCount int) error {
 				session.model = append(session.model, EntryIdentity{
 					payloadType: a.payloadType,
 					transaction: a.transaction,
-					id:          a.id,
 				})
 			}
 
@@ -404,7 +402,7 @@ func (s *Service) processChangesForSession(session *Session, eventCount int, cha
 				Entry: &entry,
 			})
 			// Insert in session model at modelPos index
-			session.model = append(session.model[:modelPos], append([]EntryIdentity{{payloadType: entry.payloadType, transaction: entry.transaction, id: entry.id}}, session.model[modelPos:]...)...)
+			session.model = append(session.model[:modelPos], append([]EntryIdentity{{payloadType: entry.payloadType, transaction: entry.transaction}}, session.model[modelPos:]...)...)
 		}
 	}
 
@@ -425,17 +423,7 @@ func (s *Service) processEntryDataUpdates(sessionID SessionID, entries []Entry, 
 
 	entriesMap := make(map[string]Entry, len(entries))
 	for _, e := range entries {
-		if e.payloadType == ac.MultiTransactionPT {
-			if e.id != common.NoMultiTransactionID {
-				for _, tx := range e.transactions {
-					id := TransactionID{
-						ChainID: tx.ChainID,
-						Hash:    tx.Hash,
-					}
-					entriesMap[id.key()] = e
-				}
-			}
-		} else if e.transaction != nil {
+		if e.transaction != nil {
 			id := TransactionID{
 				ChainID: e.transaction.ChainID,
 				Hash:    e.transaction.Hash,
@@ -453,13 +441,9 @@ func (s *Service) processEntryDataUpdates(sessionID SessionID, entries []Entry, 
 		data := &ac.EntryData{
 			Key:            e.Key(),
 			ActivityStatus: &e.activityStatus,
+			Transaction:    e.transaction,
+			PayloadType:    e.payloadType,
 		}
-		if e.payloadType == ac.MultiTransactionPT {
-			data.ID = common.NewAndSet(e.id)
-		} else {
-			data.Transaction = e.transaction
-		}
-		data.PayloadType = e.payloadType
 
 		updateData = append(updateData, data)
 	}

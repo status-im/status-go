@@ -17,6 +17,11 @@ func TestFindUpdates(t *testing.T) {
 			Hash:    eth.HexToHash("0x1234"),
 			Address: eth.HexToAddress("0x1234"),
 		},
+		ac.TransactionIdentity{
+			ChainID: 1,
+			Hash:    eth.HexToHash("0x5678"),
+			Address: eth.HexToAddress("0x5678"),
+		},
 	}
 
 	type findUpdatesResult struct {
@@ -31,13 +36,13 @@ func TestFindUpdates(t *testing.T) {
 		want       findUpdatesResult
 	}{
 		{
-			name:       "Empty to single MT update",
+			name:       "Empty to single transaction update",
 			identities: []EntryIdentity{},
 			updated: []Entry{
-				{payloadType: ac.MultiTransactionPT, id: 1},
+				{payloadType: ac.SimpleTransactionPT, transaction: &txIds[0]},
 			},
 			want: findUpdatesResult{
-				new: []mixedIdentityResult{{0, EntryIdentity{payloadType: ac.MultiTransactionPT, id: 1}}},
+				new: []mixedIdentityResult{{0, EntryIdentity{payloadType: ac.SimpleTransactionPT, transaction: &txIds[0]}}},
 			},
 		},
 		{
@@ -56,12 +61,12 @@ func TestFindUpdates(t *testing.T) {
 			name:       "Empty to mixed updates",
 			identities: []EntryIdentity{},
 			updated: []Entry{
-				{payloadType: ac.MultiTransactionPT, id: 1},
-				{payloadType: ac.PendingTransactionPT, transaction: &txIds[0]},
+				{payloadType: ac.SimpleTransactionPT, transaction: &txIds[0]},
+				{payloadType: ac.PendingTransactionPT, transaction: &txIds[1]},
 			},
 			want: findUpdatesResult{
-				new: []mixedIdentityResult{{0, EntryIdentity{payloadType: ac.MultiTransactionPT, id: 1}},
-					{1, EntryIdentity{payloadType: ac.PendingTransactionPT, transaction: &txIds[0]}},
+				new: []mixedIdentityResult{{0, EntryIdentity{payloadType: ac.SimpleTransactionPT, transaction: &txIds[0]}},
+					{1, EntryIdentity{payloadType: ac.PendingTransactionPT, transaction: &txIds[1]}},
 				},
 			},
 		},
@@ -69,30 +74,30 @@ func TestFindUpdates(t *testing.T) {
 			name: "Add one on top of one",
 			identities: []EntryIdentity{
 				EntryIdentity{
-					payloadType: ac.MultiTransactionPT, id: 1,
+					payloadType: ac.SimpleTransactionPT, transaction: &txIds[0],
 				},
 			},
 			updated: []Entry{
-				{payloadType: ac.PendingTransactionPT, transaction: &txIds[0]},
-				{payloadType: ac.MultiTransactionPT, id: 1},
+				{payloadType: ac.PendingTransactionPT, transaction: &txIds[1]},
+				{payloadType: ac.SimpleTransactionPT, transaction: &txIds[0]},
 			},
 			want: findUpdatesResult{
-				new: []mixedIdentityResult{{0, EntryIdentity{payloadType: ac.PendingTransactionPT, transaction: &txIds[0]}}},
+				new: []mixedIdentityResult{{0, EntryIdentity{payloadType: ac.PendingTransactionPT, transaction: &txIds[1]}}},
 			},
 		},
 		{
 			name: "Add one on top keep window",
 			identities: []EntryIdentity{
-				EntryIdentity{payloadType: ac.MultiTransactionPT, id: 1},
-				EntryIdentity{payloadType: ac.PendingTransactionPT, transaction: &txIds[0]},
+				EntryIdentity{payloadType: ac.SimpleTransactionPT, transaction: &txIds[0]},
+				EntryIdentity{payloadType: ac.PendingTransactionPT, transaction: &txIds[1]},
 			},
 			updated: []Entry{
-				{payloadType: ac.MultiTransactionPT, id: 2},
-				{payloadType: ac.MultiTransactionPT, id: 1},
+				{payloadType: ac.SimpleTransactionPT, transaction: &txIds[1]},
+				{payloadType: ac.SimpleTransactionPT, transaction: &txIds[0]},
 			},
 			want: findUpdatesResult{
-				new:     []mixedIdentityResult{{0, EntryIdentity{payloadType: ac.MultiTransactionPT, id: 2}}},
-				removed: []EntryIdentity{EntryIdentity{payloadType: ac.PendingTransactionPT, transaction: &txIds[0]}},
+				new:     []mixedIdentityResult{{0, EntryIdentity{payloadType: ac.SimpleTransactionPT, transaction: &txIds[1]}}},
+				removed: []EntryIdentity{EntryIdentity{payloadType: ac.PendingTransactionPT, transaction: &txIds[1]}},
 			},
 		},
 	}

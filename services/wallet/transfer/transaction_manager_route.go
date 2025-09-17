@@ -358,7 +358,7 @@ func addSignatureAndSendTransaction(
 	return responses.NewRouterSentTransaction(txData.TxArgs, txData.SentHash, isApproval), nil
 }
 
-func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiTx *MultiTransaction) (transactions []*responses.RouterSentTransaction, fromChainID uint64, toChainID uint64, err error) {
+func (tm *TransactionManager) SendRouterTransactions(ctx context.Context) (transactions []*responses.RouterSentTransaction, fromChainID uint64, toChainID uint64, err error) {
 	transactions = make([]*responses.RouterSentTransaction, 0)
 
 	// send transactions
@@ -367,7 +367,7 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiT
 		toChainID = desc.RouterPath.ToChain.ChainID
 		if desc.ApprovalTxData != nil && !desc.IsApprovalPlaced() {
 			var response *responses.RouterSentTransaction
-			response, err = addSignatureAndSendTransaction(tm.transactor, desc.ApprovalTxData, multiTx.ID, true)
+			response, err = addSignatureAndSendTransaction(tm.transactor, desc.ApprovalTxData, walletCommon.NoMultiTransactionID, true)
 			if err != nil {
 				return
 			}
@@ -382,7 +382,7 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiT
 
 		if desc.TxData != nil && !desc.IsTxPlaced() {
 			var response *responses.RouterSentTransaction
-			response, err = addSignatureAndSendTransaction(tm.transactor, desc.TxData, multiTx.ID, false)
+			response, err = addSignatureAndSendTransaction(tm.transactor, desc.TxData, walletCommon.NoMultiTransactionID, false)
 			if err != nil {
 				return
 			}

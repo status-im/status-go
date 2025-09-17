@@ -2,7 +2,6 @@ package activity
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 
 	// used for embedding the sql query in the binary
@@ -19,9 +18,7 @@ import (
 
 type Entry struct {
 	payloadType               ac.PayloadType
-	transaction               *ac.TransactionIdentity       // ID for SimpleTransactionPT and PendingTransactionPT.	Origin transaction for MultiTransactionPT
-	id                        common.MultiTransactionIDType // ID for MultiTransactionPT
-	transactions              []*ac.TransactionIdentity     // List of transactions for MultiTransactionPT
+	transaction               *ac.TransactionIdentity // ID for SimpleTransactionPT and PendingTransactionPT
 	timestamp                 int64
 	activityType              ac.Type
 	activityStatus            ac.Status
@@ -45,13 +42,6 @@ type Entry struct {
 }
 
 func (e *Entry) Key() string {
-	if e.payloadType == ac.MultiTransactionPT {
-		key := fmt.Sprintf("%d", e.id)
-		for _, t := range e.transactions {
-			key += fmt.Sprintf("-%s", t.Key())
-		}
-		return key
-	}
 	return e.transaction.Key()
 }
 
@@ -80,12 +70,7 @@ func (e *Entry) MarshalJSON() ([]byte, error) {
 		ApprovalSpender:           e.approvalSpender,
 	}
 
-	if e.payloadType == ac.MultiTransactionPT {
-		data.ID = common.NewAndSet(e.id)
-		data.Transactions = e.transactions
-	} else {
-		data.Transaction = e.transaction
-	}
+	data.Transaction = e.transaction
 
 	data.PayloadType = e.payloadType
 	if e.isNew {
@@ -102,10 +87,6 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	}
 	e.payloadType = aux.PayloadType
 	e.transaction = aux.Transaction
-	if aux.ID != nil {
-		e.id = *aux.ID
-	}
-	e.transactions = aux.Transactions
 	if aux.Timestamp != nil {
 		e.timestamp = *aux.Timestamp
 	}
@@ -177,7 +158,6 @@ func (e *Entry) anyIdentity() *thirdparty.CollectibleUniqueID {
 func (e *Entry) getIdentity() EntryIdentity {
 	return EntryIdentity{
 		payloadType: e.payloadType,
-		id:          e.id,
 		transaction: e.transaction,
 	}
 }
