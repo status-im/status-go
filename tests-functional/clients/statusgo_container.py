@@ -84,7 +84,6 @@ class StatusGoContainer:
             raise RuntimeError(f"Docker image '{image_name}' not found")
 
         self.container = self.docker_client.containers.run(**container_args)
-
         StatusGoContainer.all_containers.append(self)
 
         logging.debug(f"Container {self.container.name} created. ID = {self.container.id}")
@@ -335,20 +334,21 @@ class StatusGoContainer:
     def connect_to_bridge_network(self):
         if not self.container:
             return
+
+        networks_attached = set(self.container.attrs.get("NetworkSettings", {}).get("Networks", {}).keys() or [])
+        if "bridge" in networks_attached:
+            return
         try:
-            networks_attached = set(self.container.attrs.get("NetworkSettings", {}).get("Networks", {}).keys() or [])
-            if "bridge" not in networks_attached:
-                try:
-                    bridge_net = self.docker_client.networks.get("bridge")
-                    bridge_net.connect(self.container)
-                    logging.info(f"Connected container {self.container.name} to bridge network")
-                except docker.errors.APIError as e:
-                    if "already exists" in str(e).lower():
-                        logging.debug(f"Bridge connection already exists for {self.container.name}")
-                    else:
-                        logging.warning(f"Failed to connect container to bridge network: {e}")
-        except Exception as e:
-            logging.warning(f"Bridge network attach check failed: {e}")
+            bridge_net = self.docker_client.networks.get("bridge")
+            bridge_net.connect(self.container)
+            logging.info(f"Connected container {self.container.name} to bridge network")
+        except docker.errors.APIError as e:
+            if "already exists" in str(e).lower():
+                # Not an error
+                logging.debug(f"Bridge connection already exists for {self.container.name}")
+                return
+            # Otherwise re-raise the exception
+            raise e
 
 
 class PushNotificationServerContainer(StatusGoContainer):
@@ -416,7 +416,7 @@ class StatusBackendContainer(StatusGoContainer):
 
         super().__init__(entrypoint, ports, privileged, container_name_suffix=f"-status-backend-{host_port}")
 
-        bridge_network = kwargs.get("bridge_network", True)
+        bridge_network = kwargs.get("bridge_network", False)
         if bridge_network:
             self.connect_to_bridge_network()
 

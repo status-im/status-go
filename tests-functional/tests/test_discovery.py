@@ -41,7 +41,7 @@ class TestDiscovery:
 
         def create_node(node_index: int):
             """Function to run in each thread - waits for wakuv2.peerstats signal"""
-            backend = backend_new_profile(f"node_{node_index}", bridge_network=False)
+            backend = backend_new_profile(f"node_{node_index}")
             peer_id = backend.wakuext_service.peer_id()
             known_nodes[peer_id] = f"backend_{node_index}"
             nodes[peer_id] = backend

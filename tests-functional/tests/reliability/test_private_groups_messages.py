@@ -12,8 +12,8 @@ class TestPrivateGroupMessages(MessengerSteps):
     @pytest.fixture(autouse=True)
     def setup_backends(self, backend_new_profile):
         """Initialize two unprivileged backends (sender and receiver) for each test function"""
-        self.sender = backend_new_profile("sender")
-        self.receiver = backend_new_profile("receiver")
+        self.sender = backend_new_profile("sender", bridge_network=True)
+        self.receiver = backend_new_profile("receiver", bridge_network=True)
 
     def test_private_group_messages_baseline(self, message_count=1):
         self.make_contacts(self.sender, self.receiver)
