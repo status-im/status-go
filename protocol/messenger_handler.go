@@ -2927,6 +2927,11 @@ func (m *Messenger) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR *p
 		return nil
 	}
 
+	err = m.CheckMaxNumberOfEmojiReactionsPerMessage(emojiReaction.ChatId, emojiReaction.MessageId, pbEmojiR.Emoji)
+	if err != nil {
+		return err
+	}
+
 	chat, err := m.matchChatEntity(emojiReaction, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message

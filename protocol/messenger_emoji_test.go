@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -179,4 +180,95 @@ func (s *MessengerEmojiSuite) TestCompressedKeyReturnedWithEmoji() {
 	// Check that compressedKey and emojiHash exists
 	s.Require().True(strings.Contains(string(encodedReaction), "compressedKey\":\"zQ"))
 	s.Require().True(strings.Contains(string(encodedReaction), "emojiHash"))
+}
+
+func (s *MessengerEmojiSuite) TestMaxEmojiReactionsPerMessage() {
+	alice := s.m
+	alice.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
+
+	bob := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, bob)
+
+	chatID := statusChatID
+
+	chat := CreatePublicChat(chatID, alice.getTimesource())
+
+	err := alice.SaveChat(chat)
+	s.Require().NoError(err)
+
+	_, err = alice.Join(chat)
+	s.Require().NoError(err)
+
+	err = bob.SaveChat(chat)
+	s.Require().NoError(err)
+
+	_, err = bob.Join(chat)
+	s.Require().NoError(err)
+
+	// Send chat message from alice to bob
+
+	message := buildTestMessage(*chat)
+	_, err = alice.SendChatMessage(context.Background(), message)
+	s.NoError(err)
+
+	// Wait for message to arrive to bob
+	response, err := WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Messages(), 1)
+
+	messageID := response.Messages()[0].ID
+
+	// Respond with the max amount of emojis
+	emojis := []string{"😀", "🤓", "😄", "😁", "😆", "😅", "🤣", "😂", "🥹", "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😗", "☺️"}
+	for _, emoji := range emojis {
+		response, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, emoji)
+		s.Require().NoError(err)
+		s.Require().Len(response.EmojiReactions(), 1)
+	}
+
+	// Try sending one more (should fail)
+	_, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, "😋")
+	s.Require().Error(err)
+	s.Require().Equal(ErrTooManyEmojiReactionsForMessage, err)
+
+	messageState := bob.buildMessageState()
+	messageState.CurrentMessageState = &CurrentMessageState{
+		Contact: &Contact{
+			ID: common.PubkeyToHex(&alice.identity.PublicKey),
+		},
+	}
+
+	// Try handling a new emoji (like if it was sent by Alice) (should fail)
+	err = bob.HandleEmojiReaction(
+		messageState,
+		&protobuf.EmojiReaction{
+			MessageId:   messageID,
+			ChatId:      chat.ID,
+			Emoji:       "😋",
+			Type:        protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE,
+			Clock:       123,
+			MessageType: protobuf.MessageType_PUBLIC_GROUP,
+		},
+		&messagingtypes.Message{},
+	)
+	s.Require().Error(err)
+	s.Require().Equal(ErrTooManyEmojiReactionsForMessage, err)
+
+	// Sending an existing emoji should work
+	response, err = alice.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, "😀")
+	s.Require().NoError(err)
+	s.Require().Len(response.EmojiReactions(), 1)
+
+	_, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool { return len(r.EmojiReactions()) == 1 },
+		"no emoji",
+	)
+	s.Require().NoError(err)
+
 }
