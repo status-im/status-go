@@ -8,8 +8,6 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/requests"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -29,12 +27,8 @@ type PathProcessor interface {
 	EstimateGas(params ProcessorInputParams, input []byte) (uint64, error)
 	// CalculateAmountOut calculates the amount out
 	CalculateAmountOut(params ProcessorInputParams) (*big.Int, error)
-	// Send sends the tx, returns the hash and the used nonce (lastUsedNonce is -1 if it's the first tx)
-	Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (types.Hash, uint64, error)
 	// GetContractAddress returns the contract address
 	GetContractAddress(params ProcessorInputParams) (common.Address, error)
-	// BuildTransaction builds the transaction based on MultipathProcessorTxArgs, returns the transaction and the used nonce (lastUsedNonce is -1 if it's the first tx)
-	BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error)
 	// BuildTransactionV2 builds the transaction based on SendTxArgs, returns the transaction and the used nonce (lastUsedNonce is -1 if it's the first tx)
 	BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error)
 }

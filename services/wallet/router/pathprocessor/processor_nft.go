@@ -6,10 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/utils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -93,15 +90,6 @@ func (s *NFTProcessor) getHandlerForContract(params ProcessorInputParams) NFTHan
 	return s.getHandlerForContractID(contractID)
 }
 
-func (s *NFTProcessor) getHandlerForMultipathTx(sendArgs *MultipathProcessorTxArgs) NFTHandler {
-	contractID := thirdparty.ContractID{
-		ChainID: walletCommon.ChainID(sendArgs.ChainID),
-		Address: common.Address(*sendArgs.ERC721TransferTx.To),
-	}
-
-	return s.getHandlerForContractID(contractID)
-}
-
 func (s *NFTProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	handler := s.getHandlerForContract(params)
 	if handler == nil {
@@ -127,44 +115,6 @@ func (s *NFTProcessor) EstimateGas(params ProcessorInputParams, input []byte) (u
 		return 0, createNFTErrorResponse(err)
 	}
 	return estimation, nil
-}
-
-func (s *NFTProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (types.Hash, uint64, error) {
-	handler := s.getHandlerForMultipathTx(sendArgs)
-	if handler == nil {
-		return types.Hash{}, 0, createNFTErrorResponse(ErrNoTokenSet)
-	}
-
-	tx, err := handler.SendOrBuild(
-		s.transactor,
-		s.rpcClient,
-		sendArgs,
-		utils.GetSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount.PrivateKey()),
-		lastUsedNonce,
-	)
-	if err != nil {
-		return types.Hash{}, 0, createNFTErrorResponse(err)
-	}
-	return types.Hash(tx.Hash()), tx.Nonce(), nil
-}
-
-func (s *NFTProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
-	handler := s.getHandlerForMultipathTx(sendArgs)
-	if handler == nil {
-		return nil, 0, createNFTErrorResponse(ErrNoTokenSet)
-	}
-
-	tx, err := handler.SendOrBuild(
-		s.transactor,
-		s.rpcClient,
-		sendArgs,
-		nil,
-		lastUsedNonce,
-	)
-	if err != nil {
-		return nil, 0, createNFTErrorResponse(err)
-	}
-	return tx, tx.Nonce(), nil
 }
 
 func (s *NFTProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
