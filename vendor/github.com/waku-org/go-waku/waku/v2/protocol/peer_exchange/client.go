@@ -114,7 +114,9 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 		enr      *enode.Node
 	}
 
-	for _, p := range response.PeerInfos {
+	wakuPX.log.Debug("WakuPeerExchange - received response", zap.Int("count", len(response.PeerInfos)))
+
+	for i, p := range response.PeerInfos {
 		enrRecord := &enr.Record{}
 		buf := bytes.NewBuffer(p.Enr)
 
@@ -123,6 +125,8 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 			wakuPX.log.Error("converting bytes to enr", zap.Error(err))
 			return err
 		}
+
+		wakuPX.log.Debug("WakuPeerExchange - processing peer", zap.Int("i", i))
 
 		if params.clusterID != 0 {
 			rs, err := wenr.RelaySharding(enrRecord)
@@ -153,7 +157,7 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 	}
 
 	if len(discoveredPeers) != 0 {
-		wakuPX.log.Info("connecting to newly discovered peers", zap.Int("count", len(discoveredPeers)))
+		wakuPX.log.Info("WakuPeerExchange: connecting to newly discovered peers", zap.Int("count", len(discoveredPeers)))
 		wakuPX.WaitGroup().Add(1)
 		go func() {
 			defer utils.LogOnPanic()

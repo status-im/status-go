@@ -67,6 +67,9 @@ func (pm *PeerManager) SelectRandom(criteria PeerSelectionCriteria) (peer.IDSlic
 	} else if len(peerIDs) == 0 {
 		peerIDs = make(PeerSet)
 	}
+	pm.logger.Debug("could not retrieve random peer from slot, falling back to node peerstore",
+		zap.String("protocol", string(criteria.Proto)),
+		)
 	// if not found in serviceSlots or proto == WakuRelayIDv200
 	filteredPeers, err := pm.FilterPeersByProto(criteria.SpecificPeers, criteria.ExcludePeers, criteria.Proto)
 	if err != nil {
