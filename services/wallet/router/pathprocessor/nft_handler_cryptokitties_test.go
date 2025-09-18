@@ -89,25 +89,6 @@ func TestCryptoKittiesHandler_WithMocks(t *testing.T) {
 	handler := NewCryptoKittiesHandler(mockRPCClient, mockTransactor)
 
 	testTx := ethTypes.NewTransaction(1, CryptoKittiesContractID.Address, big.NewInt(0), 21000, big.NewInt(1000000000), []byte{})
-	contractAddress := types.Address(CryptoKittiesContractID.Address)
-
-	// Test SendOrBuild
-	sendArgs := &MultipathProcessorTxArgs{
-		ChainID: walletCommon.EthereumMainnet,
-		ERC721TransferTx: &ERC721TxArgs{
-			SendTxArgs: wallettypes.SendTxArgs{From: types.HexToAddress("0x1234567890123456789012345678901234567890"), To: &contractAddress},
-			TokenID:    (*hexutil.Big)(big.NewInt(456)),
-			Recipient:  common.HexToAddress("0x5678901234567890123456789012345678901234"),
-		},
-	}
-
-	mockTransactor.EXPECT().NextNonce(gomock.Any(), mockRPCClient, walletCommon.EthereumMainnet, gomock.Any()).Return(uint64(1), nil)
-	mockTransactor.EXPECT().ValidateAndBuildTransaction(walletCommon.EthereumMainnet, gomock.Any(), int64(0)).Return(testTx, uint64(1), nil)
-	mockTransactor.EXPECT().StoreAndTrackPendingTx(gomock.Any(), gomock.Any(), walletCommon.EthereumMainnet, testTx).Return(nil)
-
-	tx, err := handler.SendOrBuild(mockTransactor, mockRPCClient, sendArgs, nil, -1)
-	require.NoError(t, err)
-	assert.Equal(t, testTx, tx)
 
 	// Test BuildTransactionV2
 	buildArgs := &wallettypes.SendTxArgs{

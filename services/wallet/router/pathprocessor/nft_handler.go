@@ -5,18 +5,11 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/utils"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -32,14 +25,6 @@ type NFTHandler interface {
 	PackTxInputData(params ProcessorInputParams) ([]byte, error)
 
 	EstimateGas(params ProcessorInputParams, input []byte, handlerName string) (uint64, error)
-
-	SendOrBuild(
-		transactor transactions.TransactorIface,
-		rpcClient rpc.ClientInterface,
-		sendArgs *MultipathProcessorTxArgs,
-		signerFn bind.SignerFn,
-		lastUsedNonce int64,
-	) (*ethTypes.Transaction, error)
 
 	BuildTransactionV2(
 		transactor transactions.TransactorIface,
@@ -96,114 +81,4 @@ func (h *BaseNFTHandler) EstimateGas(params ProcessorInputParams, input []byte, 
 	}
 
 	return uint64(float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor), nil
-}
-
-func (h *BaseNFTHandler) PrepareNonce(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (uint64, error) {
-	var nonce uint64
-	var err error
-	if lastUsedNonce < 0 {
-		nonce, err = h.transactor.NextNonce(context.Background(), h.rpcClient, sendArgs.ChainID, sendArgs.ERC721TransferTx.From)
-		if err != nil {
-			return 0, err
-		}
-	} else {
-		nonce = uint64(lastUsedNonce) + 1
-	}
-
-	argNonce := hexutil.Uint64(nonce)
-	sendArgs.ERC721TransferTx.Nonce = &argNonce
-	return nonce, nil
-}
-
-func (h *BaseNFTHandler) SendOrBuildCollectible(
-	sendArgs *MultipathProcessorTxArgs,
-	lastUsedNonce int64,
-	packDataFn func(ProcessorInputParams) ([]byte, error),
-	targetContractID *thirdparty.ContractID, // nil for regular ERC721, specify for special contracts
-) (*ethTypes.Transaction, error) {
-	from := common.Address(sendArgs.ERC721TransferTx.From)
-
-	inputParams := ProcessorInputParams{
-		FromChain: &params.Network{ChainID: sendArgs.ChainID},
-		FromAddr:  from,
-		ToAddr:    sendArgs.ERC721TransferTx.Recipient,
-		FromToken: &tokenTypes.Token{
-			Symbol:  sendArgs.ERC721TransferTx.TokenID.String(),
-			Address: common.Address(*sendArgs.ERC721TransferTx.To),
-		},
-	}
-
-	nonce, err := h.PrepareNonce(sendArgs, lastUsedNonce)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := packDataFn(inputParams)
-	if err != nil {
-		return nil, err
-	}
-
-	var contractAddress *types.Address
-	if targetContractID != nil {
-		// For special contracts (CryptoKitties, CryptoPunks) force use their address
-		addr := types.Address(targetContractID.Address)
-		contractAddress = &addr
-	} else {
-		contractAddress = sendArgs.ERC721TransferTx.To
-	}
-
-	tx, _, err := h.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, wallettypes.SendTxArgs{
-		From:     sendArgs.ERC721TransferTx.From,
-		To:       contractAddress,
-		Gas:      sendArgs.ERC721TransferTx.Gas,
-		GasPrice: sendArgs.ERC721TransferTx.GasPrice,
-		Value:    (*hexutil.Big)(big.NewInt(0)),
-		Nonce:    sendArgs.ERC721TransferTx.Nonce,
-		Data:     types.HexBytes(data),
-	}, int64(nonce-1))
-
-	if err != nil {
-		return nil, err
-	}
-
-	err = h.transactor.StoreAndTrackPendingTx(from, sendArgs.ERC721TransferTx.Symbol, sendArgs.ChainID, tx)
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
-}
-
-func (h *BaseNFTHandler) Send(
-	sendArgs *MultipathProcessorTxArgs,
-	lastUsedNonce int64,
-	verifiedAccount *generator.Account,
-	handler NFTHandler,
-) (types.Hash, uint64, error) {
-	tx, err := handler.SendOrBuild(
-		h.transactor,
-		h.rpcClient,
-		sendArgs,
-		utils.GetSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount.PrivateKey()),
-		lastUsedNonce,
-	)
-	if err != nil {
-		return types.Hash{}, 0, err
-	}
-	return types.Hash(tx.Hash()), tx.Nonce(), nil
-}
-
-func (h *BaseNFTHandler) BuildTransaction(
-	sendArgs *MultipathProcessorTxArgs,
-	lastUsedNonce int64,
-	handler NFTHandler,
-) (*ethTypes.Transaction, uint64, error) {
-	tx, err := handler.SendOrBuild(
-		h.transactor,
-		h.rpcClient,
-		sendArgs,
-		nil,
-		lastUsedNonce,
-	)
-	return tx, tx.Nonce(), err
 }

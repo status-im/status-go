@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/hop"
 	hopL1CctpImplementation "github.com/status-im/status-go/contracts/hop/l1Contracts/l1CctpImplementation"
@@ -30,11 +29,9 @@ import (
 	hopL2BaseBridge "github.com/status-im/status-go/contracts/hop/l2Contracts/l2BaseBridge"
 	hopL2CctpImplementation "github.com/status-im/status-go/contracts/hop/l2Contracts/l2CctpImplementation"
 	hopL2OptimismBridge "github.com/status-im/status-go/contracts/hop/l2Contracts/l2OptimismBridge"
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
@@ -318,74 +315,6 @@ func (h *HopBridgeProcessor) GetContractAddress(params ProcessorInputParams) (co
 	return address, createBridgeHopErrorResponse(err)
 }
 
-// TODO: remove this struct once mobile switches to the new approach
-func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
-	fromChain := h.networkManager.Find(sendArgs.HopTx.ChainID)
-	if fromChain == nil {
-		return tx, fmt.Errorf("ChainID not supported %d", sendArgs.HopTx.ChainID)
-	}
-
-	token := h.tokenManager.FindToken(fromChain, sendArgs.HopTx.Symbol)
-
-	var nonce uint64
-	if lastUsedNonce < 0 {
-		nonce, err = h.transactor.NextNonce(context.Background(), h.contractMaker.RPCClient, fromChain.ChainID, sendArgs.HopTx.From)
-		if err != nil {
-			return tx, createBridgeHopErrorResponse(err)
-		}
-	} else {
-		nonce = uint64(lastUsedNonce) + 1
-	}
-
-	argNonce := hexutil.Uint64(nonce)
-	sendArgs.HopTx.Nonce = &argNonce
-
-	txOpts := sendArgs.HopTx.ToTransactOpts(signerFn)
-	if token.IsNative() {
-		txOpts.Value = (*big.Int)(sendArgs.HopTx.Amount)
-	}
-
-	ethClient, err := h.contractMaker.RPCClient.EthClient(fromChain.ChainID)
-	if err != nil {
-		return tx, createBridgeHopErrorResponse(err)
-	}
-
-	contractAddress, contractType, err := hop.GetContractAddress(fromChain.ChainID, sendArgs.HopTx.Symbol)
-	if err != nil {
-		return tx, createBridgeHopErrorResponse(err)
-	}
-
-	bonderKey := pathProcessorCommon.MakeKey(sendArgs.HopTx.ChainID, sendArgs.HopTx.ChainIDTo, "", "", (*big.Int)(sendArgs.HopTx.Amount))
-	bonderFeeIns, ok := h.bonderFee.Load(bonderKey)
-	if !ok {
-		return nil, ErrNoBonderFeeFound
-	}
-	bonderFee := bonderFeeIns.(*BonderFee)
-
-	switch contractType {
-	case hop.CctpL1Bridge:
-		tx, err = h.sendCctpL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainIDTo, sendArgs.HopTx.Recipient, txOpts, bonderFee)
-	case hop.L1Bridge:
-		tx, err = h.sendL1BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainIDTo, sendArgs.HopTx.Recipient, txOpts, token, bonderFee)
-	case hop.L2AmmWrapper:
-		tx, err = h.sendL2AmmWrapperTx(contractAddress, ethClient, sendArgs.HopTx.ChainIDTo, sendArgs.HopTx.Recipient, txOpts, bonderFee)
-	case hop.CctpL2Bridge:
-		tx, err = h.sendCctpL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainIDTo, sendArgs.HopTx.Recipient, txOpts, bonderFee)
-	case hop.L2Bridge:
-		tx, err = h.sendL2BridgeTx(contractAddress, ethClient, sendArgs.HopTx.ChainIDTo, sendArgs.HopTx.Recipient, txOpts, bonderFee)
-	default:
-		return tx, ErrContractTypeNotSupported
-	}
-	if err != nil {
-		return tx, createBridgeHopErrorResponse(err)
-	}
-	err = h.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.HopTx.Symbol, sendArgs.HopTx.ChainID, tx)
-	if err != nil {
-		return tx, createBridgeHopErrorResponse(err)
-	}
-	return tx, nil
-}
-
 func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
 	fromChain := h.networkManager.Find(sendArgs.FromChainID)
 	if fromChain == nil {
@@ -451,22 +380,6 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, sig
 		return tx, createBridgeHopErrorResponse(err)
 	}
 	return tx, nil
-}
-
-func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, nonce uint64, err error) {
-	tx, err := h.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.HopTx.ChainID, sendArgs.HopTx.From, verifiedAccount.PrivateKey()), lastUsedNonce)
-	if err != nil {
-		return types.Hash{}, 0, createBridgeHopErrorResponse(err)
-	}
-	return types.Hash(tx.Hash()), tx.Nonce(), nil
-}
-
-func (h *HopBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
-	tx, err := h.sendOrBuild(sendArgs, nil, lastUsedNonce)
-	if err != nil {
-		return nil, 0, createBridgeHopErrorResponse(err)
-	}
-	return tx, tx.Nonce(), createBridgeHopErrorResponse(err)
 }
 
 func (h *HopBridgeProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {

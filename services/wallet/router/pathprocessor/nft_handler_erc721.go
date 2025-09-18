@@ -7,18 +7,13 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/contracts/erc721"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -96,78 +91,6 @@ func (h *ERC721Handler) checkIfFunctionExists(params ProcessorInputParams, funct
 
 	_, err = ethClient.CallContract(context.Background(), msg, nil)
 	return err
-}
-
-func (h *ERC721Handler) SendOrBuild(
-	transactor transactions.TransactorIface,
-	rpcClient rpc.ClientInterface,
-	sendArgs *MultipathProcessorTxArgs,
-	signerFn bind.SignerFn,
-	lastUsedNonce int64,
-) (*ethTypes.Transaction, error) {
-	from := common.Address(sendArgs.ERC721TransferTx.From)
-
-	useSafeTransferFrom := true
-	inputParams := ProcessorInputParams{
-		FromChain: &params.Network{
-			ChainID: sendArgs.ChainID,
-		},
-		FromAddr: from,
-		ToAddr:   sendArgs.ERC721TransferTx.Recipient,
-		FromToken: &tokenTypes.Token{
-			Symbol:  sendArgs.ERC721TransferTx.TokenID.String(),
-			Address: common.Address(*sendArgs.ERC721TransferTx.To),
-		},
-	}
-	err := h.checkIfFunctionExists(inputParams, erc721FunctionNameSafeTransferFrom)
-	if err != nil {
-		useSafeTransferFrom = false
-	}
-
-	ethClient, err := rpcClient.EthClient(sendArgs.ChainID)
-	if err != nil {
-		return nil, err
-	}
-
-	contract, err := collectibles.NewCollectibles(common.Address(*sendArgs.ERC721TransferTx.To), ethClient)
-	if err != nil {
-		return nil, err
-	}
-
-	var nonce uint64
-	if lastUsedNonce < 0 {
-		nonce, err = transactor.NextNonce(context.Background(), rpcClient, sendArgs.ChainID, sendArgs.ERC721TransferTx.From)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		nonce = uint64(lastUsedNonce) + 1
-	}
-
-	argNonce := hexutil.Uint64(nonce)
-	sendArgs.ERC721TransferTx.Nonce = &argNonce
-	txOpts := sendArgs.ERC721TransferTx.ToTransactOpts(signerFn)
-
-	var tx *ethTypes.Transaction
-	if useSafeTransferFrom {
-		tx, err = contract.SafeTransferFrom(txOpts, from,
-			sendArgs.ERC721TransferTx.Recipient,
-			sendArgs.ERC721TransferTx.TokenID.ToInt())
-	} else {
-		tx, err = contract.TransferFrom(txOpts, from,
-			sendArgs.ERC721TransferTx.Recipient,
-			sendArgs.ERC721TransferTx.TokenID.ToInt())
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	err = transactor.StoreAndTrackPendingTx(from, sendArgs.ERC721TransferTx.Symbol, sendArgs.ChainID, tx)
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
 }
 
 func (h *ERC721Handler) BuildTransactionV2(
