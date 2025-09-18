@@ -15,12 +15,12 @@
   inputs = {
     # We are pinning the commit because ultimately we want to use same commit across different projects.
     # A commit from nixpkgs 24.11 release : https://github.com/NixOS/nixpkgs/tree/release-24.11
-    nixpkgs.url = "github:NixOS/nixpkgs/3939f5f357444b182817a65b86019dbcb16bdb65";
+    nixpkgs.url = "github:NixOS/nixpkgs/0ef228213045d2cdb5a169a95d63ded38670b293";
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
     nwaku.url = "git+https://github.com/waku-org/nwaku?submodules=1&rev=e755fd834f5f3d6fba216b09469316f0328b3b6f";
   };
 
-  outputs = { self, nixpkgs, nwaku }: 
+  outputs = { self, nixpkgs, nwaku }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -36,8 +36,8 @@
           android_sdk.accept_license = true;
           allowUnfree = true;
         };
-        overlays = [ 
-          pkgsOverlay 
+        overlays = [
+          pkgsOverlay
           (final: prev: { nwaku = nwaku.packages.${system}; })
         ];
       }
