@@ -62,8 +62,6 @@ type Transfer struct {
 	// TokenValue is the value of the token transfer. Nil for eth transfer.
 	TokenValue  *big.Int `json:"tokenValue"`
 	BaseGasFees string
-	// Internal field that is used to track multi-transaction transfers.
-	MultiTransactionID w_common.MultiTransactionIDType `json:"multi_transaction_id"`
 }
 
 // ETHDownloader downloads regular eth transfers and tokens transfers.
@@ -244,19 +242,19 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 				// If it's a plain ETH transfer, add it to the list
 				if isPlainTransfer {
 					rst = append(rst, Transfer{
-						Type:               w_common.EthTransfer,
-						NetworkID:          tx.ChainId().Uint64(),
-						ID:                 tx.Hash(),
-						Address:            address,
-						BlockNumber:        blk.Number(),
-						BlockHash:          receipt.BlockHash,
-						Timestamp:          blk.Time(),
-						Transaction:        tx,
-						From:               from,
-						Receipt:            receipt,
-						Log:                nil,
-						BaseGasFees:        blk.BaseFee().String(),
-						MultiTransactionID: w_common.NoMultiTransactionID})
+						Type:        w_common.EthTransfer,
+						NetworkID:   tx.ChainId().Uint64(),
+						ID:          tx.Hash(),
+						Address:     address,
+						BlockNumber: blk.Number(),
+						BlockHash:   receipt.BlockHash,
+						Timestamp:   blk.Time(),
+						Transaction: tx,
+						From:        from,
+						Receipt:     receipt,
+						Log:         nil,
+						BaseGasFees: blk.BaseFee().String(),
+					})
 				}
 			}
 		}
@@ -386,22 +384,21 @@ func (d *ETHDownloader) subTransactionsFromPreloaded(preloadedTx *PreloadedTrans
 		)
 
 		transfer := Transfer{
-			Type:               w_common.EventTypeToSubtransactionType(eventType),
-			ID:                 preloadedTx.ID,
-			Address:            address,
-			BlockNumber:        new(big.Int).SetUint64(txLog.BlockNumber),
-			BlockHash:          txLog.BlockHash,
-			Loaded:             true,
-			NetworkID:          d.signer.ChainID().Uint64(),
-			From:               from,
-			Log:                txLog,
-			TokenID:            preloadedTx.TokenID,
-			TokenValue:         preloadedTx.Value,
-			BaseGasFees:        blk.BaseFee().String(),
-			Transaction:        tx,
-			Receipt:            receipt,
-			Timestamp:          blk.Time(),
-			MultiTransactionID: w_common.NoMultiTransactionID,
+			Type:        w_common.EventTypeToSubtransactionType(eventType),
+			ID:          preloadedTx.ID,
+			Address:     address,
+			BlockNumber: new(big.Int).SetUint64(txLog.BlockNumber),
+			BlockHash:   txLog.BlockHash,
+			Loaded:      true,
+			NetworkID:   d.signer.ChainID().Uint64(),
+			From:        from,
+			Log:         txLog,
+			TokenID:     preloadedTx.TokenID,
+			TokenValue:  preloadedTx.Value,
+			BaseGasFees: blk.BaseFee().String(),
+			Transaction: tx,
+			Receipt:     receipt,
+			Timestamp:   blk.Time(),
 		}
 
 		rst = append(rst, transfer)
@@ -431,20 +428,19 @@ func (d *ETHDownloader) subTransactionsFromTransactionData(address, from common.
 			w_common.HopBridgeTransferSentToL2EventType, w_common.HopBridgeTransferFromL1CompletedEventType,
 			w_common.HopBridgeWithdrawalBondedEventType, w_common.HopBridgeTransferSentEventType:
 			transfer := Transfer{
-				Type:               w_common.EventTypeToSubtransactionType(eventType),
-				ID:                 w_common.GetLogSubTxID(*txLog),
-				Address:            address,
-				BlockNumber:        new(big.Int).SetUint64(txLog.BlockNumber),
-				BlockHash:          txLog.BlockHash,
-				Loaded:             true,
-				NetworkID:          d.signer.ChainID().Uint64(),
-				From:               from,
-				Log:                txLog,
-				BaseGasFees:        blk.BaseFee().String(),
-				Transaction:        tx,
-				Receipt:            receipt,
-				Timestamp:          blk.Time(),
-				MultiTransactionID: w_common.NoMultiTransactionID,
+				Type:        w_common.EventTypeToSubtransactionType(eventType),
+				ID:          w_common.GetLogSubTxID(*txLog),
+				Address:     address,
+				BlockNumber: new(big.Int).SetUint64(txLog.BlockNumber),
+				BlockHash:   txLog.BlockHash,
+				Loaded:      true,
+				NetworkID:   d.signer.ChainID().Uint64(),
+				From:        from,
+				Log:         txLog,
+				BaseGasFees: blk.BaseFee().String(),
+				Transaction: tx,
+				Receipt:     receipt,
+				Timestamp:   blk.Time(),
 			}
 
 			rst = append(rst, transfer)
