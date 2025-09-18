@@ -12,7 +12,7 @@ import (
 	w_common "github.com/status-im/status-go/services/wallet/common"
 )
 
-const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, network_id, base_gas_fee, COALESCE(multi_transaction_id, 0) %s FROM transfers"
+const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, network_id, base_gas_fee %s FROM transfers"
 const preloadedTransfersQuery = "SELECT hash, type, address, log, token_id, amount_padded128hex FROM transfers"
 
 type transfersQuery struct {
@@ -211,7 +211,7 @@ func (q *transfersQuery) TransferScan(rows *sql.Rows) (rst []Transfer, err error
 		err = rows.Scan(
 			&transfer.ID, &transfer.Type, &transfer.BlockHash,
 			(*bigint.SQLBigInt)(transfer.BlockNumber), &transfer.Timestamp, &transfer.Address,
-			&JSONBlob{transfer.Transaction}, &transfer.From, &JSONBlob{transfer.Receipt}, &JSONBlob{transfer.Log}, &transfer.NetworkID, &transfer.BaseGasFees, &transfer.MultiTransactionID)
+			&JSONBlob{transfer.Transaction}, &transfer.From, &JSONBlob{transfer.Receipt}, &JSONBlob{transfer.Log}, &transfer.NetworkID, &transfer.BaseGasFees)
 		if err != nil {
 			return nil, err
 		}
