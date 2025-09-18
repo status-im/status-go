@@ -331,6 +331,25 @@ class StatusGoContainer:
         Config.status_backend_port_range.remove(host_port)
         return host_port
 
+    def connect_to_bridge_network(self):
+        if not self.container:
+            return
+
+        networks_attached = set(self.container.attrs.get("NetworkSettings", {}).get("Networks", {}).keys() or [])
+        if "bridge" in networks_attached:
+            return
+        try:
+            bridge_net = self.docker_client.networks.get("bridge")
+            bridge_net.connect(self.container)
+            logging.info(f"Connected container {self.container.name} to bridge network")
+        except docker.errors.APIError as e:
+            if "already exists" in str(e).lower():
+                # Not an error
+                logging.debug(f"Bridge connection already exists for {self.container.name}")
+                return
+            # Otherwise re-raise the exception
+            raise e
+
 
 class PushNotificationServerContainer(StatusGoContainer):
     def __init__(self, identity, gorush_port):
@@ -396,6 +415,10 @@ class StatusBackendContainer(StatusGoContainer):
             self.connector_ws_url = f"ws://127.0.0.1:{connector_ws_port}"
 
         super().__init__(entrypoint, ports, privileged, container_name_suffix=f"-status-backend-{host_port}")
+
+        bridge_network = kwargs.get("bridge_network", False)
+        if bridge_network:
+            self.connect_to_bridge_network()
 
     def _change_ip(self, new_ipv4=None, new_ipv6=None):
         if not self.container:

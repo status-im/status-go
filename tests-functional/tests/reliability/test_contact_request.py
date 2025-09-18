@@ -13,8 +13,8 @@ class TestContactRequests(MessengerSteps):
     @pytest.fixture(autouse=True)
     def setup_backends(self, backend_new_profile):
         """Initialize two unprivileged backends (sender and receiver) for each test function"""
-        self.sender = backend_new_profile("sender")
-        self.receiver = backend_new_profile("receiver")
+        self.sender = backend_new_profile("sender", bridge_network=True)
+        self.receiver = backend_new_profile("receiver", bridge_network=True)
 
     def test_contact_request_baseline(self, execution_number=1, network_condition=None):
         self.add_contact(sender=self.sender, receiver=self.receiver, execution_number=execution_number, network_condition=network_condition)
