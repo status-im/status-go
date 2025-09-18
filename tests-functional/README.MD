@@ -317,3 +317,12 @@ If that is so, force Python to use the same Docker socket (from `docker context 
 export DOCKER_HOST=unix:///var/run/docker.sock
 ```
 Add this before launching your test runner
+
+## `/usr/status-user/wakufleetconfig.json: no such file or directory"`
+
+When running tests against `status-backend` Docker containers, you might see this error:
+```
+DEBUG:root:Got response: b'{"error":"failed to open fleets json file: open /usr/status-user/wakufleetconfig.json: no such file or directory"}'
+```
+
+If running with default arguments, this most likely means that you're not running local Waku fleet as described in [Prerequisites](#prerequisites).
