@@ -626,32 +626,15 @@ func (w *Waku) runPeerExchangeLoop() {
 			w.logger.Debug("Peer exchange loop stopped")
 			return
 		case <-ticker.C:
-			w.logger.Info("Running peer exchange loop")
-
-			// We select only the nodes discovered via DNS Discovery that support peer exchange
-			// We assume that those peers are running peer exchange according to infra config,
-			// If not, the peer selection process in go-waku will filter them out anyway
-			w.dnsAddressCacheLock.RLock()
-			var peers peer.IDSlice
-			for _, record := range w.dnsAddressCache {
-				for _, discoveredNode := range record {
-					if len(discoveredNode.PeerInfo.Addrs) == 0 {
-						continue
-					}
-					// Attempt to connect to the peers.
-					// Peers will be added to the libp2p peer store thanks to identify
-					go w.connect(discoveredNode.PeerInfo, discoveredNode.ENR, wps.DNSDiscovery)
-					peers = append(peers, discoveredNode.PeerID)
-				}
-			}
-			w.dnsAddressCacheLock.RUnlock()
-
-			if len(peers) != 0 {
-				err := w.node.PeerExchange().Request(w.ctx, w.cfg.DiscoveryLimit, peer_exchange.WithAutomaticPeerSelection(peers...),
-					peer_exchange.FilterByShard(int(w.defaultShardInfo.ClusterID), int(w.defaultShardInfo.ShardIDs[0])))
-				if err != nil {
-					w.logger.Error("couldnt request peers via peer exchange", zap.Error(err))
-				}
+			w.logger.Debug("Running peer exchange loop")
+			err := w.node.PeerExchange().Request(
+				w.ctx,
+				w.cfg.DiscoveryLimit,
+				peer_exchange.WithAutomaticPeerSelection(),
+				peer_exchange.FilterByShard(int(w.defaultShardInfo.ClusterID), int(w.defaultShardInfo.ShardIDs[0])),
+			)
+			if err != nil {
+				w.logger.Error("could not request peers via peer exchange", zap.Error(err))
 			}
 		}
 	}
