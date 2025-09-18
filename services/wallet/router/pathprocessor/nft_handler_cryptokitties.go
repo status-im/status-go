@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/contracts/cryptokitties"
@@ -59,21 +58,6 @@ func (h *CryptoKittiesHandler) PackTxInputData(params ProcessorInputParams) ([]b
 	}
 
 	return parsedABI.Pack(cryptoKittiesFunctionNameTransfer, params.ToAddr, tokenID)
-}
-
-func (h *CryptoKittiesHandler) SendOrBuild(
-	transactor transactions.TransactorIface,
-	rpcClient rpc.ClientInterface,
-	sendArgs *MultipathProcessorTxArgs,
-	signerFn bind.SignerFn,
-	lastUsedNonce int64,
-) (*ethTypes.Transaction, error) {
-	return h.SendOrBuildCollectible(
-		sendArgs,
-		lastUsedNonce,
-		h.PackTxInputData,
-		&CryptoKittiesContractID, // Force use CryptoKitties address
-	)
 }
 
 func (h *CryptoKittiesHandler) BuildTransactionV2(
