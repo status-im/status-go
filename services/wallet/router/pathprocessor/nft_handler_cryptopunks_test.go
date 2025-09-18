@@ -91,7 +91,7 @@ func TestCryptoPunksHandler_WithMocks(t *testing.T) {
 
 	mockTransactor.EXPECT().NextNonce(gomock.Any(), mockRPCClient, walletCommon.EthereumMainnet, gomock.Any()).Return(uint64(1), nil)
 	mockTransactor.EXPECT().ValidateAndBuildTransaction(walletCommon.EthereumMainnet, gomock.Any(), int64(0)).Return(testTx, uint64(1), nil)
-	mockTransactor.EXPECT().StoreAndTrackPendingTx(gomock.Any(), gomock.Any(), walletCommon.EthereumMainnet, gomock.Any(), testTx).Return(nil)
+	mockTransactor.EXPECT().StoreAndTrackPendingTx(gomock.Any(), gomock.Any(), walletCommon.EthereumMainnet, testTx).Return(nil)
 
 	tx, err := handler.SendOrBuild(mockTransactor, mockRPCClient, sendArgs, nil, -1)
 	require.NoError(t, err)

@@ -158,6 +158,6 @@ func (tm *TransactionManager) SendTransactionWithSignature(chainID uint64, sendA
 		return hash, err
 	}
 
-	hash, err = tm.transactor.SendTransactionWithSignature(common.Address(sendArgs.From), sendArgs.Symbol, sendArgs.MultiTransactionID, txWithSignature)
+	hash, err = tm.transactor.SendTransactionWithSignature(common.Address(sendArgs.From), sendArgs.Symbol, txWithSignature)
 	return hash, err
 }
