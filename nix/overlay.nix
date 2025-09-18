@@ -11,11 +11,11 @@ in rec {
   androidPkgs = prev.androidenv.composeAndroidPackages {
     cmdLineToolsVersion = "9.0";
     toolsVersion = "26.1.1";
-    platformToolsVersion = "33.0.3";
+    platformToolsVersion = "34.0.5";
     buildToolsVersions = [ "34.0.0" ];
     platformVersions = [ "34" ];
     cmakeVersions = [ "3.22.1" ];
-    ndkVersion = "25.2.9519653";
+    ndkVersion = "27.2.12479018";
     includeNDK = true;
     includeExtras = [
       "extras;android;m2repository"
@@ -28,18 +28,16 @@ in rec {
   go = prev.go_1_24;
   buildGoModule = prev.buildGo124Module;
 
-  golangci-lint = prev.golangci-lint.override {
-    buildGoModule = args: prev.buildGo124Module ( args // rec {
-      version = "2.3.1";
-      src = prev.fetchFromGitHub {
-        owner = "golangci";
-        repo = "golangci-lint";
-        rev = "v${version}";
-        sha256 = "sha256-TuMIDKs8g1oYT4nQoUjwW0wEMaGxN+3YyWsbWTGy+tE=";
-      };
-      vendorHash = "sha256-1jnunHTVtqeDoljOC6JVq1pOxtZ/njqIRyQHRzctxgI=";
-    });
-  };
+  golangci-lint = prev.golangci-lint.overrideAttrs (oldAttrs: rec {
+    version = "2.3.1";
+    src = prev.fetchFromGitHub {
+      owner = "golangci";
+      repo = "golangci-lint";
+      rev = "v${version}";
+      sha256 = "sha256-TuMIDKs8g1oYT4nQoUjwW0wEMaGxN+3YyWsbWTGy+tE=";
+    };
+    vendorHash = "sha256-1jnunHTVtqeDoljOC6JVq1pOxtZ/njqIRyQHRzctxgI=";
+  });
 
   go-junit-report = prev.go-junit-report.overrideAttrs ( attrs : rec {
     version = "2.1.0";

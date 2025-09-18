@@ -62,7 +62,7 @@ ifeq ($(MAKECMDGOALS),statusgo-ios-library)
     else
         MOBILE_GOARCH := $(ARCH)
     endif
-    IOS_BUILD_FLAGS := CC="$(shell xcrun --sdk $(IPHONE_SDK) --find clang)" CGO_CFLAGS="-Os -flto -arch $(ARCH) -isysroot $(shell xcrun --sdk $(IPHONE_SDK) --show-sdk-path) -miphoneos-version-min=$(IOS_TARGET) -fembed-bitcode" CGO_LDFLAGS="-Os -flto" CGO_ENABLED=1 GOOS=ios GOARCH=$(MOBILE_GOARCH)
+    IOS_BUILD_FLAGS := CGO_LDFLAGS="-Os -flto" CGO_ENABLED=1 GOOS=ios GOARCH=$(MOBILE_GOARCH)
 endif
 
 ifeq ($(detected_OS),Darwin)
@@ -243,8 +243,6 @@ endif
 
 statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
-	@echo "MOBILE_GOARCH: $(MOBILE_GOARCH)"
-	@echo "Android build flags: $(ANDROID_BUILD_FLAGS)"
 	$(ANDROID_BUILD_FLAGS) go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
@@ -253,8 +251,9 @@ statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compi
 
 statusgo-ios-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
-	@echo "MOBILE_GOARCH: $(MOBILE_GOARCH)"
-	@echo "iOS build flags: $(IOS_BUILD_FLAGS)"
+	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
+	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
+	CGO_CFLAGS="-Os -flto -arch $(ARCH) -isysroot $$(xcrun --sdk $(IPHONE_SDK) --show-sdk-path) -miphoneos-version-min=$(IOS_TARGET) -fembed-bitcode" \
 	$(IOS_BUILD_FLAGS) go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
