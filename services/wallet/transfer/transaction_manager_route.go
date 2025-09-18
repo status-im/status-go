@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/errors"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -332,7 +331,6 @@ func (tm *TransactionManager) ValidateAndAddSignaturesToRouterTransactions(signa
 func addSignatureAndSendTransaction(
 	transactor transactions.TransactorIface,
 	txData *wallettypes.TransactionData,
-	multiTransactionID walletCommon.MultiTransactionIDType,
 	isApproval bool) (*responses.RouterSentTransaction, error) {
 	var txWithSignature *ethTypes.Transaction
 	var err error
@@ -365,7 +363,7 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context) (trans
 		toChainID = desc.RouterPath.ToChain.ChainID
 		if desc.ApprovalTxData != nil && !desc.IsApprovalPlaced() {
 			var response *responses.RouterSentTransaction
-			response, err = addSignatureAndSendTransaction(tm.transactor, desc.ApprovalTxData, walletCommon.NoMultiTransactionID, true)
+			response, err = addSignatureAndSendTransaction(tm.transactor, desc.ApprovalTxData, true)
 			if err != nil {
 				return
 			}
@@ -380,7 +378,7 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context) (trans
 
 		if desc.TxData != nil && !desc.IsTxPlaced() {
 			var response *responses.RouterSentTransaction
-			response, err = addSignatureAndSendTransaction(tm.transactor, desc.TxData, walletCommon.NoMultiTransactionID, false)
+			response, err = addSignatureAndSendTransaction(tm.transactor, desc.TxData, false)
 			if err != nil {
 				return
 			}

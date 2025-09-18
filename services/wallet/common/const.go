@@ -8,11 +8,8 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 )
 
-type MultiTransactionIDType int64
-
 const (
-	NoMultiTransactionID = MultiTransactionIDType(0)
-	HexAddressLength     = 42
+	HexAddressLength = 42
 
 	StatusDomain = "stateofus.eth"
 	EthDomain    = "eth"

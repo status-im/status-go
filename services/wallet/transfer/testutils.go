@@ -305,27 +305,26 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 	}
 
 	transfer := transferDBFields{
-		chainID:            uint64(tr.ChainID),
-		id:                 tr.Hash,
-		txHash:             &tr.Hash,
-		address:            address,
-		blockHash:          blkHash,
-		blockNumber:        big.NewInt(tr.BlkNumber),
-		sender:             tr.From,
-		transferType:       common.Type(tokenType),
-		timestamp:          uint64(tr.Timestamp),
-		multiTransactionID: common.NoMultiTransactionID,
-		baseGasFees:        "0x0",
-		receiptStatus:      &receiptStatus,
-		txValue:            big.NewInt(tr.Value),
-		txFrom:             txFrom,
-		txTo:               txTo,
-		txNonce:            &tr.Nonce,
-		tokenAddress:       &opt.TokenAddress,
-		contractAddress:    &tr.Contract,
-		tokenID:            opt.TokenID,
-		transaction:        opt.Tx,
-		receipt:            opt.Receipt,
+		chainID:         uint64(tr.ChainID),
+		id:              tr.Hash,
+		txHash:          &tr.Hash,
+		address:         address,
+		blockHash:       blkHash,
+		blockNumber:     big.NewInt(tr.BlkNumber),
+		sender:          tr.From,
+		transferType:    common.Type(tokenType),
+		timestamp:       uint64(tr.Timestamp),
+		baseGasFees:     "0x0",
+		receiptStatus:   &receiptStatus,
+		txValue:         big.NewInt(tr.Value),
+		txFrom:          txFrom,
+		txTo:            txTo,
+		txNonce:         &tr.Nonce,
+		tokenAddress:    &opt.TokenAddress,
+		contractAddress: &tr.Contract,
+		tokenID:         opt.TokenID,
+		transaction:     opt.Tx,
+		receipt:         opt.Receipt,
 	}
 	err = updateOrInsertTransfersDBFields(tx, []transferDBFields{transfer})
 	require.NoError(tb, err)
@@ -334,9 +333,9 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 func InsertTestPendingTransaction(tb testing.TB, db *sql.DB, tr *TestTransfer) {
 	_, err := db.Exec(`
 		INSERT INTO pending_transactions (network_id, hash, timestamp, from_address, to_address,
-			symbol, gas_price, gas_limit, value, data, type, additional_data, multi_transaction_id
-		) VALUES (?, ?, ?, ?, ?, 'ETH', 0, 0, ?, '', 'eth', '', ?)`,
-		tr.ChainID, tr.Hash, tr.Timestamp, tr.From, tr.To, (*bigint.SQLBigIntBytes)(big.NewInt(tr.Value)), common.NoMultiTransactionID)
+			symbol, gas_price, gas_limit, value, data, type, additional_data
+		) VALUES (?, ?, ?, ?, ?, 'ETH', 0, 0, ?, '', 'eth', '')`,
+		tr.ChainID, tr.Hash, tr.Timestamp, tr.From, tr.To, (*bigint.SQLBigIntBytes)(big.NewInt(tr.Value)))
 	require.NoError(tb, err)
 }
 

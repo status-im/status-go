@@ -372,41 +372,40 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 		}
 
 		dbFields := transferDBFields{
-			chainID:            chainID,
-			id:                 t.ID,
-			blockHash:          t.BlockHash,
-			blockNumber:        t.BlockNumber,
-			timestamp:          t.Timestamp,
-			address:            t.Address,
-			transaction:        t.Transaction,
-			sender:             t.From,
-			receipt:            t.Receipt,
-			log:                t.Log,
-			transferType:       t.Type,
-			baseGasFees:        t.BaseGasFees,
-			multiTransactionID: t.MultiTransactionID,
-			receiptStatus:      receiptStatus,
-			receiptType:        receiptType,
-			txHash:             txHash,
-			logIndex:           logIndex,
-			receiptBlockHash:   blockHash,
-			cumulativeGasUsed:  cumulativeGasUsed,
-			contractAddress:    contractAddress,
-			gasUsed:            gasUsed,
-			transactionIndex:   transactionIndex,
-			txType:             txType,
-			txProtected:        txProtected,
-			txGas:              txGas,
-			txGasPrice:         txGasPrice,
-			txGasTipCap:        txGasTipCap,
-			txGasFeeCap:        txGasFeeCap,
-			txValue:            txValue,
-			txNonce:            txNonce,
-			txSize:             txSize,
-			tokenAddress:       tokenAddress,
-			tokenID:            tokenID,
-			txFrom:             txFrom,
-			txTo:               txTo,
+			chainID:           chainID,
+			id:                t.ID,
+			blockHash:         t.BlockHash,
+			blockNumber:       t.BlockNumber,
+			timestamp:         t.Timestamp,
+			address:           t.Address,
+			transaction:       t.Transaction,
+			sender:            t.From,
+			receipt:           t.Receipt,
+			log:               t.Log,
+			transferType:      t.Type,
+			baseGasFees:       t.BaseGasFees,
+			receiptStatus:     receiptStatus,
+			receiptType:       receiptType,
+			txHash:            txHash,
+			logIndex:          logIndex,
+			receiptBlockHash:  blockHash,
+			cumulativeGasUsed: cumulativeGasUsed,
+			contractAddress:   contractAddress,
+			gasUsed:           gasUsed,
+			transactionIndex:  transactionIndex,
+			txType:            txType,
+			txProtected:       txProtected,
+			txGas:             txGas,
+			txGasPrice:        txGasPrice,
+			txGasTipCap:       txGasTipCap,
+			txGasFeeCap:       txGasFeeCap,
+			txValue:           txValue,
+			txNonce:           txNonce,
+			txSize:            txSize,
+			tokenAddress:      tokenAddress,
+			tokenID:           tokenID,
+			txFrom:            txFrom,
+			txTo:              txTo,
 		}
 		txsDBFields = append(txsDBFields, dbFields)
 	}
@@ -415,50 +414,49 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 }
 
 type transferDBFields struct {
-	chainID            uint64
-	id                 common.Hash
-	blockHash          common.Hash
-	blockNumber        *big.Int
-	timestamp          uint64
-	address            common.Address
-	transaction        *types.Transaction
-	sender             common.Address
-	receipt            *types.Receipt
-	log                *types.Log
-	transferType       w_common.Type
-	baseGasFees        string
-	multiTransactionID w_common.MultiTransactionIDType
-	receiptStatus      *uint64
-	receiptType        *uint8
-	txHash             *common.Hash
-	logIndex           *uint
-	receiptBlockHash   *common.Hash
-	cumulativeGasUsed  *uint64
-	contractAddress    *common.Address
-	gasUsed            *uint64
-	transactionIndex   *uint
-	txType             *uint8
-	txProtected        *bool
-	txGas              *uint64
-	txGasPrice         *big.Int
-	txGasTipCap        *big.Int
-	txGasFeeCap        *big.Int
-	txValue            *big.Int
-	txNonce            *uint64
-	txSize             *uint64
-	tokenAddress       *common.Address
-	tokenID            *big.Int
-	txFrom             *common.Address
-	txTo               *common.Address
+	chainID           uint64
+	id                common.Hash
+	blockHash         common.Hash
+	blockNumber       *big.Int
+	timestamp         uint64
+	address           common.Address
+	transaction       *types.Transaction
+	sender            common.Address
+	receipt           *types.Receipt
+	log               *types.Log
+	transferType      w_common.Type
+	baseGasFees       string
+	receiptStatus     *uint64
+	receiptType       *uint8
+	txHash            *common.Hash
+	logIndex          *uint
+	receiptBlockHash  *common.Hash
+	cumulativeGasUsed *uint64
+	contractAddress   *common.Address
+	gasUsed           *uint64
+	transactionIndex  *uint
+	txType            *uint8
+	txProtected       *bool
+	txGas             *uint64
+	txGasPrice        *big.Int
+	txGasTipCap       *big.Int
+	txGasFeeCap       *big.Int
+	txValue           *big.Int
+	txNonce           *uint64
+	txSize            *uint64
+	tokenAddress      *common.Address
+	tokenID           *big.Int
+	txFrom            *common.Address
+	txTo              *common.Address
 }
 
 func updateOrInsertTransfersDBFields(creator statementCreator, transfers []transferDBFields) error {
 	insert, err := creator.Prepare(`INSERT OR REPLACE INTO transfers
-        (network_id, hash, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, type, loaded, base_gas_fee, multi_transaction_id,
+        (network_id, hash, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, type, loaded, base_gas_fee,
 		status, receipt_type, tx_hash, log_index, block_hash, cumulative_gas_used, contract_address, gas_used, tx_index,
 		tx_type, protected, gas_limit, gas_price_clamped64, gas_tip_cap_clamped64, gas_fee_cap_clamped64, amount_padded128hex, account_nonce, size, token_address, token_id, tx_from_address, tx_to_address)
 	VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -469,7 +467,7 @@ func updateOrInsertTransfersDBFields(creator statementCreator, transfers []trans
 		txGasFeeCap := sqlite.BigIntToClampedInt64(t.txGasFeeCap)
 		txValue := sqlite.BigIntToPadded128BitsStr(t.txValue)
 
-		_, err = insert.Exec(t.chainID, t.id, t.blockHash, (*bigint.SQLBigInt)(t.blockNumber), t.timestamp, t.address, &JSONBlob{t.transaction}, t.sender, &JSONBlob{t.receipt}, &JSONBlob{t.log}, t.transferType, t.baseGasFees, t.multiTransactionID,
+		_, err = insert.Exec(t.chainID, t.id, t.blockHash, (*bigint.SQLBigInt)(t.blockNumber), t.timestamp, t.address, &JSONBlob{t.transaction}, t.sender, &JSONBlob{t.receipt}, &JSONBlob{t.log}, t.transferType, t.baseGasFees,
 			t.receiptStatus, t.receiptType, t.txHash, t.logIndex, t.receiptBlockHash, t.cumulativeGasUsed, t.contractAddress, t.gasUsed, t.transactionIndex,
 			t.txType, t.txProtected, t.txGas, txGasPrice, txGasTipCap, txGasFeeCap, txValue, t.txNonce, t.txSize, t.tokenAddress, (*bigint.SQLBigIntBytes)(t.tokenID), t.txFrom, t.txTo)
 		if err != nil {
@@ -556,16 +554,6 @@ func markBlocksAsLoaded(chainID uint64, creator statementCreator, address common
 		}
 	}
 	return nil
-}
-
-// GetOwnedMultiTransactionID returns sql.ErrNoRows if no transaction is found for the given identity
-func GetOwnedMultiTransactionID(tx *sql.Tx, chainID w_common.ChainID, hash common.Hash, address common.Address) (mTID int64, err error) {
-	row := tx.QueryRow(`SELECT COALESCE(multi_transaction_id, 0) FROM transfers WHERE network_id = ? AND tx_hash = ? AND address = ?`, chainID, hash, address)
-	err = row.Scan(&mTID)
-	if err != nil {
-		return 0, err
-	}
-	return mTID, nil
 }
 
 func (db *Database) GetLatestCollectibleTransfer(address common.Address, id thirdparty.CollectibleUniqueID) (*Transfer, error) {
