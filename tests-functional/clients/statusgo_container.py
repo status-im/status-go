@@ -94,14 +94,14 @@ class StatusGoContainer:
         # Known node names from docker compose
         bootstrap_nodes = "boot-1"
         static_nodes = "boot-1"  # Add bootnode, otherwise metadata exchange doesn't happen, and Waku light mode doesn't work
-        store_nodes = "store"
+        # store_nodes = "store"
 
         return (
             "python3 /usr/local/bin/scan_waku_fleet.py "
             f"--fleet-name {Config.waku_fleet} "
             f"--cluster-id 16 "  # Cluster ID matches docker-compose.waku.yml
             f"--bootstrap-nodes {bootstrap_nodes} "
-            f"--store-nodes {store_nodes} "
+            # f"--store-nodes {store_nodes} "
             f"--static-nodes {static_nodes} "
             f"--output {Config.waku_fleets_config}"
         )

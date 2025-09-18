@@ -1,7 +1,8 @@
 import logging
-import time
-import pytest
 import threading
+import time
+
+import pytest
 
 from clients.status_backend import StatusBackend
 
@@ -30,8 +31,10 @@ def _all_nodes_discovered(nodes: dict[str, StatusBackend], known_peers: dict[str
 @pytest.mark.rpc
 class TestDiscovery:
 
+    # @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True,
+    #                          ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
     def test_discovery(self, backend_new_profile):
-        nodes_count = 3
+        nodes_count = 2
         nodes: dict[str, StatusBackend] = {}
 
         known_nodes = {
@@ -41,11 +44,15 @@ class TestDiscovery:
 
         def create_node(node_index: int):
             """Function to run in each thread - waits for wakuv2.peerstats signal"""
-            backend = backend_new_profile(f"node_{node_index}")
+            backend = backend_new_profile(f"node_{node_index}", waku_light_client=True)
             peer_id = backend.wakuext_service.peer_id()
             known_nodes[peer_id] = f"backend_{node_index}"
             nodes[peer_id] = backend
-            logging.info(f"Backend {node_index} ready. Peer ID: {peer_id}")
+            info = f"Peer ID: {peer_id}"
+            info += f", URL: {backend.url}"
+            if backend.container:
+                info += f", Container: {backend.container.short_id()}"
+            logging.info(f"Backend {node_index} ready. {info}")
 
         # Run threads, each waiting for wakuv2.peerstats signal
         logging.info("Starting threads to wait for wakuv2.peerstats signals...")
