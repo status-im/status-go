@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/contracts/cryptopunks"
@@ -59,21 +58,6 @@ func (h *CryptoPunksHandler) PackTxInputData(params ProcessorInputParams) ([]byt
 	}
 
 	return parsedABI.Pack(cryptoPunksHandlerFunctionNameTransferPunk, params.ToAddr, tokenID)
-}
-
-func (h *CryptoPunksHandler) SendOrBuild(
-	transactor transactions.TransactorIface,
-	rpcClient rpc.ClientInterface,
-	sendArgs *MultipathProcessorTxArgs,
-	signerFn bind.SignerFn,
-	lastUsedNonce int64,
-) (*ethTypes.Transaction, error) {
-	return h.SendOrBuildCollectible(
-		sendArgs,
-		lastUsedNonce,
-		h.PackTxInputData,
-		&CryptoPunksContractID, // Force use CryptoPunks address
-	)
 }
 
 func (h *CryptoPunksHandler) BuildTransactionV2(

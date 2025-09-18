@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
@@ -311,60 +310,6 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 	return uint64(increasedEstimation), nil
 }
 
-// TODO: remove this struct once mobile switches to the new approach
-func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {
-	slippageBP := uint(sendArgs.SwapTx.SlippagePercentage * 100) // convert to basis points
-
-	key := pathProcessorCommon.MakeKey(sendArgs.SwapTx.ChainID, sendArgs.SwapTx.ChainIDTo, sendArgs.SwapTx.TokenIDFrom, sendArgs.SwapTx.TokenIDTo, sendArgs.SwapTx.ValueIn.ToInt())
-	priceRoute, err := s.getPriceRoute(key)
-	if err != nil {
-		return createSwapParaswapErrorResponse(err)
-	}
-
-	tx, err := s.paraswapClient.BuildTransaction(context.Background(), priceRoute.SrcTokenAddress, priceRoute.SrcTokenDecimals, priceRoute.SrcAmount.Int,
-		priceRoute.DestTokenAddress, priceRoute.DestTokenDecimals, priceRoute.DestAmount.Int, slippageBP,
-		common.Address(sendArgs.SwapTx.From), common.Address(*sendArgs.SwapTx.To),
-		priceRoute.RawPriceRoute, priceRoute.Side)
-	if err != nil {
-		return createSwapParaswapErrorResponse(err)
-	}
-
-	value, ok := new(big.Int).SetString(tx.Value, 10)
-	if !ok {
-		return ErrConvertingAmountToBigInt
-	}
-
-	gas, err := strconv.ParseUint(tx.Gas, 10, 64)
-	if err != nil {
-		return createSwapParaswapErrorResponse(err)
-	}
-
-	gasPrice, ok := new(big.Int).SetString(tx.GasPrice, 10)
-	if !ok {
-		return ErrConvertingAmountToBigInt
-	}
-
-	sendArgs.ChainID = tx.ChainID
-	sendArgs.SwapTx.ChainID = tx.ChainID
-	toAddr := types.HexToAddress(tx.To)
-	sendArgs.SwapTx.From = types.HexToAddress(tx.From)
-	sendArgs.SwapTx.To = &toAddr
-	sendArgs.SwapTx.Value = (*hexutil.Big)(value)
-	sendArgs.SwapTx.Gas = (*hexutil.Uint64)(&gas)
-	sendArgs.SwapTx.GasPrice = (*hexutil.Big)(gasPrice)
-	sendArgs.SwapTx.Data = types.Hex2Bytes(tx.Data)
-
-	return nil
-}
-
-func (s *SwapParaswapProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
-	err := s.prepareTransaction(sendArgs)
-	if err != nil {
-		return nil, 0, createSwapParaswapErrorResponse(err)
-	}
-	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs, lastUsedNonce)
-}
-
 func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	key := pathProcessorCommon.MakeKey(sendArgs.FromChainID, sendArgs.ToChainID, sendArgs.FromTokenID, sendArgs.ToTokenID, sendArgs.ValueIn.ToInt())
 	tx, err := s.getTransaction(key)
@@ -399,15 +344,6 @@ func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxA
 	sendArgs.Data = types.Hex2Bytes(tx.Data)
 
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
-}
-
-func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (types.Hash, uint64, error) {
-	err := s.prepareTransaction(sendArgs)
-	if err != nil {
-		return types.Hash{}, 0, createSwapParaswapErrorResponse(err)
-	}
-
-	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs, lastUsedNonce, verifiedAccount)
 }
 
 func (s *SwapParaswapProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
