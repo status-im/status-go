@@ -90,29 +90,27 @@ type Token struct {
 }
 
 type EntryData struct {
-	PayloadType               PayloadType                    `json:"payloadType"`
-	Key                       string                         `json:"key"`
-	Transaction               *TransactionIdentity           `json:"transaction,omitempty"`
-	ID                        *common.MultiTransactionIDType `json:"id,omitempty"`
-	Transactions              []*TransactionIdentity         `json:"transactions,omitempty"`
-	Timestamp                 *int64                         `json:"timestamp,omitempty"`
-	ActivityType              *Type                          `json:"activityType,omitempty"`
-	ActivityStatus            *Status                        `json:"activityStatus,omitempty"`
-	AmountOut                 *hexutil.Big                   `json:"amountOut,omitempty"`
-	AmountIn                  *hexutil.Big                   `json:"amountIn,omitempty"`
-	TokenOut                  *Token                         `json:"tokenOut,omitempty"`
-	TokenIn                   *Token                         `json:"tokenIn,omitempty"`
-	SymbolOut                 *string                        `json:"symbolOut,omitempty"`
-	SymbolIn                  *string                        `json:"symbolIn,omitempty"`
-	Sender                    *eth.Address                   `json:"sender,omitempty"`
-	Recipient                 *eth.Address                   `json:"recipient,omitempty"`
-	ChainIDOut                *common.ChainID                `json:"chainIdOut,omitempty"`
-	ChainIDIn                 *common.ChainID                `json:"chainIdIn,omitempty"`
-	TransferType              *TransferType                  `json:"transferType,omitempty"`
-	ContractAddress           *eth.Address                   `json:"contractAddress,omitempty"`
-	CommunityID               *string                        `json:"communityId,omitempty"`
-	InteractedContractAddress *eth.Address                   `json:"interactedContractAddress,omitempty"`
-	ApprovalSpender           *eth.Address                   `json:"approvalSpender,omitempty"`
+	PayloadType               PayloadType          `json:"payloadType"`
+	Key                       string               `json:"key"`
+	Transaction               *TransactionIdentity `json:"transaction,omitempty"`
+	Timestamp                 *int64               `json:"timestamp,omitempty"`
+	ActivityType              *Type                `json:"activityType,omitempty"`
+	ActivityStatus            *Status              `json:"activityStatus,omitempty"`
+	AmountOut                 *hexutil.Big         `json:"amountOut,omitempty"`
+	AmountIn                  *hexutil.Big         `json:"amountIn,omitempty"`
+	TokenOut                  *Token               `json:"tokenOut,omitempty"`
+	TokenIn                   *Token               `json:"tokenIn,omitempty"`
+	SymbolOut                 *string              `json:"symbolOut,omitempty"`
+	SymbolIn                  *string              `json:"symbolIn,omitempty"`
+	Sender                    *eth.Address         `json:"sender,omitempty"`
+	Recipient                 *eth.Address         `json:"recipient,omitempty"`
+	ChainIDOut                *common.ChainID      `json:"chainIdOut,omitempty"`
+	ChainIDIn                 *common.ChainID      `json:"chainIdIn,omitempty"`
+	TransferType              *TransferType        `json:"transferType,omitempty"`
+	ContractAddress           *eth.Address         `json:"contractAddress,omitempty"`
+	CommunityID               *string              `json:"communityId,omitempty"`
+	InteractedContractAddress *eth.Address         `json:"interactedContractAddress,omitempty"`
+	ApprovalSpender           *eth.Address         `json:"approvalSpender,omitempty"`
 
 	IsNew *bool `json:"isNew,omitempty"`
 

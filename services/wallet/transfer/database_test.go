@@ -72,14 +72,13 @@ func TestDBSaveTransfers(t *testing.T) {
 	tx := types.NewTransaction(1, address, nil, 10, big.NewInt(10), nil)
 	transfers := []Transfer{
 		{
-			ID:                 common.Hash{1},
-			Type:               w_common.EthTransfer,
-			BlockHash:          header.Hash,
-			BlockNumber:        header.Number,
-			Transaction:        tx,
-			Receipt:            types.NewReceipt(nil, false, 100),
-			Address:            address,
-			MultiTransactionID: 0,
+			ID:          common.Hash{1},
+			Type:        w_common.EthTransfer,
+			BlockHash:   header.Hash,
+			BlockNumber: header.Number,
+			Transaction: tx,
+			Receipt:     types.NewReceipt(nil, false, 100),
+			Address:     address,
 		},
 	}
 	require.NoError(t, db.SaveBlocks(777, []*DBHeader{header}))
@@ -156,8 +155,6 @@ func TestGetTransfersForIdentities(t *testing.T) {
 	require.Equal(t, uint64(trs[3].Timestamp), entries[1].Timestamp)
 	require.Equal(t, uint64(trs[1].ChainID), entries[0].NetworkID)
 	require.Equal(t, uint64(trs[3].ChainID), entries[1].NetworkID)
-	require.Equal(t, w_common.MultiTransactionIDType(0), entries[0].MultiTransactionID)
-	require.Equal(t, w_common.MultiTransactionIDType(0), entries[1].MultiTransactionID)
 }
 
 func TestGetLatestCollectibleTransfer(t *testing.T) {
