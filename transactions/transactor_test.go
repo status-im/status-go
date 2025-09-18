@@ -30,7 +30,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/utils"
@@ -448,7 +447,7 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 			} else {
 				s.NoError(err)
 
-				_, err = s.manager.SendTransactionWithSignature(common.Address(args.From), args.Symbol, args.MultiTransactionID, tx)
+				_, err = s.manager.SendTransactionWithSignature(common.Address(args.From), args.Symbol, tx)
 				if scenario.expectError {
 					s.Error(err)
 				} else {
@@ -505,6 +504,6 @@ func (s *TransactorSuite) TestStoreAndTrackPendingTx() {
 	s.Nil(s.manager.pendingTracker)
 
 	// Empty tracker doesn't produce error
-	err := s.manager.StoreAndTrackPendingTx(common.Address{}, "", 0, wallet_common.MultiTransactionIDType(0), nil)
+	err := s.manager.StoreAndTrackPendingTx(common.Address{}, "", 0, nil)
 	s.NoError(err)
 }

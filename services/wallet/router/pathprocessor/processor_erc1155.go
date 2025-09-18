@@ -142,7 +142,7 @@ func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signe
 	if err != nil {
 		return tx, createERC1155ErrorResponse(err)
 	}
-	err = s.transactor.StoreAndTrackPendingTx(from, sendArgs.ERC1155TransferTx.Symbol, sendArgs.ChainID, sendArgs.ERC1155TransferTx.MultiTransactionID, tx)
+	err = s.transactor.StoreAndTrackPendingTx(from, sendArgs.ERC1155TransferTx.Symbol, sendArgs.ChainID, tx)
 	if err != nil {
 		return tx, createERC1155ErrorResponse(err)
 	}
