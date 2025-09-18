@@ -2023,7 +2023,7 @@ func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs wallettypes.Se
 		return hash, err
 	}
 
-	return b.transactor.SendTransactionWithSignature(common.Address(sendArgs.From), sendArgs.Symbol, sendArgs.MultiTransactionID, txWithSignature)
+	return b.transactor.SendTransactionWithSignature(common.Address(sendArgs.From), sendArgs.Symbol, txWithSignature)
 }
 
 // HashTransaction validate the transaction and returns new sendArgs and the transaction hash.
