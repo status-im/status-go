@@ -7,15 +7,11 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/contracts/ierc1155"
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/utils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -104,62 +100,6 @@ func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams, input []byte
 	}
 	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil
-}
-
-// TODO: remove this struct once mobile switches to the new approach
-func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
-	ethClient, err := s.rpcClient.EthClient(sendArgs.ChainID)
-	if err != nil {
-		return tx, createERC1155ErrorResponse(err)
-	}
-
-	contract, err := ierc1155.NewIerc1155(common.Address(*sendArgs.ERC1155TransferTx.To), ethClient)
-	if err != nil {
-		return tx, createERC1155ErrorResponse(err)
-	}
-
-	var nonce uint64
-	if lastUsedNonce < 0 {
-		nonce, err = s.transactor.NextNonce(context.Background(), s.rpcClient, sendArgs.ChainID, sendArgs.ERC1155TransferTx.From)
-		if err != nil {
-			return tx, createERC1155ErrorResponse(err)
-		}
-	} else {
-		nonce = uint64(lastUsedNonce) + 1
-	}
-
-	argNonce := hexutil.Uint64(nonce)
-	sendArgs.ERC1155TransferTx.Nonce = &argNonce
-	txOpts := sendArgs.ERC1155TransferTx.ToTransactOpts(signerFn)
-	from := common.Address(sendArgs.ERC1155TransferTx.From)
-	tx, err = contract.SafeTransferFrom(
-		txOpts, from,
-		sendArgs.ERC1155TransferTx.Recipient,
-		sendArgs.ERC1155TransferTx.TokenID.ToInt(),
-		sendArgs.ERC1155TransferTx.Amount.ToInt(),
-		[]byte{},
-	)
-	if err != nil {
-		return tx, createERC1155ErrorResponse(err)
-	}
-	err = s.transactor.StoreAndTrackPendingTx(from, sendArgs.ERC1155TransferTx.Symbol, sendArgs.ChainID, tx)
-	if err != nil {
-		return tx, createERC1155ErrorResponse(err)
-	}
-	return tx, nil
-}
-
-func (s *ERC1155Processor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, usedNonce uint64, err error) {
-	tx, err := s.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.ChainID, sendArgs.ERC1155TransferTx.From, verifiedAccount.PrivateKey()), lastUsedNonce)
-	if err != nil {
-		return hash, 0, createERC1155ErrorResponse(err)
-	}
-	return types.Hash(tx.Hash()), tx.Nonce(), nil
-}
-
-func (s *ERC1155Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
-	tx, err := s.sendOrBuild(sendArgs, nil, lastUsedNonce)
-	return tx, tx.Nonce(), err
 }
 
 func (s *ERC1155Processor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {

@@ -11,11 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/accounts-management/generator"
 	communitytokens "github.com/status-im/status-go/contracts/community-tokens"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -98,14 +96,6 @@ func (s *CommunityDeployCollectiblesProcessor) EstimateGas(params ProcessorInput
 	logutils.ZapLogger().Debug("CommunityDeployCollectiblesProcessor estimation", zap.Uint64("gas", uint64(increasedEstimation)))
 
 	return uint64(increasedEstimation), nil
-}
-
-func (s *CommunityDeployCollectiblesProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, usedNonce uint64, err error) {
-	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce, verifiedAccount)
-}
-
-func (s *CommunityDeployCollectiblesProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
-	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce)
 }
 
 func (s *CommunityDeployCollectiblesProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
