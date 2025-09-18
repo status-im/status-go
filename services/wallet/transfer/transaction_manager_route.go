@@ -343,12 +343,10 @@ func addSignatureAndSendTransaction(
 	}
 	txData.Tx = txWithSignature
 
-	txData.SentHash, err = transactor.SendTransactionWithSignature(common.Address(txData.TxArgs.From), txData.TxArgs.FromTokenID, multiTransactionID, txWithSignature)
+	txData.SentHash, err = transactor.SendTransactionWithSignature(common.Address(txData.TxArgs.From), txData.TxArgs.FromTokenID, txWithSignature)
 	if err != nil {
 		return nil, err
 	}
-
-	txData.TxArgs.MultiTransactionID = multiTransactionID
 
 	if txWithSignature.To() == nil {
 		toAddr := crypto.CreateAddress(txData.TxArgs.From, txData.Tx.Nonce())

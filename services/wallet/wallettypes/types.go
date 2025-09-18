@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/crypto/types"
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
 )
 
 type SendTxArgsVersion uint
@@ -63,8 +62,7 @@ type SendTxArgs struct {
 	Data  types.HexBytes `json:"data"`
 
 	// additional data - version SendTxArgsVersion0
-	MultiTransactionID wallet_common.MultiTransactionIDType `json:"multiTransactionID"`
-	Symbol             string                               `json:"symbol"`
+	Symbol string `json:"symbol"`
 	// additional data - version SendTxArgsVersion1
 	ValueIn            *hexutil.Big  `json:"valueIn"`
 	ValueOut           *hexutil.Big  `json:"valueOut"`

@@ -119,7 +119,7 @@ func TestBaseNFTHandler_SendOrBuildCollectible(t *testing.T) {
 	// Setup mock expectations
 	mockTransactor.EXPECT().NextNonce(gomock.Any(), mockRPCClient, uint64(1), types.HexToAddress("0x1234")).Return(uint64(1), nil)
 	mockTransactor.EXPECT().ValidateAndBuildTransaction(uint64(1), gomock.Any(), int64(0)).Return(testTx, uint64(1), nil)
-	mockTransactor.EXPECT().StoreAndTrackPendingTx(gomock.Any(), gomock.Any(), uint64(1), gomock.Any(), testTx).Return(nil)
+	mockTransactor.EXPECT().StoreAndTrackPendingTx(gomock.Any(), gomock.Any(), uint64(1), testTx).Return(nil)
 
 	packDataFn := func(params ProcessorInputParams) ([]byte, error) { return []byte("test_data"), nil }
 	tx, err := handler.SendOrBuildCollectible(sendArgs, -1, packDataFn, nil)
@@ -186,7 +186,7 @@ func TestCryptoKittiesHandler_SendOrBuild(t *testing.T) {
 	// Setup mock expectations
 	mockTransactor.EXPECT().NextNonce(gomock.Any(), mockRPCClient, walletCommon.EthereumMainnet, types.HexToAddress("0x1234567890123456789012345678901234567890")).Return(uint64(1), nil)
 	mockTransactor.EXPECT().ValidateAndBuildTransaction(walletCommon.EthereumMainnet, gomock.Any(), int64(0)).Return(testTx, uint64(1), nil)
-	mockTransactor.EXPECT().StoreAndTrackPendingTx(gomock.Any(), gomock.Any(), walletCommon.EthereumMainnet, gomock.Any(), testTx).Return(nil)
+	mockTransactor.EXPECT().StoreAndTrackPendingTx(gomock.Any(), gomock.Any(), walletCommon.EthereumMainnet, testTx).Return(nil)
 
 	tx, err := handler.SendOrBuild(mockTransactor, mockRPCClient, sendArgs, nil, -1)
 	require.NoError(t, err)

@@ -379,7 +379,7 @@ func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, sig
 	if err != nil {
 		return tx, createBridgeHopErrorResponse(err)
 	}
-	err = h.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.HopTx.Symbol, sendArgs.HopTx.ChainID, sendArgs.HopTx.MultiTransactionID, tx)
+	err = h.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.HopTx.Symbol, sendArgs.HopTx.ChainID, tx)
 	if err != nil {
 		return tx, createBridgeHopErrorResponse(err)
 	}
@@ -446,7 +446,7 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, sig
 	if err != nil {
 		return tx, createBridgeHopErrorResponse(err)
 	}
-	err = h.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.FromTokenID, sendArgs.FromChainID, sendArgs.MultiTransactionID, tx)
+	err = h.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.FromTokenID, sendArgs.FromChainID, tx)
 	if err != nil {
 		return tx, createBridgeHopErrorResponse(err)
 	}

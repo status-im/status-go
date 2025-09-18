@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -462,20 +461,19 @@ const (
 )
 
 type PendingTransaction struct {
-	Hash               eth.Hash                             `json:"hash"`
-	Timestamp          uint64                               `json:"timestamp"`
-	Value              bigint.BigInt                        `json:"value"`
-	From               eth.Address                          `json:"from"`
-	To                 eth.Address                          `json:"to"`
-	Data               string                               `json:"data"`
-	Symbol             string                               `json:"symbol"`
-	GasPrice           bigint.BigInt                        `json:"gasPrice"`
-	GasLimit           bigint.BigInt                        `json:"gasLimit"`
-	Type               PendingTrxType                       `json:"type"`
-	AdditionalData     string                               `json:"additionalData"`
-	ChainID            common.ChainID                       `json:"network_id"`
-	MultiTransactionID wallet_common.MultiTransactionIDType `json:"multi_transaction_id"`
-	Nonce              uint64                               `json:"nonce"`
+	Hash           eth.Hash       `json:"hash"`
+	Timestamp      uint64         `json:"timestamp"`
+	Value          bigint.BigInt  `json:"value"`
+	From           eth.Address    `json:"from"`
+	To             eth.Address    `json:"to"`
+	Data           string         `json:"data"`
+	Symbol         string         `json:"symbol"`
+	GasPrice       bigint.BigInt  `json:"gasPrice"`
+	GasLimit       bigint.BigInt  `json:"gasLimit"`
+	Type           PendingTrxType `json:"type"`
+	AdditionalData string         `json:"additionalData"`
+	ChainID        common.ChainID `json:"network_id"`
+	Nonce          uint64         `json:"nonce"`
 
 	// nil will insert the default value (Pending) in DB
 	Status *TxStatus `json:"status,omitempty"`
@@ -485,7 +483,7 @@ type PendingTransaction struct {
 
 const selectFromPending = `SELECT hash, timestamp, value, from_address, to_address, data,
 								symbol, gas_price, gas_limit, type, additional_data,
-								network_id, COALESCE(multi_transaction_id, 0), status, auto_delete, nonce
+								network_id, status, auto_delete, nonce
 							FROM pending_transactions
 							`
 
@@ -511,7 +509,6 @@ func rowsToTransactions(rows *sql.Rows) (transactions []*PendingTransaction, err
 			&transaction.Type,
 			&transaction.AdditionalData,
 			&transaction.ChainID,
-			&transaction.MultiTransactionID,
 			transaction.Status,
 			transaction.AutoDelete,
 			&transaction.Nonce,
@@ -657,10 +654,10 @@ func (tm *PendingTxTracker) addPending(transaction *PendingTransaction) error {
 	var insert *sql.Stmt
 	insert, err = tx.Prepare(`INSERT OR REPLACE INTO pending_transactions
                                       (network_id, hash, timestamp, value, from_address, to_address,
-                                       data, symbol, gas_price, gas_limit, type, additional_data, multi_transaction_id, status,
+                                       data, symbol, gas_price, gas_limit, type, additional_data, status,
 																			 auto_delete, nonce)
                                       VALUES
-                                      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ?, ?)`)
+                                      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -679,7 +676,6 @@ func (tm *PendingTxTracker) addPending(transaction *PendingTransaction) error {
 		(*bigint.SQLBigIntBytes)(transaction.GasLimit.Int),
 		transaction.Type,
 		transaction.AdditionalData,
-		transaction.MultiTransactionID,
 		transaction.Status,
 		transaction.AutoDelete,
 		transaction.Nonce,
@@ -754,15 +750,14 @@ func (tm *PendingTxTracker) DeleteBySQLTx(tx *sql.Tx, chainID common.ChainID, ha
 }
 
 // GetOwnedPendingStatus returns sql.ErrNoRows if no pending transaction is found for the given identity
-func GetOwnedPendingStatus(tx *sql.Tx, chainID common.ChainID, hash eth.Hash, ownerAddress eth.Address) (txType *PendingTrxType, mTID *int64, err error) {
-	row := tx.QueryRow(`SELECT type, multi_transaction_id FROM pending_transactions WHERE network_id = ? AND hash = ? AND from_address = ?`, chainID, hash, ownerAddress)
+func GetOwnedPendingStatus(tx *sql.Tx, chainID common.ChainID, hash eth.Hash, ownerAddress eth.Address) (txType *PendingTrxType, err error) {
+	row := tx.QueryRow(`SELECT type FROM pending_transactions WHERE network_id = ? AND hash = ? AND from_address = ?`, chainID, hash, ownerAddress)
 	txType = new(PendingTrxType)
-	mTID = new(int64)
-	err = row.Scan(txType, mTID)
+	err = row.Scan(txType)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return txType, mTID, nil
+	return txType, nil
 }
 
 // Watch returns sql.ErrNoRows if no pending transaction is found for the given identity

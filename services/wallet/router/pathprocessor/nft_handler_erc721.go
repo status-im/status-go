@@ -162,7 +162,7 @@ func (h *ERC721Handler) SendOrBuild(
 		return nil, err
 	}
 
-	err = transactor.StoreAndTrackPendingTx(from, sendArgs.ERC721TransferTx.Symbol, sendArgs.ChainID, sendArgs.ERC721TransferTx.MultiTransactionID, tx)
+	err = transactor.StoreAndTrackPendingTx(from, sendArgs.ERC721TransferTx.Symbol, sendArgs.ChainID, tx)
 	if err != nil {
 		return nil, err
 	}

@@ -385,10 +385,10 @@ func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers [
 	notifyFunctions = make([]func(), 0)
 
 	// Confirm all pending transactions that are included in this block
-	for i, tr := range allTransfers {
+	for _, tr := range allTransfers {
 		chainID := w_common.ChainID(tr.NetworkID)
 		txHash := tr.Receipt.TxHash
-		txType, mTID, err := transactions.GetOwnedPendingStatus(tx, chainID, txHash, tr.Address)
+		txType, err := transactions.GetOwnedPendingStatus(tx, chainID, txHash, tr.Address)
 		if err == sql.ErrNoRows {
 			if tr.MultiTransactionID > 0 {
 				continue
@@ -398,15 +398,10 @@ func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers [
 				if externalTransactionOrError(err, existingMTID) {
 					continue
 				}
-				mTID = w_common.NewAndSet(existingMTID)
 			}
 		} else if err != nil {
 			logutils.ZapLogger().Warn("GetOwnedPendingStatus", zap.Error(err))
 			continue
-		}
-
-		if mTID != nil {
-			allTransfers[i].MultiTransactionID = w_common.MultiTransactionIDType(*mTID)
 		}
 		if txType != nil && *txType == transactions.WalletTransfer {
 			notify, err := c.pendingTxManager.DeleteBySQLTx(tx, chainID, txHash)

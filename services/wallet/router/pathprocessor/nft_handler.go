@@ -166,7 +166,7 @@ func (h *BaseNFTHandler) SendOrBuildCollectible(
 		return nil, err
 	}
 
-	err = h.transactor.StoreAndTrackPendingTx(from, sendArgs.ERC721TransferTx.Symbol, sendArgs.ChainID, sendArgs.ERC721TransferTx.MultiTransactionID, tx)
+	err = h.transactor.StoreAndTrackPendingTx(from, sendArgs.ERC721TransferTx.Symbol, sendArgs.ChainID, tx)
 	if err != nil {
 		return nil, err
 	}
