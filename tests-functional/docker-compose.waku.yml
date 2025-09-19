@@ -47,7 +47,7 @@ services:
       "--log-level=INFO",
       "--max-connections=18000",
       "--nodekey=3190bc9b55b18dbc171997a7a67abcd5bbf0c81002ad9617b1cb67f2f15daa64",
-      "--peer-exchange=false",
+      "--peer-exchange=true",
       "--relay=true",
       "--rest-address=0.0.0.0",
       "--rest-admin",
