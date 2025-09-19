@@ -1,5 +1,7 @@
 package communities
 
+//go:generate go tool mockgen -package=mock_communities -source=manager.go -destination=mock/communities/manager.go
+
 import (
 	"bytes"
 	"context"
@@ -41,13 +43,11 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
 )
@@ -104,7 +104,9 @@ type Manager struct {
 	identity                 *ecdsa.PrivateKey
 	installationID           string
 	accountsManager          *accsmanagement.AccountsManager
+	networkManager           NetworkManager
 	tokenManager             TokenManager
+	tokenBalanceManager      TokenBalanceManager
 	collectiblesManager      CollectiblesManager
 	logger                   *zap.Logger
 	signer                   MessageSigner
@@ -245,7 +247,9 @@ type membersReevaluationTask struct {
 
 type managerOptions struct {
 	accountsManager        *accsmanagement.AccountsManager
+	networkManager         NetworkManager
 	tokenManager           TokenManager
+	tokenBalanceManager    TokenBalanceManager
 	collectiblesManager    CollectiblesManager
 	communityTokensService CommunityTokensServiceInterface
 	permissionChecker      PermissionChecker
@@ -256,11 +260,16 @@ type managerOptions struct {
 	allowForcingCommunityMembersReevaluation bool
 }
 
-type TokenManager interface {
-	GetBalancesByChain(ctx context.Context, accounts, tokens []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
-	GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
-	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token
+type NetworkManager interface {
 	GetAllChainIDs() ([]uint64, error)
+}
+type TokenManager interface {
+	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token
+}
+
+type TokenBalanceManager interface {
+	GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
+	GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
 }
 
 type CollectibleContractData struct {
@@ -283,65 +292,13 @@ type CommunityTokensServiceInterface interface {
 	ProcessCommunityTokenAction(message *protobuf.CommunityTokenAction) error
 }
 
-type DefaultTokenManager struct {
-	tokenManager   *token.Manager
-	networkManager network.ManagerInterface
-}
-
-func NewDefaultTokenManager(tm *token.Manager, nm network.ManagerInterface) *DefaultTokenManager {
-	return &DefaultTokenManager{tokenManager: tm, networkManager: nm}
-}
-
 type BalancesByChain = map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
-
-func (m *DefaultTokenManager) GetAllChainIDs() ([]uint64, error) {
-	networks, err := m.networkManager.GetAll()
-	if err != nil {
-		return nil, err
-	}
-
-	areTestNetworksEnabled, err := m.networkManager.GetTestNetworksEnabled()
-	if err != nil {
-		return nil, err
-	}
-
-	chainIDs := make([]uint64, 0)
-	for _, network := range networks {
-		if areTestNetworksEnabled == network.IsTest {
-			chainIDs = append(chainIDs, network.ChainID)
-		}
-	}
-	return chainIDs, nil
-}
 
 type CollectiblesManager interface {
 	FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletcommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error)
 	FetchCachedBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletcommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error)
 	GetCollectibleOwnership(id thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error)
 	FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletcommon.ChainID, contractAddress gethcommon.Address) (*thirdparty.CollectibleContractOwnership, error)
-}
-
-func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
-	clients, err := m.tokenManager.RPCClient.EthClients(chainIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := m.tokenManager.GetBalancesByChain(context.Background(), clients, accounts, tokenAddresses)
-	return resp, err
-}
-
-func (m *DefaultTokenManager) GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
-	resp, err := m.tokenManager.GetCachedBalancesByChain(accounts, tokenAddresses, chainIDs)
-	if err != nil {
-		return resp, err
-	}
-
-	return resp, nil
-}
-
-func (m *DefaultTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token {
-	return m.tokenManager.FindOrCreateTokenByAddress(ctx, chainID, address)
 }
 
 type ManagerOption func(*managerOptions)
@@ -364,9 +321,21 @@ func WithCollectiblesManager(collectiblesManager CollectiblesManager) ManagerOpt
 	}
 }
 
+func WithNetworkManager(networkManager NetworkManager) ManagerOption {
+	return func(opts *managerOptions) {
+		opts.networkManager = networkManager
+	}
+}
+
 func WithTokenManager(tokenManager TokenManager) ManagerOption {
 	return func(opts *managerOptions) {
 		opts.tokenManager = tokenManager
+	}
+}
+
+func WithTokenBalanceManager(tokenBalanceManager TokenBalanceManager) ManagerOption {
+	return func(opts *managerOptions) {
+		opts.tokenBalanceManager = tokenBalanceManager
 	}
 }
 
@@ -455,6 +424,14 @@ func NewManager(
 		manager.tokenManager = managerConfig.tokenManager
 	}
 
+	if managerConfig.tokenBalanceManager != nil {
+		manager.tokenBalanceManager = managerConfig.tokenBalanceManager
+	}
+
+	if managerConfig.networkManager != nil {
+		manager.networkManager = managerConfig.networkManager
+	}
+
 	if managerConfig.communityTokensService != nil {
 		manager.communityTokensService = managerConfig.communityTokensService
 	}
@@ -469,7 +446,8 @@ func NewManager(
 		manager.PermissionChecker = managerConfig.permissionChecker
 	} else {
 		manager.PermissionChecker = &DefaultPermissionChecker{
-			tokenManager:        manager.tokenManager,
+			networkManager:      manager.networkManager,
+			tokenBalanceManager: manager.tokenBalanceManager,
 			collectiblesManager: manager.collectiblesManager,
 			logger:              logger,
 			ensVerifier:         ensverifier,
@@ -3356,7 +3334,7 @@ func (m *Manager) CheckChannelPermissions(communityID types.HexBytes, chatID str
 	viewOnlyPreParsedPermissions := preParsedCommunityPermissionsData(viewOnlyPermissions)
 	viewAndPostPreParsedPermissions := preParsedCommunityPermissionsData(viewAndPostPermissions)
 
-	allChainIDs, err := m.tokenManager.GetAllChainIDs()
+	allChainIDs, err := m.networkManager.GetAllChainIDs()
 	if err != nil {
 		return nil, err
 	}
@@ -3465,7 +3443,7 @@ func (m *Manager) CheckAllChannelsPermissions(communityID types.HexBytes, addres
 	}
 	channels := community.Chats()
 
-	allChainIDs, err := m.tokenManager.GetAllChainIDs()
+	allChainIDs, err := m.networkManager.GetAllChainIDs()
 	if err != nil {
 		return nil, err
 	}

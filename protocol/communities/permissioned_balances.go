@@ -235,7 +235,7 @@ func (m *Manager) GetPermissionedBalances(
 
 	tokenPermissions := keepRoleTokenPermissions(community.TokenPermissions())
 
-	allChainIDs, err := m.tokenManager.GetAllChainIDs()
+	allChainIDs, err := m.networkManager.GetAllChainIDs()
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +265,7 @@ func (m *Manager) GetPermissionedBalances(
 	erc20ChainIDs := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsSet)
 	erc721ChainIDs := calculateChainIDsSet(accountsAndChainIDs, erc721ChainIDsSet)
 
-	erc20Balances, err := m.tokenManager.GetBalancesByChain(ctx, accounts, erc20TokenAddresses, erc20ChainIDs)
+	erc20Balances, err := m.tokenBalanceManager.GetBalancesByChain(ctx, accounts, erc20TokenAddresses, erc20ChainIDs)
 	if err != nil {
 		return nil, err
 	}

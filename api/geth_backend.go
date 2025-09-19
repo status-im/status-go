@@ -2349,7 +2349,9 @@ func (b *GethStatusBackend) initProtocol() error {
 		AccountsPublisher:      b.statusNode.AccountsPublisher(),
 		TimeSource:             b.statusNode.TimeSource(),
 		MetricsEnabled:         b.prometheusMetrics != nil,
-		TokenManager:           b.statusNode.TokenManager(),
+		TokenManager:           NewCommunitiesTokenManager(b.statusNode.TokenManager()),
+		TokenBalanceManager:    NewCommunitiesTokenBalanceManager(b.statusNode.TokenManager()),
+		NetworkManager:         NewCommunitiesNetworkManager(b.statusNode.RPCClient().GetNetworkManager()),
 	}
 	err = st.InitProtocol(params)
 	if err != nil {

@@ -330,11 +330,16 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithCollectiblesManager(c.collectiblesManager))
 	}
 
-	if c.communityTokenManager != nil {
-		managerOptions = append(managerOptions, communities.WithTokenManager(c.communityTokenManager))
-	} else if c.rpcClient != nil && c.tokenManager != nil {
-		managerOptions = append(managerOptions, communities.WithTokenManager(
-			communities.NewDefaultTokenManager(c.tokenManager, c.rpcClient.GetNetworkManager())))
+	if c.tokenManager != nil {
+		managerOptions = append(managerOptions, communities.WithTokenManager(c.tokenManager))
+	}
+
+	if c.tokenBalanceManager != nil {
+		managerOptions = append(managerOptions, communities.WithTokenBalanceManager(c.tokenBalanceManager))
+	}
+
+	if c.networkManager != nil {
+		managerOptions = append(managerOptions, communities.WithNetworkManager(c.networkManager))
 	}
 
 	if c.communityTokensService != nil {

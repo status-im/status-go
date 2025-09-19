@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	mock_communities "github.com/status-im/status-go/protocol/communities/mock/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -37,26 +38,22 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-type TokenManagerMock struct {
-	Balances *communities.BalancesByChain
-}
-
-func (m *TokenManagerMock) GetAllChainIDs() ([]uint64, error) {
-	chainIDs := make([]uint64, 0, len(*m.Balances))
-	for key := range *m.Balances {
+func getAllChainIDs(balances communities.BalancesByChain) []uint64 {
+	chainIDs := make([]uint64, 0, len(balances))
+	for key := range balances {
 		chainIDs = append(chainIDs, key)
 	}
-	return chainIDs, nil
+	return chainIDs
 }
 
-func (m *TokenManagerMock) getBalanceBasedOnParams(accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big {
+func getBalanceBasedOnParams(balances communities.BalancesByChain, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big {
 	retBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
 
 	for _, chainId := range chainIDs {
 		if _, exists := retBalances[chainId]; !exists {
 			retBalances[chainId] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
 		}
-		if storedAccounts, exists := (*m.Balances)[chainId]; exists {
+		if storedAccounts, exists := balances[chainId]; exists {
 			for _, account := range accounts {
 				if _, exists := retBalances[chainId][account]; !exists {
 					retBalances[chainId][account] = make(map[gethcommon.Address]*hexutil.Big)
@@ -77,21 +74,6 @@ func (m *TokenManagerMock) getBalanceBasedOnParams(accounts, tokenAddresses []ge
 	}
 
 	return retBalances
-}
-
-func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
-	time.Sleep(100 * time.Millisecond) // simulate response time
-	return m.getBalanceBasedOnParams(accounts, tokenAddresses, chainIDs), nil
-}
-
-func (m *TokenManagerMock) GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
-	time.Sleep(100 * time.Millisecond) // simulate response time
-	return m.getBalanceBasedOnParams(accounts, tokenAddresses, chainIDs), nil
-}
-
-func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token {
-	time.Sleep(100 * time.Millisecond) // simulate response time
-	return nil
 }
 
 type CollectiblesManagerMock struct {
@@ -307,13 +289,37 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 	accountsManagerMock.EXPECT().GetVerifiedWalletAccount(gomock.Any(), gomock.Any()).
 		Return(generator.NewAccount(nil, nil), nil).AnyTimes()
 
-	tokenManagerMock := &TokenManagerMock{
-		Balances: config.mockedBalances,
-	}
+	tokenManagerMock := mock_communities.NewMockTokenManager(ctrl)
+	tokenManagerMock.EXPECT().FindOrCreateTokenByAddress(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token {
+			time.Sleep(100 * time.Millisecond) // simulate response time
+			return nil
+		}).AnyTimes()
+
+	tokenBalanceManagerMock := mock_communities.NewMockTokenBalanceManager(ctrl)
+	tokenBalanceManagerMock.EXPECT().GetBalancesByChain(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+			time.Sleep(100 * time.Millisecond) // simulate response time
+			return getBalanceBasedOnParams(*config.mockedBalances, accounts, tokenAddresses, chainIDs), nil
+		}).AnyTimes()
+	tokenBalanceManagerMock.EXPECT().GetCachedBalancesByChain(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+			time.Sleep(100 * time.Millisecond) // simulate response time
+			return getBalanceBasedOnParams(*config.mockedBalances, accounts, tokenAddresses, chainIDs), nil
+		}).AnyTimes()
+
+	networkManagerMock := mock_communities.NewMockNetworkManager(ctrl)
+	networkManagerMock.EXPECT().GetAllChainIDs().
+		DoAndReturn(func() ([]uint64, error) {
+			time.Sleep(100 * time.Millisecond) // simulate response time
+			return getAllChainIDs(*config.mockedBalances), nil
+		}).AnyTimes()
 
 	options := []Option{
 		WithAccountsManager(accountsManagerMock),
-		WithCommunityTokenManager(tokenManagerMock),
+		WithTokenManager(tokenManagerMock),
+		WithTokenBalanceManager(tokenBalanceManagerMock),
+		WithNetworkManager(networkManagerMock),
 		WithMessageSigner(NewSignerStub()),
 		WithCollectiblesManager(config.collectiblesManager),
 		WithCommunityTokensService(config.collectiblesService),
