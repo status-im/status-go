@@ -27,7 +27,8 @@ type PermissionChecker interface {
 }
 
 type DefaultPermissionChecker struct {
-	tokenManager        TokenManager
+	networkManager      NetworkManager
+	tokenBalanceManager TokenBalanceManager
 	collectiblesManager CollectiblesManager
 	ensVerifier         *ens.Verifier
 
@@ -158,7 +159,7 @@ func (p *DefaultPermissionChecker) CheckPermissionToJoin(community *Community, a
 
 	adminOrTokenMasterPermissionsToJoin := append(becomeAdminPermissions, becomeTokenMasterPermissions...)
 
-	allChainIDs, err := p.tokenManager.GetAllChainIDs()
+	allChainIDs, err := p.networkManager.GetAllChainIDs()
 	if err != nil {
 		return nil, err
 	}
@@ -492,14 +493,14 @@ func (p *DefaultPermissionChecker) handlePermissionsCheck(permissionsParsedData 
 }
 
 func (p *DefaultPermissionChecker) CheckCachedPermissions(permissionsParsedData *PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error) {
-	return p.handlePermissionsCheck(permissionsParsedData, accountsAndChainIDs, shortcircuit, p.collectiblesManager.FetchCachedBalancesByOwnerAndContractAddress, p.tokenManager.GetCachedBalancesByChain)
+	return p.handlePermissionsCheck(permissionsParsedData, accountsAndChainIDs, shortcircuit, p.collectiblesManager.FetchCachedBalancesByOwnerAndContractAddress, p.tokenBalanceManager.GetCachedBalancesByChain)
 }
 
 // CheckPermissions will retrieve balances and check whether the user has
 // permission to join the community, if shortcircuit is true, it will stop as soon
 // as we know the answer
 func (p *DefaultPermissionChecker) CheckPermissions(permissionsParsedData *PreParsedCommunityPermissionsData, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error) {
-	return p.handlePermissionsCheck(permissionsParsedData, accountsAndChainIDs, shortcircuit, p.collectiblesManager.FetchBalancesByOwnerAndContractAddress, p.tokenManager.GetBalancesByChain)
+	return p.handlePermissionsCheck(permissionsParsedData, accountsAndChainIDs, shortcircuit, p.collectiblesManager.FetchBalancesByOwnerAndContractAddress, p.tokenBalanceManager.GetBalancesByChain)
 }
 
 type CollectiblesOwners = map[walletcommon.ChainID]map[gethcommon.Address]*thirdparty.CollectibleContractOwnership
@@ -535,7 +536,7 @@ func (p *DefaultPermissionChecker) CheckPermissionsWithPreFetchedData(permission
 		return p.getOwnedERC721Tokens(walletAddresses, tokenRequirements, chainIDs, getCollectiblesBalances)
 	}
 
-	return p.checkPermissions(permissionsParsedData, accountsAndChainIDs, shortcircuit, getOwnedERC721Tokens, p.tokenManager.GetBalancesByChain)
+	return p.checkPermissions(permissionsParsedData, accountsAndChainIDs, shortcircuit, getOwnedERC721Tokens, p.tokenBalanceManager.GetBalancesByChain)
 }
 
 func preParsedPermissionsData(permissions []*CommunityTokenPermission) *PreParsedPermissionsData {

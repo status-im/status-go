@@ -54,7 +54,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -112,7 +111,9 @@ type InitProtocolParams struct {
 	AccountsPublisher      *pubsub.Publisher
 	TimeSource             timesource.TimeSource
 	MetricsEnabled         bool
-	TokenManager           *token.Manager
+	TokenManager           communities.TokenManager
+	TokenBalanceManager    communities.TokenBalanceManager
+	NetworkManager         communities.NetworkManager
 }
 
 func (s *Service) InitProtocol(params InitProtocolParams) error {
@@ -198,7 +199,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 	options, err := buildMessengerOptions(s.config, params.Identity, params.AppDB, params.WalletDB, params.HTTPServer,
 		s.rpcClient, s.multiAccountsDB, params.Account, envelopeEventsConfig, s.accountsDB, params.WalletService,
 		params.CommunityTokensService, s.logger, &MessengerSignalsHandler{}, params.AccountsManager, params.AccountsPublisher,
-		ensVerifier, params.TokenManager)
+		ensVerifier, params.TokenManager, params.TokenBalanceManager, params.NetworkManager)
 	if err != nil {
 		return err
 	}
@@ -435,7 +436,9 @@ func buildMessengerOptions(
 	accountsManager *accsmanagement.AccountsManager,
 	accountsPublisher *pubsub.Publisher,
 	ensVerifier *ens.Verifier,
-	tokenManager *token.Manager,
+	tokenManager communities.TokenManager,
+	tokenBalanceManager communities.TokenBalanceManager,
+	networkManager communities.NetworkManager,
 ) ([]protocol.Option, error) {
 	personalService := personal.New()
 	options := []protocol.Option{
@@ -462,6 +465,8 @@ func buildMessengerOptions(
 		protocol.WithNewsFeed(),
 		protocol.WithMessageSigner(personalService),
 		protocol.WithTokenManager(tokenManager),
+		protocol.WithTokenBalanceManager(tokenBalanceManager),
+		protocol.WithNetworkManager(networkManager),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {

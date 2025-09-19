@@ -166,11 +166,11 @@ func (m *testCollectiblesManager) FetchCachedBalancesByOwnerAndContractAddress(c
 	return m.response[uint64(chainID)][ownerAddress], nil
 }
 
-type testTokenManager struct {
+type testTokenBalanceManager struct {
 	response map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
 }
 
-func (m *testTokenManager) setResponse(chainID uint64, walletAddress, tokenAddress gethcommon.Address, balance int64) {
+func (m *testTokenBalanceManager) setResponse(chainID uint64, walletAddress, tokenAddress gethcommon.Address, balance int64) {
 
 	if m.response == nil {
 		m.response = make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
@@ -188,23 +188,29 @@ func (m *testTokenManager) setResponse(chainID uint64, walletAddress, tokenAddre
 
 }
 
-func (m *testTokenManager) GetAllChainIDs() ([]uint64, error) {
+type testNetworkManager struct {
+}
+
+func (m *testNetworkManager) GetAllChainIDs() ([]uint64, error) {
 	return []uint64{5}, nil
 }
 
-func (m *testTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+func (m *testTokenBalanceManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
 	return m.response, nil
 }
 
-func (m *testTokenManager) GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
+func (m *testTokenBalanceManager) GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
 	return m.response, nil
+}
+
+type testTokenManager struct {
 }
 
 func (m *testTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token {
 	return nil
 }
 
-func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollectiblesManager, *testTokenManager) {
+func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollectiblesManager, *testTokenBalanceManager) {
 	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
@@ -216,17 +222,21 @@ func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollect
 
 	cm := &testCollectiblesManager{}
 	tm := &testTokenManager{}
+	tbm := &testTokenBalanceManager{}
+	nm := &testNetworkManager{}
 
 	options := []ManagerOption{
 		WithCollectiblesManager(cm),
 		WithTokenManager(tm),
+		WithTokenBalanceManager(tbm),
+		WithNetworkManager(nm),
 	}
 
 	m, err := NewManager(key, "", db, nil, nil, nil, nil, &TimeSourceStub{}, nil, nil, options...)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
-	return m, cm, tm
+	return m, cm, tbm
 }
 
 func (s *ManagerSuite) TestRetrieveTokens() {
