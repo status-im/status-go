@@ -25,7 +25,16 @@ class TestDiscovery:
         }
 
         def create_node(node_index: int, waku_light_client: bool):
-            backend = backend_new_profile(f"node_{node_index}", waku_light_client=waku_light_client)
+            backend = backend_new_profile(
+                f"node_{node_index}",
+                # We mix full and light clients in a single test.
+                # Light clients (edge nodes) will not discover each,
+                # but they must discover full clients.
+                waku_light_client=waku_light_client,
+                # Force the container to only have the docker compose network.
+                # Otherwise, advertised ENRs may contain the wrong IP address.
+                bridge_network=False,
+            )
             peer_id = backend.wakuext_service.peer_id()
             known_nodes[peer_id] = f"backend_{node_index}"
             if not waku_light_client:
