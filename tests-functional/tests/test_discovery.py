@@ -96,7 +96,7 @@ class TestDiscovery:
 
                 # Log peer names
                 peer_names = [known_nodes.get(peer, peer[-5:]) for peer in peers]
-                logging.debug(f"Checking ode {known_nodes[peer_id]} peers: {peer_names}")
+                logging.info(f"Checking node {known_nodes[peer_id]} peers: {peer_names}")
 
                 if peers == expected_by_node[peer_id]:
                     logging.info(f"Node {known_nodes[peer_id]} discovered peers as expected")
