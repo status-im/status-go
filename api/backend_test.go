@@ -675,7 +675,7 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "INFO", newConf.RuntimeLogLevel)
 
-	require.NoError(t, testContext.backend.OpenAccounts())
+	require.NoError(t, testContext.backend.OpenAccounts(true))
 	require.NotNil(t, testContext.backend.statusNode.MediaServer())
 
 	err = testContext.backend.ensureDBsOpened(*testContext.multiAcc, testPassword)
@@ -970,7 +970,7 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig, keyUID string) {
 
 	b.UpdateRootDataDir(conf.RootDataDir)
 
-	require.NoError(t, b.OpenAccounts())
+	require.NoError(t, b.OpenAccounts(true))
 
 	accs, err := b.GetAccounts()
 	require.NoError(t, err)
@@ -1375,7 +1375,7 @@ func TestAcceptTerms(t *testing.T) {
 	require.NoError(t, err)
 
 	b.UpdateRootDataDir(conf.RootDataDir)
-	require.NoError(t, b.OpenAccounts())
+	require.NoError(t, b.OpenAccounts(true))
 	nameserver := "8.8.8.8"
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
@@ -1538,7 +1538,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 
 	backend.UpdateRootDataDir(conf.RootDataDir)
 
-	require.NoError(t, backend.OpenAccounts())
+	require.NoError(t, backend.OpenAccounts(true))
 
 	keycardPairingDataFile := exampleRequest["createAccountRequest"].(map[string]interface{})["keycardPairingDataFile"].(string)
 

@@ -263,6 +263,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 "wsHost": "0.0.0.0",
                 "wsPort": constants.STATUS_CONNECTOR_WS_PORT,
             },
+            "thirdpartyServicesEnabled": True,
         }
         if not Config.disable_override_networks:
             self._set_networks(data, **kwargs)

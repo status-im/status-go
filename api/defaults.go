@@ -280,7 +280,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	if request.TestOverrideNetworks != nil {
 		nodeConfig.Networks = request.TestOverrideNetworks
 	} else {
-		nodeConfig.Networks = BuildDefaultNetworks(&request.WalletSecretsConfig)
+		nodeConfig.Networks = BuildDefaultNetworks(&request.WalletSecretsConfig, request.ThirdpartyServicesEnabled)
 	}
 
 	if request.NetworkID != nil {

@@ -30,6 +30,19 @@ type ServiceConfig struct {
 	AllowETag bool
 }
 
+func NewDefaultServiceConfig() ServiceConfig {
+	return ServiceConfig{
+		UrlOverride:         security.NewSensitiveString(""),
+		User:                security.NewSensitiveString(""),
+		Password:            security.NewSensitiveString(""),
+		StageName:           "production",
+		FullDataInterval:    24 * time.Hour,
+		PriceUpdateInterval: 5 * time.Minute,
+		AllowGzip:           true,
+		AllowETag:           true,
+	}
+}
+
 // Validate checks if the configuration is valid
 func (c *ServiceConfig) setDefaults() {
 	// Set default refresh intervals if not provided

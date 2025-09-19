@@ -11,6 +11,14 @@ type Service struct {
 	accountsDB *accounts.Database
 }
 
+func (s *Service) ThirdpartyServicesEnabled() bool {
+	enabled, err := s.accountsDB.ThirdpartyServicesEnabled()
+	if err != nil {
+		return true
+	}
+	return enabled
+}
+
 // New returns a new Service.
 func NewService(db *accounts.Database) *Service {
 	return &Service{accountsDB: db}
@@ -18,6 +26,9 @@ func NewService(db *accounts.Database) *Service {
 
 // APIs returns a list of new APIs.
 func (s *Service) APIs() []rpc.API {
+	if !s.ThirdpartyServicesEnabled() {
+		return nil
+	}
 	return []rpc.API{
 		{
 			Namespace: "gif",

@@ -25,7 +25,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		},
 	}
 
-	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig)
+	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig, true)
 
 	require.Len(t, actualNetworks, 11)
 	for _, n := range actualNetworks {

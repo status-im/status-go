@@ -77,7 +77,7 @@ func TestOldMobileUserUpgradingFromV1ToV2(t *testing.T) {
 func (s *OldMobileUserUpgradingFromV1ToV2Test) loginMobileUser(check PostLoginCheckCallback) {
 	b := NewGethStatusBackend(s.logger)
 	b.UpdateRootDataDir(s.tmpdir)
-	s.Require().NoError(b.OpenAccounts())
+	s.Require().NoError(b.OpenAccounts(true))
 	s.Require().NoError(b.Login(oldMobileUserKeyUID, oldMobileUserPasswd))
 
 	check(b)
@@ -187,7 +187,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradingFromMobileV1() {
 	b := NewGethStatusBackend(s.logger)
 	b.UpdateRootDataDir(s.tmpdir)
-	s.Require().NoError(b.OpenAccounts())
+	s.Require().NoError(b.OpenAccounts(true))
 
 	err := b.LoginAccount(&requests.Login{
 		KeyUID:   oldMobileUserKeyUID,

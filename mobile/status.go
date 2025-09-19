@@ -117,7 +117,7 @@ func initializeApplication(requestJSON string) string {
 	)
 	statusBackend.UpdateRootDataDir(request.DataDir)
 
-	err = statusBackend.OpenAccounts()
+	err = statusBackend.OpenAccounts(true)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -229,7 +229,7 @@ func OpenAccounts(datadir string) string {
 // openAccounts opens database and returns accounts list.
 func openAccounts(datadir string) string {
 	statusBackend.UpdateRootDataDir(datadir)
-	err := statusBackend.OpenAccounts()
+	err := statusBackend.OpenAccounts(true)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
