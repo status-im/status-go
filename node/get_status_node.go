@@ -19,6 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
+	_ "github.com/gorilla/rpc"
+
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	common2 "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"

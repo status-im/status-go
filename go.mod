@@ -85,6 +85,7 @@ require (
 	github.com/btcsuite/btcd/btcutil v1.1.6
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/getsentry/sentry-go v0.29.1
+	github.com/gorilla/rpc v1.2.1
 	github.com/gorilla/sessions v1.2.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/ipfs/go-log/v2 v2.5.1
