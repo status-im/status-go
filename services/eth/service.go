@@ -21,6 +21,7 @@ func NewService(client *rpc.Client, accountsManager *accounts.AccountsManager) *
 	}
 }
 
+
 func (s *Service) Start() error {
 	return nil
 }
@@ -37,4 +38,8 @@ func (s *Service) APIs() []gethrpc.API {
 			Service:   NewAPI(s.client, s.accountsManager),
 		},
 	}
+}
+
+func (s *Service) GorillaAPI() *API {
+	return NewAPI(s.client, s.accountsManager)
 }

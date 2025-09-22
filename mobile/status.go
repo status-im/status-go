@@ -320,6 +320,15 @@ func callRPC(inputJSON string) string {
 	return callWithResponse(statusBackend.StatusNode().CallInProcessRPC, inputJSON)
 }
 
+func CallGorillaRPC(inputJSON string) string {
+	return callGorillaRPC(inputJSON)
+}
+
+//
+func callGorillaRPC(inputJSON string) string {
+	return callWithResponse(statusBackend.StatusNode().CallInProcessGorillaRPC, inputJSON)
+}
+
 // Deprecated: Use CallRPC instead, the behaviour is the same.
 func CallPrivateRPC(inputJSON string) string {
 	return callRPC(inputJSON)

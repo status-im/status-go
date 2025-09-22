@@ -1,10 +1,14 @@
 package node
 
+import "C"
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -18,6 +22,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	gorillarpc "github.com/gorilla/rpc"
+	gorillajson "github.com/gorilla/rpc/json"
 
 	_ "github.com/gorilla/rpc"
 
@@ -79,8 +85,9 @@ type StatusNode struct {
 	config    *params.NodeConfig // Status node configuration
 	rpcClient *rpc.Client        // reference to an RPC client
 
-	services  []common2.StatusService
-	rpcServer *gethrpc.Server
+	services         []common2.StatusService
+	rpcServer        *gethrpc.Server
+	gorillaRPCServer *gorillarpc.Server
 
 	downloader *ipfs.Downloader
 
@@ -130,6 +137,10 @@ type StatusNode struct {
 // New makes new instance of StatusNode.
 func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagement.AccountsManager, logger *zap.Logger) *StatusNode {
 	logger = logger.Named("StatusNode")
+
+	gorillaRPCServer := gorillarpc.NewServer()
+	gorillaRPCServer.RegisterCodec(gorillajson.NewCodec(), "application/json")
+
 	return &StatusNode{
 		transactor:          transactor,
 		gethAccountsManager: gethAccountsManager,
@@ -137,7 +148,9 @@ func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagemen
 		publicMethods:       make(map[string]bool),
 		accountsPublisher:   pubsub.NewPublisher(),
 		rpcServer:           gethrpc.NewServer(),
+		gorillaRPCServer:    gorillaRPCServer,
 	}
+
 }
 
 // Config exposes reference to running node's configuration
@@ -341,9 +354,14 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 		}
 	}
 
+	err := n.gorillaRPCServer.RegisterTCPService(n.ethSrvc.GorillaAPI(), "eth")
+	if err != nil {
+		return errorspkg.Wrap(err, "failed to register eth service")
+	}
+
 	// Start services
 
-	err := n.timeSourceSrvc.Start(context.Background())
+	err = n.timeSourceSrvc.Start(context.Background())
 	if err != nil {
 		return errorspkg.Wrap(err, "failed to start time source")
 	}
@@ -474,6 +492,33 @@ func (n *StatusNode) CallInProcessRPC(inputJSON string) string {
 	codec := rpc2.NewSingleRequestCodec(inputJSON)
 	n.rpcServer.ServeCodec(codec.GethCodec(), 0)
 	return codec.Output()
+}
+
+func (n *StatusNode) CallInProcessGorillaRPC(inputJSON string) string {
+	//n.gorillaRPCServer.ServeHTTP()
+
+	payloadBytes := []byte(inputJSON)
+
+	// Create a fake HTTP request
+	req := httptest.NewRequest("POST", "/CallInProcessGorillaRPC", bytes.NewBuffer(payloadBytes))
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create a fake HTTP response writer
+	rr := httptest.NewRecorder()
+
+	// Call the server's ServeHTTP method
+	n.gorillaRPCServer.ServeHTTP(rr, req)
+
+	// Read and return the response body
+	resp := rr.Result()
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(body)
 }
 
 // RPCClient exposes reference to RPC client connected to the running node.
