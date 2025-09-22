@@ -22,6 +22,9 @@ type InstallationIDProvider interface {
 	Validate() error
 }
 
+// TODO use a setting or an API param instead
+const syncMessages = false
+
 func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallationAndSync) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -159,7 +162,9 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, targetInstallation
 // SyncDevices sends all public chats and contacts to paired devices
 // TODO remove use of photoPath in contacts
 func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, rawMessageHandler RawMessageHandler) (err error) {
+	isLocalPairing := true
 	if rawMessageHandler == nil {
+		isLocalPairing = false
 		rawMessageHandler = m.dispatchMessage
 	}
 
@@ -310,6 +315,15 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
+	// Only sync messages when enabled by the user and on local pairing
+	// This is to avoid as much as possible the possibility of breaching user privacy
+	if syncMessages && isLocalPairing {
+		err = m.syncMessages(ctx, rawMessageHandler)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -448,6 +462,40 @@ func (m *Messenger) syncProfilePicturesFromDatabase(rawMessageHandler RawMessage
 		return err
 	}
 	return m.syncProfilePictures(rawMessageHandler, identityImages)
+}
+
+func (m *Messenger) syncMessages(ctx context.Context, rawMessageHandler RawMessageHandler) error {
+	backupMessages, err := m.persistence.AllMessagesForBackup()
+	if err != nil {
+		return err
+	}
+
+	// Sync messages in batches of 100
+	batchSize := 100
+	for i := 0; i < len(backupMessages); i += batchSize {
+		end := min(i+batchSize, len(backupMessages))
+		batch := &protobuf.BackedUpMessageBatch{Messages: backupMessages[i:end]}
+
+		encodedMessage, err := proto.Marshal(batch)
+		if err != nil {
+			return err
+		}
+
+		_, chat := m.getLastClockWithRelatedChat()
+		rawMessage := messagingtypes.RawMessage{
+			LocalChatID: chat.ID,
+			Payload:     encodedMessage,
+			MessageType: protobuf.ApplicationMetadataMessage_BACKED_UP_MESSAGE_BATCH,
+			ResendType:  messagingtypes.ResendTypeDataSync,
+		}
+
+		_, err = rawMessageHandler(ctx, rawMessage)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (m *Messenger) InitInstallations() error {

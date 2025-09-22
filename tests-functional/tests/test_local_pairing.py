@@ -6,6 +6,7 @@ from clients.signals import SignalType, LocalPairingEventType, LocalPairingEvent
 from clients.status_backend import StatusBackend
 from resources.constants import Account
 from steps.messenger import MessengerSteps
+from resources.enums import MessageContentType
 
 
 def check_server_sender_events(events):
@@ -187,6 +188,11 @@ class TestLocalPairing(MessengerSteps):
         # Create community before local pairing
         self.create_community(bob)
 
+        # Send a message to Alice before local pairing
+        response = bob.wakuext_service.send_one_to_one_message(alice.public_key, "test_message")
+        message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        message_id, sender_chat_id = message["id"], message["chatId"]
+
         # Local pairing
         pair_server_as_sender(bob, bob_second_device)
 
@@ -211,6 +217,19 @@ class TestLocalPairing(MessengerSteps):
         assert alice_response is False
         bob_response = bob.accounts_service.has_paired_devices()
         assert bob_response is True
+
+        # Check that the messages are synced
+        # TODO uncomment this when message sync is enabled (syncMessages = true)
+        # those asserts are just to avoid unused variable warnings for now
+        assert message_id is not None
+        assert sender_chat_id is not None
+        # messages = bob_second_device.wakuext_service.chat_messages(sender_chat_id, limit=10)["messages"]
+        # message_found = False
+        # for message in messages:
+        #     if message["id"] == message_id and message["text"] == "test_message":
+        #         message_found = True
+        #         break
+        # assert message_found, "Message sent before pairing not found on paired device"
 
     def test_pairing_server_as_receiver(self):
         # Create users
