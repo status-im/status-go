@@ -626,3 +626,8 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(syncCommunity *protob
 
 	return nil
 }
+
+func (m *Messenger) HandleBackedUpMessageBatch(state *ReceivedMessageState, messageBatch *protobuf.BackedUpMessageBatch, msg *messagingtypes.Message) error {
+	// BackedUpMessages can only be sent in the context of a local backup
+	return nil
+}
