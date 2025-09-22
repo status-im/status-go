@@ -520,3 +520,60 @@ class WakuextService(Service):
         params = [last_emoji_id]
         response = self.rpc_request(method="sendEmojiReactionRetraction", params=params)
         return response
+
+    def get_saved_addresses(self, params=[]):
+        response = self.rpc_request("getSavedAddresses", params)
+        return response
+
+    def get_saved_addresses_per_mode(self, is_test: bool):
+        params = [is_test]
+        response = self.rpc_request("getSavedAddressesPerMode", params)
+        return response
+
+    def upsert_saved_address(self, address_payload: dict):
+        params = [address_payload]
+        response = self.rpc_request("upsertSavedAddress", params)
+        return response
+
+    def delete_saved_address(self, address: str, is_test: bool):
+        params = [address, is_test]
+        response = self.rpc_request("deleteSavedAddress", params)
+        return response
+
+    def remaining_capacity_for_saved_addresses(self, is_test: bool):
+        params = [is_test]
+        response = self.rpc_request("remainingCapacityForSavedAddresses", params)
+        return response
+
+    def set_display_name(self, name: str):
+        params = [name]
+        response = self.rpc_request("setDisplayName", params)
+        return response
+
+    def set_profile_showcase_preferences(self, prefs: dict):
+        response = self.rpc_request("setProfileShowcasePreferences", [prefs])
+        return response
+
+    def get_profile_showcase_preferences(self):
+        params = []
+        response = self.rpc_request("getProfileShowcasePreferences", params)
+        return response
+
+    def create_community_from_payload(self, community: dict):
+        params = [community]
+        response = self.rpc_request("createCommunity", params)
+        return response
+
+    def communities(self):
+        params = []
+        response = self.rpc_request("communities", params)
+        return response
+
+    def joined_communities(self):
+        params = []
+        response = self.rpc_request("joinedCommunities", params)
+        return response
+
+    def log_test(self):
+        response = self.rpc_request("logTest")
+        return response

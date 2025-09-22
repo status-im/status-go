@@ -9,3 +9,8 @@ class SettingsService(Service):
     def get_settings(self):
         response = self.rpc_request("getSettings")
         return response
+
+    def save_setting(self, key, value):
+        params = [key, value]
+        response = self.rpc_request("saveSetting", params)
+        return response
