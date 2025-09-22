@@ -321,6 +321,16 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
+		case protobuf.ApplicationMetadataMessage_BACKED_UP_MESSAGE_BATCH:
+			var messageBatch protobuf.BackedUpMessageBatch
+			err := proto.Unmarshal(rawMessage.GetPayload(), &messageBatch)
+			if err != nil {
+				return err
+			}
+			err = m.persistence.SaveBackedUpMessages(messageBatch.Messages)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	response, err := m.saveDataAndPrepareResponse(state)
