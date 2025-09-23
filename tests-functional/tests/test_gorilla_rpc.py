@@ -1,5 +1,3 @@
-import logging
-
 import pytest
 
 import utils.fake as fake
@@ -25,13 +23,27 @@ class TestEth:
         testvalue = fake.profile_name()
         args = {"a": testvalue}
 
-        request = {"jsonrpc": "2.0", "method": "eth.TestGorilla", "id": 1, "params": [args]}
+        request = {"jsonrpc": "2.0", "method": "eth.TestGorilla", "id": 1, "params": args}
         reply = backend.api_request_json("CallGorillaRPC", request)
         result = reply.get("result")
 
         assert result is not None
         assert result.get("b") == ("a: " + testvalue)
 
-        request = {"jsonrpc": "2.0", "method": "eth.TestPanic", "id": 1, "params": [args]}
-        reply = backend.api_request_json("CallGorillaRPC", request)
-        logging.debug(f"<<< reply {reply}")
+        request = {"jsonrpc": "2.0", "method": "eth_testGorilla2", "id": 2, "params": [args]}
+        reply = backend.api_request_json("CallRPC", request)
+        result = reply.get("result")
+
+        assert result is not None
+        assert result.get("b") == ("a: " + testvalue)
+
+        request = {"jsonrpc": "2.0", "method": "eth_testGorilla2", "id": 3, "params": args}
+        reply = backend.api_request_json("CallRPC", request)
+        result = reply.get("result")
+
+        assert result is not None
+        assert result.get("b") == ("a: " + testvalue)
+
+        # request = {"jsonrpc": "2.0", "method": "eth.TestPanic", "id": 4, "params": [args]}
+        # reply = backend.api_request_json("CallGorillaRPC", request)
+        # logging.debug(f"<<< reply {reply}")

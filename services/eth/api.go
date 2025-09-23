@@ -44,9 +44,11 @@ func (a *API) TestGorilla(args *GorillaArgs, reply *GorillaReply) error {
 	return nil
 }
 
-func (a *API) TestGorilla2(args *GorillaArgs, reply *GorillaReply) error {
-	reply.B = fmt.Sprintf("a: %s", args.A)
-	return fmt.Errorf("test error: %s", args.A)
+func (a *API) TestGorilla2(args *GorillaArgs) (*GorillaReply, error) {
+	reply := &GorillaReply{
+		B: fmt.Sprintf("a: %s", args.A),
+	}
+	return reply, nil
 }
 
 func (a *API) TestPanic(args *GorillaArgs, reply *GorillaReply) error {
