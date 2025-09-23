@@ -290,7 +290,7 @@ class TestLocalPairing(MessengerSteps):
 
             # Paired device will get notifications of requests that are not fulfilled (not mutual)
             notifications = bob_another_device.wakuext_service.get_activity_center_notifications(
-                activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_CONTACT_REQUEST]
+                activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_CONTACT_REQUEST.value]
             )["notifications"]
             assert len(notifications) == 2
             notifications_dict = {notification["chatId"]: notification for notification in notifications}

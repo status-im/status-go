@@ -1,7 +1,5 @@
 import logging
-
 import pytest
-
 from clients.signals import SignalType
 from steps.messenger import MessengerSteps
 
@@ -13,29 +11,36 @@ class TestProfile:
         """Initialize one backend for each test function"""
         self.rpc_client = backend_new_profile("rpc_client")
 
-    @pytest.mark.parametrize(
-        "method, params",
-        [
-            ("wakuext_setDisplayName", ["new valid username"]),
-            ("wakuext_setBio", ["some valid bio"]),
-            (
-                "wakuext_setCustomizationColor",
-                [
-                    {
-                        "customizationColor": "magenta",
-                        "keyUid": "0xea42dd9a4e668b0b76c7a5210ca81576d51cd19cdd0f6a0c22196219dc423f29",
-                    }
-                ],
-            ),
-            ("wakuext_setUserStatus", [3, ""]),
-            ("wakuext_setSyncingOnMobileNetwork", [{"enabled": False}]),
-            ("wakuext_togglePeerSyncing", [{"enabled": True}]),
-            ("wakuext_backupData", []),
-        ],
-    )
-    def test_wakuext_(self, method, params):
-        # TODO: Break this down into individual tests and implment the coresponding wakuext methods
-        self.rpc_client.rpc_valid_request(method, params)
+    def test_set_display_name(self):
+        self.rpc_client.wakuext_service.set_display_name("new valid username")
+        result = self.rpc_client.settings_service.get_settings()
+        assert result.get("display-name") == "new valid username"
+
+    def test_set_bio(self):
+        self.rpc_client.wakuext_service.set_bio("some valid bio")
+        result = self.rpc_client.settings_service.get_settings()
+        assert result.get("bio") == "some valid bio"
+
+    def test_set_customization_color(self):
+        payload = {
+            "customizationColor": "magenta",
+            "keyUid": "0xea42dd9a4e668b0b76c7a5210ca81576d51cd19cdd0f6a0c22196219dc423f29",
+        }
+        self.rpc_client.wakuext_service.set_customization_color(payload)
+
+    def test_set_user_status(self):
+        status_type = 3
+        status_text = "test"
+        self.rpc_client.wakuext_service.set_user_status(status_type, status_text)
+        result = self.rpc_client.settings_service.get_settings()
+        assert result.get("current-user-status").get("statusType") == status_type
+        assert result.get("current-user-status").get("text") == status_text
+
+    def test_set_syncing_on_mobile_network(self):
+        self.rpc_client.wakuext_service.set_syncing_on_mobile_network(False)
+
+    def test_toggle_peer_syncing(self):
+        self.rpc_client.wakuext_service.toggle_peer_syncing({"enabled": True})
 
     @pytest.mark.parametrize(
         "setting_name, default_value, changed_value",
@@ -97,7 +102,7 @@ class TestProfile:
 
         logging.info("Step: change %s to %s and check it is updated" % (setting_name, set_value))
         # settings_saveSetting -> settings_service.saveSetting
-        self.rpc_client.settings_service.rpc_request("saveSetting", [setting_name, set_value])
+        self.rpc_client.settings_service.save_setting(setting_name, set_value)
         response = self.rpc_client.settings_service.get_settings()
         assert response[setting_name] == set_value
 

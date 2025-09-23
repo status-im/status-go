@@ -19,5 +19,5 @@ class TestEth:
 
     def test_estimate_gas(self, backend_recovered_profile):
         backend = backend_recovered_profile("sender", user=user_1)
-        result = backend.rpc_valid_request("eth_estimateGas", params=[31337, {"to": user_2.address, "value": 100}])
+        result = backend.eth_service.estimate_gas(31337, user_2.address, 100)
         assert int(result, 16) > 0

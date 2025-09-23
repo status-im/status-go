@@ -10,12 +10,16 @@ class TestAppGeneral:
         """Initialize one backend for each test function"""
         self.rpc_client = backend_new_profile("rpc_client")
 
-    @pytest.mark.parametrize(
-        "method, params",
-        [
-            ("appgeneral_getCurrencies", []),
-        ],
-    )
-    def test_(self, method, params):
-        self.rpc_client.rpc_valid_request(method, params)
-        # TODO: Add more assertions on response
+    def test_get_currencies(self):
+        result = self.rpc_client.appgeneral_service.get_currencies()
+        assert result[0].get("emoji") == "🇺🇸"
+        assert result[0].get("name") == "United States Dollar"
+        assert result[0].get("shortName") == "USD"
+        assert result[0].get("isPopular") is True
+        assert result[0].get("isToken") is False
+        assert result[0].get("symbol") == "$"
+        assert result[0].get("unicode") == "1f1fa-1f1f8"
+
+    def test_version(self):
+        result = self.rpc_client.appgeneral_service.version()
+        assert result == ""  # not sure if it's ok to return an empty string, or maybe this endpoint is deprecated
