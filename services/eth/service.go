@@ -21,7 +21,6 @@ func NewService(client *rpc.Client, accountsManager *accounts.AccountsManager) *
 	}
 }
 
-
 func (s *Service) Start() error {
 	return nil
 }

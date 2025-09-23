@@ -9,16 +9,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 )
 
-type (
-	// EstimateGasArgs are the Gorilla RPC request args for eth_estimateGas.
-	EstimateGasArgs struct {
-		ChainID uint64      `json:"chainID"`
-		Payload interface{} `json:"payload"`
-	}
-	// EstimateGasReply is the Gorilla RPC reply type for eth_estimateGas.
-	EstimateGasReply string
-)
-
 type API struct {
 	client          *rpc.Client
 	accountsManager *accounts.AccountsManager
@@ -39,21 +29,6 @@ func (a *API) EstimateGas(ctx context.Context, chainID uint64, payload any) (res
 	}
 	err = client.CallContext(ctx, &result, "eth_estimateGas", payload)
 	return
-}
-
-// EstimateGasGorilla is a gorilla/rpc-compatible wrapper around EstimateGas.
-// It matches RegisterTCPService expected signature: (args *Args, reply *Reply) error
-// JSON-RPC method name: "eth_estimateGas"
-func (a *API) EstimateGasGorilla(args *EstimateGasArgs, reply *EstimateGasReply) error {
-	if args == nil || reply == nil {
-		return nil
-	}
-	res, err := a.EstimateGas(context.Background(), args.ChainID, args.Payload)
-	if err != nil {
-		return err
-	}
-	*reply = EstimateGasReply(res)
-	return nil
 }
 
 type GorillaArgs struct {
