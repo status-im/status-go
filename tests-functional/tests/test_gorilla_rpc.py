@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 import utils.fake as fake
@@ -29,3 +31,7 @@ class TestEth:
 
         assert result is not None
         assert result.get("b") == ("a: " + testvalue)
+
+        request = {"jsonrpc": "2.0", "method": "eth.TestPanic", "id": 1, "params": [args]}
+        reply = backend.api_request_json("CallGorillaRPC", request)
+        logging.debug(f"<<< reply {reply}")

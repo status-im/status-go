@@ -48,3 +48,7 @@ func (a *API) TestGorilla2(args *GorillaArgs, reply *GorillaReply) error {
 	reply.B = fmt.Sprintf("a: %s", args.A)
 	return fmt.Errorf("test error: %s", args.A)
 }
+
+func (a *API) TestPanic(args *GorillaArgs, reply *GorillaReply) error {
+	panic("test panic")
+}
