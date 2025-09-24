@@ -189,9 +189,37 @@ class TestLocalPairing(MessengerSteps):
         self.create_community(bob)
 
         # Send a message to Alice before local pairing
-        response = bob.wakuext_service.send_one_to_one_message(alice.public_key, "test_message")
+        response = bob.wakuext_service.send_one_to_one_message(alice.public_key, "hello alice")
         message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
-        message_id, sender_chat_id = message["id"], message["chatId"]
+        message_id1, sender_chat_id = message["id"], message["chatId"]
+
+        # Send a message to Bob before local pairing
+        response = alice.wakuext_service.send_one_to_one_message(bob.public_key, "hello bob")
+        message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        message_id2 = message["id"]
+
+        # Wait for the message to be delivered
+        bob.find_signal_containing_pattern(
+            SignalType.MESSAGES_NEW.value,
+            event_pattern=message_id2,
+            timeout=60,
+        )
+
+        # Check that bob has the messages before pairing
+        messages = bob.wakuext_service.chat_messages(alice.public_key, limit=10)["messages"]
+        assert messages is not None, "No messages found on paired device"
+        message_found1 = False
+        message_found2 = False
+        for message in messages:
+            if message["id"] == message_id1 and message["text"] == "hello alice":
+                message_found1 = True
+                continue
+            if message["id"] == message_id2 and message["text"] == "hello bob":
+                message_found2 = True
+                continue
+        assert message_found1, "Message 1 not found on original device"
+        assert message_found2, "Message 2 not found on original device"
 
         # Local pairing WITH message syncing
         pair_server_as_sender(bob, bob_second_device, True)
@@ -221,12 +249,17 @@ class TestLocalPairing(MessengerSteps):
         # Check that the messages are synced
         messages = bob_second_device.wakuext_service.chat_messages(sender_chat_id, limit=10)["messages"]
         assert messages is not None, "No messages found on paired device"
-        message_found = False
+        message_found1 = False
+        message_found2 = False
         for message in messages:
-            if message["id"] == message_id and message["text"] == "test_message":
-                message_found = True
-                break
-        assert message_found, "Message sent before pairing not found on paired device"
+            if message["id"] == message_id1 and message["text"] == "hello alice":
+                message_found1 = True
+                continue
+            if message["id"] == message_id2 and message["text"] == "hello bob":
+                message_found2 = True
+                continue
+        assert message_found1, "Message 1 sent before pairing not found on paired device"
+        assert message_found2, "Message 2 sent before pairing not found on paired device"
 
     def test_pairing_server_as_receiver(self):
         # Create users

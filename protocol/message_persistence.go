@@ -131,7 +131,7 @@ func (db sqlitePersistence) tableUserMessagesProtobufFields() string {
     		m1.text,
     		m1.source,
 			m1.response_to,
-    		m1.chat_id,
+    		m1.local_chat_id,
     		m1.message_type,
     		m1.content_type,
 
