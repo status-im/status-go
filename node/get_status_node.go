@@ -22,8 +22,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	gorillarpc "github.com/gorilla/rpc"
-	gorillajson "github.com/gorilla/rpc/json"
+	gorillarpc "github.com/gorilla/rpc/v2"
+	gorillajson "github.com/gorilla/rpc/v2/json"
 
 	_ "github.com/gorilla/rpc"
 
@@ -354,7 +354,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 		}
 	}
 
-	err := n.gorillaRPCServer.RegisterTCPService(n.ethSrvc.GorillaAPI(), "eth")
+	err := n.gorillaRPCServer.RegisterService(n.ethSrvc.GorillaAPI(), "eth")
 	if err != nil {
 		return errorspkg.Wrap(err, "failed to register eth service")
 	}

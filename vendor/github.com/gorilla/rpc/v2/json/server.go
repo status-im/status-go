@@ -8,12 +8,25 @@ package json
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 
-	"github.com/gorilla/rpc"
+	"github.com/gorilla/rpc/v2"
 )
 
 var null = json.RawMessage([]byte("null"))
+
+// An Error is a wrapper for a JSON interface value. It can be used by either
+// a service's handler func to write more complex JSON data to an error field
+// of a server's response, or by a client to read it.
+type Error struct {
+	Data interface{}
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("%v", e.Data)
+}
 
 // ----------------------------------------------------------------------------
 // Request and Response
@@ -104,32 +117,41 @@ func (c *CodecRequest) ReadRequest(args interface{}) error {
 }
 
 // WriteResponse encodes the response and writes it to the ResponseWriter.
-//
-// The err parameter is the error resulted from calling the RPC method,
-// or nil if there was no error.
-func (c *CodecRequest) WriteResponse(w http.ResponseWriter, reply interface{}, methodErr error) error {
-	if c.err != nil {
-		return c.err
+func (c *CodecRequest) WriteResponse(w http.ResponseWriter, reply interface{}) {
+	if c.request.Id != nil {
+		// Id is null for notifications and they don't have a response.
+		res := &serverResponse{
+			Result: reply,
+			Error:  &null,
+			Id:     c.request.Id,
+		}
+		c.writeServerResponse(w, 200, res)
 	}
+}
+
+func (c *CodecRequest) WriteError(w http.ResponseWriter, _ int, err error) {
 	res := &serverResponse{
-		Result: reply,
-		Error:  &null,
+		Result: &null,
 		Id:     c.request.Id,
 	}
-	if methodErr != nil {
-		// Propagate error message as string.
-		res.Error = methodErr.Error()
-		// Result must be null if there was an error invoking the method.
-		// http://json-rpc.org/wiki/specification#a1.2Response
-		res.Result = &null
-	}
-	if c.request.Id == nil {
-		// Id is null for notifications and they don't have a response.
-		res.Id = &null
+	if jsonErr, ok := err.(*Error); ok {
+		res.Error = jsonErr.Data
 	} else {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		encoder := json.NewEncoder(w)
-		c.err = encoder.Encode(res)
+		res.Error = err.Error()
 	}
-	return c.err
+	c.writeServerResponse(w, 400, res)
+}
+
+func (c *CodecRequest) writeServerResponse(w http.ResponseWriter, status int, res *serverResponse) {
+	b, err := json.Marshal(res)
+	if err == nil {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(status)
+		if _, err := w.Write(b); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		// Not sure in which case will this happen. But seems harmless.
+		rpc.WriteError(w, 400, err.Error())
+	}
 }

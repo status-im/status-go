@@ -3,6 +3,7 @@ package eth
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	accounts "github.com/status-im/status-go/accounts-management"
 
@@ -39,18 +40,22 @@ type GorillaReply struct {
 	B string `json:"b"`
 }
 
-func (a *API) TestGorilla(args *GorillaArgs, reply *GorillaReply) error {
+func (a *API) TestGorilla(request *http.Request, args *GorillaArgs, reply *GorillaReply) error {
 	reply.B = fmt.Sprintf("a: %s", args.A)
 	return nil
 }
 
-func (a *API) TestGorilla2(args *GorillaArgs) (*GorillaReply, error) {
+func (a *API) TestGorilla2(request *http.Request, args *GorillaArgs) (*GorillaReply, error) {
 	reply := &GorillaReply{
 		B: fmt.Sprintf("a: %s", args.A),
 	}
 	return reply, nil
 }
 
-func (a *API) TestPanic(args *GorillaArgs, reply *GorillaReply) error {
+func (a *API) TestPanic(request *http.Request, args *GorillaArgs, reply *GorillaReply) error {
 	panic("test panic")
+}
+
+func (a *API) IntendedPanic() error {
+	panic("intended panic")
 }
