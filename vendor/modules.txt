@@ -370,7 +370,8 @@ github.com/google/uuid
 # github.com/gorilla/rpc v1.2.1
 ## explicit; go 1.20
 github.com/gorilla/rpc
-github.com/gorilla/rpc/json
+github.com/gorilla/rpc/v2
+github.com/gorilla/rpc/v2/json
 # github.com/gorilla/securecookie v1.1.1
 ## explicit
 github.com/gorilla/securecookie
