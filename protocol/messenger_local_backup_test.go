@@ -24,6 +24,13 @@ type MessengerLocalBackupSuite struct {
 	MessengerBaseTestSuite
 }
 
+func makeMutualContacts(lhs *Messenger, rhs *Messenger) error {
+	if err := makeMutualContact(lhs, &rhs.identity.PublicKey); err != nil {
+		return err
+	}
+	return makeMutualContact(rhs, &lhs.identity.PublicKey)
+}
+
 func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	// Create bob1
 	bob1 := s.anotherMessenger()
@@ -59,23 +66,6 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.Require().NoError(err)
 
 	s.Require().Len(bob1.Contacts(), 2)
-
-	// Validate contacts on bob1
-	actualContacts := bob1.Contacts()
-	if actualContacts[0].ID == contactID1 {
-		s.Require().Equal(actualContacts[0].ID, contactID1)
-		s.Require().Equal(actualContacts[1].ID, contactID2)
-	} else {
-		s.Require().Equal(actualContacts[0].ID, contactID2)
-		s.Require().Equal(actualContacts[1].ID, contactID1)
-	}
-	s.Require().Equal(ContactRequestStateSent, actualContacts[0].ContactRequestLocalState)
-	s.Require().Equal(ContactRequestStateSent, actualContacts[1].ContactRequestLocalState)
-	s.Require().True(actualContacts[0].added())
-	s.Require().True(actualContacts[1].added())
-
-	// Check that bob2 has no contacts
-	s.Require().Len(bob2.Contacts(), 0)
 
 	//-------------------- COMMUNITIES --------------------
 	// Create a community
@@ -211,8 +201,18 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	alice := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, alice)
 
+	makeMutualContacts(bob1, alice)
+
+	aliceContact := bob1.GetContactByID(alice.selfContact.ID)
+	err = bob1.persistence.SaveContact(aliceContact, nil)
+	s.Require().NoError(err)
+
 	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.getTimesource())
 	err = bob1.SaveChat(ourOneOneChat)
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &bob1.identity.PublicKey, bob1.getTimesource())
+	err = alice.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	// Send transaction command to Alice
@@ -222,6 +222,53 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	transactionMessage.Text = "some transaction"
 	_, err = bob1.SendChatMessage(ctx, transactionMessage)
 	s.Require().NoError(err)
+
+	// Alice sends a message to bob1
+	inputMessage = buildTestMessage(*theirChat)
+	inputMessage.Text = "some text from alice"
+	sendResponse, err = alice.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	response, err = WaitOnMessengerResponse(
+		bob1,
+		func(r *MessengerResponse) bool {
+			return len(r.messages) > 0 && r.Messages()[0].Text == "some text from alice"
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+
+	// Validate contacts on bob1
+	contact1Found := false
+	contact2Found := false
+	aliceFound := false
+	for _, c := range bob1.Contacts() {
+		switch c.ID {
+		case contactID1:
+			contact1Found = true
+			s.Require().Equal(ContactRequestStateSent, c.ContactRequestLocalState)
+			s.Require().Equal(ContactRequestStateNone, c.ContactRequestRemoteState)
+			s.Require().True(c.added())
+		case contactID2:
+			contact2Found = true
+			s.Require().Equal(ContactRequestStateSent, c.ContactRequestLocalState)
+			s.Require().Equal(ContactRequestStateNone, c.ContactRequestRemoteState)
+			s.Require().True(c.added())
+		case alice.selfContact.ID:
+			aliceFound = true
+			s.Require().Equal(ContactRequestStateSent, c.ContactRequestLocalState)
+			s.Require().Equal(ContactRequestStateReceived, c.ContactRequestRemoteState)
+			s.Require().True(c.added())
+		}
+	}
+	s.Require().True(contact1Found)
+	s.Require().True(contact2Found)
+	s.Require().True(aliceFound)
+	// Check that bob2 has no contacts
+	s.Require().Len(bob2.Contacts(), 0)
 
 	// -------------------- BACKUP --------------------
 	// Backup
@@ -234,7 +281,31 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 
 	// -------------------- VALIDATE BACKUP --------------------
 	// Validate contacts on bob2
-	s.Require().Len(bob2.Contacts(), 2)
+	contact1Found = false
+	contact2Found = false
+	aliceFound = false
+	for _, c := range bob2.Contacts() {
+		switch c.ID {
+		case contactID1:
+			contact1Found = true
+			s.Require().Equal(ContactRequestStateSent, c.ContactRequestLocalState)
+			s.Require().Equal(ContactRequestStateNone, c.ContactRequestRemoteState)
+			s.Require().True(c.added())
+		case contactID2:
+			contact2Found = true
+			s.Require().Equal(ContactRequestStateSent, c.ContactRequestLocalState)
+			s.Require().Equal(ContactRequestStateNone, c.ContactRequestRemoteState)
+			s.Require().True(c.added())
+		case alice.selfContact.ID:
+			aliceFound = true
+			s.Require().Equal(ContactRequestStateSent, c.ContactRequestLocalState)
+			s.Require().Equal(ContactRequestStateReceived, c.ContactRequestRemoteState)
+			s.Require().True(c.added())
+		}
+	}
+	s.Require().True(contact1Found)
+	s.Require().True(contact2Found)
+	s.Require().True(aliceFound)
 
 	// Validate communities on bob2
 	communities, err = bob2.JoinedCommunities()
@@ -257,7 +328,7 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.Require().NoError(err)
 	messages, err := bob2.persistence.AllMessagesForBackup()
 	s.Require().NoError(err)
-	s.Require().Len(messages, 14)
+	s.Require().Len(messages, 15)
 
 	textMessageFound := false
 	mdMessageFound := false
@@ -266,6 +337,7 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	emojiMessageFound := false
 	txMessageFound := false
 	pinnedSystemMessageFound := false
+	messageFromAliceFound := false
 	for _, msg := range messages {
 		if msg.ContentType == int64(protobuf.ChatMessage_TEXT_PLAIN) && msg.Text == "some text" {
 			textMessageFound = true
@@ -282,6 +354,8 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 			txMessageFound = true
 		} else if msg.ContentType == int64(protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE) && msg.Text == "" {
 			pinnedSystemMessageFound = true
+		} else if msg.ContentType == int64(protobuf.ChatMessage_TEXT_PLAIN) && msg.Text == "some text from alice" {
+			messageFromAliceFound = true
 		}
 	}
 	s.Require().True(textMessageFound)
@@ -291,6 +365,7 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.Require().True(emojiMessageFound)
 	s.Require().True(txMessageFound)
 	s.Require().True(pinnedSystemMessageFound)
+	s.Require().True(messageFromAliceFound)
 
 	// Validate pinned messages
 	pinnedMessages, _, err := bob2.PinnedMessageByChatID(chatID, "", 10)
