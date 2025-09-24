@@ -22,9 +22,6 @@ type InstallationIDProvider interface {
 	Validate() error
 }
 
-// TODO use a setting or an API param instead
-const syncMessages = false
-
 func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallationAndSync) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -43,7 +40,7 @@ func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallati
 		return nil, err
 	}
 
-	if err = m.SyncDevices(context.Background(), "", "", nil); err != nil {
+	if err = m.SyncDevices(context.Background(), "", "", false, nil); err != nil {
 		return nil, err
 	}
 
@@ -160,8 +157,9 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, targetInstallation
 }
 
 // SyncDevices sends all public chats and contacts to paired devices
+// Also sends all messages if enabled
 // TODO remove use of photoPath in contacts
-func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, rawMessageHandler RawMessageHandler) (err error) {
+func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, messageSyncEnabled bool, rawMessageHandler RawMessageHandler) (err error) {
 	isLocalPairing := true
 	if rawMessageHandler == nil {
 		isLocalPairing = false
@@ -317,7 +315,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 
 	// Only sync messages when enabled by the user and on local pairing
 	// This is to avoid as much as possible the possibility of breaching user privacy
-	if syncMessages && isLocalPairing {
+	if messageSyncEnabled && isLocalPairing {
 		err = m.syncMessages(ctx, rawMessageHandler)
 		if err != nil {
 			return err

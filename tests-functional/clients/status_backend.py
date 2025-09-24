@@ -356,7 +356,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             return
         raise TimeoutError(f"StatusBackend was not online after {timeout} seconds")
 
-    def get_connection_string_for_bootstrapping_another_device(self):
+    def get_connection_string_for_bootstrapping_another_device(self, message_sync_enabled=False):
         method = "GetConnectionStringForBootstrappingAnotherDevice"
         data = {
             "senderConfig": {
@@ -365,6 +365,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 "keyUID": self.key_uid,
                 "password": self.password,
                 "chatKey": "",
+                "messageSyncingEnabled": message_sync_enabled,
             },
             "serverConfig": {
                 "timeout": 5 * 60 * 1000,
