@@ -1,6 +1,5 @@
 version: "2"
 run:
-  modules-download-mode: vendor
   issues-exit-code: 1
   tests: true
 linters:
@@ -70,4 +69,3 @@ formatters:
     generated: strict
     paths:
     - static
-    - vendor

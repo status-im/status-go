@@ -111,14 +111,6 @@ pipeline {
       } }
     }
 
-    stage('Vendor Check') {
-      steps { script {
-        nix.develop('make vendor', pure: false)
-        /* fail build if vendoring hasn't been done */
-        nix.develop('git diff --exit-code --no-color --stat vendor/')
-      } }
-    }
-
     stage('Unit Tests') {
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"
