@@ -9,7 +9,6 @@ codecov:
 
 ignore:
   - "_.*"
-  - "vendor"
   - "scripts"
   - "contracts"
   - "Makefile"

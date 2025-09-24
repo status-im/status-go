@@ -165,7 +165,7 @@ all: $(GO_CMD_NAMES)
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
 $(GO_CMD_BUILDS): generate
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
-	go build -mod=vendor -v \
+	go build -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
 	@echo "Compilation done."
@@ -187,7 +187,7 @@ status-backend: build/bin/status-backend
 run-status-backend: PORT ?= 0
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
-	go run ./cmd/status-backend --address localhost:${PORT}
+	go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
@@ -206,7 +206,7 @@ status-go-deps:
 statusgo-c-bindings:
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
-	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
+	go run -mod=mod cmd/library/*.go > build/bin/statusgo-lib/main.go
 
 statusgo-library: generate
 statusgo-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
@@ -294,9 +294,9 @@ generate:  ##@ Run generate for all given packages using go-generate-fast, fallb
 generate-contracts:
 	go generate ./contracts
 download-tokens:
-	go run ./services/wallet/token/token-lists/default-lists/downloader/main.go
+	go run -mod=mod ./services/wallet/token/token-lists/default-lists/downloader/main.go
 analyze-token-stores:
-	go run ./services/wallet/token/token-lists/analyzer/main.go
+	go run -mod=mod ./services/wallet/token/token-lists/analyzer/main.go
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
@@ -315,11 +315,9 @@ lint-fix:
 		-and -not -name 'messenger_handlers.go' \
 		-and -not -name '*/mock/*' \
 		-and -not -name 'mock.go' \
-		-and -not -wholename '*/vendor/*' \
 		-exec goimports \
 		-local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go,github.com/status-im/markdown' \
 		-w {} \;
-	$(MAKE) vendor
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
@@ -346,7 +344,6 @@ test-unit-prep: export UNIT_TEST_REPORT_CODECOV ?= false
 test-unit: test-unit-prep
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true
 test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
-	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake | \
@@ -375,7 +372,7 @@ benchmark:
 
 lint-panics: export GOFLAGS ?= -tags='$(BUILD_TAGS)'
 lint-panics: generate
-	go run ./cmd/lint-panics -root="$(PWD)" -skip=./cmd -test=false ./...
+	go run -mod=mod ./cmd/lint-panics -root="$(PWD)" -skip=./cmd -test=false ./...
 
 lint: generate lint-panics
 	golangci-lint --build-tags '$(BUILD_TAGS)' run ./...
@@ -391,12 +388,6 @@ deep-clean: clean git-clean
 
 tidy:
 	go mod tidy
-
-vendor: generate
-	go mod tidy
-	go mod vendor
-	go tool modvendor -copy="**/*.c **/*.h" -v
-.PHONY: vendor
 
 migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
 migration:
