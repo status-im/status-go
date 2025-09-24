@@ -157,6 +157,7 @@ func (b *GethStatusBackend) initialize() (err error) {
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
 	b.LocalPairingStateManager = new(statecontrol.ProcessStateManager)
 	b.LocalPairingStateManager.SetPairing(false)
+	b.LocalPairingStateManager.SetMessageSyncEnabled(false)
 
 	return
 }

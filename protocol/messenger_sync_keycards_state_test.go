@@ -125,7 +125,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNoKeycard
 	s.Require().NoError(err)
 
 	// Trigger's a sync between devices
-	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
+	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", false, nil)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -189,7 +189,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfKeycardsWereDeletedO
 	s.Require().NoError(err)
 
 	// Trigger's a sync between devices
-	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
+	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", false, nil)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -245,7 +245,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverAndSenderHas
 	s.Require().NoError(err)
 
 	// Trigger's a sync between devices
-	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
+	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", false, nil)
 	s.Require().NoError(err)
 
 	// Wait for the response

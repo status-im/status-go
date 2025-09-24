@@ -174,7 +174,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().Equal(len(profileKp.Accounts)+len(seedPhraseKp.Accounts)+len(privKeyKp.Accounts)+len(woAccounts), len(dbAccounts1))
 
 	// Trigger's a sync between devices
-	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
+	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", false, nil)
 	s.Require().NoError(err)
 
 	err = tt.RetryWithBackOff(func() error {
@@ -567,7 +567,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	s.Require().NoError(err)
 
 	// Trigger's a sync between devices
-	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
+	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", false, nil)
 	s.Require().NoError(err)
 
 	err = tt.RetryWithBackOff(func() error {

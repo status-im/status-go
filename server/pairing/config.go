@@ -20,6 +20,8 @@ type SenderConfig struct {
 	Password string `json:"password" validate:"required"`
 	ChatKey  string `json:"chatKey"` // set only in case of a Keycard user, otherwise empty
 
+	MessageSyncingEnabled bool `json:"messageSyncingEnabled"`
+
 	DB *multiaccounts.Database `json:"-"`
 }
 
