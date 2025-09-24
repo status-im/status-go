@@ -49,3 +49,42 @@ class WalletService(Service):
     def sign_message(self, hash: str, address: str, password: str):
         params = [hash, address, password]
         return self.rpc_request("signMessage", params)
+
+    def get_ethereum_chain(
+        self,
+    ):
+        return self.rpc_request("getEthereumChains")
+
+    def get_token_list(
+        self,
+    ):
+        return self.rpc_request("getTokenList")
+
+    def get_crypto_on_ramps(
+        self,
+    ):
+        return self.rpc_request("getCryptoOnRamps")
+
+    def get_cached_currency_formats(
+        self,
+    ):
+        return self.rpc_request("getCachedCurrencyFormats")
+
+    def fetch_prices(self, symbols: list, currencies: list):
+        params = [symbols, currencies]
+        return self.rpc_request("fetchPrices", params)
+
+    def fetch_market_values(self, symbols: list, currency: str):
+        params = [symbols, currency]
+        return self.rpc_request("fetchMarketValues", params)
+
+    def fetch_token_details(self, symbols: list):
+        params = [symbols]
+        return self.rpc_request("fetchTokenDetails", params)
+
+    def get_wallet_connect_active_sessions(self, timestamp: int):
+        params = [timestamp]
+        return self.rpc_request("getWalletConnectActiveSessions", params)
+
+    def stop_suggested_routes_async_calculation(self):
+        return self.rpc_request("stopSuggestedRoutesAsyncCalculation")
