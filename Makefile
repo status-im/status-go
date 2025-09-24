@@ -60,13 +60,12 @@ GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
-BUILD_TAGS ?= gowaku_no_rln
+BUILD_TAGS ?= gowaku_no_rln rpc_panic
 
 ifeq ($(USE_NWAKU), true)
 BUILD_TAGS += use_nwaku
 endif
 
-BUILD_FLAGS ?= -ldflags=""
 BUILD_FLAGS_MOBILE ?=
 
 networkid ?= StatusChain
