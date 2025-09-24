@@ -7,7 +7,6 @@ from utils.config import Config
 
 
 def get_suggested_routes(rpc_client, **kwargs):
-    method = "wallet_getSuggestedRoutesAsync"
     required_params = ["uuid", "sendType", "addrFrom", "addrTo", "amountIn", "tokenID", "gasFeeMode"]
     input_params = {}
 
@@ -21,7 +20,7 @@ def get_suggested_routes(rpc_client, **kwargs):
     params = [input_params]
 
     rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
-    _ = rpc_client.rpc_valid_request(method, params)
+    _ = rpc_client.wallet_service.get_suggested_routes_async(params)
 
     routes_signal = rpc_client.wait_for_signal("wallet.suggested.routes")
     routes = routes_signal["event"]
@@ -30,12 +29,10 @@ def get_suggested_routes(rpc_client, **kwargs):
 
 
 def build_transactions_from_route(rpc_client, uuid):
-    method = "wallet_buildTransactionsFromRoute"
     if uuid is None or uuid == "":
         logging.info(f"Warning: provided '{uuid}' does not exist or is empty")
 
-    params = [uuid]
-    _ = rpc_client.rpc_valid_request(method, params)
+    _ = rpc_client.wallet_service.build_transactions_from_route(uuid)
 
     wallet_router_sign_transactions_signal = rpc_client.wait_for_signal("wallet.router.sign-transactions")
     wallet_router_sign_transactions = wallet_router_sign_transactions_signal["event"]
@@ -54,10 +51,7 @@ def sign_messages(rpc_client, hashes, address):
 
     for hash in hashes:
 
-        method = "wallet_signMessage"
-        params = [hash, address, Config.password]
-
-        response = rpc_client.rpc_valid_request(method, params)
+        response = rpc_client.wallet_service.sign_message(hash, address, Config.password)
 
         assert response and response.startswith("0x"), f"Invalid transaction signature for hash {hash}: {response}"
 
@@ -133,14 +127,12 @@ def check_fees_for_path(path_name, gas_fee_mode, check_approval, route):
 
 
 def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
-    method = "wallet_sendRouterTransactionsWithSignatures"
-    params = [{"uuid": uuid, "Signatures": tx_signatures}]
     rpc_client.prepare_wait_for_signal(
         SignalType.WALLET.value,
         1,
         lambda signal: signal["event"]["type"] == WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value,
     )
-    _ = rpc_client.rpc_valid_request(method, params)
+    _ = rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)
     event_response = rpc_client.wait_for_signal(SignalType.WALLET.value)["event"]
     tx_status = json.loads(event_response["message"].replace("'", '"'))
 

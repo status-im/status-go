@@ -55,9 +55,6 @@ class TestWalletAssets:
         tx_signatures = wallet_utils.sign_messages(self.rpc_client, build_tx["signingDetails"]["hashes"], input_params.get("addrFrom"))
 
         # Send tx, listen to reload tick signal
-        method = "wallet_sendRouterTransactionsWithSignatures"
-        params = [{"uuid": uuid, "Signatures": tx_signatures}]
-
         def accept_fn(signal):
             match signal["event"]["type"]:
                 case WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value:
@@ -73,7 +70,7 @@ class TestWalletAssets:
             2,
             accept_fn,
         )
-        _ = self.rpc_client.rpc_valid_request(method, params)
+        _ = self.rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)
         signals = self.rpc_client.wait_for_signal(SignalType.WALLET.value)
 
         # Verify

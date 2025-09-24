@@ -106,7 +106,6 @@ class TestWalletActivitySession:
         tx_data.append(wallet_utils.send_router_transaction(self.rpc_client, **input_params))
 
         # Start activity session
-        method = "wallet_startActivityFilterSessionV2"
         params = [
             [user_1.address],
             [self.rpc_client.network_id],  # type: ignore
@@ -127,7 +126,7 @@ class TestWalletActivitySession:
             1,
             lambda signal: signal["event"]["type"] == EventActivityFilteringDone,
         )
-        response = self.rpc_client.rpc_valid_request(method, params)
+        response = self.rpc_client.wallet_service.start_activity_filter_session_v2(params)
         event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
 
         # Check response
@@ -177,14 +176,12 @@ class TestWalletActivitySession:
         assert message["hasNewOnTop"]  # New entries reported
 
         # Reset activity session
-        method = "wallet_resetActivityFilterSession"
-        params = [sessionID, 10]
         self.rpc_client.prepare_wait_for_signal(
             "wallet",
             1,
             lambda signal: signal["event"]["type"] == EventActivityFilteringDone and signal["event"]["requestId"] == sessionID,
         )
-        response = self.rpc_client.rpc_valid_request(method, params)
+        response = self.rpc_client.wallet_service.reset_activity_filter_session(sessionID, 10)
         event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
 
         # Check response event
