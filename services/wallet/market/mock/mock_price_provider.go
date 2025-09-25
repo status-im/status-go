@@ -4,6 +4,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	mock_thirdparty "github.com/status-im/status-go/services/wallet/thirdparty/mock"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 type MockPriceProvider struct {
@@ -25,12 +26,12 @@ func (mpp *MockPriceProvider) ID() string {
 	return "MockPriceProvider"
 }
 
-func (mpp *MockPriceProvider) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
+func (mpp *MockPriceProvider) FetchPrices(tokens []*tokentypes.Token, currencies []string) (map[string]map[string]float64, error) {
 	res := make(map[string]map[string]float64)
-	for _, symbol := range symbols {
-		res[symbol] = make(map[string]float64)
+	for _, token := range tokens {
+		res[token.Key()] = make(map[string]float64)
 		for _, currency := range currencies {
-			res[symbol][currency] = mpp.mockPrices[symbol][currency]
+			res[token.Key()][currency] = mpp.mockPrices[token.Key()][currency]
 		}
 	}
 	return res, nil
@@ -49,6 +50,6 @@ func NewMockPriceProviderWithError(ctrl *gomock.Controller, err error) *MockPric
 	}
 }
 
-func (mpp *MockPriceProviderWithError) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
+func (mpp *MockPriceProviderWithError) FetchPrices(tokens []*tokentypes.Token, currencies []string) (map[string]map[string]float64, error) {
 	return nil, mpp.err
 }

@@ -1,7 +1,9 @@
 package cryptocompare_tests
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
@@ -9,6 +11,7 @@ import (
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/token"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 
@@ -17,7 +20,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func getTokenSymbols(t *testing.T) []string {
+func getTokenSymbols(t *testing.T) []*tokentypes.Token {
 	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
@@ -55,36 +58,31 @@ func getTokenSymbols(t *testing.T) []string {
 	networkManager.EXPECT().GetEmbeddedNetworks().Return(networksList).AnyTimes()
 
 	// Skeleton token store to get full list of tokens
-	tm := token.NewTokenManager(walletDB, nil, nil, networkManager, appDB, nil, nil, nil, nil, nil)
-
-	tokens, err := tm.GetAllTokens()
+	tm, err := token.NewTokenManager(walletDB, nil, nil, networkManager, appDB, nil, nil, nil, nil, time.Hour, time.Hour)
 	require.NoError(t, err)
 
-	symbolsMap := make(map[string]bool)
-	for _, token := range tokens {
-		symbolsMap[token.Symbol] = true
-	}
+	err = tm.Start(context.Background())
+	require.NoError(t, err)
 
-	symbols := make([]string, 0, len(symbolsMap))
-	for symbol := range symbolsMap {
-		symbols = append(symbols, symbol)
-	}
+	tokens, err := tm.GetTokensForActiveNetworksMode()
+	require.NoError(t, err)
+	require.Greater(t, len(tokens), 0)
 
-	return symbols
+	return tokens
 }
 
 func TestFetchPrices(t *testing.T) {
-	symbols := getTokenSymbols(t)
+	tokens := getTokenSymbols(t)
 
 	stdClient := cryptocompare.NewClient()
-	_, err := stdClient.FetchPrices(symbols, []string{"USD"})
+	_, err := stdClient.FetchPrices(tokens, []string{"USD"})
 	require.NoError(t, err)
 }
 
 func TestFetchTokenMarketValues(t *testing.T) {
-	symbols := getTokenSymbols(t)
+	tokens := getTokenSymbols(t)
 
 	stdClient := cryptocompare.NewClient()
-	_, err := stdClient.FetchTokenMarketValues(symbols, "USD")
+	_, err := stdClient.FetchTokenMarketValues(tokens, "USD")
 	require.NoError(t, err)
 }

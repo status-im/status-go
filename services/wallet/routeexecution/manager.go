@@ -17,8 +17,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
-	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -31,14 +31,16 @@ const (
 
 type Manager struct {
 	router             *router.Router
+	tokenManager       *token.Manager
 	transactionManager *transfer.TransactionManager
 	db                 *storage.DB
 	eventFeed          *event.Feed
 }
 
-func NewManager(walletDB *sql.DB, eventFeed *event.Feed, router *router.Router, transactionManager *transfer.TransactionManager) *Manager {
+func NewManager(walletDB *sql.DB, eventFeed *event.Feed, router *router.Router, tokenManager *token.Manager, transactionManager *transfer.TransactionManager) *Manager {
 	return &Manager{
 		router:             router,
+		tokenManager:       tokenManager,
 		transactionManager: transactionManager,
 		db:                 storage.NewDB(walletDB),
 		eventFeed:          eventFeed,
@@ -82,20 +84,22 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 			return
 		}
 
+		tokenFrom, _ := m.tokenManager.GetTokenByKey(routeInputParams.TokenKey)
+		tokenTo, _ := m.tokenManager.GetTokenByKey(routeInputParams.ToTokenKey)
+
 		// re-use path processor input params structure to pass extra params to transaction manager
 		var extraParams pathprocessor.ProcessorInputParams
-		extraParams, err = m.router.CreateProcessorInputParams(&routeInputParams, nil, nil, nil, nil, 0)
+		extraParams, err = m.router.CreateProcessorInputParams(&routeInputParams, tokenFrom, tokenTo, 0)
 		if err != nil {
 			return
 		}
 
-		fromChainID, toChainID := route.GetFirstPathChains()
-
-		response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
+		response.SendDetails.UpdateFields(routeInputParams, routeInputParams.FromChainID, routeInputParams.ToChainID)
 
 		// notify client that sending transactions started (has 3 steps, building txs, signing txs, sending txs)
 		signal.SendWalletEvent(signal.RouterSendingTransactionsStarted, response.SendDetails)
 
+		var fromChainID, toChainID uint64
 		response.SigningDetails, fromChainID, toChainID, err = m.transactionManager.BuildTransactionsFromRoute(
 			route,
 			m.router.GetPathProcessors(),
@@ -113,7 +117,6 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 
 		var (
 			err              error
-			route            routes.Route
 			routeInputParams requests.RouteInputParams
 		)
 		response := &responses.RouterSentTransactions{
@@ -150,17 +153,15 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			m.eventFeed.Send(event)
 		}()
 
-		route, routeInputParams = m.router.GetBestRouteAndAssociatedInputParams()
+		_, routeInputParams = m.router.GetBestRouteAndAssociatedInputParams()
 		if routeInputParams.Uuid != sendInputParams.Uuid {
 			err = ErrCannotResolveRouteId
 			return
 		}
 
-		fromChainID, toChainID := route.GetFirstPathChains()
+		response.SendDetails.UpdateFields(routeInputParams, routeInputParams.FromChainID, routeInputParams.ToChainID)
 
-		response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
-
-		fromChainID, toChainID, err = m.transactionManager.ValidateAndAddSignaturesToRouterTransactions(sendInputParams.Signatures)
+		fromChainID, toChainID, err := m.transactionManager.ValidateAndAddSignaturesToRouterTransactions(sendInputParams.Signatures)
 		if err != nil {
 			response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
 			return

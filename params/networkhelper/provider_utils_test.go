@@ -6,6 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -180,8 +182,8 @@ func TestDeepCopyNetwork(t *testing.T) {
 		*params.NewDirectProvider(walletcommon.EthereumMainnet, "Provider2", security.NewSensitiveString("https://mainnet.infura.io/v3/"), true),
 	})
 
-	originalNetwork.TokenOverrides = []params.TokenOverride{
-		{Symbol: "token1", Address: common.HexToAddress("0x123")},
+	originalNetwork.TokenOverrides = []types.Token{
+		{ChainID: walletcommon.EthereumMainnet, Address: common.HexToAddress("0x123")},
 	}
 
 	copiedNetwork := originalNetwork.DeepCopy()
@@ -190,7 +192,9 @@ func TestDeepCopyNetwork(t *testing.T) {
 
 	// Modify the copied network and verify that the original network remains unchanged
 	copiedNetwork.RpcProviders[0].Enabled = false
-	copiedNetwork.TokenOverrides[0].Symbol = "modifiedSymbol"
+	copiedNetwork.TokenOverrides[0].ChainID = walletcommon.OptimismMainnet
+	copiedNetwork.TokenOverrides[0].Address = common.HexToAddress("0x456")
 	assert.NotEqual(t, originalNetwork.RpcProviders[0].Enabled, copiedNetwork.RpcProviders[0].Enabled, "Original network should remain unchanged")
-	assert.NotEqual(t, originalNetwork.TokenOverrides[0].Symbol, copiedNetwork.TokenOverrides[0].Symbol, "Original network should remain unchanged")
+	assert.NotEqual(t, originalNetwork.TokenOverrides[0].ChainID, copiedNetwork.TokenOverrides[0].ChainID, "Original network should remain unchanged")
+	assert.NotEqual(t, originalNetwork.TokenOverrides[0].Address, copiedNetwork.TokenOverrides[0].Address, "Original network should remain unchanged")
 }

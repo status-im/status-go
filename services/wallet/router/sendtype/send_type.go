@@ -3,7 +3,6 @@ package sendtype
 import (
 	"math/big"
 
-	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 )
@@ -108,23 +107,23 @@ func (s SendType) ProcessZeroAmountInProcessor(amountIn *big.Int, amountOut *big
 	return true
 }
 
-func (s SendType) IsAvailableBetween(from, to *params.Network) bool {
+func (s SendType) IsAvailableBetween(fromChainID, toChainID uint64) bool {
 	if s.IsCollectiblesTransfer() ||
 		s.IsEnsTransfer() ||
 		s.IsStickersTransfer() ||
 		s.IsCommunityRelatedTransfer() ||
 		s == Swap {
-		return from.ChainID == to.ChainID
+		return fromChainID == toChainID
 	}
 
 	if s == Bridge {
-		return from.ChainID != to.ChainID
+		return fromChainID != toChainID
 	}
 
 	return true
 }
 
-func (s SendType) IsAvailableFor(network *params.Network) bool {
+func (s SendType) IsAvailableFor(chainID uint64) bool {
 	// Check for Swap specific networks
 	if s == Swap {
 		swapAllowedNetworks := map[uint64]bool{
@@ -134,7 +133,7 @@ func (s SendType) IsAvailableFor(network *params.Network) bool {
 			walletCommon.BaseMainnet:     true,
 			walletCommon.BSCMainnet:      true,
 		}
-		_, ok := swapAllowedNetworks[network.ChainID]
+		_, ok := swapAllowedNetworks[chainID]
 		return ok
 	}
 
@@ -149,12 +148,12 @@ func (s SendType) IsAvailableFor(network *params.Network) bool {
 			walletCommon.BaseMainnet:     true,
 			walletCommon.BaseSepolia:     true,
 		}
-		_, ok := bridgeAllowedNetworks[network.ChainID]
+		_, ok := bridgeAllowedNetworks[chainID]
 		return ok
 	}
 
 	if s.IsEnsTransfer() || s.IsStickersTransfer() {
-		return network.ChainID == walletCommon.EthereumMainnet || network.ChainID == walletCommon.EthereumSepolia
+		return chainID == walletCommon.EthereumMainnet || chainID == walletCommon.EthereumSepolia
 	}
 
 	return true

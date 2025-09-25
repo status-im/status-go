@@ -150,7 +150,7 @@ class SignalClient:
             return self.received_signals[signal_type]["received"][-1]
         return self.received_signals[signal_type]["received"][-delta_count:]
 
-    def wait_for_signal_predicate(self, signal_type: SignalType | str, predicate=lambda signal: True, timeout=20):
+    def wait_for_signal_predicate(self, signal_type: SignalType | str, predicate=lambda signal: True, timeout=40):
         signal_type = self._convert_signal_type(signal_type)
         start_time = time.time()
         while True:

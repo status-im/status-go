@@ -5,14 +5,19 @@ package token
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
-	"strings"
+	"slices"
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/autofetcher"
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/fetcher"
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/manager"
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/parsers"
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -21,125 +26,222 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/contracts/community-tokens/assets"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
-	"github.com/status-im/status-go/services/utils"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
-	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
-	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/local-token-lists/default-lists"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/signal"
 )
 
 const (
+	remoteListOfTokenListsID = "status-list-of-token-lists" // #nosec G101
+	// #nosec G101
+	remoteListOfTokenLists = "https://prod.market.status.im/static/lists.json"
+
+	communityTokenListName   = "Community tokens"
+	communityTokenListSource = "local"
+
 	EventCommunityTokenReceived walletevent.EventType = "wallet-community-token-received"
 )
 
 type ReceivedToken struct {
-	tokenTypes.Token
+	tokentypes.Token
 	Amount  float64     `json:"amount"`
 	TxHash  common.Hash `json:"txHash"`
 	IsFirst bool        `json:"isFirst"`
 }
 
-type List struct {
-	Name                string              `json:"name"`
-	Tokens              []*tokenTypes.Token `json:"tokens"`
-	Source              string              `json:"source"`
-	Version             string              `json:"version"`
-	LastUpdateTimestamp int64               `json:"lastUpdateTimestamp"`
+type CommunityTokenImageBuilder interface {
+	MakeCommunityTokenImagesURL(communityID string, chainID uint64, symbol string) string
 }
-
-type ListWrapper struct {
-	UpdatedAt int64   `json:"updatedAt"`
-	Data      []*List `json:"data"`
-}
-
-type addressTokenMap = map[common.Address]*tokenTypes.Token
-type storeMap = map[uint64]addressTokenMap
 
 type ManagerInterface interface {
-	LookupTokenIdentity(chainID uint64, address common.Address, native bool) *tokenTypes.Token
-	LookupToken(chainID *uint64, tokenSymbol string) (token *tokenTypes.Token, isNative bool)
-	GetTokensByChainIDs(chainIDs []uint64) ([]*tokenTypes.Token, error)
-	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) *tokenTypes.Token
-	MarkAsPreviouslyOwnedToken(token *tokenTypes.Token, owner common.Address) (bool, error)
-	SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *tokenTypes.Token, isFirst bool)
+	GetTokenByChainAddress(chainID uint64, address common.Address) (*tokentypes.Token, error)
+	GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, error)
+	GetCachedBalances() (map[common.Address][]tokentypes.StorageToken, error)
+	CacheBalances(balances map[common.Address][]tokentypes.StorageToken) error
+	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error)
+	MarkAsPreviouslyOwnedToken(token *tokentypes.Token, owner common.Address) (bool, error)
+	SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *tokentypes.Token, isFirst bool)
 }
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
-	db                   *sql.DB
-	ethClientGetter      rpc.EthClientGetter
-	ContractMaker        *contracts.ContractMaker
-	networkManager       network.ManagerInterface
-	communityTokensDB    *communitytokensdatabase.Database
-	communityManager     *community.Manager
-	mediaServer          *server.MediaServer
-	walletFeed           *event.Feed
-	accountsDB           *accounts.Database
-	accountsPublisher    *pubsub.Publisher
-	tokenBalancesStorage TokenBalancesStorage
+	walletDB                   *sql.DB
+	settings                   *settings.Database
+	ethClientGetter            rpc.EthClientGetter
+	ContractMaker              *contracts.ContractMaker
+	networkManager             network.ManagerInterface
+	communityTokensDB          *communitytokensdatabase.Database
+	communityManager           *community.Manager
+	communityTokenImageBuilder CommunityTokenImageBuilder
+	walletFeed                 *event.Feed
+	accountsDB                 *accounts.Database
+	accountsPublisher          *pubsub.Publisher
+	tokenBalancesStorage       balanceStorage
 
-	tokenLists *tokenlists.TokenLists
+	tokensManager manager.Manager
 
-	stopCh chan struct{}
+	stopCh   chan struct{}
+	notifyCh chan struct{}
 }
 
 func NewTokenManager(
-	db *sql.DB,
+	walletDB *sql.DB,
 	ethClientGetter rpc.EthClientGetter,
 	communityManager *community.Manager,
 	networkManager network.ManagerInterface,
 	appDB *sql.DB,
-	mediaServer *server.MediaServer,
+	communityTokenImageBuilder CommunityTokenImageBuilder,
 	walletFeed *event.Feed,
 	accountsPublisher *pubsub.Publisher,
 	accountsDB *accounts.Database,
-	tokenBalancesStorage TokenBalancesStorage,
-) *Manager {
+	autoRefreshInterval time.Duration,
+	autoRefreshCheckInterval time.Duration,
+) (*Manager, error) {
 	maker := contracts.NewContractMaker(ethClientGetter)
 
-	tokensLists, err := tokenlists.NewTokenLists(appDB, db)
+	settings, err := settings.MakeNewDB(appDB)
 	if err != nil {
-		logutils.ZapLogger().Error("Failed to create token lists", zap.Error(err))
-		return nil
+		return nil, err
 	}
 
-	return &Manager{
-		db:                   db,
-		ethClientGetter:      ethClientGetter,
-		ContractMaker:        maker,
-		networkManager:       networkManager,
-		communityManager:     communityManager,
-		communityTokensDB:    communitytokensdatabase.NewCommunityTokensDatabase(appDB),
-		mediaServer:          mediaServer,
-		walletFeed:           walletFeed,
-		accountsPublisher:    accountsPublisher,
-		accountsDB:           accountsDB,
-		tokenBalancesStorage: tokenBalancesStorage,
-		tokenLists:           tokensLists,
+	lastTokensUpdate, err := settings.LastTokensUpdate()
+	if err != nil {
+		return nil, err
 	}
+
+	manager := &Manager{
+		walletDB:                   walletDB,
+		settings:                   settings,
+		ethClientGetter:            ethClientGetter,
+		ContractMaker:              maker,
+		networkManager:             networkManager,
+		communityManager:           communityManager,
+		communityTokensDB:          communitytokensdatabase.NewCommunityTokensDatabase(appDB),
+		communityTokenImageBuilder: communityTokenImageBuilder,
+		walletFeed:                 walletFeed,
+		accountsPublisher:          accountsPublisher,
+		accountsDB:                 accountsDB,
+		tokenBalancesStorage:       balanceStorage{walletDB: walletDB},
+	}
+
+	tokensManager, err := setUpTokenListsManager(manager, walletDB, lastTokensUpdate, autoRefreshInterval, autoRefreshCheckInterval)
+	if err != nil {
+		logutils.ZapLogger().Error("Failed to create token lists manager", zap.Error(err))
+		return nil, err
+	}
+
+	manager.tokensManager = tokensManager
+
+	return manager, nil
+
 }
 
-func (tm *Manager) Start(ctx context.Context, autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) {
+func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, lastUpdate time.Time, autoRefreshInterval time.Duration,
+	autoRefreshCheckInterval time.Duration) (manager.Manager, error) {
+
+	wsdkFetcher := fetcher.New(fetcher.DefaultConfig())
+
+	contentStore := NewContentStore(walletDB)
+
+	customTokenStore := NewCustomTokenStore(mng)
+
+	config := &manager.Config{
+		AutoFetcherConfig: &autofetcher.ConfigRemoteListOfTokenLists{
+			Config: autofetcher.Config{
+				LastUpdate:               lastUpdate,
+				AutoRefreshInterval:      autoRefreshInterval,
+				AutoRefreshCheckInterval: autoRefreshCheckInterval,
+			},
+			RemoteListOfTokenListsFetchDetails: types.ListDetails{
+				ID:        remoteListOfTokenListsID,
+				SourceURL: remoteListOfTokenLists,
+				Schema:    fetcher.ListOfTokenListsSchema,
+			},
+			RemoteListOfTokenListsParser: &parsers.StatusListOfTokenListsParser{},
+		},
+
+		MainListID: walletcommon.StatusTokenListID,
+
+		InitialLists: map[string][]byte{
+			walletcommon.StatusTokenListID:            defaulttokenlists.StatusTokenList.JsonData,
+			walletcommon.UniswapTokenListID:           defaulttokenlists.UniswapTokenList.JsonData,
+			walletcommon.CoingeckoEthereumTokenListID: defaulttokenlists.CoingeckoEthereumTokenList.JsonData,
+			walletcommon.CoingeckoOptimismTokenListID: defaulttokenlists.CoingeckoOptimismTokenList.JsonData,
+			walletcommon.CoingeckoArbitrumTokenListID: defaulttokenlists.CoingeckoArbitrumTokenList.JsonData,
+			walletcommon.CoingeckoBSCTokenListID:      defaulttokenlists.CoingeckoBscTokenList.JsonData,
+			walletcommon.CoingeckoBaseTokenListID:     defaulttokenlists.CoingeckoBaseTokenList.JsonData,
+		},
+		CustomParsers: map[string]parsers.TokenListParser{
+			walletcommon.StatusTokenListID: &parsers.StatusTokenListParser{},
+		},
+
+		Chains: walletcommon.AllChainIDsAsUint64(),
+	}
+
+	return manager.New(config, wsdkFetcher, contentStore, customTokenStore)
+}
+
+func (tm *Manager) Start(ctx context.Context) error {
 	tm.stopCh = make(chan struct{})
 	tm.startAccountsWatcher()
 
-	// For now we don't have the list of tokens lists remotely set so we're uisng the harcoded default lists. Once we have it
-	//we will just need to update the empty string with the correct URL.
-	tm.tokenLists.Start(ctx, fetcher.RemoteListOfTokenLists, autoRefreshInterval, autoRefreshCheckInterval)
+	tm.notifyCh = make(chan struct{})
+	return tm.startTokenListsNotifier(ctx)
+}
+
+func (tm *Manager) startTokenListsNotifier(ctx context.Context) error {
+	thirdpartyServicesEnabled, err := tm.settings.ThirdpartyServicesEnabled()
+	if err != nil {
+		logutils.ZapLogger().Error("failed to get if thirdparty services are enabled", zap.Error(err))
+		return err
+	}
+	autoRefreshEnabled, err := tm.settings.AutoRefreshTokensEnabled()
+	if err != nil {
+		logutils.ZapLogger().Error("failed to get auto refresh tokens enabled", zap.Error(err))
+		return err
+	}
+
+	autoRefresh := thirdpartyServicesEnabled && autoRefreshEnabled
+
+	err = tm.tokensManager.Start(ctx, autoRefresh, tm.notifyCh)
+	if err != nil {
+		logutils.ZapLogger().Error("failed to start token lists notifier", zap.Error(err))
+		return err
+	}
+
+	go func() {
+		defer gocommon.LogOnPanic()
+		for {
+			select {
+			case <-tm.stopCh:
+				err := tm.tokensManager.Stop()
+				if err != nil {
+					logutils.ZapLogger().Error("failed to stop token lists notifier", zap.Error(err))
+				}
+				return
+			case <-tm.notifyCh:
+				err := tm.setLastTokenListsRefreshTime(time.Now().UTC())
+				if err != nil {
+					logutils.ZapLogger().Error("failed to set last tokens update", zap.Error(err))
+				}
+				signal.SendWalletEvent(signal.TokenListsUpdated, nil)
+			}
+		}
+	}()
+
+	return nil
 }
 
 func (tm *Manager) startAccountsWatcher() {
@@ -170,138 +272,236 @@ func (tm *Manager) Stop() {
 		close(tm.stopCh)
 		tm.stopCh = nil
 	}
-	tm.tokenLists.Stop()
 }
 
-// overrideTokensInPlace overrides tokens in the store with the ones from the networks
-// BEWARE: overridden tokens will have their original address removed and replaced by the one in networks
-func overrideTokensInPlace(networks []params.Network, tokens []*tokenTypes.Token) {
-	for _, network := range networks {
-		if len(network.TokenOverrides) == 0 {
+func (tm *Manager) GetTokenByChainAddress(chainID uint64, address common.Address) (*tokentypes.Token, error) {
+	if token, ok := tm.tokensManager.GetTokenByChainAddress(chainID, address); ok {
+		return &tokentypes.Token{Token: token}, nil
+	}
+
+	// search in the custom tokens
+	communityToken, err := tm.getCustomByChainAddress(true, chainID, address)
+	if err != nil {
+		return nil, err
+	}
+	return communityToken, nil
+}
+
+func (tm *Manager) GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, error) {
+	wsdkTokens, err := tm.tokensManager.GetTokensByKeys(tokenKeys)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens := make([]*tokentypes.Token, 0)
+	for _, token := range wsdkTokens {
+		tokens = append(tokens, &tokentypes.Token{Token: token})
+	}
+
+	communityTokens, err := tm.GetCustoms(true)
+	if err != nil {
+		return nil, err
+	}
+	for _, token := range communityTokens {
+		if !slices.Contains(tokenKeys, token.Key()) {
 			continue
 		}
-
-		for _, overrideToken := range network.TokenOverrides {
-			for _, token := range tokens {
-				if token.Symbol == overrideToken.Symbol {
-					token.Address = overrideToken.Address
-				}
-			}
-		}
-	}
-}
-
-func (tm *Manager) FindToken(network *params.Network, tokenSymbol string) *tokenTypes.Token {
-	if tokenSymbol == network.NativeCurrencySymbol {
-		return tm.ToToken(network)
+		tokens = append(tokens, token)
 	}
 
-	return tm.GetToken(network.ChainID, tokenSymbol)
+	return tokens, nil
 }
 
-func (tm *Manager) LookupToken(chainID *uint64, tokenSymbol string) (token *tokenTypes.Token, isNative bool) {
-	if chainID == nil {
-		networks, err := tm.networkManager.Get(false)
-		if err != nil {
-			return nil, false
-		}
-
-		for _, network := range networks {
-			if tokenSymbol == network.NativeCurrencySymbol {
-				return tm.ToToken(network), true
-			}
-			token := tm.GetToken(network.ChainID, tokenSymbol)
-			if token != nil {
-				return token, false
-			}
-		}
-	} else {
-		network := tm.networkManager.Find(*chainID)
-		if network != nil && tokenSymbol == network.NativeCurrencySymbol {
-			return tm.ToToken(network), true
-		}
-		return tm.GetToken(*chainID, tokenSymbol), false
+func (tm *Manager) GetTokenByKey(tokenKey string) (*tokentypes.Token, error) {
+	if tokenKey == "" {
+		return nil, errors.New("token key is empty")
 	}
-	return nil, false
+	chainID, address, ok := types.ChainAndAddressFromTokenKey(tokenKey)
+	if !ok {
+		return nil, errors.New("token key is invalid")
+	}
+	return tm.GetTokenByChainAddress(chainID, address)
 }
 
-// GetToken returns token by chainID and tokenSymbol. Use ToToken for native token
-func (tm *Manager) GetToken(chainID uint64, tokenSymbol string) *tokenTypes.Token {
-	allTokens, err := tm.GetTokens(chainID)
+func (tm *Manager) GetNativeTokenForChain(chainID uint64) (*tokentypes.Token, error) {
+	return tm.GetTokenByChainAddress(chainID, common.Address{})
+}
+
+func (tm *Manager) GetTokensByChain(chainID uint64) ([]*tokentypes.Token, error) {
+	wsdkTokens := tm.tokensManager.GetTokensByChain(chainID)
+	tokens := make([]*tokentypes.Token, 0)
+	for _, token := range wsdkTokens {
+		tokens = append(tokens, &tokentypes.Token{Token: token})
+	}
+
+	communityTokens, err := tm.GetCustoms(true)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	for _, token := range allTokens {
-		if token.Symbol == tokenSymbol {
-			return token
-		}
-	}
-	return nil
-}
-
-func (tm *Manager) LookupTokenIdentity(chainID uint64, address common.Address, native bool) *tokenTypes.Token {
-	network := tm.networkManager.Find(chainID)
-	if native {
-		return tm.ToToken(network)
-	}
-
-	return tm.FindTokenByAddress(chainID, address)
-}
-
-func (tm *Manager) FindTokenByAddress(chainID uint64, address common.Address) *tokenTypes.Token {
-	allTokens, err := tm.GetTokens(chainID)
-	if err != nil {
-		return nil
-	}
-	for _, token := range allTokens {
-		if token.Address == address {
-			return token
-		}
-	}
-
-	return nil
-}
-
-func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) *tokenTypes.Token {
-	uniqueListsTokens := tm.tokenLists.GetUniqueTokens()
-	// If token comes datasource, simply returns it
-	for _, token := range uniqueListsTokens {
+	for _, token := range communityTokens {
 		if token.ChainID != chainID {
 			continue
 		}
-		if token.Address == address {
-			return token
+		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
+
+func (tm *Manager) GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, error) {
+	allWsdkTokens := tm.tokensManager.UniqueTokens()
+	tokens := make([]*tokentypes.Token, 0)
+	for _, token := range allWsdkTokens {
+		if slices.Contains(chainIDs, token.ChainID) {
+			tokens = append(tokens, &tokentypes.Token{Token: token})
 		}
 	}
 
-	// Create custom token if not known or try to link with a community
-	customTokens, err := tm.GetCustoms(false)
+	communityTokens, err := tm.GetCustoms(true)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-
-	for _, token := range customTokens {
-		if token.Address == address {
-			tm.discoverTokenCommunityID(ctx, token, address)
-			return token
+	for _, token := range communityTokens {
+		if !slices.Contains(chainIDs, token.ChainID) {
+			continue
 		}
+		tokens = append(tokens, token)
 	}
 
-	token, err := tm.DiscoverToken(ctx, chainID, address)
+	return tokens, nil
+}
+
+func (tm *Manager) GetTokensForActiveNetworksMode() ([]*tokentypes.Token, error) {
+	testnetMode, err := tm.settings.GetTestNetworksEnabled()
 	if err != nil {
-		return nil
+		return nil, err
+	}
+
+	chainIDs := make([]uint64, 0)
+	for _, chainID := range walletcommon.AllChainIDs() {
+		if chainID.IsMainnet() == testnetMode {
+			continue
+		}
+		chainIDs = append(chainIDs, uint64(chainID))
+	}
+
+	return tm.GetTokensByChains(chainIDs)
+}
+
+func (tm *Manager) GetAllTokens() ([]*tokentypes.Token, error) {
+	wsdkTokens := tm.tokensManager.UniqueTokens()
+	tokens := make([]*tokentypes.Token, 0)
+	for _, token := range wsdkTokens {
+		tokens = append(tokens, &tokentypes.Token{Token: token})
+	}
+
+	communityTokens, err := tm.GetCustoms(true)
+	if err != nil {
+		return nil, err
+	}
+	tokens = append(tokens, communityTokens...)
+	return tokens, nil
+}
+
+func (tm *Manager) GetTokenList(id string) (*tokentypes.TokenList, error) {
+	if id == walletcommon.CommunityTokenListID {
+		communityTokens, err := tm.GetCustoms(true)
+		if err != nil {
+			return nil, err
+		}
+		return &tokentypes.TokenList{
+			TokenList: &types.TokenList{
+				ID:     walletcommon.CommunityTokenListID,
+				Name:   communityTokenListName,
+				Source: communityTokenListSource,
+			},
+			Tokens: communityTokens,
+		}, nil
+	}
+
+	wsdkTokenList, ok := tm.tokensManager.TokenList(id)
+	if ok {
+		tokenList := &tokentypes.TokenList{TokenList: wsdkTokenList}
+		tokenList.Tokens = make([]*tokentypes.Token, 0)
+		for _, token := range wsdkTokenList.Tokens {
+			tokenList.Tokens = append(tokenList.Tokens, &tokentypes.Token{Token: token})
+		}
+		return tokenList, nil
+	}
+
+	return nil, fmt.Errorf("token list %s not found", id)
+}
+
+func (tm *Manager) GetAllTokenLists() ([]*tokentypes.TokenList, error) {
+	wsdkTokenLists := tm.tokensManager.TokenLists()
+	tokenLists := make([]*tokentypes.TokenList, 0)
+	for _, wsdkTokenList := range wsdkTokenLists {
+		tokenList := &tokentypes.TokenList{TokenList: wsdkTokenList}
+		tokenList.Tokens = make([]*tokentypes.Token, 0)
+		for _, token := range wsdkTokenList.Tokens {
+			tokenList.Tokens = append(tokenList.Tokens, &tokentypes.Token{Token: token})
+		}
+		tokenLists = append(tokenLists, tokenList)
+	}
+
+	communityTokens, err := tm.GetCustoms(true)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenList := &tokentypes.TokenList{TokenList: &types.TokenList{
+		ID:     walletcommon.CommunityTokenListID,
+		Name:   communityTokenListName,
+		Source: communityTokenListSource,
+	}}
+
+	tokenList.Tokens = make([]*tokentypes.Token, 0)
+	tokenList.Tokens = append(tokenList.Tokens, communityTokens...)
+
+	tokenLists = append(tokenLists, tokenList)
+
+	return tokenLists, nil
+}
+
+func (tm *Manager) GetCachedBalances() (map[common.Address][]tokentypes.StorageToken, error) {
+	return tm.tokenBalancesStorage.getBalances()
+}
+
+func (tm *Manager) CacheBalances(balances map[common.Address][]tokentypes.StorageToken) error {
+	return tm.tokenBalancesStorage.saveBalances(balances)
+}
+
+func (tm *Manager) setLastTokenListsRefreshTime(time time.Time) error {
+	return tm.settings.SaveSettingField(settings.LastTokensUpdate, time)
+}
+
+func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error) {
+	token, err := tm.GetTokenByChainAddress(chainID, address)
+	if err == nil && token != nil {
+		if token.CommunityData == nil && !token.CustomToken {
+			return token, nil
+		}
+
+		tm.discoverTokenCommunityID(ctx, token, address)
+		return token, nil
+	}
+
+	// Not found among known tokens, discover it and insert it into the `tokens` table
+	token, err = tm.DiscoverToken(ctx, chainID, address)
+	if err != nil {
+		return nil, err
 	}
 
 	err = tm.UpsertCustom(*token)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	tm.discoverTokenCommunityID(ctx, token, address)
-	return token
+	return token, nil
 }
 
-func (tm *Manager) MarkAsPreviouslyOwnedToken(token *tokenTypes.Token, owner common.Address) (bool, error) {
+func (tm *Manager) MarkAsPreviouslyOwnedToken(token *tokentypes.Token, owner common.Address) (bool, error) {
 	logutils.ZapLogger().Info("Marking token as previously owned",
 		zap.Any("token", token),
 		zap.Stringer("owner", owner),
@@ -313,16 +513,16 @@ func (tm *Manager) MarkAsPreviouslyOwnedToken(token *tokenTypes.Token, owner com
 		return false, errors.New("owner is nil")
 	}
 
-	tokens, err := tm.tokenBalancesStorage.GetTokens()
+	tokenBalances, err := tm.tokenBalancesStorage.getBalances()
 	if err != nil {
 		return false, err
 	}
 
-	if tokens[owner] == nil {
-		tokens[owner] = make([]tokenTypes.StorageToken, 0)
+	if tokenBalances[owner] == nil {
+		tokenBalances[owner] = make([]tokentypes.StorageToken, 0)
 	} else {
-		for _, t := range tokens[owner] {
-			if t.Address == token.Address && t.ChainID == token.ChainID && t.Symbol == token.Symbol {
+		for _, t := range tokenBalances[owner] {
+			if t.TokenAddress == token.Token.Address && t.TokenChainID == token.Token.ChainID {
 				logutils.ZapLogger().Info("Token already marked as previously owned",
 					zap.Any("token", token),
 					zap.Stringer("owner", owner),
@@ -333,20 +533,15 @@ func (tm *Manager) MarkAsPreviouslyOwnedToken(token *tokenTypes.Token, owner com
 	}
 
 	// append token to the list of tokens
-	tokens[owner] = append(tokens[owner], tokenTypes.StorageToken{
-		Token: *token,
-		BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
-			token.ChainID: {
-				RawBalance: "0",
-				Balance:    &big.Float{},
-				Address:    token.Address,
-				ChainID:    token.ChainID,
-			},
-		},
+	tokenBalances[owner] = append(tokenBalances[owner], tokentypes.StorageToken{
+		TokenAddress: token.Token.Address,
+		TokenChainID: token.Token.ChainID,
+		RawBalance:   "0",
+		Balance:      &big.Float{},
 	})
 
 	// save the updated list of tokens
-	err = tm.tokenBalancesStorage.SaveTokens(tokens)
+	err = tm.tokenBalancesStorage.saveBalances(tokenBalances)
 	if err != nil {
 		return false, err
 	}
@@ -354,200 +549,21 @@ func (tm *Manager) MarkAsPreviouslyOwnedToken(token *tokenTypes.Token, owner com
 	return true, nil
 }
 
-func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *tokenTypes.Token, address common.Address) {
-	if token == nil || token.CommunityData != nil {
-		// Token is invalid or is alrady discovered. Nothing to do here.
-		return
-	}
-	backend, err := tm.ethClientGetter.EthClient(token.ChainID)
-	if err != nil {
-		return
-	}
-	caller, err := assets.NewAssetsCaller(address, backend)
-	if err != nil {
-		return
-	}
-	uri, err := caller.BaseTokenURI(&bind.CallOpts{
-		Context: ctx,
-	})
-	if err != nil {
-		return
-	}
-
-	update, err := tm.db.Prepare("UPDATE tokens SET community_id=? WHERE network_id=? AND address=?")
-	if err != nil {
-		logutils.ZapLogger().Error("Cannot prepare token update query", zap.Error(err))
-		return
-	}
-	defer update.Close()
-
-	if uri == "" {
-		// Update token community ID to prevent further checks
-		_, err := update.Exec("", token.ChainID, token.Address)
-		if err != nil {
-			logutils.ZapLogger().Error("Cannot update community id", zap.Error(err))
-		}
-		return
-	}
-
-	uri = strings.TrimSuffix(uri, "/")
-	communityIDHex, err := utils.DeserializePublicKey(uri)
-	if err != nil {
-		return
-	}
-	communityID := cryptotypes.EncodeHex(communityIDHex)
-
-	token.CommunityData = &community.Data{
-		ID: communityID,
-	}
-
-	_, err = update.Exec(communityID, token.ChainID, token.Address)
-	if err != nil {
-		logutils.ZapLogger().Error("Cannot update community id", zap.Error(err))
-	}
-}
-
-func (tm *Manager) FindSNT(chainID uint64) *tokenTypes.Token {
-	tokens, err := tm.GetTokens(chainID)
-	if err != nil {
-		return nil
-	}
-
-	for _, token := range tokens {
-		if token.Symbol == "SNT" || token.Symbol == "STT" {
-			return token
-		}
-	}
-
-	return nil
-}
-
-func (tm *Manager) getNativeTokens() ([]*tokenTypes.Token, error) {
-	tokens := make([]*tokenTypes.Token, 0)
-	networks, err := tm.networkManager.Get(false)
+func (tm *Manager) FindSNT(chainID uint64) (*tokentypes.Token, error) {
+	address, err := snt.ContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, network := range networks {
-		tokens = append(tokens, tm.ToToken(network))
-	}
-
-	return tokens, nil
-}
-
-func (tm *Manager) GetAllTokens() ([]*tokenTypes.Token, error) {
-	allTokens, err := tm.GetCustoms(true)
-	if err != nil {
-		logutils.ZapLogger().Error("can't fetch custom tokens", zap.Error(err))
-	}
-
-	uniqueListsTokens := tm.tokenLists.GetUniqueTokens()
-
-	allTokens = append(uniqueListsTokens, allTokens...)
-
-	overrideTokensInPlace(tm.networkManager.GetEmbeddedNetworks(), allTokens)
-
-	native, err := tm.getNativeTokens()
+	token, err := tm.GetTokenByChainAddress(chainID, address)
 	if err != nil {
 		return nil, err
 	}
 
-	allTokens = append(allTokens, native...)
-
-	return allTokens, nil
+	return token, nil
 }
 
-func (tm *Manager) GetTokens(chainID uint64) ([]*tokenTypes.Token, error) {
-	tokens, err := tm.GetAllTokens()
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]*tokenTypes.Token, 0)
-
-	for _, token := range tokens {
-		if token.ChainID == chainID {
-			res = append(res, token)
-		}
-	}
-
-	return res, nil
-}
-
-func (tm *Manager) GetTokensByChainIDs(chainIDs []uint64) ([]*tokenTypes.Token, error) {
-	tokens, err := tm.GetAllTokens()
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]*tokenTypes.Token, 0)
-
-	for _, token := range tokens {
-		for _, chainID := range chainIDs {
-			if token.ChainID == chainID {
-				res = append(res, token)
-			}
-		}
-	}
-
-	return res, nil
-}
-
-func (tm *Manager) GetList() *ListWrapper {
-	data := make([]*List, 0)
-	nativeTokens, err := tm.getNativeTokens()
-	if err == nil {
-		data = append(data, &List{
-			Name:    "native",
-			Tokens:  nativeTokens,
-			Source:  "native",
-			Version: "1.0.0",
-		})
-	}
-
-	customTokens, err := tm.GetCustoms(true)
-	if err == nil && len(customTokens) > 0 {
-		data = append(data, &List{
-			Name:    "custom",
-			Tokens:  customTokens,
-			Source:  "custom",
-			Version: "1.0.0",
-		})
-	}
-
-	tokensLists := tm.tokenLists.GetTokensLists()
-	for _, tokensList := range tokensLists {
-		timestamp, err := time.Parse(time.RFC3339, tokensList.Timestamp)
-		if err != nil {
-			logutils.ZapLogger().Error("Failed to parse timestamp", zap.Error(err))
-			continue
-		}
-		data = append(data, &List{
-			Name:                tokensList.Name,
-			Tokens:              tokensList.Tokens,
-			Source:              tokensList.Source,
-			Version:             tokensList.GetVersion(),
-			LastUpdateTimestamp: timestamp.Unix(),
-		})
-	}
-
-	lastUpdate, err := tm.tokenLists.LastTokensUpdate()
-	if err != nil {
-		logutils.ZapLogger().Error("Failed to get last update timestamp", zap.Error(err))
-	}
-	var updatedAt int64
-	if !lastUpdate.IsZero() {
-		updatedAt = lastUpdate.Unix()
-	}
-
-	return &ListWrapper{
-		Data:      data,
-		UpdatedAt: updatedAt,
-	}
-}
-
-func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*tokenTypes.Token, error) {
+func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error) {
 	caller, err := tm.ContractMaker.NewERC20(chainID, address)
 	if err != nil {
 		return nil, err
@@ -574,259 +590,45 @@ func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address co
 		return nil, err
 	}
 
-	return &tokenTypes.Token{
-		Address:  address,
-		Name:     name,
-		Symbol:   symbol,
-		Decimals: uint(decimal),
-		ChainID:  chainID,
+	return &tokentypes.Token{
+		Token: &types.Token{
+			Address:  address,
+			Name:     name,
+			Symbol:   symbol,
+			Decimals: uint(decimal),
+			ChainID:  chainID,
+		},
 	}, nil
 }
 
-func (tm *Manager) GetCommunityTokenType(chainID uint64, tokenContractAddress string) (protobuf.CommunityTokenType, error) {
-	if tm.communityTokensDB != nil {
-		return tm.communityTokensDB.GetTokenType(chainID, tokenContractAddress)
-	}
-	return protobuf.CommunityTokenType_UNKNOWN_TOKEN_TYPE, nil
-}
-
-func (tm *Manager) GetCommunityTokenPrivilegesLevel(chainID uint64, tokenContractAddress string) (token.PrivilegesLevel, error) {
-	if tm.communityTokensDB != nil {
-		return tm.communityTokensDB.GetTokenPrivilegesLevel(chainID, tokenContractAddress)
-	}
-	return token.CommunityLevel, nil
-}
-
-func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*tokenTypes.Token, error) {
-	communityTokens := []*token.CommunityToken{}
-	if tm.communityTokensDB != nil {
-		// Error is skipped because it's only returning optional metadata
-		communityTokens, _ = tm.communityTokensDB.GetCommunityERC20Metadata()
-	}
-
-	rows, err := tm.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var rst []*tokenTypes.Token
-	for rows.Next() {
-		token := &tokenTypes.Token{}
-		var communityIDDB sql.NullString
-		err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.ChainID, &communityIDDB)
-		if err != nil {
-			return nil, err
-		}
-
-		if communityIDDB.Valid {
-			communityID := communityIDDB.String
-			for _, communityToken := range communityTokens {
-				if communityToken.CommunityID != communityID || uint64(communityToken.ChainID) != token.ChainID || communityToken.Symbol != token.Symbol {
-					continue
-				}
-				token.Image = tm.mediaServer.MakeCommunityTokenImagesURL(communityID, token.ChainID, token.Symbol)
-				break
-			}
-
-			token.CommunityData = &community.Data{
-				ID: communityID,
-			}
-		}
-
-		_ = tm.fillCommunityData(token)
-
-		rst = append(rst, token)
-	}
-
-	return rst, nil
-}
-
-func (tm *Manager) GetCustoms(onlyCommunityCustoms bool) ([]*tokenTypes.Token, error) {
-	if onlyCommunityCustoms {
-		return tm.getTokensFromDB("SELECT address, name, symbol, decimals, network_id, community_id FROM tokens WHERE community_id IS NOT NULL AND community_id != ''")
-	}
-	return tm.getTokensFromDB("SELECT address, name, symbol, decimals, network_id, community_id FROM tokens")
-}
-
-func (tm *Manager) ToToken(network *params.Network) *tokenTypes.Token {
-	return &tokenTypes.Token{
-		// TODO: we need to change the address for the native token to the correct one, we cannot to that right now cause will affect other parts of the code
-		// The following line is the right fix for `{"error":"Validation failed: \"srcToken\" contains an invalid value"}` error for Swap
-		// Address:  common.HexToAddress("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"), // for all the chains we support this is the address of the native (ETH) token
-		Address:   common.HexToAddress("0x"),
-		Name:      network.NativeCurrencyName,
-		Symbol:    network.NativeCurrencySymbol,
-		TmpSymbol: network.NativeCurrencySymbol,
-		Decimals:  uint(network.NativeCurrencyDecimals),
-		ChainID:   network.ChainID,
-		Verified:  true,
-	}
-}
-
-func (tm *Manager) UpsertCustom(token tokenTypes.Token) error {
-	insert, err := tm.db.Prepare("INSERT OR REPLACE INTO TOKENS (network_id, address, name, symbol, decimals) VALUES (?, ?, ?, ?, ?)")
-	if err != nil {
-		return err
-	}
-	defer insert.Close()
-	_, err = insert.Exec(token.ChainID, token.Address, token.Name, token.Symbol, token.Decimals)
-	return err
-}
-
-func (tm *Manager) DeleteCustom(chainID uint64, address common.Address) error {
-	_, err := tm.db.Exec(`DELETE FROM TOKENS WHERE address = ? and network_id = ?`, address, chainID)
-	return err
-}
-
-func (tm *Manager) SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *tokenTypes.Token, isFirst bool) {
-	defer gocommon.LogOnPanic()
-	if tm.walletFeed == nil || t == nil || t.CommunityData == nil {
-		return
-	}
-
-	if len(t.CommunityData.Name) == 0 {
-		_ = tm.fillCommunityData(t)
-	}
-	if len(t.CommunityData.Name) == 0 && tm.communityManager != nil {
-		communityData, _ := tm.communityManager.FetchCommunityMetadata(t.CommunityData.ID)
-		if communityData != nil {
-			t.CommunityData.Name = communityData.CommunityName
-			t.CommunityData.Color = communityData.CommunityColor
-			t.CommunityData.Image = tm.communityManager.GetCommunityImageURL(t.CommunityData.ID)
-		}
-	}
-
-	floatAmount, _ := new(big.Float).Quo(new(big.Float).SetInt(value), new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(t.Decimals)), nil))).Float64()
-	t.Image = tm.mediaServer.MakeCommunityTokenImagesURL(t.CommunityData.ID, t.ChainID, t.Symbol)
-
-	receivedToken := ReceivedToken{
-		Token:   *t,
-		Amount:  floatAmount,
-		TxHash:  txHash,
-		IsFirst: isFirst,
-	}
-
-	encodedMessage, err := json.Marshal(receivedToken)
-	if err != nil {
-		return
-	}
-
-	tm.walletFeed.Send(walletevent.Event{
-		Type:    EventCommunityTokenReceived,
-		ChainID: t.ChainID,
-		Accounts: []common.Address{
-			address,
-		},
-		Message: string(encodedMessage),
-	})
-}
-
-func (tm *Manager) fillCommunityData(token *tokenTypes.Token) error {
-	if token == nil || token.CommunityData == nil || tm.communityManager == nil {
-		return nil
-	}
-
-	communityInfo, _, err := tm.communityManager.GetCommunityInfo(token.CommunityData.ID)
-	if err != nil {
-		return err
-	}
-	if err == nil && communityInfo != nil {
-		// Fetched data from cache. Cache is refreshed during every wallet token list call.
-		token.CommunityData.Name = communityInfo.CommunityName
-		token.CommunityData.Color = communityInfo.CommunityColor
-		token.CommunityData.Image = communityInfo.CommunityImage
-	}
-	return nil
-}
-
-func (tm *Manager) GetPreviouslyOwnedTokens() (map[common.Address][]tokenTypes.Token, error) {
-	storageTokens, err := tm.tokenBalancesStorage.GetTokens()
+func (tm *Manager) GetPreviouslyOwnedTokens() (map[common.Address][]*tokentypes.Token, error) {
+	balancesPerAccount, err := tm.tokenBalancesStorage.getBalances()
 	if err != nil {
 		return nil, err
 	}
 
-	tokens := make(map[common.Address][]tokenTypes.Token)
-	for account, storageToken := range storageTokens {
-		for _, token := range storageToken {
-			tokens[account] = append(tokens[account], token.Token)
+	tokens := make(map[common.Address][]*tokentypes.Token)
+	for account, balances := range balancesPerAccount {
+		for _, balance := range balances {
+			token, err := tm.GetTokenByChainAddress(balance.TokenChainID, balance.TokenAddress)
+			if err != nil {
+				return nil, err
+			}
+			tokens[account] = append(tokens[account], token)
 		}
 	}
 
 	return tokens, nil
 }
 
-func (tm *Manager) removeTokenBalances(account common.Address) error {
-	_, err := tm.db.Exec("DELETE FROM token_balances WHERE user_address = ?", account.String())
-	return err
-}
-
 func (tm *Manager) onAccountsRemoved(removedAddresses []common.Address) {
 	for _, account := range removedAddresses {
-		err := tm.removeTokenBalances(account)
+		err := tm.tokenBalancesStorage.removeTokenBalances(account)
 		if err != nil {
 			logutils.ZapLogger().Error("token.Manager: can't remove token balances", zap.Error(err))
 		}
 	}
 }
-
-func (tm *Manager) GetCachedBalancesByChain(accounts, tokenAddresses []common.Address, chainIDs []uint64) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
-	accountStrings := make([]string, len(accounts))
-	for i, account := range accounts {
-		accountStrings[i] = fmt.Sprintf("'%s'", account.Hex())
-	}
-
-	tokenAddressStrings := make([]string, len(tokenAddresses))
-	for i, tokenAddress := range tokenAddresses {
-		tokenAddressStrings[i] = fmt.Sprintf("'%s'", tokenAddress.Hex())
-	}
-
-	chainIDStrings := make([]string, len(chainIDs))
-	for i, chainID := range chainIDs {
-		chainIDStrings[i] = fmt.Sprintf("%d", chainID)
-	}
-
-	//nolint: gosec
-	query := `SELECT chain_id, user_address, token_address, raw_balance
-			  	FROM token_balances
-				WHERE user_address IN (` + strings.Join(accountStrings, ",") + `)
-					AND token_address IN (` + strings.Join(tokenAddressStrings, ",") + `)
-					AND chain_id IN (` + strings.Join(chainIDStrings, ",") + `)`
-
-	rows, err := tm.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	ret := make(map[uint64]map[common.Address]map[common.Address]*hexutil.Big)
-
-	for rows.Next() {
-		var chainID uint64
-		var userAddressStr, tokenAddressStr string
-		var rawBalance string
-
-		err := rows.Scan(&chainID, &userAddressStr, &tokenAddressStr, &rawBalance)
-		if err != nil {
-			return nil, err
-		}
-
-		num := new(hexutil.Big)
-		_, ok := num.ToInt().SetString(rawBalance, 10)
-		if !ok {
-			return ret, nil
-		}
-
-		if ret[chainID] == nil {
-			ret[chainID] = make(map[common.Address]map[common.Address]*hexutil.Big)
-		}
-
-		if ret[chainID][common.HexToAddress(userAddressStr)] == nil {
-			ret[chainID][common.HexToAddress(userAddressStr)] = make(map[common.Address]*hexutil.Big)
-		}
-
-		ret[chainID][common.HexToAddress(userAddressStr)][common.HexToAddress(tokenAddressStr)] = num
-	}
-
-	return ret, nil
+func (tm *Manager) GetCachedBalancesByChain(accounts []common.Address, tokens []*tokentypes.Token) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
+	return tm.tokenBalancesStorage.getCachedBalancesByChain(accounts, tokens)
 }

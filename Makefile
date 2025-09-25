@@ -323,13 +323,23 @@ generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
 	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
+	make download-tokens
 
 generate-contracts:
 	go generate ./contracts
+
 download-tokens:
-	go run -mod=mod ./services/wallet/token/token-lists/default-lists/downloader/main.go
+	@if [ ! -f services/wallet/token/local-token-lists/default-lists/status.go ] || \
+	   [ ! -f services/wallet/token/local-token-lists/default-lists/uniswap.go ]; then \
+		echo "Downloading token lists..."; \
+		GOROOT=$$(go env GOROOT) GOFLAGS="-mod=mod" go run -mod=mod ./services/wallet/token/local-token-lists/default-lists/downloader/main.go; \
+		echo "token list downloaded successfully"; \
+	else \
+		echo "Token lists are already downloaded, skipping download"; \
+	fi
+
 analyze-token-stores:
-	go run -mod=mod ./services/wallet/token/token-lists/analyzer/main.go
+	go run -mod=mod ./services/wallet/token/local-token-lists/analyzer/main.go
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)

@@ -23,8 +23,10 @@ class TestWalletAssets:
 
     def test_balance_refresh_ticker_after_sending_transaction(self):
         uuid = str(uuid_lib.uuid4())
+        gas_fee_mode = constants.gas_fee_mode_medium
         amount_in = "0xde0b6b3a7640000"
 
+        native_token_key = wallet_utils.get_token_key(constants.ANVIL_NETWORK_ID, constants.NATIVE_TOKEN_ADDRESS)
         input_params = {
             "uuid": uuid,
             "sendType": 0,
@@ -32,12 +34,12 @@ class TestWalletAssets:
             "addrTo": constants.user_2.address,
             "amountIn": amount_in,
             "amountOut": "0x0",
-            "tokenID": "ETH",
+            "tokenKey": native_token_key,
             "tokenIDIsOwnerToken": False,
-            "toTokenID": "",
-            "fromChainID": 31337,
-            "toChainID": 31337,
-            "gasFeeMode": 1,
+            "toTokenKey": native_token_key,
+            "fromChainID": constants.ANVIL_NETWORK_ID,
+            "toChainID": constants.ANVIL_NETWORK_ID,
+            "gasFeeMode": gas_fee_mode,
             # params for building tx from route
             "slippagePercentage": 0,
         }

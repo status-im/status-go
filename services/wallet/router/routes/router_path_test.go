@@ -7,12 +7,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/router/fees"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 func TestCopyPath(t *testing.T) {
@@ -21,8 +23,8 @@ func TestCopyPath(t *testing.T) {
 		ProcessorName: "test",
 		FromChain:     &params.Network{ChainID: 1},
 		ToChain:       &params.Network{ChainID: 2},
-		FromToken:     &tokenTypes.Token{Symbol: "symbol1"},
-		ToToken:       &tokenTypes.Token{Symbol: "symbol2"},
+		FromToken:     &tokentypes.Token{Token: &types.Token{Symbol: "symbol1"}},
+		ToToken:       &tokentypes.Token{Token: &types.Token{Symbol: "symbol2"}},
 		AmountIn:      (*hexutil.Big)(big.NewInt(100)),
 		AmountOut:     (*hexutil.Big)(big.NewInt(200)),
 		SuggestedLevelsForMaxFeesPerGas: &fees.MaxFeesLevels{

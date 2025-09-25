@@ -11,7 +11,7 @@ import (
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/requests"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
@@ -55,8 +55,8 @@ type ProcessorInputParams struct {
 	ToChain   *params.Network
 	FromAddr  common.Address
 	ToAddr    common.Address
-	FromToken *tokenTypes.Token
-	ToToken   *tokenTypes.Token
+	FromToken *tokentypes.Token
+	ToToken   *tokentypes.Token
 	AmountIn  *big.Int
 	AmountOut *big.Int
 

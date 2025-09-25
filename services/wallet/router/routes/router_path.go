@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 type Path struct {
@@ -18,8 +18,8 @@ type Path struct {
 	ProcessorName         string
 	FromChain             *params.Network   // Source chain
 	ToChain               *params.Network   // Destination chain
-	FromToken             *tokenTypes.Token // Source token
-	ToToken               *tokenTypes.Token // Destination token, set if applicable
+	FromToken             *tokentypes.Token // Source token
+	ToToken               *tokentypes.Token // Destination token, set if applicable
 	AmountIn              *hexutil.Big      // Amount that will be sent from the source chain
 	AmountOut             *hexutil.Big      // Amount that will be received on the destination chain
 
@@ -126,12 +126,12 @@ func (p *Path) Copy() *Path {
 	}
 
 	if p.FromToken != nil {
-		newPath.FromToken = &tokenTypes.Token{}
+		newPath.FromToken = &tokentypes.Token{}
 		*newPath.FromToken = *p.FromToken
 	}
 
 	if p.ToToken != nil {
-		newPath.ToToken = &tokenTypes.Token{}
+		newPath.ToToken = &tokentypes.Token{}
 		*newPath.ToToken = *p.ToToken
 	}
 

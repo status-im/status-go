@@ -48,7 +48,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -264,12 +264,12 @@ type NetworkManager interface {
 	GetAllChainIDs() ([]uint64, error)
 }
 type TokenManager interface {
-	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token
+	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) (*tokentypes.Token, error)
 }
 
 type TokenBalanceManager interface {
-	GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
-	GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
+	GetBalancesByChain(ctx context.Context, accounts []gethcommon.Address, tokens []*tokentypes.Token) (BalancesByChain, error)
+	GetCachedBalancesByChain(ctx context.Context, accounts []gethcommon.Address, tokens []*tokentypes.Token) (BalancesByChain, error)
 }
 
 type CollectibleContractData struct {
@@ -2263,7 +2263,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 			}
 
 			for chainID, address := range tokenMetadata.ContractAddresses {
-				_ = m.tokenManager.FindOrCreateTokenByAddress(context.Background(), chainID, gethcommon.HexToAddress(address))
+				_, _ = m.tokenManager.FindOrCreateTokenByAddress(context.Background(), chainID, gethcommon.HexToAddress(address))
 			}
 		}
 	}

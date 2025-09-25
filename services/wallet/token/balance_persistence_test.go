@@ -6,175 +6,127 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/services/wallet/community"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
 func TestSaveTokens(t *testing.T) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
-	persistence := NewPersistence(db)
+	persistence := balanceStorage{walletDB: db}
 	require.NotNil(t, persistence)
 
-	tokens := make(map[common.Address][]tokenTypes.StorageToken)
+	storageTokens := make(map[common.Address][]tokentypes.StorageToken)
 	address1 := common.HexToAddress("0xdAC17F958D2ee523a2206206994597C13D831ec7")
 	address2 := common.HexToAddress("0x5e4e65926ba27467555eb562121fac00d24e9dd2")
 
-	tokenAddress1 := common.HexToAddress("0xDb8d79C775452a3929b86ac5DEaB3e9d38e1c006")
-	tokenAddress2 := common.HexToAddress("0xDb8d79C775452a3929b86ac5DEaB3e9d38e1c005")
+	tokenAddress11 := common.HexToAddress("0xDb8d79C775452a3929b86ac5DEaB3e9d38e1c006")
+	tokenAddress12 := common.HexToAddress("0xDb8d79C775452a3929b86ac5DEaB3e9d38e1c007")
+	tokenAddress21 := common.HexToAddress("0xDb8d79C775452a3929b86ac5DEaB3e9d38e1c008")
+	tokenAddress31 := common.HexToAddress("0xDb8d79C775452a3929b86ac5DEaB3e9d38e1c009")
 
 	var chain1 uint64 = 1
 	var chain2 uint64 = 2
 
-	token1 := tokenTypes.StorageToken{
-		Token: tokenTypes.Token{
-			Name:     "token-1",
-			Symbol:   "TT1",
-			Decimals: 10,
-		},
-		BalancesPerChain: make(map[uint64]tokenTypes.ChainBalance),
-		Description:      "description-1",
-		AssetWebsiteURL:  "url-1",
+	// token 1 on chain 1
+	token11 := tokentypes.StorageToken{
+		TokenAddress:    tokenAddress11,
+		TokenChainID:    chain1,
+		RawBalance:      "1",
+		Balance:         big.NewFloat(0.1),
+		Description:     "description-1",
+		AssetWebsiteURL: "url-1",
 	}
 
-	token1.BalancesPerChain[chain1] = tokenTypes.ChainBalance{
-		RawBalance: "1",
-		Balance:    big.NewFloat(0.1),
-		Address:    tokenAddress1,
-		ChainID:    chain1,
+	// token 1 on chain 2
+	token12 := tokentypes.StorageToken{
+		TokenAddress:    tokenAddress12,
+		TokenChainID:    chain2,
+		RawBalance:      "2",
+		Balance:         big.NewFloat(0.2),
+		Description:     "description-1",
+		AssetWebsiteURL: "url-1",
 	}
 
-	token1.BalancesPerChain[chain2] = tokenTypes.ChainBalance{
-		RawBalance: "2",
-		Balance:    big.NewFloat(0.2),
-		Address:    tokenAddress2,
-		ChainID:    chain2,
+	// token 2 on chain 1
+	token21 := tokentypes.StorageToken{
+		TokenAddress:    tokenAddress21,
+		TokenChainID:    chain1,
+		RawBalance:      "3",
+		Balance:         big.NewFloat(0.3),
+		Description:     "description-2",
+		AssetWebsiteURL: "url-2",
 	}
 
-	token2 := tokenTypes.StorageToken{
-		Token: tokenTypes.Token{
-			Name:     "token-2",
-			Symbol:   "TT2",
-			Decimals: 11,
-		},
-		BalancesPerChain: make(map[uint64]tokenTypes.ChainBalance),
-		Description:      "description-2",
-		AssetWebsiteURL:  "url-2",
+	// token 3 on chain 1
+	token31 := tokentypes.StorageToken{
+		TokenAddress:    tokenAddress31,
+		TokenChainID:    chain1,
+		RawBalance:      "4",
+		Balance:         big.NewFloat(0.4),
+		Description:     "description-3",
+		AssetWebsiteURL: "url-3",
 	}
 
-	token2.BalancesPerChain[chain1] = tokenTypes.ChainBalance{
-		RawBalance: "3",
-		Balance:    big.NewFloat(0.3),
-		Address:    tokenAddress1,
-		ChainID:    chain1,
-	}
+	storageTokens[address1] = []tokentypes.StorageToken{token11, token12, token21}
 
-	token3 := tokenTypes.StorageToken{
-		Token: tokenTypes.Token{
-			Name:     "token-3",
-			Symbol:   "TT3",
-			Decimals: 11,
-		},
-		BalancesPerChain: make(map[uint64]tokenTypes.ChainBalance),
-		Description:      "description-3",
-		AssetWebsiteURL:  "url-3",
-	}
+	storageTokens[address2] = []tokentypes.StorageToken{token31}
 
-	token3.BalancesPerChain[chain1] = tokenTypes.ChainBalance{
-		RawBalance: "4",
-		Balance:    big.NewFloat(0.4),
-		Address:    tokenAddress1,
-		ChainID:    chain1,
-	}
+	err = persistence.saveBalances(storageTokens)
+	require.NoError(t, err)
 
-	tokens[address1] = []tokenTypes.StorageToken{token1, token2}
-
-	tokens[address2] = []tokenTypes.StorageToken{token3}
-
-	require.NoError(t, persistence.SaveTokens(tokens))
-
-	actualTokens, err := persistence.GetTokens()
+	actualTokens, err := persistence.getBalances()
 	require.NoError(t, err)
 	require.NotNil(t, actualTokens)
-	require.NotNil(t, actualTokens[address1])
-	require.Len(t, actualTokens[address1], 2)
-
-	var actualToken1, actualToken2, actualToken3 tokenTypes.StorageToken
-	if actualTokens[address1][0].Name == "token-1" {
-		actualToken1 = actualTokens[address1][0]
-		actualToken2 = actualTokens[address1][1]
-	} else {
-		actualToken1 = actualTokens[address1][1]
-		actualToken2 = actualTokens[address1][0]
-
-	}
-
-	require.NotNil(t, actualTokens[address2])
+	require.Len(t, actualTokens[address1], 3)
 	require.Len(t, actualTokens[address2], 1)
 
-	actualToken3 = actualTokens[address2][0]
+	var actualToken1, actualToken2, actualToken3 tokentypes.StorageToken
+	for _, token := range actualTokens[address1] {
+		if token.TokenAddress == tokenAddress11 && token.TokenChainID == chain1 {
+			actualToken1 = token
+		} else if token.TokenAddress == tokenAddress12 && token.TokenChainID == chain2 {
+			actualToken2 = token
+		} else if token.TokenAddress == tokenAddress21 && token.TokenChainID == chain1 {
+			actualToken3 = token
+		}
+	}
 
-	require.Equal(t, actualToken1.Name, token1.Name)
-	require.Equal(t, actualToken1.Symbol, token1.Symbol)
-	require.Equal(t, actualToken1.Decimals, token1.Decimals)
-	require.Equal(t, actualToken1.Description, token1.Description)
-	require.Equal(t, actualToken1.AssetWebsiteURL, token1.AssetWebsiteURL)
+	actualToken4 := actualTokens[address2][0]
 
-	require.Equal(t, actualToken1.BalancesPerChain[chain1].RawBalance, "1")
-	require.NotNil(t, actualToken1.BalancesPerChain[chain1].Balance)
-	require.Equal(t, actualToken1.BalancesPerChain[chain1].Balance.String(), "0.1")
-	require.Equal(t, actualToken1.BalancesPerChain[chain1].Address, tokenAddress1)
-	require.Equal(t, actualToken1.BalancesPerChain[chain1].ChainID, chain1)
+	sameTokens := func(token1, token2 tokentypes.StorageToken) bool {
+		return token1.TokenAddress == token2.TokenAddress &&
+			token1.TokenChainID == token2.TokenChainID &&
+			token1.RawBalance == token2.RawBalance &&
+			token1.Balance.String() == token2.Balance.String() &&
+			token1.HasError == token2.HasError &&
+			token1.Description == token2.Description &&
+			token1.AssetWebsiteURL == token2.AssetWebsiteURL &&
+			token1.BuiltOn == token2.BuiltOn &&
+			len(token1.MarketValuesPerCurrency) == len(token2.MarketValuesPerCurrency)
+	}
 
-	require.Equal(t, actualToken1.BalancesPerChain[chain2].RawBalance, "2")
-	require.NotNil(t, actualToken1.BalancesPerChain[chain2].Balance)
-	require.Equal(t, actualToken1.BalancesPerChain[chain2].Balance.String(), "0.2")
-	require.Equal(t, actualToken1.BalancesPerChain[chain2].Address, tokenAddress2)
-	require.Equal(t, actualToken1.BalancesPerChain[chain2].ChainID, chain2)
-
-	require.Equal(t, actualToken2.Name, token2.Name)
-	require.Equal(t, actualToken2.Symbol, token2.Symbol)
-	require.Equal(t, actualToken2.Decimals, token2.Decimals)
-	require.Equal(t, actualToken2.Description, token2.Description)
-	require.Equal(t, actualToken2.AssetWebsiteURL, token2.AssetWebsiteURL)
-
-	require.Equal(t, actualToken2.BalancesPerChain[chain1].RawBalance, "3")
-	require.NotNil(t, actualToken2.BalancesPerChain[chain1].Balance)
-	require.Equal(t, actualToken2.BalancesPerChain[chain1].Balance.String(), "0.3")
-	require.Equal(t, actualToken2.BalancesPerChain[chain1].Address, tokenAddress1)
-	require.Equal(t, actualToken2.BalancesPerChain[chain1].ChainID, chain1)
-
-	require.Equal(t, actualToken3.Name, token3.Name)
-	require.Equal(t, actualToken3.Symbol, token3.Symbol)
-	require.Equal(t, actualToken3.Decimals, token3.Decimals)
-	require.Equal(t, actualToken3.Description, token3.Description)
-	require.Equal(t, actualToken3.AssetWebsiteURL, token3.AssetWebsiteURL)
-
-	require.Equal(t, actualToken3.BalancesPerChain[chain1].RawBalance, "4")
-	require.NotNil(t, actualToken3.BalancesPerChain[chain1].Balance)
-	require.Equal(t, actualToken3.BalancesPerChain[chain1].Balance.String(), "0.4")
-	require.Equal(t, actualToken3.BalancesPerChain[chain1].Address, tokenAddress1)
-	require.Equal(t, actualToken3.BalancesPerChain[chain1].ChainID, chain1)
+	require.True(t, sameTokens(actualToken1, token11))
+	require.True(t, sameTokens(actualToken2, token12))
+	require.True(t, sameTokens(actualToken3, token21))
+	require.True(t, sameTokens(actualToken4, token31))
 }
 
 func TestGetCachedBalancesByChain(t *testing.T) {
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-
+	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
-	require.NotNil(t, db)
 
-	persistence := NewPersistence(db)
+	persistence := balanceStorage{walletDB: walletDB}
 	require.NotNil(t, persistence)
 
-	tokens := make(map[common.Address][]tokenTypes.StorageToken)
+	storageTokens := make(map[common.Address][]tokentypes.StorageToken)
 	address1 := common.HexToAddress("0xdAC17F958D2ee523a2206206994597C13D831ec7")
 	address2 := common.HexToAddress("0x5e4e65926ba27467555eb562121fac00d24e9dd2")
 
@@ -184,68 +136,52 @@ func TestGetCachedBalancesByChain(t *testing.T) {
 	var chain1 uint64 = 1
 	var chain2 uint64 = 2
 
-	token1 := tokenTypes.StorageToken{
-		Token: tokenTypes.Token{
-			Name:     "token-1",
-			Symbol:   "TT1",
-			Decimals: 18,
-		},
-		BalancesPerChain: make(map[uint64]tokenTypes.ChainBalance),
-		Description:      "description-1",
-		AssetWebsiteURL:  "url-1",
+	token1 := tokentypes.StorageToken{
+		TokenAddress:    tokenAddress1,
+		TokenChainID:    chain1,
+		RawBalance:      "1",
+		Balance:         big.NewFloat(0.000000000000000001),
+		Description:     "description-1",
+		AssetWebsiteURL: "url-1",
 	}
 
-	token1.BalancesPerChain[chain1] = tokenTypes.ChainBalance{
-		RawBalance: "1",
-		// min eth number (not zero)
-		Balance: big.NewFloat(0.000000000000000001),
-		Address: tokenAddress1,
-		ChainID: chain1,
+	token2 := tokentypes.StorageToken{
+		TokenAddress:    tokenAddress2,
+		TokenChainID:    chain2,
+		RawBalance:      "1000000000000000000",
+		Balance:         big.NewFloat(1),
+		Description:     "description-2",
+		AssetWebsiteURL: "url-2",
 	}
 
-	token2 := tokenTypes.StorageToken{
-		Token: tokenTypes.Token{
-			Name:     "token-2",
-			Symbol:   "TT2",
-			Decimals: 10,
-		},
-		BalancesPerChain: make(map[uint64]tokenTypes.ChainBalance),
-		Description:      "description-2",
-		AssetWebsiteURL:  "url-2",
-	}
+	storageTokens[address1] = []tokentypes.StorageToken{token1}
+	storageTokens[address2] = []tokentypes.StorageToken{token2}
 
-	token2.BalancesPerChain[chain2] = tokenTypes.ChainBalance{
-		RawBalance: "1000000000000000000",
-		Balance:    big.NewFloat(1),
-		Address:    tokenAddress2,
-		ChainID:    chain1,
-	}
-
-	tokens[address1] = []tokenTypes.StorageToken{token1}
-	tokens[address2] = []tokenTypes.StorageToken{token2}
-
-	require.NoError(t, persistence.SaveTokens(tokens))
-
-	tokenManager := NewTokenManager(db, nil, community.NewManager(db, nil, nil), network.NewManager(db, nil), db, nil, nil, nil, nil, persistence)
+	err = persistence.saveBalances(storageTokens)
+	require.NoError(t, err)
 
 	// Verify that the token balance was inserted correctly
 	var count int
-	err = db.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
+	err = walletDB.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 2, count)
 
+	tokens := []*tokentypes.Token{{Token: &types.Token{ChainID: chain1, Address: tokenAddress1}}}
+
 	nonExistingAddress := common.HexToAddress("0xaAC17F958D2ee523a2206206994597C13D831ec8")
-	result, err := tokenManager.GetCachedBalancesByChain([]common.Address{nonExistingAddress}, []common.Address{tokenAddress1}, []uint64{chain1})
+	result, err := persistence.getCachedBalancesByChain([]common.Address{nonExistingAddress}, tokens)
 	require.NoError(t, err)
 	require.Len(t, result, 0)
 
-	result, err = tokenManager.GetCachedBalancesByChain([]common.Address{address1}, []common.Address{tokenAddress1}, []uint64{chain1})
+	result, err = persistence.getCachedBalancesByChain([]common.Address{address1}, tokens)
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 
 	require.Equal(t, result[chain1][address1][tokenAddress1].ToInt(), big.NewInt(1))
 
-	result, err = tokenManager.GetCachedBalancesByChain([]common.Address{address1, address2}, []common.Address{tokenAddress2, tokenAddress1}, []uint64{chain1, chain2})
+	tokens = append(tokens, &tokentypes.Token{Token: &types.Token{ChainID: chain2, Address: tokenAddress2}})
+
+	result, err = persistence.getCachedBalancesByChain([]common.Address{address1, address2}, tokens)
 	require.NoError(t, err)
 	require.Len(t, result, 2)
 

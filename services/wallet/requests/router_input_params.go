@@ -3,14 +3,17 @@ package requests
 import (
 	"math/big"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/errors"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 var (
@@ -41,20 +44,20 @@ var (
 )
 
 type RouteInputParams struct {
-	Uuid                string            `json:"uuid"`
-	SendType            sendtype.SendType `json:"sendType" validate:"required"`
-	AddrFrom            common.Address    `json:"addrFrom" validate:"required"`
-	AddrTo              common.Address    `json:"addrTo" validate:"required"`
-	AmountIn            *hexutil.Big      `json:"amountIn" validate:"required"`
-	AmountOut           *hexutil.Big      `json:"amountOut"`
-	TokenID             string            `json:"tokenID" validate:"required"`
-	TokenIDIsOwnerToken bool              `json:"tokenIDIsOwnerToken"`
-	ToTokenID           string            `json:"toTokenID"`
-	FromChainID         uint64            `json:"fromChainID"`
-	ToChainID           uint64            `json:"toChainID"`
-	GasFeeMode          fees.GasFeeMode   `json:"gasFeeMode" validate:"required"`
-	SlippagePercentage  float32           `json:"slippagePercentage"`
-	TestnetMode         bool
+	Uuid               string            `json:"uuid"`
+	SendType           sendtype.SendType `json:"sendType" validate:"required"`
+	AddrFrom           common.Address    `json:"addrFrom" validate:"required"`
+	AddrTo             common.Address    `json:"addrTo" validate:"required"`
+	AmountIn           *hexutil.Big      `json:"amountIn" validate:"required"`
+	AmountOut          *hexutil.Big      `json:"amountOut"`
+	TokenKey           string            `json:"tokenKey" validate:"required"`
+	TokenIsOwnerToken  bool              `json:"tokenIDIsOwnerToken"`
+	ToTokenKey         string            `json:"toTokenKey" validate:"required"`
+	FromChainID        uint64            `json:"fromChainID"` // TODO: remove since it can be inferred from the token key
+	ToChainID          uint64            `json:"toChainID"`   // TODO: remove since it can be inferred from the token key
+	GasFeeMode         fees.GasFeeMode   `json:"gasFeeMode" validate:"required"`
+	SlippagePercentage float32           `json:"slippagePercentage"`
+	TestnetMode        bool
 
 	// For send types like EnsRegister, EnsRelease, EnsSetPubKey, StickersBuy
 	Username  string       `json:"username"`
@@ -74,7 +77,7 @@ type RouteInputParams struct {
 }
 
 type RouterTestParams struct {
-	TokenFrom             *tokenTypes.Token
+	TokenFrom             *tokentypes.Token
 	TokenPrices           map[string]float64
 	EstimationMap         map[string]Estimation // [processor-name, estimation]
 	BonderFeeMap          map[string]*big.Int   // [token-symbol, bonder-fee]
@@ -111,11 +114,33 @@ func (i *RouteInputParams) Validate() error {
 			return ErrENSRegisterRequiresUsernameAndPubKey
 		}
 		if i.TestnetMode {
-			if i.TokenID != walletCommon.SttSymbol {
+			// available only on sepolia testnet
+			sntToken := tokentypes.Token{
+				Token: &types.Token{
+					ChainID: walletCommon.EthereumSepolia,
+				},
+			}
+			var err error
+			sntToken.Address, err = snt.ContractAddress(walletCommon.EthereumSepolia)
+			if err != nil {
+				return err
+			}
+			if i.TokenKey != sntToken.Key() {
 				return ErrENSRegisterTestnetSTTOnly
 			}
 		} else {
-			if i.TokenID != walletCommon.SntSymbol {
+			// available only on mainnet
+			sntToken := tokentypes.Token{
+				Token: &types.Token{
+					ChainID: walletCommon.EthereumMainnet,
+				},
+			}
+			var err error
+			sntToken.Address, err = snt.ContractAddress(walletCommon.EthereumMainnet)
+			if err != nil {
+				return err
+			}
+			if i.TokenKey != sntToken.Key() {
 				return ErrENSRegisterMainnetSNTOnly
 			}
 		}
@@ -145,10 +170,10 @@ func (i *RouteInputParams) Validate() error {
 	}
 
 	if i.SendType == sendtype.Swap {
-		if i.ToTokenID == "" {
+		if i.ToTokenKey == "" {
 			return ErrSwapRequiresToTokenID
 		}
-		if i.TokenID == i.ToTokenID {
+		if i.TokenKey == i.ToTokenKey {
 			return ErrSwapTokenIDMustBeDifferent
 		}
 

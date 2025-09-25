@@ -8,6 +8,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
 	mock_common "github.com/status-im/status-go/services/wallet/common/mock"
@@ -18,7 +21,7 @@ import (
 type MarketTestSuite struct {
 	suite.Suite
 	feedSub    *mock_common.FeedSubscription
-	symbols    []string
+	tokensKeys []string
 	currencies []string
 }
 
@@ -26,7 +29,11 @@ func (s *MarketTestSuite) SetupTest() {
 	feed := new(event.Feed)
 	s.feedSub = mock_common.NewFeedSubscription(feed)
 
-	s.symbols = []string{"BTC", "ETH"}
+	// Create test tokens
+	s.tokensKeys = []string{
+		types.TokenKey(1, common.HexToAddress("0x0000000000000000000000000000000000000000")),
+		types.TokenKey(1, common.HexToAddress("0x0000000000000000000000000000000000000001")),
+	}
 	s.currencies = []string{"USD", "EUR"}
 }
 
@@ -40,11 +47,10 @@ func (s *MarketTestSuite) TestEventOnRpsError() {
 	// GIVEN
 	customErr := errors.New("request rate exceeded")
 	priceProviderWithError := mock_market.NewMockPriceProviderWithError(ctrl, customErr)
-	manager, close := setupMarketManager(s.T(), []thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
-	s.T().Cleanup(close)
+	manager := setupMarketManager(s.T(), []thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
 
 	// WHEN
-	_, err := manager.FetchPrices(s.symbols, s.currencies)
+	_, err := manager.FetchPrices(s.tokensKeys, s.currencies)
 	s.Require().Error(err, "expected error from FetchPrices due to MockPriceProviderWithError")
 	event, ok := s.feedSub.WaitForEvent(5 * time.Second)
 	s.Require().True(ok, "expected an event, but none was received")
@@ -60,10 +66,9 @@ func (s *MarketTestSuite) TestEventOnNetworkError() {
 	// GIVEN
 	customErr := errors.New("dial tcp: lookup optimism-goerli.infura.io: no such host")
 	priceProviderWithError := mock_market.NewMockPriceProviderWithError(ctrl, customErr)
-	manager, close := setupMarketManager(s.T(), []thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
-	s.T().Cleanup(close)
+	manager := setupMarketManager(s.T(), []thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
 
-	_, err := manager.FetchPrices(s.symbols, s.currencies)
+	_, err := manager.FetchPrices(s.tokensKeys, s.currencies)
 	s.Require().Error(err, "expected error from FetchPrices due to MockPriceProviderWithError")
 	event, ok := s.feedSub.WaitForEvent(500 * time.Millisecond)
 	s.Require().True(ok, "expected an event, but none was received")

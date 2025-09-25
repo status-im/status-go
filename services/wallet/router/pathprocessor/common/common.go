@@ -6,11 +6,8 @@ import (
 	"strings"
 )
 
-func MakeKey(fromChain, toChain uint64, fromTokenSymbol, toTokenSymbol string, amount *big.Int) string {
-	key := fmt.Sprintf("%d-%d", fromChain, toChain)
-	if fromTokenSymbol != "" || toTokenSymbol != "" {
-		key = fmt.Sprintf("%s-%s-%s", key, fromTokenSymbol, toTokenSymbol)
-	}
+func MakeKey(fromTokenKey, toTokenKey string, amount *big.Int) string {
+	key := fmt.Sprintf("%s-%s", fromTokenKey, toTokenKey)
 	if amount != nil {
 		key = fmt.Sprintf("%s-%s", key, amount.String())
 	}

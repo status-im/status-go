@@ -16,8 +16,6 @@ type FilterDependencies struct {
 	db *sql.DB
 	// use token.TokenType, token.ChainID and token.Address to find the available symbol
 	tokenSymbol func(token ac.Token) string
-	// use the chainID and symbol to look up token.TokenType and token.Address. Return nil if not found
-	tokenFromSymbol func(chainID *wCommon.ChainID, symbol string) *ac.Token
 	// use to get current timestamp
 	currentTimestamp func() int64
 }
@@ -170,7 +168,7 @@ func buildTransactionOrderQuery(chainIDCount, addressCount int, withPagination b
 
             SELECT
                 fat.chain_id,
-                CASE 
+                CASE
                     WHEN substr(fat.hash, 1, 2) = '0x' THEN unhex(substr(fat.hash, 3))
                     ELSE unhex(fat.hash)
                 END AS tx_hash,
@@ -181,7 +179,7 @@ func buildTransactionOrderQuery(chainIDCount, addressCount int, withPagination b
             WHERE fat.chain_id IN (` + buildPlaceholders(chainIDCount) + `)
                 AND fat.address IN (` + buildPlaceholders(addressCount) + `)
         )
-    ) 
+    )
     WHERE rn = 1
     ORDER BY timestamp DESC, chain_id, tx_hash, address`
 

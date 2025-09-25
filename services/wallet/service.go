@@ -96,7 +96,7 @@ func NewService(
 	mediaServer *server.MediaServer,
 	tokenManager *token.Manager,
 	statusProxyStageName string,
-) *Service {
+) (*Service, error) {
 	signals := &walletevent.SignalsTransmitter{
 		Publisher: feed,
 	}
@@ -213,7 +213,6 @@ func NewService(
 	reader := NewReader(
 		tokenManager,
 		marketManager,
-		token.NewPersistence(db),
 		feed,
 		multistandardBalanceController.GetPublisher(),
 		tokenBalancesStorage,
@@ -254,7 +253,7 @@ func NewService(
 		router.AddPathProcessor(processor)
 	}
 
-	routeExecutionManager := routeexecution.NewManager(db, feed, router, transactionManager)
+	routeExecutionManager := routeexecution.NewManager(db, feed, router, tokenManager, transactionManager)
 
 	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, db, feed)
 
@@ -299,7 +298,7 @@ func NewService(
 		leaderboardService:             leaderboardService,
 		activityFetcherService:         activityFetcherService,
 		started:                        false,
-	}
+	}, nil
 }
 
 func buildPathProcessors(

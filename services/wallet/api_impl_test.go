@@ -74,9 +74,11 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)
 
-	tokenManager := token.NewTokenManager(db, c, nil, nil, appDB, nil, nil, nil, accountsDb, token.NewPersistence(db))
+	tokenManager, err := token.NewTokenManager(db, c, nil, nil, appDB, nil, nil, nil, accountsDb, 0, 0)
+	require.NoError(t, err)
 
-	service := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, tokenManager, "")
+	service, err := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, tokenManager, "")
+	require.NoError(t, err)
 
 	mockCtrl := gomock.NewController(t)
 	tokenbalancesFetcher := mock_tokenbalances.NewMockFetcherIface(mockCtrl)
