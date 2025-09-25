@@ -18,8 +18,8 @@ type SendDetails struct {
 	ToAddress           types.Address         `json:"toAddress"`
 	FromChain           uint64                `json:"fromChain"` // this chain should be used only if en error occurred while sending a transaction
 	ToChain             uint64                `json:"toChain"`   // this chain should be used only if en error occurred while sending a transaction
-	FromToken           string                `json:"fromToken"`
-	ToToken             string                `json:"toToken"`
+	FromTokenKey        string                `json:"fromToken"`
+	ToTokenKey          string                `json:"toToken"`
 	FromAmount          string                `json:"fromAmount"` // total amount
 	ToAmount            string                `json:"toAmount"`
 	OwnerTokenBeingSent bool                  `json:"ownerTokenBeingSent"`
@@ -47,17 +47,17 @@ type RouterTransactionsForSigning struct {
 }
 
 type RouterSentTransaction struct {
-	FromAddress types.Address `json:"fromAddress"`
-	ToAddress   types.Address `json:"toAddress"`
-	FromChain   uint64        `json:"fromChain"`
-	ToChain     uint64        `json:"toChain"`
-	FromToken   string        `json:"fromToken"`
-	ToToken     string        `json:"toToken"`
-	Amount      string        `json:"amount"`    // amount sent
-	AmountIn    string        `json:"amountIn"`  // amount that is "data" of tx (important for erc20 tokens)
-	AmountOut   string        `json:"amountOut"` // amount that will be received
-	Hash        types.Hash    `json:"hash"`
-	ApprovalTx  bool          `json:"approvalTx"`
+	FromAddress  types.Address `json:"fromAddress"`
+	ToAddress    types.Address `json:"toAddress"`
+	FromChain    uint64        `json:"fromChain"`
+	ToChain      uint64        `json:"toChain"`
+	FromTokenKey string        `json:"fromTokenKey"`
+	ToTokenKey   string        `json:"toTokenKey"`
+	Amount       string        `json:"amount"`    // amount sent
+	AmountIn     string        `json:"amountIn"`  // amount that is "data" of tx (important for erc20 tokens)
+	AmountOut    string        `json:"amountOut"` // amount that will be received
+	Hash         types.Hash    `json:"hash"`
+	ApprovalTx   bool          `json:"approvalTx"`
 }
 
 type RouterSentTransactions struct {
@@ -79,18 +79,26 @@ func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types.Hash,
 	if sendArgs.ValueOut == nil {
 		sendArgs.ValueOut = (*hexutil.Big)(big.NewInt(0))
 	}
+	fromTokenKey := ""
+	if sendArgs.FromToken != nil {
+		fromTokenKey = sendArgs.FromToken.Key()
+	}
+	toTokenKey := ""
+	if sendArgs.ToToken != nil {
+		toTokenKey = sendArgs.ToToken.Key()
+	}
 	return &RouterSentTransaction{
-		FromAddress: sendArgs.From,
-		ToAddress:   addr,
-		FromChain:   sendArgs.FromChainID,
-		ToChain:     sendArgs.ToChainID,
-		FromToken:   sendArgs.FromTokenID,
-		ToToken:     sendArgs.ToTokenID,
-		Amount:      sendArgs.Value.String(),
-		AmountIn:    sendArgs.ValueIn.String(),
-		AmountOut:   sendArgs.ValueOut.String(),
-		Hash:        hash,
-		ApprovalTx:  approvalTx,
+		FromAddress:  sendArgs.From,
+		ToAddress:    addr,
+		FromChain:    sendArgs.FromChainID,
+		ToChain:      sendArgs.ToChainID,
+		FromTokenKey: fromTokenKey,
+		ToTokenKey:   toTokenKey,
+		Amount:       sendArgs.Value.String(),
+		AmountIn:     sendArgs.ValueIn.String(),
+		AmountOut:    sendArgs.ValueOut.String(),
+		Hash:         hash,
+		ApprovalTx:   approvalTx,
 	}
 }
 
@@ -98,15 +106,15 @@ func (sd *SendDetails) UpdateFields(inputParams requests.RouteInputParams, fromC
 	sd.SendType = int(inputParams.SendType)
 	sd.FromAddress = types.Address(inputParams.AddrFrom)
 	sd.ToAddress = types.Address(inputParams.AddrTo)
-	sd.FromToken = inputParams.TokenID
-	sd.ToToken = inputParams.ToTokenID
+	sd.FromTokenKey = inputParams.TokenKey
+	sd.ToTokenKey = inputParams.ToTokenKey
 	if inputParams.AmountIn != nil {
 		sd.FromAmount = inputParams.AmountIn.String()
 	}
 	if inputParams.AmountOut != nil {
 		sd.ToAmount = inputParams.AmountOut.String()
 	}
-	sd.OwnerTokenBeingSent = inputParams.TokenIDIsOwnerToken
+	sd.OwnerTokenBeingSent = inputParams.TokenIsOwnerToken
 	sd.Username = inputParams.Username
 	sd.PublicKey = inputParams.PublicKey
 	if inputParams.PackID != nil {

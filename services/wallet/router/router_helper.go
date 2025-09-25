@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -15,8 +17,7 @@ import (
 	"github.com/status-im/status-go/contracts"
 	gaspriceproxy "github.com/status-im/status-go/contracts/gas-price-proxy"
 	"github.com/status-im/status-go/contracts/hop"
-	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/params"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/collectibles"
@@ -27,7 +28,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
@@ -109,7 +110,7 @@ func CalculateL1Fee(chainID uint64, data []byte, ethClient ethclient.EthClientIn
 	return proxyContract.GetL1Fee(callOpt, data)
 }
 
-func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network, token *tokenTypes.Token, account common.Address) (*big.Int, error) {
+func (r *Router) getERC1155Balance(ctx context.Context, chainID uint64, token *tokentypes.Token, account common.Address) (*big.Int, error) {
 	tokenID, success := new(big.Int).SetString(token.Symbol, 10)
 	if !success {
 		return nil, errors.New("failed to convert token symbol to big.Int")
@@ -118,7 +119,7 @@ func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network,
 	balances, err := r.collectiblesManager.FetchERC1155Balances(
 		ctx,
 		account,
-		walletCommon.ChainID(network.ChainID),
+		walletCommon.ChainID(chainID),
 		token.Address,
 		[]*bigint.BigInt{&bigint.BigInt{Int: tokenID}},
 	)
@@ -133,7 +134,7 @@ func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network,
 	return balances[0].Int, nil
 }
 
-func (r *Router) getBalance(ctx context.Context, chainID uint64, token *tokenTypes.Token, account common.Address) (*big.Int, error) {
+func (r *Router) getBalance(ctx context.Context, chainID uint64, token *tokentypes.Token, account common.Address) (*big.Int, error) {
 	return r.tokenBalancesFetcher.FetchSingle(ctx, chainID, token.Address, account)
 }
 
@@ -142,7 +143,7 @@ func (r *Router) resolveSuggestedNonceForPath(ctx context.Context, path *routes.
 	if nonce, ok := usedNonces[path.FromChain.ChainID]; ok {
 		nextNonce = nonce + 1
 	} else {
-		nonce, err := r.transactor.NextNonce(ctx, r.rpcClient, path.FromChain.ChainID, types.Address(address))
+		nonce, err := r.transactor.NextNonce(ctx, r.rpcClient, path.FromChain.ChainID, cryptotypes.Address(address))
 		if err != nil {
 			return err
 		}
@@ -457,10 +458,10 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	return
 }
 
-func ParseCollectibleID(ID string) (contractAddress common.Address, tokenID *big.Int, success bool) {
+func ParseCollectibleID(tokenKey string) (contractAddress common.Address, tokenID *big.Int, success bool) {
 	success = false
 
-	parts := strings.Split(ID, ":")
+	parts := strings.Split(tokenKey, ":")
 	if len(parts) != 2 {
 		return
 	}
@@ -469,9 +470,14 @@ func ParseCollectibleID(ID string) (contractAddress common.Address, tokenID *big
 	return
 }
 
-func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *tokenTypes.Token {
+func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibles *collectibles.Service,
+	account common.Address, chainID uint64, tokenKey string) *tokentypes.Token {
 	if !sendType.IsCollectiblesTransfer() {
-		return tokenManager.FindToken(network, tokenID)
+		token, err := tokenManager.GetTokenByKey(tokenKey)
+		if err != nil {
+			return nil
+		}
+		return token
 	}
 
 	if sendType.IsCommunityRelatedTransfer() {
@@ -479,59 +485,44 @@ func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibl
 		return nil
 	}
 
-	contractAddress, collectibleTokenID, success := ParseCollectibleID(tokenID)
+	contractAddress, collectibleTokenID, success := ParseCollectibleID(tokenKey)
 	if !success {
 		return nil
 	}
-	uniqueID, err := collectibles.GetOwnedCollectible(walletCommon.ChainID(network.ChainID), account, contractAddress, collectibleTokenID)
+	uniqueID, err := collectibles.GetOwnedCollectible(walletCommon.ChainID(chainID), account, contractAddress, collectibleTokenID)
 	if err != nil || uniqueID == nil {
 		return nil
 	}
 
-	return &tokenTypes.Token{
-		Address:  contractAddress,
-		Symbol:   collectibleTokenID.String(),
-		Decimals: 0,
-		ChainID:  network.ChainID,
+	return &tokentypes.Token{
+		Token: &types.Token{
+			Address:  contractAddress,
+			Symbol:   collectibleTokenID.String(),
+			Decimals: 0,
+			ChainID:  chainID,
+		},
 	}
 }
 
-func fetchPrices(sendType sendtype.SendType, marketManager *market.Manager, tokenIDs []string) (map[string]float64, error) {
-	nonUniqueSymbols := append(tokenIDs, "ETH", "BNB")
-	// remove duplicate enteries
-	slices.Sort(nonUniqueSymbols)
-	symbols := slices.Compact(nonUniqueSymbols)
-	if sendType.IsCollectiblesTransfer() {
-		symbols = []string{"ETH", "BNB"}
-	}
-
-	pricesMap, err := marketManager.GetOrFetchPrices(symbols, []string{"USD"}, market.MaxAgeInSecondsForFresh)
+func (r *Router) fetchPrices(sendType sendtype.SendType, tokenKeys []string) (map[string]float64, error) {
+	pricesMap, err := r.marketManager.GetOrFetchPrices(tokenKeys, []string{"USD"}, market.MaxAgeInSecondsForFresh)
 
 	if err != nil {
 		return nil, err
 	}
 	prices := make(map[string]float64, 0)
-	for symbol, pricePerCurrency := range pricesMap {
-		prices[symbol] = pricePerCurrency["USD"].Price
+	for tokenKey, pricePerCurrency := range pricesMap {
+		prices[tokenKey] = pricePerCurrency["USD"].Price
 	}
 	if sendType.IsCollectiblesTransfer() {
-		for _, tokenID := range tokenIDs {
-			prices[tokenID] = 0
+		for _, tokenKey := range tokenKeys {
+			prices[tokenKey] = 0
 		}
 	}
 	return prices, nil
 }
 
-func (r *Router) GetTokensAvailableForBridgeOnChain(chainID uint64) []*tokenTypes.Token {
-	symbols := hop.GetSymbolsAvailableOnChain(chainID)
-
-	tokens := make([]*tokenTypes.Token, 0)
-	for _, symbol := range symbols {
-		t, _ := r.tokenManager.LookupToken(&chainID, symbol)
-		if t == nil {
-			continue
-		}
-		tokens = append(tokens, t)
-	}
-	return tokens
+func (r *Router) TokenAvailableForBridgingViaHop(chainID uint64, address common.Address) bool {
+	hopContracts := hop.GetTokenContractsAvailableOnChain(chainID)
+	return slices.Contains(hopContracts, address)
 }

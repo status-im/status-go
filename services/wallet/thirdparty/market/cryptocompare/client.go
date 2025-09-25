@@ -8,9 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 const baseID = "cryptocompare"
@@ -101,19 +104,34 @@ func (c *Client) buildURL(path string) string {
 	return baseURL + "/" + trimmedPath
 }
 
-func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
+func (c *Client) mapTokensToSymbols(tokens []*tokentypes.Token) (map[string][]string, error) {
+	symbolsToTokenKeysMap := make(map[string][]string)
+	for _, token := range tokens {
+		symbol := strings.ToUpper(token.Symbol)
+		symbolsToTokenKeysMap[symbol] = append(symbolsToTokenKeysMap[symbol], token.Key())
+	}
+	return symbolsToTokenKeysMap, nil
+}
+
+// FetchPrices fetches the prices for the given tokens and currencies
+// returns a map[tokenKey]map[currency]price
+func (c *Client) FetchPrices(tokens []*tokentypes.Token, currencies []string) (map[string]map[string]float64, error) {
+	symbolsToTokenKeysMap, err := c.mapTokensToSymbols(tokens)
+	if err != nil {
+		return nil, err
+	}
+
 	chunkSymbolParams := utils.ChunkSymbolsParams{
 		MaxCharsPerChunk:    maxFsymsLength,
 		ExtraCharsPerSymbol: 1, // joined with a comma
 	}
-	chunks, err := utils.ChunkSymbols(symbols, chunkSymbolParams)
+	chunks, err := utils.ChunkSymbols(maps.Keys(symbolsToTokenKeysMap), chunkSymbolParams)
 	if err != nil {
 		return nil, err
 	}
 	result := make(map[string]map[string]float64)
 	realCurrencies := utils.RenameSymbols(currencies)
 	for _, smbls := range chunks {
-		smbls = append(smbls, "ETH")
 		realSymbols := utils.RenameSymbols(smbls)
 
 		params := url.Values{}
@@ -123,6 +141,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 		params.Add("extraParams", extraParamStatus)
 
 		url := c.buildURL("data/pricemulti")
+
 		response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, params, c.creds)
 		if err != nil {
 			return nil, err
@@ -135,16 +154,25 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 		}
 
 		for _, symbol := range smbls {
-			result[symbol] = map[string]float64{}
-			for _, currency := range currencies {
-				result[symbol][currency] = prices[utils.GetRealSymbol(symbol)][utils.GetRealSymbol(currency)]
+			for _, tokenKey := range symbolsToTokenKeysMap[symbol] {
+				result[tokenKey] = map[string]float64{}
+				for _, currency := range currencies {
+					result[tokenKey][currency] = prices[utils.GetRealSymbol(symbol)][utils.GetRealSymbol(currency)]
+				}
 			}
 		}
 	}
 	return result, nil
 }
 
-func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
+// FetchTokenDetails fetches the token details for the given tokens
+// returns a map[tokenKey]TokenDetails
+func (c *Client) FetchTokenDetails(tokens []*tokentypes.Token) (map[string]thirdparty.TokenDetails, error) {
+	symbolsToTokenKeysMap, err := c.mapTokensToSymbols(tokens)
+	if err != nil {
+		return nil, err
+	}
+
 	url := c.buildURL("data/all/coinlist")
 	response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, nil, c.creds)
 	if err != nil {
@@ -159,19 +187,28 @@ func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.Toke
 
 	tokenDetails := make(map[string]thirdparty.TokenDetails)
 
-	for _, symbol := range symbols {
-		tokenDetails[symbol] = container.Data[utils.GetRealSymbol(symbol)]
+	for symbol, tokenKeys := range symbolsToTokenKeysMap {
+		for _, tokenKey := range tokenKeys {
+			tokenDetails[tokenKey] = container.Data[utils.GetRealSymbol(symbol)]
+		}
 	}
 
 	return tokenDetails, nil
 }
 
-func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
+// FetchTokenMarketValues fetches the market values for the given tokens and currency
+// returns a map[tokenKey]TokenMarketValues
+func (c *Client) FetchTokenMarketValues(tokens []*tokentypes.Token, currency string) (map[string]thirdparty.TokenMarketValues, error) {
+	symbolsToTokenKeysMap, err := c.mapTokensToSymbols(tokens)
+	if err != nil {
+		return nil, err
+	}
+
 	chunkSymbolParams := utils.ChunkSymbolsParams{
 		MaxCharsPerChunk:    maxFsymsLength,
 		ExtraCharsPerSymbol: 1, // joined with a comma
 	}
-	chunks, err := utils.ChunkSymbols(symbols, chunkSymbolParams)
+	chunks, err := utils.ChunkSymbols(maps.Keys(symbolsToTokenKeysMap), chunkSymbolParams)
 	if err != nil {
 		return nil, err
 	}
@@ -204,17 +241,21 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		}
 
 		for _, symbol := range smbls {
-			item[symbol] = container.Raw[utils.GetRealSymbol(symbol)][realCurrency]
+			for _, tokenKey := range symbolsToTokenKeysMap[symbol] {
+				item[tokenKey] = container.Raw[utils.GetRealSymbol(symbol)][realCurrency]
+			}
 		}
 	}
 	return item, nil
 }
 
-func (c *Client) FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+// FetchHistoricalHourlyPrices fetches the hourly prices for the given token and currency
+// returns a list of HistoricalPrice
+func (c *Client) FetchHistoricalHourlyPrices(token *tokentypes.Token, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	item := []thirdparty.HistoricalPrice{}
 
 	params := url.Values{}
-	params.Add("fsym", utils.GetRealSymbol(symbol))
+	params.Add("fsym", utils.GetRealSymbol(token.Symbol))
 	params.Add("tsym", currency)
 	params.Add("aggregate", fmt.Sprintf("%d", aggregate))
 	params.Add("limit", fmt.Sprintf("%d", limit))
@@ -237,11 +278,13 @@ func (c *Client) FetchHistoricalHourlyPrices(symbol string, currency string, lim
 	return item, nil
 }
 
-func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+// FetchHistoricalDailyPrices fetches the daily prices for the given token and currency
+// returns a list of HistoricalPrice
+func (c *Client) FetchHistoricalDailyPrices(token *tokentypes.Token, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	item := []thirdparty.HistoricalPrice{}
 
 	params := url.Values{}
-	params.Add("fsym", utils.GetRealSymbol(symbol))
+	params.Add("fsym", utils.GetRealSymbol(token.Symbol))
 	params.Add("tsym", currency)
 	params.Add("aggregate", fmt.Sprintf("%d", aggregate))
 	params.Add("limit", fmt.Sprintf("%d", limit))

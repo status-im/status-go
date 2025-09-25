@@ -13,12 +13,16 @@ import (
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 type PermissionChecker interface {
@@ -221,7 +225,7 @@ func (p *DefaultPermissionChecker) checkPermissionsOrDefault(permissions []*Comm
 }
 
 type ownedERC721TokensGetter = func(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria, chainIDs []uint64) (CollectiblesByChain, error)
-type balancesByChainGetter = func(ctx context.Context, accounts, tokens []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
+type balancesByChainGetter = func(ctx context.Context, accounts []gethcommon.Address, tokens []*tokentypes.Token) (BalancesByChain, error)
 
 func (p *DefaultPermissionChecker) checkTokenRequirement(
 	tokenRequirement *protobuf.TokenCriteria,
@@ -415,8 +419,14 @@ func (p *DefaultPermissionChecker) checkPermissions(permissionsParsedData *PrePa
 
 	ownedERC20TokenBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, 0)
 	if len(chainIDsForERC20) > 0 {
+		tokens := make([]*tokentypes.Token, 0)
+		for _, chainID := range chainIDsForERC20 {
+			for _, tokenAddress := range erc20TokenAddresses {
+				tokens = append(tokens, &tokentypes.Token{Token: &types.Token{ChainID: chainID, Address: tokenAddress}})
+			}
+		}
 		// this only returns balances for the networks we're actually interested in
-		balances, err := getBalancesByChain(context.Background(), accounts, erc20TokenAddresses, chainIDsForERC20)
+		balances, err := getBalancesByChain(context.Background(), accounts, tokens)
 		if err != nil {
 			return nil, err
 		}

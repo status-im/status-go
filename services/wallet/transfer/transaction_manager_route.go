@@ -99,15 +99,12 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 
 		// additional fields version 1
 		FromChainID: path.FromChain.ChainID,
+		FromToken:   path.FromToken,
 	}
 
 	// set appropriate fields based on EIP-1559 compatibility of the chain
 	approavalSendArgs.MaxFeePerGas = path.ApprovalMaxFeesPerGas
 	approavalSendArgs.MaxPriorityFeePerGas = path.ApprovalPriorityFee
-
-	if path.FromToken != nil {
-		approavalSendArgs.FromTokenID = path.FromToken.Symbol
-	}
 
 	builtApprovalTx, usedNonce, err := transactor.ValidateAndBuildTransaction(approavalSendArgs.FromChainID, *approavalSendArgs, lastUsedNonce)
 	if err != nil {
@@ -145,6 +142,8 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 		Gas:   (*hexutil.Uint64)(&path.TxGasAmount),
 
 		// additional fields version 1
+		FromToken:          path.FromToken,
+		ToToken:            path.ToToken,
 		ValueIn:            path.AmountIn,
 		ValueOut:           path.AmountOut,
 		FromChainID:        path.FromChain.ChainID,
@@ -163,7 +162,6 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 	}
 
 	if path.FromToken != nil {
-		sendArgs.FromTokenID = path.FromToken.Symbol
 		sendArgs.ToContractAddress = types.Address(path.FromToken.Address)
 
 		// special handling for transfer tx if selected token is not ETH
@@ -192,9 +190,6 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 			sendArgs.To = &toContractAddr
 			sendArgs.ToContractAddress = toContractAddr
 		}
-	}
-	if path.ToToken != nil {
-		sendArgs.ToTokenID = path.ToToken.Symbol
 	}
 
 	builtTx, usedNonce, err := pathProcessors[path.ProcessorName].BuildTransactionV2(sendArgs, lastUsedNonce)
@@ -342,7 +337,7 @@ func addSignatureAndSendTransaction(
 	}
 	txData.Tx = txWithSignature
 
-	txData.SentHash, err = transactor.SendTransactionWithSignature(common.Address(txData.TxArgs.From), txData.TxArgs.FromTokenID, txWithSignature)
+	txData.SentHash, err = transactor.SendTransactionWithSignature(txData.TxArgs, txWithSignature)
 	if err != nil {
 		return nil, err
 	}

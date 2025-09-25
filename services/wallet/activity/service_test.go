@@ -10,13 +10,15 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	mock_pendingtxtracker "github.com/status-im/status-go/services/wallet/pendingtxtracker/mock"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
@@ -98,20 +100,14 @@ func setupTransactions(t *testing.T, state testState, txCount int, testTxs []pen
 		allAddresses = append(allAddresses, p.From, p.To)
 	}
 
-	state.tokenMock.EXPECT().LookupTokenIdentity(gomock.Any(), gomock.Any(), gomock.Any()).Return(
-		&tokenTypes.Token{
-			ChainID: 5,
-			Address: eth.Address{},
-			Symbol:  "ETH",
-		},
-	).AnyTimes()
-
-	state.tokenMock.EXPECT().LookupToken(gomock.Any(), gomock.Any()).Return(
-		&tokenTypes.Token{
-			ChainID: 5,
-			Address: eth.Address{},
-			Symbol:  "ETH",
-		}, true,
+	state.tokenMock.EXPECT().GetTokenByChainAddress(gomock.Any(), gomock.Any()).Return(
+		&tokentypes.Token{
+			Token: &types.Token{
+				ChainID: 5,
+				Address: eth.Address{},
+				Symbol:  "ETH",
+			},
+		}, nil,
 	).AnyTimes()
 
 	return allAddresses, pendings, ch, func() {

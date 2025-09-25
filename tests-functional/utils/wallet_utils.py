@@ -6,8 +6,12 @@ from clients.signals import SignalType, WalletEventType
 from utils.config import Config
 
 
+def get_token_key(chain_id, token_address):
+    return f"{chain_id}-{token_address}"
+
+
 def get_suggested_routes(rpc_client, **kwargs):
-    required_params = ["uuid", "sendType", "addrFrom", "addrTo", "amountIn", "tokenID", "gasFeeMode"]
+    required_params = ["uuid", "sendType", "addrFrom", "addrTo", "amountIn", "tokenKey", "toTokenKey", "gasFeeMode"]
     input_params = {}
 
     for key, new_value in kwargs.items():

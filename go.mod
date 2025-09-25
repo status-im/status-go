@@ -101,7 +101,7 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/status-im/extkeys v1.4.0
-	github.com/status-im/go-wallet-sdk v0.0.0-20251027141302-43edbd6abc92
+	github.com/status-im/go-wallet-sdk v0.0.0-20251128124044-df18aa5cfd60
 	github.com/waku-org/go-waku v0.10.1-0.20251003225121-06c9af60f35b
 	github.com/waku-org/sds-go-bindings v0.0.0-20251119184907-e78f76307965
 	github.com/waku-org/waku-go-bindings v0.0.0-20251202095947-63b01b7d0ca9
@@ -221,6 +221,7 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
+	github.com/go-playground/validator/v10 v10.11.1 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/go-toolsmith/astcast v1.1.0 // indirect
 	github.com/go-toolsmith/astcopy v1.1.0 // indirect

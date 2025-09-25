@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -192,7 +193,7 @@ func (s *PermissionCheckerSuite) TestCheckPermissions() {
 					}, nil
 				}
 
-				var getBalancesByChain balancesByChainGetter = func(ctx context.Context, accounts, tokens []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
+				var getBalancesByChain balancesByChainGetter = func(ctx context.Context, accounts []gethcommon.Address, tokens []*tokentypes.Token) (BalancesByChain, error) {
 					balance, ok := new(big.Int).SetString(tc.amountInWei(protobuf.CommunityTokenType_ERC20), 10)
 					if !ok {
 						return nil, errors.New("invalid conversion")

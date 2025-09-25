@@ -3,9 +3,9 @@ package params
 import (
 	"net/url"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/status-im/status-go/pkg/security"
+
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 )
 
 // RpcProviderAuthType defines the different types of authentication for RPC providers
@@ -60,11 +60,6 @@ func (p RpcProvider) GetHost() string {
 	return u.Host
 }
 
-type TokenOverride struct {
-	Symbol  string         `json:"symbol"`
-	Address common.Address `json:"address"`
-}
-
 type Network struct {
 	ChainID      uint64        `json:"chainId" validate:"required,gt=0"`
 	ChainName    string        `json:"chainName" validate:"required,min=1"`
@@ -80,30 +75,30 @@ type Network struct {
 	FallbackURL         string `json:"fallbackURL" validate:"omitempty,url"`         // Deprecated
 	OriginalFallbackURL string `json:"originalFallbackURL" validate:"omitempty,url"` // Deprecated
 
-	BlockExplorerURL       string          `json:"blockExplorerUrl,omitempty" validate:"omitempty,url"`
-	IconURL                string          `json:"iconUrl,omitempty" validate:"omitempty"`
-	NativeCurrencyName     string          `json:"nativeCurrencyName,omitempty" validate:"omitempty,min=1"`
-	NativeCurrencySymbol   string          `json:"nativeCurrencySymbol,omitempty" validate:"omitempty,min=1"`
-	NativeCurrencyDecimals uint64          `json:"nativeCurrencyDecimals" validate:"omitempty"`
-	IsTest                 bool            `json:"isTest"`
-	Layer                  uint64          `json:"layer" validate:"omitempty"`
-	Enabled                bool            `json:"enabled"`
-	ChainColor             string          `json:"chainColor" validate:"omitempty"`
-	ShortName              string          `json:"shortName" validate:"omitempty,min=1"`
-	TokenOverrides         []TokenOverride `json:"tokenOverrides" validate:"omitempty,dive"`
-	RelatedChainID         uint64          `json:"relatedChainId" validate:"omitempty"`
-	IsActive               bool            `json:"isActive"`
-	IsDeactivatable        bool            `json:"isDeactivatable"`
-	EIP1559Enabled         bool            `json:"eip1559Enabled"`
-	NoBaseFee              bool            `json:"noBaseFee"`
-	NoPriorityFee          bool            `json:"noPriorityFee"`
+	BlockExplorerURL       string        `json:"blockExplorerUrl,omitempty" validate:"omitempty,url"`
+	IconURL                string        `json:"iconUrl,omitempty" validate:"omitempty"`
+	NativeCurrencyName     string        `json:"nativeCurrencyName,omitempty" validate:"omitempty,min=1"`
+	NativeCurrencySymbol   string        `json:"nativeCurrencySymbol,omitempty" validate:"omitempty,min=1"`
+	NativeCurrencyDecimals uint64        `json:"nativeCurrencyDecimals" validate:"omitempty"`
+	IsTest                 bool          `json:"isTest"`
+	Layer                  uint64        `json:"layer" validate:"omitempty"`
+	Enabled                bool          `json:"enabled"`
+	ChainColor             string        `json:"chainColor" validate:"omitempty"`
+	ShortName              string        `json:"shortName" validate:"omitempty,min=1"`
+	TokenOverrides         []types.Token `json:"tokenOverrides" validate:"omitempty,dive"`
+	RelatedChainID         uint64        `json:"relatedChainId" validate:"omitempty"`
+	IsActive               bool          `json:"isActive"`
+	IsDeactivatable        bool          `json:"isDeactivatable"`
+	EIP1559Enabled         bool          `json:"eip1559Enabled"`
+	NoBaseFee              bool          `json:"noBaseFee"`
+	NoPriorityFee          bool          `json:"noPriorityFee"`
 }
 
 func (n *Network) DeepCopy() Network {
 	updatedNetwork := *n
 	updatedNetwork.RpcProviders = make([]RpcProvider, len(n.RpcProviders))
 	copy(updatedNetwork.RpcProviders, n.RpcProviders)
-	updatedNetwork.TokenOverrides = make([]TokenOverride, len(n.TokenOverrides))
+	updatedNetwork.TokenOverrides = make([]types.Token, len(n.TokenOverrides))
 	copy(updatedNetwork.TokenOverrides, n.TokenOverrides)
 	return updatedNetwork
 }

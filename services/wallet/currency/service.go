@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -73,11 +72,11 @@ func (s *Service) Start(ctx context.Context) {
 	}()
 }
 
-func (s *Service) GetCachedCurrencyFormats() (FormatPerSymbol, error) {
+func (s *Service) GetCachedCurrencyFormats() (FormatPerKey, error) {
 	return s.db.GetCachedFormats()
 }
 
-func (s *Service) FetchAllCurrencyFormats() (FormatPerSymbol, error) {
+func (s *Service) FetchAllCurrencyFormats() (FormatPerKey, error) {
 	// Only token prices can change, so we fetch those
 	tokenFormats, err := s.fetchAllTokenCurrencyFormats()
 
@@ -96,30 +95,29 @@ func (s *Service) FetchAllCurrencyFormats() (FormatPerSymbol, error) {
 	return s.GetCachedCurrencyFormats()
 }
 
-func (s *Service) getAllFiatCurrencyFormats() (FormatPerSymbol, error) {
+func (s *Service) getAllFiatCurrencyFormats() (FormatPerKey, error) {
 	return GetFiatCurrencyFormats(GetAllFiatCurrencySymbols())
 }
 
-func (s *Service) getAllFixedTokenCurrencyFormats() (FormatPerSymbol, error) {
-	tokens, err := s.tokenManager.GetAllTokens()
+func (s *Service) getAllFixedTokenCurrencyFormats() (FormatPerKey, error) {
+	tokens, err := s.tokenManager.GetTokensForActiveNetworksMode()
 	if err != nil {
 		return nil, err
 	}
 
-	peggedTokens := make([]*tokentypes.Token, 0, len(tokens))
+	tokensKeysSymbolMap := make(map[string]string)
 	for _, token := range tokens {
-		if token.PegSymbol != "" {
-			peggedTokens = append(peggedTokens, token)
-		}
+		tokensKeysSymbolMap[token.Key()] = token.Symbol
 	}
 
-	tokenFormats, err := s.currency.FetchTokenCurrencyFormats(peggedTokens)
+	tokenFormats, err := s.currency.FetchTokenCurrencyFormats(tokensKeysSymbolMap)
 	if err != nil {
 		return nil, err
 	}
 
 	const gweiSymbol = "Gwei"
 	tokenFormats[gweiSymbol] = Format{
+		Key:                 gweiSymbol,
 		Symbol:              gweiSymbol,
 		DisplayDecimals:     9,
 		StripTrailingZeroes: true,
@@ -128,13 +126,18 @@ func (s *Service) getAllFixedTokenCurrencyFormats() (FormatPerSymbol, error) {
 	return tokenFormats, nil
 }
 
-func (s *Service) fetchAllTokenCurrencyFormats() (FormatPerSymbol, error) {
-	tokens, err := s.tokenManager.GetAllTokens()
+func (s *Service) fetchAllTokenCurrencyFormats() (FormatPerKey, error) {
+	tokens, err := s.tokenManager.GetTokensForActiveNetworksMode()
 	if err != nil {
 		return nil, err
 	}
 
-	tokenFormats, err := s.currency.FetchTokenCurrencyFormats(tokens)
+	tokensKeysSymbolMap := make(map[string]string)
+	for _, token := range tokens {
+		tokensKeysSymbolMap[token.Key()] = token.Symbol
+	}
+
+	tokenFormats, err := s.currency.FetchTokenCurrencyFormats(tokensKeysSymbolMap)
 	if err != nil {
 		return nil, err
 	}
