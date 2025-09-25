@@ -191,13 +191,13 @@ class TestLocalPairing(MessengerSteps):
         # Send a message to Alice before local pairing
         response = bob.wakuext_service.send_one_to_one_message(alice.public_key, "hello alice")
         message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
-        message_id1, sender_chat_id = message["id"], message["chatId"]
+        message_id1, sender_chat_id, clock_1 = message["id"], message["chatId"], message["clock"]
 
         # Send a message to Bob before local pairing
         response = alice.wakuext_service.send_one_to_one_message(bob.public_key, "hello bob")
         message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
-        message_id2 = message["id"]
+        message_id2, clock_2 = message["id"], message["clock"]
 
         # Wait for the message to be delivered
         bob.find_signal_containing_pattern(
@@ -254,9 +254,11 @@ class TestLocalPairing(MessengerSteps):
         for message in messages:
             if message["id"] == message_id1 and message["text"] == "hello alice":
                 message_found1 = True
+                assert message["clock"] == clock_1, "Message 1 clock is not right on paired device"
                 continue
             if message["id"] == message_id2 and message["text"] == "hello bob":
                 message_found2 = True
+                assert message["clock"] == clock_2, "Message 2 clock is not right on paired device"
                 continue
         assert message_found1, "Message 1 sent before pairing not found on paired device"
         assert message_found2, "Message 2 sent before pairing not found on paired device"
