@@ -15,6 +15,8 @@ import (
 	"github.com/status-im/mvds/state"
 	"go.uber.org/zap"
 
+	sds "github.com/waku-org/sds-go-bindings/sds"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	utils "github.com/status-im/status-go/common"
@@ -32,7 +34,6 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	sds "github.com/waku-org/sds-go-bindings/sds"
 )
 
 // Whisper message properties.
