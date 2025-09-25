@@ -298,15 +298,15 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 		}).AnyTimes()
 
 	tokenBalanceManagerMock := mock_communities.NewMockTokenBalanceManager(ctrl)
-	tokenBalanceManagerMock.EXPECT().GetBalancesByChain(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+	tokenBalanceManagerMock.EXPECT().GetBalancesByChain(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, accounts []gethcommon.Address, tokens []*tokenTypes.Token) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
 			time.Sleep(100 * time.Millisecond) // simulate response time
-			return getBalanceBasedOnParams(*config.mockedBalances, accounts, tokenAddresses, chainIDs), nil
+			return getBalanceBasedOnParams(*config.mockedBalances, accounts, extractTokenAddresses(tokens), extractChainIDs(tokens)), nil
 		}).AnyTimes()
-	tokenBalanceManagerMock.EXPECT().GetCachedBalancesByChain(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+	tokenBalanceManagerMock.EXPECT().GetCachedBalancesByChain(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, accounts []gethcommon.Address, tokens []*tokenTypes.Token) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
 			time.Sleep(100 * time.Millisecond) // simulate response time
-			return getBalanceBasedOnParams(*config.mockedBalances, accounts, tokenAddresses, chainIDs), nil
+			return getBalanceBasedOnParams(*config.mockedBalances, accounts, extractTokenAddresses(tokens), extractChainIDs(tokens)), nil
 		}).AnyTimes()
 
 	networkManagerMock := mock_communities.NewMockNetworkManager(ctrl)
@@ -747,4 +747,25 @@ func checkRequestToJoinInResponse(r *MessengerResponse, member *Messenger, state
 		}
 	}
 	return false
+}
+
+func extractTokenAddresses(tokens []*tokenTypes.Token) []gethcommon.Address {
+	addresses := make([]gethcommon.Address, len(tokens))
+	for i, token := range tokens {
+		addresses[i] = token.Address
+	}
+	return addresses
+}
+
+func extractChainIDs(tokens []*tokenTypes.Token) []uint64 {
+	chainIDsMap := make(map[uint64]bool)
+	for _, token := range tokens {
+		chainIDsMap[token.ChainID] = true
+	}
+
+	chainIDs := make([]uint64, 0, len(chainIDsMap))
+	for chainID := range chainIDsMap {
+		chainIDs = append(chainIDs, chainID)
+	}
+	return chainIDs
 }

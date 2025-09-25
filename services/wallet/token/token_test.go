@@ -3,7 +3,6 @@ package token
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -12,21 +11,26 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
+	protocolsqlite "github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
-	mediaserver "github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
-	"github.com/status-im/status-go/services/wallet/community"
-	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/walletdatabase"
 )
+
+type addressTokenMap = map[common.Address]*tokentypes.Token
+type storeMap = map[uint64]addressTokenMap
 
 func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
@@ -35,32 +39,67 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	tokensLists, err := tokenlists.NewTokenLists(appDb, walletDb)
-	require.NoError(t, err)
-
 	return &Manager{
-			db:                   walletDb,
+			walletDB:             walletDb,
 			ethClientGetter:      nil,
 			ContractMaker:        nil,
 			networkManager:       nil,
 			communityTokensDB:    nil,
 			communityManager:     nil,
-			tokenBalancesStorage: NewPersistence(walletDb),
-			tokenLists:           tokensLists,
+			tokenBalancesStorage: balanceStorage{walletDB: walletDb},
 		}, func() {
 			require.NoError(t, appDb.Close())
 			require.NoError(t, walletDb.Close())
 		}
 }
 
-func upsertCommunityToken(t *testing.T, token *tokenTypes.Token, manager *Manager) {
+func setupTestTokenManager(t *testing.T) (*Manager, *pubsub.Publisher, func()) {
+	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	err = protocolsqlite.Migrate(appDB)
+	require.NoError(t, err)
+
+	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	accountsDB, err := accounts.NewDB(appDB)
+	require.NoError(t, err)
+
+	accountsPublisher := pubsub.NewPublisher()
+
+	config := rpc.ClientConfig{
+		Networks: nil,
+		DB:       appDB,
+	}
+	rpcClient, _ := rpc.NewClient(config)
+
+	nm := network.NewManager(appDB, nil)
+
+	manager, err := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, nil, nil, accountsPublisher,
+		accountsDB, 1*time.Hour, 1*time.Hour)
+	require.NoError(t, err)
+
+	lastTokensUpdate := time.Time{}
+
+	tokensManager, err := setUpTokenListsManager(manager, walletDB, lastTokensUpdate, 1*time.Hour, 1*time.Hour)
+	require.NoError(t, err)
+	manager.tokensManager = tokensManager
+
+	return manager, accountsPublisher, func() {
+		require.NoError(t, appDB.Close())
+		require.NoError(t, walletDB.Close())
+	}
+}
+
+func upsertCommunityToken(t *testing.T, token *tokentypes.Token, manager *Manager) {
 	require.NotNil(t, token.CommunityData)
 
 	err := manager.UpsertCustom(*token)
 	require.NoError(t, err)
 
 	// Community ID is only discovered by calling contract, so must be updated manually
-	_, err = manager.db.Exec("UPDATE tokens SET community_id = ? WHERE address = ?", token.CommunityData.ID, token.Address)
+	_, err = manager.walletDB.Exec("UPDATE tokens SET community_id = ? WHERE address = ?", token.CommunityData.ID, token.Address)
 	require.NoError(t, err)
 }
 
@@ -72,12 +111,14 @@ func TestCustoms(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	token := tokenTypes.Token{
-		Address:  common.Address{1},
-		Name:     "Zilliqa",
-		Symbol:   "ZIL",
-		Decimals: 12,
-		ChainID:  777,
+	token := tokentypes.Token{
+		Token: &types.Token{
+			Address:  common.Address{1},
+			Name:     "Zilliqa",
+			Symbol:   "ZIL",
+			Decimals: 12,
+			ChainID:  777,
+		},
 	}
 
 	err = manager.UpsertCustom(token)
@@ -104,114 +145,43 @@ func TestCommunityTokens(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	token := tokenTypes.Token{
-		Address:  common.Address{1},
-		Name:     "Zilliqa",
-		Symbol:   "ZIL",
-		Decimals: 12,
-		ChainID:  777,
+	token := tokentypes.Token{
+		Token: &types.Token{
+			Address:  common.Address{1},
+			Name:     "Zilliqa",
+			Symbol:   "ZIL",
+			Decimals: 12,
+			ChainID:  777,
+		},
 	}
 
 	err = manager.UpsertCustom(token)
 	require.NoError(t, err)
 
-	communityToken := tokenTypes.Token{
-		Address:  common.Address{2},
-		Name:     "Communitia",
-		Symbol:   "COM",
-		Decimals: 12,
-		ChainID:  777,
-		CommunityData: &community.Data{
+	communityToken := &tokentypes.Token{
+		Token: &types.Token{
+			Address:  common.Address{2},
+			Name:     "Communitia",
+			Symbol:   "COM",
+			Decimals: 12,
+			ChainID:  777,
+		},
+		CommunityData: &tokentypes.CommunityData{
 			ID: "random_community_id",
 		},
 	}
 
-	upsertCommunityToken(t, &communityToken, manager)
+	upsertCommunityToken(t, communityToken, manager)
 
 	rst, err = manager.GetCustoms(false)
 	require.NoError(t, err)
-	require.Equal(t, 2, len(rst))
+	require.Equal(t, 1, len(rst))
 	require.Equal(t, token, *rst[0])
-	require.Equal(t, communityToken, *rst[1])
 
 	rst, err = manager.GetCustoms(true)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
-	require.Equal(t, communityToken, *rst[0])
-}
-
-func toTokenMap(tokens []*tokenTypes.Token) storeMap {
-	tokenMap := storeMap{}
-
-	for _, token := range tokens {
-		addTokMap := tokenMap[token.ChainID]
-		if addTokMap == nil {
-			addTokMap = make(addressTokenMap)
-		}
-
-		addTokMap[token.Address] = token
-		tokenMap[token.ChainID] = addTokMap
-	}
-
-	return tokenMap
-}
-
-func TestTokenOverride(t *testing.T) {
-	networks := []params.Network{
-		{
-			ChainID:   1,
-			ChainName: "TestChain1",
-			TokenOverrides: []params.TokenOverride{
-				{
-					Symbol:  "SNT",
-					Address: common.Address{11},
-				},
-			},
-		}, {
-			ChainID:   2,
-			ChainName: "TestChain2",
-			TokenOverrides: []params.TokenOverride{
-				{
-					Symbol:  "STT",
-					Address: common.Address{33},
-				},
-			},
-		},
-	}
-
-	tokenList := []*tokenTypes.Token{
-		&tokenTypes.Token{
-			Address: common.Address{1},
-			Symbol:  "SNT",
-			ChainID: 1,
-		},
-		&tokenTypes.Token{
-			Address: common.Address{2},
-			Symbol:  "TNT",
-			ChainID: 1,
-		},
-		&tokenTypes.Token{
-			Address: common.Address{3},
-			Symbol:  "STT",
-			ChainID: 2,
-		},
-		&tokenTypes.Token{
-			Address: common.Address{4},
-			Symbol:  "TTT",
-			ChainID: 2,
-		},
-	}
-
-	overrideTokensInPlace(networks, tokenList)
-	tokenMap := toTokenMap(tokenList)
-	_, found := tokenMap[1][common.Address{1}]
-	require.False(t, found)
-	require.Equal(t, common.Address{11}, tokenMap[1][common.Address{11}].Address)
-	require.Equal(t, common.Address{2}, tokenMap[1][common.Address{2}].Address)
-	_, found = tokenMap[2][common.Address{3}]
-	require.False(t, found)
-	require.Equal(t, common.Address{33}, tokenMap[2][common.Address{33}].Address)
-	require.Equal(t, common.Address{4}, tokenMap[2][common.Address{4}].Address)
+	require.Equal(t, *communityToken, *rst[0])
 }
 
 func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
@@ -219,12 +189,14 @@ func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
 	defer stop()
 
 	owner := common.HexToAddress("0x1234567890abcdef")
-	token := &tokenTypes.Token{
-		Address:  common.HexToAddress("0xabcdef1234567890"),
-		Name:     "TestToken",
-		Symbol:   "TT",
-		Decimals: 18,
-		ChainID:  1,
+	token := &tokentypes.Token{
+		Token: &types.Token{
+			Address:  common.HexToAddress("0xabcdef1234567890"),
+			Name:     "TestToken",
+			Symbol:   "TT",
+			Decimals: 18,
+			ChainID:  1,
+		},
 	}
 
 	isFirst, err := manager.MarkAsPreviouslyOwnedToken(nil, owner)
@@ -241,18 +213,16 @@ func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
 
 	// Verify that the token balance was inserted correctly
 	var count int
-	err = manager.db.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
+	err = manager.walletDB.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
-
-	token.Name = "123"
 
 	isFirst, err = manager.MarkAsPreviouslyOwnedToken(token, owner)
 	require.NoError(t, err)
 	require.False(t, isFirst)
 
 	// Not updated because already exists
-	err = manager.db.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
+	err = manager.walletDB.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
@@ -262,43 +232,33 @@ func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
 	require.NoError(t, err)
 
 	// Same token on different chains counts as different token
-	err = manager.db.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
+	err = manager.walletDB.QueryRow(`SELECT count(*) FROM token_balances`).Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 2, count)
 	require.True(t, isFirst)
 }
 
 func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
+	manager, accountsPublisher, stop := setupTestTokenManager(t)
+	defer stop()
 
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	accountsDB, err := accounts.NewDB(appDB)
+	err := manager.Start(context.Background())
 	require.NoError(t, err)
 
 	address := common.HexToAddress("0x1234")
-	accountsPublisher := pubsub.NewPublisher()
 
-	config := rpc.ClientConfig{
-		Networks: nil,
-		DB:       appDB,
-	}
-	rpcClient, _ := rpc.NewClient(config)
-
-	nm := network.NewManager(appDB, nil)
-	mediaServer, err := mediaserver.NewMediaServer(appDB, nil, nil, walletDB)
+	chainID := uint64(1)
+	sntAddress, err := snt.ContractAddress(chainID)
 	require.NoError(t, err)
 
-	manager := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, mediaServer, nil, accountsPublisher, accountsDB, NewPersistence(walletDB))
-
 	// Insert balances for address
-	marked, err := manager.MarkAsPreviouslyOwnedToken(&tokenTypes.Token{
-		Address:  common.HexToAddress("0x1234"),
-		Symbol:   "Dummy",
-		Decimals: 18,
-		ChainID:  1,
+	marked, err := manager.MarkAsPreviouslyOwnedToken(&tokentypes.Token{
+		Token: &types.Token{
+			Address:  sntAddress,
+			Symbol:   "Dummy",
+			Decimals: 18,
+			ChainID:  chainID,
+		},
 	}, address)
 	require.NoError(t, err)
 	require.True(t, marked)
@@ -308,7 +268,8 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	require.Len(t, tokenByAddress, 1)
 
 	// Start service
-	manager.Start(context.Background(), 1*time.Hour, 1*time.Hour)
+	err = manager.Start(context.Background())
+	require.NoError(t, err)
 
 	// Watching accounts must start before sending event.
 	// To avoid running goroutine immediately and let the controller subscribe first,
@@ -339,44 +300,42 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 }
 
 func Test_tokensListsValidity(t *testing.T) {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	manager, _, stop := setupTestTokenManager(t)
+	defer stop()
+
+	err := manager.Start(context.Background())
 	require.NoError(t, err)
 
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	allLists, err := manager.GetAllTokenLists()
 	require.NoError(t, err)
-
-	accountsDB, err := accounts.NewDB(appDB)
-	require.NoError(t, err)
-
-	nm := network.NewManager(appDB, nil)
-
-	manager := NewTokenManager(walletDB, nil, nil, nm, appDB, nil, nil, nil, accountsDB, NewPersistence(walletDB))
-	require.NotNil(t, manager)
-
-	manager.Start(context.Background(), 1*time.Hour, 1*time.Hour)
-
-	tokensListWrapper := manager.GetList()
-	require.NotNil(t, tokensListWrapper)
-	allLists := tokensListWrapper.Data
 	require.Greater(t, len(allLists), 0)
 
-	tmpMap := make(map[string][]*tokenTypes.Token)
+	allTokens, err := manager.GetAllTokens()
+	require.NoError(t, err)
+	require.Greater(t, len(allTokens), 0)
+
+	allTokensForActiveNetworksMode, err := manager.GetTokensForActiveNetworksMode()
+	require.NoError(t, err)
+	require.Greater(t, len(allTokensForActiveNetworksMode), 0)
+
+	testnetMode, err := manager.settings.GetTestNetworksEnabled()
+	require.NoError(t, err)
+
+	for _, token := range allTokensForActiveNetworksMode {
+		require.True(t, testnetMode == !walletcommon.ChainID(token.Token.ChainID).IsMainnet())
+	}
+
+	// every token from the list should appear in the allTokens only once
 	for _, list := range allLists {
 		for _, token := range list.Tokens {
-			key := fmt.Sprintf("%d-%s", token.ChainID, token.Address)
-			if added, ok := tmpMap[key]; ok {
-				found := false
-				for _, a := range added {
-					if a.Address == token.Address {
-						found = true
-						break
-					}
+			numOfOccurrences := 0
+			for _, t := range allTokens {
+				if t.Address == token.Address {
+					numOfOccurrences++
+					break
 				}
-
-				require.True(t, found, "Token %s not found in list %s", token.Symbol, list.Name)
-			} else {
-				tmpMap[key] = []*tokenTypes.Token{token}
 			}
+			require.Equal(t, 1, numOfOccurrences)
 		}
 	}
 }

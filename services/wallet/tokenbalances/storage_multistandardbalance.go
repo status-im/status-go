@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 type StorageMultistandardBalance struct {
@@ -15,29 +16,39 @@ func NewStorageMultistandardBalance(multistandardbalanceStorage multistandardbal
 	return &StorageMultistandardBalance{multistandardbalanceStorage: multistandardbalanceStorage}
 }
 
-func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, chainID uint64, tokenAddresses []ContractAddress, accountAddresses []AccountAddress) (map[AccountAddress]map[ContractAddress]*big.Int, error) {
-	ret := make(map[AccountAddress]map[ContractAddress]*big.Int)
-	for _, account := range accountAddresses {
-		ret[account] = make(map[ContractAddress]*big.Int)
-		erc20balances, _, err := s.multistandardbalanceStorage.GetERC20Balances(ctx, multistandardbalance.BalancesKey{ChainID: chainID, Account: account})
-		if err != nil {
-			return nil, err
-		}
-		needsNative := false
-		for _, tokenAddress := range tokenAddresses {
-			if tokenAddress == NativeTokenAddress {
-				needsNative = true
-			}
-			if _, exists := erc20balances[tokenAddress]; exists {
-				ret[account][tokenAddress] = erc20balances[tokenAddress]
-			}
-		}
-		if needsNative {
-			nativeBalance, _, err := s.multistandardbalanceStorage.GetNativeBalance(ctx, multistandardbalance.BalancesKey{ChainID: chainID, Account: account})
+func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, tokens []*tokentypes.Token, accountAddresses []AccountAddress) (
+	map[uint64]map[AccountAddress]map[ContractAddress]*big.Int, error) {
+	ret := make(map[uint64]map[AccountAddress]map[ContractAddress]*big.Int)
+
+	tokensPerChain := make(map[uint64][]*tokentypes.Token)
+	for _, token := range tokens {
+		tokensPerChain[token.ChainID] = append(tokensPerChain[token.ChainID], token)
+	}
+
+	for chainID, chainTokens := range tokensPerChain {
+		ret[chainID] = make(map[AccountAddress]map[ContractAddress]*big.Int)
+		for _, account := range accountAddresses {
+			ret[chainID][account] = make(map[ContractAddress]*big.Int)
+			erc20balances, _, err := s.multistandardbalanceStorage.GetERC20Balances(ctx, multistandardbalance.BalancesKey{ChainID: chainID, Account: account})
 			if err != nil {
 				return nil, err
 			}
-			ret[account][NativeTokenAddress] = nativeBalance
+			needsNative := false
+			for _, token := range chainTokens {
+				if token.IsNative() {
+					needsNative = true
+				}
+				if _, exists := erc20balances[token.Address]; exists {
+					ret[chainID][account][token.Address] = erc20balances[token.Address]
+				}
+			}
+			if needsNative {
+				nativeBalance, _, err := s.multistandardbalanceStorage.GetNativeBalance(ctx, multistandardbalance.BalancesKey{ChainID: chainID, Account: account})
+				if err != nil {
+					return nil, err
+				}
+				ret[chainID][account][NativeTokenAddress] = nativeBalance
+			}
 		}
 	}
 	return ret, nil

@@ -378,15 +378,6 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 }
 
 func (n *StatusNode) createAndStartTokenManager() error {
-	accDB, err := accounts.NewDB(n.appDB)
-	if err != nil {
-		return err
-	}
-
-	n.tokenManager = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.mediaServer, nil),
-		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsPublisher, accDB,
-		token.NewPersistence(n.walletDB))
-
 	const (
 		defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
 		defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
@@ -401,8 +392,19 @@ func (n *StatusNode) createAndStartTokenManager() error {
 		autoRefreshCheckInterval = time.Duration(n.config.WalletConfig.TokensListsAutoRefreshCheckInterval) * time.Second
 	}
 
-	n.tokenManager.Start(context.Background(), autoRefreshInterval, autoRefreshCheckInterval)
-	return nil
+	accDB, err := accounts.NewDB(n.appDB)
+	if err != nil {
+		return err
+	}
+
+	n.tokenManager, err = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.mediaServer, nil),
+		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsPublisher, accDB,
+		autoRefreshInterval, autoRefreshCheckInterval)
+	if err != nil {
+		return err
+	}
+
+	return n.tokenManager.Start(context.Background())
 }
 
 func (n *StatusNode) setupRPCClient() (err error) {

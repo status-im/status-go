@@ -145,7 +145,11 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 		"",
 	)
 
-	tokenManager := token.NewTokenManager(walletDb, nil, nil, network.NewManager(appDb, nil), appDb, nil, nil, nil, nil, token.NewPersistence(walletDb))
+	tokenManager, err := token.NewTokenManager(walletDb, nil, nil, network.NewManager(appDb, nil), appDb, nil, nil, nil,
+		nil, time.Hour, time.Hour)
+	if err != nil {
+		return nil, err
+	}
 
 	options := []Option{
 		WithCustomLogger(config.logger),

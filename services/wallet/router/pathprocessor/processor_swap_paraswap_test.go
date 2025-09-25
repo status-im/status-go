@@ -9,6 +9,8 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/params"
@@ -17,7 +19,7 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	mock_paraswap "github.com/status-im/status-go/services/wallet/thirdparty/paraswap/mock"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -87,16 +89,16 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 	processor := NewSwapParaswapProcessor(nil, nil, nil)
 	processor.paraswapClient = client
 
-	fromToken := tokenTypes.Token{
+	fromToken := tokentypes.Token{Token: &types.Token{
 		Symbol: walletCommon.EthSymbol,
-	}
-	toToken := tokenTypes.Token{
+	}}
+	toToken := tokentypes.Token{Token: &types.Token{
 		Symbol: walletCommon.UsdcSymbol,
-	}
+	}}
 	chainIDs := []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.UnknownChainID}
 
 	for _, chainID := range chainIDs {
-		key := pathProcessorCommon.MakeKey(chainID, chainID, fromToken.Symbol, toToken.Symbol, testPriceRoute.SrcAmount.Int)
+		key := pathProcessorCommon.MakeKey(fromToken.Key(), toToken.Key(), testPriceRoute.SrcAmount.Int)
 		processor.priceRoute.Store(key, testPriceRoute)
 
 		testInputParams := ProcessorInputParams{
@@ -152,12 +154,12 @@ func TestParaswapErrors(t *testing.T) {
 	processor := NewSwapParaswapProcessor(nil, nil, nil)
 	processor.paraswapClient = client
 
-	fromToken := tokenTypes.Token{
+	fromToken := tokentypes.Token{Token: &types.Token{
 		Symbol: walletCommon.EthSymbol,
-	}
-	toToken := tokenTypes.Token{
+	}}
+	toToken := tokentypes.Token{Token: &types.Token{
 		Symbol: walletCommon.UsdcSymbol,
-	}
+	}}
 	chainID := walletCommon.EthereumMainnet
 
 	testInputParams := ProcessorInputParams{

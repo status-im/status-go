@@ -154,12 +154,11 @@ func (tm *TransactionManager) BuildRawTransaction(chainID uint64, sendArgs walle
 	}, nil
 }
 
-func (tm *TransactionManager) SendTransactionWithSignature(chainID uint64, sendArgs wallettypes.SendTxArgs, signature []byte) (hash types.Hash, err error) {
+func (tm *TransactionManager) SendTransactionWithSignature(chainID uint64, sendArgs wallettypes.SendTxArgs, signature []byte) (types.Hash, error) {
 	txWithSignature, err := tm.transactor.BuildTransactionWithSignature(chainID, sendArgs, signature)
 	if err != nil {
-		return hash, err
+		return types.Hash{}, err
 	}
 
-	hash, err = tm.transactor.SendTransactionWithSignature(common.Address(sendArgs.From), sendArgs.Symbol, txWithSignature)
-	return hash, err
+	return tm.transactor.SendTransactionWithSignature(&sendArgs, txWithSignature)
 }

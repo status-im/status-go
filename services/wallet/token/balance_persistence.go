@@ -1,32 +1,24 @@
 package token
 
-//go:generate go tool mockgen -package=mock_balance_persistence -source=balance_persistence.go -destination=mock/balance_persistence/balance_persistence.go
-
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
-type TokenBalancesStorage interface {
-	SaveTokens(tokens map[common.Address][]tokenTypes.StorageToken) error
-	GetTokens() (map[common.Address][]tokenTypes.StorageToken, error)
+type balanceStorage struct {
+	walletDB *sql.DB
 }
 
-type Persistence struct {
-	db *sql.DB
-}
-
-func NewPersistence(db *sql.DB) *Persistence {
-	return &Persistence{db: db}
-}
-
-func (p *Persistence) SaveTokens(tokens map[common.Address][]tokenTypes.StorageToken) (err error) {
-	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+func (p *balanceStorage) saveBalances(tokens map[common.Address][]tokentypes.StorageToken) (err error) {
+	tx, err := p.walletDB.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return
 	}
@@ -41,77 +33,152 @@ func (p *Persistence) SaveTokens(tokens map[common.Address][]tokenTypes.StorageT
 
 	for address, addressTokens := range tokens {
 		for _, t := range addressTokens {
-			for chainID, b := range t.BalancesPerChain {
-				if b.HasError {
-					continue
-				}
-				_, err = tx.Exec(`INSERT INTO token_balances(user_address,token_name,token_symbol,token_address,token_decimals,token_description,token_url,balance,raw_balance,chain_id) VALUES (?,?,?,?,?,?,?,?,?,?)`, address.Hex(), t.Name, t.Symbol, b.Address.Hex(), t.Decimals, t.Description, t.AssetWebsiteURL, b.Balance.String(), b.RawBalance, chainID)
-				if err != nil {
-					return err
-				}
+			if t.HasError {
+				continue
 			}
-
+			_, err = tx.Exec(`
+			INSERT INTO token_balances(
+				user_address,
+				token_address,
+				token_description,
+				token_url,
+				balance,
+				raw_balance,
+				chain_id)
+			VALUES
+				(?,?,?,?,?,?,?)`,
+				address.Hex(),
+				t.TokenAddress.Hex(),
+				t.Description,
+				t.AssetWebsiteURL,
+				t.Balance.String(),
+				t.RawBalance,
+				t.TokenChainID)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (p *Persistence) GetTokens() (map[common.Address][]tokenTypes.StorageToken, error) {
-	rows, err := p.db.Query(`SELECT user_address, token_name, token_symbol, token_address, token_decimals, token_description, token_url, balance, raw_balance, chain_id FROM token_balances `)
+func (p *balanceStorage) removeTokenBalances(account common.Address) error {
+	_, err := p.walletDB.Exec("DELETE FROM token_balances WHERE user_address = ?", account.String())
+	return err
+}
+
+func (p *balanceStorage) getBalances() (map[common.Address][]tokentypes.StorageToken, error) {
+	rows, err := p.walletDB.Query(`
+	SELECT
+		user_address,
+		token_address,
+		token_description,
+		token_url,
+		balance,
+		raw_balance,
+		chain_id
+	FROM
+		token_balances`)
 	if err != nil {
 		return nil, err
 	}
 
 	defer rows.Close()
 
-	acc := make(map[common.Address]map[string]tokenTypes.StorageToken)
+	result := make(map[common.Address][]tokentypes.StorageToken)
 
 	for rows.Next() {
-		var addressStr, balance, rawBalance, tokenAddress string
-		token := tokenTypes.StorageToken{}
-		var chainID uint64
+		var userAddressStr, tokenAddressStr, balanceStr string
+		token := tokentypes.StorageToken{}
 
-		err := rows.Scan(&addressStr, &token.Name, &token.Symbol, &tokenAddress, &token.Decimals, &token.Description, &token.AssetWebsiteURL, &balance, &rawBalance, &chainID)
+		err := rows.Scan(&userAddressStr, &tokenAddressStr, &token.Description, &token.AssetWebsiteURL, &balanceStr, &token.RawBalance, &token.TokenChainID)
 		if err != nil {
 			return nil, err
 		}
 
-		token.Address = common.HexToAddress(tokenAddress)
-		token.ChainID = chainID
-		address := common.HexToAddress(addressStr)
-
-		if acc[address] == nil {
-			acc[address] = make(map[string]tokenTypes.StorageToken)
-		}
-
-		if acc[address][token.Name].Name == "" {
-			token.BalancesPerChain = make(map[uint64]tokenTypes.ChainBalance)
-			acc[address][token.Name] = token
-		}
-
-		tokenAcc := acc[address][token.Name]
+		userAddress := common.HexToAddress(userAddressStr)
+		token.TokenAddress = common.HexToAddress(tokenAddressStr)
 
 		balanceFloat := new(big.Float)
-		_, _, err = balanceFloat.Parse(balance, 10)
+		_, _, err = balanceFloat.Parse(balanceStr, 10)
 		if err != nil {
 			return nil, err
 		}
 
-		tokenAcc.BalancesPerChain[chainID] = tokenTypes.ChainBalance{
-			RawBalance: rawBalance,
-			Balance:    balanceFloat,
-			Address:    common.HexToAddress(tokenAddress),
-			ChainID:    chainID,
-		}
+		token.Balance = balanceFloat
+
+		result[userAddress] = append(result[userAddress], token)
 	}
 
-	result := make(map[common.Address][]tokenTypes.StorageToken)
-
-	for address, tks := range acc {
-		for _, t := range tks {
-			result[address] = append(result[address], t)
-		}
-	}
 	return result, nil
+}
+
+func (p *balanceStorage) getCachedBalancesByChain(accounts []common.Address, tokens []*tokentypes.Token) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
+	ret := make(map[uint64]map[common.Address]map[common.Address]*hexutil.Big)
+
+	if len(accounts) == 0 || len(tokens) == 0 {
+		return ret, nil
+	}
+
+	accountStrings := make([]string, len(accounts))
+	for i, account := range accounts {
+		accountStrings[i] = fmt.Sprintf("'%s'", account.Hex())
+	}
+
+	tokenAddressStrings := make([]string, len(tokens))
+	chainIDStrings := make([]string, len(tokens))
+	for i, token := range tokens {
+		tokenAddressStrings[i] = fmt.Sprintf("'%s'", token.Address.Hex())
+		chainIDStrings[i] = fmt.Sprintf("%d", token.ChainID)
+	}
+
+	//nolint: gosec
+	query := `
+	SELECT
+		chain_id,
+		user_address,
+		token_address,
+		raw_balance
+	FROM
+		token_balances
+	WHERE
+		user_address IN (` + strings.Join(accountStrings, ",") + `)
+		AND token_address IN (` + strings.Join(tokenAddressStrings, ",") + `)
+		AND chain_id IN (` + strings.Join(chainIDStrings, ",") + `)`
+
+	rows, err := p.walletDB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var chainID uint64
+		var userAddressStr, tokenAddressStr string
+		var rawBalance string
+
+		err := rows.Scan(&chainID, &userAddressStr, &tokenAddressStr, &rawBalance)
+		if err != nil {
+			return nil, err
+		}
+
+		num := new(hexutil.Big)
+		_, ok := num.ToInt().SetString(rawBalance, 10)
+		if !ok {
+			return ret, nil
+		}
+
+		if ret[chainID] == nil {
+			ret[chainID] = make(map[common.Address]map[common.Address]*hexutil.Big)
+		}
+
+		if ret[chainID][common.HexToAddress(userAddressStr)] == nil {
+			ret[chainID][common.HexToAddress(userAddressStr)] = make(map[common.Address]*hexutil.Big)
+		}
+
+		ret[chainID][common.HexToAddress(userAddressStr)][common.HexToAddress(tokenAddressStr)] = num
+	}
+
+	return ret, nil
 }

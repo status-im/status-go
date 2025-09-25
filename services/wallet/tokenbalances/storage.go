@@ -5,8 +5,11 @@ package tokenbalances
 import (
 	"context"
 	"math/big"
+
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 type Storage interface {
-	GetBalances(ctx context.Context, chainID uint64, tokenAddresses []ContractAddress, accountAddresses []AccountAddress) (map[AccountAddress]map[ContractAddress]*big.Int, error)
+	// GetBalances returns the balances for the given tokens and account addresses, grouped by chainID.
+	GetBalances(ctx context.Context, tokens []*tokentypes.Token, accountAddresses []AccountAddress) (map[uint64]map[AccountAddress]map[ContractAddress]*big.Int, error)
 }

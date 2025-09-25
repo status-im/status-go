@@ -14,9 +14,9 @@ import (
 
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/params"
 	communityToken "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
+
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/collectibles"
@@ -29,7 +29,7 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -42,9 +42,8 @@ var (
 )
 
 type TokenManager interface {
-	GetToken(chainID uint64, tokenSymbol string) *tokenTypes.Token
-	FindToken(network *params.Network, tokenSymbol string) *tokenTypes.Token
-	LookupToken(chainID *uint64, tokenSymbol string) (token *tokenTypes.Token, isNative bool)
+	GetNativeTokenForChain(chainID uint64) (*tokentypes.Token, error)
+	GetTokenByKey(tokenKey string) (*tokentypes.Token, error)
 	GetCommunityTokenType(chainID uint64, tokenContractAddress string) (protobuf.CommunityTokenType, error)
 	GetCommunityTokenPrivilegesLevel(chainID uint64, tokenContractAddress string) (communityToken.PrivilegesLevel, error)
 }
@@ -270,7 +269,7 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 			}
 
 			r.lastInputParamsMutex.Lock()
-			processorInputParams, err := r.CreateProcessorInputParams(r.lastInputParams, path.FromChain, path.ToChain, path.FromToken, path.ToToken, 0)
+			processorInputParams, err := r.CreateProcessorInputParams(r.lastInputParams, path.FromToken, path.ToToken, 0)
 			r.lastInputParamsMutex.Unlock()
 			if err != nil {
 				return err
@@ -414,17 +413,7 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
-	fromChain := r.rpcClient.GetNetworkManager().Find(input.FromChainID)
-	if fromChain == nil {
-		return nil, errors.CreateErrorResponseFromError(fmt.Errorf("from chain %d not found", input.FromChainID))
-	}
-
-	toChain := r.rpcClient.GetNetworkManager().Find(input.ToChainID)
-	if toChain == nil {
-		return nil, errors.CreateErrorResponseFromError(fmt.Errorf("to chain %d not found", input.ToChainID))
-	}
-
-	err = r.prepareBalanceMapForTokenOnChain(ctx, input, fromChain)
+	err = r.prepareBalanceMapForTokenOnChain(ctx, input)
 	if err != nil {
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
@@ -445,7 +434,7 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 		}
 	}
 
-	route, processorErrors, err := r.resolveRoute(ctx, input, fromChain, toChain)
+	route, processorErrors, err := r.resolveRoute(ctx, input)
 	if err != nil {
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
@@ -499,7 +488,7 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 
 // prepareBalanceMapForTokenOnChain prepares the balance map for passed address, where the key is in format "chainID-tokenSymbol" and
 // value is the balance of the token. Native token (EHT) is always added to the balance map.
-func (r *Router) prepareBalanceMapForTokenOnChain(ctx context.Context, input *requests.RouteInputParams, fromChain *params.Network) (err error) {
+func (r *Router) prepareBalanceMapForTokenOnChain(ctx context.Context, input *requests.RouteInputParams) (err error) {
 	// clear the active balance map
 	r.activeBalanceMap = sync.Map{}
 
@@ -511,15 +500,15 @@ func (r *Router) prepareBalanceMapForTokenOnChain(ctx context.Context, input *re
 	}
 
 	// check token existence
-	token := findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, fromChain, input.TokenID)
+	token := findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, input.FromChainID, input.TokenKey)
 	if token == nil {
 		err = errors.CreateErrorResponseFromError(ErrTokenNotFound)
 		return
 	}
 	// check native token existence
-	nativeToken := r.tokenManager.FindToken(fromChain, fromChain.NativeCurrencySymbol)
-	if nativeToken == nil {
-		err = errors.CreateErrorResponseFromError(fmt.Errorf("chain %d, token %s: %w", fromChain.ChainID, token.Symbol, ErrNativeTokenNotFound))
+	nativeToken, err := r.tokenManager.GetNativeTokenForChain(input.FromChainID)
+	if err != nil {
+		err = errors.CreateErrorResponseFromError(fmt.Errorf("getting native token for chain %d: %w", input.FromChainID, err))
 		return
 	}
 
@@ -528,21 +517,21 @@ func (r *Router) prepareBalanceMapForTokenOnChain(ctx context.Context, input *re
 	if input.SendType == sendtype.ERC721Transfer {
 		tokenBalance = big.NewInt(1)
 	} else if input.SendType == sendtype.ERC1155Transfer {
-		tokenBalance, err = r.getERC1155Balance(ctx, fromChain, token, input.AddrFrom)
+		tokenBalance, err = r.getERC1155Balance(ctx, input.FromChainID, token, input.AddrFrom)
 		if err != nil {
-			err = errors.CreateErrorResponseFromError(fmt.Errorf("chain %d, token %s: %w", fromChain.ChainID, token.Symbol, err))
+			err = errors.CreateErrorResponseFromError(fmt.Errorf("chain %d, token %s: %w", input.FromChainID, token.Symbol, err))
 			return
 		}
 	} else {
-		tokenBalance, err = r.getBalance(ctx, fromChain.ChainID, token, input.AddrFrom)
+		tokenBalance, err = r.getBalance(ctx, input.FromChainID, token, input.AddrFrom)
 		if err != nil {
-			err = errors.CreateErrorResponseFromError(fmt.Errorf("chain %d, token %s: %w", fromChain.ChainID, token.Symbol, err))
+			err = errors.CreateErrorResponseFromError(fmt.Errorf("chain %d, token %s: %w", input.FromChainID, token.Symbol, err))
 			return
 		}
 	}
 	// add only if balance is not nil
 	if tokenBalance != nil {
-		r.activeBalanceMap.Store(makeBalanceKey(fromChain.ChainID, token.Symbol), tokenBalance)
+		r.activeBalanceMap.Store(makeBalanceKey(input.FromChainID, token.Symbol), tokenBalance)
 	}
 
 	if token.IsNative() {
@@ -550,25 +539,38 @@ func (r *Router) prepareBalanceMapForTokenOnChain(ctx context.Context, input *re
 	}
 
 	// add native token balance for the chain
-	nativeBalance, err := r.getBalance(ctx, fromChain.ChainID, nativeToken, input.AddrFrom)
+	nativeBalance, err := r.getBalance(ctx, input.FromChainID, nativeToken, input.AddrFrom)
 	if err != nil {
-		err = errors.CreateErrorResponseFromError(fmt.Errorf("chain %d, token %s: %w", fromChain.ChainID, token.Symbol, err))
+		err = errors.CreateErrorResponseFromError(fmt.Errorf("chain %d, token %s: %w", input.FromChainID, token.Symbol, err))
 		return
 	}
 	// add only if balance is not nil
 	if nativeBalance != nil {
-		r.activeBalanceMap.Store(makeBalanceKey(fromChain.ChainID, nativeToken.Symbol), nativeBalance)
+		r.activeBalanceMap.Store(makeBalanceKey(input.FromChainID, nativeToken.Symbol), nativeBalance)
 	}
 
 	return
 }
 
-func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fromNetwork *params.Network, toNetwork *params.Network,
-	fromToken *tokenTypes.Token, toToken *tokenTypes.Token, useCommunityTokenTransferDetailsAtIndex int) (pathprocessor.ProcessorInputParams, error) {
+func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fromToken *tokentypes.Token, toToken *tokentypes.Token,
+	useCommunityTokenTransferDetailsAtIndex int) (pathprocessor.ProcessorInputParams, error) {
 	var err error
+
+	fromChain := r.rpcClient.GetNetworkManager().Find(input.FromChainID)
+	if fromChain == nil {
+		// should never be here, input.Validate() ensures that the chain is supported
+		panic(fmt.Errorf("from chain %d not found", input.FromChainID))
+	}
+
+	toChain := r.rpcClient.GetNetworkManager().Find(input.ToChainID)
+	if toChain == nil {
+		// should never be here, input.Validate() ensures that the chain is supported
+		panic(fmt.Errorf("to chain %d not found", input.ToChainID))
+	}
+
 	processorInputParams := pathprocessor.ProcessorInputParams{
-		FromChain:          fromNetwork,
-		ToChain:            toNetwork,
+		FromChain:          fromChain,
+		ToChain:            toChain,
 		FromToken:          fromToken,
 		ToToken:            toToken,
 		ToAddr:             input.AddrTo,
@@ -592,14 +594,14 @@ func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fr
 	if input.SendType.IsCommunityRelatedTransfer() {
 		processorInputParams.CommunityParams = input.CommunityRouteInputParams
 
-		if input.CommunityRouteInputParams.UseTransferDetails() && fromNetwork != nil {
+		if input.CommunityRouteInputParams.UseTransferDetails() {
 			tokenContractAddress := input.CommunityRouteInputParams.TransferDetails[useCommunityTokenTransferDetailsAtIndex].TokenContractAddress
-			tokenType, err := r.tokenManager.GetCommunityTokenType(fromNetwork.ChainID, tokenContractAddress.String())
+			tokenType, err := r.tokenManager.GetCommunityTokenType(fromChain.ChainID, tokenContractAddress.String())
 			if err != nil {
 				return processorInputParams, err
 			}
 
-			privilegeLevel, err := r.tokenManager.GetCommunityTokenPrivilegesLevel(fromNetwork.ChainID, tokenContractAddress.String())
+			privilegeLevel, err := r.tokenManager.GetCommunityTokenPrivilegesLevel(fromChain.ChainID, tokenContractAddress.String())
 			if err != nil {
 				return processorInputParams, err
 			}
@@ -625,23 +627,21 @@ func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fr
 	return processorInputParams, err
 }
 
-func (r *Router) findFromAndToTokens(testsMode bool, input *requests.RouteInputParams, network *params.Network) (fromToken *tokenTypes.Token, toToken *tokenTypes.Token) {
+func (r *Router) findFromAndToTokens(testsMode bool, input *requests.RouteInputParams, chainID uint64) (fromToken *tokentypes.Token, toToken *tokentypes.Token) {
 	if testsMode {
 		fromToken = input.TestParams.TokenFrom
 	} else {
-		fromToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.TokenID)
+		fromToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, chainID, input.TokenKey)
 	}
 	if fromToken == nil {
 		return
 	}
 
-	if input.SendType == sendtype.Swap {
-		toToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, common.Address{}, network, input.ToTokenID)
-	}
+	toToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, common.Address{}, chainID, input.ToTokenKey)
 	return
 }
 
-func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputParams, fromChain *params.Network, toChain *params.Network) (route routes.Route, processorErrors []*ProcessorError, err error) {
+func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputParams) (route routes.Route, processorErrors []*ProcessorError, err error) {
 	var (
 		testsMode = input.TestsMode && input.TestParams != nil
 
@@ -663,14 +663,18 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 		})
 	}
 
-	if !input.SendType.IsAvailableFor(fromChain) {
-		err = errors.CreateErrorResponseFromError(fmt.Errorf("send type %d not available for from chain %d", input.SendType, fromChain.ChainID))
+	if !input.SendType.IsAvailableFor(input.FromChainID) {
+		err = errors.CreateErrorResponseFromError(fmt.Errorf("send type %d not available for from chain %d", input.SendType, input.FromChainID))
 		return
 	}
 
-	fromToken, toToken := r.findFromAndToTokens(testsMode, input, fromChain)
+	fromToken, toToken := r.findFromAndToTokens(testsMode, input, input.FromChainID)
 	if fromToken == nil {
-		err = errors.CreateErrorResponseFromError(fmt.Errorf("from token not found for send type %d on chain %d", input.SendType, fromChain.ChainID))
+		err = errors.CreateErrorResponseFromError(fmt.Errorf("from token not found for send type %d on chain %d", input.SendType, input.FromChainID))
+		return
+	}
+	if toToken == nil {
+		err = errors.CreateErrorResponseFromError(fmt.Errorf("to token not found for send type %d on chain %d", input.SendType, input.ToChainID))
 		return
 	}
 
@@ -682,9 +686,9 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 	if testsMode {
 		fetchedFees = input.TestParams.SuggestedFees
 	} else {
-		fetchedFees, noBaseFee, noPriorityFee, err = r.feesManager.SuggestedFees(ctx, fromChain.ChainID, r.lastInputParams.AddrFrom)
+		fetchedFees, noBaseFee, noPriorityFee, err = r.feesManager.SuggestedFees(ctx, input.FromChainID, r.lastInputParams.AddrFrom)
 		if err != nil {
-			err = errors.CreateErrorResponseFromError(fmt.Errorf("failed to fetch fees for from chain %d", fromChain.ChainID))
+			err = errors.CreateErrorResponseFromError(fmt.Errorf("failed to fetch fees for from chain %d", input.FromChainID))
 			return
 		}
 	}
@@ -696,7 +700,7 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 		}
 
 		// if we're doing a single chain operation, we can skip bridge processors
-		if walletCommon.IsSingleChainOperation(fromChain, toChain) && walletCommon.IsProcessorBridge(pProcessor.Name()) {
+		if walletCommon.IsSingleChainOperation(input.FromChainID, input.ToChainID) && walletCommon.IsProcessorBridge(pProcessor.Name()) {
 			continue
 		}
 
@@ -707,10 +711,10 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 		if input.UseCommunityTransferDetails() {
 			for i := 0; i < len(input.CommunityRouteInputParams.TransferDetails); i++ {
 				usedNoncesMu.Lock()
-				path, err := r.buildPath(ctx, input, fromChain, toChain, fromToken, toToken, pProcessor, fetchedFees, usedNonces, noBaseFee, noPriorityFee, i)
+				path, err := r.buildPath(ctx, input, fromToken, toToken, pProcessor, fetchedFees, usedNonces, noBaseFee, noPriorityFee, i)
 				usedNoncesMu.Unlock()
 				if err != nil {
-					appendProcessorErrorFn(pProcessor.Name(), input.SendType, fromChain.ChainID, toChain.ChainID, input.AmountIn.ToInt(), err)
+					appendProcessorErrorFn(pProcessor.Name(), input.SendType, input.FromChainID, input.ToChainID, input.AmountIn.ToInt(), err)
 					continue
 				}
 
@@ -718,10 +722,10 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 			}
 		} else {
 			usedNoncesMu.Lock()
-			path, err := r.buildPath(ctx, input, fromChain, toChain, fromToken, toToken, pProcessor, fetchedFees, usedNonces, noBaseFee, noPriorityFee, 0)
+			path, err := r.buildPath(ctx, input, fromToken, toToken, pProcessor, fetchedFees, usedNonces, noBaseFee, noPriorityFee, 0)
 			usedNoncesMu.Unlock()
 			if err != nil {
-				appendProcessorErrorFn(pProcessor.Name(), input.SendType, fromChain.ChainID, toChain.ChainID, input.AmountIn.ToInt(), err)
+				appendProcessorErrorFn(pProcessor.Name(), input.SendType, input.FromChainID, input.ToChainID, input.AmountIn.ToInt(), err)
 				continue
 			}
 
@@ -732,19 +736,18 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 	return
 }
 
-func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams, fromNetwork *params.Network,
-	toNetwork *params.Network, fromToken *tokenTypes.Token, toToken *tokenTypes.Token,
-	pathProcessor pathprocessor.PathProcessor, fetchedFees *fees.SuggestedFees, usedNonces map[uint64]uint64,
-	noBaseFee bool, noPriorityFee bool, useCommunityTokenTransferDetailsAtIndex int) (*routes.Path, error) {
-	if !input.SendType.IsAvailableFor(fromNetwork) {
+func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams, fromToken *tokentypes.Token,
+	toToken *tokentypes.Token, pathProcessor pathprocessor.PathProcessor, fetchedFees *fees.SuggestedFees,
+	usedNonces map[uint64]uint64, noBaseFee bool, noPriorityFee bool, useCommunityTokenTransferDetailsAtIndex int) (*routes.Path, error) {
+	if !input.SendType.IsAvailableFor(input.FromChainID) {
 		return nil, ErrPathNotSupportedForProvidedChain
 	}
 
-	if !input.SendType.IsAvailableBetween(fromNetwork, toNetwork) {
+	if !input.SendType.IsAvailableBetween(input.FromChainID, input.ToChainID) {
 		return nil, ErrPathNotSupportedBetweenProvidedChains
 	}
 
-	processorInputParams, err := r.CreateProcessorInputParams(input, fromNetwork, toNetwork, fromToken, toToken, useCommunityTokenTransferDetailsAtIndex)
+	processorInputParams, err := r.CreateProcessorInputParams(input, fromToken, toToken, useCommunityTokenTransferDetailsAtIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -814,8 +817,8 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 	path := &routes.Path{
 		RouterInputParamsUuid: input.Uuid,
 		ProcessorName:         pathProcessor.Name(),
-		FromChain:             fromNetwork,
-		ToChain:               toNetwork,
+		FromChain:             processorInputParams.FromChain,
+		ToChain:               processorInputParams.ToChain,
 		FromToken:             fromToken,
 		ToToken:               toToken,
 		AmountIn:              (*hexutil.Big)(processorInputParams.AmountIn),
@@ -942,12 +945,12 @@ func (r *Router) makeSuggestedRoute(input *requests.RouteInputParams, route rout
 		prices = input.TestParams.TokenPrices
 	} else {
 		var errPrices error
-		prices, errPrices = fetchPrices(input.SendType, r.marketManager, []string{input.TokenID, input.ToTokenID})
+		prices, errPrices = r.fetchPrices(input.SendType, []string{input.TokenKey, input.ToTokenKey})
 		// error while fetching prices should not block the route evaluation, don't return, just log the error
 		if errPrices != nil {
 			r.logger.Error("router.checkRoute error fetching prices",
-				zap.String("input.TokenID", input.TokenID),
-				zap.String("input.ToTokenID", input.ToTokenID),
+				zap.String("input.TokenKey", input.TokenKey),
+				zap.String("input.ToTokenKey", input.ToTokenKey),
 				zap.Error(errPrices))
 		}
 	}

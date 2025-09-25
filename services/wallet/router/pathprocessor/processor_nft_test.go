@@ -7,11 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 func TestNFTProcessor_Name(t *testing.T) {
@@ -26,9 +28,9 @@ func TestNFTProcessor_AvailableFor(t *testing.T) {
 	cryptoKittiesParams := ProcessorInputParams{
 		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
 		ToChain:   &params.Network{ChainID: walletCommon.EthereumMainnet},
-		FromToken: &tokenTypes.Token{
+		FromToken: &tokentypes.Token{Token: &types.Token{
 			Address: CryptoKittiesContractID.Address,
-		},
+		}},
 		ToToken: nil, // NFT transfers don't have destination token
 	}
 
@@ -40,9 +42,9 @@ func TestNFTProcessor_AvailableFor(t *testing.T) {
 	cryptoPunksParams := ProcessorInputParams{
 		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
 		ToChain:   &params.Network{ChainID: walletCommon.EthereumMainnet},
-		FromToken: &tokenTypes.Token{
+		FromToken: &tokentypes.Token{Token: &types.Token{
 			Address: CryptoPunksContractID.Address,
-		},
+		}},
 		ToToken: nil,
 	}
 
@@ -54,9 +56,9 @@ func TestNFTProcessor_AvailableFor(t *testing.T) {
 	genericERC721Params := ProcessorInputParams{
 		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
 		ToChain:   &params.Network{ChainID: walletCommon.EthereumMainnet},
-		FromToken: &tokenTypes.Token{
+		FromToken: &tokentypes.Token{Token: &types.Token{
 			Address: common.HexToAddress("0x1234567890123456789012345678901234567890"),
-		},
+		}},
 		ToToken: nil,
 	}
 
@@ -68,9 +70,9 @@ func TestNFTProcessor_AvailableFor(t *testing.T) {
 	crossChainParams := ProcessorInputParams{
 		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
 		ToChain:   &params.Network{ChainID: walletCommon.OptimismMainnet},
-		FromToken: &tokenTypes.Token{
+		FromToken: &tokentypes.Token{Token: &types.Token{
 			Address: common.HexToAddress("0x1234567890123456789012345678901234567890"),
-		},
+		}},
 		ToToken: nil,
 	}
 
@@ -82,12 +84,12 @@ func TestNFTProcessor_AvailableFor(t *testing.T) {
 	withToTokenParams := ProcessorInputParams{
 		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
 		ToChain:   &params.Network{ChainID: walletCommon.EthereumMainnet},
-		FromToken: &tokenTypes.Token{
+		FromToken: &tokentypes.Token{Token: &types.Token{
 			Address: common.HexToAddress("0x1234567890123456789012345678901234567890"),
-		},
-		ToToken: &tokenTypes.Token{
+		}},
+		ToToken: &tokentypes.Token{Token: &types.Token{
 			Address: common.HexToAddress("0x0987654321098765432109876543210987654321"),
-		},
+		}},
 	}
 
 	available, err = processor.AvailableFor(withToTokenParams)
@@ -101,9 +103,9 @@ func TestNFTProcessor_GetHandlerForContract(t *testing.T) {
 	// Test CryptoKitties handler selection
 	cryptoKittiesParams := ProcessorInputParams{
 		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
-		FromToken: &tokenTypes.Token{
+		FromToken: &tokentypes.Token{Token: &types.Token{
 			Address: CryptoKittiesContractID.Address,
-		},
+		}},
 	}
 
 	handler := processor.getHandlerForContract(cryptoKittiesParams)
@@ -113,9 +115,9 @@ func TestNFTProcessor_GetHandlerForContract(t *testing.T) {
 	// Test CryptoPunks handler selection
 	cryptoPunksParams := ProcessorInputParams{
 		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
-		FromToken: &tokenTypes.Token{
+		FromToken: &tokentypes.Token{Token: &types.Token{
 			Address: CryptoPunksContractID.Address,
-		},
+		}},
 	}
 
 	handler = processor.getHandlerForContract(cryptoPunksParams)
@@ -125,9 +127,9 @@ func TestNFTProcessor_GetHandlerForContract(t *testing.T) {
 	// Test generic ERC721 handler selection
 	genericParams := ProcessorInputParams{
 		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
-		FromToken: &tokenTypes.Token{
+		FromToken: &tokentypes.Token{Token: &types.Token{
 			Address: common.HexToAddress("0x1234567890123456789012345678901234567890"),
-		},
+		}},
 	}
 
 	handler = processor.getHandlerForContract(genericParams)

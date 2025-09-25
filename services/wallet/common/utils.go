@@ -42,8 +42,8 @@ func ArrayContainsElement[T comparable](el T, arr []T) bool {
 	return false
 }
 
-func IsSingleChainOperation(fromChain *params.Network, toChain *params.Network) bool {
-	return fromChain.ChainID == toChain.ChainID
+func IsSingleChainOperation(fromChainID, toChainID uint64) bool {
+	return fromChainID == toChainID
 }
 
 // CopyMapGeneric creates a copy of any map, if the deepCopyValue function is provided, it will be used to copy values.

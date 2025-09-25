@@ -30,7 +30,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/golang/protobuf/proto"
@@ -194,19 +194,19 @@ func (m *testNetworkManager) GetAllChainIDs() ([]uint64, error) {
 	return []uint64{5}, nil
 }
 
-func (m *testTokenBalanceManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+func (m *testTokenBalanceManager) GetBalancesByChain(ctx context.Context, accounts []gethcommon.Address, tokens []*tokentypes.Token) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
 	return m.response, nil
 }
 
-func (m *testTokenBalanceManager) GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
+func (m *testTokenBalanceManager) GetCachedBalancesByChain(ctx context.Context, accounts []gethcommon.Address, tokens []*tokentypes.Token) (BalancesByChain, error) {
 	return m.response, nil
 }
 
 type testTokenManager struct {
 }
 
-func (m *testTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token {
-	return nil
+func (m *testTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) (*tokentypes.Token, error) {
+	return nil, nil
 }
 
 func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollectiblesManager, *testTokenBalanceManager) {

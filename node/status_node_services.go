@@ -77,8 +77,11 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
 	// Keep this initialization before the other two
 	if config.WalletConfig.Enabled {
-		walletService := b.walletService(accDB, b.appDB, b.accountsPublisher, &b.walletFeed, config.WalletConfig.StatusProxyStageName)
-		services = append(services, walletService)
+		err := b.createWalletService(accDB, b.appDB, b.accountsPublisher, &b.walletFeed, config.WalletConfig.StatusProxyStageName)
+		if err != nil {
+			return err
+		}
+		services = append(services, b.walletSrvc)
 	}
 
 	// CollectiblesManager needs the WakuExt service to get metadata for
@@ -292,9 +295,9 @@ func (b *StatusNode) SetWalletCommunityInfoProvider(provider thirdparty.Communit
 	}
 }
 
-func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB, accountsPublisher *pubsub.Publisher, walletFeed *event.Feed, statusProxyStageName string) *wallet.Service {
+func (b *StatusNode) createWalletService(accountsDB *accounts.Database, appDB *sql.DB, accountsPublisher *pubsub.Publisher, walletFeed *event.Feed, statusProxyStageName string) (err error) {
 	if b.walletSrvc == nil {
-		b.walletSrvc = wallet.NewService(
+		b.walletSrvc, err = wallet.NewService(
 			b.walletDB, accountsDB, appDB, b.rpcClient, accountsPublisher, b.gethAccountsManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()).API().EnsResolver(),
 			b.pendingTracker,
@@ -304,7 +307,7 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB,
 			statusProxyStageName,
 		)
 	}
-	return b.walletSrvc
+	return
 }
 
 func (b *StatusNode) ethService() *eth.Service {

@@ -46,8 +46,8 @@ func (db *Database) GetTokenPrivilegesLevel(chainID uint64, contractAddress stri
 	return result, fmt.Errorf("can't find privileges level: chainId %v, contractAddress %v", chainID, contractAddress)
 }
 
-func (db *Database) GetCommunityERC20Metadata() ([]*token.CommunityToken, error) {
-	rows, err := db.db.Query(`SELECT community_id, address, name, symbol, chain_id FROM community_tokens WHERE type = ?`, protobuf.CommunityTokenType_ERC20)
+func (db *Database) GetTokens() ([]*token.CommunityToken, error) {
+	rows, err := db.db.Query(`SELECT community_id, address, name, symbol, chain_id, decimals, type FROM community_tokens`)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (db *Database) GetCommunityERC20Metadata() ([]*token.CommunityToken, error)
 	var result []*token.CommunityToken
 	for rows.Next() {
 		token := token.CommunityToken{}
-		err := rows.Scan(&token.CommunityID, &token.Address, &token.Name, &token.Symbol, &token.ChainID)
+		err := rows.Scan(&token.CommunityID, &token.Address, &token.Name, &token.Symbol, &token.ChainID, &token.Decimals, &token.TokenType)
 		if err != nil {
 			return nil, err
 		}

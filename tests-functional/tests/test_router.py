@@ -6,7 +6,6 @@ from web3.types import Wei  # type: ignore
 
 import resources.constants as constants
 from clients.api import ApiResponseError
-from resources.constants import user_1
 from utils import wallet_utils
 
 
@@ -18,13 +17,17 @@ class TestRouter:
     @pytest.fixture(autouse=True)
     def setup_backend(self, backend_recovered_profile, anvil_client, multicall3_deployer):
         self.anvil_client = anvil_client
-        self.rpc_client = backend_recovered_profile(name="main_user", user=user_1, multicall_contract_address=multicall3_deployer.contract_address)
+        self.rpc_client = backend_recovered_profile(
+            name="main_user", user=constants.user_1, multicall_contract_address=multicall3_deployer.contract_address
+        )
 
     def test_tx_from_route(self):
         uuid = str(uuid_lib.uuid4())
+        gas_fee_mode = constants.gas_fee_mode_medium
         amount_in = "0xde0b6b3a7640000"
         amount_in_wei = Wei(1000000000000000000)
 
+        native_token_key = wallet_utils.get_token_key(constants.ANVIL_NETWORK_ID, constants.NATIVE_TOKEN_ADDRESS)
         params = {
             "uuid": uuid,
             "sendType": 0,
@@ -32,12 +35,12 @@ class TestRouter:
             "addrTo": constants.user_2.address,
             "amountIn": amount_in,
             "amountOut": "0x0",
-            "tokenID": "ETH",
+            "tokenKey": native_token_key,
             "tokenIDIsOwnerToken": False,
-            "toTokenID": "",
-            "fromChainID": 31337,
-            "toChainID": 31337,
-            "gasFeeMode": 1,
+            "toTokenKey": native_token_key,
+            "fromChainID": constants.ANVIL_NETWORK_ID,
+            "toChainID": constants.ANVIL_NETWORK_ID,
+            "gasFeeMode": gas_fee_mode,
         }
 
         routes = wallet_utils.get_suggested_routes(self.rpc_client, **params)
@@ -65,6 +68,7 @@ class TestRouter:
         gas_fee_mode = constants.gas_fee_mode_medium
         amount_in = "0xde0b6b3a7640000"
 
+        native_token_key = wallet_utils.get_token_key(constants.ANVIL_NETWORK_ID, constants.NATIVE_TOKEN_ADDRESS)
         router_input_params = {
             "uuid": uuid,
             "sendType": 0,
@@ -72,11 +76,11 @@ class TestRouter:
             "addrTo": constants.user_2.address,
             "amountIn": amount_in,
             "amountOut": "0x0",
-            "tokenID": "ETH",
+            "tokenKey": native_token_key,
             "tokenIDIsOwnerToken": False,
-            "toTokenID": "",
-            "fromChainID": 31337,
-            "toChainID": 31337,
+            "toTokenKey": native_token_key,
+            "fromChainID": constants.ANVIL_NETWORK_ID,
+            "toChainID": constants.ANVIL_NETWORK_ID,
             "gasFeeMode": gas_fee_mode,
         }
 
@@ -130,6 +134,7 @@ class TestRouter:
         gas_fee_mode = constants.gas_fee_mode_medium
         amount_in = "0xde0b6b3a7640000"
 
+        native_token_key = wallet_utils.get_token_key(constants.ANVIL_NETWORK_ID, constants.NATIVE_TOKEN_ADDRESS)
         router_input_params = {
             "uuid": uuid,
             "sendType": 0,
@@ -137,11 +142,11 @@ class TestRouter:
             "addrTo": constants.user_2.address,
             "amountIn": amount_in,
             "amountOut": "0x0",
-            "tokenID": "ETH",
+            "tokenKey": native_token_key,
             "tokenIDIsOwnerToken": False,
-            "toTokenID": "",
-            "fromChainID": 31337,
-            "toChainID": 31337,
+            "toTokenKey": native_token_key,
+            "fromChainID": constants.ANVIL_NETWORK_ID,
+            "toChainID": constants.ANVIL_NETWORK_ID,
             "gasFeeMode": gas_fee_mode,
         }
 

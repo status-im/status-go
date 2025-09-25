@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 )
@@ -131,8 +130,8 @@ func TestSendType_ProcessZeroAmountInProcessor(t *testing.T) {
 }
 
 func TestSendType_IsAvailableBetween(t *testing.T) {
-	eth := &params.Network{ChainID: walletCommon.EthereumMainnet}
-	opt := &params.Network{ChainID: walletCommon.OptimismMainnet}
+	eth := walletCommon.EthereumMainnet
+	opt := walletCommon.OptimismMainnet
 
 	sameChainOnly := []SendType{ERC721Transfer, ENSRegister, StickersBuy, CommunityBurn, Swap}
 	diffChainOnly := []SendType{Bridge}
@@ -155,14 +154,14 @@ func TestSendType_IsAvailableBetween(t *testing.T) {
 }
 
 func TestSendType_IsAvailableFor(t *testing.T) {
-	networks := map[uint64]*params.Network{
-		walletCommon.EthereumMainnet: {ChainID: walletCommon.EthereumMainnet},
-		walletCommon.EthereumSepolia: {ChainID: walletCommon.EthereumSepolia},
-		walletCommon.OptimismMainnet: {ChainID: walletCommon.OptimismMainnet},
-		walletCommon.ArbitrumMainnet: {ChainID: walletCommon.ArbitrumMainnet},
-		walletCommon.BaseMainnet:     {ChainID: walletCommon.BaseMainnet},
-		walletCommon.BSCMainnet:      {ChainID: walletCommon.BSCMainnet},
-		999999:                       {ChainID: 999999}, // unknown
+	chainIDs := []uint64{
+		walletCommon.EthereumMainnet,
+		walletCommon.EthereumSepolia,
+		walletCommon.OptimismMainnet,
+		walletCommon.ArbitrumMainnet,
+		walletCommon.BaseMainnet,
+		walletCommon.BSCMainnet,
+		999999, // unknown
 	}
 
 	swapNetworks := []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet}
@@ -170,29 +169,29 @@ func TestSendType_IsAvailableFor(t *testing.T) {
 	ensNetworks := []uint64{walletCommon.EthereumMainnet, walletCommon.EthereumSepolia}
 
 	// Test Swap
-	for chainID, network := range networks {
+	for _, chainID := range chainIDs {
 		expected := slices.Contains(swapNetworks, chainID)
-		assert.Equal(t, expected, Swap.IsAvailableFor(network), "Swap on chain %d", chainID)
+		assert.Equal(t, expected, Swap.IsAvailableFor(chainID), "Swap on chain %d", chainID)
 	}
 
 	// Test Bridge (includes sepolia networks)
 	bridgeNetworksExtended := append(bridgeNetworks, walletCommon.OptimismSepolia, walletCommon.ArbitrumSepolia, walletCommon.BaseSepolia)
-	for chainID, network := range networks {
+	for _, chainID := range chainIDs {
 		expected := slices.Contains(bridgeNetworksExtended, chainID)
-		assert.Equal(t, expected, Bridge.IsAvailableFor(network), "Bridge on chain %d", chainID)
+		assert.Equal(t, expected, Bridge.IsAvailableFor(chainID), "Bridge on chain %d", chainID)
 	}
 
 	// Test ENS and Stickers
-	for chainID, network := range networks {
+	for _, chainID := range chainIDs {
 		expected := slices.Contains(ensNetworks, chainID)
-		assert.Equal(t, expected, ENSRegister.IsAvailableFor(network), "ENS on chain %d", chainID)
-		assert.Equal(t, expected, StickersBuy.IsAvailableFor(network), "Stickers on chain %d", chainID)
+		assert.Equal(t, expected, ENSRegister.IsAvailableFor(chainID), "ENS on chain %d", chainID)
+		assert.Equal(t, expected, StickersBuy.IsAvailableFor(chainID), "Stickers on chain %d", chainID)
 	}
 
 	// Test others (always true)
-	for _, network := range networks {
-		assert.True(t, Transfer.IsAvailableFor(network))
-		assert.True(t, ERC721Transfer.IsAvailableFor(network))
-		assert.True(t, CommunityBurn.IsAvailableFor(network))
+	for _, chainID := range chainIDs {
+		assert.True(t, Transfer.IsAvailableFor(chainID))
+		assert.True(t, ERC721Transfer.IsAvailableFor(chainID))
+		assert.True(t, CommunityBurn.IsAvailableFor(chainID))
 	}
 }

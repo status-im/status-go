@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -128,15 +132,15 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &mainnet,
-				FromToken: &tokenTypes.Token{
+				FromToken: &tokentypes.Token{Token: &types.Token{
 					Symbol: walletCommon.EthSymbol,
-				},
+				}},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
 				pathProcessorCommon.ProcessorTransferName: {
-					expected:      true,
-					expectedError: nil,
+					expected:      false,
+					expectedError: ErrToAndFromTokensMustBeSet,
 				},
 				pathProcessorCommon.ProcessorBridgeHopName: {
 					expected:      false,
@@ -154,22 +158,22 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &mainnet,
-				FromToken: &tokenTypes.Token{
+				FromToken: &tokentypes.Token{Token: &types.Token{
 					Symbol: walletCommon.EthSymbol,
-				},
-				ToToken: &tokenTypes.Token{
+				}},
+				ToToken: &tokentypes.Token{Token: &types.Token{
 					Symbol: walletCommon.EthSymbol,
-				},
+				}},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
 				pathProcessorCommon.ProcessorTransferName: {
-					expected:      false,
-					expectedError: ErrToTokenShouldNotBeSet,
+					expected:      true,
+					expectedError: nil,
 				},
 				pathProcessorCommon.ProcessorBridgeHopName: {
 					expected:      false,
-					expectedError: ErrToTokenShouldNotBeSet,
+					expectedError: ErrFromAndToChainsMustBeDifferent,
 				},
 				pathProcessorCommon.ProcessorSwapParaswapName: {
 					expected:      false,
@@ -178,27 +182,29 @@ func TestPathProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "Same Chains Set - FormToken Set - ToToken Set - Different Tokens",
+			name: "Same Chains Set - FormToken Set - ToToken Set - Different Tokens On Same Chain",
 			input: ProcessorInputParams{
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &mainnet,
-				FromToken: &tokenTypes.Token{
-					Symbol: walletCommon.EthSymbol,
-				},
-				ToToken: &tokenTypes.Token{
-					Symbol: walletCommon.UsdcSymbol,
-				},
+				FromToken: &tokentypes.Token{Token: &types.Token{
+					ChainID: walletCommon.EthereumMainnet,
+					Address: common.HexToAddress("0x1"),
+				}},
+				ToToken: &tokentypes.Token{Token: &types.Token{
+					ChainID: walletCommon.EthereumMainnet,
+					Address: common.HexToAddress("0x2"),
+				}},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
 				pathProcessorCommon.ProcessorTransferName: {
 					expected:      false,
-					expectedError: ErrToTokenShouldNotBeSet,
+					expectedError: ErrFromAndToTokensMustBeSame,
 				},
 				pathProcessorCommon.ProcessorBridgeHopName: {
 					expected:      false,
-					expectedError: ErrToTokenShouldNotBeSet,
+					expectedError: ErrFromAndToChainsMustBeDifferent,
 				},
 				pathProcessorCommon.ProcessorSwapParaswapName: {
 					expected:      true,
@@ -235,23 +241,23 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &optimism,
-				FromToken: &tokenTypes.Token{
+				FromToken: &tokentypes.Token{Token: &types.Token{
 					Symbol: walletCommon.EthSymbol,
-				},
+				}},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
 				pathProcessorCommon.ProcessorTransferName: {
 					expected:      false,
-					expectedError: nil,
+					expectedError: ErrToAndFromTokensMustBeSet,
 				},
 				pathProcessorCommon.ProcessorBridgeHopName: {
-					expected:      true,
-					expectedError: nil,
+					expected:      false,
+					expectedError: ErrToAndFromTokensMustBeSet,
 				},
 				pathProcessorCommon.ProcessorSwapParaswapName: {
 					expected:      false,
-					expectedError: ErrFromAndToChainsMustBeSame,
+					expectedError: ErrToAndFromTokensMustBeSet,
 				},
 			},
 		},
@@ -261,26 +267,28 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &optimism,
-				FromToken: &tokenTypes.Token{
-					Symbol: walletCommon.EthSymbol,
-				},
-				ToToken: &tokenTypes.Token{
-					Symbol: walletCommon.EthSymbol,
-				},
+				FromToken: &tokentypes.Token{Token: &types.Token{
+					ChainID: walletCommon.EthereumMainnet,
+					Address: common.HexToAddress("0x1"),
+				}},
+				ToToken: &tokentypes.Token{Token: &types.Token{
+					ChainID: walletCommon.EthereumMainnet,
+					Address: common.HexToAddress("0x1"),
+				}},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
 				pathProcessorCommon.ProcessorTransferName: {
-					expected:      false,
-					expectedError: ErrToTokenShouldNotBeSet,
+					expected:      true,
+					expectedError: nil,
 				},
 				pathProcessorCommon.ProcessorBridgeHopName: {
 					expected:      false,
-					expectedError: ErrToTokenShouldNotBeSet,
+					expectedError: ErrFromAndToChainsMustBeDifferent,
 				},
 				pathProcessorCommon.ProcessorSwapParaswapName: {
 					expected:      false,
-					expectedError: ErrFromAndToChainsMustBeSame,
+					expectedError: ErrFromAndToTokensMustBeDifferent,
 				},
 			},
 		},
@@ -290,15 +298,15 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &optimism,
 				ToChain:   &base,
-				FromToken: &tokenTypes.Token{
+				FromToken: &tokentypes.Token{Token: &types.Token{
 					Symbol: walletCommon.DaiSymbol,
-				},
+				}},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
 				pathProcessorCommon.ProcessorTransferName: {
 					expected:      false,
-					expectedError: nil,
+					expectedError: ErrToAndFromTokensMustBeSet,
 				},
 				pathProcessorCommon.ProcessorBridgeHopName: {
 					expected:      false,
@@ -311,27 +319,29 @@ func TestPathProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "Different Chains Set - FormToken Set - ToToken Set - Different Tokens",
+			name: "Different Chains Set - FormToken Set - ToToken Set - Different Tokens On Different Chains",
 			input: ProcessorInputParams{
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &optimism,
-				FromToken: &tokenTypes.Token{
-					Symbol: walletCommon.EthSymbol,
-				},
-				ToToken: &tokenTypes.Token{
-					Symbol: walletCommon.UsdcSymbol,
-				},
+				FromToken: &tokentypes.Token{Token: &types.Token{
+					ChainID: walletCommon.EthereumMainnet,
+					Address: common.HexToAddress("0x1"),
+				}},
+				ToToken: &tokentypes.Token{Token: &types.Token{
+					ChainID: walletCommon.OptimismMainnet,
+					Address: common.HexToAddress("0x1"),
+				}},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
 				pathProcessorCommon.ProcessorTransferName: {
 					expected:      false,
-					expectedError: ErrToTokenShouldNotBeSet,
+					expectedError: ErrFromAndToTokensMustBeSame,
 				},
 				pathProcessorCommon.ProcessorBridgeHopName: {
 					expected:      false,
-					expectedError: ErrToTokenShouldNotBeSet,
+					expectedError: ErrToChainNotSupported,
 				},
 				pathProcessorCommon.ProcessorSwapParaswapName: {
 					expected:      false,
@@ -354,8 +364,13 @@ func TestPathProcessors(t *testing.T) {
 					processor = NewSwapParaswapProcessor(nil, nil, nil)
 				}
 
+				fmt.Println("\n\nprocessor.Name()", processor.Name())
+				fmt.Printf("\n\ninput: %+v", tt.input)
+
 				assert.Equal(t, processorName, processor.Name())
 				result, err := processor.AvailableFor(tt.input)
+				fmt.Println("\n\nresult", result)
+				fmt.Println("\n\nerr", err)
 				if expResult.expectedError != nil {
 					assert.Error(t, err)
 				} else {

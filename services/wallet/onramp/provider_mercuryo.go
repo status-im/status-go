@@ -12,12 +12,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/status-im/status-go/pkg/security"
+
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/mercuryo"
 	"github.com/status-im/status-go/services/wallet/token"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 const mercuryoID = "mercuryo"
@@ -25,7 +27,7 @@ const mercuryioNoFeesBaseURL = "https://exchange.mercuryo.io/?type=buy&networks=
 const supportedAssetsUpdateInterval = 24 * time.Hour
 
 type MercuryoProvider struct {
-	supportedTokens          []*tokenTypes.Token
+	supportedTokens          []*types.Token
 	supportedTokensTimestamp time.Time
 	supportedTokensLock      sync.RWMutex
 	httpClient               *mercuryo.Client
@@ -76,7 +78,7 @@ func (p *MercuryoProvider) GetCryptoOnRamp(ctx context.Context) (CryptoOnRamp, e
 	return provider, err
 }
 
-func (p *MercuryoProvider) getSupportedCurrencies(ctx context.Context) ([]*tokenTypes.Token, error) {
+func (p *MercuryoProvider) getSupportedCurrencies(ctx context.Context) ([]*types.Token, error) {
 	p.supportedTokensLock.Lock()
 	defer p.supportedTokensLock.Unlock()
 
@@ -89,23 +91,17 @@ func (p *MercuryoProvider) getSupportedCurrencies(ctx context.Context) ([]*token
 		return p.supportedTokens, err
 	}
 
-	newSupportedTokens := make([]*tokenTypes.Token, 0, len(newSupportedCurrencies))
+	newSupportedTokens := make([]*types.Token, 0, len(newSupportedCurrencies))
 	for _, currency := range newSupportedCurrencies {
 		chainID := mercuryo.NetworkToCommonChainID(currency.Network)
 		if chainID == walletCommon.UnknownChainID {
 			continue
 		}
-		token, isNative := p.tokenManager.LookupToken(&chainID, currency.Symbol)
-		if token == nil {
+		token, err := p.tokenManager.GetTokenByChainAddress(chainID, common.HexToAddress(currency.Contract))
+		if err != nil {
 			continue
 		}
-		if !isNative {
-			contractAddress := common.HexToAddress(currency.Contract)
-			if contractAddress != token.Address {
-				continue
-			}
-		}
-		newSupportedTokens = append(newSupportedTokens, token)
+		newSupportedTokens = append(newSupportedTokens, token.Token)
 	}
 
 	p.supportedTokens = newSupportedTokens
