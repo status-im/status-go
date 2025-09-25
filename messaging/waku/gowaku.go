@@ -343,18 +343,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 		cfg.EnableStoreConfirmationForMessagesSent = true
 	}
 
-	if cfg.EnableStore {
-		if appDB == nil {
-			return nil, errors.New("appDB is required for store")
-		}
-		opts = append(opts, node.WithWakuStore())
-		dbStore, err := persistence.NewDBStore(logger, persistence.WithDB(appDB), persistence.WithRetentionPolicy(cfg.StoreCapacity, time.Duration(cfg.StoreSeconds)*time.Second))
-		if err != nil {
-			return nil, err
-		}
-		opts = append(opts, node.WithMessageProvider(dbStore))
-	}
-
 	if !cfg.LightClient {
 		opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
 		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(5, 10)))

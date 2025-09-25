@@ -1698,7 +1698,6 @@ func gowakuToNwakuConfig(cfg *Config, logger *zap.Logger) *bindingscommon.WakuCo
 	nwakuCfg.Discv5Discovery = cfg.EnableDiscV5
 	nwakuCfg.Discv5EnrAutoUpdate = cfg.AutoUpdate
 	nwakuCfg.Discv5UdpPort = cfg.UDPPort
-	nwakuCfg.Store = cfg.EnableStore
 
 	if cfg.Nameserver != "" {
 		nwakuCfg.DnsAddrsNameServers = []string{cfg.Nameserver}
@@ -1726,12 +1725,6 @@ func gowakuToNwakuConfig(cfg *Config, logger *zap.Logger) *bindingscommon.WakuCo
 		}
 
 		nwakuCfg.Shards = append(nwakuCfg.Shards, sharded.Shard())
-	}
-
-	if cfg.StoreCapacity > 0 {
-		nwakuCfg.StoreMessageRetentionPolicy = fmt.Sprintf("capacity:%d", cfg.StoreCapacity)
-	} else if cfg.StoreSeconds > 0 {
-		nwakuCfg.StoreMessageRetentionPolicy = fmt.Sprintf("time:%d", cfg.StoreSeconds)
 	}
 
 	if !cfg.LightClient {
