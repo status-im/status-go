@@ -19,10 +19,9 @@ type TokenMarketValues struct {
 }
 
 type ChainBalance struct {
-	RawBalance     string         `json:"rawBalance"`
-	Balance        *big.Float     `json:"balance"`
-	Balance1DayAgo string         `json:"balance1DayAgo"`
-	Address        common.Address `json:"address"`
-	ChainID        uint64         `json:"chainId"`
-	HasError       bool           `json:"hasError"`
+	RawBalance string         `json:"rawBalance"`
+	Balance    *big.Float     `json:"balance"`
+	Address    common.Address `json:"address"`
+	ChainID    uint64         `json:"chainId"`
+	HasError   bool           `json:"hasError"`
 }

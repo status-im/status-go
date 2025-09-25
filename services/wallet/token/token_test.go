@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"sync"
 	"testing"
 	"time"
@@ -21,7 +20,6 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 	mediaserver "github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
-	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/community"
 	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -268,53 +266,6 @@ func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, count)
 	require.True(t, isFirst)
-}
-
-func TestGetTokenHistoricalBalance(t *testing.T) {
-	manager, stop := setupTestTokenDB(t)
-	defer stop()
-
-	account := common.HexToAddress("0x1234567890abcdef")
-	chainID := uint64(1)
-	testSymbol := "TEST"
-	block := int64(1)
-	timestamp := int64(1629878400) // Replace with desired timestamp
-	historyBalance := big.NewInt(0)
-
-	// Test case when no rows are returned
-	balance, err := manager.GetTokenHistoricalBalance(account, chainID, testSymbol, timestamp)
-	require.NoError(t, err)
-	require.Nil(t, balance)
-
-	// Test case when a row is returned
-	historyBalance.SetInt64(int64(100))
-	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", testSymbol, chainID, account, timestamp-100, (*bigint.SQLBigIntBytes)(historyBalance), block)
-	require.NoError(t, err)
-
-	expectedBalance := big.NewInt(100)
-	balance, err = manager.GetTokenHistoricalBalance(account, chainID, testSymbol, timestamp)
-	require.NoError(t, err)
-	require.Equal(t, expectedBalance, balance)
-
-	// Test multiple values. Must return the most recent one
-	historyBalance.SetInt64(int64(100))
-	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", testSymbol, chainID, account, timestamp-200, (*bigint.SQLBigIntBytes)(historyBalance), block+1)
-	require.NoError(t, err)
-
-	historyBalance.SetInt64(int64(50))
-	symbol := "TEST2"
-	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", symbol, chainID, account, timestamp-1, (*bigint.SQLBigIntBytes)(historyBalance), block)
-	require.NoError(t, err)
-
-	historyBalance.SetInt64(int64(50))
-	chainID = uint64(2)
-	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", testSymbol, chainID, account, timestamp-1, (*bigint.SQLBigIntBytes)(historyBalance), block+2)
-	require.NoError(t, err)
-
-	chainID = uint64(1)
-	balance, err = manager.GetTokenHistoricalBalance(account, chainID, testSymbol, timestamp)
-	require.NoError(t, err)
-	require.Equal(t, expectedBalance, balance)
 }
 
 func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {

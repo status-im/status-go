@@ -151,7 +151,6 @@ func testChainBalancesEqual(t *testing.T, expected, actual tokenTypes.ChainBalan
 	assert.Equal(t, expected.Address, actual.Address)
 	assert.Equal(t, expected.ChainID, actual.ChainID)
 	assert.Equal(t, expected.HasError, actual.HasError)
-	assert.Equal(t, expected.Balance1DayAgo, actual.Balance1DayAgo)
 }
 
 func testBalancePerChainEqual(t *testing.T, expected, actual map[uint64]tokenTypes.ChainBalance) {
@@ -356,38 +355,6 @@ func TestTokensToBalancesPerChain(t *testing.T) {
 	assert.Equal(t, expectedBalancesPerChain, result)
 }
 
-func TestGetBalance1DayAgo(t *testing.T) {
-	reader, tokenManager, _, mockCtrl := setupReader(t)
-	defer mockCtrl.Finish()
-
-	address := common.Address{0x12}
-	chainID := uint64(1)
-	symbol := "T1"
-	dayAgoTimestamp := time.Now().Add(-24 * time.Hour).Unix()
-
-	// Test happy path
-	expectedBalance := big.NewInt(1000000000000000000)
-	tokenManager.EXPECT().GetTokenHistoricalBalance(address, chainID, symbol, dayAgoTimestamp).Return(expectedBalance, nil)
-
-	balance1DayAgo, err := reader.getBalance1DayAgo(&tokenTypes.ChainBalance{
-		ChainID: chainID,
-		Address: address,
-	}, dayAgoTimestamp, symbol, address)
-
-	require.NoError(t, err)
-	assert.Equal(t, expectedBalance, balance1DayAgo)
-
-	// Test error
-	tokenManager.EXPECT().GetTokenHistoricalBalance(address, chainID, symbol, dayAgoTimestamp).Return(nil, errors.New("error"))
-	balance1DayAgo, err = reader.getBalance1DayAgo(&tokenTypes.ChainBalance{
-		ChainID: chainID,
-		Address: address,
-	}, dayAgoTimestamp, symbol, address)
-
-	require.Error(t, err)
-	assert.Nil(t, balance1DayAgo)
-}
-
 func TestToChainBalance(t *testing.T) {
 	balances := map[uint64]map[common.Address]map[common.Address]*hexutil.Big{
 		1: {
@@ -421,12 +388,11 @@ func TestToChainBalance(t *testing.T) {
 	expectedBalance := big.NewFloat(1)
 	hasError := false
 	expectedChainBalance := &tokenTypes.ChainBalance{
-		RawBalance:     "1000000000000000000",
-		Balance:        expectedBalance,
-		Balance1DayAgo: "0",
-		Address:        common.Address{0x34},
-		ChainID:        1,
-		HasError:       hasError,
+		RawBalance: "1000000000000000000",
+		Balance:    expectedBalance,
+		Address:    common.Address{0x34},
+		ChainID:    1,
+		HasError:   hasError,
 	}
 
 	chainBalance := toChainBalance(balances, tok, address, decimals, cachedTokens, hasError, false)
@@ -550,27 +516,24 @@ func TestCreateBalancePerChainPerSymbol(t *testing.T) {
 
 	expectedBalancesPerChain := map[uint64]tokenTypes.ChainBalance{
 		1: {
-			RawBalance:     "1000000000000000000",
-			Balance:        big.NewFloat(1),
-			Balance1DayAgo: "0",
-			Address:        common.Address{0x34},
-			ChainID:        1,
-			HasError:       false,
+			RawBalance: "1000000000000000000",
+			Balance:    big.NewFloat(1),
+			Address:    common.Address{0x34},
+			ChainID:    1,
+			HasError:   false,
 		},
 		2: {
-			RawBalance:     "2000000000000000000",
-			Balance:        big.NewFloat(2),
-			Balance1DayAgo: "0",
-			Address:        common.Address{0x56},
-			ChainID:        2,
-			HasError:       true,
+			RawBalance: "2000000000000000000",
+			Balance:    big.NewFloat(2),
+			Address:    common.Address{0x56},
+			ChainID:    2,
+			HasError:   true,
 		},
 	}
 
-	reader, tokenManager, _, mockCtrl := setupReader(t)
+	reader, _, _, mockCtrl := setupReader(t)
 	defer mockCtrl.Finish()
 
-	tokenManager.EXPECT().GetTokenHistoricalBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(nil, errors.New("error"))
 	result := reader.createBalancePerChainPerSymbol(address, balances, tokens, cachedTokens, clientConnectionPerChain, dayAgoTimestamp)
 
 	assert.Len(t, result, 2)
@@ -619,19 +582,17 @@ func TestCreateBalancePerChainPerSymbolWithMissingBalance(t *testing.T) {
 
 	expectedBalancesPerChain := map[uint64]tokenTypes.ChainBalance{
 		2: {
-			RawBalance:     "1000000000000000000",
-			Balance:        big.NewFloat(1),
-			Balance1DayAgo: "1",
-			Address:        common.Address{0x56},
-			ChainID:        2,
-			HasError:       true,
+			RawBalance: "1000000000000000000",
+			Balance:    big.NewFloat(1),
+			Address:    common.Address{0x56},
+			ChainID:    2,
+			HasError:   true,
 		},
 	}
 
-	reader, tokenManager, _, mockCtrl := setupReader(t)
+	reader, _, _, mockCtrl := setupReader(t)
 	defer mockCtrl.Finish()
 
-	tokenManager.EXPECT().GetTokenHistoricalBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(big.NewInt(1), nil)
 	result := reader.createBalancePerChainPerSymbol(address, oneBalanceMissing, tokens, emptyCachedTokens, clientConnectionPerChain, dayAgoTimestamp)
 	assert.Len(t, result, 1)
 	testBalancePerChainEqual(t, expectedBalancesPerChain, result)
@@ -726,12 +687,11 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 				},
 				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					1: {
-						RawBalance:     "1000000000000000000",
-						Balance:        big.NewFloat(1),
-						Address:        common.HexToAddress("0x789"),
-						ChainID:        1,
-						HasError:       false,
-						Balance1DayAgo: "0",
+						RawBalance: "1000000000000000000",
+						Balance:    big.NewFloat(1),
+						Address:    common.HexToAddress("0x789"),
+						ChainID:    1,
+						HasError:   false,
 					},
 				},
 			},
@@ -746,30 +706,27 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 				},
 				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					1: {
-						RawBalance:     "2000000000000000000",
-						Balance:        big.NewFloat(2),
-						Address:        common.HexToAddress("0xdef"),
-						ChainID:        1,
-						HasError:       false,
-						Balance1DayAgo: "0",
+						RawBalance: "2000000000000000000",
+						Balance:    big.NewFloat(2),
+						Address:    common.HexToAddress("0xdef"),
+						ChainID:    1,
+						HasError:   false,
 					},
 					2: {
-						RawBalance:     "3000000000000000000",
-						Balance:        big.NewFloat(3),
-						Address:        common.HexToAddress("0xabc"),
-						ChainID:        2,
-						HasError:       false,
-						Balance1DayAgo: "0",
+						RawBalance: "3000000000000000000",
+						Balance:    big.NewFloat(3),
+						Address:    common.HexToAddress("0xabc"),
+						ChainID:    2,
+						HasError:   false,
 					},
 				},
 			},
 		},
 	}
 
-	reader, tokenManager, _, mockCtrl := setupReader(t)
+	reader, _, _, mockCtrl := setupReader(t)
 	defer mockCtrl.Finish()
 
-	tokenManager.EXPECT().GetTokenHistoricalBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil, nil)
 	tokens := reader.balancesToTokensByAddress(connectedPerChain, addresses, allTokens, balances, cachedTokens)
 
 	assert.Len(t, tokens, 2)
@@ -848,12 +805,11 @@ func TestGetCachedBalances(t *testing.T) {
 				},
 				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					2: {
-						RawBalance:     "1000000000000000000",
-						Balance:        big.NewFloat(1),
-						Balance1DayAgo: "0",
-						Address:        common.HexToAddress("0xdef"),
-						ChainID:        2,
-						HasError:       false,
+						RawBalance: "1000000000000000000",
+						Balance:    big.NewFloat(1),
+						Address:    common.HexToAddress("0xdef"),
+						ChainID:    2,
+						HasError:   false,
 					},
 				},
 			},
@@ -870,12 +826,11 @@ func TestGetCachedBalances(t *testing.T) {
 				},
 				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					2: {
-						RawBalance:     "1000000000000000000",
-						Balance:        big.NewFloat(1),
-						Balance1DayAgo: "0",
-						Address:        common.HexToAddress("0xdef"),
-						ChainID:        2,
-						HasError:       false,
+						RawBalance: "1000000000000000000",
+						Balance:    big.NewFloat(1),
+						Address:    common.HexToAddress("0xdef"),
+						ChainID:    2,
+						HasError:   false,
 					},
 				},
 			},
@@ -885,7 +840,6 @@ func TestGetCachedBalances(t *testing.T) {
 	persistence.EXPECT().GetTokens().Return(cachedTokens, nil)
 	expectedChains := []uint64{1, 2}
 	tokenManager.EXPECT().GetTokensByChainIDs(testutils.NewUint64SliceMatcher(expectedChains)).Return(allTokens, nil)
-	tokenManager.EXPECT().GetTokenHistoricalBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
 	mockClientIface1.EXPECT().GetConnectionStatus().Return(rpcstatus.StatusUp)
 	mockClientIface2.EXPECT().GetConnectionStatus().Return(rpcstatus.StatusUp)
 	tokens, err := reader.GetCachedBalances(clients, addresses)
@@ -963,12 +917,11 @@ func TestFetchBalances(t *testing.T) {
 				},
 				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					2: {
-						RawBalance:     "1000000000000000000",
-						Balance:        big.NewFloat(1),
-						Balance1DayAgo: "0",
-						Address:        common.HexToAddress("0xdef"),
-						ChainID:        2,
-						HasError:       false,
+						RawBalance: "1000000000000000000",
+						Balance:    big.NewFloat(1),
+						Address:    common.HexToAddress("0xdef"),
+						ChainID:    2,
+						HasError:   false,
 					},
 				},
 			},
@@ -985,12 +938,11 @@ func TestFetchBalances(t *testing.T) {
 				},
 				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 					2: {
-						RawBalance:     "2000000000000000000",
-						Balance:        big.NewFloat(2),
-						Balance1DayAgo: "0",
-						Address:        common.HexToAddress("0xdef"),
-						ChainID:        2,
-						HasError:       false,
+						RawBalance: "2000000000000000000",
+						Balance:    big.NewFloat(2),
+						Address:    common.HexToAddress("0xdef"),
+						ChainID:    2,
+						HasError:   false,
 					},
 				},
 			},
@@ -1002,7 +954,6 @@ func TestFetchBalances(t *testing.T) {
 	persistence.EXPECT().SaveTokens(newMapTokenWithBalanceMatcher([]interface{}{expectedTokens})).Return(nil)
 	expectedChains := []uint64{1, 2}
 	tokenManager.EXPECT().GetTokensByChainIDs(testutils.NewUint64SliceMatcher(expectedChains)).Return(allTokens, nil)
-	tokenManager.EXPECT().GetTokenHistoricalBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
 	expectedBalances := map[uint64]map[common.Address]map[common.Address]*hexutil.Big{
 		2: {
 			addresses[1]: {
