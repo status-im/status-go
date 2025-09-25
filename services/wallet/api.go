@@ -29,7 +29,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/currency"
-	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/leaderboard"
 	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/requests"
@@ -114,49 +113,6 @@ func (api *API) FetchDecodedTxData(ctx context.Context, data string) (*thirdpart
 	logutils.ZapLogger().Debug("[Wallet: FetchDecodedTxData]")
 
 	return api.s.decoder.Decode(data)
-}
-
-// GetBalanceHistory retrieves token balance history for token identity on multiple chains
-func (api *API) GetBalanceHistory(ctx context.Context, chainIDs []uint64, addresses []common.Address, tokenSymbol string, currencySymbol string, timeInterval history.TimeInterval) ([]*history.ValuePoint, error) {
-	logutils.ZapLogger().Debug("wallet.api.GetBalanceHistory",
-		zap.Uint64s("chainIDs", chainIDs),
-		zap.Stringers("address", addresses),
-		zap.String("tokenSymbol", tokenSymbol),
-		zap.String("currencySymbol", currencySymbol),
-		zap.Int("timeInterval", int(timeInterval)),
-	)
-
-	var fromTimestamp uint64
-	now := uint64(time.Now().UTC().Unix())
-	switch timeInterval {
-	case history.BalanceHistoryAllTime:
-		fromTimestamp = 0
-	case history.BalanceHistory1Year:
-		fallthrough
-	case history.BalanceHistory6Months:
-		fallthrough
-	case history.BalanceHistory1Month:
-		fallthrough
-	case history.BalanceHistory7Days:
-		fromTimestamp = now - history.TimeIntervalDurationSecs(timeInterval)
-	default:
-		return nil, fmt.Errorf("unknown time interval: %v", timeInterval)
-	}
-
-	return api.GetBalanceHistoryRange(ctx, chainIDs, addresses, tokenSymbol, currencySymbol, fromTimestamp, now)
-}
-
-// GetBalanceHistoryRange retrieves token balance history for token identity on multiple chains for a time range
-// 'toTimestamp' is ignored for now, but will be used in the future to limit the range of the history
-func (api *API) GetBalanceHistoryRange(ctx context.Context, chainIDs []uint64, addresses []common.Address, tokenSymbol string, currencySymbol string, fromTimestamp uint64, _ uint64) ([]*history.ValuePoint, error) {
-	logutils.ZapLogger().Debug("wallet.api.GetBalanceHistoryRange",
-		zap.Uint64s("chainIDs", chainIDs),
-		zap.Stringers("address", addresses),
-		zap.String("tokenSymbol", tokenSymbol),
-		zap.String("currencySymbol", currencySymbol),
-		zap.Uint64("fromTimestamp", fromTimestamp),
-	)
-	return api.s.history.GetBalanceHistory(ctx, chainIDs, addresses, tokenSymbol, currencySymbol, fromTimestamp)
 }
 
 func (api *API) GetTokenList(ctx context.Context) (*token.ListWrapper, error) {

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 
@@ -30,12 +29,10 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	"github.com/status-im/status-go/services/wallet/activity"
-	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/currency"
-	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/leaderboard"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/onramp"
@@ -101,7 +98,6 @@ func NewService(
 		Publisher: feed,
 	}
 	communityManager := community.NewManager(db, mediaServer, feed)
-	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
 
 	featureFlags := &protocolCommon.FeatureFlags{}
 
@@ -190,7 +186,6 @@ func NewService(
 
 	marketManager := market.NewManager(marketProviders, tokenManager, feed)
 	reader := NewReader(tokenManager, marketManager, token.NewPersistence(db), feed)
-	history := history.NewService(db, accountsDB, accountsPublisher, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 
 	collectiblesManager := collectibles.NewManager(
@@ -234,7 +229,6 @@ func NewService(
 		feed:                  feed,
 		signals:               signals,
 		reader:                reader,
-		history:               history,
 		currency:              currency,
 		activity:              activity,
 		decoder:               NewDecoder(),
@@ -329,7 +323,6 @@ type Service struct {
 	feed                  *event.Feed
 	signals               *walletevent.SignalsTransmitter
 	reader                *Reader
-	history               *history.Service
 	currency              *currency.Service
 	activity              *activity.Service
 	decoder               *Decoder
@@ -354,7 +347,6 @@ func (s *Service) Start() error {
 		s.transferController.Start(ctx)
 		s.currency.Start(ctx)
 		err := s.signals.Start(ctx)
-		s.history.Start(ctx)
 		s.collectibles.Start(ctx)
 		s.leaderboardService.Start(ctx)
 		s.started = true
@@ -375,7 +367,6 @@ func (s *Service) Stop() error {
 	s.signals.Stop()
 	s.transferController.Stop()
 	s.reader.Stop()
-	s.history.Stop()
 	s.activity.Stop()
 	s.collectibles.Stop()
 	s.tokenManager.Stop()
