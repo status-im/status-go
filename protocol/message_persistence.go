@@ -128,6 +128,7 @@ func (db sqlitePersistence) tableUserMessagesProtobufFields() string {
 	return `
 			m1.id,
     		m1.whisper_timestamp,
+			m1.clock_value,
     		m1.text,
     		m1.source,
 			m1.response_to,
@@ -573,6 +574,7 @@ func (db sqlitePersistence) tableUserMessagesScanProtobufFields(row scanner, mes
 	args := []interface{}{
 		&message.Id,
 		&message.Timestamp,
+		&message.Clock,
 		&message.Text,
 		&message.From, // source in table
 		&message.ResponseTo,
