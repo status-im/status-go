@@ -148,7 +148,6 @@ nix-gc-protected:
 	@echo -e "$(YELLOW)The following paths are protected:$(RESET)" && \
 	ls -1 $(_NIX_GCROOTS) | sed 's/^/ - /'
 
-
 nix-upgrade: SHELL := /bin/sh
 nix-upgrade: ##@nix Upgrade Nix interpreter to current version.
 	nix/scripts/upgrade.sh
@@ -207,7 +206,6 @@ push-notification-server: build/bin/push-notification-server
 cmd: ##@build Build all public apps in ./cmd
 cmd: status-backend push-notification-server
 
-
 status-go-deps:
 	go clean -cache || true
 	go clean -modcache || true
@@ -215,13 +213,10 @@ status-go-deps:
 
 statusgo-library: generate-sds generate
 statusgo-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as static library for current platform
+	@echo "Building static library..."
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
-
-statusgo-library: generate
-statusgo-library: $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
-	@echo "Building static library..."
 	go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
