@@ -91,6 +91,37 @@ func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBy
 		}
 	}
 
+	// codex extension
+	codexArchiveDir := m.torrentConfig.DataDir + "/codex/" + communityID.String()
+	codexIndexPath := codexArchiveDir + "/index"
+	codexDataPath := codexArchiveDir + "/data"
+
+	m.logger.Debug("codexDataPath", zap.String("codexDataPath", codexDataPath))
+
+	codexWakuMessageArchiveIndexProto := &protobuf.CodexWakuMessageArchiveIndex{}
+	codexWakuMessageArchiveIndex := make(map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata)
+	codexArchiveIDs := make([]string, 0)
+
+	if _, err := os.Stat(codexArchiveDir); os.IsNotExist(err) {
+		err := os.MkdirAll(codexArchiveDir, 0700)
+		if err != nil {
+			return codexArchiveIDs, err
+		}
+	}
+
+	_, err = os.Stat(codexIndexPath)
+	if err == nil {
+		codexWakuMessageArchiveIndexProto, err = m.CodexLoadHistoryArchiveIndexFromFile(m.identity, communityID)
+		if err != nil {
+			return codexArchiveIDs, err
+		}
+	}
+
+	m.logger.Debug("codexWakuMessageArchiveIndexProto",
+		zap.Any("codexWakuMessageArchiveIndexProto", codexWakuMessageArchiveIndexProto))
+	m.logger.Debug("codexWakuMessageArchiveIndex",
+		zap.Any("codexWakuMessageArchiveIndex", codexWakuMessageArchiveIndex))
+
 	var offset uint64 = 0
 
 	for hash, metadata := range wakuMessageArchiveIndexProto.Archives {
@@ -330,6 +361,10 @@ func (m *ArchiveFileManager) archiveIndexFile(communityID string) string {
 	return path.Join(m.torrentConfig.DataDir, communityID, "index")
 }
 
+func (m *ArchiveFileManager) codexArchiveIndexFile(communityID string) string {
+	return path.Join(m.torrentConfig.DataDir, "codex", communityID, "index")
+}
+
 func (m *ArchiveFileManager) createWakuMessageArchive(from time.Time, to time.Time, messages []messagingtypes.ReceivedMessage, topics [][]byte) *protobuf.WakuMessageArchive {
 	var wakuMessages []*protobuf.WakuMessage
 
@@ -492,4 +527,40 @@ func (m *ArchiveFileManager) LoadHistoryArchiveIndexFromFile(myKey *ecdsa.Privat
 	}
 
 	return wakuMessageArchiveIndexProto, nil
+}
+
+func (m *ArchiveFileManager) CodexLoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.CodexWakuMessageArchiveIndex, error) {
+	codexWakuMessageArchiveIndexProto := &protobuf.CodexWakuMessageArchiveIndex{}
+
+	indexPath := m.codexArchiveIndexFile(communityID.String())
+	indexData, err := os.ReadFile(indexPath)
+	if err != nil {
+		return nil, err
+	}
+
+	err = proto.Unmarshal(indexData, codexWakuMessageArchiveIndexProto)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(codexWakuMessageArchiveIndexProto.Archives) == 0 && len(indexData) > 0 {
+		// This means we're dealing with an encrypted index file, so we have to decrypt it first
+		pk, err := crypto.DecompressPubkey(communityID)
+		if err != nil {
+			return nil, err
+		}
+
+		decryptedData, err := m.messaging.DecryptMessage(myKey, pk, indexData)
+		if err != nil {
+			m.logger.Error("failed to decrypt message archive", zap.Error(err))
+			return nil, err
+		}
+
+		err = proto.Unmarshal(decryptedData, codexWakuMessageArchiveIndexProto)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return codexWakuMessageArchiveIndexProto, nil
 }
