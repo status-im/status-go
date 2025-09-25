@@ -254,6 +254,16 @@ message WakuMessageArchiveIndex {
   map<string, WakuMessageArchiveIndexMetadata> archives = 1;
 }
 
+message CodexWakuMessageArchiveIndexMetadata {
+  uint32 version = 1;
+  WakuMessageArchiveMetadata metadata = 2;
+  string cid = 3;
+}
+
+message CodexWakuMessageArchiveIndex {
+  map<string, CodexWakuMessageArchiveIndexMetadata> archives = 1;
+}
+
 message CommunityReevaluatePermissionsRequest {
   bytes community_id = 1;
 }
