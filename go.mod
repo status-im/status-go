@@ -97,7 +97,7 @@ require (
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
 	github.com/prometheus/client_model v0.6.1
 	github.com/schollz/peerdiscovery v1.7.0
-	github.com/status-im/extkeys v1.3.0
+	github.com/status-im/extkeys v1.3.1-0.20250925172621-907b49dea9c7
 	github.com/status-im/go-wallet-sdk v0.0.0-20250912130226-d334ec9bff18
 	github.com/waku-org/go-waku v0.8.1-0.20250825172353-0c3d6dc0a8cc
 	github.com/waku-org/waku-go-bindings v0.0.0-20250714110306-6feba5b0df4d
