@@ -220,7 +220,7 @@ statusgo-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as stati
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
 
 statusgo-library: generate
-statusgo-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
+statusgo-library: $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	go build \
 		-tags '$(BUILD_TAGS)' \
@@ -253,7 +253,7 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate $(LIBWAKU) ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
@@ -261,7 +261,7 @@ statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compi
 	@echo "Android library built"
 	@file build/bin/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate $(LIBWAKU) ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
