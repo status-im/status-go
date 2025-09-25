@@ -191,6 +191,7 @@ type ArchiveFileService interface {
 	ExtractMessagesFromHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error)
 	GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error)
 	LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error)
+	CodexLoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.CodexWakuMessageArchiveIndex, error)
 }
 
 type ArchiveService interface {
