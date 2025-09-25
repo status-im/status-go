@@ -53,9 +53,6 @@ type Config struct {
 	DiscoveryLimit                         int                        `toml:",omitempty"` // Indicates the number of nodes to discover with peer exchange client
 	AutoUpdate                             bool                       `toml:",omitempty"`
 	UDPPort                                int                        `toml:",omitempty"`
-	EnableStore                            bool                       `toml:",omitempty"`
-	StoreCapacity                          int                        `toml:",omitempty"`
-	StoreSeconds                           int                        `toml:",omitempty"`
 	MetricsEnabled                         bool                       `toml:",omitempty"`
 	DefaultShardPubsubTopic                string                     `toml:",omitempty"` // Pubsub topic to be used by default for messages that do not have a topic assigned (depending whether sharding is used or not)
 	DefaultShardedPubsubTopics             []string                   `toml:", omitempty"`
