@@ -20,8 +20,8 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"net"
+	"net/netip"
 	"reflect"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -45,7 +45,7 @@ const (
 // current process. Setting ENR entries via the Set method updates the record. A new version
 // of the record is signed on demand when the Node method is called.
 type LocalNode struct {
-	cur atomic.Value // holds a non-nil node pointer while the record is up-to-date
+	cur atomic.Pointer[Node] // holds a non-nil node pointer while the record is up-to-date
 
 	id  ID
 	key *ecdsa.PrivateKey
@@ -82,7 +82,7 @@ func NewLocalNode(db *DB, key *ecdsa.PrivateKey) *LocalNode {
 	}
 	ln.seq = db.localSeq(ln.id)
 	ln.update = time.Now()
-	ln.cur.Store((*Node)(nil))
+	ln.cur.Store(nil)
 	return ln
 }
 
@@ -94,7 +94,7 @@ func (ln *LocalNode) Database() *DB {
 // Node returns the current version of the local node record.
 func (ln *LocalNode) Node() *Node {
 	// If we have a valid record, return that
-	n := ln.cur.Load().(*Node)
+	n := ln.cur.Load()
 	if n != nil {
 		return n
 	}
@@ -105,7 +105,7 @@ func (ln *LocalNode) Node() *Node {
 
 	// Double check the current record, since multiple goroutines might be waiting
 	// on the write mutex.
-	if n = ln.cur.Load().(*Node); n != nil {
+	if n = ln.cur.Load(); n != nil {
 		return n
 	}
 
@@ -121,7 +121,7 @@ func (ln *LocalNode) Node() *Node {
 
 	ln.sign()
 	ln.update = time.Now()
-	return ln.cur.Load().(*Node)
+	return ln.cur.Load()
 }
 
 // Seq returns the current sequence number of the local node record.
@@ -130,11 +130,6 @@ func (ln *LocalNode) Seq() uint64 {
 	defer ln.mu.Unlock()
 
 	return ln.seq
-}
-
-// Returns the entries stored in the localnode
-func (ln *LocalNode) Entries() map[string]enr.Entry {
-	return ln.entries
 }
 
 // ID returns the local node ID.
@@ -180,8 +175,8 @@ func (ln *LocalNode) delete(e enr.Entry) {
 	}
 }
 
-func (ln *LocalNode) endpointForIP(ip net.IP) *lnEndpoint {
-	if ip.To4() != nil {
+func (ln *LocalNode) endpointForIP(ip netip.Addr) *lnEndpoint {
+	if ip.Is4() {
 		return &ln.endpoint4
 	}
 	return &ln.endpoint6
@@ -193,7 +188,7 @@ func (ln *LocalNode) SetStaticIP(ip net.IP) {
 	ln.mu.Lock()
 	defer ln.mu.Unlock()
 
-	ln.endpointForIP(ip).staticIP = ip
+	ln.endpointForIP(netutil.IPToAddr(ip)).staticIP = ip
 	ln.updateEndpoints()
 }
 
@@ -203,7 +198,7 @@ func (ln *LocalNode) SetFallbackIP(ip net.IP) {
 	ln.mu.Lock()
 	defer ln.mu.Unlock()
 
-	ln.endpointForIP(ip).fallbackIP = ip
+	ln.endpointForIP(netutil.IPToAddr(ip)).fallbackIP = ip
 	ln.updateEndpoints()
 }
 
@@ -220,21 +215,21 @@ func (ln *LocalNode) SetFallbackUDP(port int) {
 
 // UDPEndpointStatement should be called whenever a statement about the local node's
 // UDP endpoint is received. It feeds the local endpoint predictor.
-func (ln *LocalNode) UDPEndpointStatement(fromaddr, endpoint *net.UDPAddr) {
+func (ln *LocalNode) UDPEndpointStatement(fromaddr, endpoint netip.AddrPort) {
 	ln.mu.Lock()
 	defer ln.mu.Unlock()
 
-	ln.endpointForIP(endpoint.IP).track.AddStatement(fromaddr.String(), endpoint.String())
+	ln.endpointForIP(endpoint.Addr()).track.AddStatement(fromaddr.Addr(), endpoint)
 	ln.updateEndpoints()
 }
 
 // UDPContact should be called whenever the local node has announced itself to another node
 // via UDP. It feeds the local endpoint predictor.
-func (ln *LocalNode) UDPContact(toaddr *net.UDPAddr) {
+func (ln *LocalNode) UDPContact(toaddr netip.AddrPort) {
 	ln.mu.Lock()
 	defer ln.mu.Unlock()
 
-	ln.endpointForIP(toaddr.IP).track.AddContact(toaddr.String())
+	ln.endpointForIP(toaddr.Addr()).track.AddContact(toaddr.Addr())
 	ln.updateEndpoints()
 }
 
@@ -273,35 +268,19 @@ func (e *lnEndpoint) get() (newIP net.IP, newPort uint16) {
 	}
 	if e.staticIP != nil {
 		newIP = e.staticIP
-	} else if ip, port := predictAddr(e.track); ip != nil {
-		newIP = ip
-		newPort = port
+	} else if ap := e.track.PredictEndpoint(); ap.IsValid() {
+		newIP = ap.Addr().AsSlice()
+		newPort = ap.Port()
 	}
 	return newIP, newPort
 }
 
-// predictAddr wraps IPTracker.PredictEndpoint, converting from its string-based
-// endpoint representation to IP and port types.
-func predictAddr(t *netutil.IPTracker) (net.IP, uint16) {
-	ep := t.PredictEndpoint()
-	if ep == "" {
-		return nil, 0
-	}
-	ipString, portString, _ := net.SplitHostPort(ep)
-	ip := net.ParseIP(ipString)
-	port, err := strconv.ParseUint(portString, 10, 16)
-	if err != nil {
-		return nil, 0
-	}
-	return ip, uint16(port)
-}
-
 func (ln *LocalNode) invalidate() {
-	ln.cur.Store((*Node)(nil))
+	ln.cur.Store(nil)
 }
 
 func (ln *LocalNode) sign() {
-	if n := ln.cur.Load().(*Node); n != nil {
+	if n := ln.cur.Load(); n != nil {
 		return // no changes
 	}
 
@@ -319,19 +298,10 @@ func (ln *LocalNode) sign() {
 		panic(fmt.Errorf("enode: can't verify local record: %v", err))
 	}
 	ln.cur.Store(n)
-	log.Info("New local node record", "seq", ln.seq, "id", n.ID(), "ip", n.IP(), "udp", n.UDP(), "tcp", n.TCP())
+	log.Info("New local node record", "seq", ln.seq, "id", n.ID(), "ip", n.IPAddr(), "udp", n.UDP(), "tcp", n.TCP())
 }
 
 func (ln *LocalNode) bumpSeq() {
 	ln.seq++
 	ln.db.storeLocalSeq(ln.id, ln.seq)
-}
-
-// nowMilliseconds gives the current timestamp at millisecond precision.
-func nowMilliseconds() uint64 {
-	ns := time.Now().UnixNano()
-	if ns < 0 {
-		return 0
-	}
-	return uint64(ns / 1000 / 1000)
 }

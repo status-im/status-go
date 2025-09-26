@@ -35,6 +35,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/hashicorp/go-bexpr"
 )
@@ -56,19 +57,13 @@ type HandlerT struct {
 // Verbosity sets the log verbosity ceiling. The verbosity of individual packages
 // and source files can be raised using Vmodule.
 func (*HandlerT) Verbosity(level int) {
-	glogger.Verbosity(log.Lvl(level))
+	glogger.Verbosity(log.FromLegacyLevel(level))
 }
 
 // Vmodule sets the log verbosity pattern. See package log for details on the
 // pattern syntax.
 func (*HandlerT) Vmodule(pattern string) error {
 	return glogger.Vmodule(pattern)
-}
-
-// BacktraceAt sets the log backtrace location. See package log for details on
-// the pattern syntax.
-func (*HandlerT) BacktraceAt(location string) error {
-	return glogger.BacktraceAt(location)
 }
 
 // MemStats returns detailed runtime memory statistics.
@@ -241,6 +236,24 @@ func (*HandlerT) FreeOSMemory() {
 // setting. A negative value disables GC.
 func (*HandlerT) SetGCPercent(v int) int {
 	return debug.SetGCPercent(v)
+}
+
+// SetMemoryLimit sets the GOMEMLIMIT for the process. It returns the previous limit.
+// Note:
+//
+//   - The input limit is provided as bytes. A negative input does not adjust the limit
+//
+//   - A zero limit or a limit that's lower than the amount of memory used by the Go
+//     runtime may cause the garbage collector to run nearly continuously. However,
+//     the application may still make progress.
+//
+//   - Setting the limit too low will cause Geth to become unresponsive.
+//
+//   - Geth also allocates memory off-heap, particularly for fastCache and Pebble,
+//     which can be non-trivial (a few gigabytes by default).
+func (*HandlerT) SetMemoryLimit(limit int64) int64 {
+	log.Info("Setting memory limit", "size", common.PrettyDuration(limit))
+	return debug.SetMemoryLimit(limit)
 }
 
 func writeProfile(name, file string) error {

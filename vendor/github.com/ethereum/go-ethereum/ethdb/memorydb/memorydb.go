@@ -18,6 +18,7 @@
 package memorydb
 
 import (
+	"bytes"
 	"errors"
 	"sort"
 	"strings"
@@ -35,10 +36,6 @@ var (
 	// errMemorydbNotFound is returned if a key is requested that is not found in
 	// the provided memory database.
 	errMemorydbNotFound = errors.New("not found")
-
-	// errSnapshotReleased is returned if callers want to retrieve data from a
-	// released snapshot.
-	errSnapshotReleased = errors.New("snapshot released")
 )
 
 // Database is an ephemeral key-value store. Apart from basic data storage
@@ -125,6 +122,29 @@ func (db *Database) Delete(key []byte) error {
 	return nil
 }
 
+// DeleteRange deletes all of the keys (and values) in the range [start,end)
+// (inclusive on start, exclusive on end). If the start is nil, it represents
+// the key before all keys; if the end is nil, it represents the key after
+// all keys.
+func (db *Database) DeleteRange(start, end []byte) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	if db.db == nil {
+		return errMemorydbClosed
+	}
+	for key := range db.db {
+		if start != nil && key < string(start) {
+			continue
+		}
+		if end != nil && key >= string(end) {
+			continue
+		}
+		delete(db.db, key)
+	}
+	return nil
+}
+
 // NewBatch creates a write-only key-value store that buffers changes to its host
 // database until a final write is called.
 func (db *Database) NewBatch() ethdb.Batch {
@@ -175,21 +195,20 @@ func (db *Database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	}
 }
 
-// NewSnapshot creates a database snapshot based on the current state.
-// The created snapshot will not be affected by all following mutations
-// happened on the database.
-func (db *Database) NewSnapshot() (ethdb.Snapshot, error) {
-	return newSnapshot(db), nil
-}
-
-// Stat returns a particular internal stat of the database.
-func (db *Database) Stat(property string) (string, error) {
-	return "", errors.New("unknown property")
+// Stat returns the statistic data of the database.
+func (db *Database) Stat() (string, error) {
+	return "", nil
 }
 
 // Compact is not supported on a memory database, but there's no need either as
 // a memory database doesn't waste space anyway.
 func (db *Database) Compact(start []byte, limit []byte) error {
+	return nil
+}
+
+// SyncKeyValue ensures that all pending writes are flushed to disk,
+// guaranteeing data durability up to the point.
+func (db *Database) SyncKeyValue() error {
 	return nil
 }
 
@@ -207,9 +226,12 @@ func (db *Database) Len() int {
 // keyvalue is a key-value tuple tagged with a deletion field to allow creating
 // memory-database write batches.
 type keyvalue struct {
-	key    []byte
+	key    string
 	value  []byte
 	delete bool
+
+	rangeFrom []byte
+	rangeTo   []byte
 }
 
 // batch is a write-only memory batch that commits changes to its host
@@ -222,15 +244,26 @@ type batch struct {
 
 // Put inserts the given value into the batch for later committing.
 func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyvalue{common.CopyBytes(key), common.CopyBytes(value), false})
+	b.writes = append(b.writes, keyvalue{key: string(key), value: common.CopyBytes(value)})
 	b.size += len(key) + len(value)
 	return nil
 }
 
-// Delete inserts the a key removal into the batch for later committing.
+// Delete inserts the key removal into the batch for later committing.
 func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyvalue{common.CopyBytes(key), nil, true})
+	b.writes = append(b.writes, keyvalue{key: string(key), delete: true})
 	b.size += len(key)
+	return nil
+}
+
+// DeleteRange removes all keys in the range [start, end) from the batch for later committing.
+func (b *batch) DeleteRange(start, end []byte) error {
+	b.writes = append(b.writes, keyvalue{
+		rangeFrom: bytes.Clone(start),
+		rangeTo:   bytes.Clone(end),
+		delete:    true,
+	})
+	b.size += len(start) + len(end)
 	return nil
 }
 
@@ -244,12 +277,29 @@ func (b *batch) Write() error {
 	b.db.lock.Lock()
 	defer b.db.lock.Unlock()
 
-	for _, keyvalue := range b.writes {
-		if keyvalue.delete {
-			delete(b.db.db, string(keyvalue.key))
+	if b.db.db == nil {
+		return errMemorydbClosed
+	}
+	for _, entry := range b.writes {
+		if entry.delete {
+			if entry.key != "" {
+				// Single key deletion
+				delete(b.db.db, entry.key)
+			} else {
+				// Range deletion (inclusive of start, exclusive of end)
+				for key := range b.db.db {
+					if entry.rangeFrom != nil && key < string(entry.rangeFrom) {
+						continue
+					}
+					if entry.rangeTo != nil && key >= string(entry.rangeTo) {
+						continue
+					}
+					delete(b.db.db, key)
+				}
+			}
 			continue
 		}
-		b.db.db[string(keyvalue.key)] = keyvalue.value
+		b.db.db[entry.key] = entry.value
 	}
 	return nil
 }
@@ -262,14 +312,26 @@ func (b *batch) Reset() {
 
 // Replay replays the batch contents.
 func (b *batch) Replay(w ethdb.KeyValueWriter) error {
-	for _, keyvalue := range b.writes {
-		if keyvalue.delete {
-			if err := w.Delete(keyvalue.key); err != nil {
-				return err
+	for _, entry := range b.writes {
+		if entry.delete {
+			if entry.key != "" {
+				// Single key deletion
+				if err := w.Delete([]byte(entry.key)); err != nil {
+					return err
+				}
+			} else {
+				// Range deletion
+				if rangeDeleter, ok := w.(ethdb.KeyValueRangeDeleter); ok {
+					if err := rangeDeleter.DeleteRange(entry.rangeFrom, entry.rangeTo); err != nil {
+						return err
+					}
+				} else {
+					return errors.New("ethdb.KeyValueWriter does not implement DeleteRange")
+				}
 			}
 			continue
 		}
-		if err := w.Put(keyvalue.key, keyvalue.value); err != nil {
+		if err := w.Put([]byte(entry.key), entry.value); err != nil {
 			return err
 		}
 	}
@@ -328,60 +390,4 @@ func (it *iterator) Value() []byte {
 // be called multiple times without causing error.
 func (it *iterator) Release() {
 	it.index, it.keys, it.values = -1, nil, nil
-}
-
-// snapshot wraps a batch of key-value entries deep copied from the in-memory
-// database for implementing the Snapshot interface.
-type snapshot struct {
-	db   map[string][]byte
-	lock sync.RWMutex
-}
-
-// newSnapshot initializes the snapshot with the given database instance.
-func newSnapshot(db *Database) *snapshot {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	copied := make(map[string][]byte)
-	for key, val := range db.db {
-		copied[key] = common.CopyBytes(val)
-	}
-	return &snapshot{db: copied}
-}
-
-// Has retrieves if a key is present in the snapshot backing by a key-value
-// data store.
-func (snap *snapshot) Has(key []byte) (bool, error) {
-	snap.lock.RLock()
-	defer snap.lock.RUnlock()
-
-	if snap.db == nil {
-		return false, errSnapshotReleased
-	}
-	_, ok := snap.db[string(key)]
-	return ok, nil
-}
-
-// Get retrieves the given key if it's present in the snapshot backing by
-// key-value data store.
-func (snap *snapshot) Get(key []byte) ([]byte, error) {
-	snap.lock.RLock()
-	defer snap.lock.RUnlock()
-
-	if snap.db == nil {
-		return nil, errSnapshotReleased
-	}
-	if entry, ok := snap.db[string(key)]; ok {
-		return common.CopyBytes(entry), nil
-	}
-	return nil, errMemorydbNotFound
-}
-
-// Release releases associated resources. Release should always succeed and can
-// be called multiple times without causing error.
-func (snap *snapshot) Release() {
-	snap.lock.Lock()
-	defer snap.lock.Unlock()
-
-	snap.db = nil
 }
