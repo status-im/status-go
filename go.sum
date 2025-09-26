@@ -2059,8 +2059,8 @@ github.com/spf13/viper v1.4.0/go.mod h1:PTJ7Z/lr49W6bUbkmS1V3by4uWynFiR9p7+dSq/y
 github.com/spf13/viper v1.7.0/go.mod h1:8WkrPz2fc9jxqZNCJI/76HCieCp4Q8HaLFoCha5qpdg=
 github.com/status-im/doubleratchet v3.0.0+incompatible h1:aJ1ejcSERpSzmWZBgtfYtiU2nF0Q8ZkGyuEPYETXkCY=
 github.com/status-im/doubleratchet v3.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
-github.com/status-im/extkeys v1.3.0 h1:w6pEQaVEsW2ECxsGqRbxYk44/TULVZOUsuhHiODE9Qk=
-github.com/status-im/extkeys v1.3.0/go.mod h1:j4gRTgnyD1wCP3E+e8ngmQg0KccLNfMC7xT2i5Ltvts=
+github.com/status-im/extkeys v1.4.0 h1:HiB/vQXZrGveZbGy3W6hI4T0CfCt0uP4xvGwjXL4cAQ=
+github.com/status-im/extkeys v1.4.0/go.mod h1:AZGS9vJKbME5tovNqYH/LrfHu8t9ad9nxl76fbLG5PY=
 github.com/status-im/go-ethereum v1.10.25-status.24 h1:TOLSwMHbJ1KeLAPljVP7o8jmgRb3eIODfn/rO5DkmqU=
 github.com/status-im/go-ethereum v1.10.25-status.24/go.mod h1:kcIyUwKuTYxEXYRTVkvHtV6EyESKuI5EubF3et9cyR8=
 github.com/status-im/go-sqlcipher/v4 v4.5.4-status.3 h1:/73h1w1hUfb3wVyTlNrUIwahZxatgesCHa6lwO57C2M=

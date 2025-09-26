@@ -1023,8 +1023,8 @@ github.com/spaolacci/murmur3
 # github.com/status-im/doubleratchet v3.0.0+incompatible
 ## explicit
 github.com/status-im/doubleratchet
-# github.com/status-im/extkeys v1.3.0
-## explicit; go 1.22
+# github.com/status-im/extkeys v1.4.0
+## explicit; go 1.23.0
 github.com/status-im/extkeys
 # github.com/status-im/go-wallet-sdk v0.0.0-20250912130226-d334ec9bff18
 ## explicit; go 1.23.0
