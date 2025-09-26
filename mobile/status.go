@@ -1555,7 +1555,7 @@ func inputConnectionStringForBootstrapping(cs, configJSON string) string {
 		return response.toJSON(err)
 	}
 
-	return nil
+	return response.toJSON(nil)
 }
 
 func InputConnectionStringForBootstrappingV2(requestJSON string) string {
