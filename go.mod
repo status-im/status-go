@@ -79,6 +79,7 @@ require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5
 	github.com/andybalholm/brotli v1.1.0
+	github.com/bep/debounce v1.2.1
 	github.com/bits-and-blooms/bloom/v3 v3.7.0
 	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/brianvoe/gofakeit/v7 v7.3.0
@@ -98,7 +99,7 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/status-im/extkeys v1.4.0
-	github.com/status-im/go-wallet-sdk v0.0.0-20250912130226-d334ec9bff18
+	github.com/status-im/go-wallet-sdk v0.0.0-20250924175027-d5faf23a5ef7
 	github.com/waku-org/go-waku v0.8.1-0.20250825172353-0c3d6dc0a8cc
 	github.com/waku-org/waku-go-bindings v0.0.0-20250714110306-6feba5b0df4d
 	github.com/wk8/go-ordered-map/v2 v2.1.7
