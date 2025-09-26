@@ -16,71 +16,90 @@
 
 package rawdb
 
-import "fmt"
+import (
+	"path/filepath"
+
+	"github.com/ethereum/go-ethereum/ethdb"
+)
 
 // The list of table names of chain freezer.
 const (
-	// chainFreezerHeaderTable indicates the name of the freezer header table.
-	chainFreezerHeaderTable = "headers"
+	// ChainFreezerHeaderTable indicates the name of the freezer header table.
+	ChainFreezerHeaderTable = "headers"
 
-	// chainFreezerHashTable indicates the name of the freezer canonical hash table.
-	chainFreezerHashTable = "hashes"
+	// ChainFreezerHashTable indicates the name of the freezer canonical hash table.
+	ChainFreezerHashTable = "hashes"
 
-	// chainFreezerBodiesTable indicates the name of the freezer block body table.
-	chainFreezerBodiesTable = "bodies"
+	// ChainFreezerBodiesTable indicates the name of the freezer block body table.
+	ChainFreezerBodiesTable = "bodies"
 
-	// chainFreezerReceiptTable indicates the name of the freezer receipts table.
-	chainFreezerReceiptTable = "receipts"
-
-	// chainFreezerDifficultyTable indicates the name of the freezer total difficulty table.
-	chainFreezerDifficultyTable = "diffs"
+	// ChainFreezerReceiptTable indicates the name of the freezer receipts table.
+	ChainFreezerReceiptTable = "receipts"
 )
 
-// chainFreezerNoSnappy configures whether compression is disabled for the ancient-tables.
-// Hashes and difficulties don't compress well.
-var chainFreezerNoSnappy = map[string]bool{
-	chainFreezerHeaderTable:     false,
-	chainFreezerHashTable:       true,
-	chainFreezerBodiesTable:     false,
-	chainFreezerReceiptTable:    false,
-	chainFreezerDifficultyTable: true,
+// chainFreezerTableConfigs configures the settings for tables in the chain freezer.
+// Compression is disabled for hashes as they don't compress well. Additionally,
+// tail truncation is disabled for the header and hash tables, as these are intended
+// to be retained long-term.
+var chainFreezerTableConfigs = map[string]freezerTableConfig{
+	ChainFreezerHeaderTable:  {noSnappy: false, prunable: false},
+	ChainFreezerHashTable:    {noSnappy: true, prunable: false},
+	ChainFreezerBodiesTable:  {noSnappy: false, prunable: true},
+	ChainFreezerReceiptTable: {noSnappy: false, prunable: true},
+}
+
+// freezerTableConfig contains the settings for a freezer table.
+type freezerTableConfig struct {
+	noSnappy bool // disables item compression
+	prunable bool // true for tables that can be pruned by TruncateTail
+}
+
+const (
+	// stateHistoryTableSize defines the maximum size of freezer data files.
+	stateHistoryTableSize = 2 * 1000 * 1000 * 1000
+
+	// stateHistoryAccountIndex indicates the name of the freezer state history table.
+	stateHistoryMeta         = "history.meta"
+	stateHistoryAccountIndex = "account.index"
+	stateHistoryStorageIndex = "storage.index"
+	stateHistoryAccountData  = "account.data"
+	stateHistoryStorageData  = "storage.data"
+)
+
+// stateFreezerTableConfigs configures the settings for tables in the state freezer.
+var stateFreezerTableConfigs = map[string]freezerTableConfig{
+	stateHistoryMeta:         {noSnappy: true, prunable: true},
+	stateHistoryAccountIndex: {noSnappy: false, prunable: true},
+	stateHistoryStorageIndex: {noSnappy: false, prunable: true},
+	stateHistoryAccountData:  {noSnappy: false, prunable: true},
+	stateHistoryStorageData:  {noSnappy: false, prunable: true},
 }
 
 // The list of identifiers of ancient stores.
 var (
-	chainFreezerName = "chain" // the folder name of chain segment ancient store.
+	ChainFreezerName       = "chain"        // the folder name of chain segment ancient store.
+	MerkleStateFreezerName = "state"        // the folder name of state history ancient store.
+	VerkleStateFreezerName = "state_verkle" // the folder name of state history ancient store.
 )
 
 // freezers the collections of all builtin freezers.
-var freezers = []string{chainFreezerName}
+var freezers = []string{ChainFreezerName, MerkleStateFreezerName, VerkleStateFreezerName}
 
-// InspectFreezerTable dumps out the index of a specific freezer table. The passed
-// ancient indicates the path of root ancient directory where the chain freezer can
-// be opened. Start and end specify the range for dumping out indexes.
-// Note this function can only be used for debugging purposes.
-func InspectFreezerTable(ancient string, freezerName string, tableName string, start, end int64) error {
-	var (
-		path   string
-		tables map[string]bool
-	)
-	switch freezerName {
-	case chainFreezerName:
-		path, tables = resolveChainFreezerDir(ancient), chainFreezerNoSnappy
-	default:
-		return fmt.Errorf("unknown freezer, supported ones: %v", freezers)
+// NewStateFreezer initializes the ancient store for state history.
+//
+//   - if the empty directory is given, initializes the pure in-memory
+//     state freezer (e.g. dev mode).
+//   - if non-empty directory is given, initializes the regular file-based
+//     state freezer.
+func NewStateFreezer(ancientDir string, verkle bool, readOnly bool) (ethdb.ResettableAncientStore, error) {
+	if ancientDir == "" {
+		return NewMemoryFreezer(readOnly, stateFreezerTableConfigs), nil
 	}
-	noSnappy, exist := tables[tableName]
-	if !exist {
-		var names []string
-		for name := range tables {
-			names = append(names, name)
-		}
-		return fmt.Errorf("unknown table, supported ones: %v", names)
+	var name string
+	if verkle {
+		name = filepath.Join(ancientDir, VerkleStateFreezerName)
+	} else {
+		name = filepath.Join(ancientDir, MerkleStateFreezerName)
 	}
-	table, err := newFreezerTable(path, tableName, noSnappy, true)
-	if err != nil {
-		return err
-	}
-	table.dumpIndexStdout(start, end)
-	return nil
+	return newResettableFreezer(name, "eth/db/state", readOnly, stateHistoryTableSize, stateFreezerTableConfigs)
 }

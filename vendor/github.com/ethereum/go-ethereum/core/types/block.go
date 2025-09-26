@@ -18,6 +18,7 @@
 package types
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-verkle"
 )
 
 // A BlockNonce is a 64-bit hash which proves (combined with the
@@ -57,6 +59,13 @@ func (n BlockNonce) MarshalText() ([]byte, error) {
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (n *BlockNonce) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("BlockNonce", input, n[:])
+}
+
+// ExecutionWitness represents the witness + proof used in a verkle context,
+// to provide the ability to execute a block statelessly.
+type ExecutionWitness struct {
+	StateDiff   verkle.StateDiff    `json:"stateDiff"`
+	VerkleProof *verkle.VerkleProof `json:"verkleProof"`
 }
 
 //go:generate go run github.com/fjl/gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
@@ -96,7 +105,7 @@ type Header struct {
 	ParentBeaconRoot *common.Hash `json:"parentBeaconBlockRoot" rlp:"optional"`
 
 	// RequestsHash was added by EIP-7685 and is ignored in legacy headers.
-	RequestsHash *common.Hash `json:"requestsRoot" rlp:"optional"`
+	RequestsHash *common.Hash `json:"requestsHash" rlp:"optional"`
 }
 
 // field type overrides for gencodec
@@ -119,7 +128,7 @@ func (h *Header) Hash() common.Hash {
 	return rlpHash(h)
 }
 
-var headerSize = common.StorageSize(reflect.TypeOf(Header{}).Size())
+var headerSize = common.StorageSize(reflect.TypeFor[Header]().Size())
 
 // Size returns the approximate memory used by all internal contents. It is used
 // to approximate and limit the memory consumption of various caches.
@@ -160,9 +169,8 @@ func (h *Header) SanityCheck() error {
 func (h *Header) EmptyBody() bool {
 	var (
 		emptyWithdrawals = h.WithdrawalsHash == nil || *h.WithdrawalsHash == EmptyWithdrawalsHash
-		emptyRequests    = h.RequestsHash == nil || *h.RequestsHash == EmptyReceiptsHash
 	)
-	return h.TxHash == EmptyTxsHash && h.UncleHash == EmptyUncleHash && emptyWithdrawals && emptyRequests
+	return h.TxHash == EmptyTxsHash && h.UncleHash == EmptyUncleHash && emptyWithdrawals
 }
 
 // EmptyReceipts returns true if there are no receipts for this header/block.
@@ -178,16 +186,37 @@ type Body struct {
 	Withdrawals  []*Withdrawal `rlp:"optional"`
 }
 
-// Block represents an entire block in the Ethereum blockchain.
+// Block represents an Ethereum block.
+//
+// Note the Block type tries to be 'immutable', and contains certain caches that rely
+// on that. The rules around block immutability are as follows:
+//
+//   - We copy all data when the block is constructed. This makes references held inside
+//     the block independent of whatever value was passed in.
+//
+//   - We copy all header data on access. This is because any change to the header would mess
+//     up the cached hash and size values in the block. Calling code is expected to take
+//     advantage of this to avoid over-allocating!
+//
+//   - When new body data is attached to the block, a shallow copy of the block is returned.
+//     This ensures block modifications are race-free.
+//
+//   - We do not copy body data on access because it does not affect the caches, and also
+//     because it would be too expensive.
 type Block struct {
 	header       *Header
 	uncles       []*Header
 	transactions Transactions
 	withdrawals  Withdrawals
 
+	// witness is not an encoded part of the block body.
+	// It is held in Block in order for easy relaying to the places
+	// that process it.
+	witness *ExecutionWitness
+
 	// caches
-	hash atomic.Value
-	size atomic.Value
+	hash atomic.Pointer[common.Hash]
+	size atomic.Uint64
 
 	// These fields are used by package eth to track
 	// inter-peer block relay.
@@ -203,17 +232,25 @@ type extblock struct {
 	Withdrawals []*Withdrawal `rlp:"optional"`
 }
 
-// NewBlock creates a new block. The input data is copied,
-// changes to header and to the field values will not affect the
-// block.
+// NewBlock creates a new block. The input data is copied, changes to header and to the
+// field values will not affect the block.
 //
-// The values of TxHash, UncleHash, ReceiptHash and Bloom in header
-// are ignored and set to values derived from the given txs, uncles
-// and receipts.
-func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, hasher TrieHasher) *Block {
-	b := &Block{header: CopyHeader(header)}
+// The body elements and the receipts are used to recompute and overwrite the
+// relevant portions of the header.
+//
+// The receipt's bloom must already calculated for the block's bloom to be
+// correctly calculated.
+func NewBlock(header *Header, body *Body, receipts []*Receipt, hasher TrieHasher) *Block {
+	if body == nil {
+		body = &Body{}
+	}
+	var (
+		b           = NewBlockWithHeader(header)
+		txs         = body.Transactions
+		uncles      = body.Uncles
+		withdrawals = body.Withdrawals
+	)
 
-	// TODO: panic if len(txs) != len(receipts)
 	if len(txs) == 0 {
 		b.header.TxHash = EmptyTxsHash
 	} else {
@@ -226,7 +263,10 @@ func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*
 		b.header.ReceiptHash = EmptyReceiptsHash
 	} else {
 		b.header.ReceiptHash = DeriveSha(Receipts(receipts), hasher)
-		b.header.Bloom = CreateBloom(receipts)
+		// Receipts must go through MakeReceipt to calculate the receipt's bloom
+		// already. Merge the receipt's bloom together instead of recalculating
+		// everything.
+		b.header.Bloom = MergeBloom(receipts)
 	}
 
 	if len(uncles) == 0 {
@@ -239,36 +279,18 @@ func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*
 		}
 	}
 
-	return b
-}
-
-// NewBlockWithWithdrawals creates a new block with withdrawals. The input data
-// is copied, changes to header and to the field values will not
-// affect the block.
-//
-// The values of TxHash, UncleHash, ReceiptHash and Bloom in header
-// are ignored and set to values derived from the given txs, uncles
-// and receipts.
-func NewBlockWithWithdrawals(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, withdrawals []*Withdrawal, hasher TrieHasher) *Block {
-	b := NewBlock(header, txs, uncles, receipts, hasher)
-
 	if withdrawals == nil {
 		b.header.WithdrawalsHash = nil
 	} else if len(withdrawals) == 0 {
 		b.header.WithdrawalsHash = &EmptyWithdrawalsHash
+		b.withdrawals = Withdrawals{}
 	} else {
-		h := DeriveSha(Withdrawals(withdrawals), hasher)
-		b.header.WithdrawalsHash = &h
+		hash := DeriveSha(Withdrawals(withdrawals), hasher)
+		b.header.WithdrawalsHash = &hash
+		b.withdrawals = slices.Clone(withdrawals)
 	}
 
-	return b.WithWithdrawals(withdrawals)
-}
-
-// NewBlockWithHeader creates a block with the given header data. The
-// header data is copied, changes to header and to the field values
-// will not affect the block.
-func NewBlockWithHeader(header *Header) *Block {
-	return &Block{header: CopyHeader(header)}
+	return b
 }
 
 // CopyHeader creates a deep copy of a block header.
@@ -310,7 +332,7 @@ func CopyHeader(h *Header) *Header {
 	return &cpy
 }
 
-// DecodeRLP decodes the Ethereum
+// DecodeRLP decodes a block from RLP.
 func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	var eb extblock
 	_, size, _ := s.Kind()
@@ -322,9 +344,9 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	return nil
 }
 
-// EncodeRLP serializes b into the Ethereum RLP block format.
+// EncodeRLP serializes a block as RLP.
 func (b *Block) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, extblock{
+	return rlp.Encode(w, &extblock{
 		Header:      b.header,
 		Txs:         b.transactions,
 		Uncles:      b.uncles,
@@ -332,10 +354,18 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 	})
 }
 
-// TODO: copies
+// Body returns the non-header content of the block.
+// Note the returned data is not an independent copy.
+func (b *Block) Body() *Body {
+	return &Body{b.transactions, b.uncles, b.withdrawals}
+}
+
+// Accessors for body data. These do not return a copy because the content
+// of the body slices does not affect the cached hash/size in block.
 
 func (b *Block) Uncles() []*Header          { return b.uncles }
 func (b *Block) Transactions() Transactions { return b.transactions }
+func (b *Block) Withdrawals() Withdrawals   { return b.withdrawals }
 
 func (b *Block) Transaction(hash common.Hash) *Transaction {
 	for _, transaction := range b.transactions {
@@ -345,6 +375,13 @@ func (b *Block) Transaction(hash common.Hash) *Transaction {
 	}
 	return nil
 }
+
+// Header returns the block header (as a copy).
+func (b *Block) Header() *Header {
+	return CopyHeader(b.header)
+}
+
+// Header value accessors. These do copy!
 
 func (b *Block) Number() *big.Int     { return new(big.Int).Set(b.header.Number) }
 func (b *Block) GasLimit() uint64     { return b.header.GasLimit }
@@ -371,25 +408,40 @@ func (b *Block) BaseFee() *big.Int {
 	return new(big.Int).Set(b.header.BaseFee)
 }
 
-func (b *Block) Withdrawals() Withdrawals {
-	return b.withdrawals
+func (b *Block) BeaconRoot() *common.Hash   { return b.header.ParentBeaconRoot }
+func (b *Block) RequestsHash() *common.Hash { return b.header.RequestsHash }
+
+func (b *Block) ExcessBlobGas() *uint64 {
+	var excessBlobGas *uint64
+	if b.header.ExcessBlobGas != nil {
+		excessBlobGas = new(uint64)
+		*excessBlobGas = *b.header.ExcessBlobGas
+	}
+	return excessBlobGas
 }
 
-func (b *Block) Header() *Header { return CopyHeader(b.header) }
+func (b *Block) BlobGasUsed() *uint64 {
+	var blobGasUsed *uint64
+	if b.header.BlobGasUsed != nil {
+		blobGasUsed = new(uint64)
+		*blobGasUsed = *b.header.BlobGasUsed
+	}
+	return blobGasUsed
+}
 
-// Body returns the non-header content of the block.
-func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles, b.withdrawals} }
+// ExecutionWitness returns the verkle execution witneess + proof for a block
+func (b *Block) ExecutionWitness() *ExecutionWitness { return b.witness }
 
 // Size returns the true RLP encoded storage size of the block, either by encoding
 // and returning it, or returning a previously cached value.
-func (b *Block) Size() common.StorageSize {
-	if size := b.size.Load(); size != nil {
-		return size.(common.StorageSize)
+func (b *Block) Size() uint64 {
+	if size := b.size.Load(); size > 0 {
+		return size
 	}
 	c := writeCounter(0)
 	rlp.Encode(&c, b)
-	b.size.Store(common.StorageSize(c))
-	return common.StorageSize(c)
+	b.size.Store(uint64(c))
+	return uint64(c)
 }
 
 // SanityCheck can be used to prevent that unbounded fields are
@@ -412,16 +464,37 @@ func CalcUncleHash(uncles []*Header) common.Hash {
 	return rlpHash(uncles)
 }
 
+// CalcRequestsHash creates the block requestsHash value for a list of requests.
+func CalcRequestsHash(requests [][]byte) common.Hash {
+	h1, h2 := sha256.New(), sha256.New()
+	var buf common.Hash
+	for _, item := range requests {
+		if len(item) > 1 { // skip items with only requestType and no data.
+			h1.Reset()
+			h1.Write(item)
+			h2.Write(h1.Sum(buf[:0]))
+		}
+	}
+	h2.Sum(buf[:0])
+	return buf
+}
+
+// NewBlockWithHeader creates a block with the given header data. The
+// header data is copied, changes to header and to the field values
+// will not affect the block.
+func NewBlockWithHeader(header *Header) *Block {
+	return &Block{header: CopyHeader(header)}
+}
+
 // WithSeal returns a new block with the data from b but the header replaced with
 // the sealed one.
 func (b *Block) WithSeal(header *Header) *Block {
-	cpy := *header
-
 	return &Block{
-		header:       &cpy,
+		header:       CopyHeader(header),
 		transactions: b.transactions,
 		uncles:       b.uncles,
 		withdrawals:  b.withdrawals,
+		witness:      b.witness,
 	}
 }
 
@@ -433,6 +506,7 @@ func (b *Block) WithBody(body Body) *Block {
 		transactions: slices.Clone(body.Transactions),
 		uncles:       make([]*Header, len(body.Uncles)),
 		withdrawals:  slices.Clone(body.Withdrawals),
+		witness:      b.witness,
 	}
 	for i := range body.Uncles {
 		block.uncles[i] = CopyHeader(body.Uncles[i])
@@ -440,24 +514,25 @@ func (b *Block) WithBody(body Body) *Block {
 	return block
 }
 
-// WithWithdrawals sets the withdrawal contents of a block, does not return a new block.
-func (b *Block) WithWithdrawals(withdrawals []*Withdrawal) *Block {
-	if withdrawals != nil {
-		b.withdrawals = make([]*Withdrawal, len(withdrawals))
-		copy(b.withdrawals, withdrawals)
+func (b *Block) WithWitness(witness *ExecutionWitness) *Block {
+	return &Block{
+		header:       b.header,
+		transactions: b.transactions,
+		uncles:       b.uncles,
+		withdrawals:  b.withdrawals,
+		witness:      witness,
 	}
-	return b
 }
 
 // Hash returns the keccak256 hash of b's header.
 // The hash is computed on the first call and cached thereafter.
 func (b *Block) Hash() common.Hash {
 	if hash := b.hash.Load(); hash != nil {
-		return hash.(common.Hash)
+		return *hash
 	}
-	v := b.header.Hash()
-	b.hash.Store(v)
-	return v
+	h := b.header.Hash()
+	b.hash.Store(&h)
+	return h
 }
 
 type Blocks []*Block

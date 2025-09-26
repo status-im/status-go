@@ -26,15 +26,10 @@ import (
 	"github.com/ethereum/go-ethereum/internal/debug"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
 )
-
-// PrivateAdminAPI is the collection of administrative API methods exposed only
-// over a secure RPC channel.
-type PrivateAdminAPI struct {
-	node *Node // Node interfaced by this API
-}
 
 // apis returns the collection of built-in RPC APIs.
 func (n *Node) apis() []rpc.API {
@@ -45,6 +40,9 @@ func (n *Node) apis() []rpc.API {
 		}, {
 			Namespace: "debug",
 			Service:   debug.Handler,
+		}, {
+			Namespace: "debug",
+			Service:   &p2pDebugAPI{n},
 		}, {
 			Namespace: "web3",
 			Service:   &web3API{n},
@@ -88,24 +86,6 @@ func (api *adminAPI) RemovePeer(url string) (bool, error) {
 		return false, fmt.Errorf("invalid enode: %v", err)
 	}
 	server.RemovePeer(node)
-	return true, nil
-}
-
-// DeletePeer disconnects and deletes forcefully a remote node.
-func (api *PrivateAdminAPI) DeletePeer(url string) (bool, error) {
-	// Make sure the server is running, fail otherwise
-	server := api.node.Server()
-	if server == nil {
-		return false, ErrNodeStopped
-	}
-	// Try to remove the url as a static peer and return
-	node, err := enode.ParseV4(url)
-	if err != nil {
-		return false, fmt.Errorf("invalid enode: %v", err)
-	}
-	if err := server.DeletePeer(node); err != nil {
-		return false, err
-	}
 	return true, nil
 }
 
@@ -169,8 +149,6 @@ func (api *adminAPI) PeerEvents(ctx context.Context) (*rpc.Subscription, error) 
 				return
 			case <-rpcSub.Err():
 				return
-			case <-notifier.Closed():
-				return
 			}
 		}
 	}()
@@ -200,6 +178,10 @@ func (api *adminAPI) StartHTTP(host *string, port *int, cors *string, apis *stri
 		CorsAllowedOrigins: api.node.config.HTTPCors,
 		Vhosts:             api.node.config.HTTPVirtualHosts,
 		Modules:            api.node.config.HTTPModules,
+		rpcEndpointConfig: rpcEndpointConfig{
+			batchItemLimit:         api.node.config.BatchRequestLimit,
+			batchResponseSizeLimit: api.node.config.BatchResponseMaxSize,
+		},
 	}
 	if cors != nil {
 		config.CorsAllowedOrigins = nil
@@ -209,7 +191,7 @@ func (api *adminAPI) StartHTTP(host *string, port *int, cors *string, apis *stri
 	}
 	if vhosts != nil {
 		config.Vhosts = nil
-		for _, vhost := range strings.Split(*host, ",") {
+		for _, vhost := range strings.Split(*vhosts, ",") {
 			config.Vhosts = append(config.Vhosts, strings.TrimSpace(vhost))
 		}
 	}
@@ -274,6 +256,10 @@ func (api *adminAPI) StartWS(host *string, port *int, allowedOrigins *string, ap
 		Modules: api.node.config.WSModules,
 		Origins: api.node.config.WSOrigins,
 		// ExposeAll: api.node.config.WSExposeAll,
+		rpcEndpointConfig: rpcEndpointConfig{
+			batchItemLimit:         api.node.config.BatchRequestLimit,
+			batchResponseSizeLimit: api.node.config.BatchResponseMaxSize,
+		},
 	}
 	if apis != nil {
 		config.Modules = nil
@@ -350,4 +336,17 @@ func (s *web3API) ClientVersion() string {
 // It assumes the input is hex encoded.
 func (s *web3API) Sha3(input hexutil.Bytes) hexutil.Bytes {
 	return crypto.Keccak256(input)
+}
+
+// p2pDebugAPI provides access to p2p internals for debugging.
+type p2pDebugAPI struct {
+	stack *Node
+}
+
+func (s *p2pDebugAPI) DiscoveryV4Table() [][]discover.BucketNode {
+	disc := s.stack.server.DiscoveryV4()
+	if disc != nil {
+		return disc.TableBuckets()
+	}
+	return nil
 }
