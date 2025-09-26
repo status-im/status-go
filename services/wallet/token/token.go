@@ -74,6 +74,9 @@ type ManagerInterface interface {
 	LookupTokenIdentity(chainID uint64, address common.Address, native bool) *tokenTypes.Token
 	LookupToken(chainID *uint64, tokenSymbol string) (token *tokenTypes.Token, isNative bool)
 	GetTokensByChainIDs(chainIDs []uint64) ([]*tokenTypes.Token, error)
+	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) *tokenTypes.Token
+	MarkAsPreviouslyOwnedToken(token *tokenTypes.Token, owner common.Address) (bool, error)
+	SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *tokenTypes.Token, isFirst bool)
 }
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
