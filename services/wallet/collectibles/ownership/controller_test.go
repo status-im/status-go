@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
@@ -18,12 +17,12 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles/ownership"
 	mock_ownership "github.com/status-im/status-go/services/wallet/collectibles/ownership/mock"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	mock_common "github.com/status-im/status-go/services/wallet/common/mock"
+	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/transfer"
-	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
+
+	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 
 	"github.com/stretchr/testify/require"
 
@@ -70,20 +69,20 @@ func TestControllerMultipleAccountsAddedEvent(t *testing.T) {
 			return emptyCollectiblesContainer, nil
 		}).AnyTimes()
 
-	feed := new(event.Feed)
-	feedSub := mock_common.NewFeedSubscription(feed)
-	defer feedSub.Close()
-
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
 	publisher := pubsub.NewPublisher()
-
 	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
 
 	controller := ownership.NewController(
 		ownership.NewOwnershipDB(walletDB),
-		feed,
 		accountsProvider,
 		accountsPublisher,
 		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
 		ownershipFetcher,
 		publisher,
 		logger,
@@ -121,7 +120,7 @@ func TestControllerMultipleAccountsAddedEvent(t *testing.T) {
 	controller.Stop()
 }
 
-func TestControllerWalletEventsWatcher(t *testing.T) {
+func TestControllerMultiStandardBalanceEvents(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -157,19 +156,20 @@ func TestControllerWalletEventsWatcher(t *testing.T) {
 			return emptyCollectiblesContainer, nil
 		}).AnyTimes()
 
-	feed := new(event.Feed)
-	feedSub := mock_common.NewFeedSubscription(feed)
-	defer feedSub.Close()
-
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
 	publisher := pubsub.NewPublisher()
 	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
 
 	controller := ownership.NewController(
 		ownershipDB,
-		feed,
 		accountsProvider,
 		accountsPublisher,
 		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
 		ownershipFetcher,
 		publisher,
 		logger,
@@ -199,13 +199,21 @@ func TestControllerWalletEventsWatcher(t *testing.T) {
 	}, 1*time.Second, 100*time.Millisecond)
 
 	// Test ERC721 transfer event
-	erc721Event := walletevent.Event{
-		Type:     transfer.EventInternalERC721TransferDetected,
-		ChainID:  1,
-		Accounts: []common.Address{common.Address(fakeAddress)},
-		At:       time.Now().Unix(),
+	erc721Event := multistandardbalance.EventBalanceFetchFinished{
+		Key: multistandardbalance.BalancesKey{
+			ChainID: 1,
+			Account: common.Address(fakeAddress),
+		},
+		ResultType:     multistandardfetcher.ResultTypeERC721,
+		BalanceChanged: true,
+		OldState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix() - 1000,
+		},
+		NewState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix(),
+		},
 	}
-	feed.Send(erc721Event)
+	pubsub.Publish(multistandardBalancePublisher, erc721Event)
 
 	// Check that the controller eventually reaches the delayed state
 	require.Eventually(t, func() bool {
@@ -226,13 +234,21 @@ func TestControllerWalletEventsWatcher(t *testing.T) {
 	}, 1*time.Second, 100*time.Millisecond)
 
 	// Test ERC1155 transfer event
-	erc1155Event := walletevent.Event{
-		Type:     transfer.EventInternalERC1155TransferDetected,
-		ChainID:  1,
-		Accounts: []common.Address{common.Address(fakeAddress)},
-		At:       time.Now().Unix(),
+	erc1155Event := multistandardbalance.EventBalanceFetchFinished{
+		Key: multistandardbalance.BalancesKey{
+			ChainID: 1,
+			Account: common.Address(fakeAddress),
+		},
+		ResultType:     multistandardfetcher.ResultTypeERC1155,
+		BalanceChanged: true,
+		OldState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix() - 1000,
+		},
+		NewState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix(),
+		},
 	}
-	feed.Send(erc1155Event)
+	pubsub.Publish(multistandardBalancePublisher, erc1155Event)
 
 	// Check that the controller eventually reaches the delayed state
 	require.Eventually(t, func() bool {
@@ -253,23 +269,62 @@ func TestControllerWalletEventsWatcher(t *testing.T) {
 	}, 1*time.Second, 100*time.Millisecond)
 
 	// Test too old transfer detected event (should not trigger refetch)
-	tooOldEvent := walletevent.Event{
-		Type:     transfer.EventInternalERC721TransferDetected,
-		ChainID:  1,
-		Accounts: []common.Address{common.Address(fakeAddress)},
-		At:       time.Now().Unix() - 1000,
+	tooOldEvent := multistandardbalance.EventBalanceFetchFinished{
+		Key: multistandardbalance.BalancesKey{
+			ChainID: 1,
+			Account: common.Address(fakeAddress),
+		},
+		ResultType:     multistandardfetcher.ResultTypeERC721,
+		BalanceChanged: true,
+		OldState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix() - 2000 - 30*60,
+		},
+		NewState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix() - 1000 - 30*60,
+		},
 	}
-	feed.Send(tooOldEvent)
+	pubsub.Publish(multistandardBalancePublisher, tooOldEvent)
+
+	time.Sleep(100 * time.Millisecond)
+
 	require.Equal(t, ownership.LoaderStateIdle, controller.GetLoaderState(walletCommon.ChainID(1), common.Address(fakeAddress)))
 
 	// Test non-relevant event (should not trigger refetch)
-	nonRelevantEvent := walletevent.Event{
-		Type:     "non-relevant-event",
-		ChainID:  1,
-		Accounts: []common.Address{common.Address(fakeAddress)},
-		At:       time.Now().Unix(),
-	}
-	feed.Send(nonRelevantEvent)
+	pubsub.Publish(multistandardBalancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key: multistandardbalance.BalancesKey{
+			ChainID: 1,
+			Account: common.Address(fakeAddress),
+		},
+		ResultType:     multistandardfetcher.ResultTypeNative, // Native balance fetch
+		BalanceChanged: true,
+		OldState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix() - 1000,
+		},
+		NewState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix(),
+		},
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	require.Equal(t, ownership.LoaderStateIdle, controller.GetLoaderState(walletCommon.ChainID(1), common.Address(fakeAddress)))
+
+	pubsub.Publish(multistandardBalancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key: multistandardbalance.BalancesKey{
+			ChainID: 1,
+			Account: common.Address(fakeAddress),
+		},
+		ResultType:     multistandardfetcher.ResultTypeERC721,
+		BalanceChanged: false, // Balance unchanged
+		OldState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix() - 1000,
+		},
+		NewState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix(),
+		},
+	})
+
+	time.Sleep(100 * time.Millisecond)
 
 	require.Equal(t, ownership.LoaderStateIdle, controller.GetLoaderState(walletCommon.ChainID(1), common.Address(fakeAddress)))
 
@@ -308,19 +363,20 @@ func TestControllerNetworkEventsWatcher(t *testing.T) {
 			return emptyCollectiblesContainer, nil
 		}).AnyTimes()
 
-	feed := new(event.Feed)
-	feedSub := mock_common.NewFeedSubscription(feed)
-	defer feedSub.Close()
-
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
 	publisher := pubsub.NewPublisher()
 	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
 
 	controller := ownership.NewController(
 		ownership.NewOwnershipDB(walletDB),
-		feed,
 		accountsProvider,
 		accountsPublisher,
 		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
 		ownershipFetcher,
 		publisher,
 		logger,
@@ -480,19 +536,20 @@ func TestControllerTriggerLoad(t *testing.T) {
 		gomock.Any(),
 	).Return(collectiblesContainer999, nil).Times(1)
 
-	feed := new(event.Feed)
-	feedSub := mock_common.NewFeedSubscription(feed)
-	defer feedSub.Close()
-
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
 	publisher := pubsub.NewPublisher()
 	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
 
 	controller := ownership.NewController(
 		ownership.NewOwnershipDB(walletDB),
-		feed,
 		accountsProvider,
 		accountsPublisher,
 		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
 		ownershipFetcher,
 		publisher,
 		logger,
@@ -576,19 +633,20 @@ func TestControllerAccountsEvents(t *testing.T) {
 			return emptyCollectiblesContainer, nil
 		}).AnyTimes()
 
-	feed := new(event.Feed)
-	feedSub := mock_common.NewFeedSubscription(feed)
-	defer feedSub.Close()
-
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
 	publisher := pubsub.NewPublisher()
 	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
 
 	controller := ownership.NewController(
 		ownership.NewOwnershipDB(walletDB),
-		feed,
 		accountsProvider,
 		accountsPublisher,
 		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
 		ownershipFetcher,
 		publisher,
 		logger,
@@ -698,19 +756,20 @@ func TestControllerPeriodicalLoads(t *testing.T) {
 			return emptyCollectiblesContainer, nil
 		}).AnyTimes()
 
-	feed := new(event.Feed)
-	feedSub := mock_common.NewFeedSubscription(feed)
-	defer feedSub.Close()
-
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
 	publisher := pubsub.NewPublisher()
 	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
 
 	controller := ownership.NewController(
 		ownership.NewOwnershipDB(walletDB),
-		feed,
 		accountsProvider,
 		accountsPublisher,
 		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
 		ownershipFetcher,
 		publisher,
 		logger,

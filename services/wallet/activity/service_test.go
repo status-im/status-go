@@ -18,7 +18,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
@@ -107,13 +106,6 @@ func setupTransactions(t *testing.T, state testState, txCount int, testTxs []tra
 	for _, p := range pendings {
 		allAddresses = append(allAddresses, p.From, p.To)
 	}
-
-	txs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, state.service.db, len(pendings), txCount)
-	for i := range txs {
-		transfer.InsertTestTransfer(t, state.service.db, txs[i].To, &txs[i])
-	}
-
-	allAddresses = append(append(allAddresses, fromTrs...), toTrs...)
 
 	state.tokenMock.EXPECT().LookupTokenIdentity(gomock.Any(), gomock.Any(), gomock.Any()).Return(
 		&tokenTypes.Token{

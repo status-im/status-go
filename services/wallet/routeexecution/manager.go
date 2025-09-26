@@ -32,16 +32,14 @@ const (
 type Manager struct {
 	router             *router.Router
 	transactionManager *transfer.TransactionManager
-	transferController *transfer.Controller
 	db                 *storage.DB
 	eventFeed          *event.Feed
 }
 
-func NewManager(walletDB *sql.DB, eventFeed *event.Feed, router *router.Router, transactionManager *transfer.TransactionManager, transferController *transfer.Controller) *Manager {
+func NewManager(walletDB *sql.DB, eventFeed *event.Feed, router *router.Router, transactionManager *transfer.TransactionManager) *Manager {
 	return &Manager{
 		router:             router,
 		transactionManager: transactionManager,
-		transferController: transferController,
 		db:                 storage.NewDB(walletDB),
 		eventFeed:          eventFeed,
 	}
