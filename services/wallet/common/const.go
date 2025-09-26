@@ -129,10 +129,15 @@ func IsSupportedChainID(chainID uint64) bool {
 var AverageBlockDurationForChain = map[ChainID]time.Duration{
 	ChainID(UnknownChainID):       time.Duration(12000) * time.Millisecond,
 	ChainID(EthereumMainnet):      time.Duration(12000) * time.Millisecond,
+	ChainID(EthereumSepolia):      time.Duration(12000) * time.Millisecond,
 	ChainID(OptimismMainnet):      time.Duration(2000) * time.Millisecond,
+	ChainID(OptimismSepolia):      time.Duration(2000) * time.Millisecond,
 	ChainID(ArbitrumMainnet):      time.Duration(250) * time.Millisecond,
+	ChainID(ArbitrumSepolia):      time.Duration(250) * time.Millisecond,
 	ChainID(BaseMainnet):          time.Duration(2000) * time.Millisecond,
+	ChainID(BaseSepolia):          time.Duration(2000) * time.Millisecond,
 	ChainID(BSCMainnet):           time.Duration(3000) * time.Millisecond,
+	ChainID(BSCTestnet):           time.Duration(3000) * time.Millisecond,
 	ChainID(StatusNetworkSepolia): time.Duration(2000) * time.Millisecond,
 }
 
