@@ -28,6 +28,8 @@ import (
 	"github.com/status-im/status-go/rpc/chain/tagger"
 	"github.com/status-im/status-go/services/rpcstats"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+
+	sdkethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
 )
 
 type ClientInterface interface {
@@ -239,12 +241,12 @@ type MakeCallFunctor struct {
 	Func       func(client ethclient.EthClientInterface) (interface{}, error)
 }
 
-func (c *ClientWithFallback) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
+func (c *ClientWithFallback) EthGetBlockByHashWithFullTxs(ctx context.Context, hash common.Hash) (*sdkethclient.BlockWithFullTxs, error) {
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
-			MethodName: "eth_BlockByHash",
+			MethodName: "eth_GetBlockByHashWithFullTxs",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
-				return client.BlockByHash(ctx, hash)
+				return client.EthGetBlockByHashWithFullTxs(ctx, hash)
 			},
 		},
 	)
@@ -252,15 +254,15 @@ func (c *ClientWithFallback) BlockByHash(ctx context.Context, hash common.Hash) 
 		return nil, err
 	}
 
-	return res.(*types.Block), nil
+	return res.(*sdkethclient.BlockWithFullTxs), nil
 }
 
-func (c *ClientWithFallback) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
+func (c *ClientWithFallback) EthGetBlockByNumberWithFullTxs(ctx context.Context, number *big.Int) (*sdkethclient.BlockWithFullTxs, error) {
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
-			MethodName: "eth_BlockByNumber",
+			MethodName: "eth_EthGetBlockByNumberWithFullTxs",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
-				return client.BlockByNumber(ctx, number)
+				return client.EthGetBlockByNumberWithFullTxs(ctx, number)
 			},
 		},
 	)
@@ -268,7 +270,7 @@ func (c *ClientWithFallback) BlockByNumber(ctx context.Context, number *big.Int)
 		return nil, err
 	}
 
-	return res.(*types.Block), nil
+	return res.(*sdkethclient.BlockWithFullTxs), nil
 }
 
 func (c *ClientWithFallback) BlockNumber(ctx context.Context) (uint64, error) {
@@ -287,22 +289,6 @@ func (c *ClientWithFallback) BlockNumber(ctx context.Context) (uint64, error) {
 	return res.(uint64), nil
 }
 
-func (c *ClientWithFallback) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
-	res, err := c.makeCall(
-		ctx, MakeCallFunctor{
-			MethodName: "eth_HeaderByHash",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
-				return client.HeaderByHash(ctx, hash)
-			},
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return res.(*types.Header), nil
-}
-
 func (c *ClientWithFallback) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
@@ -319,46 +305,12 @@ func (c *ClientWithFallback) HeaderByNumber(ctx context.Context, number *big.Int
 	return res.(*types.Header), nil
 }
 
-func (c *ClientWithFallback) TransactionByHash(ctx context.Context, hash common.Hash) (*types.Transaction, bool, error) {
+func (c *ClientWithFallback) EthGetBlockByHashWithTxHashes(ctx context.Context, hash common.Hash) (*sdkethclient.BlockWithTxHashes, error) {
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
-			MethodName: "eth_TransactionByHash",
+			MethodName: "eth_HeaderByHash",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
-				tx, isPending, err := client.TransactionByHash(ctx, hash)
-				return []any{tx, isPending}, err
-			},
-		},
-	)
-	if err != nil {
-		return nil, false, err
-	}
-
-	resArr := res.([]any)
-	return resArr[0].(*types.Transaction), resArr[1].(bool), nil
-}
-
-func (c *ClientWithFallback) TransactionSender(ctx context.Context, tx *types.Transaction, block common.Hash, index uint) (common.Address, error) {
-	res, err := c.makeCall(
-		ctx, MakeCallFunctor{
-			MethodName: "eth_TransactionSender",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
-				return client.TransactionSender(ctx, tx, block, index)
-			},
-		},
-	)
-	if err != nil {
-		return common.Address{}, err
-	}
-
-	return res.(common.Address), nil
-}
-
-func (c *ClientWithFallback) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
-	res, err := c.makeCall(
-		ctx, MakeCallFunctor{
-			MethodName: "eth_TransactionReceipt",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
-				return client.TransactionReceipt(ctx, txHash)
+				return client.EthGetBlockByHashWithTxHashes(ctx, hash)
 			},
 		},
 	)
@@ -366,7 +318,57 @@ func (c *ClientWithFallback) TransactionReceipt(ctx context.Context, txHash comm
 		return nil, err
 	}
 
-	return res.(*types.Receipt), nil
+	return res.(*sdkethclient.BlockWithTxHashes), nil
+}
+
+func (c *ClientWithFallback) EthGetBlockByNumberWithTxHashes(ctx context.Context, number *big.Int) (*sdkethclient.BlockWithTxHashes, error) {
+	res, err := c.makeCall(
+		ctx, MakeCallFunctor{
+			MethodName: "eth_HeaderByNumber",
+			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+				return client.EthGetBlockByNumberWithTxHashes(ctx, number)
+			},
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.(*sdkethclient.BlockWithTxHashes), nil
+}
+
+func (c *ClientWithFallback) EthGetTransactionByHash(ctx context.Context, hash common.Hash) (*sdkethclient.Transaction, error) {
+	res, err := c.makeCall(
+		ctx, MakeCallFunctor{
+			MethodName: "eth_TransactionByHash",
+			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+				tx, err := client.EthGetTransactionByHash(ctx, hash)
+				return []any{tx}, err
+			},
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	resArr := res.([]any)
+	return resArr[0].(*sdkethclient.Transaction), nil
+}
+
+func (c *ClientWithFallback) EthGetTransactionReceipt(ctx context.Context, txHash common.Hash) (*sdkethclient.Receipt, error) {
+	res, err := c.makeCall(
+		ctx, MakeCallFunctor{
+			MethodName: "eth_GetTransactionReceipt",
+			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+				return client.EthGetTransactionReceipt(ctx, txHash)
+			},
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.(*sdkethclient.Receipt), nil
 }
 
 func (c *ClientWithFallback) SyncProgress(ctx context.Context) (*ethereum.SyncProgress, error) {
