@@ -157,10 +157,6 @@ func (m *MessengerSignalsHandler) DiscordChannelImportCancelled(id string) {
 	signal.SendDiscordChannelImportCancelled(id)
 }
 
-func (m *MessengerSignalsHandler) SendWakuFetchingBackupProgress(response *wakusync.WakuBackedUpDataResponse) {
-	signal.SendWakuFetchingBackupProgress(response)
-}
-
 func (m *MessengerSignalsHandler) SendWakuBackedUpProfile(response *wakusync.WakuBackedUpDataResponse) {
 	signal.SendWakuBackedUpProfile(response)
 }

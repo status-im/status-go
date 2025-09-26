@@ -2,14 +2,12 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	errorsLib "errors"
 
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -81,46 +79,6 @@ func (m *Messenger) syncSettings(rawMessageHandler RawMessageHandler) error {
 	}
 
 	return nil
-}
-
-// extractSyncSetting parses incoming *protobuf.SyncSetting and stores the setting data if needed
-func (m *Messenger) extractAndSaveSyncSetting(syncSetting *protobuf.SyncSetting) (*settings.SyncSettingField, error) {
-	sf, err := settings.GetFieldFromProtobufType(syncSetting.Type)
-	if err != nil {
-		m.logger.Error(
-			"extractSyncSetting - settings.GetFieldFromProtobufType",
-			zap.Error(err),
-			zap.Any("syncSetting", syncSetting),
-		)
-		return nil, err
-	}
-
-	spf := sf.SyncProtobufFactory()
-	if spf == nil {
-		m.logger.Warn("extractSyncSetting - received protobuf for setting with no SyncProtobufFactory", zap.Any("SettingField", sf))
-		return nil, nil
-	}
-	if spf.Inactive() {
-		m.logger.Warn("extractSyncSetting - received protobuf for inactive sync setting", zap.Any("SettingField", sf))
-		return nil, nil
-	}
-
-	value := spf.ExtractValueFromProtobuf()(syncSetting)
-
-	err = m.settings.SaveSyncSetting(sf, value, syncSetting.Clock)
-	if err == errors.ErrNewClockOlderThanCurrent {
-		m.logger.Info("extractSyncSetting - SaveSyncSetting :", zap.Error(err))
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	if v, ok := value.([]byte); ok {
-		value = json.RawMessage(v)
-	}
-
-	return &settings.SyncSettingField{SettingField: sf, Value: value}, nil
 }
 
 // startSyncSettingsLoop watches the m.settings.SyncQueue and sends a sync message in response to a settings update

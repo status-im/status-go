@@ -54,7 +54,6 @@ type MessengerSignalsHandler interface {
 	DiscordChannelImportProgress(importProgress *discord.ImportProgress)
 	DiscordChannelImportFinished(communityID string, channelID string)
 	DiscordChannelImportCancelled(channelID string)
-	SendWakuFetchingBackupProgress(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpProfile(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpSettings(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpKeypair(response *wakusync.WakuBackedUpDataResponse)

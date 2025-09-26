@@ -2,10 +2,8 @@ package signal
 
 import "encoding/json"
 
+// TODO rename those events to remove the waku part as we are not using waku anymore for backups
 const (
-	// EventWakuFetchingBackupProgress is emitted while applying fetched data is ongoing
-	EventWakuFetchingBackupProgress = "waku.fetching.backup.progress"
-
 	// EventSyncFromWakuProfile is emitted while applying fetched profile data from waku
 	EventWakuBackedUpProfile = "waku.backedup.profile"
 
@@ -18,10 +16,6 @@ const (
 	// EventWakuBackedUpWatchOnlyAccount is emitted while applying fetched watch only account data from waku
 	EventWakuBackedUpWatchOnlyAccount = "waku.backedup.watch-only-account" // #nosec G101
 )
-
-func SendWakuFetchingBackupProgress(obj json.Marshaler) {
-	send(EventWakuFetchingBackupProgress, obj)
-}
 
 func SendWakuBackedUpProfile(obj json.Marshaler) {
 	send(EventWakuBackedUpProfile, obj)

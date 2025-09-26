@@ -2418,7 +2418,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState, message *prot
 }
 
 func (m *Messenger) HandleSyncSetting(messageState *ReceivedMessageState, message *protobuf.SyncSetting, statusMessage *messagingtypes.Message) error {
-	settingField, err := m.extractAndSaveSyncSetting(message)
+	settingField, err := syncing.ExtractAndSaveSyncSetting(m.settings, m.logger, message)
 	if err != nil {
 		return err
 	}

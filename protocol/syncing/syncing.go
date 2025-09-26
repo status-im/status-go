@@ -1,7 +1,10 @@
 package syncing
 
 import (
+	"encoding/json"
 	"errors"
+
+	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
@@ -9,10 +12,15 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	maErrors "github.com/status-im/status-go/multiaccounts/errors"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 )
+
+// TODO move this code out of the protocol package
+// https://github.com/status-im/status-go/pull/6967#discussion_r2391383496
 
 var (
 	ErrNotWatchOnlyAccount           = errors.New("an account is not a watch only account")
@@ -95,4 +103,44 @@ func HandleSyncWatchOnlyAccount(accountsDB *accounts.Database, message *protobuf
 		}
 	}
 	return acc, nil
+}
+
+// extractSyncSetting parses incoming *protobuf.SyncSetting and stores the setting data if needed
+func ExtractAndSaveSyncSetting(accountsDB *accounts.Database, logger *zap.Logger, syncSetting *protobuf.SyncSetting) (*settings.SyncSettingField, error) {
+	sf, err := settings.GetFieldFromProtobufType(syncSetting.Type)
+	if err != nil {
+		logger.Error(
+			"extractSyncSetting - settings.GetFieldFromProtobufType",
+			zap.Error(err),
+			zap.Any("syncSetting", syncSetting),
+		)
+		return nil, err
+	}
+
+	spf := sf.SyncProtobufFactory()
+	if spf == nil {
+		logger.Warn("extractSyncSetting - received protobuf for setting with no SyncProtobufFactory")
+		return nil, nil
+	}
+	if spf.Inactive() {
+		logger.Warn("extractSyncSetting - received protobuf for inactive sync setting")
+		return nil, nil
+	}
+
+	value := spf.ExtractValueFromProtobuf()(syncSetting)
+
+	err = accountsDB.SaveSyncSetting(sf, value, syncSetting.Clock)
+	if err == maErrors.ErrNewClockOlderThanCurrent {
+		logger.Info("extractSyncSetting - SaveSyncSetting :", zap.Error(err))
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if v, ok := value.([]byte); ok {
+		value = json.RawMessage(v)
+	}
+
+	return &settings.SyncSettingField{SettingField: sf, Value: value}, nil
 }

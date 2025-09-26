@@ -174,53 +174,6 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 	return err
 }
 
-// TODO move this to the AccountsService
-func (m *Messenger) HandleBackedUpSettings(message *protobuf.SyncSetting) error {
-	if message == nil {
-		return nil
-	}
-
-	// DisplayName is recovered via `protobuf.BackedUpProfile` message
-	if message.GetType() == protobuf.SyncSetting_DISPLAY_NAME {
-		return nil
-	}
-
-	settingField, err := m.extractAndSaveSyncSetting(message)
-	if err != nil {
-		m.logger.Warn("failed to handle SyncSetting from backed up message", zap.Error(err))
-		return nil
-	}
-
-	if settingField != nil {
-		if message.GetType() == protobuf.SyncSetting_PREFERRED_NAME && message.GetValueString() != "" {
-			displayNameClock, err := m.settings.GetSettingLastSynced(settings.DisplayName)
-			if err != nil {
-				m.logger.Warn("failed to get last synced clock for display name", zap.Error(err))
-				return nil
-			}
-			// there is a race condition between display name and preferred name on updating m.account.Name, so we need to check the clock
-			// there is also a similar check within SaveSyncDisplayName
-			if displayNameClock < message.GetClock() {
-				m.account.Name = message.GetValueString()
-				err = m.multiAccounts.SaveAccount(*m.account)
-				if err != nil {
-					m.logger.Warn("[HandleBackedUpSettings] failed to save account", zap.Error(err))
-					return nil
-				}
-			}
-		}
-
-		if m.config.messengerSignalsHandler != nil {
-			response := wakusync.WakuBackedUpDataResponse{
-				Setting: settingField,
-			}
-			m.config.messengerSignalsHandler.SendWakuBackedUpSettings(&response)
-		}
-	}
-
-	return nil
-}
-
 func syncInstallationCommunitiesSet(communities []*protobuf.SyncInstallationCommunity) map[string]*protobuf.SyncInstallationCommunity {
 	ret := map[string]*protobuf.SyncInstallationCommunity{}
 	for _, c := range communities {
@@ -248,6 +201,15 @@ func (m *Messenger) handleLocalBackupCommunities(state *ReceivedMessageState, co
 	}
 
 	return errors
+}
+
+func (m *Messenger) PublishSettingEvent(settingField *settings.SyncSettingField) {
+	if m.config.messengerSignalsHandler != nil {
+		response := wakusync.WakuBackedUpDataResponse{
+			Setting: settingField,
+		}
+		m.config.messengerSignalsHandler.SendWakuBackedUpSettings(&response)
+	}
 }
 
 func (m *Messenger) requestCommunityKeysAndSharedAddresses(syncCommunity *protobuf.SyncInstallationCommunity) error {
