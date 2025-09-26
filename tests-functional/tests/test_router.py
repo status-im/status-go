@@ -96,16 +96,15 @@ class TestRouter:
         wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Route"][0]["ApprovalRequired"], routes["Route"])
 
         # Step: update gas fee mode without providing path tx identity params via wallet_setFeeMode endpoint
-        method = "wallet_setFeeMode"
         with pytest.raises(ApiResponseError, match=re.escape("transaction identity not provided")):
-            self.rpc_client.rpc_valid_request(method, [None, gas_fee_mode])
+            self.rpc_client.wallet_service.set_fee_mode(None, gas_fee_mode)
 
         # Step: update gas fee mode with incomplete details for path tx identity params via wallet_setFeeMode endpoint
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
         }
         with pytest.raises(ApiResponseError, match=re.escape("Error:Field validation")):
-            self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
+            self.rpc_client.wallet_service.set_fee_mode(tx_identity_params, gas_fee_mode)
 
         # Step: update gas fee mode to low
         gas_fee_mode = constants.gas_fee_mode_low
@@ -116,7 +115,7 @@ class TestRouter:
             "isApprovalTx": routes["Route"][0]["ApprovalRequired"],
         }
         self.rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
-        _ = self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
+        _ = self.rpc_client.wallet_service.set_fee_mode(tx_identity_params, gas_fee_mode)
         response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
         routes = response["event"]
         assert len(routes["Route"]) > 0
@@ -125,7 +124,7 @@ class TestRouter:
         # Step: update gas fee mode to high
         gas_fee_mode = constants.gas_fee_mode_high
         self.rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
-        _ = self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
+        _ = self.rpc_client.wallet_service.set_fee_mode(tx_identity_params, gas_fee_mode)
         response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
         routes = response["event"]
         assert len(routes["Route"]) > 0
@@ -134,7 +133,7 @@ class TestRouter:
         # Step: try to set custom gas fee mode via wallet_setFeeMode endpoint
         gas_fee_mode = constants.gas_fee_mode_custom
         with pytest.raises(ApiResponseError, match=re.escape("custom fee mode cannot be set this way")):
-            self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
+            self.rpc_client.wallet_service.set_fee_mode(tx_identity_params, gas_fee_mode)
 
     def test_setting_custom_fee_mode(self):
         uuid = str(uuid_lib.uuid4())
@@ -162,16 +161,15 @@ class TestRouter:
         wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Route"][0]["ApprovalRequired"], routes["Route"])
 
         # Step: try to set custom tx details with empty params via wallet_setCustomTxDetails endpoint
-        method = "wallet_setCustomTxDetails"
         with pytest.raises(ApiResponseError, match=re.escape("transaction identity not provided")):
-            self.rpc_client.rpc_valid_request(method, [None, None])
+            self.rpc_client.wallet_service.set_custom_tx_details(None, None)
 
         # Step: try to set custom tx details with incomplete details for path tx identity params via wallet_setCustomTxDetails endpoint
         tx_identity_params = {
             "routerInputParamsUuid": uuid,
         }
         with pytest.raises(ApiResponseError, match=re.escape("Error:Field validation")):
-            self.rpc_client.rpc_valid_request(method, [tx_identity_params, None])
+            self.rpc_client.wallet_service.set_custom_tx_details(tx_identity_params, None)
 
         # Step: try to set custom tx details providing other than the custom gas fee mode via wallet_setCustomTxDetails endpoint
         tx_identity_params = {
@@ -184,14 +182,14 @@ class TestRouter:
             "gasFeeMode": constants.gas_fee_mode_low,
         }
         with pytest.raises(ApiResponseError, match=re.escape("only custom fee mode can be set this way")):
-            self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
+            self.rpc_client.wallet_service.set_custom_tx_details(tx_identity_params, tx_custom_params)
 
         # Step: try to set custom tx details without providing maxFeesPerGas via wallet_setCustomTxDetails endpoint
         tx_custom_params = {
             "gasFeeMode": gas_fee_mode,
         }
         with pytest.raises(ApiResponseError, match=re.escape("only custom fee mode can be set this way")):
-            self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
+            self.rpc_client.wallet_service.set_custom_tx_details(tx_identity_params, tx_custom_params)
 
         # Step: try to set custom tx details without providing PriorityFee via wallet_setCustomTxDetails endpoint
         tx_custom_params = {
@@ -199,7 +197,7 @@ class TestRouter:
             "maxFeesPerGas": "0x77359400",
         }
         with pytest.raises(ApiResponseError, match=re.escape("only custom fee mode can be set this way")):
-            self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
+            self.rpc_client.wallet_service.set_custom_tx_details(tx_identity_params, tx_custom_params)
 
         # Step: try to set custom tx details via wallet_setCustomTxDetails endpoint
         gas_fee_mode = constants.gas_fee_mode_custom
@@ -221,7 +219,7 @@ class TestRouter:
             "priorityFee": tx_priority_fee,
         }
         self.rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
-        _ = self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
+        _ = self.rpc_client.wallet_service.set_custom_tx_details(tx_identity_params, tx_custom_params)
         response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
         routes = response["event"]
         assert len(routes["Route"]) > 0

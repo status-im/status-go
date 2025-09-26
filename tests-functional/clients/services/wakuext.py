@@ -348,6 +348,26 @@ class WakuextService(Service):
         response = self.rpc_request("setUserStatus", params)
         return response
 
+    def set_bio(self, bio: str):
+        params = [bio]
+        response = self.rpc_request("setBio", params)
+        return response
+
+    def set_customization_color(self, color: str, key_uid: str):
+        params = [{"customizationColor": color, "keyUid": key_uid}]
+        response = self.rpc_request("setCustomizationColor", params)
+        return response
+
+    def set_syncing_on_mobile_network(self, enabled: bool):
+        params = [{"enabled": enabled}]
+        response = self.rpc_request("setSyncingOnMobileNetwork", params)
+        return response
+
+    def toggle_peer_syncing(self, enabled: bool):
+        args = {"enabled": enabled}
+        response = self.rpc_request("togglePeerSyncing", [args])
+        return response
+
     def status_updates(self):
         params = []
         response = self.rpc_request("statusUpdates", params)
@@ -501,9 +521,61 @@ class WakuextService(Service):
             "limit": limit,
         }
         if read_type is not None:
-            params["readType"] = read_type.value
+            params["readType"] = read_type
 
         response = self.rpc_request(method="activityCenterNotifications", params=[params])
+        return response
+
+    def activity_center_notifications_count(
+        self, activity_types: list = list(ActivityCenterNotificationType), read_type: Union[ActivityCenterQueryParamsRead, None] = None
+    ):
+        params = [{"activityTypes": activity_types, "readType": read_type}]
+        response = self.rpc_request("activityCenterNotificationsCount", params)
+        return response
+
+    def has_unseen_activity_center_notifications(self):
+        params = []
+        response = self.rpc_request("hasUnseenActivityCenterNotifications", params)
+        return response
+
+    def mark_as_seen_activity_center_notifications(self):
+        params = []
+        response = self.rpc_request("markAsSeenActivityCenterNotifications", params)
+        return response
+
+    def mark_activity_center_notifications_read(self, message_id: str):
+        params = [message_id]
+        response = self.rpc_request("markActivityCenterNotificationsRead", params)
+        return response
+
+    def mark_activity_center_notifications_unread(self, message_id: str):
+        params = [message_id]
+        response = self.rpc_request("markActivityCenterNotificationsUnread", params)
+        return response
+
+    def mark_all_activity_center_notifications_read(self):
+        params = []
+        response = self.rpc_request("markAllActivityCenterNotificationsRead", params)
+        return response
+
+    def accept_activity_center_notifications(self, message_id: str):
+        params = [message_id]
+        response = self.rpc_request("acceptActivityCenterNotifications", params)
+        return response
+
+    def dismiss_activity_center_notifications(self, message_id: str):
+        params = [message_id]
+        response = self.rpc_request("dismissActivityCenterNotifications", params)
+        return response
+
+    def delete_activity_center_notifications(self, message_id: str):
+        params = [message_id]
+        response = self.rpc_request("deleteActivityCenterNotifications", params)
+        return response
+
+    def get_activity_center_state(self):
+        params = []
+        response = self.rpc_request("getActivityCenterState", params)
         return response
 
     def peer_id(self):
@@ -511,7 +583,12 @@ class WakuextService(Service):
         response = self.rpc_request("peerID", params)
         return response
 
-    def send_emoji_reaction(self, chat_id: str, message_id: str, emoji: str):
+    def send_emoji_reaction(self, receiver_chat_id: str, message_id: str, emoji_id: int):
+        params = [receiver_chat_id, message_id, emoji_id]
+        response = self.rpc_request(method="sendEmojiReaction", params=params)
+        return response
+
+    def send_emoji_reaction_v2(self, chat_id: str, message_id: str, emoji: str):
         params = [chat_id, message_id, emoji]
         response = self.rpc_request(method="sendEmojiReactionV2", params=params)
         return response
@@ -519,4 +596,71 @@ class WakuextService(Service):
     def send_emoji_reaction_retraction(self, last_emoji_id: str):
         params = [last_emoji_id]
         response = self.rpc_request(method="sendEmojiReactionRetraction", params=params)
+        return response
+
+    def emoji_reactions_by_chat_id(self, sender_chat_id: str, limit: int):
+        params = [sender_chat_id, None, limit]
+        response = self.rpc_request(method="emojiReactionsByChatID", params=params)
+        return response
+
+    def emoji_reactions_by_chat_id_message_id(self, sender_chat_id: str, message_id: str):
+        params = [sender_chat_id, message_id]
+        response = self.rpc_request(method="emojiReactionsByChatIDMessageID", params=params)
+        return response
+
+    def get_saved_addresses(self, params=[]):
+        response = self.rpc_request("getSavedAddresses", params)
+        return response
+
+    def get_saved_addresses_per_mode(self, is_test: bool):
+        params = [is_test]
+        response = self.rpc_request("getSavedAddressesPerMode", params)
+        return response
+
+    def upsert_saved_address(self, address_payload: dict):
+        params = [address_payload]
+        response = self.rpc_request("upsertSavedAddress", params)
+        return response
+
+    def delete_saved_address(self, address: str, is_test: bool):
+        params = [address, is_test]
+        response = self.rpc_request("deleteSavedAddress", params)
+        return response
+
+    def remaining_capacity_for_saved_addresses(self, is_test: bool):
+        params = [is_test]
+        response = self.rpc_request("remainingCapacityForSavedAddresses", params)
+        return response
+
+    def set_display_name(self, name: str):
+        params = [name]
+        response = self.rpc_request("setDisplayName", params)
+        return response
+
+    def set_profile_showcase_preferences(self, prefs: dict):
+        response = self.rpc_request("setProfileShowcasePreferences", [prefs])
+        return response
+
+    def get_profile_showcase_preferences(self):
+        params = []
+        response = self.rpc_request("getProfileShowcasePreferences", params)
+        return response
+
+    def create_community_from_payload(self, community: dict):
+        params = [community]
+        response = self.rpc_request("createCommunity", params)
+        return response
+
+    def communities(self):
+        params = []
+        response = self.rpc_request("communities", params)
+        return response
+
+    def joined_communities(self):
+        params = []
+        response = self.rpc_request("joinedCommunities", params)
+        return response
+
+    def log_test(self):
+        response = self.rpc_request("logTest")
         return response

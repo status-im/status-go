@@ -13,92 +13,75 @@ class TestSavedAddresses:
         self.rpc_client = backend_new_profile("rpc_client")
 
     @pytest.mark.parametrize(
-        "method, params",
+        "params",
         [
-            (
-                "wakuext_upsertSavedAddress",
-                [
-                    {
-                        "address": "0xcf2272205cc0cf96cfbb9dd740bd681d1e86901e",
-                        "name": "some_random_address",
-                        "colorId": "green",
-                        "isTest": False,
-                        "chainShortNames": "",
-                    }
-                ],
-            ),
-            (
-                "wakuext_upsertSavedAddress",
-                [
-                    {
-                        "address": "0x8e58eb36c7b77d6c43fc05c8fd3fe645d1d39588",
-                        "mixedcaseAddress": "0x8e58eb36c7b77d6C43fC05C8Fd3FE645d1d39588",
-                        "name": "yellow_ENS",
-                        "colorId": "yellow",
-                        "ens": "some_yellow_ENS.eth",
-                        "isTest": False,
-                        "chainShortNames": "",
-                    }
-                ],
-            ),
-            (
-                "wakuext_upsertSavedAddress",
-                [
-                    {
-                        "address": "0xc6a54e79fb8915efbe00a8adac5bd94b68022fb6",
-                        "name": "test_address_pretty_long_name WITH Cap letters",
-                        "colorId": "blue",
-                        "ens": "test_some_yellow_ENS.eth",
-                        "isTest": False,
-                        "chainShortNames": "orb:opt",
-                    }
-                ],
-            ),
+            {
+                "address": "0xcf2272205cc0cf96cfbb9dd740bd681d1e86901e",
+                "name": "some_random_address",
+                "colorId": "green",
+                "isTest": False,
+                "chainShortNames": "",
+            },
+            {
+                "address": "0x8e58eb36c7b77d6c43fc05c8fd3fe645d1d39588",
+                "mixedcaseAddress": "0x8e58eb36c7b77d6C43fC05C8Fd3FE645d1d39588",
+                "name": "yellow_ENS",
+                "colorId": "yellow",
+                "ens": "some_yellow_ENS.eth",
+                "isTest": False,
+                "chainShortNames": "",
+            },
+            {
+                "address": "0xc6a54e79fb8915efbe00a8adac5bd94b68022fb6",
+                "name": "test_address_pretty_long_name WITH Cap letters",
+                "colorId": "blue",
+                "ens": "test_some_yellow_ENS.eth",
+                "isTest": False,
+                "chainShortNames": "orb:opt",
+            },
         ],
     )
-    def test_add_saved_address(self, method, params):
+    def test_add_saved_address(self, params):
         """Test adding saved addresses and verifying their presence in the lists."""
 
         # Step: Adding item in mainnet mode
-        self.rpc_client.rpc_valid_request(method, params)
-        response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddresses", [])
+        self.rpc_client.wakuext_service.upsert_saved_address(params)
+        response = self.rpc_client.wakuext_service.get_saved_addresses()
         # TODO: Add more assertions on response
 
         # Step: Verifying the item is in the saved addresses list
-        assert any(params[0].items() <= item.items() for item in response), f"{params[0]['name']} not found in getSavedAddresses"
+        assert any(params.items() <= item.items() for item in response), f"{params['name']} not found in getSavedAddresses"
 
         # Step: Checking if the item is listed under mainnet saved addresses
-        response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [False])
+        response = self.rpc_client.wakuext_service.get_saved_addresses_per_mode(False)
         # TODO: Add more assertions on response
-        assert any(params[0].items() <= item.items() for item in response), f"{params[0]['name']} not found in getSavedAddressesPerMode"
+        assert any(params.items() <= item.items() for item in response), f"{params['name']} not found in getSavedAddressesPerMode"
 
         # Step: Ensuring the item is NOT in the testnet saved addresses list
-        response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [True])
+        response = self.rpc_client.wakuext_service.get_saved_addresses_per_mode(True)
         assert response is None, "wakuext_getSavedAddressesPerMode for test mode is not empty"
 
     def test_delete_saved_address(self):
         """Test deleting a saved address and verifying its removal."""
         address, is_test = "0xc6a54e79fb8915efbe00a8adac5bd94b68022fb6", True
-        params = [
-            {
-                "address": address,
-                "name": "testnet_yellow_ENS",
-                "colorId": "red",
-                "ens": "some_red_ENS.stateofus.eth",
-                "isTest": is_test,
-            }
-        ]
+        params = {
+            "address": address,
+            "name": "testnet_yellow_ENS",
+            "colorId": "red",
+            "ens": "some_red_ENS.stateofus.eth",
+            "isTest": is_test,
+        }
 
         # Step: Adding item in testnet mode
-        self.rpc_client.rpc_valid_request("wakuext_upsertSavedAddress", params)
+        self.rpc_client.wakuext_service.upsert_saved_address(params)
 
         # Step: Verifying the item exists in testnet saved addresses
-        response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [is_test])
-        assert any(params[0].items() <= item.items() for item in response), f"{params[0]['name']} not found in getSavedAddressesPerMode"
+        response = self.rpc_client.wakuext_service.get_saved_addresses_per_mode(is_test)
+        assert any(params.items() <= item.items() for item in response), f"{params['name']} not found in getSavedAddressesPerMode"
 
         # Step: Deleting the item and verifying removal
-        self.rpc_client.rpc_valid_request("wakuext_deleteSavedAddress", [address, is_test])
-        response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [is_test])
+        self.rpc_client.wakuext_service.delete_saved_address(address, is_test)
+        response = self.rpc_client.wakuext_service.get_saved_addresses_per_mode(is_test)
         assert response is None, "getSavedAddressesPerMode for test mode is not empty"
 
     def test_remaining_capacity_for_saved_addresses(self):
@@ -128,12 +111,12 @@ class TestSavedAddresses:
         ]
 
         # Step: Checking remaining capacity
-        remaining_capacity = self.rpc_client.rpc_valid_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
+        remaining_capacity = self.rpc_client.wakuext_service.remaining_capacity_for_saved_addresses(is_test)
 
         # Step: adding  addresses to fill capacity
         for i in range(remaining_capacity):
-            self.rpc_client.rpc_valid_request("wakuext_upsertSavedAddress", [{"address": addresses[i], "name": f"test{i}", "isTest": is_test}])
+            self.rpc_client.wakuext_service.upsert_saved_address({"address": addresses[i], "name": f"test{i}", "isTest": is_test})
 
         # Step: Verifying that capacity is now 0
         with pytest.raises(ApiResponseError, match=re.escape("no more save addresses can be added")):
-            self.rpc_client.rpc_valid_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
+            self.rpc_client.wakuext_service.remaining_capacity_for_saved_addresses(is_test)

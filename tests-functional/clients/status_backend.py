@@ -21,6 +21,9 @@ from clients.services.wakuext import (
     PushNotificationRegistrationTokenType,
 )
 from clients.services.wallet import WalletService
+from clients.services.multiaccounts import MultiAccountsService
+from clients.services.appgeneral import AppgeneralService
+from clients.services.eth import EthService
 from clients.signals import SignalClient, SignalType
 from clients.statusgo_container import StatusBackendContainer
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
@@ -87,8 +90,11 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.wallet_service = WalletService(self)
         self.wakuext_service = WakuextService(self)
         self.accounts_service = AccountService(self)
+        self.multiaccounts_service = MultiAccountsService(self)
         self.settings_service = SettingsService(self)
         self.connector_service = ConnectorService(self)
+        self.appgeneral_service = AppgeneralService(self)
+        self.eth_service = EthService(self)
         self.expvar_client = ExpvarClient(self.base_url)
 
     def __del__(self):

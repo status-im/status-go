@@ -49,19 +49,19 @@ class TestLogging:
         profile_log_file_name = f"{formatted_key_uid}.log"
         log_path = os.path.join(backend_client.data_dir, profile_log_file_name)
         # Ensure changes take effect at runtime
-        backend_client.rpc_valid_request("wakuext_logTest")
+        backend_client.wakuext_service.log_test()
         profile_log = backend_client.extract_data(log_path)
         self.expect_logs(profile_log, "test message", log_pattern, count=1)
 
         # Disable logging
         backend_client.api_request_json("SetLogEnabled", {"enabled": False})
-        backend_client.rpc_valid_request("wakuext_logTest")
+        backend_client.wakuext_service.log_test()
         profile_log = backend_client.extract_data(log_path)
         self.expect_logs(profile_log, "test message", log_pattern, count=1)
 
         # Enable logging
         backend_client.api_request_json("SetLogEnabled", {"enabled": True})
-        backend_client.rpc_valid_request("wakuext_logTest")
+        backend_client.wakuext_service.log_test()
         profile_log = backend_client.extract_data(log_path)
         self.expect_logs(profile_log, "test message", log_pattern, count=2)
 
@@ -69,7 +69,7 @@ class TestLogging:
         backend_client.logout()
         backend_client.login(key_uid)
         backend_client.wait_for_login()
-        backend_client.rpc_valid_request("wakuext_logTest")
+        backend_client.wakuext_service.log_test()
         profile_log = backend_client.extract_data(log_path)
         self.expect_logs(profile_log, "test message", log_pattern, count=3)
 

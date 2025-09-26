@@ -17,7 +17,6 @@ class TestWalletSignals:
 
     @pytest.mark.skip  # TODO: returns empty response in most of the cases, so needs to be fixed with attention of required signals in signal_response
     def test_wallet_get_owned_collectibles_async(self):
-        method = "wallet_getOwnedCollectiblesAsync"
         params = [
             0,
             [
@@ -30,7 +29,7 @@ class TestWalletSignals:
             1,
             {"fetch-type": 2, "max-cache-age-seconds": 3600},
         ]
-        self.rpc_client.rpc_valid_request(method, params)
+        self.rpc_client.wallet_service.get_owned_collectibles_async(params)
         signal_response = self.rpc_client.wait_for_signal(SignalType.WALLET.value, timeout=60)
         # TODO: Add more assertions on response
         assert signal_response["event"]["type"] == "wallet-owned-collectibles-filtering-done"
