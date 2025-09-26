@@ -4,10 +4,13 @@ import pytest
 
 from clients.status_backend import StatusBackend
 from steps.messenger import MessengerSteps
+from clients.services.wakuext import ActivityCenterNotificationType
 
 
 def _get_activity_center_notifications(
-    backend_instance: StatusBackend, activity_types: list = [1, 2, 3, 4, 5, 7, 8, 9, 10, 23, 24], read_type: Union[int, None] = None
+    backend_instance: StatusBackend,
+    activity_types: list = [activity for activity in ActivityCenterNotificationType],
+    read_type: Union[int, None] = None,
 ):
     params = {"cursor": "", "limit": 20, "activity_types": activity_types}
     if read_type:
@@ -26,7 +29,9 @@ class TestActivityCenterNotifications(MessengerSteps):
 
     def test_activity_center_notifications(self):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = _get_activity_center_notifications(backend_instance=self.receiver, activity_types=[5], read_type=2)
+        response = _get_activity_center_notifications(
+            backend_instance=self.receiver, activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_CONTACT_REQUEST], read_type=2
+        )
         notification = response["notifications"][0]
         assert all(
             (
@@ -105,7 +110,9 @@ class TestActivityCenterNotifications(MessengerSteps):
             )
         )
 
-        result = _get_activity_center_notifications(backend_instance=self.sender, activity_types=[5])
+        result = _get_activity_center_notifications(
+            backend_instance=self.sender, activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_CONTACT_REQUEST]
+        )
         assert result["notifications"][0]["read"] is True
 
         response = self.sender.wakuext_service.mark_activity_center_notifications_unread([message_id])
@@ -117,7 +124,9 @@ class TestActivityCenterNotifications(MessengerSteps):
             )
         )
 
-        result = _get_activity_center_notifications(backend_instance=self.sender, activity_types=[5])
+        result = _get_activity_center_notifications(
+            backend_instance=self.sender, activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_CONTACT_REQUEST]
+        )
         assert result["notifications"][0]["read"] is False
 
     def test_accept_activity_center_notifications(self):

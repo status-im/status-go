@@ -353,8 +353,9 @@ class WakuextService(Service):
         response = self.rpc_request("setBio", params)
         return response
 
-    def set_customization_color(self, customization_payload: dict):
-        response = self.rpc_request("setCustomizationColor", [customization_payload])
+    def set_customization_color(self, color: str, key_uid: str):
+        params = [{"customizationColor": color, "keyUid": key_uid}]
+        response = self.rpc_request("setCustomizationColor", params)
         return response
 
     def set_syncing_on_mobile_network(self, enabled: bool):
@@ -362,8 +363,9 @@ class WakuextService(Service):
         response = self.rpc_request("setSyncingOnMobileNetwork", params)
         return response
 
-    def toggle_peer_syncing(self, payload: dict):
-        response = self.rpc_request("togglePeerSyncing", [payload])
+    def toggle_peer_syncing(self, enabled: bool):
+        args = {"enabled": enabled}
+        response = self.rpc_request("togglePeerSyncing", [args])
         return response
 
     def status_updates(self):
@@ -514,7 +516,7 @@ class WakuextService(Service):
         limit: int = 20,
     ):
         params = {
-            "activityTypes": activity_types,
+            "activityTypes": [item.value for item in activity_types],
             "cursor": cursor,
             "limit": limit,
         }

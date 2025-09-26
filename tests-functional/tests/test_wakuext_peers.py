@@ -9,6 +9,7 @@ class TestRpc:
         self.rpc_client = backend_new_profile("peers")
 
     def test_peers(self):
+        self.rpc_client.wait_for_online()
         peers = self.rpc_client.wakuext_service.peers()
         assert len(peers) >= 1
         for _, peer in peers.items():

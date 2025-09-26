@@ -22,11 +22,10 @@ class TestProfile:
         assert result.get("bio") == "some valid bio"
 
     def test_set_customization_color(self):
-        payload = {
-            "customizationColor": "magenta",
-            "keyUid": "0xea42dd9a4e668b0b76c7a5210ca81576d51cd19cdd0f6a0c22196219dc423f29",
-        }
-        self.rpc_client.wakuext_service.set_customization_color(payload)
+        result = self.rpc_client.wakuext_service.set_customization_color(
+            "magenta", "0xea42dd9a4e668b0b76c7a5210ca81576d51cd19cdd0f6a0c22196219dc423f29"
+        )
+        assert result is None
 
     def test_set_user_status(self):
         status_type = 3
@@ -40,7 +39,7 @@ class TestProfile:
         self.rpc_client.wakuext_service.set_syncing_on_mobile_network(False)
 
     def test_toggle_peer_syncing(self):
-        self.rpc_client.wakuext_service.toggle_peer_syncing({"enabled": True})
+        self.rpc_client.wakuext_service.toggle_peer_syncing(True)
 
     @pytest.mark.parametrize(
         "setting_name, default_value, changed_value",

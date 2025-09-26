@@ -20,6 +20,7 @@ class TestAppGeneral:
         assert result[0].get("symbol") == "$"
         assert result[0].get("unicode") == "1f1fa-1f1f8"
 
+    @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6957")
     def test_version(self):
         result = self.rpc_client.appgeneral_service.version()
-        assert result == ""  # not sure if it's ok to return an empty string, or maybe this endpoint is deprecated
+        assert result != ""
