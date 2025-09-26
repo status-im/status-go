@@ -10,6 +10,7 @@ import (
 	"time"
 	"unsafe"
 
+	errors2 "github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
@@ -1519,7 +1520,8 @@ func inputConnectionStringForBootstrapping(cs, configJSON string) string {
 	err = params.FromString(cs)
 	if err != nil {
 		response := &inputConnectionStringForBootstrappingResponse{}
-		return response.toJSON(fmt.Errorf("could not parse connection string"))
+		err = errors2.Wrap(err, "error parsing connection string")
+		return response.toJSON(err)
 	}
 	response := &inputConnectionStringForBootstrappingResponse{
 		InstallationID: params.InstallationID(),
@@ -1529,21 +1531,31 @@ func inputConnectionStringForBootstrapping(cs, configJSON string) string {
 	err = statusBackend.LocalPairingStateManager.StartPairing(cs)
 	defer func() { statusBackend.LocalPairingStateManager.StopPairing(cs, err) }()
 	if err != nil {
+		err = errors2.Wrap(err, "could not start pairing")
 		return response.toJSON(err)
 	}
 
 	var conf pairing.ReceiverClientConfig
 	err = json.Unmarshal([]byte(configJSON), &conf)
 	if err != nil {
+		logutils.ZapLogger().Error("error parsing config", zap.Error(err), zap.String("config", configJSON))
+		err = errors2.Wrap(err, "could not unmarshal config")
 		return response.toJSON(err)
 	}
 
 	err = pairing.StartUpReceivingClient(statusBackend, cs, &conf)
 	if err != nil {
+		err = errors2.Wrap(err, "could not start receiving client")
 		return response.toJSON(err)
 	}
 
-	return response.toJSON(statusBackend.Logout())
+	err = statusBackend.Logout()
+	if err != nil {
+		err = errors2.Wrap(err, "could not logout")
+		return response.toJSON(err)
+	}
+
+	return nil
 }
 
 func InputConnectionStringForBootstrappingV2(requestJSON string) string {
