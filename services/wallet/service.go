@@ -9,7 +9,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 
@@ -20,11 +19,11 @@ import (
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	protocolCommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/syncing"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
@@ -51,12 +50,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
-)
-
-// TODO this is duplicated
-var (
-	ErrNotWatchOnlyAccount           = errors.New("an account is not a watch only account")
-	ErrTryingToStoreOldWalletAccount = errors.New("trying to store an old wallet account")
 )
 
 const (
@@ -508,76 +501,13 @@ func (s *Service) ExportBackup() ([]byte, error) {
 	return proto.Marshal(backup)
 }
 
-func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability accsmanagementtypes.AccountOperable,
-	accType accsmanagementtypes.AccountType) *accsmanagementtypes.Account {
-	return &accsmanagementtypes.Account{
-		Address:               types.BytesToAddress(message.Address),
-		KeyUID:                message.KeyUid,
-		PublicKey:             types.HexBytes(message.PublicKey),
-		Type:                  accType,
-		Path:                  message.Path,
-		Name:                  message.Name,
-		ColorID:               multiaccountscommon.CustomizationColor(message.ColorId),
-		Emoji:                 message.Emoji,
-		Wallet:                message.Wallet,
-		Chat:                  message.Chat,
-		Hidden:                message.Hidden,
-		Clock:                 message.Clock,
-		Operable:              accountOperability,
-		Removed:               message.Removed,
-		Position:              message.Position,
-		ProdPreferredChainIDs: message.ProdPreferredChainIDs,
-		TestPreferredChainIDs: message.TestPreferredChainIDs,
-	}
-}
-
-// TODO this is a duplicate of the code in messenger_handler. Should it be moved to a common place?
-func (s *Service) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*accsmanagementtypes.Account, error) {
-	if message.KeyUid != "" {
-		return nil, ErrNotWatchOnlyAccount
-	}
-
-	accountOperability := accsmanagementtypes.AccountFullyOperable
-
-	accAddress := types.BytesToAddress(message.Address)
-	dbAccount, err := s.accountsDB.GetAccountByAddress(accAddress)
-	if err != nil && err != accounts.ErrDbAccountNotFound {
-		return nil, err
-	}
-
-	if dbAccount != nil {
-		if message.Clock <= dbAccount.Clock {
-			// ignore this old message
-			return nil, nil
-		}
-
-		if message.Removed {
-			err = s.accountsDB.RemoveAccount(accAddress, message.Clock)
-			if err != nil {
-				return nil, err
-			}
-			dbAccount.Removed = true
-			return dbAccount, nil
-		}
-	}
-
-	acc := mapSyncAccountToAccount(message, accountOperability, accsmanagementtypes.AccountTypeWatch)
-
-	err = s.accountsDB.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{acc}, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return acc, nil
-}
-
 func (s *Service) handleWatchOnlyAccount(message *protobuf.SyncAccount) error {
 	if message == nil {
 		return nil
 	}
 
-	acc, err := s.handleSyncWatchOnlyAccount(message)
-	if err != nil {
+	acc, err := syncing.HandleSyncWatchOnlyAccount(s.accountsDB, message, nil)
+	if err != nil && !errors.Is(err, syncing.ErrTryingToStoreOldWalletAccount) {
 		return err
 	}
 	response := wakusync.WakuBackedUpDataResponse{
