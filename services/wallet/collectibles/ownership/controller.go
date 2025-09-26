@@ -4,13 +4,19 @@ package ownership
 
 import (
 	"context"
+	"slices"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+	"github.com/status-im/go-wallet-sdk/pkg/contracts/erc1155"
+	"github.com/status-im/go-wallet-sdk/pkg/contracts/erc721"
+	"github.com/status-im/go-wallet-sdk/pkg/eventlog"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
@@ -18,8 +24,9 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/transferdetector"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -30,8 +37,6 @@ const (
 type loaderPerChainID = map[walletCommon.ChainID]*PeriodicalLoader
 type loaderPerAddressAndChainID = map[common.Address]loaderPerChainID
 
-type TransferCb func(common.Address, walletCommon.ChainID, []transfer.Transfer)
-
 type AccountsProvider interface {
 	GetWalletAddresses() ([]types.Address, error)
 }
@@ -41,12 +46,19 @@ type NetworksProvider interface {
 	GetPublisher() *pubsub.Publisher
 }
 
+type BlockChainStateProvider interface {
+	GetEstimatedBlockTime(ctx context.Context, chainID uint64, blockNumber uint64) (time.Time, error)
+}
+
 type Controller struct {
-	fetcher           CollectibleOwnershipFetcher
-	storage           CollectibleOwnershipStorage
-	walletFeed        *event.Feed
-	accountsProvider  AccountsProvider
-	accountsPublisher *pubsub.Publisher
+	fetcher                       CollectibleOwnershipFetcher
+	storage                       CollectibleOwnershipStorage
+	walletFeed                    *event.Feed
+	accountsProvider              AccountsProvider
+	accountsPublisher             *pubsub.Publisher
+	multistandardBalancePublisher *pubsub.Publisher
+	transferDetectorPublisher     *pubsub.Publisher
+	blockChainStateProvider       BlockChainStateProvider
 
 	networksProvider NetworksProvider
 
@@ -70,20 +82,26 @@ func NewController(
 	accountsProvider AccountsProvider,
 	accountsPublisher *pubsub.Publisher,
 	networksProvider NetworksProvider,
+	multistandardBalancePublisher *pubsub.Publisher,
+	transferDetectorPublisher *pubsub.Publisher,
+	blockChainStateProvider BlockChainStateProvider,
 	fetcher CollectibleOwnershipFetcher,
 	collectiblesPublisher *pubsub.Publisher,
 	logger *zap.Logger,
 ) *Controller {
 	return &Controller{
-		fetcher:               fetcher,
-		storage:               storage,
-		walletFeed:            walletFeed,
-		accountsProvider:      accountsProvider,
-		accountsPublisher:     accountsPublisher,
-		networksProvider:      networksProvider,
-		periodicalLoaders:     make(loaderPerAddressAndChainID),
-		collectiblesPublisher: collectiblesPublisher,
-		logger:                logger.Named("OwnershipController"),
+		fetcher:                       fetcher,
+		storage:                       storage,
+		walletFeed:                    walletFeed,
+		accountsProvider:              accountsProvider,
+		accountsPublisher:             accountsPublisher,
+		networksProvider:              networksProvider,
+		multistandardBalancePublisher: multistandardBalancePublisher,
+		transferDetectorPublisher:     transferDetectorPublisher,
+		blockChainStateProvider:       blockChainStateProvider,
+		periodicalLoaders:             make(loaderPerAddressAndChainID),
+		collectiblesPublisher:         collectiblesPublisher,
+		logger:                        logger.Named("OwnershipController"),
 	}
 }
 
@@ -105,11 +123,14 @@ func (c *Controller) Start() {
 	// Setup collectibles fetch when a new account gets added
 	c.startAccountsWatcher()
 
-	// Setup collectibles fetch when relevant activity is detected
-	c.startWalletEventsWatcher()
-
 	// Setup collectibles fetch when active networks change
 	c.startNetworkEventsWatcher()
+
+	// Start balance change watcher
+	c.startBalanceChangeWatcher()
+
+	// Start transfer detection watcher
+	c.startTransferDetectionWatcher()
 }
 
 func (c *Controller) Stop() {
@@ -119,8 +140,6 @@ func (c *Controller) Stop() {
 
 	close(c.stopCh)
 	c.stopCh = nil
-
-	c.stopWalletEventsWatcher()
 
 	c.stopPeriodicalLoaders()
 }
@@ -237,39 +256,6 @@ func (c *Controller) startAccountsWatcher() {
 	}()
 }
 
-func (c *Controller) startWalletEventsWatcher() {
-	if c.walletEventsWatcher != nil {
-		return
-	}
-
-	if c.walletFeed == nil {
-		return
-	}
-
-	walletEventCb := func(event walletevent.Event) {
-		if event.Type != transfer.EventInternalERC721TransferDetected &&
-			event.Type != transfer.EventInternalERC1155TransferDetected {
-			return
-		}
-
-		chainID := walletCommon.ChainID(event.ChainID)
-		for _, account := range event.Accounts {
-			c.refetchOwnershipIfRecentTransfer(account, chainID, event.At)
-		}
-	}
-
-	c.walletEventsWatcher = walletevent.NewWatcher(c.walletFeed, walletEventCb)
-
-	c.walletEventsWatcher.Start()
-}
-
-func (c *Controller) stopWalletEventsWatcher() {
-	if c.walletEventsWatcher != nil {
-		c.walletEventsWatcher.Stop()
-		c.walletEventsWatcher = nil
-	}
-}
-
 func (c *Controller) startNetworkEventsWatcher() {
 	if c.networksProvider == nil {
 		return
@@ -293,7 +279,95 @@ func (c *Controller) startNetworkEventsWatcher() {
 	}()
 }
 
-func (c *Controller) refetchOwnershipIfRecentTransfer(account common.Address, chainID walletCommon.ChainID, latestTxTimestamp int64) {
+func (c *Controller) startBalanceChangeWatcher() {
+	if c.multistandardBalancePublisher == nil {
+		return
+	}
+
+	ch, unsub := pubsub.Subscribe[multistandardbalance.EventBalanceFetchFinished](c.multistandardBalancePublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsub()
+		for {
+			select {
+			case <-c.stopCh:
+				return
+			case event, ok := <-ch:
+				if !ok {
+					return
+				}
+				switch event.ResultType {
+				case multistandardfetcher.ResultTypeERC721, multistandardfetcher.ResultTypeERC1155:
+					if event.BalanceChanged {
+						c.refetchOwnershipIfRecentTx(event.Key.Account, walletCommon.ChainID(event.Key.ChainID), event.NewState.FetchedAt)
+					}
+				}
+			}
+		}
+	}()
+}
+
+func (c *Controller) startTransferDetectionWatcher() {
+	if c.transferDetectorPublisher == nil {
+		return
+	}
+
+	ch, unsub := pubsub.Subscribe[transferdetector.EventTransferDetectionFinished](c.transferDetectorPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsub()
+		for {
+			select {
+			case <-c.stopCh:
+				return
+			case msg, ok := <-ch:
+				if !ok {
+					return
+				}
+				for _, event := range msg.Events {
+					switch event.EventKey {
+					case eventlog.ERC721Transfer:
+						unpackedEvent, ok := event.Unpacked.(erc721.Erc721Transfer)
+						if !ok {
+							c.logger.Error("failed to unpack ERC721Transfer event")
+							continue
+						}
+						c.refetchOwnershipIfRelevantEvent(msg.Accounts, unpackedEvent.From, unpackedEvent.To, msg.ChainID, unpackedEvent.Raw.BlockNumber)
+					case eventlog.ERC1155TransferSingle:
+						unpackedEvent, ok := event.Unpacked.(erc1155.Erc1155TransferSingle)
+						if !ok {
+							c.logger.Error("failed to unpack ERC1155TransferSingle event")
+							continue
+						}
+						c.refetchOwnershipIfRelevantEvent(msg.Accounts, unpackedEvent.From, unpackedEvent.To, msg.ChainID, unpackedEvent.Raw.BlockNumber)
+					case eventlog.ERC1155TransferBatch:
+						unpackedEvent, ok := event.Unpacked.(erc1155.Erc1155TransferBatch)
+						if !ok {
+							c.logger.Error("failed to unpack ERC1155TransferBatch event")
+							continue
+						}
+						c.refetchOwnershipIfRelevantEvent(msg.Accounts, unpackedEvent.From, unpackedEvent.To, msg.ChainID, unpackedEvent.Raw.BlockNumber)
+					}
+				}
+			}
+		}
+	}()
+}
+
+func (c *Controller) refetchOwnershipIfRelevantEvent(checkedAccounts []common.Address, eventFrom common.Address, eventTo common.Address, chainID uint64, blockNumber uint64) {
+	for _, address := range []common.Address{eventFrom, eventTo} {
+		if slices.Contains(checkedAccounts, address) {
+			blockTime, err := c.blockChainStateProvider.GetEstimatedBlockTime(context.TODO(), chainID, blockNumber)
+			if err != nil {
+				c.logger.Error("failed to get estimated block time", zap.Error(err))
+				continue
+			}
+			c.refetchOwnershipIfRecentTx(address, walletCommon.ChainID(chainID), blockTime.Unix())
+		}
+	}
+}
+
+func (c *Controller) refetchOwnershipIfRecentTx(account common.Address, chainID walletCommon.ChainID, latestTxTimestamp int64) {
 	// Check last ownership update timestamp
 	timestamp, err := c.storage.GetOwnershipUpdateTimestamp(account, chainID)
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"math"
 	"math/big"
+	"slices"
 	"sync"
 	"time"
 
@@ -16,14 +17,20 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
+
+	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+	"github.com/status-im/go-wallet-sdk/pkg/contracts/erc20"
+	"github.com/status-im/go-wallet-sdk/pkg/eventlog"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/market"
+	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/transferdetector"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
@@ -58,27 +65,45 @@ type ReaderInterface interface {
 	GetLastTokenUpdateTimestamps() map[common.Address]int64
 }
 
-func NewReader(tokenManager token.ManagerInterface, marketManager *market.Manager, persistence token.TokenBalancesStorage, walletFeed *event.Feed) *Reader {
+type BlockChainStateProvider interface {
+	GetEstimatedBlockTime(ctx context.Context, chainID uint64, blockNumber uint64) (time.Time, error)
+}
+
+func NewReader(
+	tokenManager token.ManagerInterface,
+	marketManager *market.Manager,
+	persistence token.TokenBalancesStorage,
+	walletFeed *event.Feed,
+	multistandardBalancePublisher *pubsub.Publisher,
+	transferDetectorPublisher *pubsub.Publisher,
+	blockChainStateProvider BlockChainStateProvider) *Reader {
 	return &Reader{
-		tokenManager:        tokenManager,
-		marketManager:       marketManager,
-		persistence:         persistence,
-		walletFeed:          walletFeed,
-		refreshBalanceCache: true,
+		tokenManager:                  tokenManager,
+		marketManager:                 marketManager,
+		multistandardBalancePublisher: multistandardBalancePublisher,
+		transferDetectorPublisher:     transferDetectorPublisher,
+		blockChainStateProvider:       blockChainStateProvider,
+		persistence:                   persistence,
+		walletFeed:                    walletFeed,
+		refreshBalanceCache:           true,
 	}
 }
 
 type Reader struct {
 	tokenManager                   token.ManagerInterface
 	marketManager                  *market.Manager
+	multistandardBalancePublisher  *pubsub.Publisher
+	transferDetectorPublisher      *pubsub.Publisher
+	blockChainStateProvider        BlockChainStateProvider
 	persistence                    token.TokenBalancesStorage
 	walletFeed                     *event.Feed
-	cancel                         context.CancelFunc
 	walletEventsWatcher            *walletevent.Watcher
 	lastWalletTokenUpdateTimestamp sync.Map
 	reloadDelayTimer               *time.Timer
 	refreshBalanceCache            bool
 	rw                             sync.RWMutex
+
+	stopCh chan struct{}
 }
 
 func splitVerifiedTokens(tokens []*tokenTypes.Token) ([]*tokenTypes.Token, []*tokenTypes.Token) {
@@ -123,31 +148,31 @@ func getTokenAddresses(tokens []*tokenTypes.Token) []common.Address {
 }
 
 func (r *Reader) Start() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	r.cancel = cancel
+	if r.stopCh != nil {
+		return nil
+	}
 
 	r.startWalletEventsWatcher()
 
-	go func() {
-		defer gocommon.LogOnPanic()
-		ticker := time.NewTicker(walletTickReloadPeriod)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				r.triggerWalletReload()
-			}
-		}
-	}()
+	// Start balance change watcher
+	r.startBalanceChangeWatcher()
+
+	// Start transfer detection watcher
+	r.startTransferDetectionWatcher()
+
+	// Start periodic load
+	r.startPeriodicLoad()
+
 	return nil
 }
 
 func (r *Reader) Stop() {
-	if r.cancel != nil {
-		r.cancel()
+	if r.stopCh == nil {
+		return
 	}
+
+	close(r.stopCh)
+	r.stopCh = nil
 
 	r.stopWalletEventsWatcher()
 
@@ -192,8 +217,6 @@ func (r *Reader) startWalletEventsWatcher() {
 	walletEventCb := func(event walletevent.Event) {
 		delayed := true
 		switch event.Type {
-		case transfer.EventInternalETHTransferDetected, transfer.EventInternalERC20TransferDetected:
-			// Delayed refresh
 		case transactions.EventPendingTransactionUpdate:
 			var p transactions.PendingTxUpdatePayload
 			err := json.Unmarshal([]byte(event.Message), &p)
@@ -211,21 +234,7 @@ func (r *Reader) startWalletEventsWatcher() {
 		}
 
 		for _, address := range event.Accounts {
-			timestamp, ok := r.lastWalletTokenUpdateTimestamp.Load(address)
-			timecheck := int64(0)
-			if ok {
-				timecheck = timestamp.(int64) - activityReloadMarginSeconds
-			}
-
-			if !ok || event.At > timecheck {
-				r.invalidateBalanceCache()
-				if delayed {
-					r.triggerDelayedWalletReload()
-				} else {
-					r.triggerWalletReload()
-				}
-				break
-			}
+			r.triggerReloadIfRecent(event.At, address, delayed)
 		}
 	}
 
@@ -238,6 +247,132 @@ func (r *Reader) stopWalletEventsWatcher() {
 	if r.walletEventsWatcher != nil {
 		r.walletEventsWatcher.Stop()
 		r.walletEventsWatcher = nil
+	}
+}
+
+func (r *Reader) startBalanceChangeWatcher() {
+	if r.multistandardBalancePublisher == nil {
+		return
+	}
+
+	ch, unsub := pubsub.Subscribe[multistandardbalance.EventBalanceFetchFinished](r.multistandardBalancePublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsub()
+		for {
+			select {
+			case <-r.stopCh:
+				return
+			case event, ok := <-ch:
+				if !ok {
+					return
+				}
+				switch event.ResultType {
+				case multistandardfetcher.ResultTypeNative, multistandardfetcher.ResultTypeERC20:
+					if !event.BalanceChanged {
+						continue
+					}
+
+					r.triggerReloadIfRecent(event.NewState.FetchedAt, event.Key.Account, true)
+				}
+			}
+		}
+	}()
+}
+
+func (r *Reader) startTransferDetectionWatcher() {
+	if r.transferDetectorPublisher == nil {
+		return
+	}
+
+	ch, unsub := pubsub.Subscribe[transferdetector.EventTransferDetectionFinished](r.transferDetectorPublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsub()
+		for {
+			select {
+			case <-r.stopCh:
+				return
+			case msg, ok := <-ch:
+				if !ok {
+					return
+				}
+				for _, event := range msg.Events {
+					switch event.EventKey {
+					case eventlog.ERC20Transfer:
+						unpackedEvent, ok := event.Unpacked.(erc20.Erc20Transfer)
+						if !ok {
+							logutils.ZapLogger().Error("failed to unpack ERC20Transfer event")
+							continue
+						}
+						r.processERC20TransferEvent(msg.ChainID, unpackedEvent)
+						r.triggerReloadIfRelevantEvent(msg.Accounts, unpackedEvent.From, unpackedEvent.To, msg.ChainID, unpackedEvent.Raw.BlockNumber)
+					}
+				}
+			}
+		}
+	}()
+}
+
+func (r *Reader) startPeriodicLoad() {
+	go func() {
+		defer gocommon.LogOnPanic()
+		ticker := time.NewTicker(walletTickReloadPeriod)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-r.stopCh:
+				return
+			case <-ticker.C:
+				r.triggerWalletReload()
+			}
+		}
+	}()
+}
+
+func (r *Reader) processERC20TransferEvent(chainID uint64, event erc20.Erc20Transfer) {
+	// Find token in db or if this is a community token, find its metadata
+	token := r.tokenManager.FindOrCreateTokenByAddress(context.TODO(), chainID, event.Raw.Address)
+	if token != nil {
+		isFirst := false
+		if token.Verified || token.CommunityData != nil {
+			isFirst, _ = r.tokenManager.MarkAsPreviouslyOwnedToken(token, event.To)
+		}
+		if token.CommunityData != nil {
+			go func() {
+				defer gocommon.LogOnPanic()
+				r.tokenManager.SignalCommunityTokenReceived(event.To, event.Raw.TxHash, event.Value, token, isFirst)
+			}()
+		}
+	}
+}
+
+func (r *Reader) triggerReloadIfRelevantEvent(checkedAccounts []common.Address, eventFrom common.Address, eventTo common.Address, chainID uint64, blockNumber uint64) {
+	for _, address := range []common.Address{eventFrom, eventTo} {
+		if slices.Contains(checkedAccounts, address) {
+			blockTime, err := r.blockChainStateProvider.GetEstimatedBlockTime(context.TODO(), chainID, blockNumber)
+			if err != nil {
+				logutils.ZapLogger().Error("failed to get estimated block time", zap.Error(err))
+				continue
+			}
+			r.triggerReloadIfRecent(blockTime.Unix(), address, true)
+		}
+	}
+}
+
+func (r *Reader) triggerReloadIfRecent(timestamp int64, account common.Address, delayed bool) {
+	lastTimestamp, ok := r.lastWalletTokenUpdateTimestamp.Load(account)
+	timecheck := int64(0)
+	if ok {
+		timecheck = lastTimestamp.(int64) - activityReloadMarginSeconds
+	}
+	if !ok || timestamp > timecheck {
+		r.invalidateBalanceCache()
+		if delayed {
+			r.triggerDelayedWalletReload()
+		} else {
+			r.triggerWalletReload()
+		}
 	}
 }
 

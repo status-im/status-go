@@ -18,7 +18,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/routeexecution"
-	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 
@@ -323,12 +322,6 @@ func (s *Service) processEvents(ctx context.Context) {
 					ChainID: payload.ChainID,
 					Hash:    payload.Hash,
 				})
-				debounceProcessChangesFn()
-			case transfer.EventNewTransfers:
-				eventCount++
-				// No updates here, these are detected with their final state, just trigger
-				// the detection of new entries
-				newTxs = true
 				debounceProcessChangesFn()
 			case routeexecution.EventRouteExecutionTransactionSent:
 				sentTxs, ok := event.EventParams.(*responses.RouterSentTransactions)
