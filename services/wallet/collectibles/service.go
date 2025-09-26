@@ -17,17 +17,13 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/rpc/network"
 
 	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/collectibles/ownership"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -100,7 +96,6 @@ type Service struct {
 	ownershipController *ownership.Controller
 	db                  *sql.DB
 	ownershipDB         ownership.OwnershipStorage
-	transferDB          *transfer.Database
 	communityManager    *community.Manager
 	walletFeed          *event.Feed
 	scheduler           *async.MultiClientScheduler
@@ -117,38 +112,26 @@ type Service struct {
 func NewService(
 	db *sql.DB,
 	walletFeed *event.Feed,
-	accountsDB *accounts.Database,
-	accountsPublisher *pubsub.Publisher,
 	communityManager *community.Manager,
-	networkManager *network.Manager,
-	manager *Manager) *Service {
-
-	publisher := pubsub.NewPublisher()
+	manager *Manager,
+	ownershipController *ownership.Controller,
+	publisher *pubsub.Publisher,
+) *Service {
 	ownershipDB := ownership.NewOwnershipDB(db)
 
 	logger := logutils.ZapLogger().Named("Collectibles")
 
 	s := &Service{
-		manager: manager,
-		ownershipController: ownership.NewController(
-			ownershipDB,
-			walletFeed,
-			accountsDB,
-			accountsPublisher,
-			networkManager,
-			manager,
-			publisher,
-			logger,
-		),
-		db:               db,
-		ownershipDB:      ownershipDB,
-		transferDB:       transfer.NewDB(db),
-		communityManager: communityManager,
-		walletFeed:       walletFeed,
-		scheduler:        async.NewMultiClientScheduler(),
-		group:            async.NewGroup(context.Background()),
-		publisher:        publisher,
-		logger:           logger.Named("Service"),
+		manager:             manager,
+		ownershipController: ownershipController,
+		db:                  db,
+		ownershipDB:         ownershipDB,
+		communityManager:    communityManager,
+		walletFeed:          walletFeed,
+		scheduler:           async.NewMultiClientScheduler(),
+		group:               async.NewGroup(context.Background()),
+		publisher:           publisher,
+		logger:              logger.Named("Service"),
 	}
 	return s
 }
@@ -363,7 +346,6 @@ func (s *Service) Start(ctx context.Context) {
 	s.closeCh = make(chan struct{})
 
 	s.ownershipController.Start()
-	s.startWalletEventsWatcher()
 	s.startOwnershipLoadWatcher()
 }
 
@@ -377,7 +359,6 @@ func (s *Service) Stop() {
 
 	s.scheduler.Stop()
 	s.ownershipController.Stop()
-	s.stopWalletEventsWatcher()
 }
 
 func (s *Service) sendResponseEvent(requestID *int32, eventType walletevent.EventType, payloadObj interface{}, resErr error) {
@@ -468,62 +449,6 @@ func (s *Service) collectibleIDsToDataType(ctx context.Context, ids []thirdparty
 	return nil, errors.New("unknown data type")
 }
 
-func (s *Service) onOwnedCollectiblesChanged(account common.Address, chainID walletCommon.ChainID, newOrUpdated []thirdparty.CollectibleUniqueID) {
-	// Try to find a matching transfer for newly added/updated collectibles
-	if len(newOrUpdated) > 0 {
-		hashMap := s.lookupTransferForCollectibles(account, newOrUpdated)
-		s.notifyCommunityCollectiblesReceived(account, chainID, newOrUpdated, hashMap)
-	}
-}
-
-func (s *Service) onCollectiblesTransfer(account common.Address, chainID walletCommon.ChainID, transfers []transfer.Transfer) {
-	for _, transfer := range transfers {
-		// If Collectible is already in the DB, update transfer ID with the latest detected transfer
-		id := thirdparty.CollectibleUniqueID{
-			ContractID: thirdparty.ContractID{
-				ChainID: chainID,
-				Address: transfer.Log.Address,
-			},
-			TokenID: &bigint.BigInt{Int: transfer.TokenID},
-		}
-		err := s.manager.SetCollectibleTransferID(account, id, transfer.ID, true)
-		if err != nil {
-			s.logger.Error("Error setting transfer ID for collectible", zap.Error(err))
-		}
-	}
-}
-
-func (s *Service) lookupTransferForCollectibles(account common.Address, collectibles []thirdparty.CollectibleUniqueID) map[thirdparty.CollectibleUniqueID]TxHashData {
-	// There are some limitations to this approach:
-	// - Collectibles ownership and transfers are not in sync and might represent the state at different moments.
-	// - We have no way of knowing if the latest collectible transfer we've detected is actually the latest one, so the timestamp we
-	// use might be older than the real one.
-	// - There might be detected transfers that are temporarily not reflected in the collectibles ownership.
-	// - For ERC721 tokens we should only look for incoming transfers. For ERC1155 tokens we should look for both incoming and outgoing transfers.
-	// We need to get the contract standard for each collectible to know which approach to take.
-
-	result := make(map[thirdparty.CollectibleUniqueID]TxHashData)
-
-	for _, id := range collectibles {
-		transfer, err := s.transferDB.GetLatestCollectibleTransfer(account, id)
-		if err != nil {
-			s.logger.Error("Error fetching latest collectible transfer", zap.Error(err))
-			continue
-		}
-		if transfer != nil {
-			result[id] = TxHashData{
-				Hash: transfer.Transaction.Hash(),
-				TxID: transfer.ID,
-			}
-			err = s.manager.SetCollectibleTransferID(account, id, transfer.ID, false)
-			if err != nil {
-				s.logger.Error("Error setting transfer ID for collectible", zap.Error(err))
-			}
-		}
-	}
-	return result
-}
-
 func (s *Service) notifyCommunityCollectiblesReceived(account common.Address, chainID walletCommon.ChainID, collectibles []thirdparty.CollectibleUniqueID, hashMap map[thirdparty.CollectibleUniqueID]TxHashData) {
 	ctx := context.Background()
 
@@ -601,39 +526,6 @@ func (s *Service) notifyCommunityCollectiblesReceived(account common.Address, ch
 	})
 }
 
-func (s *Service) startWalletEventsWatcher() {
-	if s.walletEventsWatcher != nil {
-		return
-	}
-
-	if s.walletFeed == nil {
-		return
-	}
-
-	walletEventCb := func(event walletevent.Event) {
-		if event.Type != transfer.EventInternalERC721TransferDetected &&
-			event.Type != transfer.EventInternalERC1155TransferDetected {
-			return
-		}
-
-		chainID := walletCommon.ChainID(event.ChainID)
-		for _, account := range event.Accounts {
-			s.onCollectiblesTransfer(account, chainID, event.EventParams.([]transfer.Transfer))
-		}
-	}
-
-	s.walletEventsWatcher = walletevent.NewWatcher(s.walletFeed, walletEventCb)
-
-	s.walletEventsWatcher.Start()
-}
-
-func (s *Service) stopWalletEventsWatcher() {
-	if s.walletEventsWatcher != nil {
-		s.walletEventsWatcher.Stop()
-		s.walletEventsWatcher = nil
-	}
-}
-
 func (s *Service) startOwnershipLoadWatcher() {
 	if s.publisher == nil {
 		return
@@ -656,7 +548,6 @@ func (s *Service) startOwnershipLoadWatcher() {
 				// Send WalletEvent to the client
 				s.triggerWalletEvent(EventCollectiblesOwnershipUpdateStarted, event.ChainID, event.Account, "")
 			case event := <-loadPartialCh:
-				s.onOwnedCollectiblesChanged(event.Account, event.ChainID, event.Added)
 				// Send WalletEvent to the client
 				updateMessage := OwnershipUpdateMessage{
 					Added: event.Added,
@@ -667,10 +558,6 @@ func (s *Service) startOwnershipLoadWatcher() {
 				}
 				s.triggerWalletEvent(EventCollectiblesOwnershipUpdatePartial, event.ChainID, event.Account, string(encodedMessage))
 			case event := <-loadFinishedCh:
-				addedOrUpdated := make([]thirdparty.CollectibleUniqueID, 0, len(event.Added)+len(event.Updated))
-				addedOrUpdated = append(addedOrUpdated, event.Added...)
-				addedOrUpdated = append(addedOrUpdated, event.Updated...)
-				s.onOwnedCollectiblesChanged(event.Account, event.ChainID, addedOrUpdated)
 				// Send WalletEvent to the client
 				updateMessage := OwnershipUpdateMessage{
 					Added:   event.Added,

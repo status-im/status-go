@@ -11,7 +11,9 @@ import (
 
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
+	"github.com/status-im/status-go/services/wallet/transferdetector"
 
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -34,6 +36,8 @@ import (
 	alchemymanager "github.com/status-im/status-go/services/wallet/activityfetcher/alchemy"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	"github.com/status-im/status-go/services/wallet/collectibles"
+	"github.com/status-im/status-go/services/wallet/collectibles/ownership"
+	collectibles_ownership "github.com/status-im/status-go/services/wallet/collectibles/ownership"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/leaderboard"
@@ -111,8 +115,7 @@ func NewService(
 
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(gethManager, transactor, config, accountsDB, pendingTxManager, feed)
-	blockChainState := blockchainstate.NewBlockChainState()
-	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountsPublisher, transactionManager, blockChainState)
+	blockChainState := blockchainstate.NewBlockChainState(rpcClient)
 
 	thirdpartyServicesEnabled := ThirdpartyServicesEnabled(accountsDB)
 
@@ -194,9 +197,44 @@ func NewService(
 	cryptoOnRampManager := onramp.NewManager(cryptoOnRampProviders)
 
 	marketManager := market.NewManager(marketProviders, tokenManager, feed)
-	reader := NewReader(tokenManager, marketManager, token.NewPersistence(db), feed)
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 
+	multistandardBalanceFetcher := multistandardbalance.NewFetcher(rpcClient, multistandardbalance.DefaultBatchSize)
+	multistandardBalanceStorage := multistandardbalance.NewStorageMemory()
+	multistandardBalanceController := multistandardbalance.NewController(
+		multistandardbalance.DefaultControllerConfig(),
+		multistandardBalanceStorage,
+		multistandardBalanceFetcher,
+		accountsDB,
+		accountsPublisher,
+		rpcClient.GetNetworkManager(),
+		NewMultistandardBalanceTokenListProvider(tokenManager),
+		NewMultistandardBalanceCollectiblesListProvider(ownership.NewOwnershipDB(db), collectibles.NewContractTypeDB(db)),
+		blockChainState,
+		logutils.ZapLogger().Named("MultistandardBalanceController"),
+	)
+
+	transferDetectorController := transferdetector.NewController(
+		transferdetector.DefaultControllerConfig(),
+		transferdetector.NewFetcher(rpcClient),
+		accountsDB,
+		accountsPublisher,
+		rpcClient.GetNetworkManager(),
+		blockChainState,
+		logutils.ZapLogger().Named("TransferDetectorController"),
+	)
+
+	reader := NewReader(
+		tokenManager,
+		marketManager,
+		token.NewPersistence(db),
+		feed,
+		multistandardBalanceController.GetPublisher(),
+		transferDetectorController.GetPublisher(),
+		blockChainState,
+	)
+
+	collectiblesPublisher := pubsub.NewPublisher()
 	collectiblesManager := collectibles.NewManager(
 		db,
 		rpcClient,
@@ -205,7 +243,22 @@ func NewService(
 		mediaServer,
 		feed,
 	)
-	collectibles := collectibles.NewService(db, feed, accountsDB, accountsPublisher, communityManager, rpcClient.GetNetworkManager(), collectiblesManager)
+	collectiblesOwnershipController := collectibles_ownership.NewController(
+		ownership.NewOwnershipDB(db), accountsDB, accountsPublisher, rpcClient.GetNetworkManager(),
+		multistandardBalanceController.GetPublisher(),
+		transferDetectorController.GetPublisher(),
+		blockChainState,
+		collectiblesManager,
+		collectiblesPublisher,
+		logutils.ZapLogger().Named("CollectiblesOwnershipController"),
+	)
+	collectibles := collectibles.NewService(
+		db,
+		feed,
+		communityManager,
+		collectiblesManager,
+		collectiblesOwnershipController,
+		collectiblesPublisher)
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
@@ -215,7 +268,7 @@ func NewService(
 		router.AddPathProcessor(processor)
 	}
 
-	routeExecutionManager := routeexecution.NewManager(db, feed, router, transactionManager, transferController)
+	routeExecutionManager := routeexecution.NewManager(db, feed, router, transactionManager)
 
 	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, db, feed)
 
@@ -227,36 +280,37 @@ func NewService(
 	activityFetcherService := activityfetcher.NewService(activityFetcherManager, rpcClient.GetNetworkManager(), accountsDB, accountsPublisher, rpcClient, feed)
 
 	return &Service{
-		db:                     db,
-		accountsDB:             accountsDB,
-		rpcClient:              rpcClient,
-		tokenManager:           tokenManager,
-		communityManager:       communityManager,
-		savedAddressesManager:  savedAddressesManager,
-		transactionManager:     transactionManager,
-		pendingTxManager:       pendingTxManager,
-		transferController:     transferController,
-		cryptoOnRampManager:    cryptoOnRampManager,
-		collectiblesManager:    collectiblesManager,
-		collectibles:           collectibles,
-		gethManager:            gethManager,
-		marketManager:          marketManager,
-		transactor:             transactor,
-		feed:                   feed,
-		signals:                signals,
-		reader:                 reader,
-		currency:               currency,
-		activity:               activity,
-		decoder:                NewDecoder(),
-		blockChainState:        blockChainState,
-		keycardPairings:        NewKeycardPairings(),
-		config:                 config,
-		featureFlags:           featureFlags,
-		router:                 router,
-		routeExecutionManager:  routeExecutionManager,
-		leaderboardService:     leaderboardService,
-		activityFetcherService: activityFetcherService,
-		started:                false,
+		db:                             db,
+		accountsDB:                     accountsDB,
+		rpcClient:                      rpcClient,
+		tokenManager:                   tokenManager,
+		communityManager:               communityManager,
+		savedAddressesManager:          savedAddressesManager,
+		transactionManager:             transactionManager,
+		pendingTxManager:               pendingTxManager,
+		multistandardBalanceController: multistandardBalanceController,
+		transferDetectorController:     transferDetectorController,
+		cryptoOnRampManager:            cryptoOnRampManager,
+		collectiblesManager:            collectiblesManager,
+		collectibles:                   collectibles,
+		gethManager:                    gethManager,
+		marketManager:                  marketManager,
+		transactor:                     transactor,
+		feed:                           feed,
+		signals:                        signals,
+		reader:                         reader,
+		currency:                       currency,
+		activity:                       activity,
+		decoder:                        NewDecoder(),
+		blockChainState:                blockChainState,
+		keycardPairings:                NewKeycardPairings(),
+		config:                         config,
+		featureFlags:                   featureFlags,
+		router:                         router,
+		routeExecutionManager:          routeExecutionManager,
+		leaderboardService:             leaderboardService,
+		activityFetcherService:         activityFetcherService,
+		started:                        false,
 	}
 }
 
@@ -322,36 +376,37 @@ func buildPathProcessors(
 
 // Service is a wallet service.
 type Service struct {
-	db                     *sql.DB
-	accountsDB             *accounts.Database
-	rpcClient              *rpc.Client
-	tokenManager           *token.Manager
-	communityManager       *community.Manager
-	savedAddressesManager  *SavedAddressesManager
-	transactionManager     *transfer.TransactionManager
-	pendingTxManager       *transactions.PendingTxTracker
-	transferController     *transfer.Controller
-	cryptoOnRampManager    *onramp.Manager
-	collectiblesManager    *collectibles.Manager
-	collectibles           *collectibles.Service
-	gethManager            *accsmanagement.AccountsManager
-	marketManager          *market.Manager
-	transactor             *transactions.Transactor
-	feed                   *event.Feed
-	signals                *walletevent.SignalsTransmitter
-	reader                 *Reader
-	currency               *currency.Service
-	activity               *activity.Service
-	decoder                *Decoder
-	blockChainState        *blockchainstate.BlockChainState
-	keycardPairings        *KeycardPairings
-	config                 *params.NodeConfig
-	featureFlags           *protocolCommon.FeatureFlags
-	router                 *router.Router
-	routeExecutionManager  *routeexecution.Manager
-	leaderboardService     *leaderboard.MarketDataService
-	activityFetcherService *activityfetcher.Service
-	started                bool
+	db                             *sql.DB
+	accountsDB                     *accounts.Database
+	rpcClient                      *rpc.Client
+	tokenManager                   *token.Manager
+	communityManager               *community.Manager
+	savedAddressesManager          *SavedAddressesManager
+	transactionManager             *transfer.TransactionManager
+	pendingTxManager               *transactions.PendingTxTracker
+	multistandardBalanceController *multistandardbalance.Controller
+	transferDetectorController     *transferdetector.Controller
+	cryptoOnRampManager            *onramp.Manager
+	collectiblesManager            *collectibles.Manager
+	collectibles                   *collectibles.Service
+	gethManager                    *accsmanagement.AccountsManager
+	marketManager                  *market.Manager
+	transactor                     *transactions.Transactor
+	feed                           *event.Feed
+	signals                        *walletevent.SignalsTransmitter
+	reader                         *Reader
+	currency                       *currency.Service
+	activity                       *activity.Service
+	decoder                        *Decoder
+	blockChainState                *blockchainstate.BlockChainState
+	keycardPairings                *KeycardPairings
+	config                         *params.NodeConfig
+	featureFlags                   *protocolCommon.FeatureFlags
+	router                         *router.Router
+	routeExecutionManager          *routeexecution.Manager
+	leaderboardService             *leaderboard.MarketDataService
+	activityFetcherService         *activityfetcher.Service
+	started                        bool
 
 	cancelWalletServiceCtx context.CancelFunc
 }
@@ -362,7 +417,8 @@ func (s *Service) Start() error {
 		ctx, cancel := context.WithCancel(context.Background())
 		s.cancelWalletServiceCtx = cancel
 
-		s.transferController.Start(ctx)
+		s.multistandardBalanceController.Start()
+		s.transferDetectorController.Start()
 		s.currency.Start(ctx)
 		err := s.signals.Start(ctx)
 		s.collectibles.Start(ctx)
@@ -384,7 +440,8 @@ func (s *Service) Stop() error {
 	logutils.ZapLogger().Info("wallet will be stopped")
 	s.router.Stop()
 	s.signals.Stop()
-	s.transferController.Stop()
+	s.multistandardBalanceController.Stop()
+	s.transferDetectorController.Stop()
 	s.reader.Stop()
 	s.activity.Stop()
 	s.collectibles.Stop()

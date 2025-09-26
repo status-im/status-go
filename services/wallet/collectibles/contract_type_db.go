@@ -10,6 +10,28 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
+type ContractTypeDB struct {
+	db *sql.DB
+}
+
+func NewContractTypeDB(sqlDb *sql.DB) *ContractTypeDB {
+	return &ContractTypeDB{
+		db: sqlDb,
+	}
+}
+
+func (o *ContractTypeDB) GetContractTypes(ids []thirdparty.ContractID) (map[thirdparty.ContractID]w_common.ContractType, error) {
+	ret := make(map[thirdparty.ContractID]w_common.ContractType)
+	var err error
+	for _, id := range ids {
+		ret[id], err = readContractType(o.db, id)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ret, nil
+}
+
 func upsertContractType(creator sqlite.StatementCreator, id thirdparty.ContractID, contractType w_common.ContractType) error {
 	if contractType == w_common.ContractTypeUnknown {
 		return nil
