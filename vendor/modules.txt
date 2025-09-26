@@ -134,6 +134,9 @@ github.com/benbjohnson/immutable
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
+# github.com/bep/debounce v1.2.1
+## explicit
+github.com/bep/debounce
 # github.com/bits-and-blooms/bitset v1.20.0
 ## explicit; go 1.16
 github.com/bits-and-blooms/bitset
@@ -1026,9 +1029,15 @@ github.com/status-im/doubleratchet
 # github.com/status-im/extkeys v1.4.0
 ## explicit; go 1.23.0
 github.com/status-im/extkeys
-# github.com/status-im/go-wallet-sdk v0.0.0-20250912130226-d334ec9bff18
+# github.com/status-im/go-wallet-sdk v0.0.0-20250924175027-d5faf23a5ef7
 ## explicit; go 1.23.0
+github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher
+github.com/status-im/go-wallet-sdk/pkg/contracts/erc1155
+github.com/status-im/go-wallet-sdk/pkg/contracts/erc20
+github.com/status-im/go-wallet-sdk/pkg/contracts/erc721
+github.com/status-im/go-wallet-sdk/pkg/contracts/multicall3
 github.com/status-im/go-wallet-sdk/pkg/ethclient
+github.com/status-im/go-wallet-sdk/pkg/multicall
 # github.com/status-im/markdown v0.0.0-20250825083641-55c1df9bc05d
 ## explicit; go 1.12
 github.com/status-im/markdown
