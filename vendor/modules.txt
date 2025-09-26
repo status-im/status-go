@@ -1037,6 +1037,8 @@ github.com/status-im/go-wallet-sdk/pkg/contracts/erc20
 github.com/status-im/go-wallet-sdk/pkg/contracts/erc721
 github.com/status-im/go-wallet-sdk/pkg/contracts/multicall3
 github.com/status-im/go-wallet-sdk/pkg/ethclient
+github.com/status-im/go-wallet-sdk/pkg/eventfilter
+github.com/status-im/go-wallet-sdk/pkg/eventlog
 github.com/status-im/go-wallet-sdk/pkg/multicall
 # github.com/status-im/markdown v0.0.0-20250825083641-55c1df9bc05d
 ## explicit; go 1.12
