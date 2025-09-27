@@ -29,6 +29,8 @@ type StubPersistence struct {
 	completedSegments map[string]struct{}                           // hash
 }
 
+var _ types.Persistence = (*StubPersistence)(nil)
+
 func NewStubPersistence() *StubPersistence {
 	return &StubPersistence{
 		wakuKeys:                   make(map[string][]byte),
@@ -244,21 +246,33 @@ func (s *StubPersistence) CompleteMessageSegments(hash []byte, sigPubKey *ecdsa.
 }
 
 func (s *StubPersistence) DeleteHashRatchetMessagesOlderThan(timestamp int64) error {
-	// Not implemented for stub
 	return nil
 }
 
 func (s *StubPersistence) InsertPendingConfirmation(*types.RawMessageConfirmation) error {
-	// Not implemented for stub
 	return nil
 }
 
 func (s *StubPersistence) RemoveMessageSegmentsOlderThan(timestamp int64) error {
-	// Not implemented for stub
 	return nil
 }
 
 func (s *StubPersistence) RemoveMessageSegmentsCompletedOlderThan(timestamp int64) error {
-	// Not implemented for stub
 	return nil
+}
+
+func (s *StubPersistence) WakuInsertProtectedTopic(pubsubTopic string, privKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) error {
+	return nil
+}
+
+func (s *StubPersistence) WakuDeleteProtectedTopic(pubsubTopic string) error {
+	return nil
+}
+
+func (s *StubPersistence) WakuFetchPrivateKeyForProtectedTopic(topic string) (*ecdsa.PrivateKey, error) {
+	return nil, nil
+}
+
+func (s *StubPersistence) WakuProtectedTopics() ([]types.ProtectedTopic, error) {
+	return nil, nil
 }

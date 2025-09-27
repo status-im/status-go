@@ -9,7 +9,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -108,8 +107,6 @@ type IMetricsHandler interface {
 type Waku struct {
 	node *waku.WakuNode
 
-	appDB *sql.DB
-
 	dnsAddressCache             map[string][]dnsdisc.DiscoveredNode // Map to store the multiaddresses returned by dns discovery
 	dnsAddressCacheLock         *sync.RWMutex                       // lock to handle access to the map
 	dnsDiscAsyncRetrievedSignal chan struct{}
@@ -127,7 +124,7 @@ type Waku struct {
 
 	bandwidthCounter *metrics.BandwidthCounter
 
-	protectedTopicStore *persistence.ProtectedTopicsStore
+	protectedTopicStore persistence.ProtectedTopics
 
 	sendQueue *publish.MessageQueue
 
@@ -207,7 +204,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts timesource.TimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTopicsPersistence persistence.ProtectedTopics, ts timesource.TimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -257,7 +254,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 
 	waku := &Waku{
 		node:                            wakunode,
-		appDB:                           appDB,
 		cfg:                             cfg,
 		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
 		symKeys:                         make(map[string][]byte),
@@ -281,6 +277,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 		onPeerStats:                     onPeerStats,
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
 		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
+		protectedTopicStore:             protectedTopicsPersistence,
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
@@ -1070,13 +1067,6 @@ func (w *Waku) Stop() error {
 	err := w.node.Stop()
 	if err != nil {
 		return err
-	}
-
-	if w.protectedTopicStore != nil {
-		err := w.protectedTopicStore.Close()
-		if err != nil {
-			return err
-		}
 	}
 
 	close(w.goingOnline)

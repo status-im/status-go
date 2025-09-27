@@ -77,7 +77,7 @@ func (s *MessageSenderSuite) SetupTest() {
 		nil,
 		&wakuConfig,
 		s.logger,
-		database,
+		nil,
 		nil,
 		func([]byte, peer.AddrInfo, error) {},
 		nil,
