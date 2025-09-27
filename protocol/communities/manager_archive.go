@@ -309,12 +309,37 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 }
 
 func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
+	archiveTorrentCreatedSuccessfully := true
+	archiveCodexCreatedSuccessfully := true
 	m.UnseedHistoryArchiveTorrent(communityID)
-	_, err := m.ArchiveFileManager.CreateHistoryArchiveTorrentFromDB(communityID, topics, startDate, endDate, partition, encrypt)
-	if err != nil {
-		return err
+	_, errTorrent := m.ArchiveFileManager.CreateHistoryArchiveTorrentFromDB(communityID, topics, startDate, endDate, partition, encrypt)
+	if errTorrent != nil {
+		archiveTorrentCreatedSuccessfully = false
+		m.logger.Error("failed to create history archive torrent", zap.Error(errTorrent))
+	} else {
+		errTorrent = m.SeedHistoryArchiveTorrent(communityID)
+		if errTorrent != nil {
+			archiveTorrentCreatedSuccessfully = false
+			m.logger.Error("failed to seed history archive torrent", zap.Error(errTorrent))
+		}
 	}
-	return m.SeedHistoryArchiveTorrent(communityID)
+	_, errCodex := m.ArchiveFileManager.CreateHistoryArchiveCodexFromDB(communityID, topics, startDate, endDate, partition, encrypt)
+	if errCodex != nil {
+		archiveCodexCreatedSuccessfully = false
+		m.logger.Error("failed to create history archive codex", zap.Error(errCodex))
+	}
+	if !archiveTorrentCreatedSuccessfully && !archiveCodexCreatedSuccessfully {
+		return errors.Join(errTorrent, errCodex)
+	}
+	// one way of publishing index succeeded - we can publish the seeding signal
+	m.publisher.publish(&Subscription{
+		HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
+			CommunityID: communityID.String(),
+			MagnetLink:  archiveTorrentCreatedSuccessfully, // true if torrent created successfully
+			IndexCid:    archiveCodexCreatedSuccessfully,   // true if codex created successfully
+		},
+	})
+	return nil
 }
 
 func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, interval time.Duration) {
@@ -431,12 +456,6 @@ func (m *ArchiveManager) SeedHistoryArchiveTorrent(communityID types.HexBytes) e
 	}
 
 	torrent.DownloadAll()
-
-	m.publisher.publish(&Subscription{
-		HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
-			CommunityID: communityID.String(),
-		},
-	})
 
 	magnetLink := metaInfo.Magnet(nil, &info).String()
 
@@ -641,6 +660,8 @@ func (m *ArchiveManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 					m.publisher.publish(&Subscription{
 						HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
 							CommunityID: communityID.String(),
+							MagnetLink:  true,  // Downloaded via magnet link
+							IndexCid:    false, // No Codex CID in magnet link downloads
 						},
 					})
 					m.logger.Debug("finished downloading archives")

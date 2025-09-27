@@ -219,6 +219,11 @@ message CommunityMessageArchiveMagnetlink {
   string magnet_uri = 2;
 }
 
+message CommunityMessageArchiveIndexCid {
+  uint64 clock = 1;
+  string cid = 2;
+}
+
 message WakuMessage {
   bytes sig = 1;
   uint64 timestamp = 2;

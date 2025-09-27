@@ -56,6 +56,8 @@ type HistoryArchivesCreatedSignal struct {
 
 type HistoryArchivesSeedingSignal struct {
 	CommunityID string `json:"communityId"`
+	MagnetLink  bool   `json:"magnetLink"`
+	IndexCid    bool   `json:"indexCid"`
 }
 
 type HistoryArchivesUnseededSignal struct {
@@ -108,8 +110,12 @@ func SendHistoryArchivesCreated(communityID string, from int, to int) {
 	})
 }
 
-func SendHistoryArchivesSeeding(communityID string) {
-	send(EventHistoryArchivesSeeding, HistoryArchivesSeedingSignal{CommunityID: communityID})
+func SendHistoryArchivesSeeding(communityID string, magnetLink bool, indexCid bool) {
+	send(EventHistoryArchivesSeeding, HistoryArchivesSeedingSignal{
+		CommunityID: communityID,
+		MagnetLink:  magnetLink,
+		IndexCid:    indexCid,
+	})
 }
 
 func SendHistoryArchivesUnseeded(communityID string) {

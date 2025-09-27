@@ -960,6 +960,9 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			startDate := time.Unix(int64(exportData.OldestMessageTimestamp), 0)
 			endDate := time.Now()
 
+			archiveTorrentCreatedSuccessfully := true
+			archiveCodexCreatedSuccessfully := true
+
 			_, err = m.archiveManager.CreateHistoryArchiveTorrentFromMessages(
 				request.CommunityID,
 				wakuMessages,
@@ -971,8 +974,28 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			)
 			if err != nil {
 				m.logger.Error("failed to create history archive torrent", zap.Error(err))
+				archiveTorrentCreatedSuccessfully = false
+			}
+
+			// codex extension
+			_, err = m.archiveManager.CreateHistoryArchiveCodexFromMessages(
+				request.CommunityID,
+				wakuMessages,
+				topics,
+				startDate,
+				endDate,
+				messageArchiveInterval,
+				community.Encrypted(),
+			)
+			if err != nil {
+				m.logger.Error("failed to create history archive codex", zap.Error(err))
+				archiveCodexCreatedSuccessfully = false
+			}
+
+			if !archiveTorrentCreatedSuccessfully && !archiveCodexCreatedSuccessfully {
 				continue
 			}
+
 			communitySettings, err := m.communitiesManager.GetCommunitySettingsByID(request.CommunityID)
 			if err != nil {
 				m.logger.Error("Failed to get community settings", zap.Error(err))
@@ -1732,6 +1755,9 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			startDate := time.Unix(int64(exportData.OldestMessageTimestamp), 0)
 			endDate := time.Now()
 
+			archiveTorrentCreatedSuccessfully := true
+			archiveCodexCreatedSuccessfully := true
+
 			_, err = m.archiveManager.CreateHistoryArchiveTorrentFromMessages(
 				discordCommunity.ID(),
 				wakuMessages,
@@ -1743,6 +1769,25 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			)
 			if err != nil {
 				m.logger.Error("failed to create history archive torrent", zap.Error(err))
+				archiveTorrentCreatedSuccessfully = false
+			}
+
+			// codex extension
+			_, err = m.archiveManager.CreateHistoryArchiveCodexFromMessages(
+				discordCommunity.ID(),
+				wakuMessages,
+				topics,
+				startDate,
+				endDate,
+				messageArchiveInterval,
+				discordCommunity.Encrypted(),
+			)
+			if err != nil {
+				m.logger.Error("failed to create history archive codex", zap.Error(err))
+				archiveCodexCreatedSuccessfully = false
+			}
+
+			if !archiveTorrentCreatedSuccessfully && !archiveCodexCreatedSuccessfully {
 				continue
 			}
 

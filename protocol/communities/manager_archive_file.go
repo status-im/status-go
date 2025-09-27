@@ -596,6 +596,14 @@ func (m *ArchiveFileManager) CreateHistoryArchiveTorrentFromDB(communityID types
 	return m.createHistoryArchiveTorrent(communityID, make([]*messagingtypes.ReceivedMessage, 0), topics, startDate, endDate, partition, encrypt)
 }
 
+func (m *ArchiveFileManager) CreateHistoryArchiveCodexFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+	return m.createHistoryArchiveCodex(communityID, messages, topics, startDate, endDate, partition, encrypt)
+}
+
+func (m *ArchiveFileManager) CreateHistoryArchiveCodexFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+	return m.createHistoryArchiveCodex(communityID, make([]*messagingtypes.ReceivedMessage, 0), topics, startDate, endDate, partition, encrypt)
+}
+
 func (m *ArchiveFileManager) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
 	return m.persistence.GetMessageArchiveIDsToImport(communityID)
 }
@@ -623,6 +631,18 @@ func (m *ArchiveFileManager) GetHistoryArchiveMagnetlink(communityID types.HexBy
 	}
 
 	return metaInfo.Magnet(nil, &info).String(), nil
+}
+
+func (m *ArchiveFileManager) GetHistoryArchiveIndexCid(communityID types.HexBytes) (string, error) {
+	codexArchiveDir := m.torrentConfig.DataDir + "/codex/" + communityID.String()
+	codexIndexCidPath := codexArchiveDir + "/index-cid"
+
+	cidData, err := os.ReadFile(codexIndexCidPath)
+	if err != nil {
+		return "", err
+	}
+
+	return string(cidData), nil
 }
 
 func (m *ArchiveFileManager) archiveDataFile(communityID string) string {
