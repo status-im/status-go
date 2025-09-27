@@ -125,7 +125,7 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 	config := newConfig(options...)
 
 	waku, err := newWaku(wakuParams{
-		db:                              params.DB,
+		persistence:                     params.Persistence,
 		identity:                        params.Identity,
 		nodeKey:                         params.NodeKey,
 		wakuConfig:                      params.WakuConfig,
@@ -369,7 +369,7 @@ func (c *Core) startCleanupLoop(name string, cleanupFunc func() error) {
 }
 
 type wakuParams struct {
-	db *sql.DB
+	persistence types.Persistence
 
 	identity *ecdsa.PrivateKey
 	nodeKey  *ecdsa.PrivateKey
@@ -425,7 +425,7 @@ func newWaku(params wakuParams) (*wakuv2.Waku, error) {
 		params.nodeKey,
 		cfg,
 		params.logger,
-		params.db,
+		&adapters.WakuProtectedTopics{P: params.persistence},
 		params.timeSource,
 		params.onHistoricMessagesRequestFailed,
 		params.onPeerStats,

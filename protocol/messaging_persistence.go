@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -373,4 +374,63 @@ func (c *messagingPersistence) MarkAsConfirmed(dataSyncID []byte, atLeastOne boo
 	}
 
 	return
+}
+
+func (c *messagingPersistence) WakuInsertProtectedTopic(pubsubTopic string, privKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) error {
+	var privKeyBytes []byte
+	if privKey != nil {
+		privKeyBytes = crypto.FromECDSA(privKey)
+	}
+	pubKeyBytes := crypto.FromECDSAPub(publicKey)
+
+	_, err := c.db.Exec("INSERT OR REPLACE INTO pubsubtopic_signing_key (topic, priv_key, pub_key) VALUES (?, ?, ?)",
+		pubsubTopic, privKeyBytes, pubKeyBytes)
+	return err
+}
+
+func (c *messagingPersistence) WakuDeleteProtectedTopic(pubsubTopic string) error {
+	_, err := c.db.Exec("DELETE FROM pubsubtopic_signing_key WHERE topic = ?", pubsubTopic)
+	return err
+}
+
+func (c *messagingPersistence) WakuFetchPrivateKeyForProtectedTopic(topic string) (*ecdsa.PrivateKey, error) {
+	var privKeyBytes []byte
+	err := c.db.QueryRow("SELECT priv_key FROM pubsubtopic_signing_key WHERE topic = ?", topic).Scan(&privKeyBytes)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return crypto.ToECDSA(privKeyBytes)
+}
+
+func (c *messagingPersistence) WakuProtectedTopics() ([]types.ProtectedTopic, error) {
+	rows, err := c.db.Query("SELECT pub_key, topic FROM pubsubtopic_signing_key")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []types.ProtectedTopic
+	for rows.Next() {
+		var pubKeyBytes []byte
+		var topic string
+		err := rows.Scan(&pubKeyBytes, &topic)
+		if err != nil {
+			return nil, err
+		}
+
+		pubk, err := crypto.UnmarshalPubkey(pubKeyBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, types.ProtectedTopic{
+			PubKey: pubk,
+			Topic:  topic,
+		})
+	}
+
+	return result, nil
 }

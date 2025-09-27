@@ -3,8 +3,7 @@ package types
 import "crypto/ecdsa"
 
 type Persistence interface {
-	WakuKeys() (map[string][]byte, error)
-	AddWakuKey(chatID string, key []byte) error
+	wakuPersistence
 
 	MessageCacheAdd(ids []string, timestamp uint64) error
 	MessageCacheClear() error
@@ -23,4 +22,18 @@ type Persistence interface {
 	CompleteMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey, timestamp int64) error
 	RemoveMessageSegmentsOlderThan(timestamp int64) error
 	RemoveMessageSegmentsCompletedOlderThan(timestamp int64) error
+}
+
+type ProtectedTopic struct {
+	PubKey *ecdsa.PublicKey
+	Topic  string
+}
+
+type wakuPersistence interface {
+	WakuKeys() (map[string][]byte, error)
+	AddWakuKey(chatID string, key []byte) error
+	WakuInsertProtectedTopic(pubsubTopic string, privKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) error
+	WakuDeleteProtectedTopic(pubsubTopic string) error
+	WakuFetchPrivateKeyForProtectedTopic(topic string) (*ecdsa.PrivateKey, error)
+	WakuProtectedTopics() ([]ProtectedTopic, error)
 }

@@ -154,7 +154,7 @@ type Waku struct {
 
 	bandwidthCounter *metrics.BandwidthCounter
 
-	protectedTopicStore *persistence.ProtectedTopicsStore
+	protectedTopicStore persistence.ProtectedTopics
 
 	sendQueue *publish.MessageQueue
 
@@ -221,7 +221,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts timesource.TimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTopicsPersistence persistence.ProtectedTopics, ts timesource.TimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -244,7 +244,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 	ctx, cancel := context.WithCancel(context.Background())
 
 	waku := &Waku{
-		appDB:                           appDB,
 		cfg:                             cfg,
 		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
 		symKeys:                         make(map[string][]byte),
@@ -267,6 +266,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 		onPeerStats:                     onPeerStats,
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
 		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
+		protectedTopicStore:             protectedTopicsPersistence,
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
@@ -346,13 +346,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 	if !cfg.LightClient {
 		opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
 		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(5, 10)))
-	}
-
-	if appDB != nil {
-		waku.protectedTopicStore, err = persistence.NewProtectedTopicsStore(logger, appDB)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	if cfg.EnablePeerExchangeServer {
@@ -1398,13 +1391,6 @@ func (w *Waku) Stop() error {
 	w.envelopeCache.Stop()
 
 	w.node.Stop()
-
-	if w.protectedTopicStore != nil {
-		err := w.protectedTopicStore.Close()
-		if err != nil {
-			return err
-		}
-	}
 
 	close(w.goingOnline)
 	w.wg.Wait()
