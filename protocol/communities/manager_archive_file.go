@@ -91,48 +91,11 @@ func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBy
 		}
 	}
 
-	// codex extension
-	codexArchiveDir := m.torrentConfig.DataDir + "/codex/" + communityID.String()
-	codexIndexPath := codexArchiveDir + "/index"
-	codexIndexCidPath := codexArchiveDir + "/index-cid"
-	codexDataPath := codexArchiveDir + "/data"
-
-	m.logger.Debug("codexDataPath", zap.String("codexDataPath", codexDataPath))
-
-	codexWakuMessageArchiveIndexProto := &protobuf.CodexWakuMessageArchiveIndex{}
-	codexWakuMessageArchiveIndex := make(map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata)
-	codexArchiveIDs := make([]string, 0)
-
-	if _, err := os.Stat(codexArchiveDir); os.IsNotExist(err) {
-		err := os.MkdirAll(codexArchiveDir, 0700)
-		if err != nil {
-			return codexArchiveIDs, err
-		}
-	}
-
-	_, err = os.Stat(codexIndexPath)
-	if err == nil {
-		codexWakuMessageArchiveIndexProto, err = m.CodexLoadHistoryArchiveIndexFromFile(m.identity, communityID)
-		if err != nil {
-			return codexArchiveIDs, err
-		}
-	}
-
-	m.logger.Debug("codexWakuMessageArchiveIndexProto",
-		zap.Any("codexWakuMessageArchiveIndexProto", codexWakuMessageArchiveIndexProto))
-	m.logger.Debug("codexWakuMessageArchiveIndex",
-		zap.Any("codexWakuMessageArchiveIndex", codexWakuMessageArchiveIndex))
-
 	var offset uint64 = 0
 
 	for hash, metadata := range wakuMessageArchiveIndexProto.Archives {
 		offset = offset + metadata.Size
 		wakuMessageArchiveIndex[hash] = metadata
-	}
-
-	// codex extension
-	for hash, metadata := range codexWakuMessageArchiveIndexProto.Archives {
-		codexWakuMessageArchiveIndex[hash] = metadata
 	}
 
 	var encodedArchives []*EncodedArchiveData
@@ -240,31 +203,6 @@ func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBy
 				Padding:  uint64(padding),
 			}
 
-			// codex extension
-			// upload archive to codex and get CID back
-			client := NewCodexClient("localhost", "8080") // make this configurable
-			cid, err := client.UploadArchive(encodedArchive)
-			if err != nil {
-				m.logger.Error("failed to upload to codex", zap.Error(err))
-				return codexArchiveIDs, err
-			}
-
-			m.logger.Debug("uploaded to codex", zap.String("cid", cid))
-
-			codexWakuMessageArchiveIndexMetadata := &protobuf.CodexWakuMessageArchiveIndexMetadata{
-				Metadata: wakuMessageArchive.Metadata,
-				Cid:      cid,
-			}
-
-			codexWakuMessageArchiveIndexMetadataBytes, err := proto.Marshal(codexWakuMessageArchiveIndexMetadata)
-			if err != nil {
-				return codexArchiveIDs, err
-			}
-
-			codexArchiveID := crypto.Keccak256Hash(codexWakuMessageArchiveIndexMetadataBytes).String()
-			codexArchiveIDs = append(codexArchiveIDs, codexArchiveID)
-			codexWakuMessageArchiveIndex[codexArchiveID] = codexWakuMessageArchiveIndexMetadata
-
 			wakuMessageArchiveIndexMetadataBytes, err := proto.Marshal(wakuMessageArchiveIndexMetadata)
 			if err != nil {
 				return archiveIDs, err
@@ -285,33 +223,6 @@ func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBy
 	}
 
 	if len(encodedArchives) > 0 {
-
-		// codex extension
-		codexWakuMessageArchiveIndexProto.Archives = codexWakuMessageArchiveIndex
-		codexIndexBytes, err := proto.Marshal(codexWakuMessageArchiveIndexProto)
-		if err != nil {
-			return codexArchiveIDs, err
-		}
-
-		if encrypt {
-			codexIndexBytes, err = m.messaging.BuildHashRatchetMessage(communityID, codexIndexBytes)
-			if err != nil {
-				return codexArchiveIDs, err
-			}
-		}
-
-		// upload index file to codex
-		client := NewCodexClient("localhost", "8080") // make this configurable
-		cid, err := client.UploadArchive(codexIndexBytes)
-		if err != nil {
-			m.logger.Error("failed to upload to codex", zap.Error(err))
-			return codexArchiveIDs, err
-		}
-
-		err = os.WriteFile(codexIndexCidPath, []byte(cid), 0644) // nolint: gosec
-		if err != nil {
-			return codexArchiveIDs, err
-		}
 
 		dataBytes := make([]byte, 0)
 
