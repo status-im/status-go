@@ -22,6 +22,14 @@ func (amm *ArchiveFileManagerNop) CreateHistoryArchiveTorrentFromDB(communityID 
 	return nil, nil
 }
 
+func (amm *ArchiveFileManagerNop) CreateHistoryArchiveCodexFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+	return nil, nil
+}
+
+func (amm *ArchiveFileManagerNop) CreateHistoryArchiveCodexFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+	return nil, nil
+}
+
 func (amm *ArchiveFileManagerNop) SaveMessageArchiveID(communityID types.HexBytes, hash string) error {
 	return nil
 }

@@ -185,11 +185,14 @@ type HistoryArchiveDownloadTaskInfo struct {
 type ArchiveFileService interface {
 	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
 	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveCodexFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveCodexFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
 	SaveMessageArchiveID(communityID types.HexBytes, hash string) error
 	GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error)
 	SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error
 	ExtractMessagesFromHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error)
 	GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error)
+	GetHistoryArchiveIndexCid(communityID types.HexBytes) (string, error)
 	LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error)
 	CodexLoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.CodexWakuMessageArchiveIndex, error)
 }
@@ -3677,8 +3680,24 @@ func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID t
 	return m.SaveCommunity(community)
 }
 
+func (m *Manager) UpdateCommunityDescriptionIndexCidMessageClock(communityID types.HexBytes, clock uint64) error {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
+	community, err := m.GetByIDString(communityID.String())
+	if err != nil {
+		return err
+	}
+	community.config.CommunityDescription.ArchiveMagnetlinkClock = clock
+	return m.SaveCommunity(community)
+}
+
 func (m *Manager) UpdateMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
 	return m.persistence.UpdateMagnetlinkMessageClock(communityID, clock)
+}
+
+func (m *Manager) UpdateIndexCidMessageClock(communityID types.HexBytes, clock uint64) error {
+	return m.persistence.UpdateIndexCidMessageClock(communityID, clock)
 }
 
 func (m *Manager) UpdateLastSeenMagnetlink(communityID types.HexBytes, magnetlinkURI string) error {
