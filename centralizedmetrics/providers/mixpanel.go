@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -148,9 +149,7 @@ func (p mixpanelMetricProperties) MarshalJSON() ([]byte, error) {
 	}
 
 	// Merge AdditionalProperties into the map
-	for key, value := range p.AdditionalProperties {
-		mmpMap[key] = value
-	}
+	maps.Copy(mmpMap, p.AdditionalProperties)
 
 	// Marshal the merged map back to JSON
 	marshaled, err := json.Marshal(mmpMap)

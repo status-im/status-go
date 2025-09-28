@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 )
@@ -58,9 +59,7 @@ func ChunkMapFetcher[T any](
 
 	result := make(map[string]T)
 	for _, chunkResult := range chunkResults {
-		for k, v := range chunkResult {
-			result[k] = v
-		}
+		maps.Copy(result, chunkResult)
 	}
 
 	return result, nil

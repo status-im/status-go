@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"maps"
 )
 
 type ErrorCode int
@@ -48,9 +49,7 @@ func (e *AccountsError) Copy() *AccountsError {
 	var ctx map[string]interface{}
 	if e.Context != nil {
 		ctx = make(map[string]interface{}, len(e.Context))
-		for k, v := range e.Context {
-			ctx[k] = v
-		}
+		maps.Copy(ctx, e.Context)
 	}
 
 	return &AccountsError{
