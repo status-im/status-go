@@ -113,3 +113,6 @@ pkg/version/GIT_COMMIT
 pkg/sentry/SENTRY_CONTEXT_NAME
 pkg/sentry/SENTRY_CONTEXT_VERSION
 pkg/sentry/SENTRY_PRODUCTION
+
+go.work
+go.work.sum
