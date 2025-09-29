@@ -23,19 +23,19 @@ func TestGethAdapter(t *testing.T) {
 	)
 	logger := zap.New(core)
 
-	log.Root().SetHandler(gethAdapter(logger))
+	log.SetDefault(newGethAdapter(logger))
 
 	log.Debug("should not be printed, as it's below the log level")
 	require.Empty(t, buffer.String())
 
 	buffer.Reset()
 	log.Info("should be printed")
-	require.Regexp(t, `INFO\s+'INFO\s*\[.*\]\s*should be printed '`, buffer.String())
+	require.Regexp(t, `INFO\s+t=.* lvl=info msg="should be printed"`, buffer.String())
 
 	buffer.Reset()
 	level.SetLevel(zap.DebugLevel)
 	log.Debug("should be printed with context", "value1", 12345, "value2", "string")
-	require.Regexp(t, `DEBUG\s+'DEBUG\s*\[.*\]\s*should be printed with context\s+value1=12345\s+value2=string'`, buffer.String())
+	require.Regexp(t, `DEBUG\s+t=.* lvl=debug msg="should be printed with context" value1=12345 value2=string`, buffer.String())
 
 	buffer.Reset()
 	log.Trace("should be skipped")
