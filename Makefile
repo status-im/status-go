@@ -109,6 +109,11 @@ GO_CMD_BUILDS := $(addprefix build/bin/, $(GO_CMD_NAMES))
 # Location of symlinks to derivations that should not be garbage collected
 export _NIX_GCROOTS = ./.nix-gcroots
 
+# Location of waku-go-bindings and nwaku
+WAKU_GO_BINDINGS_DIR := $(shell go list -m -f '{{.Dir}}' github.com/waku-org/waku-go-bindings)
+NWAKU_DIR := $(WAKU_GO_BINDINGS_DIR)/third_party/nwaku
+LIBWAKU := $(NWAKU_DIR)/libwaku.$(LIBWAKU_EXT)
+
 #----------------
 # Nix targets
 #----------------
@@ -163,7 +168,7 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
-$(GO_CMD_BUILDS): generate
+$(GO_CMD_BUILDS): generate $(LIBWAKU)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
@@ -171,11 +176,10 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	@echo "Compilation done."
 	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
-LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(LIBWAKU_EXT)
 $(LIBWAKU):
 ifeq ($(USE_NWAKU),true)
-	@echo "Building libwaku"
-	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
+	@echo "Building libwaku in $(NWAKU_DIR)"
+	$(MAKE) -C "$(WAKU_GO_BINDINGS_DIR)/waku"
 endif
 
 statusgo: ##@build Build status-go as status-backend server
