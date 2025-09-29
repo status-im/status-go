@@ -22,8 +22,7 @@ func ZapLogger() *zap.Logger {
 		_zapLogger = defaultLogger()
 
 		// forward geth logs to zap logger
-		_gethLogger := _zapLogger.Named("geth")
-		log.Root().SetHandler(gethAdapter(_gethLogger))
+		log.SetDefault(newGethAdapter(_zapLogger.Named("geth")))
 	})
 	return _zapLogger
 }
