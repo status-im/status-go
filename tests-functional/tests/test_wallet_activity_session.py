@@ -182,7 +182,7 @@ class TestWalletActivitySession:
             1,
             lambda signal: signal["event"]["type"] == EventActivityFilteringDone and signal["event"]["requestId"] == sessionID,
         )
-        response = self.rpc_client.wallet_service.reset_activity_filter_session(sessionID, 10)
+        response = self.rpc_client.wallet_service.reset_activity_filter_session(sessionID)
         event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
 
         # Check response event
