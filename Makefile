@@ -171,12 +171,17 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	@echo "Compilation done."
 	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
-LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(LIBWAKU_EXT)
+WAKU_GO_BINDINGS_DIR := $(shell go list -m -f '{{.Dir}}' github.com/waku-org/waku-go-bindings)
+NWAKU_DIR := $(WAKU_GO_BINDINGS_DIR)/third_party/nwaku
+LIBWAKU := $(NWAKU_DIR)/build/libwaku.$(LIBWAKU_EXT)
+
 $(LIBWAKU):
 ifeq ($(USE_NWAKU),true)
-	@echo "Building libwaku"
-	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
+	@echo "Building libwaku in $(NWAKU_DIR)"
+	$(MAKE) -C "$(WAKU_GO_BINDINGS_DIR)/waku"
 endif
+
+build-libwaku: $(LIBWAKU)
 
 statusgo: ##@build Build status-go as status-backend server
 statusgo: build/bin/status-backend
@@ -219,8 +224,6 @@ statusgo-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-g
 		./build/bin/statusgo-lib
 	@echo "Static library built:"
 	@ls -la build/bin/libstatus.*
-
-build-libwaku: $(LIBWAKU)
 
 statusgo-shared-library: generate
 statusgo-shared-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as shared library for current platform
@@ -289,7 +292,7 @@ generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
-	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
+	#@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
 
 generate-contracts:
 	go generate ./contracts
