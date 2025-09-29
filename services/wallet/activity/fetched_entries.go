@@ -82,10 +82,10 @@ func getFetchedEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs 
 			entries := thirdpartyActivityEntriesToEntries(deps, activityEntries)
 
 			for _, entry := range entries {
-				if len(entry.transactions) > 0 {
+				if entry.transaction != nil {
 					key := fmt.Sprintf("%d-%s-%s",
-						entry.transactions[0].ChainID,
-						entry.transactions[0].Hash.Hex(),
+						entry.transaction.ChainID,
+						entry.transaction.Hash.Hex(),
 						address.Hex())
 					result[key] = entry
 				}
@@ -153,22 +153,8 @@ func thirdpartyActivityEntriesToEntries(deps FilterDependencies, activityEntries
 			chainID = wCommon.ChainID(wCommon.UnknownChainID)
 		}
 
-		var payloadType ac.PayloadType
-		if ae.ActivityType == ac.SwapAT || ae.ActivityType == ac.BridgeAT {
-			payloadType = ac.MultiTransactionPT
-		} else {
-			payloadType = ac.SimpleTransactionPT
-		}
-
 		entry := Entry{
-			payloadType: payloadType,
-			transactions: []*ac.TransactionIdentity{
-				{
-					ChainID: chainID,
-					Hash:    ae.TxHash,
-					Address: ae.Sender,
-				},
-			},
+			payloadType: ac.SimpleTransactionPT,
 			transaction: &ac.TransactionIdentity{
 				ChainID: chainID,
 				Hash:    ae.TxHash,

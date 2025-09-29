@@ -132,8 +132,8 @@ func getSentEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs []O
 	// Build the result map using ChainID-Hash-Address key format
 	result := make(map[string]Entry)
 	for _, entry := range entries {
-		if len(entry.transactions) > 0 {
-			key := entry.transactions[0].Key()
+		if entry.transaction != nil {
+			key := entry.transaction.Key()
 			result[key] = entry
 		}
 	}
@@ -198,14 +198,11 @@ func sentEntryDataToEntriesV2(deps FilterDependencies, data []*sentEntryDataV2) 
 		chainID := wCommon.ChainID(d.Path.FromChain.ChainID)
 
 		entry := Entry{
-			payloadType: ac.MultiTransactionPT, // Temporary, to keep compatibility with clients
-			id:          d.TxArgs.MultiTransactionID,
-			transactions: []*ac.TransactionIdentity{
-				{
-					ChainID: chainID,
-					Hash:    d.Tx.Hash(),
-					Address: d.RouteInputParams.AddrFrom,
-				},
+			payloadType: ac.SimpleTransactionPT,
+			transaction: &ac.TransactionIdentity{
+				ChainID: chainID,
+				Hash:    d.Tx.Hash(),
+				Address: d.RouteInputParams.AddrFrom,
 			},
 			timestamp:      d.Timestamp,
 			activityType:   getSentActivityType(d.Path.ProcessorName, d.IsApproval),
@@ -258,7 +255,7 @@ func getSentActivityType(processorName string, isApproval bool) ac.Type {
 	switch processorName {
 	case pathProcessorCommon.ProcessorTransferName, pathProcessorCommon.ProcessorERC721Name, pathProcessorCommon.ProcessorERC1155Name:
 		return ac.SendAT
-	case pathProcessorCommon.ProcessorBridgeHopName, pathProcessorCommon.ProcessorBridgeCelerName:
+	case pathProcessorCommon.ProcessorBridgeHopName:
 		return ac.BridgeAT
 	case pathProcessorCommon.ProcessorSwapParaswapName:
 		return ac.SwapAT
