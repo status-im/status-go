@@ -2,16 +2,19 @@ package onramp
 
 import (
 	"context"
-	"crypto/sha512"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/pkg/security"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/mercuryo"
 	"github.com/status-im/status-go/services/wallet/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -27,12 +30,20 @@ type MercuryoProvider struct {
 	supportedTokensLock      sync.RWMutex
 	httpClient               *mercuryo.Client
 	tokenManager             token.ManagerInterface
+	params                   MercuryoParams
 }
 
-func NewMercuryoProvider(tokenManager token.ManagerInterface) *MercuryoProvider {
+type MercuryoParams struct {
+	SignURL      string
+	SignUser     security.SensitiveString
+	SignPassword security.SensitiveString
+}
+
+func NewMercuryoProvider(tokenManager token.ManagerInterface, params MercuryoParams) *MercuryoProvider {
 	return &MercuryoProvider{
 		httpClient:   mercuryo.NewClient(),
 		tokenManager: tokenManager,
+		params:       params,
 	}
 }
 
@@ -103,13 +114,36 @@ func (p *MercuryoProvider) getSupportedCurrencies(ctx context.Context) ([]*token
 	return p.supportedTokens, nil
 }
 
-// Should generate the SHA512 hash of the string "AddressKey"
-func getMercuryoSignature(address common.Address, key string) string {
-	addressString := address.Hex()
+// Returns a widget-id and a signature (the SHA512 hash of the concatenated address and the widget's secret).
+func (p *MercuryoProvider) getMercuryoSignatureParams(ctx context.Context, address common.Address) (widgetID string, signature string, err error) {
+	if p.params.SignURL == "" || p.params.SignUser.Empty() || p.params.SignPassword.Empty() {
+		return "", "", errors.New("signURL, signUser, and signPassword are required")
+	}
 
-	hash := sha512.New()
-	hash.Write([]byte(addressString[:] + key))
-	return fmt.Sprintf("%x", hash.Sum(nil))
+	queryParams := url.Values{
+		"address": {address.Hex()},
+	}
+
+	client := thirdparty.NewHTTPClient()
+	resp, err := client.DoGetRequestWithCredentials(ctx, p.params.SignURL, queryParams, &thirdparty.BasicCreds{
+		User:     p.params.SignUser,
+		Password: p.params.SignPassword,
+	})
+	if err != nil {
+		return "", "", err
+	}
+
+	type signResponse struct {
+		WidgetID  string `json:"widget_id"`
+		Signature string `json:"signature"`
+	}
+	var response signResponse
+	err = json.Unmarshal(resp, &response)
+	if err != nil {
+		return "", "", err
+	}
+
+	return response.WidgetID, response.Signature, nil
 }
 
 func getMercuryoCurrency(symbol string) string {
@@ -117,11 +151,7 @@ func getMercuryoCurrency(symbol string) string {
 }
 
 func (p *MercuryoProvider) GetURL(ctx context.Context, parameters Parameters) (string, error) {
-	const (
-		baseURL      = "https://exchange.mercuryo.io/?type=buy"
-		widgetID     = "6a7eb330-2b09-49b7-8fd3-1c77cfb6cd47"
-		widgetSecret = "AZ5fmxmrgyrXH3zre6yHU2Vw9fPqEw82" // #nosec G101
-	)
+	const baseURL = "https://exchange.mercuryo.io/?type=buy"
 
 	if parameters.DestAddress == nil || *parameters.DestAddress == walletCommon.ZeroAddress() {
 		return "", errors.New("destination address is required")
@@ -145,8 +175,11 @@ func (p *MercuryoProvider) GetURL(ctx context.Context, parameters Parameters) (s
 		return "", errors.New("unsupported symbol")
 	}
 
-	// TODO #16005: Move signature generation to proxy server
-	signature := getMercuryoSignature(*parameters.DestAddress, widgetSecret)
+	widgetID, signature, err := p.getMercuryoSignatureParams(ctx, *parameters.DestAddress)
+	if err != nil {
+		return "", err
+	}
+
 	url := fmt.Sprintf("%s&network=%s&currency=%s&address=%s&hide_address=false&fix_address=true&signature=%s&widget_id=%s",
 		baseURL, network, currency, parameters.DestAddress.Hex(), signature, widgetID)
 

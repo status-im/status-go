@@ -512,13 +512,13 @@ func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConf
 		walletConfig.EthRpcProxyPassword)
 
 	// Apply auth for old proxy
-	hasOldProxyCredentials := !walletConfig.StatusProxyBlockchainUser.Empty() && !walletConfig.StatusProxyBlockchainPassword.Empty()
+	hasOldProxyCredentials := !walletConfig.StatusProxyUser.Empty() && !walletConfig.StatusProxyPassword.Empty()
 	networks = networkhelper.OverrideBasicAuth(
 		networks,
 		params.EmbeddedProxyProviderType,
 		hasOldProxyCredentials,
-		walletConfig.StatusProxyBlockchainUser,
-		walletConfig.StatusProxyBlockchainPassword)
+		walletConfig.StatusProxyUser,
+		walletConfig.StatusProxyPassword)
 
 	return networks
 }
