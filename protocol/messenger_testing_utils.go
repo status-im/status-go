@@ -10,7 +10,7 @@ import (
 	"time"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/protocol/wakusync"
+	"github.com/status-im/status-go/protocol/backupsync"
 
 	"github.com/status-im/status-go/protocol/identity"
 
@@ -54,11 +54,8 @@ type MessengerSignalsHandlerMock struct {
 	communityFoundChan chan *communities.Community
 }
 
-func (m *MessengerSignalsHandlerMock) SendWakuBackedUpProfile(*wakusync.WakuBackedUpDataResponse)  {}
-func (m *MessengerSignalsHandlerMock) SendWakuBackedUpSettings(*wakusync.WakuBackedUpDataResponse) {}
-func (m *MessengerSignalsHandlerMock) SendWakuBackedUpKeypair(*wakusync.WakuBackedUpDataResponse)  {}
-func (m *MessengerSignalsHandlerMock) SendWakuBackedUpWatchOnlyAccount(*wakusync.WakuBackedUpDataResponse) {
-}
+func (m *MessengerSignalsHandlerMock) SendBackedUpProfile(*backupsync.BackedUpDataResponse)  {}
+func (m *MessengerSignalsHandlerMock) SendBackedUpSettings(*backupsync.BackedUpDataResponse) {}
 
 func (m *MessengerSignalsHandlerMock) HistoryArchivesProtocolEnabled()           {}
 func (m *MessengerSignalsHandlerMock) HistoryArchivesProtocolDisabled()          {}

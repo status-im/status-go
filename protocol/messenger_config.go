@@ -14,13 +14,13 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
-	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 )
@@ -54,10 +54,8 @@ type MessengerSignalsHandler interface {
 	DiscordChannelImportProgress(importProgress *discord.ImportProgress)
 	DiscordChannelImportFinished(communityID string, channelID string)
 	DiscordChannelImportCancelled(channelID string)
-	SendWakuBackedUpProfile(response *wakusync.WakuBackedUpDataResponse)
-	SendWakuBackedUpSettings(response *wakusync.WakuBackedUpDataResponse)
-	SendWakuBackedUpKeypair(response *wakusync.WakuBackedUpDataResponse)
-	SendWakuBackedUpWatchOnlyAccount(response *wakusync.WakuBackedUpDataResponse)
+	SendBackedUpProfile(response *backupsync.BackedUpDataResponse)
+	SendBackedUpSettings(response *backupsync.BackedUpDataResponse)
 	SendCuratedCommunitiesUpdate(response *communities.KnownCommunitiesResponse)
 }
 

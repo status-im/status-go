@@ -21,10 +21,10 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/protocol/backupsync"
 	protocolCommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/syncing"
-	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/ens/ensresolver"
@@ -510,7 +510,7 @@ func (s *Service) handleWatchOnlyAccount(message *protobuf.SyncAccount) error {
 	if err != nil && !errors.Is(err, syncing.ErrTryingToStoreOldWalletAccount) {
 		return err
 	}
-	response := wakusync.WakuBackedUpDataResponse{
+	response := backupsync.BackedUpDataResponse{
 		WatchOnlyAccount: acc,
 	}
 	encodedmessage, err := json.Marshal(response)

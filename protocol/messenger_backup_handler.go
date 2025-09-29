@@ -12,9 +12,9 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/wakusync"
 	ensservice "github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/signal"
 )
@@ -70,8 +70,8 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 		return nil
 	}
 
-	response := wakusync.WakuBackedUpDataResponse{
-		Profile: &wakusync.BackedUpProfile{},
+	response := backupsync.BackedUpDataResponse{
+		Profile: &backupsync.BackedUpProfile{},
 	}
 
 	err := utils.ValidateDisplayName(&message.DisplayName)
@@ -168,7 +168,7 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 	response.SetEnsUsernameDetails(ensUsernameDetails)
 
 	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.SendWakuBackedUpProfile(&response)
+		m.config.messengerSignalsHandler.SendBackedUpProfile(&response)
 	}
 
 	return err
@@ -205,10 +205,10 @@ func (m *Messenger) handleLocalBackupCommunities(state *ReceivedMessageState, co
 
 func (m *Messenger) PublishSettingEvent(settingField *settings.SyncSettingField) {
 	if m.config.messengerSignalsHandler != nil {
-		response := wakusync.WakuBackedUpDataResponse{
+		response := backupsync.BackedUpDataResponse{
 			Setting: settingField,
 		}
-		m.config.messengerSignalsHandler.SendWakuBackedUpSettings(&response)
+		m.config.messengerSignalsHandler.SendBackedUpSettings(&response)
 	}
 }
 
