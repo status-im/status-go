@@ -1,0 +1,45 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -yq --no-install-recommends --fix-missing \
+    curl \
+    ca-certificates \
+    lsb-release \
+    xz-utils \
+    gnupg \
+    wget \
+    git \
+    build-essential \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    gpg --no-default-keyring --keyring /etc/apt/keyrings/docker.gpg --fingerprint | \
+    grep -q "8D81 803C 0EBF CD88" && \
+    echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+    https://download.docker.com/linux/debian  \
+    bullseye stable" \
+    | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt-get update && apt-get install -y \
+    docker-ce-cli \
+    docker-compose-plugin \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r jenkins --gid 1001 \
+    && useradd -r -m -g jenkins --uid 1001 -d /home/jenkins jenkins
+
+RUN groupadd -g 999 docker && \
+    usermod -a -G docker jenkins
+
+USER jenkins
+
+ENV PATH="${PATH}:/nix/var/nix/profiles/default/bin"
+ENV NIX_REMOTE=daemon
+ENV HOME=/home/jenkins
+
+ENTRYPOINT [""]

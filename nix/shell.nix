@@ -20,6 +20,7 @@ in mkShell {
     git jq which
     go golangci-lint go-junit-report gopls codecov-cli go-generate-fast
     protobuf3_24 protoc-gen-go gotestsum openjdk openssl
+    rustc cargo
   ];
 
   shellHook = lib.optionalString (!isMacM1) ''

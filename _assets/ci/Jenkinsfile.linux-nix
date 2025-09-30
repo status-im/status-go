@@ -1,1 +1,39 @@
-Jenkinsfile.nix
+#!/usr/bin/env groovy
+// vim: ft=groovy
+library 'status-jenkins-lib@v1.9.26'
+
+pipeline {
+  agent {
+    dockerfile {
+      label 'linuxcontainer'
+      filename 'linux.Dockerfile'
+      dir '_assets/ci/'
+      args '--volume=/nix:/nix ' +
+           '--volume=/etc/nix:/etc/nix '
+    }
+  }
+
+  options {
+    disableConcurrentBuilds()
+    disableRestartFromStage()
+    /* manage how many builds we keep */
+    buildDiscarder(logRotator(
+      numToKeepStr: '20',
+      daysToKeepStr: '30',
+    ))
+  }
+
+  stages {
+    stage('Build library') {
+      steps {
+        script {
+          nix.flake("status-go-library")
+        }
+      }
+    }
+  }
+
+  post {
+    cleanup { cleanWs() }
+  }
+}
