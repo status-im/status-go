@@ -114,7 +114,12 @@ func NewService(
 	}
 
 	if featureFlags.EnableMercuryoProvider {
-		cryptoOnRampProviders = append(cryptoOnRampProviders, onramp.NewMercuryoProvider(tokenManager))
+		params := onramp.MercuryoParams{
+			SignURL:      fmt.Sprintf("https://%s.api.status.im/mercuryo/sign/", statusProxyStageName),
+			SignUser:     config.WalletConfig.StatusProxyUser,
+			SignPassword: config.WalletConfig.StatusProxyPassword,
+		}
+		cryptoOnRampProviders = append(cryptoOnRampProviders, onramp.NewMercuryoProvider(tokenManager, params))
 	}
 
 	cryptoOnRampManager := onramp.NewManager(cryptoOnRampProviders)

@@ -300,9 +300,9 @@ type WalletConfig struct {
 	StatusProxyMarketUser     security.SensitiveString            `json:"StatusProxyMarketUser"`
 	StatusProxyMarketPassword security.SensitiveString            `json:"StatusProxyMarketPassword"`
 	MarketDataProxyConfig     MarketDataProxyConfig               `json:"MarketDataProxyConfig"`
-	// FIXME: remove when EthRpcProxy* is integrated
-	StatusProxyBlockchainUser     security.SensitiveString `json:"StatusProxyBlockchainUser"`
-	StatusProxyBlockchainPassword security.SensitiveString `json:"StatusProxyBlockchainPassword"`
+
+	StatusProxyUser     security.SensitiveString `json:"StatusProxyBlockchainUser"`
+	StatusProxyPassword security.SensitiveString `json:"StatusProxyBlockchainPassword"`
 
 	StatusProxyStageName   string                   `json:"StatusProxyStageName"`
 	EnableCelerBridge      bool                     `json:"EnableCelerBridge"`

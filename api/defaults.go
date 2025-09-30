@@ -234,12 +234,11 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 		walletConfig.MarketDataProxyConfig.PriceRefreshInterval = walletRequest.MarketDataPriceRefreshInterval
 	}
 
-	// FIXME: remove when EthRpcProxy* is integrated
-	if !request.StatusProxyBlockchainUser.Empty() {
-		walletConfig.StatusProxyBlockchainUser = request.StatusProxyBlockchainUser
+	if !request.StatusProxyUser.Empty() {
+		walletConfig.StatusProxyUser = request.StatusProxyUser
 	}
-	if !request.StatusProxyBlockchainPassword.Empty() {
-		walletConfig.StatusProxyBlockchainPassword = request.StatusProxyBlockchainPassword
+	if !request.StatusProxyPassword.Empty() {
+		walletConfig.StatusProxyPassword = request.StatusProxyPassword
 	}
 
 	if !request.EthRpcProxyUrl.Empty() {
