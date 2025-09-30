@@ -208,18 +208,14 @@ class TestLocalPairing(MessengerSteps):
 
         # Check that bob has the messages before pairing
         messages = bob.wakuext_service.chat_messages(alice.public_key, limit=10)["messages"]
-        assert messages is not None, "No messages found on paired device"
-        message_found1 = False
-        message_found2 = False
-        for message in messages:
-            if message["id"] == message_id1 and message["text"] == "hello alice":
-                message_found1 = True
-                continue
-            if message["id"] == message_id2 and message["text"] == "hello bob":
-                message_found2 = True
-                continue
-        assert message_found1, "Message 1 not found on original device"
-        assert message_found2, "Message 2 not found on original device"
+        assert messages is not None, "No messages found on original device"
+        messages_map = {message["id"]: message for message in messages}
+
+        assert message_id1 in messages_map, "Message 1 not found on original device"
+        assert messages_map[message_id1]["text"] == "hello alice"
+
+        assert message_id2 in messages_map, "Message 2 not found on original device"
+        assert messages_map[message_id2]["text"] == "hello bob"
 
         # Local pairing WITH message syncing
         pair_server_as_sender(bob, bob_second_device, True)
@@ -249,19 +245,15 @@ class TestLocalPairing(MessengerSteps):
         # Check that the messages are synced
         messages = bob_second_device.wakuext_service.chat_messages(sender_chat_id, limit=10)["messages"]
         assert messages is not None, "No messages found on paired device"
-        message_found1 = False
-        message_found2 = False
-        for message in messages:
-            if message["id"] == message_id1 and message["text"] == "hello alice":
-                message_found1 = True
-                assert message["clock"] == clock_1, "Message 1 clock is not right on paired device"
-                continue
-            if message["id"] == message_id2 and message["text"] == "hello bob":
-                message_found2 = True
-                assert message["clock"] == clock_2, "Message 2 clock is not right on paired device"
-                continue
-        assert message_found1, "Message 1 sent before pairing not found on paired device"
-        assert message_found2, "Message 2 sent before pairing not found on paired device"
+        messages_map = {message["id"]: message for message in messages}
+
+        assert message_id1 in messages_map, "Message 1 sent before pairing not found on paired device"
+        assert messages_map[message_id1]["text"] == "hello alice"
+        assert messages_map[message_id1]["clock"] == clock_1, "Message 1 clock is not right on paired device"
+
+        assert message_id2 in messages_map, "Message 2 sent before pairing not found on paired device"
+        assert messages_map[message_id2]["text"] == "hello bob"
+        assert messages_map[message_id2]["clock"] == clock_2, "Message 2 clock is not right on paired device"
 
     def test_pairing_server_as_receiver(self):
         # Create users
