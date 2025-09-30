@@ -14,6 +14,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
+	"github.com/status-im/status-go/services/wallet/activityfetcher"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/responses"
@@ -60,15 +61,7 @@ type fullFilterParams struct {
 	filter    Filter
 }
 
-func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, offset int, count int) ([]Entry, error) {
-	if f.version != V2 {
-		return nil, errors.New("unsupported version")
-	}
-	allAddresses := s.areAllAddresses(f.addresses)
-	return getActivityEntriesV2(ctx, s.getDeps(), f.addresses, allAddresses, f.chainIDs, f.filter, offset, count)
-}
-
-func (s *Service) internalFilter(f fullFilterParams, offset int, count int, processResults func(entries []Entry) (offsetOverride int)) {
+func (s *Service) queryAndProcessActivities(f fullFilterParams, offset int, count int, processResults func(entries []Entry) (offsetOverride int)) {
 	s.scheduler.Enqueue(int32(f.sessionID), filterTask, func(ctx context.Context) (interface{}, error) {
 		return s.getActivityEntries(ctx, f, offset, count)
 	}, func(result interface{}, taskType async.TaskType, err error) {
@@ -106,14 +99,13 @@ func mirrorIdentities(entries []Entry) []EntryIdentity {
 	return model
 }
 
-func (s *Service) internalFilterForSession(session *Session, firstPageCount int) {
-	s.internalFilter(
+func (s *Service) queryAndProcessActivitiesForSession(session *Session) {
+	s.queryAndProcessActivities(
 		session.getFullFilterParams(),
 		0,
-		firstPageCount,
+		session.pageSize,
 		func(entries []Entry) (offset int) {
 			session.model = mirrorIdentities(entries)
-
 			return 0
 		},
 	)
@@ -129,6 +121,7 @@ func (s *Service) StartFilterSession(addresses []eth.Address, chainIDs []common.
 		addresses: addresses,
 		chainIDs:  chainIDs,
 		filter:    filter,
+		pageSize:  firstPageCount,
 
 		model: make([]EntryIdentity, 0, firstPageCount),
 
@@ -139,7 +132,7 @@ func (s *Service) StartFilterSession(addresses []eth.Address, chainIDs []common.
 
 	session.mu.Lock()
 	defer session.mu.Unlock()
-	s.internalFilterForSession(session, firstPageCount)
+	s.queryAndProcessActivitiesForSession(session)
 
 	return sessionID
 }
@@ -147,7 +140,7 @@ func (s *Service) StartFilterSession(addresses []eth.Address, chainIDs []common.
 // UpdateFilterForSession is to be called for updating the filter of a specific session
 // After calling this method to set a filter all the incoming changes will be reported with
 // Entry.isNew = true when filter is reset to empty
-func (s *Service) UpdateFilterForSession(id SessionID, filter Filter, firstPageCount int) error {
+func (s *Service) UpdateFilterForSession(id SessionID, filter Filter) error {
 	session := s.getSession(id)
 	if session == nil {
 		return ErrSessionNotFound
@@ -168,17 +161,17 @@ func (s *Service) UpdateFilterForSession(id SessionID, filter Filter, firstPageC
 		// Take a snapshot of the current model
 		session.noFilterModel = entryIdsToMap(session.model)
 
-		session.model = make([]EntryIdentity, 0, firstPageCount)
+		session.model = make([]EntryIdentity, 0, session.pageSize)
 
 		// In this case there is nothing to flag so we request the first page
-		s.internalFilterForSession(session, firstPageCount)
+		s.queryAndProcessActivitiesForSession(session)
 	} else if !prevFilterEmpty && newFilerEmpty {
 		// Session is moving from non-empty to empty filter
 		// In this case we need to flag all the new entries that are not in the noFilterModel
-		s.internalFilter(
+		s.queryAndProcessActivities(
 			session.getFullFilterParams(),
 			0,
-			firstPageCount,
+			session.pageSize,
 			func(entries []Entry) (offset int) {
 				// Mark new entries
 				for i, a := range entries {
@@ -194,7 +187,7 @@ func (s *Service) UpdateFilterForSession(id SessionID, filter Filter, firstPageC
 		)
 	} else {
 		// Else act as a normal filter update
-		s.internalFilterForSession(session, firstPageCount)
+		s.queryAndProcessActivitiesForSession(session)
 	}
 
 	return nil
@@ -202,7 +195,7 @@ func (s *Service) UpdateFilterForSession(id SessionID, filter Filter, firstPageC
 
 // ResetFilterSession is to be called when SessionUpdate.HasNewOnTop == true to
 // update client with the latest state including new on top entries
-func (s *Service) ResetFilterSession(id SessionID, firstPageCount int) error {
+func (s *Service) ResetFilterSession(id SessionID) error {
 	session := s.getSession(id)
 	if session == nil {
 		return ErrSessionNotFound
@@ -211,10 +204,10 @@ func (s *Service) ResetFilterSession(id SessionID, firstPageCount int) error {
 	session.mu.Lock()
 	defer session.mu.Unlock()
 
-	s.internalFilter(
+	s.queryAndProcessActivities(
 		session.getFullFilterParams(),
 		0,
-		firstPageCount,
+		session.pageSize,
 		func(entries []Entry) (offset int) {
 			// Mark new entries
 			newMap := entryIdsToMap(session.new)
@@ -240,7 +233,7 @@ func (s *Service) ResetFilterSession(id SessionID, firstPageCount int) error {
 	return nil
 }
 
-func (s *Service) GetMoreForFilterSession(id SessionID, pageCount int) error {
+func (s *Service) GetMoreForFilterSession(id SessionID) error {
 	session := s.getSession(id)
 	if session == nil {
 		return ErrSessionNotFound
@@ -250,10 +243,10 @@ func (s *Service) GetMoreForFilterSession(id SessionID, pageCount int) error {
 	defer session.mu.Unlock()
 
 	prevModelLen := len(session.model)
-	s.internalFilter(
+	s.queryAndProcessActivities(
 		session.getFullFilterParams(),
 		prevModelLen+len(session.new),
-		pageCount,
+		session.pageSize,
 		func(entries []Entry) (offset int) {
 			// Mirror client identities for checking updates
 			for _, a := range entries {
@@ -341,6 +334,8 @@ func (s *Service) processEvents(ctx context.Context) {
 					}
 				}
 				debounceProcessChangesFn()
+			case activityfetcher.EventActivityFetchComplete:
+				s.refreshAllSessions()
 			}
 		case <-debouncerCh:
 			if eventCount > 0 || newTxs || len(changedTxs) > 0 {
@@ -600,4 +595,15 @@ func (s *Service) getAllSessions() []*Session {
 		sessions = append(sessions, session)
 	}
 	return sessions
+}
+
+// refreshAllSessions refreshes all active sessions to pick up newly fetched data
+func (s *Service) refreshAllSessions() {
+	sessions := s.getAllSessions()
+
+	for _, session := range sessions {
+		session.mu.Lock()
+		s.queryAndProcessActivitiesForSession(session)
+		session.mu.Unlock()
+	}
 }

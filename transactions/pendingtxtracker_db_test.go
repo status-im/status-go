@@ -8,6 +8,7 @@ import (
 	crypto_rand "crypto/rand"
 
 	eth "github.com/ethereum/go-ethereum/common"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
@@ -16,17 +17,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getRandomStatus() transactions.TxStatus {
+func getRandomStatus() ac.TxStatus {
 	switch rand.Intn(3) { // nolint: gosec
 	case 0:
-		return transactions.Pending
+		return ac.Pending
 	case 1:
-		return transactions.Success
+		return ac.Success
 	case 2:
-		return transactions.Failed
+		return ac.Failed
 	}
 
-	return transactions.Pending
+	return ac.Pending
 }
 
 func getRandomTrackedTx() transactions.TrackedTx {

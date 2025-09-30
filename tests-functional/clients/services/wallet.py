@@ -27,8 +27,8 @@ class WalletService(Service):
     def start_activity_filter_session_v2(self, params: dict):
         return self.rpc_request("startActivityFilterSessionV2", params)
 
-    def reset_activity_filter_session(self, session_id: int, page_count: int):
-        params = [session_id, page_count]
+    def reset_activity_filter_session(self, session_id: int):
+        params = [session_id]
         return self.rpc_request("resetActivityFilterSession", params)
 
     def set_fee_mode(self, path_tx_identity: dict, gas_fee_mode: int):

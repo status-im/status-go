@@ -10,9 +10,11 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 
@@ -84,13 +86,13 @@ func GenerateTestPendingTransactions(start int, count int) []PendingTransaction 
 			GasLimit:       bigint.BigInt{Int: big.NewInt(21000)},
 			GasPrice:       bigint.BigInt{Int: big.NewInt(int64(i))},
 			ChainID:        777,
-			Status:         new(TxStatus),
+			Status:         new(ac.TxStatus),
 			AutoDelete:     new(bool),
 			Symbol:         "ETH",
 			Timestamp:      uint64(i),
 		}
-		*txs[i].Status = Pending  // set to pending by default
-		*txs[i].AutoDelete = true // set to true by default
+		*txs[i].Status = ac.Pending // set to pending by default
+		*txs[i].AutoDelete = true   // set to true by default
 	}
 	return txs
 }

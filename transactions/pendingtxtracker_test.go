@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
@@ -81,7 +82,7 @@ func TestPendingTxTracker_ValidateConfirmedWithSuccessStatus(t *testing.T) {
 				err = json.Unmarshal([]byte(we.Message), &p)
 				require.NoError(t, err)
 				require.Equal(t, txs[0].Hash, p.Hash)
-				require.Equal(t, Success, p.Status)
+				require.Equal(t, ac.Success, p.Status)
 			}
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for event")
@@ -125,7 +126,7 @@ func TestPendingTxTracker_ValidateConfirmedWithFailedStatus(t *testing.T) {
 				err = json.Unmarshal([]byte(we.Message), &p)
 				require.NoError(t, err)
 				require.Equal(t, txs[0].Hash, p.Hash)
-				require.Equal(t, Failed, p.Status)
+				require.Equal(t, ac.Failed, p.Status)
 			}
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for event")
@@ -202,7 +203,7 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, txs[1].Hash, p.Hash)
 				require.Equal(t, txs[1].ChainID, p.ChainID)
-				require.Equal(t, Success, p.Status)
+				require.Equal(t, ac.Success, p.Status)
 			}
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for event")
@@ -247,7 +248,7 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, txs[0].ChainID, p.ChainID)
 				require.Equal(t, txs[0].Hash, p.Hash)
-				require.Equal(t, Success, p.Status)
+				require.Equal(t, ac.Success, p.Status)
 			}
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for event")
@@ -321,7 +322,7 @@ func TestPendingTxTracker_MultipleClients(t *testing.T) {
 			var p StatusChangedPayload
 			err := json.Unmarshal([]byte(we.Message), &p)
 			require.NoError(t, err)
-			require.Equal(t, Success, p.Status)
+			require.Equal(t, ac.Success, p.Status)
 		}
 	}
 
@@ -357,7 +358,7 @@ func TestPendingTxTracker_Watch(t *testing.T) {
 
 	txs := GenerateTestPendingTransactions(0, 2)
 	// Make the second already confirmed
-	*txs[0].Status = Success
+	*txs[0].Status = ac.Success
 
 	// Mock the first call to getTransactionByHash
 	chainClient.SetAvailableClients([]common.ChainID{txs[0].ChainID})
@@ -398,7 +399,7 @@ func TestPendingTxTracker_Watch(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, txs[1].ChainID, p.ChainID)
 				require.Equal(t, txs[1].Hash, p.Hash)
-				require.Equal(t, Success, p.Status)
+				require.Equal(t, ac.Success, p.Status)
 			}
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for the status update event")
@@ -419,7 +420,7 @@ func TestPendingTxTracker_Watch(t *testing.T) {
 
 	status, err := m.Watch(context.Background(), txs[1].ChainID, txs[1].Hash)
 	require.NoError(t, err)
-	require.NotEqual(t, Pending, status)
+	require.NotEqual(t, ac.Pending, status)
 
 	err = m.Delete(context.Background(), txs[1].ChainID, txs[1].Hash)
 	require.NoError(t, err)
@@ -491,17 +492,17 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 		if statusEventCount == 0 {
 			require.Equal(t, txs[0].ChainID, p.ChainID)
 			require.Equal(t, txs[0].Hash, p.Hash)
-			require.Equal(t, Success, p.Status)
+			require.Equal(t, ac.Success, p.Status)
 
 			status, err := m.Watch(context.Background(), txs[0].ChainID, txs[0].Hash)
 			require.NoError(t, err)
-			require.Equal(t, Success, *status)
+			require.Equal(t, ac.Success, *status)
 			err = m.Delete(context.Background(), txs[0].ChainID, txs[0].Hash)
 			require.NoError(t, err)
 
 			status, err = m.Watch(context.Background(), txs[1].ChainID, txs[1].Hash)
 			require.NoError(t, err)
-			require.Equal(t, Pending, *status)
+			require.Equal(t, ac.Pending, *status)
 			firsDoneWG.Done()
 		} else {
 			_, err := m.Watch(context.Background(), txs[0].ChainID, txs[0].Hash)
@@ -509,7 +510,7 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 
 			status, err := m.Watch(context.Background(), txs[1].ChainID, txs[1].Hash)
 			require.NoError(t, err)
-			require.Equal(t, Success, *status)
+			require.Equal(t, ac.Success, *status)
 			err = m.Delete(context.Background(), txs[1].ChainID, txs[1].Hash)
 			require.NoError(t, err)
 		}

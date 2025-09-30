@@ -36,7 +36,7 @@ func TestService_IncrementalUpdateOnTop(t *testing.T) {
 	vFn := getValidateSessionUpdateHasNewOnTopFn(t)
 	pendingTransactionUpdate, sessionUpdatesCount := validateSessionUpdateEvent(t, ch, &filterResponseCount, 1, vFn)
 
-	err = state.service.ResetFilterSession(sessionID, 5)
+	err = state.service.ResetFilterSession(sessionID)
 	require.NoError(t, err)
 
 	// Validate the reset data
@@ -161,7 +161,7 @@ func TestService_IncrementalUpdateFetchWindow(t *testing.T) {
 	vFn := getValidateSessionUpdateHasNewOnTopFn(t)
 	pendingTransactionUpdate, sessionUpdatesCount := validateSessionUpdateEvent(t, ch, &filterResponseCount, 1, vFn)
 
-	err = state.service.ResetFilterSession(sessionID, 2)
+	err = state.service.ResetFilterSession(sessionID)
 	require.NoError(t, err)
 
 	// Validate the reset data
@@ -177,7 +177,7 @@ func TestService_IncrementalUpdateFetchWindow(t *testing.T) {
 	require.Equal(t, 1, sessionUpdatesCount)
 	require.Equal(t, 1, eventActivityDoneCount)
 
-	err = state.service.GetMoreForFilterSession(sessionID, 2)
+	err = state.service.GetMoreForFilterSession(sessionID)
 	require.NoError(t, err)
 
 	eventActivityDoneCount = validateFilteringDone(t, ch, 2, func(payload FilterResponse) {
@@ -217,7 +217,7 @@ func TestService_IncrementalUpdateFetchWindowNoReset(t *testing.T) {
 	require.Equal(t, 1, filterResponseCount)
 	require.Equal(t, 1, sessionUpdatesCount)
 
-	err = state.service.GetMoreForFilterSession(sessionID, 2)
+	err = state.service.GetMoreForFilterSession(sessionID)
 	require.NoError(t, err)
 
 	// Validate that client continue loading the next window without being affected by the internal state of new
@@ -256,10 +256,10 @@ func TestService_MultiThread(t *testing.T) {
 					defer subwg.Done()
 					var suberr error
 
-					suberr = state.service.ResetFilterSession(sessionID, 5)
+					suberr = state.service.ResetFilterSession(sessionID)
 					require.NoError(t, suberr)
 
-					suberr = state.service.GetMoreForFilterSession(sessionID, 5)
+					suberr = state.service.GetMoreForFilterSession(sessionID)
 					require.NoError(t, suberr)
 				}()
 			}

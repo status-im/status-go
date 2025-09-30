@@ -5,13 +5,14 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/sqlite"
 )
 
 type TrackedTx struct {
-	ID        TxIdentity `json:"id"`
-	Timestamp uint64     `json:"timestamp"`
-	Status    TxStatus   `json:"status"`
+	ID        TxIdentity  `json:"id"`
+	Timestamp uint64      `json:"timestamp"`
+	Status    ac.TxStatus `json:"status"`
 }
 
 type DB struct {
@@ -76,7 +77,7 @@ func putTx(creator sqlite.StatementCreator, tx TrackedTx) error {
 	return err
 }
 
-func (db *DB) UpdateTxStatus(txID TxIdentity, status TxStatus) (err error) {
+func (db *DB) UpdateTxStatus(txID TxIdentity, status ac.TxStatus) (err error) {
 	var tx *sql.Tx
 	tx, err = db.db.Begin()
 	if err != nil {
@@ -93,7 +94,7 @@ func (db *DB) UpdateTxStatus(txID TxIdentity, status TxStatus) (err error) {
 	return updateTxStatus(tx, txID, status)
 }
 
-func updateTxStatus(creator sqlite.StatementCreator, txID TxIdentity, status TxStatus) error {
+func updateTxStatus(creator sqlite.StatementCreator, txID TxIdentity, status ac.TxStatus) error {
 	q := sq.Update("tracked_transactions").
 		Set("tx_status", status).
 		Where(sq.Eq{"chain_id": txID.ChainID, "tx_hash": txID.Hash})

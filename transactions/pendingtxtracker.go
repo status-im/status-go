@@ -20,6 +20,8 @@ import (
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
+
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/responses"
@@ -40,15 +42,6 @@ const (
 
 var (
 	ErrStillPending = errors.New("transaction is still pending")
-)
-
-type TxStatus = string
-
-// Values for status column in pending_transactions
-const (
-	Pending TxStatus = "Pending"
-	Success TxStatus = "Success"
-	Failed  TxStatus = "Failed"
 )
 
 type AutoDeleteType = bool
@@ -77,7 +70,7 @@ type PendingTxUpdatePayload struct {
 type StatusChangedPayload struct {
 	TxIdentity
 	TxDetails
-	Status TxStatus `json:"status"`
+	Status ac.TxStatus `json:"status"`
 }
 
 // PendingTxTracker implements StatusService in common/status_node_service.go
@@ -109,7 +102,7 @@ func NewPendingTxTracker(db *sql.DB, rpcClient rpc.ClientInterface, eventFeed *e
 }
 
 type txStatusRes struct {
-	Status TxStatus
+	Status ac.TxStatus
 	hash   eth.Hash
 }
 
@@ -230,11 +223,11 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 		receipt := receiptWrapper.Receipt
 		isPending := receipt != nil && receipt.BlockNumber == nil
 		if !isPending {
-			var status TxStatus
+			var status ac.TxStatus
 			if receipt.Status == types.ReceiptStatusSuccessful {
-				status = Success
+				status = ac.Success
 			} else {
-				status = Failed
+				status = ac.Failed
 			}
 			res = append(res, txStatusRes{
 				hash:   hashes[i],
@@ -476,7 +469,7 @@ type PendingTransaction struct {
 	Nonce          uint64         `json:"nonce"`
 
 	// nil will insert the default value (Pending) in DB
-	Status *TxStatus `json:"status,omitempty"`
+	Status *ac.TxStatus `json:"status,omitempty"`
 	// nil will insert the default value (true) in DB
 	AutoDelete *bool `json:"autoDelete,omitempty"`
 }
@@ -495,7 +488,7 @@ func rowsToTransactions(rows *sql.Rows) (transactions []*PendingTransaction, err
 			GasLimit: bigint.BigInt{Int: new(big.Int)},
 		}
 
-		transaction.Status = new(TxStatus)
+		transaction.Status = new(ac.TxStatus)
 		transaction.AutoDelete = new(bool)
 		err := rows.Scan(&transaction.Hash,
 			&transaction.Timestamp,
@@ -526,7 +519,7 @@ func (tm *PendingTxTracker) GetAllPending() ([]*PendingTransaction, error) {
 	if tm.db == nil {
 		return nil, errors.New("database is not initialized")
 	}
-	rows, err := tm.db.Query(selectFromPending+"WHERE status = ?", Pending)
+	rows, err := tm.db.Query(selectFromPending+"WHERE status = ?", ac.Pending)
 	if err != nil {
 		return nil, err
 	}
@@ -594,7 +587,7 @@ func (tm *PendingTxTracker) addPending(transaction *PendingTransaction) error {
 			ChainID: transaction.ChainID,
 			Hash:    transaction.Hash,
 		},
-		Status:    Pending,
+		Status:    ac.Pending,
 		Timestamp: transaction.Timestamp,
 	})
 	if err != nil {
@@ -724,7 +717,7 @@ func (tm *PendingTxTracker) DeleteBySQLTx(tx *sql.Tx, chainID common.ChainID, ha
 	row := tx.QueryRow(`SELECT from_address, to_address, timestamp, status FROM pending_transactions WHERE network_id = ? AND hash = ?`, chainID, hash)
 	var from, to eth.Address
 	var timestamp uint64
-	var status TxStatus
+	var status ac.TxStatus
 	err = row.Scan(&from, &to, &timestamp, &status)
 	if err != nil {
 		return nil, err
@@ -735,7 +728,7 @@ func (tm *PendingTxTracker) DeleteBySQLTx(tx *sql.Tx, chainID common.ChainID, ha
 		return nil, err
 	}
 
-	if err == nil && status == Pending {
+	if err == nil && status == ac.Pending {
 		err = ErrStillPending
 	}
 	return func() {
@@ -762,7 +755,7 @@ func GetOwnedPendingStatus(tx *sql.Tx, chainID common.ChainID, hash eth.Hash, ow
 
 // Watch returns sql.ErrNoRows if no pending transaction is found for the given identity
 // tx.Status is not nill if err is nil
-func (tm *PendingTxTracker) Watch(ctx context.Context, chainID common.ChainID, hash eth.Hash) (*TxStatus, error) {
+func (tm *PendingTxTracker) Watch(ctx context.Context, chainID common.ChainID, hash eth.Hash) (*ac.TxStatus, error) {
 	tx, err := tm.GetPendingEntry(chainID, hash)
 	if err != nil {
 		return nil, err

@@ -3,26 +3,13 @@ package activity
 import (
 	"context"
 	"database/sql"
-	"time"
-
-	sq "github.com/Masterminds/squirrel"
+	"fmt"
+	"strings"
 
 	eth "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"go.uber.org/zap"
-
-	"github.com/status-im/status-go/logutils"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	wCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/requests"
-	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
-	"github.com/status-im/status-go/services/wallet/router/routes"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/sqlite"
-	"github.com/status-im/status-go/transactions"
 )
 
 type FilterDependencies struct {
@@ -35,9 +22,57 @@ type FilterDependencies struct {
 	currentTimestamp func() int64
 }
 
-// getActivityEntriesV2 queries the route_* and tracked_transactions based on filter parameters and arguments
-// it returns metadata for all entries ordered by timestamp column
-func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresses []eth.Address, allAddresses bool, chainIDs []wCommon.ChainID, filter Filter, offset int, limit int) ([]Entry, error) {
+type TransactionOrigin int
+
+const (
+	SentTransaction TransactionOrigin = iota
+	FetchedTransaction
+)
+
+func (s TransactionOrigin) String() string {
+	switch s {
+	case SentTransaction:
+		return "sent"
+	case FetchedTransaction:
+		return "fetched"
+	default:
+		return "unknown"
+	}
+}
+
+type OrderedTransactionID struct {
+	ac.TransactionIdentity
+	Timestamp int64
+	Source    TransactionOrigin
+}
+
+// getActivityEntries is the main entry point for the implementation
+// using SQL-based unified ordering approach. It retrieves activity entries
+// for given addresses and chain IDs with pagination support.
+func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, offset int, limit int) ([]Entry, error) {
+	if f.version != V2 {
+		return nil, fmt.Errorf("unsupported version: %s, expected %s", f.version, V2)
+	}
+
+	txIDs, err := getTransactionsOrder(ctx, s.getDeps().db, f.addresses, f.chainIDs, f.filter, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(txIDs) == 0 {
+		return []Entry{}, nil
+	}
+
+	entries, err := getEntriesByTransactionIDs(ctx, s.getDeps(), txIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
+// getTransactionsOrder returns deduplicated, ordered transaction IDs from both sent and fetched sources.
+func getTransactionsOrder(ctx context.Context, db *sql.DB, addresses []eth.Address, chainIDs []wCommon.ChainID, filter Filter, offset int, limit int) ([]OrderedTransactionID, error) {
 	if len(addresses) == 0 {
 		return nil, ErrNoAddressesProvided
 	}
@@ -45,222 +80,179 @@ func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresse
 		return nil, ErrNoChainIDsProvided
 	}
 
-	q := sq.Select(`
-		st.tx_json,
-		rpt.tx_args_json,
-		rpt.is_approval,
-		rp.path_json,
-		rip.route_input_params_json,
-		tt.tx_status,
-		tt.timestamp
-		`).Distinct()
-	q = q.From("sent_transactions st").
-		LeftJoin(`route_path_transactions rpt ON
-			st.chain_id = rpt.chain_id AND
-			st.tx_hash = rpt.tx_hash`).
-		LeftJoin(`tracked_transactions tt ON
-			st.chain_id = tt.chain_id AND
-			st.tx_hash = tt.tx_hash`).
-		LeftJoin(`route_paths rp ON
-			rpt.uuid = rp.uuid AND
-			rpt.path_idx = rp.path_idx`).
-		LeftJoin(`route_input_parameters rip ON
-			rpt.uuid = rip.uuid`)
-	q = q.OrderBy("tt.timestamp DESC", "rpt.is_approval ASC")
+	query := buildTransactionOrderQuery(len(chainIDs), len(addresses), limit != ac.NoLimit)
+	args := buildQueryArgs(chainIDs, addresses, limit, offset)
 
-	qConditions := sq.And{}
-
-	qConditions = append(qConditions, sq.Eq{"rpt.chain_id": chainIDs})
-	qConditions = append(qConditions, sq.Eq{"rip.from_address": addresses})
-
-	q = q.Where(qConditions)
-
-	if limit != ac.NoLimit {
-		q = q.Limit(uint64(limit))
-		q = q.Offset(uint64(offset))
-	}
-
-	query, args, err := q.ToSql()
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
-	}
-
-	stmt, err := deps.db.Prepare(query)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.QueryContext(ctx, args...)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query transactions order: %w", err)
 	}
 	defer rows.Close()
 
-	data, err := rowsToDataV2(rows)
+	return extractTransactionIdentities(rows)
+}
+
+// extractTransactionIdentities processes SQL result rows into TransactionID slice.
+func extractTransactionIdentities(rows *sql.Rows) ([]OrderedTransactionID, error) {
+	var results []OrderedTransactionID
+
+	for rows.Next() {
+		var txID OrderedTransactionID
+		var chainID uint64
+		var hashBytes []byte
+		var addressBytes []byte
+
+		err := rows.Scan(&chainID, &hashBytes, &txID.Timestamp, &txID.Source, &addressBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan transaction row: %w", err)
+		}
+
+		txID.ChainID = wCommon.ChainID(chainID)
+		txID.Hash = eth.BytesToHash(hashBytes)
+		txID.Address = eth.BytesToAddress(addressBytes)
+		results = append(results, txID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating transaction rows: %w", err)
+	}
+
+	return results, nil
+}
+
+// buildPlaceholders creates SQL placeholders for IN clauses
+func buildPlaceholders(count int) string {
+	if count == 0 {
+		return ""
+	}
+	result := strings.Repeat("?,", count)
+	return result[:len(result)-1] // Remove the trailing comma
+}
+
+// buildTransactionOrderQuery constructs the query for getting transaction order.
+// This query merges sent and fetched transactions, deduplicates by preferring sent sources,
+// and applies ordering
+// String building used instead of Squirrel for this complex query because it is easier to comprehend this way
+func buildTransactionOrderQuery(chainIDCount, addressCount int, withPagination bool) string {
+	query := `
+    SELECT
+        chain_id,
+        tx_hash,
+        timestamp,
+        source,
+        address
+    FROM (
+        SELECT
+            chain_id,
+            tx_hash,
+            timestamp,
+            source,
+            address,
+            ROW_NUMBER() OVER (
+                PARTITION BY chain_id, tx_hash, address
+                ORDER BY source, timestamp DESC
+            ) AS rn
+        FROM (
+            SELECT
+                st.chain_id,
+                st.tx_hash,
+                tt.timestamp,
+                0 AS source,
+                rip.from_address AS address
+            FROM sent_transactions st
+            JOIN tracked_transactions tt ON st.chain_id = tt.chain_id AND st.tx_hash = tt.tx_hash
+            JOIN route_path_transactions rpt ON st.chain_id = rpt.chain_id AND st.tx_hash = rpt.tx_hash
+            JOIN route_input_parameters rip ON rpt.uuid = rip.uuid
+            WHERE st.chain_id IN (` + buildPlaceholders(chainIDCount) + `)
+                AND rip.from_address IN (` + buildPlaceholders(addressCount) + `)
+
+            UNION ALL
+
+            SELECT
+                fat.chain_id,
+                CASE 
+                    WHEN substr(fat.hash, 1, 2) = '0x' THEN unhex(substr(fat.hash, 3))
+                    ELSE unhex(fat.hash)
+                END AS tx_hash,
+                CAST(strftime('%s', json_extract(fat.transfer, '$.metadata.blockTimestamp')) AS INTEGER) AS timestamp,
+                1 AS source,
+                fat.address AS address
+            FROM fetched_alchemy_transfers fat
+            WHERE fat.chain_id IN (` + buildPlaceholders(chainIDCount) + `)
+                AND fat.address IN (` + buildPlaceholders(addressCount) + `)
+        )
+    ) 
+    WHERE rn = 1
+    ORDER BY timestamp DESC, chain_id, tx_hash, address`
+
+	if withPagination {
+		query += `
+    LIMIT ? OFFSET ?`
+	}
+
+	return query
+}
+
+// buildQueryArgs constructs the arguments for the getTransactionsOrder query.
+func buildQueryArgs(chainIDs []wCommon.ChainID, addresses []eth.Address, limit int, offset int) []interface{} {
+	capacity := 2 * (len(chainIDs) + len(addresses))
+	if limit != ac.NoLimit {
+		capacity += 2
+	}
+	args := make([]interface{}, 0, capacity)
+
+	for _, chainID := range chainIDs {
+		args = append(args, uint64(chainID))
+	}
+	for _, addr := range addresses {
+		args = append(args, addr.Bytes())
+	}
+	for _, chainID := range chainIDs {
+		args = append(args, uint64(chainID))
+	}
+	for _, addr := range addresses {
+		args = append(args, addr.Bytes())
+	}
+	if limit > 0 {
+		args = append(args, limit, offset)
+	}
+
+	return args
+}
+
+// getEntriesByTransactionIDs fetches full entry details for given transaction IDs
+// maintaining the order from the input slice
+func getEntriesByTransactionIDs(ctx context.Context, deps FilterDependencies, txIDs []OrderedTransactionID) ([]Entry, error) {
+	sentEntries, err := getSentEntriesByIDs(ctx, deps, txIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	return dataToEntriesV2(deps, data)
-}
-
-type entryDataV2 struct {
-	TxArgs           *wallettypes.SendTxArgs
-	Tx               *ethTypes.Transaction
-	IsApproval       bool
-	Status           transactions.TxStatus
-	Timestamp        int64
-	Path             *routes.Path
-	RouteInputParams *requests.RouteInputParams
-}
-
-func newEntryDataV2() *entryDataV2 {
-	return &entryDataV2{
-		TxArgs:           new(wallettypes.SendTxArgs),
-		Tx:               new(ethTypes.Transaction),
-		Path:             new(routes.Path),
-		RouteInputParams: new(requests.RouteInputParams),
-	}
-}
-
-func rowsToDataV2(rows *sql.Rows) ([]*entryDataV2, error) {
-	var ret []*entryDataV2
-	for rows.Next() {
-		data := newEntryDataV2()
-
-		nullableTx := sqlite.JSONBlob{Data: data.Tx}
-		nullableTxArgs := sqlite.JSONBlob{Data: data.TxArgs}
-		nullableIsApproval := sql.NullBool{}
-		nullablePath := sqlite.JSONBlob{Data: data.Path}
-		nullableRouteInputParams := sqlite.JSONBlob{Data: data.RouteInputParams}
-		nullableStatus := sql.NullString{}
-		nullableTimestamp := sql.NullInt64{}
-
-		err := rows.Scan(
-			&nullableTx,
-			&nullableTxArgs,
-			&nullableIsApproval,
-			&nullablePath,
-			&nullableRouteInputParams,
-			&nullableStatus,
-			&nullableTimestamp,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Check all necessary fields are not null
-		if !nullableTxArgs.Valid ||
-			!nullableTx.Valid ||
-			!nullableIsApproval.Valid ||
-			!nullableStatus.Valid ||
-			!nullableTimestamp.Valid ||
-			!nullablePath.Valid ||
-			!nullableRouteInputParams.Valid {
-			logutils.ZapLogger().Warn("some fields missing in entryData")
-			continue
-		}
-
-		data.IsApproval = nullableIsApproval.Bool
-		data.Status = nullableStatus.String
-		data.Timestamp = nullableTimestamp.Int64
-
-		ret = append(ret, data)
+	fetchedEntries, err := getFetchedEntriesByIDs(ctx, deps, txIDs)
+	if err != nil {
+		return nil, err
 	}
 
-	return ret, nil
+	entries := mergeAndOrderEntries(sentEntries, fetchedEntries, txIDs)
+
+	return entries, nil
 }
 
-func dataToEntriesV2(deps FilterDependencies, data []*entryDataV2) ([]Entry, error) {
-	var ret []Entry
+// mergeAndOrderEntries combines entries from sent and fetched sources
+func mergeAndOrderEntries(sentEntries, fetchedEntries map[string]Entry, orderedIDs []OrderedTransactionID) []Entry {
+	entries := make([]Entry, 0, len(orderedIDs))
 
-	now := time.Now().Unix()
+	for _, txID := range orderedIDs {
+		key := txID.Key()
 
-	for _, d := range data {
-		chainID := wCommon.ChainID(d.Path.FromChain.ChainID)
-
-		entry := Entry{
-			payloadType: ac.SimpleTransactionPT,
-			transaction: &ac.TransactionIdentity{
-				ChainID: chainID,
-				Hash:    d.Tx.Hash(),
-				Address: d.RouteInputParams.AddrFrom,
-			},
-			timestamp:      d.Timestamp,
-			activityType:   getActivityTypeV2(d.Path.ProcessorName, d.IsApproval),
-			activityStatus: getActivityStatusV2(d.Status, d.Timestamp, now, getFinalizationPeriod(chainID)),
-			amountOut:      d.Path.AmountIn,  // Path and Activity have inverse perspective for amountIn and amountOut
-			amountIn:       d.Path.AmountOut, // Path has the Tx perspective, Activity has the Account perspective
-			tokenOut:       getToken(d.Path.FromToken, d.Path.ProcessorName),
-			tokenIn:        getToken(d.Path.ToToken, d.Path.ProcessorName),
-			sender:         &d.RouteInputParams.AddrFrom,
-			recipient:      &d.RouteInputParams.AddrTo,
-			transferType:   getTransferType(d.Path.FromToken, d.Path.ProcessorName),
-			//contractAddress:  // TODO: Handle community contract deployment
-			//communityID:
+		if entry, exists := sentEntries[key]; exists {
+			entries = append(entries, entry)
+		} else if entry, exists := fetchedEntries[key]; exists {
+			entries = append(entries, entry)
 		}
-
-		if d.Path.FromChain != nil {
-			chainID := wCommon.ChainID(d.Path.FromChain.ChainID)
-			entry.chainIDOut = &chainID
-		}
-		if d.Path.ToChain != nil {
-			chainID := wCommon.ChainID(d.Path.ToChain.ChainID)
-			entry.chainIDIn = &chainID
-		}
-
-		entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
-
-		if entry.transferType == nil || ac.TokenType(*entry.transferType) != ac.Native {
-			var interactedAddress eth.Address
-			if d.Tx.To() != nil {
-				interactedAddress = eth.BytesToAddress(d.Tx.To().Bytes())
-			}
-			entry.interactedContractAddress = &interactedAddress
-		}
-
-		if entry.activityType == ac.ApproveAT {
-			entry.approvalSpender = d.Path.ApprovalContractAddress
-		}
-
-		ret = append(ret, entry)
 	}
 
-	return ret, nil
-}
-
-func getActivityTypeV2(processorName string, isApproval bool) ac.Type {
-	if isApproval {
-		return ac.ApproveAT
-	}
-
-	switch processorName {
-	case pathProcessorCommon.ProcessorTransferName, pathProcessorCommon.ProcessorERC721Name, pathProcessorCommon.ProcessorERC1155Name:
-		return ac.SendAT
-	case pathProcessorCommon.ProcessorBridgeHopName:
-		return ac.BridgeAT
-	case pathProcessorCommon.ProcessorSwapParaswapName:
-		return ac.SwapAT
-	}
-	return ac.UnknownAT
-}
-
-func getActivityStatusV2(status transactions.TxStatus, timestamp int64, now int64, finalizationDuration int64) ac.Status {
-	switch status {
-	case transactions.Pending:
-		return ac.PendingAS
-	case transactions.Success:
-		if timestamp+finalizationDuration > now {
-			return ac.FinalizedAS
-		}
-		return ac.CompleteAS
-	case transactions.Failed:
-		return ac.FailedAS
-	}
-
-	logutils.ZapLogger().Error("unhandled transaction status value")
-	return ac.FailedAS
+	return entries
 }
 
 func getFinalizationPeriod(chainID wCommon.ChainID) int64 {
@@ -272,58 +264,6 @@ func getFinalizationPeriod(chainID wCommon.ChainID) int64 {
 	}
 
 	return ac.L2FinalizationDuration
-}
-
-func getTransferType(fromToken *tokenTypes.Token, processorName string) *ac.TransferType {
-	ret := new(ac.TransferType)
-
-	switch processorName {
-	case pathProcessorCommon.ProcessorTransferName:
-		if fromToken.IsNative() {
-			*ret = ac.TransferTypeEth
-			break
-		}
-		*ret = ac.TransferTypeErc20
-	case pathProcessorCommon.ProcessorERC721Name:
-		*ret = ac.TransferTypeErc721
-	case pathProcessorCommon.ProcessorERC1155Name:
-		*ret = ac.TransferTypeErc1155
-	default:
-		ret = nil
-	}
-
-	return ret
-}
-
-func getToken(token *tokenTypes.Token, processorName string) *ac.Token {
-	if token == nil {
-		return nil
-	}
-
-	ret := new(ac.Token)
-	ret.ChainID = wCommon.ChainID(token.ChainID)
-	if token.IsNative() {
-		ret.TokenType = ac.Native
-	} else {
-		ret.Address = token.Address
-		switch processorName {
-		case pathProcessorCommon.ProcessorERC721Name, pathProcessorCommon.ProcessorERC1155Name:
-			id, err := wCommon.GetTokenIdFromSymbol(token.Symbol)
-			if err != nil {
-				logutils.ZapLogger().Warn("malformed token symbol", zap.Error(err))
-				return nil
-			}
-			ret.TokenID = (*hexutil.Big)(id)
-			if processorName == pathProcessorCommon.ProcessorERC721Name {
-				ret.TokenType = ac.Erc721
-			} else {
-				ret.TokenType = ac.Erc1155
-			}
-		default:
-			ret.TokenType = ac.Erc20
-		}
-	}
-	return ret
 }
 
 // lookupAndFillInTokens ignores NFTs

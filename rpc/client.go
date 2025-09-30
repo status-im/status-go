@@ -55,9 +55,14 @@ type ClientInterface interface {
 	AbstractEthClient(chainID common.ChainID) (ethclient.BatchCallClient, error)
 	EthClient(chainID uint64) (chain.ClientInterface, error)
 	EthClients(chainIDs []uint64) (map[uint64]chain.ClientInterface, error)
+	EthClientWithProvider(chainID uint64, provider string) (ethclient.EthClientInterface, error)
 	CallContext(context context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error
 	Call(result interface{}, chainID uint64, method string, args ...interface{}) error
 	GetNetworkManager() *network.Manager
+}
+
+type EthClientGetter interface {
+	GetEthClient(chainID uint64) (ethclient.EthClientInterface, error)
 }
 
 // Client represents RPC client with custom routing
@@ -294,6 +299,15 @@ func (c *Client) EthClient(chainID uint64) (chain.ClientInterface, error) {
 	}
 
 	return client, nil
+}
+
+func (c *Client) EthClientWithProvider(chainID uint64, provider string) (ethclient.EthClientInterface, error) {
+	client, err := c.getClientUsingCache(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.GetProviderClient(provider), nil
 }
 
 // AbstractEthClient returns a partial abstraction used by new components for testing purposes

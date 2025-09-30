@@ -170,17 +170,10 @@ type FullCollectibleData struct {
 	Ownership                []AccountBalance // This is a list of all the owners of the collectible (filtered according to query parameters)
 }
 
-type CollectiblesContainer[T any] struct {
-	Items          []T
-	NextCursor     string
-	PreviousCursor string
-	Provider       string
-}
-
-type CollectibleOwnershipContainer CollectiblesContainer[CollectibleIDBalance]
-type CollectionDataContainer CollectiblesContainer[CollectionData]
-type CollectibleDataContainer CollectiblesContainer[CollectibleData]
-type FullCollectibleDataContainer CollectiblesContainer[FullCollectibleData]
+type CollectibleOwnershipContainer ItemsContainer[CollectibleIDBalance]
+type CollectionDataContainer ItemsContainer[CollectionData]
+type CollectibleDataContainer ItemsContainer[CollectibleData]
+type FullCollectibleDataContainer ItemsContainer[FullCollectibleData]
 
 // Tried to find a way to make this generic, but couldn't, so the code below is duplicated somewhere else
 func collectibleItemsToBalances(items []FullCollectibleData, owner common.Address) []CollectibleIDBalance {

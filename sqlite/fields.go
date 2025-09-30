@@ -62,6 +62,11 @@ func (blob *JSONBlob) Value() (driver.Value, error) {
 	return json.Marshal(blob.Data)
 }
 
+// ToJSONBlob converts a single value to a JSONBlob
+func ToJSONBlob[T any](value T) *JSONBlob {
+	return &JSONBlob{Data: value}
+}
+
 func BigIntToClampedInt64(val *big.Int) *int64 {
 	if val == nil {
 		return nil

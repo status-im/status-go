@@ -45,6 +45,10 @@ func (d *dummyAccountsStorage) AddressExists(address types.Address) (bool, error
 	return d.account.Address == address, nil
 }
 
+func (d *dummyAccountsStorage) GetWalletAddresses() ([]types.Address, error) {
+	return []types.Address{d.account.Address}, nil
+}
+
 type dummySigner struct{}
 
 func (d *dummySigner) Hash(tx *gethtypes.Transaction) common.Hash {
