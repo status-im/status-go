@@ -146,6 +146,7 @@ func (b *GethStatusBackend) initialize() {
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
 	b.LocalPairingStateManager = new(statecontrol.ProcessStateManager)
 	b.LocalPairingStateManager.SetPairing(false)
+	b.LocalPairingStateManager.SetMessageSyncEnabled(false)
 }
 
 // StatusNode returns reference to node manager
