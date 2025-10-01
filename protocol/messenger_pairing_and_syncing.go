@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"errors"
-	"slices"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -470,7 +469,13 @@ func (m *Messenger) syncMessages(ctx context.Context, rawMessageHandler RawMessa
 	}
 
 	// Sync messages in batches of 100
-	for batch := range slices.Chunk(backupMessages, 100) {
+	batchSize := 100
+	for i := 0; i < len(backupMessages); i += batchSize {
+		end := i + batchSize
+		if end > len(backupMessages) {
+			end = len(backupMessages)
+		}
+		batch := backupMessages[i:end]
 		batchMsg := &protobuf.BackedUpMessageBatch{Messages: batch}
 
 		encodedMessage, err := proto.Marshal(batchMsg)
@@ -479,11 +484,11 @@ func (m *Messenger) syncMessages(ctx context.Context, rawMessageHandler RawMessa
 		}
 
 		_, chat := m.getLastClockWithRelatedChat()
-		rawMessage := messagingtypes.RawMessage{
+		rawMessage := common.RawMessage{
 			LocalChatID: chat.ID,
 			Payload:     encodedMessage,
 			MessageType: protobuf.ApplicationMetadataMessage_BACKED_UP_MESSAGE_BATCH,
-			ResendType:  messagingtypes.ResendTypeDataSync,
+			ResendType:  common.ResendTypeDataSync,
 		}
 
 		_, err = rawMessageHandler(ctx, rawMessage)

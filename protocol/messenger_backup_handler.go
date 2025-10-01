@@ -127,7 +127,7 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 	return errors
 }
 
-func (m *Messenger) handleLocalBackup(state *ReceivedMessageState, message *protobuf.MessengerLocalBackup) []error {
+func (m *Messenger) handleLocalBackup(state *ReceivedMessageState, backup *protobuf.MessengerLocalBackup) []error {
 	var errors []error
 
 	err := m.handleBackedUpProfile(backup.Profile, backup.Clock)
@@ -537,7 +537,7 @@ func (m *Messenger) handleSyncedCommunities(state *ReceivedMessageState, message
 			errors = append(errors, err)
 		}
 
-		err = m.requestCommunityKeysAndSharedAddresses(state, syncCommunity)
+		err = m.requestCommunityKeysAndSharedAddresses(syncCommunity)
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -627,7 +627,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(syncCommunity *protob
 	return nil
 }
 
-func (m *Messenger) HandleBackedUpMessageBatch(state *ReceivedMessageState, messageBatch *protobuf.BackedUpMessageBatch, msg *messagingtypes.Message) error {
+func (m *Messenger) HandleBackedUpMessageBatch(state *ReceivedMessageState, messageBatch *protobuf.BackedUpMessageBatch, msg *v1protocol.StatusMessage) error {
 	// BackedUpMessages can only be sent in the context of a local backup
 	return nil
 }

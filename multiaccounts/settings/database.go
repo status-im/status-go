@@ -408,7 +408,6 @@ func (db *Database) GetSettings() (Settings, error) {
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, wallet_token_preferences_group_by_community, url_unfurling_mode,
 		mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
 		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community,
-		peer_syncing_enabled, auto_refresh_tokens_enabled, last_tokens_update, news_feed_enabled, news_feed_last_fetched_timestamp, news_rss_enabled, backup_path
 		peer_syncing_enabled, auto_refresh_tokens_enabled, last_tokens_update, news_feed_enabled, news_feed_last_fetched_timestamp, news_rss_enabled, backup_path,
 		messages_backup_enabled
 	FROM

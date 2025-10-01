@@ -839,16 +839,6 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		}
 	}
 
-	chatAccount, err := b.accountManager.SelectedChatAccount()
-	if err != nil {
-		return err
-	}
-
-	if err = b.statusNode.StartLocalBackup(chatAccount.AccountKey.PrivateKey); err != nil {
-		b.logger.Error("failed to start local backup", zap.Error(err))
-		// we don't return the error to avoid login failure
-	}
-
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
 	if err != nil {
 		b.logger.Error("failed to update account")
@@ -966,16 +956,6 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		if err != nil {
 			return err
 		}
-	}
-
-	chatAccount, err := b.accountManager.SelectedChatAccount()
-	if err != nil {
-		return err
-	}
-
-	if err = b.statusNode.StartLocalBackup(chatAccount.AccountKey.PrivateKey); err != nil {
-		b.logger.Error("failed to start local backup", zap.Error(err))
-		// we don't return the error to avoid login failure
 	}
 
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
@@ -2792,6 +2772,16 @@ func (b *GethStatusBackend) SelectAccount(loginParams account.LoginParams) error
 
 	if err := b.injectAccountsIntoServices(); err != nil {
 		return err
+	}
+
+	chatAccount, err := b.accountManager.SelectedChatAccount()
+	if err != nil {
+		return err
+	}
+
+	if err = b.statusNode.StartLocalBackup(chatAccount.AccountKey.PrivateKey); err != nil {
+		b.logger.Error("failed to start local backup", zap.Error(err))
+		// we don't return the error to avoid login failure
 	}
 
 	return nil

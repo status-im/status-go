@@ -263,11 +263,23 @@ func (n *StatusNode) StartLocalBackup(privateKey *ecdsa.PrivateKey) error {
 		if backupPath != "" {
 			backupDir = backupPath
 		} else {
-			if devicescommon.OperatingSystemIs(devicescommon.AndroidPlatform) {
-				backupDir = "/storage/emulated/0/Documents/Status/Backups"
-			} else {
-				backupDir = filepath.Join(n.config.RootDataDir, "backups")
+			dir, err := os.UserConfigDir()
+			if err != nil {
+				// Try Home dir instead
+				dir, err = os.UserHomeDir()
+				if err != nil {
+					// If we still have an issue, hardcode to known paths
+					if devicescommon.OperatingSystemIs(devicescommon.AndroidPlatform) {
+						backupDir = "/storage/emulated/0/Documents/Status/Backups"
+					} else if devicescommon.OperatingSystemIs(devicescommon.IOSPlatform) {
+						backupDir = filepath.Join("/Documents", "Status", "Backups")
+					} else {
+						return "", err
+					}
+				}
 			}
+
+			backupDir = filepath.Join(dir, "Status", "backups")
 		}
 
 		fullPath := filepath.Join(backupDir, fmt.Sprintf("%s_user_data.bkp", compressedPubKey[len(compressedPubKey)-6:]))
@@ -279,7 +291,7 @@ func (n *StatusNode) StartLocalBackup(privateKey *ecdsa.PrivateKey) error {
 		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
 		FileNameGetter: filenameGetter,
 		BackupEnabled:  true,
-		Interval:       time.Minute * 1,
+		Interval:       time.Minute * 1, // TODO change that back to 30 minutes
 	}, n.logger.Named("LocalBackup"))
 	if err != nil {
 		return err
