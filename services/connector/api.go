@@ -108,8 +108,12 @@ func (api *API) CallRPC(ctx context.Context, inputJSON string) (interface{}, err
 	return api.forwardRPC(ctx, request)
 }
 
-func (api *API) RecallDAppPermission(origin string, clientID string) error {
+func (api *API) RecallDAppPermission(origin string) error {
 	// TODO: close the websocket connection
+	return api.c.RecallDAppPermissions(commands.RecallDAppPermissionsArgs{URL: origin, ClientID: ""})
+}
+
+func (api *API) RecallDAppPermissionWithClientID(origin string, clientID string) error {
 	return api.c.RecallDAppPermissions(commands.RecallDAppPermissionsArgs{URL: origin, ClientID: clientID})
 }
 
