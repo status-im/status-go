@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/crypto/types"
 )
@@ -125,9 +126,13 @@ func (args SendTxArgs) ToTransactOpts(signerFn bind.SignerFn) *bind.TransactOpts
 		gasLimit = uint64(*args.Gas)
 	}
 
-	var noSign = false
+	var noSend = false
 	if signerFn == nil {
-		noSign = true
+		// Dummy signerFn that returns the rawTx
+		signerFn = func(addr common.Address, tx *ethTypes.Transaction) (*ethTypes.Transaction, error) {
+			return tx, nil
+		}
+		noSend = true
 	}
 
 	return &bind.TransactOpts{
@@ -138,7 +143,7 @@ func (args SendTxArgs) ToTransactOpts(signerFn bind.SignerFn) *bind.TransactOpts
 		GasFeeCap: gasFeeCap,
 		GasTipCap: gasTipCap,
 		Nonce:     nonce,
-		NoSign:    noSign,
+		NoSend:    noSend,
 	}
 }
 
