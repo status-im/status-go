@@ -276,9 +276,74 @@ class WakuextService(Service):
         response = self.rpc_request("requestToJoinCommunity", params)
         return response
 
-    def accept_request_to_join_community(self, request_to_join_id):
+    def accept_request_to_join_community(self, request_to_join_id: str):
         params = [{"id": request_to_join_id}]
         response = self.rpc_request("acceptRequestToJoinCommunity", params)
+        return response
+
+    def cancel_request_to_join_community(self, request_to_join_id: str):
+        params = [{"id": request_to_join_id}]
+        response = self.rpc_request("cancelRequestToJoinCommunity", params)
+        return response
+
+    def decline_request_to_join_community(self, request_to_join_id: str):
+        params = [{"id": request_to_join_id}]
+        response = self.rpc_request("declineRequestToJoinCommunity", params)
+        return response
+
+    def canceled_requests_to_join_for_community(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("canceledRequestsToJoinForCommunity", params)
+        return response
+
+    def pending_requests_to_join_for_community(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("pendingRequestsToJoinForCommunity", params)
+        return response
+
+    def declined_requests_to_join_for_community(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("declinedRequestsToJoinForCommunity", params)
+        return response
+
+    def latest_request_to_join_for_community(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("latestRequestToJoinForCommunity", params)
+        return response
+
+    def my_pending_requests_to_join(self):
+        params = []
+        response = self.rpc_request("myPendingRequestsToJoin", params)
+        return response
+
+    def my_canceled_requests_to_join(self):
+        params = []
+        response = self.rpc_request("myCanceledRequestsToJoin", params)
+        return response
+
+    def check_and_delete_pending_request_to_join_community(self):
+        params = []
+        response = self.rpc_request("checkAndDeletePendingRequestToJoinCommunity", params)
+        return response
+
+    def all_non_approved_communities_requests_to_join(self):
+        params = []
+        response = self.rpc_request("allNonApprovedCommunitiesRequestsToJoin", params)
+        return response
+
+    def check_permissions_to_join_community(self, community_id: str):
+        params = [{"communityId": community_id}]
+        response = self.rpc_request("checkPermissionsToJoinCommunity", params)
+        return response
+
+    def generate_joining_community_requests_for_signing(self, member_pub_key: str, community_id: str, addresses_to_reveal: list):
+        params = [member_pub_key, community_id, addresses_to_reveal]
+        response = self.rpc_request("generateJoiningCommunityRequestsForSigning", params)
+        return response
+
+    def generate_edit_community_requests_for_signing(self, member_pub_key: str, community_id: str, addresses_to_reveal: list):
+        params = [member_pub_key, community_id, addresses_to_reveal]
+        response = self.rpc_request("generateEditCommunityRequestsForSigning", params)
         return response
 
     def send_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value):
