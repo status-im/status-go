@@ -42,7 +42,11 @@ func (c *SingleRequestCodec) Output() string {
 	return c.output
 }
 
-func (c *SingleRequestCodec) encode(v interface{}) error {
+func (c *SingleRequestCodec) encode(v interface{}, isErrorResponse bool) error {
+	// isErrorResponse seem to be safe to ignore.
+	// It was added in go-ethereum to handle HTTP differently in some specific cases
+	// https://github.com/ethereum/go-ethereum/pull/25457
+
 	data, err := json.Marshal(v)
 	if err != nil {
 		return err
