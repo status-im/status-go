@@ -22,6 +22,9 @@ const (
 	Method_RequestPermissions  = "wallet_requestPermissions"
 	Method_RevokePermissions   = "wallet_revokePermissions"
 	Method_SwitchEthereumChain = "wallet_switchEthereumChain"
+
+	// DefaultClientID for backward compatibility (browser extension doesn't provide clientId)
+	DefaultClientID = ""
 )
 
 // errors
@@ -32,14 +35,15 @@ var (
 )
 
 type RPCRequest struct {
-	JSONRPC string        `json:"jsonrpc"`
-	ID      int           `json:"id"`
-	Method  string        `json:"method"`
-	Params  []interface{} `json:"params"`
-	URL     string        `json:"url"`
-	Name    string        `json:"name"`
-	IconURL string        `json:"iconUrl"`
-	ChainID uint64        `json:"chainId"`
+	JSONRPC  string        `json:"jsonrpc"`
+	ID       int           `json:"id"`
+	Method   string        `json:"method"`
+	Params   []interface{} `json:"params"`
+	URL      string        `json:"url"`
+	Name     string        `json:"name"`
+	IconURL  string        `json:"iconUrl"`
+	ClientID string        `json:"clientId"`
+	ChainID  uint64        `json:"chainId"`
 }
 
 type RPCCommand interface {
@@ -67,7 +71,8 @@ type RejectedArgs struct {
 }
 
 type RecallDAppPermissionsArgs struct {
-	URL string `json:"url"`
+	URL      string `json:"url"`
+	ClientID string `json:"clientId"`
 }
 
 type ClientSideHandlerInterface interface {
@@ -106,6 +111,11 @@ func RPCRequestFromJSON(inputJSON string) (RPCRequest, error) {
 func (r *RPCRequest) Validate() error {
 	if r.URL == "" || r.Name == "" {
 		return ErrRequestMissingDAppData
+	}
+
+	// Browser extension doesn't send ClientID
+	if r.ClientID == "" {
+		r.ClientID = DefaultClientID
 	}
 	return nil
 }

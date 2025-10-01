@@ -23,7 +23,7 @@ func (c *AccountsCommand) Execute(ctx context.Context, request RPCRequest) (inte
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, request.URL)
+	dApp, err := persistence.SelectDAppByUrlAndClientID(c.Db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}

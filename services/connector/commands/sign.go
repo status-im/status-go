@@ -77,7 +77,7 @@ func (c *SignCommand) Execute(ctx context.Context, request RPCRequest) (interfac
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, request.URL)
+	dApp, err := persistence.SelectDAppByUrlAndClientID(c.Db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -87,8 +87,9 @@ func (c *SignCommand) Execute(ctx context.Context, request RPCRequest) (interfac
 	}
 
 	return c.ClientHandler.RequestSign(signal.ConnectorDApp{
-		URL:     request.URL,
-		Name:    request.Name,
-		IconURL: request.IconURL,
+		URL:      request.URL,
+		Name:     request.Name,
+		IconURL:  request.IconURL,
+		ClientID: request.ClientID,
 	}, params.Challenge, params.Address, params.Method)
 }

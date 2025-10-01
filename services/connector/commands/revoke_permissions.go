@@ -18,7 +18,7 @@ func (c *RevokePermissionsCommand) Execute(ctx context.Context, request RPCReque
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, request.URL)
+	dApp, err := persistence.SelectDAppByUrlAndClientID(c.Db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -27,15 +27,16 @@ func (c *RevokePermissionsCommand) Execute(ctx context.Context, request RPCReque
 		return "", ErrDAppIsNotPermittedByUser
 	}
 
-	err = persistence.DeleteDApp(c.Db, dApp.URL)
+	err = persistence.DeleteDApp(c.Db, dApp.URL, dApp.ClientID)
 	if err != nil {
 		return "", err
 	}
 
 	signal.SendConnectorDAppPermissionRevoked(signal.ConnectorDApp{
-		URL:     request.URL,
-		Name:    request.Name,
-		IconURL: request.IconURL,
+		URL:      request.URL,
+		Name:     request.Name,
+		IconURL:  request.IconURL,
+		ClientID: request.ClientID,
 	})
 
 	return nil, nil

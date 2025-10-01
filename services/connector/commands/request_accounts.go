@@ -26,7 +26,7 @@ func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, request.URL)
+	dApp, err := persistence.SelectDAppByUrlAndClientID(c.Db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -34,9 +34,10 @@ func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest
 	// FIXME: this may have a security issue in case some malicious software tries to fake the origin
 	if dApp == nil {
 		connectorDApp := signal.ConnectorDApp{
-			URL:     request.URL,
-			Name:    request.Name,
-			IconURL: request.IconURL,
+			URL:      request.URL,
+			Name:     request.Name,
+			IconURL:  request.IconURL,
+			ClientID: request.ClientID,
 		}
 		account, chainID, err := c.ClientHandler.RequestShareAccountForDApp(connectorDApp)
 		if err != nil {
@@ -47,6 +48,7 @@ func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest
 			URL:           request.URL,
 			Name:          request.Name,
 			IconURL:       request.IconURL,
+			ClientID:      request.ClientID,
 			SharedAccount: account,
 			ChainID:       chainID,
 		}

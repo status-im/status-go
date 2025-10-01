@@ -6,29 +6,32 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 )
 
-const upsertDAppQuery = "INSERT INTO connector_dapps (url, name, icon_url, shared_account, chain_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(url) DO UPDATE SET name = excluded.name, icon_url = excluded.icon_url, shared_account = excluded.shared_account, chain_id = excluded.chain_id"
-const selectDAppByUrlQuery = "SELECT name, icon_url, shared_account, chain_id FROM connector_dapps WHERE url = ?"
-const selectDAppsQuery = "SELECT url, name, icon_url, shared_account, chain_id FROM connector_dapps"
-const deleteDAppQuery = "DELETE FROM connector_dapps WHERE url = ?"
+const upsertDAppQuery = "INSERT INTO connector_dapps (url, name, icon_url, client_id, shared_account, chain_id) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(url, client_id) DO UPDATE SET name = excluded.name, icon_url = excluded.icon_url, shared_account = excluded.shared_account, chain_id = excluded.chain_id"
+const selectDAppByUrlAndClientIDQuery = "SELECT name, icon_url, shared_account, chain_id FROM connector_dapps WHERE url = ? AND client_id = ?"
+const selectDAppsQuery = "SELECT url, name, icon_url, client_id, shared_account, chain_id FROM connector_dapps"
+const deleteDAppQuery = "DELETE FROM connector_dapps WHERE url = ? AND client_id = ?"
 
 type DApp struct {
 	URL           string        `json:"url"`
 	Name          string        `json:"name"`
 	IconURL       string        `json:"iconUrl"`
+	ClientID      string        `json:"clientId"`
 	SharedAccount types.Address `json:"sharedAccount"`
 	ChainID       uint64        `json:"chainId"`
 }
 
 func UpsertDApp(db *sql.DB, dApp *DApp) error {
-	_, err := db.Exec(upsertDAppQuery, dApp.URL, dApp.Name, dApp.IconURL, dApp.SharedAccount, dApp.ChainID)
+	_, err := db.Exec(upsertDAppQuery, dApp.URL, dApp.Name, dApp.IconURL, dApp.ClientID, dApp.SharedAccount, dApp.ChainID)
 	return err
 }
 
-func SelectDAppByUrl(db *sql.DB, url string) (*DApp, error) {
+func SelectDAppByUrlAndClientID(db *sql.DB, url string, clientID string) (*DApp, error) {
+	// clientID can be empty for backward compatibility with browser extension
 	dApp := &DApp{
-		URL: url,
+		URL:      url,
+		ClientID: clientID,
 	}
-	err := db.QueryRow(selectDAppByUrlQuery, url).Scan(&dApp.Name, &dApp.IconURL, &dApp.SharedAccount, &dApp.ChainID)
+	err := db.QueryRow(selectDAppByUrlAndClientIDQuery, url, clientID).Scan(&dApp.Name, &dApp.IconURL, &dApp.SharedAccount, &dApp.ChainID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -45,7 +48,7 @@ func SelectAllDApps(db *sql.DB) ([]DApp, error) {
 	var dApps []DApp
 	for rows.Next() {
 		dApp := DApp{}
-		err = rows.Scan(&dApp.URL, &dApp.Name, &dApp.IconURL, &dApp.SharedAccount, &dApp.ChainID)
+		err = rows.Scan(&dApp.URL, &dApp.Name, &dApp.IconURL, &dApp.ClientID, &dApp.SharedAccount, &dApp.ChainID)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +57,7 @@ func SelectAllDApps(db *sql.DB) ([]DApp, error) {
 	return dApps, nil
 }
 
-func DeleteDApp(db *sql.DB, url string) error {
-	_, err := db.Exec(deleteDAppQuery, url)
+func DeleteDApp(db *sql.DB, url string, clientID string) error {
+	_, err := db.Exec(deleteDAppQuery, url, clientID)
 	return err
 }

@@ -21,7 +21,7 @@ func (c *ChainIDCommand) Execute(ctx context.Context, request RPCRequest) (inter
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, request.URL)
+	dApp, err := persistence.SelectDAppByUrlAndClientID(c.Db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}

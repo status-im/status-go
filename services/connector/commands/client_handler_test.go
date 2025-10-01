@@ -44,6 +44,7 @@ func TestRecallDAppPermission(t *testing.T) {
 		Name:          "Test DApp",
 		URL:           "http://testDAppURL",
 		IconURL:       "http://testDAppIconUrl",
+		ClientID:      "",
 		SharedAccount: types.HexToAddress("0x1234567890"),
 		ChainID:       0x1,
 	}
@@ -51,21 +52,21 @@ func TestRecallDAppPermission(t *testing.T) {
 	err := persistence.UpsertDApp(db, &dapp)
 	assert.NoError(t, err)
 
-	persistedDapp, err := persistence.SelectDAppByUrl(db, dapp.URL)
+	persistedDapp, err := persistence.SelectDAppByUrlAndClientID(db, dapp.URL, dapp.ClientID)
 	assert.Equal(t, persistedDapp, &dapp)
 	assert.NoError(t, err)
 
 	clientHandler := NewClientSideHandler(db)
-	err = clientHandler.RecallDAppPermissions(RecallDAppPermissionsArgs{URL: dapp.URL})
+	err = clientHandler.RecallDAppPermissions(RecallDAppPermissionsArgs{URL: dapp.URL, ClientID: dapp.ClientID})
 	assert.NoError(t, err)
 
 	err = clientHandler.RecallDAppPermissions(RecallDAppPermissionsArgs{})
 	assert.ErrorIs(t, err, ErrEmptyUrl)
 
-	err = clientHandler.RecallDAppPermissions(RecallDAppPermissionsArgs{URL: dapp.URL})
+	err = clientHandler.RecallDAppPermissions(RecallDAppPermissionsArgs{URL: dapp.URL, ClientID: dapp.ClientID})
 	assert.ErrorIs(t, err, ErrDAppDoesNotHavePermissions)
 
-	recalledDapp, err := persistence.SelectDAppByUrl(db, dapp.URL)
+	recalledDapp, err := persistence.SelectDAppByUrlAndClientID(db, dapp.URL, dapp.ClientID)
 
 	assert.Equal(t, recalledDapp, (*persistence.DApp)(nil))
 	assert.NoError(t, err)

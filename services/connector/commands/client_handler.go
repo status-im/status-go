@@ -58,7 +58,7 @@ func NewClientSideHandler(db *sql.DB) *ClientSideHandler {
 }
 
 func (c *ClientSideHandler) generateRequestID(dApp signal.ConnectorDApp) string {
-	rawID := fmt.Sprintf("%d%s", time.Now().UnixMilli(), dApp.URL)
+	rawID := fmt.Sprintf("%d%s%s", time.Now().UnixMilli(), dApp.URL, dApp.ClientID)
 	hash := sha256.Sum256([]byte(rawID))
 	return hex.EncodeToString(hash[:])
 }
@@ -126,7 +126,12 @@ func (c *ClientSideHandler) RecallDAppPermissions(args RecallDAppPermissionsArgs
 		return ErrEmptyUrl
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, args.URL)
+	// For backward compatibility with old clients(browser extension) that don't provide clientId
+	if args.ClientID == "" {
+		args.ClientID = DefaultClientID
+	}
+
+	dApp, err := persistence.SelectDAppByUrlAndClientID(c.Db, args.URL, args.ClientID)
 	if err != nil {
 		return err
 	}
@@ -135,15 +140,16 @@ func (c *ClientSideHandler) RecallDAppPermissions(args RecallDAppPermissionsArgs
 		return ErrDAppDoesNotHavePermissions
 	}
 
-	err = persistence.DeleteDApp(c.Db, dApp.URL)
+	err = persistence.DeleteDApp(c.Db, dApp.URL, dApp.ClientID)
 	if err != nil {
 		return err
 	}
 
 	signal.SendConnectorDAppPermissionRevoked(signal.ConnectorDApp{
-		URL:     dApp.URL,
-		Name:    dApp.Name,
-		IconURL: dApp.IconURL,
+		URL:      dApp.URL,
+		Name:     dApp.Name,
+		IconURL:  dApp.IconURL,
+		ClientID: dApp.ClientID,
 	})
 	return nil
 }

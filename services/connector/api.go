@@ -71,8 +71,8 @@ func NewAPI(s *Service) *API {
 	}
 }
 
-func (api *API) forwardRPC(ctx context.Context, URL string, request commands.RPCRequest) (interface{}, error) {
-	dApp, err := persistence.SelectDAppByUrl(api.s.db, URL)
+func (api *API) forwardRPC(ctx context.Context, request commands.RPCRequest) (interface{}, error) {
+	dApp, err := persistence.SelectDAppByUrlAndClientID(api.s.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -105,12 +105,12 @@ func (api *API) CallRPC(ctx context.Context, inputJSON string) (interface{}, err
 		return nil, fmt.Errorf("method %s is not allowed", request.Method)
 	}
 
-	return api.forwardRPC(ctx, request.URL, request)
+	return api.forwardRPC(ctx, request)
 }
 
-func (api *API) RecallDAppPermission(origin string) error {
+func (api *API) RecallDAppPermission(origin string, clientID string) error {
 	// TODO: close the websocket connection
-	return api.c.RecallDAppPermissions(commands.RecallDAppPermissionsArgs{URL: origin})
+	return api.c.RecallDAppPermissions(commands.RecallDAppPermissionsArgs{URL: origin, ClientID: clientID})
 }
 
 func (api *API) GetPermittedDAppsList() ([]persistence.DApp, error) {
