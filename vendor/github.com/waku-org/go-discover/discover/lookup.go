@@ -140,7 +140,7 @@ func (it *lookup) slowdown() {
 }
 
 func (it *lookup) query(n *node, reply chan<- []*node) {
-	fails := it.tab.db.FindFails(n.ID(), n.IP())
+	fails := it.tab.db.FindFails(n.ID(), n.IPAddr())
 	r, err := it.queryfunc(n)
 	if errors.Is(err, errClosed) {
 		// Avoid recording failures on shutdown.
@@ -148,18 +148,15 @@ func (it *lookup) query(n *node, reply chan<- []*node) {
 		return
 	} else if len(r) == 0 {
 		fails++
-		it.tab.db.UpdateFindFails(n.ID(), n.IP(), fails)
+		it.tab.db.UpdateFindFails(n.ID(), n.IPAddr(), fails)
 		// Remove the node from the local table if it fails to return anything useful too
 		// many times, but only if there are enough other nodes in the bucket.
-		dropped := false
 		if fails >= maxFindnodeFailures && it.tab.bucketLen(n.ID()) >= bucketSize/2 {
-			dropped = true
 			it.tab.delete(n)
 		}
-		it.tab.log.Trace("FINDNODE failed", "id", n.ID(), "failcount", fails, "dropped", dropped, "err", err)
 	} else if fails > 0 {
 		// Reset failure counter because it counts _consecutive_ failures.
-		it.tab.db.UpdateFindFails(n.ID(), n.IP(), 0)
+		it.tab.db.UpdateFindFails(n.ID(), n.IPAddr(), 0)
 	}
 
 	// Grab as many nodes as possible. Some of them might not be alive anymore, but we'll

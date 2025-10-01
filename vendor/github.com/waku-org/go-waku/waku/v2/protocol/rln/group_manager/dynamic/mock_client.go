@@ -34,7 +34,7 @@ func (c *MockClient) Close() {
 
 }
 func (c *MockClient) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
-	return types.NewBlock(&types.Header{Number: big.NewInt(c.latestBlockNum.Load())}, nil, nil, nil, nil), nil
+	return types.NewBlock(&types.Header{Number: big.NewInt(c.latestBlockNum.Load())}, nil, nil, nil), nil
 }
 func NewMockClient(t *testing.T, blockFile string) *MockClient {
 	blockChain := MockBlockChain{}
