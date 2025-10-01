@@ -20,12 +20,11 @@
 package discover
 
 import (
-	"fmt"
 	"net"
 	"sort"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
 )
 
 const (
@@ -49,10 +48,10 @@ func checkClockDrift() {
 		return
 	}
 	if drift < -driftThreshold || drift > driftThreshold {
-		log.Warn(fmt.Sprintf("System clock seems off by %v, which can prevent network connectivity", drift))
-		log.Warn("Please enable network time synchronisation in system settings.")
+		zap.L().Warn("System clock seems off", zap.Duration("drift", drift))
+		zap.L().Warn("Please enable network time synchronisation in system settings.")
 	} else {
-		log.Debug("NTP sanity check done", "drift", drift)
+		zap.L().Debug("NTP sanity check done", zap.Duration("drift", drift))
 	}
 }
 

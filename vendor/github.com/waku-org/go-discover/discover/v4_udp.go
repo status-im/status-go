@@ -26,13 +26,16 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
+
 	"github.com/waku-org/go-discover/discover/v4wire"
 )
 
@@ -66,7 +69,7 @@ const (
 // UDPv4 implements the v4 wire protocol.
 type UDPv4 struct {
 	conn        UDPConn
-	log         log.Logger
+	log         *zap.Logger
 	netrestrict *netutil.Netlist
 	priv        *ecdsa.PrivateKey
 	localNode   *enode.LocalNode
@@ -130,7 +133,7 @@ func ListenV4(c UDPConn, ln *enode.LocalNode, cfg Config) (*UDPv4, error) {
 	cfg = cfg.withDefaults()
 	closeCtx, cancel := context.WithCancel(context.Background())
 	t := &UDPv4{
-		conn:            c,
+		conn:            newMeteredConn(c),
 		priv:            cfg.PrivateKey,
 		netrestrict:     cfg.NetRestrict,
 		localNode:       ln,
@@ -142,7 +145,7 @@ func ListenV4(c UDPConn, ln *enode.LocalNode, cfg Config) (*UDPv4, error) {
 		log:             cfg.Log,
 	}
 
-	tab, err := newTable(t, ln.Database(), cfg.Bootnodes, cfg.ValidNodeFn, t.log)
+	tab, err := newTable(t, ln.Database(), cfg.Bootnodes, t.log)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +244,7 @@ func (t *UDPv4) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) *r
 		return matched, matched
 	})
 	// Send the packet.
-	t.localNode.UDPContact(toaddr)
+	t.localNode.UDPContact(toaddr.AddrPort())
 	t.write(toaddr, toid, req.Name(), packet)
 	return rm
 }
@@ -311,7 +314,6 @@ func (t *UDPv4) findnode(toid enode.ID, toaddr *net.UDPAddr, target v4wire.Pubke
 			nreceived++
 			n, err := t.nodeFromRPC(toaddr, rn)
 			if err != nil {
-				t.log.Trace("Invalid neighbor node received", "ip", rn.IP, "addr", toaddr, "err", err)
 				continue
 			}
 			nodes = append(nodes, n)
@@ -506,7 +508,6 @@ func (t *UDPv4) send(toaddr *net.UDPAddr, toid enode.ID, req v4wire.Packet) ([]b
 
 func (t *UDPv4) write(toaddr *net.UDPAddr, toid enode.ID, what string, packet []byte) error {
 	_, err := t.conn.WriteToUDP(packet, toaddr)
-	t.log.Trace(">> "+what, "id", toid, "addr", toaddr, "err", err)
 	return err
 }
 
@@ -522,12 +523,12 @@ func (t *UDPv4) readLoop(unhandled chan<- ReadPacket) {
 		nbytes, from, err := t.conn.ReadFromUDP(buf)
 		if netutil.IsTemporaryError(err) {
 			// Ignore temporary read errors.
-			t.log.Debug("Temporary UDP read error", "err", err)
+			t.log.Debug("Temporary UDP read error", zap.Error(err))
 			continue
 		} else if err != nil {
 			// Shut down the loop for permanent errors.
 			if !errors.Is(err, io.EOF) {
-				t.log.Debug("UDP read error", "err", err)
+				t.log.Debug("UDP read error", zap.Error(err))
 			}
 			return
 		}
@@ -543,7 +544,10 @@ func (t *UDPv4) readLoop(unhandled chan<- ReadPacket) {
 func (t *UDPv4) handlePacket(from *net.UDPAddr, buf []byte) error {
 	rawpacket, fromKey, hash, err := v4wire.Decode(buf)
 	if err != nil {
-		t.log.Debug("Bad discv4 packet", "addr", from, "err", err)
+		t.log.Debug("bad discv4 packet",
+			zap.Stringer("addr", from),
+			zap.Error(err),
+		)
 		return err
 	}
 	packet := t.wrapPacket(rawpacket)
@@ -551,7 +555,6 @@ func (t *UDPv4) handlePacket(from *net.UDPAddr, buf []byte) error {
 	if err == nil && packet.preverify != nil {
 		err = packet.preverify(packet, from, fromID, fromKey)
 	}
-	t.log.Trace("<< "+packet.Name(), "id", fromID, "addr", from, "err", err)
 	if err == nil && packet.handle != nil {
 		packet.handle(packet, from, fromID, hash)
 	}
@@ -559,15 +562,15 @@ func (t *UDPv4) handlePacket(from *net.UDPAddr, buf []byte) error {
 }
 
 // checkBond checks if the given node has a recent enough endpoint proof.
-func (t *UDPv4) checkBond(id enode.ID, ip net.IP) bool {
-	return time.Since(t.db.LastPongReceived(id, ip)) < bondExpiration
+func (t *UDPv4) checkBond(id enode.ID, addr netip.Addr) bool {
+	return time.Since(t.db.LastPongReceived(id, addr)) < bondExpiration
 }
 
 // ensureBond solicits a ping from a node if we haven't seen a ping from it for a while.
 // This ensures there is a valid endpoint proof on the remote end.
 func (t *UDPv4) ensureBond(toid enode.ID, toaddr *net.UDPAddr) {
-	tooOld := time.Since(t.db.LastPingReceived(toid, toaddr.IP)) > bondExpiration
-	if tooOld || t.db.FindFails(toid, toaddr.IP) > maxFindnodeFailures {
+	tooOld := time.Since(t.db.LastPingReceived(toid, toaddr.AddrPort().Addr())) > bondExpiration
+	if tooOld || t.db.FindFails(toid, toaddr.AddrPort().Addr()) > maxFindnodeFailures {
 		rm := t.sendPing(toid, toaddr, nil)
 		<-rm.errc
 		// Wait for them to ping back and process our pong.
@@ -667,7 +670,7 @@ func (t *UDPv4) handlePing(h *packetHandlerV4, from *net.UDPAddr, fromID enode.I
 
 	// Ping back if our last pong on file is too far in the past.
 	n := wrapNode(enode.NewV4(h.senderKey, from.IP, int(req.From.TCP), from.Port))
-	if time.Since(t.db.LastPongReceived(n.ID(), from.IP)) > bondExpiration {
+	if time.Since(t.db.LastPongReceived(n.ID(), from.AddrPort().Addr())) > bondExpiration {
 		t.sendPing(fromID, from, func() {
 			t.tab.addVerifiedNode(n)
 		})
@@ -676,8 +679,8 @@ func (t *UDPv4) handlePing(h *packetHandlerV4, from *net.UDPAddr, fromID enode.I
 	}
 
 	// Update node database and endpoint predictor.
-	t.db.UpdateLastPingReceived(n.ID(), from.IP, time.Now())
-	t.localNode.UDPEndpointStatement(from, &net.UDPAddr{IP: req.To.IP, Port: int(req.To.UDP)})
+	t.db.UpdateLastPingReceived(n.ID(), from.AddrPort().Addr(), time.Now())
+	t.localNode.UDPEndpointStatement(from.AddrPort(), req.To.UDPAddrPort())
 }
 
 // PONG/v4
@@ -691,8 +694,8 @@ func (t *UDPv4) verifyPong(h *packetHandlerV4, from *net.UDPAddr, fromID enode.I
 	if !t.handleReply(fromID, from.IP, req) {
 		return errUnsolicitedReply
 	}
-	t.localNode.UDPEndpointStatement(from, &net.UDPAddr{IP: req.To.IP, Port: int(req.To.UDP)})
-	t.db.UpdateLastPongReceived(fromID, from.IP, time.Now())
+	t.localNode.UDPEndpointStatement(from.AddrPort(), req.To.UDPAddrPort())
+	t.db.UpdateLastPongReceived(fromID, from.AddrPort().Addr(), time.Now())
 	return nil
 }
 
@@ -704,7 +707,7 @@ func (t *UDPv4) verifyFindnode(h *packetHandlerV4, from *net.UDPAddr, fromID eno
 	if v4wire.Expired(req.Expiration) {
 		return errExpired
 	}
-	if !t.checkBond(fromID, from.IP) {
+	if !t.checkBond(fromID, from.AddrPort().Addr()) {
 		// No endpoint proof pong exists, we don't process the packet. This prevents an
 		// attack vector where the discovery protocol could be used to amplify traffic in a
 		// DDOS attack. A malicious actor would send a findnode request with the IP address
@@ -764,7 +767,7 @@ func (t *UDPv4) verifyENRRequest(h *packetHandlerV4, from *net.UDPAddr, fromID e
 	if v4wire.Expired(req.Expiration) {
 		return errExpired
 	}
-	if !t.checkBond(fromID, from.IP) {
+	if !t.checkBond(fromID, from.AddrPort().Addr()) {
 		return errUnknownNode
 	}
 	return nil
