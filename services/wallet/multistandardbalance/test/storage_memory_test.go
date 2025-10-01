@@ -428,3 +428,200 @@ func TestStorageMemory_ClearMissingChains(t *testing.T) {
 	assert.Nil(t, balance3)
 	assert.Equal(t, multistandardbalance.NeverFetched, state3.FetchedAt)
 }
+
+func TestStorageMemory_UpdateNativeBalance_WithNilBlockNumber(t *testing.T) {
+	storage := multistandardbalance.NewStorageMemory()
+	ctx := context.Background()
+
+	key := multistandardbalance.BalancesKey{
+		Account: common.HexToAddress("0x1234567890123456789012345678901234567890"),
+		ChainID: 1,
+	}
+
+	// First, create an initial entry with a valid state
+	initialBalance := big.NewInt(1000)
+	initialState := multistandardbalance.State{
+		AtBlockNumber: big.NewInt(12345),
+		AtBlockHash:   common.HexToHash("0xabcdef"),
+		FetchedAt:     time.Now().Unix(),
+	}
+
+	_, _, err := storage.UpdateNativeBalance(ctx, key, initialBalance, initialState)
+	require.NoError(t, err)
+
+	// Now try to update with a nil block number - this should cause an error
+	newBalance := big.NewInt(2000)
+	stateWithNilBlockNumber := multistandardbalance.State{
+		AtBlockNumber: nil, // This should cause an error
+		AtBlockHash:   common.HexToHash("0xfedcba"),
+		FetchedAt:     time.Now().Unix(),
+	}
+
+	balanceChanged, oldState, err := storage.UpdateNativeBalance(ctx, key, newBalance, stateWithNilBlockNumber)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "new state at block number is nil")
+	assert.False(t, balanceChanged)
+	assert.Equal(t, initialState.AtBlockNumber, oldState.AtBlockNumber)
+
+	// Verify that the original balance is still there (not updated)
+	retrievedBalance, retrievedState, err := storage.GetNativeBalance(ctx, key)
+	require.NoError(t, err)
+	assert.Equal(t, initialBalance, retrievedBalance)
+	assert.Equal(t, initialState.AtBlockNumber, retrievedState.AtBlockNumber)
+}
+
+func TestStorageMemory_UpdateERC20Balances_WithNilBlockNumber(t *testing.T) {
+	storage := multistandardbalance.NewStorageMemory()
+	ctx := context.Background()
+
+	key := multistandardbalance.BalancesKey{
+		Account: common.HexToAddress("0x1234567890123456789012345678901234567890"),
+		ChainID: 1,
+	}
+
+	// First, create an initial entry with a valid state
+	initialBalances := map[multistandardbalance.ContractAddress]*big.Int{
+		common.HexToAddress("0x1111111111111111111111111111111111111111"): big.NewInt(100),
+	}
+	initialState := multistandardbalance.State{
+		AtBlockNumber: big.NewInt(12345),
+		AtBlockHash:   common.HexToHash("0xabcdef"),
+		FetchedAt:     time.Now().Unix(),
+	}
+
+	_, _, err := storage.UpdateERC20Balances(ctx, key, initialBalances, initialState)
+	require.NoError(t, err)
+
+	// Now try to update with a nil block number - this should cause an error
+	newBalances := map[multistandardbalance.ContractAddress]*big.Int{
+		common.HexToAddress("0x1111111111111111111111111111111111111111"): big.NewInt(200),
+	}
+	stateWithNilBlockNumber := multistandardbalance.State{
+		AtBlockNumber: nil, // This should cause an error
+		AtBlockHash:   common.HexToHash("0xfedcba"),
+		FetchedAt:     time.Now().Unix(),
+	}
+
+	balanceChanged, oldState, err := storage.UpdateERC20Balances(ctx, key, newBalances, stateWithNilBlockNumber)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "new state at block number is nil")
+	assert.False(t, balanceChanged)
+	assert.Equal(t, initialState.AtBlockNumber, oldState.AtBlockNumber)
+
+	// Verify that the original balances are still there (not updated)
+	retrievedBalances, retrievedState, err := storage.GetERC20Balances(ctx, key)
+	require.NoError(t, err)
+	assert.Equal(t, len(initialBalances), len(retrievedBalances))
+	for contract, expectedBalance := range initialBalances {
+		actualBalance, exists := retrievedBalances[contract]
+		assert.True(t, exists)
+		assert.Equal(t, expectedBalance, actualBalance)
+	}
+	assert.Equal(t, initialState.AtBlockNumber, retrievedState.AtBlockNumber)
+}
+
+func TestStorageMemory_UpdateERC721Balances_WithNilBlockNumber(t *testing.T) {
+	storage := multistandardbalance.NewStorageMemory()
+	ctx := context.Background()
+
+	key := multistandardbalance.BalancesKey{
+		Account: common.HexToAddress("0x1234567890123456789012345678901234567890"),
+		ChainID: 1,
+	}
+
+	// First, create an initial entry with a valid state
+	initialBalances := map[multistandardbalance.ContractAddress]*big.Int{
+		common.HexToAddress("0x1111111111111111111111111111111111111111"): big.NewInt(5),
+	}
+	initialState := multistandardbalance.State{
+		AtBlockNumber: big.NewInt(12345),
+		AtBlockHash:   common.HexToHash("0xabcdef"),
+		FetchedAt:     time.Now().Unix(),
+	}
+
+	_, _, err := storage.UpdateERC721Balances(ctx, key, initialBalances, initialState)
+	require.NoError(t, err)
+
+	// Now try to update with a nil block number - this should cause an error
+	newBalances := map[multistandardbalance.ContractAddress]*big.Int{
+		common.HexToAddress("0x1111111111111111111111111111111111111111"): big.NewInt(10),
+	}
+	stateWithNilBlockNumber := multistandardbalance.State{
+		AtBlockNumber: nil, // This should cause an error
+		AtBlockHash:   common.HexToHash("0xfedcba"),
+		FetchedAt:     time.Now().Unix(),
+	}
+
+	balanceChanged, oldState, err := storage.UpdateERC721Balances(ctx, key, newBalances, stateWithNilBlockNumber)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "new state at block number is nil")
+	assert.False(t, balanceChanged)
+	assert.Equal(t, initialState.AtBlockNumber, oldState.AtBlockNumber)
+
+	// Verify that the original balances are still there (not updated)
+	retrievedBalances, retrievedState, err := storage.GetERC721Balances(ctx, key)
+	require.NoError(t, err)
+	assert.Equal(t, len(initialBalances), len(retrievedBalances))
+	for contract, expectedBalance := range initialBalances {
+		actualBalance, exists := retrievedBalances[contract]
+		assert.True(t, exists)
+		assert.Equal(t, expectedBalance, actualBalance)
+	}
+	assert.Equal(t, initialState.AtBlockNumber, retrievedState.AtBlockNumber)
+}
+
+func TestStorageMemory_UpdateERC1155Balances_WithNilBlockNumber(t *testing.T) {
+	storage := multistandardbalance.NewStorageMemory()
+	ctx := context.Background()
+
+	key := multistandardbalance.BalancesKey{
+		Account: common.HexToAddress("0x1234567890123456789012345678901234567890"),
+		ChainID: 1,
+	}
+
+	// First, create an initial entry with a valid state
+	initialBalances := map[multistandardbalance.HashableCollectibleID]*big.Int{
+		multistandardbalance.HashableCollectibleID{
+			ContractAddress: common.HexToAddress("0x1111111111111111111111111111111111111111"),
+			TokenID:         [32]byte{1},
+		}: big.NewInt(10),
+	}
+	initialState := multistandardbalance.State{
+		AtBlockNumber: big.NewInt(12345),
+		AtBlockHash:   common.HexToHash("0xabcdef"),
+		FetchedAt:     time.Now().Unix(),
+	}
+
+	_, _, err := storage.UpdateERC1155Balances(ctx, key, initialBalances, initialState)
+	require.NoError(t, err)
+
+	// Now try to update with a nil block number - this should cause an error
+	newBalances := map[multistandardbalance.HashableCollectibleID]*big.Int{
+		multistandardbalance.HashableCollectibleID{
+			ContractAddress: common.HexToAddress("0x1111111111111111111111111111111111111111"),
+			TokenID:         [32]byte{1},
+		}: big.NewInt(20),
+	}
+	stateWithNilBlockNumber := multistandardbalance.State{
+		AtBlockNumber: nil, // This should cause an error
+		AtBlockHash:   common.HexToHash("0xfedcba"),
+		FetchedAt:     time.Now().Unix(),
+	}
+
+	balanceChanged, oldState, err := storage.UpdateERC1155Balances(ctx, key, newBalances, stateWithNilBlockNumber)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "new state at block number is nil")
+	assert.False(t, balanceChanged)
+	assert.Equal(t, initialState.AtBlockNumber, oldState.AtBlockNumber)
+
+	// Verify that the original balances are still there (not updated)
+	retrievedBalances, retrievedState, err := storage.GetERC1155Balances(ctx, key)
+	require.NoError(t, err)
+	assert.Equal(t, len(initialBalances), len(retrievedBalances))
+	for collectibleID, expectedBalance := range initialBalances {
+		actualBalance, exists := retrievedBalances[collectibleID]
+		assert.True(t, exists)
+		assert.Equal(t, expectedBalance, actualBalance)
+	}
+	assert.Equal(t, initialState.AtBlockNumber, retrievedState.AtBlockNumber)
+}

@@ -318,20 +318,13 @@ func (c *Controller) triggerFetchNow(balancesToFetch map[BalancesKey][]multistan
 		resultsCh, err := c.fetcher.FetchBalances(ctx, chainID, fetchConfig)
 		if err != nil {
 			c.logger.Error("failed to fetch balances", zap.Uint64("chainID", chainID), zap.Error(err))
-			pubsub.Publish(c.publisher, EventBalanceFetchFailedToStart{
-				ChainID: chainID,
-				Config:  fetchConfig,
-				Error:   err,
-			})
+			c.sendEventBalanceFetchFailedToStart(chainID, fetchConfig, err)
 			cancel()
 			continue
 		}
 
 		c.logger.Debug("fetch started", zap.Uint64("chainID", chainID))
-		pubsub.Publish(c.publisher, EventBalanceFetchStarted{
-			ChainID: chainID,
-			Config:  fetchConfig,
-		})
+		c.sendEventBalanceFetchStarted(chainID, fetchConfig)
 
 		go func() {
 			defer gocommon.LogOnPanic()

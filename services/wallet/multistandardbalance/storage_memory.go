@@ -2,6 +2,7 @@ package multistandardbalance
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -30,23 +31,40 @@ type balanceEntry[T any] struct {
 	state   State
 }
 
+func updateIfNeeded[T any](entryMap map[BalancesKey]balanceEntry[T], key BalancesKey, newEntry balanceEntry[T], isEqualFn func(old T, new T) bool) (balanceChanged bool, oldState State, err error) {
+	balanceChanged = false
+
+	oldBalance := newEntry.balance
+	oldState = defaultState()
+	// Set oldState to the existing entry's state if it exists
+	if oldEntry, exists := entryMap[key]; exists {
+		oldBalance = oldEntry.balance
+		oldState = oldEntry.state
+	}
+
+	// Check if new state has a valid block number
+	if newEntry.state.AtBlockNumber == nil {
+		err = fmt.Errorf("new state at block number is nil")
+		return
+	}
+
+	// If old state has a block number, check if new state is newer
+	if oldState.AtBlockNumber != nil && newEntry.state.AtBlockNumber.Cmp(oldState.AtBlockNumber) <= 0 {
+		return
+	}
+	balanceChanged = !isEqualFn(oldBalance, newEntry.balance)
+
+	entryMap[key] = newEntry
+	return
+}
+
 func (s *StorageMemory) UpdateNativeBalance(ctx context.Context, key BalancesKey, balance *big.Int, state State) (balanceChanged bool, oldState State, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	oldState = defaultState()
-	balanceChanged = false // If initial store for this key, balanceChanged is false
-	if oldEntry, exists := s.nativeBalances[key]; exists {
-		oldState = oldEntry.state
-		if oldState.AtBlockNumber.Cmp(state.AtBlockNumber) >= 0 {
-			// New balance is not newer than stored one, skip update
-			return
-		}
-		balanceChanged = oldEntry.balance.Cmp(balance) != 0
-	}
-
-	s.nativeBalances[key] = balanceEntry[*big.Int]{balance: balance, state: state}
-	return
+	return updateIfNeeded(s.nativeBalances, key, balanceEntry[*big.Int]{balance: balance, state: state}, func(old *big.Int, new *big.Int) bool {
+		return old.Cmp(new) == 0
+	})
 }
 
 func (s *StorageMemory) GetNativeBalance(ctx context.Context, key BalancesKey) (balance *big.Int, state State, err error) {
@@ -67,19 +85,7 @@ func (s *StorageMemory) UpdateERC20Balances(ctx context.Context, key BalancesKey
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	oldState = defaultState()
-	balanceChanged = false // If initial store for this key, balanceChanged is false
-	if oldEntry, exists := s.erc20Balances[key]; exists {
-		oldState = oldEntry.state
-		if oldState.AtBlockNumber.Cmp(state.AtBlockNumber) >= 0 {
-			// New balance is not newer than stored one, skip update
-			return
-		}
-		balanceChanged = !isBigIntMapEqual(oldEntry.balance, balances)
-	}
-
-	s.erc20Balances[key] = balanceEntry[map[ContractAddress]*big.Int]{balance: balances, state: state}
-	return
+	return updateIfNeeded(s.erc20Balances, key, balanceEntry[map[ContractAddress]*big.Int]{balance: balances, state: state}, isBigIntMapEqual)
 }
 
 func (s *StorageMemory) GetERC20Balances(ctx context.Context, key BalancesKey) (balances map[ContractAddress]*big.Int, state State, err error) {
@@ -99,19 +105,7 @@ func (s *StorageMemory) UpdateERC721Balances(ctx context.Context, key BalancesKe
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	oldState = defaultState()
-	balanceChanged = false // If initial store for this key, balanceChanged is false
-	if oldEntry, exists := s.erc721Balances[key]; exists {
-		oldState = oldEntry.state
-		if oldState.AtBlockNumber.Cmp(state.AtBlockNumber) >= 0 {
-			// New balance is not newer than stored one, skip update
-			return
-		}
-		balanceChanged = !isBigIntMapEqual(oldEntry.balance, balances)
-	}
-
-	s.erc721Balances[key] = balanceEntry[map[ContractAddress]*big.Int]{balance: balances, state: state}
-	return
+	return updateIfNeeded(s.erc721Balances, key, balanceEntry[map[ContractAddress]*big.Int]{balance: balances, state: state}, isBigIntMapEqual)
 }
 
 func (s *StorageMemory) GetERC721Balances(ctx context.Context, key BalancesKey) (balances map[ContractAddress]*big.Int, state State, err error) {
@@ -131,19 +125,7 @@ func (s *StorageMemory) UpdateERC1155Balances(ctx context.Context, key BalancesK
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	oldState = defaultState()
-	balanceChanged = false // If initial store for this key, balanceChanged is false
-	if oldEntry, exists := s.erc1155Balances[key]; exists {
-		oldState = oldEntry.state
-		if oldState.AtBlockNumber.Cmp(state.AtBlockNumber) >= 0 {
-			// New balance is not newer than stored one, skip update
-			return
-		}
-		balanceChanged = !isBigIntMapEqual(oldEntry.balance, balances)
-	}
-
-	s.erc1155Balances[key] = balanceEntry[map[HashableCollectibleID]*big.Int]{balance: balances, state: state}
-	return
+	return updateIfNeeded(s.erc1155Balances, key, balanceEntry[map[HashableCollectibleID]*big.Int]{balance: balances, state: state}, isBigIntMapEqual)
 }
 
 func (s *StorageMemory) GetERC1155Balances(ctx context.Context, key BalancesKey) (balances map[HashableCollectibleID]*big.Int, state State, err error) {
