@@ -25,7 +25,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/node/backup"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
@@ -48,6 +47,7 @@ import (
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/updates"
+	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/web3provider"
@@ -249,12 +249,16 @@ func (n *StatusNode) StartLocalBackup(privateKey *ecdsa.PrivateKey) error {
 	}
 
 	filenameGetter := func() (string, error) {
-		accountIdentifier := common.PubkeyToHex(&privateKey.PublicKey)
-
 		backupPath, err := n.accountsSrvc.GetBackupPath()
 		if err != nil {
 			return "", err
 		}
+
+		compressedPubKey, err := utils.SerializePublicKey(crypto.CompressPubkey(&privateKey.PublicKey))
+		if err != nil {
+			return "", err
+		}
+
 		var backupDir string
 		if backupPath != "" {
 			backupDir = backupPath
@@ -265,11 +269,12 @@ func (n *StatusNode) StartLocalBackup(privateKey *ecdsa.PrivateKey) error {
 				backupDir = filepath.Join(n.config.RootDataDir, "backups")
 			}
 		}
-		fullPath := filepath.Join(backupDir, fmt.Sprintf("%x_user_data.bkp", accountIdentifier[:4]))
+
+		fullPath := filepath.Join(backupDir, fmt.Sprintf("%s_user_data.bkp", compressedPubKey[len(compressedPubKey)-6:]))
+
 		return fullPath, nil
 	}
 
-	var err error
 	n.localBackup, err = backup.NewController(backup.BackupConfig{
 		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
 		FileNameGetter: filenameGetter,

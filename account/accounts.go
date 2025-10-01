@@ -99,9 +99,10 @@ type DefaultManager struct {
 	accountsGenerator *generator.Generator
 	onboarding        *Onboarding
 
-	selectedChatAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
-	mainAccountAddress  types.Address
-	watchAddresses      []types.Address
+	selectedChatAccount           *SelectedExtKey // account that was processed during the last call to SelectAccount()
+	selectedChatAccountPrivateKey *ecdsa.PrivateKey
+	mainAccountAddress            types.Address
+	watchAddresses                []types.Address
 
 	logger *zap.Logger
 }
