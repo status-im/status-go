@@ -130,26 +130,33 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 func (m *Messenger) handleLocalBackup(state *ReceivedMessageState, message *protobuf.MessengerLocalBackup) []error {
 	var errors []error
 
-	err := m.handleBackedUpProfile(message.Profile, message.Clock)
+	err := m.handleBackedUpProfile(backup.Profile, backup.Clock)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	for _, contact := range message.Contacts {
+	for _, contact := range backup.Contacts {
 		err = m.HandleSyncInstallationContactV2(state, contact, nil)
 		if err != nil {
 			errors = append(errors, err)
 		}
 	}
 
-	err = m.handleSyncChats(state, message.Chats)
+	err = m.handleSyncChats(state, backup.Chats)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	communityErrors := m.handleLocalBackupCommunities(state, message.Communities)
+	communityErrors := m.handleLocalBackupCommunities(state, backup.Communities)
 	if len(communityErrors) > 0 {
 		errors = append(errors, communityErrors...)
+	}
+
+	if len(backup.Messages) > 0 {
+		err := m.persistence.SaveBackedUpMessages(backup.Messages)
+		if err != nil {
+			errors = append(errors, err)
+		}
 	}
 
 	return errors
@@ -547,7 +554,7 @@ func (m *Messenger) handleLocalBackupCommunities(state *ReceivedMessageState, co
 			errors = append(errors, err)
 		}
 
-		err = m.requestCommunityKeysAndSharedAddresses(state, syncCommunity)
+		err = m.requestCommunityKeysAndSharedAddresses(syncCommunity)
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -556,7 +563,7 @@ func (m *Messenger) handleLocalBackupCommunities(state *ReceivedMessageState, co
 	return errors
 }
 
-func (m *Messenger) requestCommunityKeysAndSharedAddresses(state *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity) error {
+func (m *Messenger) requestCommunityKeysAndSharedAddresses(syncCommunity *protobuf.SyncInstallationCommunity) error {
 	if !syncCommunity.Joined {
 		return nil
 	}

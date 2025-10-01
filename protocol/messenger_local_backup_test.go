@@ -2,12 +2,16 @@ package protocol
 
 import (
 	"context"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -28,6 +32,15 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob2)
+
+	// Enable message backup on both accounts
+	err = bob1.settings.SaveSetting(settings.MessagesBackupEnabled.GetReactName(), true)
+	s.Require().NoError(err)
+
+	err = bob2.settings.SaveSetting(settings.MessagesBackupEnabled.GetReactName(), true)
+	s.Require().NoError(err)
+
+	ctx := context.Background()
 
 	// -------------------- CONTACTS --------------------
 	// Create 2 contacts
@@ -76,6 +89,81 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+
+	// Send message on community
+	chatID := response.Chats()[0].ID
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chatID
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	inputMessage.Text = "some text"
+
+	_, err = bob1.SendChatMessage(ctx, inputMessage)
+	s.Require().NoError(err)
+
+	// Pin message
+	pinMessage := common.NewPinMessage()
+	pinMessage.ChatId = chatID
+	pinMessage.MessageId = inputMessage.ID
+	pinMessage.Pinned = true
+	sendResponse, err := bob1.SendPinMessage(ctx, pinMessage)
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.PinMessages(), 1)
+
+	// Send markdown message
+	mdMessage := common.NewMessage()
+	mdMessage.ChatId = chatID
+	mdMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	mdMessage.Text = "some *markdown* text"
+
+	_, err = bob1.SendChatMessage(ctx, mdMessage)
+	s.Require().NoError(err)
+
+	// Send image on community
+	file, err := os.Open("../_assets/tests/test.jpg")
+	s.Require().NoError(err)
+	defer file.Close()
+
+	payload, err := io.ReadAll(file)
+	s.Require().NoError(err)
+
+	imageMessage := common.NewMessage()
+	imageMessage.ChatId = chatID
+	imageMessage.ContentType = protobuf.ChatMessage_IMAGE
+
+	image := protobuf.ImageMessage{
+		Payload: payload,
+		Format:  protobuf.ImageFormat_JPEG,
+		Width:   1200,
+		Height:  1000,
+		AlbumId: "",
+	}
+	imageMessage.Payload = &protobuf.ChatMessage_Image{Image: &image}
+	imageMessage.Text = "some image"
+
+	_, err = bob1.SendChatMessage(ctx, imageMessage)
+	s.Require().NoError(err)
+
+	// Send sticker on community
+	stickerMessage := common.NewMessage()
+	stickerMessage.ChatId = chatID
+	stickerMessage.ContentType = protobuf.ChatMessage_STICKER
+	stickerMessage.Text = "some sticker"
+	stickerMessage.Payload = &protobuf.ChatMessage_Sticker{
+		Sticker: &protobuf.StickerMessage{
+			Pack: 1,
+			Hash: "some-hash",
+		},
+	}
+	_, err = bob1.SendChatMessage(ctx, stickerMessage)
+	s.Require().NoError(err)
+
+	// Send emoji on community
+	emojiMessage := common.NewMessage()
+	emojiMessage.ChatId = chatID
+	emojiMessage.ContentType = protobuf.ChatMessage_EMOJI
+	emojiMessage.Text = ":+1:"
+	_, err = bob1.SendChatMessage(ctx, emojiMessage)
+	s.Require().NoError(err)
 
 	// Check bob2
 	communities, err := bob2.Communities()
@@ -127,6 +215,14 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	err = bob1.SaveChat(ourOneOneChat)
 	s.Require().NoError(err)
 
+	// Send transaction command to Alice
+	transactionMessage := common.NewMessage()
+	transactionMessage.ChatId = ourOneOneChat.ID
+	transactionMessage.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
+	transactionMessage.Text = "some transaction"
+	_, err = bob1.SendChatMessage(ctx, transactionMessage)
+	s.Require().NoError(err)
+
 	// -------------------- BACKUP --------------------
 	// Backup
 	marshalledBackup, err := bob1.ExportBackup()
@@ -156,4 +252,50 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.Require().True(ok)
 	s.Require().True(chat.Active)
 	s.Require().Equal("", chat.Name)
+
+	// Validate messages
+	s.Require().NoError(err)
+	messages, err := bob2.persistence.AllMessagesForBackup()
+	s.Require().NoError(err)
+	s.Require().Len(messages, 14)
+
+	textMessageFound := false
+	mdMessageFound := false
+	imageMessageFound := false
+	stickerMessageFound := false
+	emojiMessageFound := false
+	txMessageFound := false
+	pinnedSystemMessageFound := false
+	for _, msg := range messages {
+		if msg.ContentType == int64(protobuf.ChatMessage_TEXT_PLAIN) && msg.Text == "some text" {
+			textMessageFound = true
+			s.Require().True(msg.PinnedBy == bob2.selfContact.ID)
+		} else if msg.ContentType == int64(protobuf.ChatMessage_TEXT_PLAIN) && msg.Text == "some *markdown* text" {
+			mdMessageFound = true
+		} else if msg.ContentType == int64(protobuf.ChatMessage_IMAGE) && msg.Text == "some image" {
+			imageMessageFound = true
+		} else if msg.ContentType == int64(protobuf.ChatMessage_STICKER) && msg.Text == "some sticker" {
+			stickerMessageFound = true
+		} else if msg.ContentType == int64(protobuf.ChatMessage_EMOJI) && msg.Text == ":+1:" {
+			emojiMessageFound = true
+		} else if msg.ContentType == int64(protobuf.ChatMessage_TRANSACTION_COMMAND) && msg.Text == "some transaction" {
+			txMessageFound = true
+		} else if msg.ContentType == int64(protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE) && msg.Text == "" {
+			pinnedSystemMessageFound = true
+		}
+	}
+	s.Require().True(textMessageFound)
+	s.Require().True(mdMessageFound)
+	s.Require().True(imageMessageFound)
+	s.Require().True(stickerMessageFound)
+	s.Require().True(emojiMessageFound)
+	s.Require().True(txMessageFound)
+	s.Require().True(pinnedSystemMessageFound)
+
+	// Validate pinned messages
+	pinnedMessages, _, err := bob2.PinnedMessageByChatID(chatID, "", 10)
+	s.Require().NoError(err)
+	s.Require().Len(pinnedMessages, 1)
+	s.Require().Equal(bob2.selfContact.ID, pinnedMessages[0].PinnedBy)
+
 }

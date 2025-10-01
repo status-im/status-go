@@ -64,6 +64,7 @@ type DatabaseSettingsManager interface {
 	ShouldBroadcastUserStatus() (result bool, err error)
 	BackupEnabled() (result bool, err error)
 	BackupPath() (result string, err error)
+	MessagesBackupEnabled() (result bool, err error)
 	AutoMessageEnabled() (result bool, err error)
 	LastBackup() (result uint64, err error)
 	BackupFetched() (result bool, err error)
