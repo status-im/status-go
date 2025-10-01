@@ -645,35 +645,3 @@ func ExtractTokenTransferData(dbEntryType Type, log *types.Log, tx *types.Transa
 
 	return
 }
-
-func TxDataContainsAddress(txType uint8, txData []byte, address common.Address) bool {
-	// First 4 bytes are related to the methodID
-	const methodIDLen int = 4
-	const paramLen int = 32
-
-	var paramOffset int = 0
-	switch txType {
-	case types.OptimismDepositTxType:
-		// Offset for relayMessage data.
-		// I actually don't know what the 2x32 + 4 bytes mean, but it seems to be constant in all transactions I've
-		// checked. Will update the comment when I find out more about it.
-		paramOffset = 5*32 + 2*32 + 4
-	}
-
-	// Check if address is contained in any 32-byte parameter
-	for paramStart := methodIDLen + paramOffset; paramStart < len(txData); paramStart += paramLen {
-		paramEnd := paramStart + paramLen
-
-		if paramEnd > len(txData) {
-			break
-		}
-
-		// Address bytes should be in the last addressLen positions
-		paramBytes := txData[paramStart:paramEnd]
-		paramAddress := common.BytesToAddress(paramBytes)
-		if address == paramAddress {
-			return true
-		}
-	}
-	return false
-}
