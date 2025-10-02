@@ -14,7 +14,6 @@ import (
 
 	"github.com/mat/besticon/besticon"
 
-	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/images"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
@@ -27,9 +26,7 @@ import (
 )
 
 var (
-	// ErrMsgAlreadyExist returned if msg already exist.
-	ErrMsgAlreadyExist = errors.New("message with given ID already exist")
-	HoursInTwoWeeks    = 336
+	HoursInTwoWeeks = 336
 )
 
 // sqlitePersistence wrapper around sql db with operations common for a client.
@@ -970,92 +967,6 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		"",
 	)
 	return
-}
-
-func (db sqlitePersistence) SaveTransactionToValidate(transaction *TransactionToValidate) error {
-	compressedKey := crypto.CompressPubkey(transaction.From)
-
-	_, err := db.db.Exec(`INSERT INTO messenger_transactions_to_validate(
-		command_id,
-		message_id,
-		transaction_hash,
-		retry_count,
-		first_seen,
-		public_key,
-		signature,
-		to_validate)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		transaction.CommandID,
-		transaction.MessageID,
-		transaction.TransactionHash,
-		transaction.RetryCount,
-		transaction.FirstSeen,
-		compressedKey,
-		transaction.Signature,
-		transaction.Validate,
-	)
-
-	return err
-}
-
-func (db sqlitePersistence) UpdateTransactionToValidate(transaction *TransactionToValidate) error {
-	_, err := db.db.Exec(`UPDATE messenger_transactions_to_validate
-			      SET retry_count = ?, to_validate = ?
-			      WHERE transaction_hash = ?`,
-		transaction.RetryCount,
-		transaction.Validate,
-		transaction.TransactionHash,
-	)
-	return err
-}
-
-func (db sqlitePersistence) TransactionsToValidate() ([]*TransactionToValidate, error) {
-	var transactions []*TransactionToValidate
-	rows, err := db.db.Query(`
-		SELECT
-		command_id,
-			message_id,
-			transaction_hash,
-			retry_count,
-			first_seen,
-			public_key,
-			signature,
-			to_validate
-		FROM messenger_transactions_to_validate
-		WHERE to_validate = 1;
-	`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var t TransactionToValidate
-		var pkBytes []byte
-		err = rows.Scan(
-			&t.CommandID,
-			&t.MessageID,
-			&t.TransactionHash,
-			&t.RetryCount,
-			&t.FirstSeen,
-			&pkBytes,
-			&t.Signature,
-			&t.Validate,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		publicKey, err := crypto.DecompressPubkey(pkBytes)
-		if err != nil {
-			return nil, err
-		}
-		t.From = publicKey
-
-		transactions = append(transactions, &t)
-	}
-
-	return transactions, nil
 }
 
 func (db sqlitePersistence) GetWhenChatIdentityLastPublished(chatID string) (t int64, hash []byte, err error) {

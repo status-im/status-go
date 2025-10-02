@@ -638,9 +638,6 @@ func (b *GethStatusBackend) convertLoginRequestToAccountRequest(loginRequest *re
 	createAccount.WakuV2LightClient = loginRequest.WakuV2LightClient
 	createAccount.WakuV2EnableMissingMessageVerification = loginRequest.WakuV2EnableMissingMessageVerification
 	createAccount.WakuV2EnableStoreConfirmationForMessagesSent = loginRequest.WakuV2EnableStoreConfirmationForMessagesSent
-	createAccount.VerifyTransactionURL = loginRequest.VerifyTransactionURL
-	createAccount.VerifyENSURL = loginRequest.VerifyENSURL
-	createAccount.VerifyTransactionChainID = loginRequest.VerifyTransactionChainID
 	createAccount.VerifyENSContractAddress = loginRequest.VerifyENSContractAddress
 	return createAccount
 }
@@ -1670,7 +1667,7 @@ func EnrichMultiAccountByPublicKey(account *multiaccounts.Account, chatPublicKey
 
 func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 	request *requests.CreateAccount,
-	mnemonic string, // empty mnemonic is used for keycard account, not empty for regular account
+	mnemonic string,                   // empty mnemonic is used for keycard account, not empty for regular account
 	keycardData *requests.KeycardData, // nil for regular account, not nil for account with already set keycard
 	restoreAccount bool,
 ) (*multiaccounts.Account, error) {

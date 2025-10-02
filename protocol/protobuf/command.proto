@@ -4,6 +4,7 @@ option go_package = "./;protobuf";
 package protobuf;
 
 message RequestAddressForTransaction {
+  option deprecated = true;
   uint64 clock = 1;
   string value = 2;
   string contract = 3;
@@ -11,6 +12,7 @@ message RequestAddressForTransaction {
 }
 
 message AcceptRequestAddressForTransaction {
+  option deprecated = true;
   uint64 clock = 1;
   string id = 2;
   string address = 3;
@@ -18,18 +20,21 @@ message AcceptRequestAddressForTransaction {
 }
 
 message DeclineRequestAddressForTransaction {
+  option deprecated = true;
   uint64 clock = 1;
   string id = 2;
   string chat_id = 3;
 }
 
 message DeclineRequestTransaction {
+  option deprecated = true;
   uint64 clock = 1;
   string id = 2;
   string chat_id = 3;
 }
 
 message RequestTransaction {
+  option deprecated = true;
   uint64 clock = 1;
   string address = 2;
   string value = 3;
@@ -38,6 +43,7 @@ message RequestTransaction {
 }
 
 message SendTransaction {
+  option deprecated = true;
   uint64 clock = 1;
   string id = 2;
   string transaction_hash = 3;

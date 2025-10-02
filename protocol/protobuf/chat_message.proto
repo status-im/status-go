@@ -249,7 +249,7 @@ message ChatMessage {
     STICKER = 2;
     STATUS = 3;
     EMOJI = 4;
-    TRANSACTION_COMMAND = 5;
+    TRANSACTION_COMMAND = 5 [deprecated = true];
     // Only local
     SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP = 6;
     IMAGE = 7;

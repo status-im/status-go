@@ -90,7 +90,6 @@ type config struct {
 	accountsManager        AccountsManager
 	signer                 communities.MessageSigner
 
-	verifyTransactionClient EthClient
 	ensVerifier             *ens.Verifier
 
 	pushNotificationClientConfig *pushnotificationclient.Config
@@ -137,13 +136,6 @@ func WithSystemMessagesTranslations(t map[protobuf.MembershipUpdateEvent_EventTy
 func WithCustomLogger(logger *zap.Logger) Option {
 	return func(c *config) error {
 		c.logger = logger
-		return nil
-	}
-}
-
-func WithVerifyTransactionClient(client EthClient) Option {
-	return func(c *config) error {
-		c.verifyTransactionClient = client
 		return nil
 	}
 }

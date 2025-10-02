@@ -3,7 +3,6 @@ package protocol
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	utils "github.com/status-im/status-go/common"
@@ -128,100 +127,6 @@ func ValidateReceivedPairInstallation(message *protobuf.SyncPairInstallation, wh
 
 	if len(strings.TrimSpace(message.InstallationId)) == 0 {
 		return errors.New("installationId can't be empty")
-	}
-
-	return nil
-}
-
-func ValidateReceivedSendTransaction(message *protobuf.SendTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
-		return err
-	}
-
-	if len(strings.TrimSpace(message.TransactionHash)) == 0 {
-		return errors.New("transaction hash can't be empty")
-	}
-
-	if message.Signature == nil {
-		return errors.New("signature can't be nil")
-	}
-
-	return nil
-}
-
-func ValidateReceivedRequestAddressForTransaction(message *protobuf.RequestAddressForTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
-		return err
-	}
-
-	if len(strings.TrimSpace(message.Value)) == 0 {
-		return errors.New("value can't be empty")
-	}
-
-	_, err := strconv.ParseFloat(message.Value, 64)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func ValidateReceivedRequestTransaction(message *protobuf.RequestTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
-		return err
-	}
-
-	if len(strings.TrimSpace(message.Value)) == 0 {
-		return errors.New("value can't be empty")
-	}
-
-	if len(strings.TrimSpace(message.Address)) == 0 {
-		return errors.New("address can't be empty")
-	}
-
-	_, err := strconv.ParseFloat(message.Value, 64)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func ValidateReceivedAcceptRequestAddressForTransaction(message *protobuf.AcceptRequestAddressForTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
-		return err
-	}
-
-	if len(message.Id) == 0 {
-		return errors.New("messageID can't be empty")
-	}
-
-	if len(strings.TrimSpace(message.Address)) == 0 {
-		return errors.New("address can't be empty")
-	}
-
-	return nil
-}
-
-func ValidateReceivedDeclineRequestAddressForTransaction(message *protobuf.DeclineRequestAddressForTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
-		return err
-	}
-
-	if len(message.Id) == 0 {
-		return errors.New("messageID can't be empty")
-	}
-
-	return nil
-}
-
-func ValidateReceivedDeclineRequestTransaction(message *protobuf.DeclineRequestTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
-		return err
-	}
-
-	if len(message.Id) == 0 {
-		return errors.New("messageID can't be empty")
 	}
 
 	return nil

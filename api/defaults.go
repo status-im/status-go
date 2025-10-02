@@ -28,12 +28,9 @@ const (
 	DefaultKeystoreRelativePath               = "keystore"
 	DefaultKeycardPairingDataFileRelativePath = "/keycard/pairings.json"
 	DefaultAPILogFile                         = "api.log"
-
-	DefaultLogLevel                 = "ERROR"
-	DefaultVerifyTransactionChainID = 1
-	DefaultCurrentNetwork           = "mainnet_rpc"
-
-	DefaultMaxMessageDeliveryAttempts = 3
+	DefaultLogLevel                           = "ERROR"
+	DefaultCurrentNetwork                     = "mainnet_rpc"
+	DefaultMaxMessageDeliveryAttempts         = 3
 )
 
 var (
@@ -55,7 +52,7 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.WalletRootAddress = types.HexToAddress(derivedAddresses[accscommon.PathWalletRoot].Address)
 	s.URLUnfurlingMode = settings.URLUnfurlingAlwaysAsk
 
-	// Set chat key & name
+	// Set the chat key and name
 	name, err := alias.GenerateFromPublicKeyString(chatKeyString)
 	if err != nil {
 		return nil, err
@@ -131,7 +128,7 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		DiscoveryLimit: 20,
 		Host:           "0.0.0.0",
 		AutoUpdate:     true,
-		// mobile may need override following options
+		// mobile may need to override the following options
 		LightClient:                            specifiedWakuV2Config.LightClient,
 		EnableStoreConfirmationForMessagesSent: specifiedWakuV2Config.EnableStoreConfirmationForMessagesSent,
 		EnableMissingMessageVerification:       specifiedWakuV2Config.EnableMissingMessageVerification,
@@ -239,7 +236,7 @@ func overrideApiConfig(nodeConfig *params.NodeConfig, config *requests.APIConfig
 	nodeConfig.WSPort = config.WSPort
 }
 
-// getMainnetRPCURL retuevrns URL of the first provider with TokenAuth from mainnet network
+// getMainnetRPCURL returns URL of the first provider with TokenAuth from mainnet network
 func getMainnetRPCURL(networks []params.Network) string {
 	for _, network := range networks {
 		if network.ChainID != walletcommon.EthereumMainnet {
@@ -323,26 +320,11 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		InstallationID:             installationID,
 		MailServerConfirmations:    true,
 		MaxMessageDeliveryAttempts: DefaultMaxMessageDeliveryAttempts,
-		VerifyTransactionChainID:   DefaultVerifyTransactionChainID,
 		DataSyncEnabled:            true,
 		PFSEnabled:                 true,
 	}
 
-	if request.VerifyTransactionURL != nil {
-		nodeConfig.ShhextConfig.VerifyTransactionURL = *request.VerifyTransactionURL
-	} else {
-		nodeConfig.ShhextConfig.VerifyTransactionURL = getMainnetRPCURL(nodeConfig.Networks)
-	}
-
-	if request.VerifyENSURL != nil {
-		nodeConfig.ShhextConfig.VerifyENSURL = *request.VerifyENSURL
-	} else {
-		nodeConfig.ShhextConfig.VerifyENSURL = getMainnetRPCURL(nodeConfig.Networks)
-	}
-
-	if request.VerifyTransactionChainID != nil {
-		nodeConfig.ShhextConfig.VerifyTransactionChainID = *request.VerifyTransactionChainID
-	}
+	nodeConfig.ShhextConfig.VerifyENSURL = getMainnetRPCURL(nodeConfig.Networks)
 
 	if request.VerifyENSContractAddress != nil {
 		nodeConfig.ShhextConfig.VerifyENSContractAddress = *request.VerifyENSContractAddress
