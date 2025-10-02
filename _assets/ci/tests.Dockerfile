@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -yq --no-install-recommends --fix-missing 
     python3 \
     python3-pip \
     python3-venv \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 RUN ln -s /usr/bin/python3 /usr/bin/python

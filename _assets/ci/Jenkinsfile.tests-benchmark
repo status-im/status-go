@@ -4,7 +4,7 @@ library 'status-jenkins-lib@v1.9.24'
 pipeline {
   agent {
     dockerfile {
-      label 'linuxcontainer'
+      label 'benchmarkcontainer'
       filename 'tests.Dockerfile'
       dir '_assets/ci/'
       args '--volume=/nix:/nix ' +
