@@ -289,10 +289,9 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 
 	aliceContact = bob2.GetContactByID(alice.selfContact.ID)
 	s.Require().NotNil(aliceContact)
-	// FIXME
-	// s.Require().Equal(ContactRequestStateSent, aliceContact.ContactRequestLocalState)
-	// s.Require().Equal(ContactRequestStateReceived, aliceContact.ContactRequestRemoteState)
-	// s.Require().True(aliceContact.added())
+	s.Require().Equal(ContactRequestStateSent, aliceContact.ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateReceived, aliceContact.ContactRequestRemoteState)
+	s.Require().True(aliceContact.added())
 
 	// Validate communities on bob2
 	communities, err = bob2.JoinedCommunities()
