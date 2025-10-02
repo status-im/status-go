@@ -98,14 +98,6 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		links,
 		unfurled_links,
 		unfurled_status_links,
-		command_id,
-		command_value,
-		command_from,
-		command_address,
-		command_contract,
-		command_transaction_hash,
-		command_state,
-		command_signature,
 		replace_message,
 		edited_at,
 		deleted,
@@ -188,14 +180,6 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.unfurled_links,
 		m1.unfurled_status_links,
 		m1.payment_requests,
-		m1.command_id,
-		m1.command_value,
-		m1.command_from,
-		m1.command_address,
-		m1.command_contract,
-		m1.command_transaction_hash,
-		m1.command_state,
-		m1.command_signature,
 		m1.replace_message,
 		m1.edited_at,
 		m1.deleted,
@@ -296,7 +280,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var pinnedBy sql.NullString
 
 	sticker := &protobuf.StickerMessage{}
-	command := &common.CommandParameters{}
 	audio := &protobuf.AudioMessage{}
 	image := &protobuf.ImageMessage{}
 	discordMessage := &protobuf.DiscordMessage{
@@ -345,14 +328,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&serializedUnfurledLinks,
 		&serializedUnfurledStatusLinks,
 		&serializedPaymentRequests,
-		&command.ID,
-		&command.Value,
-		&command.From,
-		&command.Address,
-		&command.Contract,
-		&command.TransactionHash,
-		&command.CommandState,
-		&command.Signature,
 		&message.Replace,
 		&editedAt,
 		&deleted,
@@ -536,9 +511,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	case protobuf.ChatMessage_AUDIO:
 		message.Payload = &protobuf.ChatMessage_Audio{Audio: audio}
 
-	case protobuf.ChatMessage_TRANSACTION_COMMAND:
-		message.CommandParameters = command
-
 	case protobuf.ChatMessage_IMAGE:
 		message.Payload = &protobuf.ChatMessage_Image{Image: image}
 
@@ -665,11 +637,6 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		audio = &protobuf.AudioMessage{}
 	}
 
-	command := message.CommandParameters
-	if command == nil {
-		command = &common.CommandParameters{}
-	}
-
 	discordMessage := message.GetDiscordMessage()
 	if discordMessage == nil {
 		discordMessage = &protobuf.DiscordMessage{
@@ -760,14 +727,6 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		serializedLinks,
 		serializedUnfurledLinks,
 		serializedUnfurledStatusLinks,
-		command.ID,
-		command.Value,
-		command.From,
-		command.Address,
-		command.Contract,
-		command.TransactionHash,
-		command.CommandState,
-		command.Signature,
 		message.Replace,
 		int64(message.EditedAt),
 		message.Deleted,
@@ -824,23 +783,6 @@ func (db sqlitePersistence) albumMessages(chatID, albumID string) ([]*common.Mes
 	}
 	defer rows.Close()
 	return getMessagesFromScanRows(db, rows, false)
-}
-
-func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*common.Message, error) {
-
-	where := `WHERE
-			m1.command_id = ?
-			AND
-			m1.local_chat_id = ?
-			ORDER BY m1.clock_value DESC
-			LIMIT 1`
-	query := db.buildMessagesQuery(where)
-	rows, err := db.db.Query(query, id, chatID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return getMessageFromScanRows(db, rows)
 }
 
 func (db sqlitePersistence) MessageByID(id string) (*common.Message, error) {
@@ -1647,14 +1589,6 @@ func (db sqlitePersistence) backedUpMessageToUserMessageValues(message *protobuf
 		nil,                           // links
 		serializedUnfurledLinks,       // unfurled_links
 		serializedUnfurledStatusLinks, // unfurled_status_links
-		"",                            // command_id
-		"",                            // command_value
-		"",                            // command_from
-		"",                            // command_address
-		"",                            // command_contract
-		"",                            // command_transaction_hash
-		0,                             // command_state
-		nil,                           // command_signature
 		"",                            // replace
 		int64(0),                      // edited_at
 		false,                         // deleted
