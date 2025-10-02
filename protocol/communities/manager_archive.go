@@ -447,10 +447,6 @@ func (m *ArchiveManager) SeedHistoryArchiveTorrent(communityID types.HexBytes) e
 	hash := metaInfo.HashInfoBytes()
 	m.torrentTasks[id] = hash
 
-	if err != nil {
-		return err
-	}
-
 	torrent, err := m.torrentClient.AddTorrent(metaInfo)
 	if err != nil {
 		return err
@@ -755,7 +751,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 
 					// Create and start the archive downloader using the protobuf index directly
 					archiveDownloader := NewCodexArchiveDownloader(codexClient, index, id, existingArchiveIDs)
-					
+
 					// Set up callback for when individual archives are downloaded
 					archiveDownloader.SetOnArchiveDownloaded(func(hash string, from, to uint64) {
 						// Save the archive ID to persistence
@@ -764,7 +760,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 							m.logger.Error("couldn't save message archive ID", zap.Error(err))
 							return
 						}
-						
+
 						// Publish download signal
 						m.publisher.publish(&Subscription{
 							HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
@@ -773,13 +769,13 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 								To:          int(to),
 							},
 						})
-						
-						m.logger.Debug("archive downloaded successfully", 
+
+						m.logger.Debug("archive downloaded successfully",
 							zap.String("hash", hash),
 							zap.Uint64("from", from),
 							zap.Uint64("to", to))
 					})
-					
+
 					err = archiveDownloader.StartDownload()
 					if err != nil {
 						m.logger.Error("failed to start archive downloads", zap.Error(err))
@@ -812,7 +808,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 								// Update final progress
 								downloadTaskInfo.TotalDownloadedArchivesCount = archiveDownloader.GetTotalDownloadedArchivesCount()
 
-								m.logger.Info("All archives downloaded successfully from Codex", 
+								m.logger.Info("All archives downloaded successfully from Codex",
 									zap.Int("totalArchives", downloadTaskInfo.TotalArchivesCount),
 									zap.Int("downloadedArchives", downloadTaskInfo.TotalDownloadedArchivesCount))
 
@@ -831,7 +827,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 								currentArchive := archiveDownloader.GetCurrentArchiveHash()
 								if currentArchive != "" {
 									progress := archiveDownloader.GetArchiveDownloadProgress(currentArchive)
-									m.logger.Debug("downloading archive", 
+									m.logger.Debug("downloading archive",
 										zap.String("hash", currentArchive),
 										zap.Int64("bytes", progress),
 										zap.Int("completed", downloadTaskInfo.TotalDownloadedArchivesCount),

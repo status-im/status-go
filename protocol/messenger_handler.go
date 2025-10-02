@@ -165,10 +165,6 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 
 		chat.updateChatFromGroupMembershipChanges(group)
 
-		if err != nil {
-			return errors.Wrap(err, "failed to get group creator")
-		}
-
 		publicKeys, err := group.MemberPublicKeys()
 		if err != nil {
 			return errors.Wrap(err, "failed to get group members")
@@ -1269,13 +1265,13 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 			m.logger.Warn("failed to get archive distribution preference, using auto", zap.Error(err))
 			preference = "auto"
 		}
-		
+
 		// Skip magnetlink processing entirely if preference is codex-only
 		if preference == "codex" {
 			m.logger.Debug("skipping magnetlink processing due to codex-only preference")
 			return nil
 		}
-		
+
 		lastMagnetlinkClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
 		if err != nil {
 			return err
@@ -1284,7 +1280,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		if err != nil {
 			return err
 		}
-		
+
 		var lastClock uint64
 		if preference == "torrent" {
 			// In torrent mode, only compare against magnetlink clock
@@ -1293,7 +1289,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 			// In auto mode, use the maximum of both clocks
 			lastClock = max(lastIndexCidClock, lastMagnetlinkClock)
 		}
-		
+
 		lastSeenMagnetlink, err := m.communitiesManager.GetLastSeenMagnetlink(id)
 		if err != nil {
 			return err
@@ -1373,13 +1369,13 @@ func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageSt
 			m.logger.Warn("failed to get archive distribution preference, using auto", zap.Error(err))
 			preference = "auto"
 		}
-		
+
 		// Skip indexCid processing entirely if preference is torrent-only
 		if preference == "torrent" {
 			m.logger.Debug("skipping index CID processing due to torrent-only preference")
 			return nil
 		}
-		
+
 		lastIndexCidClock, err := m.communitiesManager.GetIndexCidMessageClock(id)
 		if err != nil {
 			return err
@@ -1388,7 +1384,7 @@ func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageSt
 		if err != nil {
 			return err
 		}
-		
+
 		var lastClock uint64
 		if preference == "codex" {
 			// In codex mode, only compare against indexCid clock
@@ -1397,7 +1393,7 @@ func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageSt
 			// In auto mode, use the maximum of both clocks
 			lastClock = max(lastMagnetlinkClock, lastIndexCidClock)
 		}
-		
+
 		lastSeenCid, err := m.communitiesManager.GetLastSeenIndexCid(id)
 		if err != nil {
 			return err

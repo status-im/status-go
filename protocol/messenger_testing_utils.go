@@ -39,7 +39,7 @@ func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bo
 			panic(err)
 		}
 
-		if err == nil && !condition(response) {
+		if !condition(response) {
 			err = errors.New(errorMessage)
 		}
 		return err
