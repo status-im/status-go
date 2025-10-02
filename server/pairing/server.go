@@ -188,7 +188,9 @@ func StartUpSenderServer(backend *api.GethStatusBackend, configJSON string) (str
 		}
 	}
 
-	backend.LocalPairingStateManager.SetMessageSyncEnabled(conf.SenderConfig.MessageSyncingEnabled)
+	// TODO remove that hardcode to true for fun
+	backend.LocalPairingStateManager.SetMessageSyncEnabled(true)
+	// backend.LocalPairingStateManager.SetMessageSyncEnabled(conf.SenderConfig.MessageSyncingEnabled)
 
 	ps, err := MakeFullSenderServer(backend, conf)
 	if err != nil {
