@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/thirdparty/efp"
 	"github.com/status-im/status-go/services/wallet/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
@@ -825,4 +826,31 @@ func (api *API) FetchMarketTokenPageAsync(ctx context.Context, page, pageSize, s
 func (api *API) UnsubscribeFromLeaderboard() error {
 	logutils.ZapLogger().Debug("call to UnsubscribeFromLeaderboard")
 	return api.s.leaderboardService.UnsubscribeFromLeaderboard()
+}
+
+// GetFollowingAddresses fetches the list of addresses that the given user is following via EFP
+func (api *API) GetFollowingAddresses(ctx context.Context, userAddress common.Address, search string, limit, offset int) ([]efp.FollowingAddress, error) {
+	logutils.ZapLogger().Debug("call to GetFollowingAddresses",
+		zap.String("userAddress", userAddress.Hex()),
+		zap.String("search", search),
+		zap.Int("limit", limit),
+		zap.Int("offset", offset))
+
+	if api.s.followingManager == nil {
+		return nil, errors.New("following manager not initialized")
+	}
+
+	return api.s.followingManager.FetchFollowingAddresses(ctx, userAddress, search, limit, offset)
+}
+
+// GetFollowingStats fetches the stats (following count) for a user
+func (api *API) GetFollowingStats(ctx context.Context, userAddress common.Address) (int, error) {
+	logutils.ZapLogger().Debug("call to GetFollowingStats",
+		zap.String("userAddress", userAddress.Hex()))
+
+	if api.s.followingManager == nil {
+		return 0, errors.New("following manager not initialized")
+	}
+
+	return api.s.followingManager.FetchFollowingStats(ctx, userAddress)
 }

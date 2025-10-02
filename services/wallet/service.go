@@ -41,6 +41,7 @@ import (
 	collectibles_ownership "github.com/status-im/status-go/services/wallet/collectibles/ownership"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/currency"
+	"github.com/status-im/status-go/services/wallet/following"
 	"github.com/status-im/status-go/services/wallet/leaderboard"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/onramp"
@@ -51,6 +52,7 @@ import (
 	activityfetcher_alchemy "github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/rarible"
+	"github.com/status-im/status-go/services/wallet/thirdparty/efp"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/coingecko"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -246,6 +248,13 @@ func NewService(
 		collectiblesOwnershipController,
 		collectiblesPublisher)
 
+	// EFP (Ethereum Follow Protocol) providers
+	efpClient := efp.NewClient()
+	followingProviders := []efp.FollowingDataProvider{
+		efpClient,
+	}
+	followingManager := following.NewManager(followingProviders)
+
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
 	router := router.NewRouter(rpcClient, transactor, tokenManager, tokenBalancesFetcher, marketManager, collectibles,
@@ -281,6 +290,7 @@ func NewService(
 		cryptoOnRampManager:            cryptoOnRampManager,
 		collectiblesManager:            collectiblesManager,
 		collectibles:                   collectibles,
+		followingManager:               followingManager,
 		gethManager:                    gethManager,
 		marketManager:                  marketManager,
 		transactor:                     transactor,
@@ -379,6 +389,7 @@ type Service struct {
 	cryptoOnRampManager            *onramp.Manager
 	collectiblesManager            *collectibles.Manager
 	collectibles                   *collectibles.Service
+	followingManager               *following.Manager
 	gethManager                    *accsmanagement.AccountsManager
 	marketManager                  *market.Manager
 	transactor                     *transactions.Transactor
