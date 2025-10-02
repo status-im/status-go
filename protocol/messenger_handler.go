@@ -165,10 +165,6 @@ func (m *Messenger) HandleMembershipUpdate(ctx context.Context, messageState *Re
 
 		chat.updateChatFromGroupMembershipChanges(group)
 
-		if err != nil {
-			return errors.Wrap(err, "failed to get group creator")
-		}
-
 		publicKeys, err := group.MemberPublicKeys()
 		if err != nil {
 			return errors.Wrap(err, "failed to get group members")
