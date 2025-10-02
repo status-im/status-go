@@ -263,23 +263,14 @@ func (n *StatusNode) StartLocalBackup(privateKey *ecdsa.PrivateKey) error {
 		if backupPath != "" {
 			backupDir = backupPath
 		} else {
-			dir, err := os.UserConfigDir()
-			if err != nil {
-				// Try Home dir instead
-				dir, err = os.UserHomeDir()
-				if err != nil {
-					// If we still have an issue, hardcode to known paths
-					if devicescommon.OperatingSystemIs(devicescommon.AndroidPlatform) {
-						backupDir = "/storage/emulated/0/Documents/Status/Backups"
-					} else if devicescommon.OperatingSystemIs(devicescommon.IOSPlatform) {
-						backupDir = filepath.Join("/Documents", "Status", "Backups")
-					} else {
-						return "", err
-					}
-				}
+			// If we still have an issue, hardcode to known paths
+			if devicescommon.OperatingSystemIs(devicescommon.AndroidPlatform) {
+				backupDir = "/storage/emulated/0/Documents/Status/Backups"
+			} else if devicescommon.OperatingSystemIs(devicescommon.IOSPlatform) {
+				backupDir = filepath.Join("/Documents", "Status", "Backups")
+			} else {
+				return "", err
 			}
-
-			backupDir = filepath.Join(dir, "Status", "backups")
 		}
 
 		fullPath := filepath.Join(backupDir, fmt.Sprintf("%s_user_data.bkp", compressedPubKey[len(compressedPubKey)-6:]))
