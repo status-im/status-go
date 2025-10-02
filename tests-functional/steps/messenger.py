@@ -1,6 +1,5 @@
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportAttributeAccessIssue=false
-import logging
 import time
 from uuid import uuid4
 
@@ -11,6 +10,7 @@ from clients.signals import SignalType
 from resources.enums import MessageContentType
 from steps.network_conditions import NetworkConditionsSteps
 from utils import fake
+from utils.retry_utils import retry_call
 
 
 class MessengerSteps(NetworkConditionsSteps):
@@ -161,20 +161,7 @@ class MessengerSteps(NetworkConditionsSteps):
         response_to_join = member.wakuext_service.request_to_join_community(self.community_id)
         join_id = response_to_join.get("requestsToJoinCommunity", [{}])[0].get("id")
 
-        # I couldn't find any signal related to the requestToJoinCommunity request in the peer node.
-        # That's why I need this retry logic for accepting the request to join the community.
-        max_retries = 40
-        retry_interval = 0.5
-        for attempt in range(max_retries):
-            try:
-                response = admin.wakuext_service.accept_request_to_join_community(join_id)
-                if response:
-                    break
-            except Exception as e:
-                logging.error(f"Attempt {attempt + 1}/{max_retries}: Unexpected error: {e}")
-                time.sleep(retry_interval)
-        else:
-            raise Exception(f"Failed to accept request to join community in {max_retries * retry_interval} seconds.")
+        response = retry_call(admin.wakuext_service.accept_request_to_join_community, join_id)
 
         chats = response.get("communities", [{}])[0].get("chats", {})
         chat_id = list(chats.keys())[0] if chats else None

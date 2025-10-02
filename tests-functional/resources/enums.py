@@ -47,3 +47,10 @@ class MuteType(Enum):
 class ChatPreviewFilterType(Enum):
     Community = 0
     NonCommunity = 1
+
+
+class RequestToJoinState(Enum):
+    RequestToJoinStatePending = 1
+    RequestToJoinStateDeclined = 2
+    RequestToJoinStateAccepted = 3
+    RequestToJoinStateCanceled = 4
