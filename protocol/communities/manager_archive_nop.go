@@ -68,6 +68,8 @@ func (tmm *ArchiveManagerNop) SeedHistoryArchiveTorrent(communityID types.HexByt
 
 func (tmm *ArchiveManagerNop) UnseedHistoryArchiveTorrent(communityID types.HexBytes) {}
 
+func (tmm *ArchiveManagerNop) UnseedHistoryArchiveIndexCid(communityID types.HexBytes) {}
+
 func (tmm *ArchiveManagerNop) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool {
 	return false
 }
@@ -80,6 +82,10 @@ func (tmm *ArchiveManagerNop) AddHistoryArchiveDownloadTask(communityID string, 
 }
 
 func (tmm *ArchiveManagerNop) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
+	return nil, nil
+}
+
+func (tmm *ArchiveManagerNop) DownloadHistoryArchivesByIndexCid(communityID types.HexBytes, indexCid string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
 	return nil, nil
 }
 

@@ -1263,10 +1263,37 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 	}
 
 	if m.archiveManager.IsReady() && settings.HistoryArchiveSupportEnabled {
-		lastClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
+		// Determine preference before any processing
+		preference, err := m.communitiesManager.GetArchiveDistributionPreference(id)
+		if err != nil {
+			m.logger.Warn("failed to get archive distribution preference, using auto", zap.Error(err))
+			preference = "auto"
+		}
+		
+		// Skip magnetlink processing entirely if preference is codex-only
+		if preference == "codex" {
+			m.logger.Debug("skipping magnetlink processing due to codex-only preference")
+			return nil
+		}
+		
+		lastMagnetlinkClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
 		if err != nil {
 			return err
 		}
+		lastIndexCidClock, err := m.communitiesManager.GetIndexCidMessageClock(id)
+		if err != nil {
+			return err
+		}
+		
+		var lastClock uint64
+		if preference == "torrent" {
+			// In torrent mode, only compare against magnetlink clock
+			lastClock = lastMagnetlinkClock
+		} else {
+			// In auto mode, use the maximum of both clocks
+			lastClock = max(lastIndexCidClock, lastMagnetlinkClock)
+		}
+		
 		lastSeenMagnetlink, err := m.communitiesManager.GetLastSeenMagnetlink(id)
 		if err != nil {
 			return err
@@ -1279,6 +1306,8 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 				m.logger.Debug("already processed this magnetlink")
 				return nil
 			}
+
+			// All checks passed - proceed with download
 
 			m.archiveManager.UnseedHistoryArchiveTorrent(id)
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
@@ -1316,6 +1345,110 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 	return nil
 }
 
+func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageState, communityPubKey *ecdsa.PublicKey, cid string, clock uint64) error {
+	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
+
+	community, err := m.communitiesManager.GetByID(id)
+	if err != nil && err != communities.ErrOrgNotFound {
+		m.logger.Debug("Couldn't get community for community with id: ", zap.Any("id", id))
+		return err
+	}
+	if community == nil {
+		return nil
+	}
+
+	settings, err := m.communitiesManager.GetCommunitySettingsByID(id)
+	if err != nil {
+		m.logger.Debug("Couldn't get community settings for community with id: ", zap.Any("id", id))
+		return err
+	}
+	if settings == nil {
+		return nil
+	}
+
+	if m.archiveManager.IsReady() && settings.HistoryArchiveSupportEnabled {
+		// Determine preference before any processing
+		preference, err := m.communitiesManager.GetArchiveDistributionPreference(id)
+		if err != nil {
+			m.logger.Warn("failed to get archive distribution preference, using auto", zap.Error(err))
+			preference = "auto"
+		}
+		
+		// Skip indexCid processing entirely if preference is torrent-only
+		if preference == "torrent" {
+			m.logger.Debug("skipping index CID processing due to torrent-only preference")
+			return nil
+		}
+		
+		lastIndexCidClock, err := m.communitiesManager.GetIndexCidMessageClock(id)
+		if err != nil {
+			return err
+		}
+		lastMagnetlinkClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
+		if err != nil {
+			return err
+		}
+		
+		var lastClock uint64
+		if preference == "codex" {
+			// In codex mode, only compare against indexCid clock
+			lastClock = lastIndexCidClock
+		} else {
+			// In auto mode, use the maximum of both clocks
+			lastClock = max(lastMagnetlinkClock, lastIndexCidClock)
+		}
+		
+		lastSeenCid, err := m.communitiesManager.GetLastSeenIndexCid(id)
+		if err != nil {
+			return err
+		}
+		// We are only interested in a community archive index CID
+		// if it originates from a community that the current account is
+		// part of and doesn't own the private key at the same time
+		if !community.IsControlNode() && community.Joined() && clock >= lastClock {
+			if lastSeenCid == cid {
+				m.logger.Debug("already processed this index cid")
+				return nil
+			}
+
+			// All checks passed - proceed with download
+
+			m.archiveManager.UnseedHistoryArchiveIndexCid(id)
+			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
+
+			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
+				defer gocommon.LogOnPanic()
+				// Cancel ongoing download/import task
+				if currentTask != nil && !currentTask.IsCancelled() {
+					currentTask.Cancel()
+					currentTask.Waiter.Wait()
+				}
+
+				// Create new task
+				task := &communities.HistoryArchiveDownloadTask{
+					CancelChan: make(chan struct{}),
+					Waiter:     *new(sync.WaitGroup),
+					Cancelled:  false,
+				}
+
+				m.archiveManager.AddHistoryArchiveDownloadTask(communityID.String(), task)
+
+				// this wait groups tracks the ongoing task for a particular community
+				task.Waiter.Add(1)
+				defer task.Waiter.Done()
+
+				// this wait groups tracks all ongoing tasks across communities
+				m.shutdownWaitGroup.Add(1)
+				defer m.shutdownWaitGroup.Done()
+				m.downloadAndImportCodexHistoryArchives(communityID, cid, task.CancelChan)
+			}(currentTask, id)
+
+			return m.communitiesManager.UpdateIndexCidMessageClock(id, clock)
+		}
+	}
+	return nil
+}
+
 func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetlink string, cancel chan struct{}) {
 	downloadTaskInfo, err := m.archiveManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
 	if err != nil {
@@ -1343,6 +1476,50 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 	err = m.communitiesManager.UpdateLastSeenMagnetlink(id, magnetlink)
 	if err != nil {
 		m.logger.Error("couldn't update last seen magnetlink", zap.Error(err))
+	}
+
+	err = m.checkIfIMemberOfCommunity(id)
+	if err != nil {
+		return
+	}
+
+	err = m.importHistoryArchives(id, cancel)
+	if err != nil {
+		m.logger.Error("failed to import history archives", zap.Error(err))
+		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+		return
+	}
+
+	m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+}
+
+func (m *Messenger) downloadAndImportCodexHistoryArchives(id types.HexBytes, indexCid string, cancel chan struct{}) {
+	downloadTaskInfo, err := m.archiveManager.DownloadHistoryArchivesByIndexCid(id, indexCid, cancel)
+	if err != nil {
+		logMsg := "failed to download history archive data"
+		if err == communities.ErrTorrentTimedout {
+			m.logger.Debug("downloading indexCid has timed out, trying once more...")
+			downloadTaskInfo, err = m.archiveManager.DownloadHistoryArchivesByIndexCid(id, indexCid, cancel)
+			if err != nil {
+				m.logger.Error(logMsg, zap.Error(err))
+				return
+			}
+		} else {
+			m.logger.Debug(logMsg, zap.Error(err))
+			return
+		}
+	}
+
+	if downloadTaskInfo.Cancelled {
+		if downloadTaskInfo.TotalDownloadedArchivesCount > 0 {
+			m.logger.Debug(fmt.Sprintf("downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
+		}
+		return
+	}
+
+	err = m.communitiesManager.UpdateLastSeenIndexCid(id, indexCid)
+	if err != nil {
+		m.logger.Error("couldn't update last seen indexCid", zap.Error(err))
 	}
 
 	err = m.checkIfIMemberOfCommunity(id)
@@ -3581,6 +3758,11 @@ func (m *Messenger) HandleSyncTrustedUser(state *ReceivedMessageState, message *
 
 	return nil
 }
+
+func (m *Messenger) HandleCommunityMessageArchiveIndexCid(state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveIndexCid, statusMessage *messagingtypes.Message) error {
+	return m.HandleHistoryArchiveIndexCidMessage(state, state.CurrentMessageState.PublicKey, message.Cid, message.Clock)
+}
+
 func (m *Messenger) HandleCommunityMessageArchiveMagnetlink(state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveMagnetlink, statusMessage *messagingtypes.Message) error {
 	return m.HandleHistoryArchiveMagnetlinkMessage(state, state.CurrentMessageState.PublicKey, message.MagnetUri, message.Clock)
 }

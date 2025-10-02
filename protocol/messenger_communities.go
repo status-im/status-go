@@ -4160,24 +4160,22 @@ func (m *Messenger) dispatchIndexCidMessage(communityID string) error {
 		LocalChatID:          chatID,
 		Sender:               community.PrivateKey(),
 		Payload:              encodedMessage,
-		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_MESSAGE_ARCHIVE_MAGNETLINK,
+		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_MESSAGE_ARCHIVE_INDEX_CID,
 		SkipGroupMessageWrap: true,
 		PubsubTopic:          community.PubsubTopic(),
 		Priority:             &messagingtypes.LowPriority,
 	}
 
 	_, err = m.messaging.SendPublic(context.Background(), chatID, rawMessage)
-	return err
-	// if err != nil {
-	// 	return err
-	// }
+	if err != nil {
+		return err
+	}
 
-	// TODO: add database migrations to include new fields for index cid message clocks
-	// err = m.communitiesManager.UpdateCommunityDescriptionIndexCidMessageClock(community.ID(), indexCidMessage.Clock)
-	// if err != nil {
-	// 	return err
-	// }
-	// return m.communitiesManager.UpdateIndexCidMessageClock(community.ID(), indexCidMessage.Clock)
+	err = m.communitiesManager.UpdateCommunityDescriptionIndexCidMessageClock(community.ID(), indexCidMessage.Clock)
+	if err != nil {
+		return err
+	}
+	return m.communitiesManager.UpdateIndexCidMessageClock(community.ID(), indexCidMessage.Clock)
 }
 
 func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
@@ -5088,4 +5086,35 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 			}
 		}
 	}()
+}
+
+// SetCommunityArchiveDistributionPreference sets the archive distribution preference for a community
+func (m *Messenger) SetCommunityArchiveDistributionPreference(request *requests.SetCommunityArchiveDistributionPreference) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	community, err := m.communitiesManager.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	if community == nil {
+		return nil, errors.New("community not found")
+	}
+
+	err = m.communitiesManager.SetArchiveDistributionPreference(request.CommunityID, request.Preference)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+
+	return response, nil
+}
+
+// GetCommunityArchiveDistributionPreference gets the archive distribution preference for a community
+func (m *Messenger) GetCommunityArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
+	return m.communitiesManager.GetArchiveDistributionPreference(communityID)
 }

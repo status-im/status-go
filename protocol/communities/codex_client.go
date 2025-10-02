@@ -9,29 +9,26 @@ import (
 	"time"
 )
 
-// CodexClient handles uploading data to Codex storage
+// CodexClient handles basic upload/download operations with Codex storage
 type CodexClient struct {
-	baseURL string
-	client  *http.Client
+	BaseURL string
+	Client  *http.Client
 }
 
 // NewCodexClient creates a new Codex client
 func NewCodexClient(host string, port string) *CodexClient {
 	return &CodexClient{
-		baseURL: fmt.Sprintf("http://%s:%s", host, port),
-		client:  &http.Client{Timeout: 30 * time.Second},
+		BaseURL: fmt.Sprintf("http://%s:%s", host, port),
+		Client:  &http.Client{Timeout: 60 * time.Second},
 	}
 }
 
-// UploadData uploads binary data to Codex and returns the CID
-func (c *CodexClient) UploadData(data []byte, filename string) (string, error) {
-	url := fmt.Sprintf("%s/api/codex/v1/data", c.baseURL)
-
-	// Create a bytes reader from the data
-	reader := bytes.NewReader(data)
+// Upload uploads data from a reader to Codex and returns the CID
+func (c *CodexClient) Upload(data io.Reader, filename string) (string, error) {
+	url := fmt.Sprintf("%s/api/codex/v1/data", c.BaseURL)
 
 	// Create the HTTP request
-	req, err := http.NewRequest("POST", url, reader)
+	req, err := http.NewRequest("POST", url, data)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -41,7 +38,7 @@ func (c *CodexClient) UploadData(data []byte, filename string) (string, error) {
 	req.Header.Set("Content-Disposition", fmt.Sprintf(`filename="%s"`, filename))
 
 	// Send request
-	resp, err := c.client.Do(req)
+	resp, err := c.Client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to upload to codex: %w", err)
 	}
@@ -63,7 +60,36 @@ func (c *CodexClient) UploadData(data []byte, filename string) (string, error) {
 	return cid, nil
 }
 
+// Download downloads data from Codex by CID and writes it to the provided writer  
+func (c *CodexClient) Download(cid string, output io.Writer) error {
+	url := fmt.Sprintf("%s/api/codex/v1/data/%s/network/stream", c.BaseURL, cid)
+	
+	resp, err := c.Client.Get(url)
+	if err != nil {
+		return fmt.Errorf("failed to download from codex: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("codex download failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Stream the data to the output writer
+	_, err = io.Copy(output, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to write downloaded data: %w", err)
+	}
+
+	return nil
+}
+
+// SetRequestTimeout sets the HTTP client timeout for requests
+func (c *CodexClient) SetRequestTimeout(timeout time.Duration) {
+	c.Client.Timeout = timeout
+}
+
 // UploadArchive is a convenience method for uploading archive data
 func (c *CodexClient) UploadArchive(encodedArchive []byte) (string, error) {
-	return c.UploadData(encodedArchive, "archive-data.bin")
+	return c.Upload(bytes.NewReader(encodedArchive), "archive-data.bin")
 }
