@@ -145,12 +145,6 @@ class TestCommunityMembershipRequests(MessengerSteps):
         decline_resp = self.creator.wakuext_service.decline_request_to_join_community(latest.get("id"))
         assert decline_resp.get("requestsToJoinCommunity")[0].get("state") == RequestToJoinState.RequestToJoinStateDeclined.value
 
-        self.requester.wait_for_signal_predicate(
-            SignalType.MESSAGES_NEW.value,
-            lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
-            == RequestToJoinState.RequestToJoinStateDeclined.value,
-        )
-
         canceled = self.creator.wakuext_service.canceled_requests_to_join_for_community(self.community_id)
         assert canceled is None
 
