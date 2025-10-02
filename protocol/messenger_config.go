@@ -90,7 +90,7 @@ type config struct {
 	accountsManager        AccountsManager
 	signer                 communities.MessageSigner
 
-	ensVerifier             *ens.Verifier
+	ensVerifier *ens.Verifier
 
 	pushNotificationClientConfig *pushnotificationclient.Config
 	pushNotificationServer       PushNotificationServer

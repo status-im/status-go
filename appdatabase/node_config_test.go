@@ -49,7 +49,6 @@ func randomNodeConfig() *params.NodeConfig {
 			PFSEnabled:               randomBool(),
 			InstallationID:           randomString(),
 			MailServerConfirmations:  randomBool(),
-			VerifyENSURL:             randomString(),
 			VerifyENSContractAddress: randomString(),
 			BandwidthStatsEnabled:    randomBool(),
 		},
