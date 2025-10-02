@@ -10,15 +10,14 @@ import (
 )
 
 func (m *Messenger) backupMessages() ([]*protobuf.BackedUpMessage, error) {
-	// TODO uncomment
-	// messagesBackupEnabled, err := m.settings.MessagesBackupEnabled()
-	// if err != nil {
-	// 	return nil, err
-	// }
+	messagesBackupEnabled, err := m.settings.MessagesBackupEnabled()
+	if err != nil {
+		return nil, err
+	}
 
-	// if !messagesBackupEnabled {
-	// 	return nil, nil
-	// }
+	if !messagesBackupEnabled {
+		return nil, nil
+	}
 
 	return m.persistence.AllMessagesForBackup()
 }

@@ -282,7 +282,7 @@ func (n *StatusNode) StartLocalBackup(privateKey *ecdsa.PrivateKey) error {
 		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
 		FileNameGetter: filenameGetter,
 		BackupEnabled:  true,
-		Interval:       time.Minute * 1, // TODO change that back to 30 minutes
+		Interval:       time.Minute * 30,
 	}, n.logger.Named("LocalBackup"))
 	if err != nil {
 		return err
