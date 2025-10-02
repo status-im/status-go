@@ -60,7 +60,9 @@ func makeMutualContact(origin *Messenger, contactPubkey *ecdsa.PublicKey) error 
 		return err
 	}
 	contact.ContactRequestLocalState = ContactRequestStateSent
+	contact.ContactRequestLocalClock = 1
 	contact.ContactRequestRemoteState = ContactRequestStateReceived
+	contact.ContactRequestRemoteClock = 1
 	origin.allContacts.Store(contact.ID, contact)
 
 	return nil
