@@ -279,6 +279,21 @@ func (api *PublicAPI) RemovePrivateKey(id types.HexBytes) (*protocol.MessengerRe
 	return api.service.messenger.RemovePrivateKey(id)
 }
 
+// Sets the community shard for a community and updates all active filters for the community
+func (api *PublicAPI) SetCommunityShard(request *requests.SetCommunityShard) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SetCommunityShard(request)
+}
+
+// SetCommunityArchiveDistributionPreference sets the archive distribution preference for a community
+func (api *PublicAPI) SetCommunityArchiveDistributionPreference(request *requests.SetCommunityArchiveDistributionPreference) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SetCommunityArchiveDistributionPreference(request)
+}
+
+// GetCommunityArchiveDistributionPreference gets the archive distribution preference for a community
+func (api *PublicAPI) GetCommunityArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
+	return api.service.messenger.GetCommunityArchiveDistributionPreference(communityID)
+}
+
 // ExportCommunity exports the private key of the community with given ID
 func (api *PublicAPI) ExportCommunity(id types.HexBytes) (types.HexBytes, error) {
 	key, err := api.service.messenger.ExportCommunity(id)

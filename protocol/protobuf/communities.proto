@@ -125,6 +125,7 @@ message CommunityDescription {
   map<string,CommunityBanInfo>banned_members = 19;
   // request to resend revealed addresses
   uint64 resend_accounts_clock = 20;
+  uint64 archive_index_cid_clock = 21;
   // key is hash ratchet key_id + seq_no
   map<string, bytes> privateData = 100;
 }
