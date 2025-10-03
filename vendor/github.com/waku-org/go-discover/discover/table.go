@@ -32,8 +32,9 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 )
@@ -71,15 +72,13 @@ type Table struct {
 	rand    *mrand.Rand       // source of randomness, periodically reseeded
 	ips     netutil.DistinctNetSet
 
-	log        log.Logger
+	log        *zap.Logger
 	db         *enode.DB // database of known nodes
 	net        transport
 	refreshReq chan chan struct{}
 	initDone   chan struct{}
 	closeReq   chan struct{}
 	closed     chan struct{}
-
-	nodeIsValidFn func(enode.Node) bool
 
 	nodeAddedHook func(*node) // for testing
 }
@@ -101,26 +100,31 @@ type bucket struct {
 	ips          netutil.DistinctNetSet
 }
 
-func newTable(t transport, db *enode.DB, bootnodes []*enode.Node, nodeIsValidFn func(enode.Node) bool, log log.Logger) (*Table, error) {
+func newTable(t transport, db *enode.DB, bootnodes []*enode.Node, logger *zap.Logger) (*Table, error) {
+	buckets := [nBuckets]*bucket{}
+	for i := range buckets {
+		buckets[i] = &bucket{
+			ips: netutil.DistinctNetSet{Subnet: bucketSubnet, Limit: bucketIPLimit},
+		}
+	}
+	nursery := wrapNodes(bootnodes)
+
 	tab := &Table{
-		net:           t,
-		db:            db,
-		refreshReq:    make(chan chan struct{}),
-		initDone:      make(chan struct{}),
-		closeReq:      make(chan struct{}),
-		closed:        make(chan struct{}),
-		rand:          mrand.New(mrand.NewSource(0)),
-		ips:           netutil.DistinctNetSet{Subnet: tableSubnet, Limit: tableIPLimit},
-		nodeIsValidFn: nodeIsValidFn,
-		log:           log,
+		mutex:      sync.Mutex{},
+		buckets:    buckets,
+		nursery:    nursery,
+		rand:       mrand.New(mrand.NewSource(time.Now().UnixNano())),
+		ips:        netutil.DistinctNetSet{},
+		log:        logger,
+		db:         db,
+		net:        t,
+		refreshReq: make(chan chan struct{}),
+		initDone:   make(chan struct{}),
+		closeReq:   make(chan struct{}),
+		closed:     make(chan struct{}),
 	}
 	if err := tab.setFallbackNodes(bootnodes); err != nil {
 		return nil, err
-	}
-	for i := range tab.buckets {
-		tab.buckets[i] = &bucket{
-			ips: netutil.DistinctNetSet{Subnet: bucketSubnet, Limit: bucketIPLimit},
-		}
 	}
 	tab.seedRand()
 	tab.loadSeedNodes()
@@ -312,8 +316,6 @@ func (tab *Table) loadSeedNodes() {
 	tab.mutex.Unlock()
 	for i := range seeds {
 		seed := seeds[i]
-		age := log.Lazy{Fn: func() interface{} { return time.Since(tab.db.LastPongReceived(seed.ID(), seed.IP())) }}
-		tab.log.Trace("Found seed node in database", "id", seed.ID(), "addr", seed.addr(), "age", age)
 		tab.addSeenNode(seed)
 	}
 }
@@ -332,15 +334,19 @@ func (tab *Table) doRevalidate(done chan<- struct{}) {
 	// Ping the selected node and wait for a pong.
 	remoteSeq, err := tab.net.ping(unwrapNode(last))
 
+	logger := tab.log.With(zap.Stringer("id", last.ID()), zap.Stringer("addr", last.addr()))
+
 	// Also fetch record if the node replied and returned a higher sequence number.
 	if last.Seq() < remoteSeq {
 		n, err := tab.net.RequestENR(unwrapNode(last))
 		if err != nil {
-			tab.log.Debug("ENR request failed", "id", last.ID(), "addr", last.addr(), "err", err)
+			logger.Debug("ENR request failed", zap.Error(err))
 		} else {
 			last = &node{Node: *n, addedAt: last.addedAt, livenessChecks: last.livenessChecks}
 		}
 	}
+
+	logger = logger.With(zap.Int("b", bi))
 
 	tab.mutex.Lock()
 	defer tab.mutex.Unlock()
@@ -348,16 +354,21 @@ func (tab *Table) doRevalidate(done chan<- struct{}) {
 	if err == nil {
 		// The node responded, move it to the front.
 		last.livenessChecks++
-		tab.log.Debug("Revalidated node", "b", bi, "id", last.ID(), "checks", last.livenessChecks)
+		logger.Debug("Revalidated node", zap.Uint("checks", last.livenessChecks))
 		tab.bumpInBucket(b, last)
 		return
 	}
+
 	// No reply received, pick a replacement or delete the node if there aren't
 	// any replacements.
 	if r := tab.replace(b, last); r != nil {
-		tab.log.Debug("Replaced dead node", "b", bi, "id", last.ID(), "ip", last.IP(), "checks", last.livenessChecks, "r", r.ID(), "rip", r.IP())
+		tab.log.Debug("Replaced dead node",
+			zap.Uint("checks", last.livenessChecks),
+			zap.Stringer("r", r.ID()),
+			zap.Stringer("rip", r.IP()))
 	} else {
-		tab.log.Debug("Removed dead node", "b", bi, "id", last.ID(), "ip", last.IP(), "checks", last.livenessChecks)
+		tab.log.Debug("Removed dead node",
+			zap.Uint("checks", last.livenessChecks))
 	}
 }
 
@@ -472,10 +483,6 @@ func (tab *Table) addSeenNode(n *node) {
 		return
 	}
 
-	if tab.nodeIsValidFn != nil && !tab.nodeIsValidFn(n.Node) {
-		return
-	}
-
 	tab.mutex.Lock()
 	defer tab.mutex.Unlock()
 	b := tab.bucket(n.ID())
@@ -515,10 +522,6 @@ func (tab *Table) addVerifiedNode(n *node) {
 		return
 	}
 	if n.ID() == tab.self().ID() {
-		return
-	}
-
-	if tab.nodeIsValidFn != nil && !tab.nodeIsValidFn(n.Node) {
 		return
 	}
 
@@ -563,11 +566,11 @@ func (tab *Table) addIP(b *bucket, ip net.IP) bool {
 		return true
 	}
 	if !tab.ips.Add(ip) {
-		tab.log.Debug("IP exceeds table limit", "ip", ip)
+		tab.log.Debug("IP exceeds table limit", zap.Stringer("ip", ip))
 		return false
 	}
 	if !b.ips.Add(ip) {
-		tab.log.Debug("IP exceeds bucket limit", "ip", ip)
+		tab.log.Debug("IP exceeds bucket limit", zap.Stringer("ip", ip))
 		tab.ips.Remove(ip)
 		return false
 	}
@@ -687,15 +690,14 @@ func (h *nodesByDistance) push(n *node, maxElems int) {
 	ix := sort.Search(len(h.entries), func(i int) bool {
 		return enode.DistCmp(h.target, h.entries[i].ID(), n.ID()) > 0
 	})
+
+	end := len(h.entries)
 	if len(h.entries) < maxElems {
 		h.entries = append(h.entries, n)
 	}
-	if ix == len(h.entries) {
-		// farther away than all nodes we already have.
-		// if there was room for it, the node is now the last element.
-	} else {
-		// slide existing entries down to make room
-		// this will overwrite the entry we just appended.
+	if ix < end {
+		// Slide existing entries down to make room.
+		// This will overwrite the entry we just appended.
 		copy(h.entries[ix+1:], h.entries[ix:])
 		h.entries[ix] = n
 	}
