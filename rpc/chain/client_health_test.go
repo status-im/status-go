@@ -13,7 +13,9 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+
+	sdkethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
+
 	healthManager "github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
@@ -63,13 +65,13 @@ func (s *ClientWithFallbackSuite) TestSingleClientSuccess() {
 	s.setupClients(1)
 	ctx := context.Background()
 	hash := common.HexToHash("0x1234")
-	block := &types.Block{}
+	block := &sdkethclient.BlockWithTxHashes{}
 
 	// GIVEN
-	s.mockEthClients[0].EXPECT().BlockByHash(ctx, hash).Return(block, nil).Times(1)
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(block, nil).Times(1)
 
 	// WHEN
-	result, err := s.client.BlockByHash(ctx, hash)
+	result, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), block, result)
 
@@ -87,10 +89,10 @@ func (s *ClientWithFallbackSuite) TestSingleClientConnectionError() {
 	hash := common.HexToHash("0x1234")
 
 	// GIVEN
-	s.mockEthClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("connection error")).Times(1)
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("connection error")).Times(1)
 
 	// WHEN
-	_, err := s.client.BlockByHash(ctx, hash)
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.Error(s.T(), err)
 
 	// THEN
@@ -108,9 +110,9 @@ func (s *ClientWithFallbackSuite) TestRPSLimitErrorDoesNotMarkChainDown() {
 	hash := common.HexToHash("0x1234")
 
 	// WHEN
-	s.mockEthClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, rpclimiter.ErrRequestsOverLimit).Times(1)
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, rpclimiter.ErrRequestsOverLimit).Times(1)
 
-	_, err := s.client.BlockByHash(ctx, hash)
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.Error(s.T(), err)
 
 	// THEN
@@ -132,7 +134,7 @@ func (s *ClientWithFallbackSuite) TestContextCanceledDoesNotMarkChainDown() {
 	hash := common.HexToHash("0x1234")
 
 	// WHEN
-	_, err := s.client.BlockByHash(ctx, hash)
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.Error(s.T(), err)
 	require.True(s.T(), errors.Is(err, context.Canceled))
 
@@ -151,10 +153,10 @@ func (s *ClientWithFallbackSuite) TestVMErrorDoesNotMarkChainDown() {
 	vmError := vm.ErrOutOfGas
 
 	// GIVEN
-	s.mockEthClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, vmError).Times(1)
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, vmError).Times(1)
 
 	// WHEN
-	_, err := s.client.BlockByHash(ctx, hash)
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.Error(s.T(), err)
 	require.True(s.T(), errors.Is(err, vm.ErrOutOfGas))
 
@@ -173,7 +175,7 @@ func (s *ClientWithFallbackSuite) TestNoClientsChainDown() {
 	hash := common.HexToHash("0x1234")
 
 	// WHEN
-	_, err := s.client.BlockByHash(ctx, hash)
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.Error(s.T(), err)
 
 	// THEN
@@ -187,12 +189,12 @@ func (s *ClientWithFallbackSuite) TestAllClientsDifferentErrors() {
 	hash := common.HexToHash("0x1234")
 
 	// GIVEN
-	s.mockEthClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
-	s.mockEthClients[1].EXPECT().BlockByHash(ctx, hash).Return(nil, rpclimiter.ErrRequestsOverLimit).Times(1)
-	s.mockEthClients[2].EXPECT().BlockByHash(ctx, hash).Return(nil, vm.ErrOutOfGas).Times(1)
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
+	s.mockEthClients[1].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, rpclimiter.ErrRequestsOverLimit).Times(1)
+	s.mockEthClients[2].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, vm.ErrOutOfGas).Times(1)
 
 	// WHEN
-	_, err := s.client.BlockByHash(ctx, hash)
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.Error(s.T(), err)
 
 	// THEN
@@ -213,12 +215,12 @@ func (s *ClientWithFallbackSuite) TestAllClientsNetworkErrors() {
 	hash := common.HexToHash("0x1234")
 
 	// GIVEN
-	s.mockEthClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
-	s.mockEthClients[1].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
-	s.mockEthClients[2].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
+	s.mockEthClients[1].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
+	s.mockEthClients[2].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
 
 	// WHEN
-	_, err := s.client.BlockByHash(ctx, hash)
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.Error(s.T(), err)
 
 	// THEN

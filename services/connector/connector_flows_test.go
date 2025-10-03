@@ -6,15 +6,12 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethTrie "github.com/ethereum/go-ethereum/trie"
 
 	"github.com/status-im/status-go/crypto/types"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
@@ -111,42 +108,14 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	assert.Equal(t, commands.FormatAccountAddressToResponse(accountAddress), response)
 
 	// Send transaction
-	blockToReturn := gethTypes.NewBlock(&gethTypes.Header{
-		Number: big.NewInt(10),
-		Time:   uint64(time.Now().Unix()),
-	},
-		[]*gethTypes.Transaction{
-			gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(1), nil),
-			gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(2), nil),
-			gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(3), nil),
-			gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(4), nil),
-			gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(5), nil),
-			gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(6), nil),
-			gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(7), nil),
-			gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(8), nil),
-			gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(9), nil),
-			gethTypes.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(10), nil),
-		},
-		nil,
-		nil,
-		gethTrie.NewStackTrie(nil),
-	)
-
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
-	const blocksToCheck = 5
-	blockNumber := uint64(10)
-	feeHistory := &fees.FeeHistory{}
-	percentiles := []int{fees.RewardPercentiles1, fees.RewardPercentiles2, fees.RewardPercentiles3}
-	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil)
-	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(2).Return(mockedChainClient, nil)
-	mockedChainClient.EXPECT().BlockNumber(state.ctx).Times(1).Return(blockNumber, nil)
-	for i := uint64(0); i < uint64(blocksToCheck); i++ {
-		blockNum := big.NewInt(0).SetUint64(blockNumber - i)
-		mockedChainClient.EXPECT().BlockByNumber(state.ctx, blockNum).Times(1).Return(blockToReturn, nil)
-	}
-	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
-	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
-	mockedChainClient.EXPECT().PendingNonceAt(state.ctx, common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
+	mockedChainClient.EXPECT().PendingNonceAt(gomock.Any(), common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
+	state.ethClientGetter.EXPECT().EthClient(uint64(1)).AnyTimes().Return(mockedChainClient, nil)
+	state.feeManager.EXPECT().SuggestedFees(gomock.Any(), uint64(1), common.Address(accountAddress)).Times(1).Return(
+		&fees.SuggestedFees{
+			GasPrice:       big.NewInt(1),
+			EIP1559Enabled: false,
+		}, false, false, nil)
 
 	request = fmt.Sprintf("{\"method\": \"eth_sendTransaction\", \"params\":[{\"from\":\"%s\",\"to\":\"0x0200000000000000000000000000000000000000\",\"value\":\"0x12345\",\"data\":\"0x307830\"}], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }", accountAddress.Hex())
 	response, err = state.api.CallRPC(state.ctx, request)
@@ -197,17 +166,13 @@ func TestForwardedRPCs(t *testing.T) {
 	expectedResultResponse, err := json.Marshal(expectedResult)
 	require.NoError(t, err)
 
-	state.rpcClient.EXPECT().
-		EthClient(request.ChainID).
-		Times(0)
-
 	_, err = state.api.CallRPC(state.ctx, requestJson)
 	assert.Equal(t, commands.ErrDAppIsNotPermittedByUser, err)
 
 	err = commands.PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
 	assert.NoError(t, err)
 
-	state.rpcClient.EXPECT().
+	state.ethClientGetter.EXPECT().
 		EthClient(request.ChainID).
 		Return(ethClientMock, nil)
 

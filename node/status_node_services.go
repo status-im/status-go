@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/timesource"
 )
@@ -162,6 +163,7 @@ func (b *StatusNode) connectorService() *connector.Service {
 			b.logger.Named("connector"),
 			b.walletDB,
 			b.rpcClient,
+			&fees.FeeManager{RPCClient: b.rpcClient},
 			b.rpcClient.GetNetworkManager(),
 			&connector.Config{
 				WSHost: b.config.WSHost,

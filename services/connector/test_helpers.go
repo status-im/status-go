@@ -10,27 +10,27 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
-
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network"
 	network_testutil "github.com/status-im/status-go/rpc/network/testutil"
+	mock_chainutils "github.com/status-im/status-go/services/connector/chainutils/mock"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
 type testState struct {
-	ctx       context.Context
-	db        *sql.DB
-	walletDb  *sql.DB
-	mockCtrl  *gomock.Controller
-	rpcClient *mock_rpcclient.MockClientInterface
-	service   *Service
-	api       *API
+	ctx             context.Context
+	db              *sql.DB
+	walletDb        *sql.DB
+	mockCtrl        *gomock.Controller
+	ethClientGetter *mock_chainutils.MockEthClientGetter
+	feeManager      *mock_chainutils.MockFeeManager
+	service         *Service
+	api             *API
 }
 
 func createDB(t *testing.T) (*sql.DB, func()) {
@@ -71,7 +71,6 @@ func setupTests(t *testing.T) (state testState, close func()) {
 	require.NoError(t, err)
 
 	state.mockCtrl = gomock.NewController(t)
-	state.rpcClient = mock_rpcclient.NewMockClientInterface(state.mockCtrl)
 
 	networkManager := network.NewManager(state.db, nil)
 	require.NotNil(t, networkManager)
@@ -87,9 +86,17 @@ func setupTests(t *testing.T) (state testState, close func()) {
 	err = networkManager.InitEmbeddedNetworks(initNetworks)
 	require.NoError(t, err)
 
-	state.rpcClient.EXPECT().GetNetworkManager().AnyTimes().Return(networkManager)
+	state.ethClientGetter = mock_chainutils.NewMockEthClientGetter(state.mockCtrl)
+	state.feeManager = mock_chainutils.NewMockFeeManager(state.mockCtrl)
 
-	state.service = NewService(zap.NewNop(), state.walletDb, state.rpcClient, state.rpcClient.GetNetworkManager(), &Config{})
+	state.service = NewService(
+		zap.NewNop(),
+		state.walletDb,
+		state.ethClientGetter,
+		state.feeManager,
+		networkManager,
+		&Config{},
+	)
 
 	state.api = NewAPI(state.service)
 
