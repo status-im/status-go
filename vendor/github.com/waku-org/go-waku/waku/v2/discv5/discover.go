@@ -146,7 +146,6 @@ func NewDiscoveryV5(priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConn
 			PrivateKey:   priv,
 			Bootnodes:    bootnodes,
 			V5ProtocolID: &protocolID,
-			Log:          logger.Named("go-discover"),
 		},
 		udpAddr: &net.UDPAddr{
 			IP:   net.IPv4zero,
