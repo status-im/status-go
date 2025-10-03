@@ -10,7 +10,7 @@ import (
 	"time"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/protocol/wakusync"
+	"github.com/status-im/status-go/protocol/backupsync"
 
 	"github.com/status-im/status-go/protocol/identity"
 
@@ -50,19 +50,12 @@ func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bo
 type MessengerSignalsHandlerMock struct {
 	MessengerSignalsHandler
 
-	responseChan                 chan *MessengerResponse
-	communityFoundChan           chan *communities.Community
-	wakuBackedUpDataResponseChan chan *wakusync.WakuBackedUpDataResponse
+	responseChan       chan *MessengerResponse
+	communityFoundChan chan *communities.Community
 }
 
-func (m *MessengerSignalsHandlerMock) SendWakuFetchingBackupProgress(response *wakusync.WakuBackedUpDataResponse) {
-	m.wakuBackedUpDataResponseChan <- response
-}
-func (m *MessengerSignalsHandlerMock) SendWakuBackedUpProfile(*wakusync.WakuBackedUpDataResponse)  {}
-func (m *MessengerSignalsHandlerMock) SendWakuBackedUpSettings(*wakusync.WakuBackedUpDataResponse) {}
-func (m *MessengerSignalsHandlerMock) SendWakuBackedUpKeypair(*wakusync.WakuBackedUpDataResponse)  {}
-func (m *MessengerSignalsHandlerMock) SendWakuBackedUpWatchOnlyAccount(*wakusync.WakuBackedUpDataResponse) {
-}
+func (m *MessengerSignalsHandlerMock) SendBackedUpProfile(*backupsync.BackedUpDataResponse)  {}
+func (m *MessengerSignalsHandlerMock) SendBackedUpSettings(*backupsync.BackedUpDataResponse) {}
 
 func (m *MessengerSignalsHandlerMock) HistoryArchivesProtocolEnabled()           {}
 func (m *MessengerSignalsHandlerMock) HistoryArchivesProtocolDisabled()          {}
@@ -90,42 +83,6 @@ func (m *MessengerSignalsHandlerMock) CommunityInfoFound(community *communities.
 	select {
 	case m.communityFoundChan <- community:
 	default:
-	}
-}
-
-func WaitOnSignaledSendWakuFetchingBackupProgress(m *Messenger, condition func(*wakusync.WakuBackedUpDataResponse) bool, errorMessage string) (*wakusync.WakuBackedUpDataResponse, error) {
-	interval := 500 * time.Millisecond
-	timeoutChan := time.After(10 * time.Second)
-
-	if m.config.messengerSignalsHandler != nil {
-		return nil, errors.New("messengerSignalsHandler already provided/mocked")
-	}
-
-	responseChan := make(chan *wakusync.WakuBackedUpDataResponse, 1000)
-	m.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{
-		wakuBackedUpDataResponseChan: responseChan,
-	}
-
-	defer func() {
-		m.config.messengerSignalsHandler = nil
-	}()
-
-	for {
-		_, err := m.RetrieveAll()
-		if err != nil {
-			return nil, err
-		}
-
-		select {
-		case r := <-responseChan:
-			if condition(r) {
-				return r, nil
-			}
-		case <-timeoutChan:
-			return nil, errors.New("timed out: " + errorMessage)
-		default: // No immediate response, rest & loop back to retrieve again
-			time.Sleep(interval)
-		}
 	}
 }
 

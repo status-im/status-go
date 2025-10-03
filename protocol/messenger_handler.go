@@ -35,6 +35,7 @@ import (
 	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/syncing"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 
@@ -2417,7 +2418,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState, message *prot
 }
 
 func (m *Messenger) HandleSyncSetting(messageState *ReceivedMessageState, message *protobuf.SyncSetting, statusMessage *messagingtypes.Message) error {
-	settingField, err := m.extractAndSaveSyncSetting(message)
+	settingField, err := syncing.ExtractAndSaveSyncSetting(m.settings, m.logger, message)
 	if err != nil {
 		return err
 	}
@@ -2999,28 +3000,6 @@ func (m *Messenger) updateUnviewedCounts(chat *Chat, message *common.Message) {
 	}
 }
 
-func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability accsmanagementtypes.AccountOperable, accType accsmanagementtypes.AccountType) *accsmanagementtypes.Account {
-	return &accsmanagementtypes.Account{
-		Address:               types.BytesToAddress(message.Address),
-		KeyUID:                message.KeyUid,
-		PublicKey:             types.HexBytes(message.PublicKey),
-		Type:                  accType,
-		Path:                  message.Path,
-		Name:                  message.Name,
-		ColorID:               multiaccountscommon.CustomizationColor(message.ColorId),
-		Emoji:                 message.Emoji,
-		Wallet:                message.Wallet,
-		Chat:                  message.Chat,
-		Hidden:                message.Hidden,
-		Clock:                 message.Clock,
-		Operable:              accountOperability,
-		Removed:               message.Removed,
-		Position:              message.Position,
-		ProdPreferredChainIDs: message.ProdPreferredChainIDs,
-		TestPreferredChainIDs: message.TestPreferredChainIDs,
-	}
-}
-
 func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount,
 	syncKpMigratedToKeycard bool, dbKpMigratedToKeycard bool, accountReceivedFromLocalPairing bool) (accsmanagementtypes.AccountOperable, error) {
 	if accountReceivedFromLocalPairing {
@@ -3075,61 +3054,6 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount,
 	}
 
 	return accountsOperability, nil
-}
-
-func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*accsmanagementtypes.Account, error) {
-	if message.KeyUid != "" {
-		return nil, ErrNotWatchOnlyAccount
-	}
-
-	accountOperability := accsmanagementtypes.AccountFullyOperable
-
-	accAddress := types.BytesToAddress(message.Address)
-	dbAccount, err := m.settings.GetAccountByAddress(accAddress)
-	if err != nil && err != accounts.ErrDbAccountNotFound {
-		return nil, err
-	}
-
-	if dbAccount != nil {
-		if message.Clock <= dbAccount.Clock {
-			return nil, ErrTryingToStoreOldWalletAccount
-		}
-
-		if message.Removed {
-			err = m.settings.RemoveAccount(accAddress, message.Clock)
-			if err != nil {
-				return nil, err
-			}
-
-			err = m.settings.ResolveAccountsPositions(message.Clock)
-			if err != nil {
-				return nil, err
-			}
-			dbAccount.Removed = true
-			return dbAccount, nil
-		}
-	}
-
-	acc := mapSyncAccountToAccount(message, accountOperability, accsmanagementtypes.AccountTypeWatch)
-
-	err = m.settings.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{acc}, false)
-	if err != nil {
-		return nil, err
-	}
-
-	if m.config.accountsPublisher != nil {
-		payload := []gethcommon.Address{gethcommon.Address(acc.Address)}
-		if acc.Removed {
-			pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsRemovedEvent{
-				Accounts: payload,
-			})
-		} else {
-			pubsub.Publish(m.config.accountsPublisher, accountsevent.AccountsAddedEvent{
-				Accounts: payload,
-			})
-		}
-	}
-	return acc, nil
 }
 
 func (m *Messenger) handleSyncTokenPreferences(message *protobuf.SyncTokenPreferences) ([]walletsettings.TokenPreferences, error) {
@@ -3330,7 +3254,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		if err != nil {
 			return nil, err
 		}
-		acc := mapSyncAccountToAccount(sAcc, accountOperability, accsmanagementtypes.GetAccountTypeForKeypairType(kp.Type))
+		acc := syncing.MapSyncAccountToAccount(sAcc, accountOperability, accsmanagementtypes.GetAccountTypeForKeypairType(kp.Type))
 
 		kp.Accounts = append(kp.Accounts, acc)
 	}
@@ -3484,9 +3408,9 @@ func (m *Messenger) HandleSyncCollectiblePreferences(state *ReceivedMessageState
 }
 
 func (m *Messenger) HandleSyncAccount(state *ReceivedMessageState, message *protobuf.SyncAccount, statusMessage *messagingtypes.Message) error {
-	acc, err := m.handleSyncWatchOnlyAccount(message)
+	acc, err := syncing.HandleSyncWatchOnlyAccount(m.settings, message, m.config.accountsPublisher)
 	if err != nil {
-		if err == ErrTryingToStoreOldWalletAccount {
+		if err == syncing.ErrTryingToStoreOldWalletAccount {
 			return nil
 		}
 		return err

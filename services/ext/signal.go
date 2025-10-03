@@ -4,9 +4,9 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -157,24 +157,12 @@ func (m *MessengerSignalsHandler) DiscordChannelImportCancelled(id string) {
 	signal.SendDiscordChannelImportCancelled(id)
 }
 
-func (m *MessengerSignalsHandler) SendWakuFetchingBackupProgress(response *wakusync.WakuBackedUpDataResponse) {
-	signal.SendWakuFetchingBackupProgress(response)
+func (m *MessengerSignalsHandler) SendBackedUpProfile(response *backupsync.BackedUpDataResponse) {
+	signal.SendBackedUpProfile(response)
 }
 
-func (m *MessengerSignalsHandler) SendWakuBackedUpProfile(response *wakusync.WakuBackedUpDataResponse) {
-	signal.SendWakuBackedUpProfile(response)
-}
-
-func (m *MessengerSignalsHandler) SendWakuBackedUpSettings(response *wakusync.WakuBackedUpDataResponse) {
-	signal.SendWakuBackedUpSettings(response)
-}
-
-func (m *MessengerSignalsHandler) SendWakuBackedUpKeypair(response *wakusync.WakuBackedUpDataResponse) {
-	signal.SendWakuBackedUpKeypair(response)
-}
-
-func (m *MessengerSignalsHandler) SendWakuBackedUpWatchOnlyAccount(response *wakusync.WakuBackedUpDataResponse) {
-	signal.SendWakuBackedUpWatchOnlyAccount(response)
+func (m *MessengerSignalsHandler) SendBackedUpSettings(response *backupsync.BackedUpDataResponse) {
+	signal.SendBackedUpSettings(response)
 }
 
 func (m *MessengerSignalsHandler) SendCuratedCommunitiesUpdate(response *communities.KnownCommunitiesResponse) {

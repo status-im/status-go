@@ -1,4 +1,4 @@
-package wakusync
+package backupsync
 
 import (
 	"github.com/status-im/status-go/images"
@@ -13,18 +13,18 @@ type BackedUpProfile struct {
 	ProfileShowcasePreferences identity.ProfileShowcasePreferences `json:"profile_showcase_preferences,omitempty"`
 }
 
-func (sfwr *WakuBackedUpDataResponse) SetDisplayName(displayName string) {
+func (sfwr *BackedUpDataResponse) SetDisplayName(displayName string) {
 	sfwr.Profile.DisplayName = displayName
 }
 
-func (sfwr *WakuBackedUpDataResponse) SetImages(images []images.IdentityImage) {
+func (sfwr *BackedUpDataResponse) SetImages(images []images.IdentityImage) {
 	sfwr.Profile.Images = images
 }
 
-func (sfwr *WakuBackedUpDataResponse) SetEnsUsernameDetails(ensUsernameDetails []*ens.UsernameDetail) {
+func (sfwr *BackedUpDataResponse) SetEnsUsernameDetails(ensUsernameDetails []*ens.UsernameDetail) {
 	sfwr.Profile.EnsUsernameDetails = ensUsernameDetails
 }
 
-func (sfwr *WakuBackedUpDataResponse) SetProfileShowcasePreferences(profileShowcasePreferences *identity.ProfileShowcasePreferences) {
+func (sfwr *BackedUpDataResponse) SetProfileShowcasePreferences(profileShowcasePreferences *identity.ProfileShowcasePreferences) {
 	sfwr.Profile.ProfileShowcasePreferences = *profileShowcasePreferences
 }

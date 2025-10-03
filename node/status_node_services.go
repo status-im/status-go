@@ -189,6 +189,7 @@ func (b *StatusNode) accountsService(accDB *accounts.Database, mediaServer *serv
 			b.config,
 			b.accountsPublisher,
 			mediaServer,
+			b.logger.Named("AccountsService"),
 		)
 	}
 
