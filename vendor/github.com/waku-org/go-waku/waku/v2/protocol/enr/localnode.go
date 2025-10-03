@@ -45,11 +45,6 @@ func WithMultiaddress(multiaddrs ...multiaddr.Multiaddr) ENROption {
 		successIdx := -1
 		for i := len(multiaddrs); i > 0; i-- {
 			cpy := localnode.Node().Record() // Record() creates a copy for the current iteration
-			// Copy all the entries that might not have been written in the ENR record due to the
-			// async nature of localnode.Set
-			for _, entry := range localnode.Entries() {
-				cpy.Set(entry)
-			}
 			cpy.Set(enr.WithEntry(MultiaddrENRField, marshalMultiaddress(multiaddrs[0:i])))
 			cpy.SetSeq(localnode.Seq() + 1)
 			err = enode.SignV4(cpy, privk)
