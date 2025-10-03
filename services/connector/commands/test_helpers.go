@@ -9,14 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
-
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network"
 	network_testutil "github.com/status-im/status-go/rpc/network/testutil"
+	mock_chainutils "github.com/status-im/status-go/services/connector/chainutils/mock"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
@@ -50,13 +49,14 @@ func createWalletDB(t *testing.T) (db *sql.DB, close func()) {
 }
 
 type testState struct {
-	ctx       context.Context
-	db        *sql.DB
-	walletDb  *sql.DB
-	cmd       RPCCommand
-	handler   *ClientSideHandler
-	mockCtrl  *gomock.Controller
-	rpcClient *mock_rpcclient.MockClientInterface
+	ctx             context.Context
+	db              *sql.DB
+	walletDb        *sql.DB
+	cmd             RPCCommand
+	handler         *ClientSideHandler
+	mockCtrl        *gomock.Controller
+	ethClientGetter *mock_chainutils.MockEthClientGetter
+	feeManager      *mock_chainutils.MockFeeManager
 }
 
 func setupCommand(t *testing.T, method string) (state testState, close func()) {
@@ -86,7 +86,8 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 	state.handler = NewClientSideHandler(state.db)
 
 	state.mockCtrl = gomock.NewController(t)
-	state.rpcClient = mock_rpcclient.NewMockClientInterface(state.mockCtrl)
+	state.ethClientGetter = mock_chainutils.NewMockEthClientGetter(state.mockCtrl)
+	state.feeManager = mock_chainutils.NewMockFeeManager(state.mockCtrl)
 
 	switch method {
 	case Method_EthAccounts:
@@ -115,9 +116,10 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 		}
 	case Method_EthSendTransaction:
 		state.cmd = &SendTransactionCommand{
-			Db:            state.walletDb,
-			ClientHandler: state.handler,
-			RpcClient:     state.rpcClient,
+			Db:              state.walletDb,
+			ClientHandler:   state.handler,
+			EthClientGetter: state.ethClientGetter,
+			FeeManager:      state.feeManager,
 		}
 	case Method_RequestPermissions:
 		state.cmd = &RequestPermissionsCommand{}

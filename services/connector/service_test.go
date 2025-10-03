@@ -11,7 +11,6 @@ func TestNewService(t *testing.T) {
 	t.Cleanup(closeFn)
 
 	assert.NotNil(t, state.service)
-	assert.Equal(t, state.rpcClient.GetNetworkManager(), state.service.nm)
 }
 
 func TestService_Start(t *testing.T) {
