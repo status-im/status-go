@@ -101,20 +101,10 @@ type bucket struct {
 }
 
 func newTable(t transport, db *enode.DB, bootnodes []*enode.Node, logger *zap.Logger) (*Table, error) {
-	buckets := [nBuckets]*bucket{}
-	for i := range buckets {
-		buckets[i] = &bucket{
-			ips: netutil.DistinctNetSet{Subnet: bucketSubnet, Limit: bucketIPLimit},
-		}
-	}
-	nursery := wrapNodes(bootnodes)
-
 	tab := &Table{
 		mutex:      sync.Mutex{},
-		buckets:    buckets,
-		nursery:    nursery,
-		rand:       mrand.New(mrand.NewSource(time.Now().UnixNano())),
-		ips:        netutil.DistinctNetSet{},
+		rand:       mrand.New(mrand.NewSource(0)),
+		ips:        netutil.DistinctNetSet{Subnet: tableSubnet, Limit: tableIPLimit},
 		log:        logger,
 		db:         db,
 		net:        t,
@@ -125,6 +115,11 @@ func newTable(t transport, db *enode.DB, bootnodes []*enode.Node, logger *zap.Lo
 	}
 	if err := tab.setFallbackNodes(bootnodes); err != nil {
 		return nil, err
+	}
+	for i := range tab.buckets {
+		tab.buckets[i] = &bucket{
+			ips: netutil.DistinctNetSet{Subnet: bucketSubnet, Limit: bucketIPLimit},
+		}
 	}
 	tab.seedRand()
 	tab.loadSeedNodes()
