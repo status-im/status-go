@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/math"
@@ -151,13 +152,16 @@ type Endpoint struct {
 
 // NewEndpoint creates an endpoint.
 func NewEndpoint(addr *net.UDPAddr, tcpPort uint16) Endpoint {
-	ip := net.IP{}
-	if ip4 := addr.IP.To4(); ip4 != nil {
-		ip = ip4
-	} else if ip6 := addr.IP.To16(); ip6 != nil {
-		ip = ip6
+	return Endpoint{
+		IP:  addr.IP,
+		UDP: uint16(addr.Port),
+		TCP: tcpPort,
 	}
-	return Endpoint{IP: ip, UDP: uint16(addr.Port), TCP: tcpPort}
+}
+
+func (ep *Endpoint) UDPAddrPort() netip.AddrPort {
+	addr, _ := netip.AddrFromSlice(ep.IP)
+	return netip.AddrPortFrom(addr, ep.UDP)
 }
 
 type Packet interface {
