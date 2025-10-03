@@ -743,34 +743,6 @@ func (api *PublicAPI) SendPinMessage(ctx context.Context, message *common.PinMes
 	return api.service.messenger.SendPinMessage(ctx, message)
 }
 
-func (api *PublicAPI) RequestTransaction(ctx context.Context, chatID, value, contract, address string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestTransaction(ctx, chatID, value, contract, address)
-}
-
-func (api *PublicAPI) RequestAddressForTransaction(ctx context.Context, chatID, from, value, contract string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAddressForTransaction(ctx, chatID, from, value, contract)
-}
-
-func (api *PublicAPI) DeclineRequestAddressForTransaction(ctx context.Context, messageID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.DeclineRequestAddressForTransaction(ctx, messageID)
-}
-
-func (api *PublicAPI) DeclineRequestTransaction(ctx context.Context, messageID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.DeclineRequestTransaction(ctx, messageID)
-}
-
-func (api *PublicAPI) AcceptRequestAddressForTransaction(ctx context.Context, messageID, address string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.AcceptRequestAddressForTransaction(ctx, messageID, address)
-}
-
-func (api *PublicAPI) SendTransaction(ctx context.Context, chatID, value, contract, transactionHash string, signature types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SendTransaction(ctx, chatID, value, contract, transactionHash, signature)
-}
-
-func (api *PublicAPI) AcceptRequestTransaction(ctx context.Context, transactionHash, messageID string, signature types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.AcceptRequestTransaction(ctx, transactionHash, messageID, signature)
-}
-
 func (api *PublicAPI) SendContactUpdates(ctx context.Context, name, picture string, customizationColor multiaccountscommon.CustomizationColor) error {
 	return api.service.messenger.SendContactUpdates(ctx, name, picture, customizationColor)
 }

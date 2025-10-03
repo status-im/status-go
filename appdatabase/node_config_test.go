@@ -49,10 +49,7 @@ func randomNodeConfig() *params.NodeConfig {
 			PFSEnabled:               randomBool(),
 			InstallationID:           randomString(),
 			MailServerConfirmations:  randomBool(),
-			VerifyTransactionURL:     randomString(),
-			VerifyENSURL:             randomString(),
 			VerifyENSContractAddress: randomString(),
-			VerifyTransactionChainID: int64(randomInt(math.MaxInt64)),
 			BandwidthStatsEnabled:    randomBool(),
 		},
 		WakuV2Config: params.WakuV2Config{

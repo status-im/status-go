@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS messenger_transactions_to_validate;

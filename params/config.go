@@ -288,10 +288,6 @@ type ShhextConfig struct {
 	// DatasyncEnabled indicates whether we should enable dataasync
 	DataSyncEnabled bool
 
-	// VerifyTransactionURL is the URL for verifying transactions.
-	// IMPORTANT: It should always be mainnet unless used for testing
-	VerifyTransactionURL string
-
 	// VerifyENSURL is the URL for verifying ens names.
 	// IMPORTANT: It should always be mainnet unless used for testing
 	VerifyENSURL string
@@ -299,8 +295,6 @@ type ShhextConfig struct {
 	// VerifyENSContractAddress is the address of the contract used to verify ENS
 	// No default is provided and if not set ENS resolution is disabled
 	VerifyENSContractAddress string
-
-	VerifyTransactionChainID int64
 
 	// PushNotificationsServers is the default-status run push notification servers
 	PushNotificationsServers []*ecdsa.PublicKey

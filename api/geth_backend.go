@@ -638,9 +638,6 @@ func (b *GethStatusBackend) convertLoginRequestToAccountRequest(loginRequest *re
 	createAccount.WakuV2LightClient = loginRequest.WakuV2LightClient
 	createAccount.WakuV2EnableMissingMessageVerification = loginRequest.WakuV2EnableMissingMessageVerification
 	createAccount.WakuV2EnableStoreConfirmationForMessagesSent = loginRequest.WakuV2EnableStoreConfirmationForMessagesSent
-	createAccount.VerifyTransactionURL = loginRequest.VerifyTransactionURL
-	createAccount.VerifyENSURL = loginRequest.VerifyENSURL
-	createAccount.VerifyTransactionChainID = loginRequest.VerifyTransactionChainID
 	createAccount.VerifyENSContractAddress = loginRequest.VerifyENSContractAddress
 	return createAccount
 }

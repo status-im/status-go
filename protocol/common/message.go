@@ -52,18 +52,6 @@ type QuotedMessage struct {
 	BridgeMessage  *protobuf.BridgeMessage  `json:"bridgeMessage,omitempty"`
 }
 
-type CommandState int
-
-const (
-	CommandStateRequestAddressForTransaction CommandState = iota + 1
-	CommandStateRequestAddressForTransactionDeclined
-	CommandStateRequestAddressForTransactionAccepted
-	CommandStateRequestTransaction
-	CommandStateRequestTransactionDeclined
-	CommandStateTransactionPending
-	CommandStateTransactionSent
-)
-
 type ContactRequestState int
 
 const (
@@ -85,34 +73,10 @@ const (
 
 const EveryoneMentionTag = "0x00001"
 
-type CommandParameters struct {
-	// ID is the ID of the initial message
-	ID string `json:"id"`
-	// From is the address we are sending the command from
-	From string `json:"from"`
-	// Address is the address sent with the command
-	Address string `json:"address"`
-	// Contract is the contract address for ERC20 tokens
-	Contract string `json:"contract"`
-	// Value is the value as a string sent
-	Value string `json:"value"`
-	// TransactionHash is the hash of the transaction
-	TransactionHash string `json:"transactionHash"`
-	// CommandState is the state of the command
-	CommandState CommandState `json:"commandState"`
-	// The Signature of the pk-bytes+transaction-hash from the wallet
-	// address originating
-	Signature []byte `json:"signature"`
-}
-
 // GapParameters is the From and To indicating the missing period in chat history
 type GapParameters struct {
 	From uint32 `json:"from,omitempty"`
 	To   uint32 `json:"to,omitempty"`
-}
-
-func (c *CommandParameters) IsTokenTransfer() bool {
-	return len(c.Contract) != 0
 }
 
 const (
@@ -147,9 +111,6 @@ type Message struct {
 	OutgoingStatus string `json:"outgoingStatus,omitempty"`
 
 	QuotedMessage *QuotedMessage `json:"quotedMessage"`
-
-	// CommandParameters is the parameters sent with the message
-	CommandParameters *CommandParameters `json:"commandParameters"`
 
 	// GapParameters is the value from/to related to the gap
 	GapParameters *GapParameters `json:"gapParameters,omitempty"`
@@ -264,7 +225,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		AudioDurationMs          uint64                           `json:"audioDurationMs,omitempty"`
 		CommunityID              string                           `json:"communityId,omitempty"`
 		Sticker                  *StickerAlias                    `json:"sticker,omitempty"`
-		CommandParameters        *CommandParameters               `json:"commandParameters,omitempty"`
 		GapParameters            *GapParameters                   `json:"gapParameters,omitempty"`
 		Timestamp                uint64                           `json:"timestamp"`
 		ContentType              protobuf.ChatMessage_ContentType `json:"contentType"`
@@ -318,7 +278,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		LinkPreviews:             m.LinkPreviews,
 		StatusLinkPreviews:       m.StatusLinkPreviews,
 		MessageType:              m.MessageType,
-		CommandParameters:        m.CommandParameters,
 		GapParameters:            m.GapParameters,
 		EditedAt:                 m.EditedAt,
 		Deleted:                  m.Deleted,

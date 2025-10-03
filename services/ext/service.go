@@ -1,7 +1,6 @@
 package ext
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"database/sql"
 	"fmt"
@@ -15,11 +14,8 @@ import (
 
 	commongethtypes "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/node"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-
-	"github.com/status-im/go-wallet-sdk/pkg/ethclient"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/api/multiformat"
@@ -27,7 +23,6 @@ import (
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/messaging"
@@ -234,7 +229,6 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 		return nil, err
 	}
 	s.messenger.StartRetrieveMessagesLoop(time.Second, s.cancelMessenger)
-	go s.verifyTransactionLoop(30*time.Second, s.cancelMessenger)
 
 	if s.config.ShhextConfig.BandwidthStatsEnabled {
 		go s.retrieveStats(5*time.Second, s.cancelMessenger)
@@ -254,112 +248,6 @@ func (s *Service) retrieveStats(tick time.Duration, cancel <-chan struct{}) {
 			response := s.messenger.GetStats()
 			PublisherSignalHandler{}.Stats(response)
 		case <-cancel:
-			return
-		}
-	}
-}
-
-type verifyTransactionClient struct {
-	chainID *big.Int
-	url     string
-}
-
-func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash types.Hash) (coretypes.Message, coretypes.TransactionStatus, error) {
-	signer := gethtypes.NewLondonSigner(c.chainID)
-
-	rpcClient, err := gethrpc.DialContext(ctx, c.url)
-	if err != nil {
-		return coretypes.Message{}, coretypes.TransactionStatusPending, err
-	}
-	client := ethclient.NewClient(rpcClient)
-
-	transaction, pending, err := client.TransactionByHash(ctx, commongethtypes.BytesToHash(hash.Bytes()))
-	if err != nil {
-		return coretypes.Message{}, coretypes.TransactionStatusPending, err
-	}
-
-	message, err := transaction.AsMessage(signer, nil)
-	if err != nil {
-		return coretypes.Message{}, coretypes.TransactionStatusPending, err
-	}
-	from := types.BytesToAddress(message.From().Bytes())
-	to := types.BytesToAddress(message.To().Bytes())
-
-	if pending {
-		return coretypes.NewMessage(
-			from,
-			&to,
-			message.Nonce(),
-			message.Value(),
-			message.Gas(),
-			message.GasPrice(),
-			message.Data(),
-			message.CheckNonce(),
-		), coretypes.TransactionStatusPending, nil
-	}
-
-	receipt, err := client.TransactionReceipt(ctx, commongethtypes.BytesToHash(hash.Bytes()))
-	if err != nil {
-		return coretypes.Message{}, coretypes.TransactionStatusPending, err
-	}
-
-	coremessage := coretypes.NewMessage(
-		from,
-		&to,
-		message.Nonce(),
-		message.Value(),
-		message.Gas(),
-		message.GasPrice(),
-		message.Data(),
-		message.CheckNonce(),
-	)
-
-	// Token transfer, check the logs
-	if len(coremessage.Data()) != 0 {
-		if w_common.IsTokenTransfer(receipt.Logs) {
-			return coremessage, coretypes.TransactionStatus(receipt.Status), nil
-		}
-		return coremessage, coretypes.TransactionStatusFailed, nil
-	}
-
-	return coremessage, coretypes.TransactionStatus(receipt.Status), nil
-}
-
-func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct{}) {
-	defer gocommon.LogOnPanic()
-	if s.config.ShhextConfig.VerifyTransactionURL == "" {
-		s.logger.Warn("not starting transaction loop")
-		return
-	}
-
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
-	ctx, cancelVerifyTransaction := context.WithCancel(context.Background())
-
-	for {
-		select {
-		case <-ticker.C:
-			activeAccounts, err := s.accountsDB.GetActiveAccounts()
-			if err != nil {
-				s.logger.Error("failed to retrieve accounts", zap.Error(err))
-			}
-			var wallets []types.Address
-			for _, account := range activeAccounts {
-				if account.IsWalletNonWatchOnlyAccount() {
-					wallets = append(wallets, types.BytesToAddress(account.Address.Bytes()))
-				}
-			}
-
-			response, err := s.messenger.ValidateTransactions(ctx, wallets)
-			if err != nil {
-				s.logger.Error("failed to validate transactions", zap.Error(err))
-				continue
-			}
-			s.messenger.PublishMessengerResponse(response)
-
-		case <-cancel:
-			cancelVerifyTransaction()
 			return
 		}
 	}
@@ -485,14 +373,6 @@ func buildMessengerOptions(
 		AllowFromContactsOnly:      settings.PushNotificationsFromContactsOnly,
 		RemoteNotificationsEnabled: settings.RemotePushNotificationsEnabled,
 	}))
-
-	if config.ShhextConfig.VerifyTransactionURL != "" {
-		client := &verifyTransactionClient{
-			url:     config.ShhextConfig.VerifyTransactionURL,
-			chainID: big.NewInt(config.ShhextConfig.VerifyTransactionChainID),
-		}
-		options = append(options, protocol.WithVerifyTransactionClient(client))
-	}
 
 	return options, nil
 }

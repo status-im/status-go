@@ -59,10 +59,7 @@ type CreateAccount struct {
 
 	PreviewPrivacy bool `json:"previewPrivacy"`
 
-	VerifyTransactionURL     *string `json:"verifyTransactionURL"`
-	VerifyENSURL             *string `json:"verifyENSURL"`
 	VerifyENSContractAddress *string `json:"verifyENSContractAddress"`
-	VerifyTransactionChainID *int64  `json:"verifyTransactionChainID"`
 	UpstreamConfig           string  `json:"upstreamConfig"`
 
 	// Deprecated: CurrentNetwork is deprecated. It was passed and not used, so nothing should be passed instead.
