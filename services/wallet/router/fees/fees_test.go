@@ -4,15 +4,11 @@ import (
 	"context"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"go.uber.org/mock/gomock"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/trie"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -177,27 +173,6 @@ func TestSuggestedFeesForNotEIP1559CompatibleChains(t *testing.T) {
 	t.Skip("Broken by PR-6882, must fix")
 	state := setupTest(t)
 
-	blockToReturn := types.NewBlock(&types.Header{
-		Number: big.NewInt(10),
-		Time:   uint64(time.Now().Unix()),
-	},
-		[]*types.Transaction{
-			types.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(1), nil),
-			types.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(2), nil),
-			types.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(3), nil),
-			types.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(4), nil),
-			types.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(5), nil),
-			types.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(6), nil),
-			types.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(7), nil),
-			types.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(8), nil),
-			types.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(9), nil),
-			types.NewTransaction(0, common.HexToAddress(""), big.NewInt(1), 100000, big.NewInt(10), nil),
-		},
-		nil,
-		nil,
-		trie.NewStackTrie(nil),
-	)
-
 	chainID := uint64(1)
 	gasPrice := big.NewInt(1)
 	feeHistory := &FeeHistory{}
@@ -206,14 +181,6 @@ func TestSuggestedFeesForNotEIP1559CompatibleChains(t *testing.T) {
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
 	state.rpcClient.EXPECT().EthClient(chainID).Times(2).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(gasPrice, nil)
-
-	const blocksToCheck = 5
-	blockNumber := uint64(10)
-	mockedChainClient.EXPECT().BlockNumber(state.ctx).Times(1).Return(blockNumber, nil)
-	for i := uint64(0); i < uint64(blocksToCheck); i++ {
-		blockNum := big.NewInt(0).SetUint64(blockNumber - i)
-		mockedChainClient.EXPECT().BlockByNumber(state.ctx, blockNum).Times(1).Return(blockToReturn, nil)
-	}
 
 	suggestedFees, noBaseFee, noPriorityFee, err := state.feeManager.SuggestedFees(context.Background(), chainID, walletCommon.ZeroAddress())
 	assert.NoError(t, err)

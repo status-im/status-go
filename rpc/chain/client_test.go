@@ -10,7 +10,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+
+	sdkethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
 
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	mock_ethclient "github.com/status-im/status-go/rpc/chain/ethclient/mock/client/ethclient"
@@ -54,34 +55,34 @@ func TestClient_Fallbacks(t *testing.T) {
 
 	ctx := context.Background()
 	hash := common.HexToHash("0x1234")
-	block := &types.Block{}
+	block := &sdkethclient.BlockWithTxHashes{}
 
 	// Expect the first client to be called, others should not be called, should succeed
-	ethClients[0].EXPECT().BlockByHash(ctx, hash).Return(block, nil).Times(1)
-	ethClients[1].EXPECT().BlockByHash(ctx, hash).Return(nil, nil).Times(0)
-	ethClients[2].EXPECT().BlockByHash(ctx, hash).Return(nil, nil).Times(0)
-	_, err := client.BlockByHash(ctx, hash)
+	ethClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(block, nil).Times(1)
+	ethClients[1].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, nil).Times(0)
+	ethClients[2].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, nil).Times(0)
+	_, err := client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.NoError(t, err)
 
 	// Expect the first and second client to be called, others should not be called, should succeed
-	ethClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("some error")).Times(1)
-	ethClients[1].EXPECT().BlockByHash(ctx, hash).Return(block, nil).Times(1)
-	ethClients[2].EXPECT().BlockByHash(ctx, hash).Return(nil, nil).Times(0)
-	_, err = client.BlockByHash(ctx, hash)
+	ethClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("some error")).Times(1)
+	ethClients[1].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(block, nil).Times(1)
+	ethClients[2].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, nil).Times(0)
+	_, err = client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.NoError(t, err)
 
 	// Expect the all client to be called, should succeed
-	ethClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("some error")).Times(1)
-	ethClients[1].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("some other error")).Times(1)
-	ethClients[2].EXPECT().BlockByHash(ctx, hash).Return(block, nil).Times(1)
-	_, err = client.BlockByHash(ctx, hash)
+	ethClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("some error")).Times(1)
+	ethClients[1].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("some other error")).Times(1)
+	ethClients[2].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(block, nil).Times(1)
+	_, err = client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.NoError(t, err)
 
 	// Expect the all client to be called, should fail
-	ethClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("some error")).Times(1)
-	ethClients[1].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("some other error")).Times(1)
-	ethClients[2].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("some other other error")).Times(1)
-	_, err = client.BlockByHash(ctx, hash)
+	ethClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("some error")).Times(1)
+	ethClients[1].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("some other error")).Times(1)
+	ethClients[2].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("some other other error")).Times(1)
+	_, err = client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.Error(t, err)
 }
 
@@ -243,8 +244,8 @@ func TestClientWithFallback_CloseStopsMultipleOperations(t *testing.T) {
 		}).Times(1)
 
 	// Set up the mock responses for operation 3
-	ethClients[0].EXPECT().BlockByHash(ctx, hash).DoAndReturn(
-		func(ctx context.Context, hash common.Hash) (*types.Block, error) {
+	ethClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).DoAndReturn(
+		func(ctx context.Context, hash common.Hash) (*sdkethclient.BlockWithTxHashes, error) {
 			err := createOperationHandler(operation3Started)(ctx)
 			return nil, err
 		}).Times(1)
@@ -273,7 +274,7 @@ func TestClientWithFallback_CloseStopsMultipleOperations(t *testing.T) {
 	// Start operation 3 in a goroutine
 	go func() {
 		defer close(operation3Done)
-		_, err := client.BlockByHash(ctx, hash)
+		_, err := client.EthGetBlockByHashWithTxHashes(ctx, hash)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "context canceled")
 	}()

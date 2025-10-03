@@ -25,9 +25,10 @@ func NewAPI(s *Service) *API {
 
 	// Transactions and signing
 	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{
-		RpcClient:     s.rpc,
-		Db:            s.db,
-		ClientHandler: c,
+		EthClientGetter: s.ethClientGetter,
+		FeeManager:      s.feeManager,
+		Db:              s.db,
+		ClientHandler:   c,
 	})
 	r.Register("personal_sign", &commands.SignCommand{
 		Db:            s.db,
@@ -80,7 +81,7 @@ func (api *API) forwardRPC(ctx context.Context, URL string, request commands.RPC
 		return "", commands.ErrDAppIsNotPermittedByUser
 	}
 
-	rpcClient, err := api.s.rpc.EthClient(dApp.ChainID)
+	rpcClient, err := api.s.ethClientGetter.EthClient(dApp.ChainID)
 	if err != nil {
 		return "", err
 	}
