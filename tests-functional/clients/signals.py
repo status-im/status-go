@@ -144,8 +144,12 @@ class SignalClient:
                 break
             remaining_time = int(timeout - elapsed_time)
             signal = self.wait_for_signal(signal_type, remaining_time)
-            if predicate(signal):
-                return signal
+            try:
+                if predicate(signal):
+                    return signal
+            except Exception as ex:
+                logging.warning(f"Could not filter signal by predicate because of error: {str(ex)}")
+                continue
         raise TimeoutError(f"Signal {signal_type} satisfying the predicate is not received in {timeout} seconds")
 
     def wait_for_logout(self):
