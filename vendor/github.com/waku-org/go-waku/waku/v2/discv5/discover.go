@@ -13,12 +13,13 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-discover/discover"
+	"go.uber.org/zap"
+
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/peerstore"
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/service"
 	"github.com/waku-org/go-waku/waku/v2/utils"
-	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
@@ -142,11 +143,9 @@ func NewDiscoveryV5(priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConn
 		localnode:              localnode,
 		metrics:                newMetrics(reg),
 		config: discover.Config{
-			PrivateKey: priv,
-			Bootnodes:  bootnodes,
-			V5Config: discover.V5Config{
-				ProtocolID: &protocolID,
-			},
+			PrivateKey:   priv,
+			Bootnodes:    bootnodes,
+			V5ProtocolID: &protocolID,
 		},
 		udpAddr: &net.UDPAddr{
 			IP:   net.IPv4zero,
