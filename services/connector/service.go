@@ -13,8 +13,8 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/services/connector/chainutils"
 )
 
 const serviceName = "connector"
@@ -24,23 +24,31 @@ type Config struct {
 	WSPort int
 }
 
-func NewService(logger *zap.Logger, db *sql.DB, rpc rpc.ClientInterface, nm *network.Manager, config *Config) *Service {
+func NewService(
+	logger *zap.Logger,
+	db *sql.DB,
+	ethClientGetter chainutils.EthClientGetter,
+	feeManager chainutils.FeeManager,
+	nm *network.Manager,
+	config *Config) *Service {
 	s := &Service{
-		logger: logger,
-		db:     db,
-		rpc:    rpc,
-		nm:     nm,
-		config: config,
+		logger:          logger,
+		db:              db,
+		ethClientGetter: ethClientGetter,
+		feeManager:      feeManager,
+		nm:              nm,
+		config:          config,
 	}
 	s.api = NewAPI(s)
 	return s
 }
 
 type Service struct {
-	logger *zap.Logger
-	db     *sql.DB
-	rpc    rpc.ClientInterface
-	nm     *network.Manager
+	logger          *zap.Logger
+	db              *sql.DB
+	ethClientGetter chainutils.EthClientGetter
+	feeManager      chainutils.FeeManager
+	nm              *network.Manager
 
 	// api stores a single API, to have the single *commands.ClientSideHandler instance.
 	// This is more of a workaround and should be refactored together with the services refactoring.

@@ -1,5 +1,7 @@
 package commands
 
+//go:generate go tool mockgen -source=send_transaction.go -destination=mock/send_transaction.go -package=mock_commands
+
 import (
 	"context"
 	"database/sql"
@@ -10,7 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -24,9 +26,10 @@ var (
 )
 
 type SendTransactionCommand struct {
-	RpcClient     rpc.ClientInterface
-	Db            *sql.DB
-	ClientHandler ClientSideHandlerInterface
+	EthClientGetter chainutils.EthClientGetter
+	FeeManager      chainutils.FeeManager
+	Db              *sql.DB
+	ClientHandler   ClientSideHandlerInterface
 }
 
 func (r *RPCRequest) getSendTransactionParams() (*wallettypes.SendTxArgs, error) {
@@ -86,10 +89,7 @@ func (c *SendTransactionCommand) Execute(ctx context.Context, request RPCRequest
 	}
 
 	if params.GasPrice == nil || (params.MaxFeePerGas == nil && params.MaxPriorityFeePerGas == nil) {
-		feeManager := &fees.FeeManager{
-			RPCClient: c.RpcClient,
-		}
-		fetchedFees, _, _, err := feeManager.SuggestedFees(ctx, dApp.ChainID, common.Address(dApp.SharedAccount))
+		fetchedFees, _, _, err := c.FeeManager.SuggestedFees(ctx, dApp.ChainID, common.Address(dApp.SharedAccount))
 		if err != nil {
 			return "", err
 		}
@@ -107,7 +107,7 @@ func (c *SendTransactionCommand) Execute(ctx context.Context, request RPCRequest
 	}
 
 	if params.Nonce == nil {
-		ethClient, err := c.RpcClient.EthClient(dApp.ChainID)
+		ethClient, err := c.EthClientGetter.EthClient(dApp.ChainID)
 		if err != nil {
 			return "", err
 		}

@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	sdkethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
+
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	mockEthclient "github.com/status-im/status-go/rpc/chain/ethclient/mock/client/ethclient"
@@ -16,7 +18,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 
 	"go.uber.org/mock/gomock"
 
@@ -78,13 +79,13 @@ func (s *BlockchainHealthSuite) simulateChainStatus(chainID uint64, up bool) {
 	hash := common.HexToHash("0x1234")
 
 	if up {
-		block := &types.Block{}
-		mockEthClient.EXPECT().BlockByHash(ctx, hash).Return(block, nil).Times(1)
-		_, err := client.BlockByHash(ctx, hash)
+		block := &sdkethclient.BlockWithTxHashes{}
+		mockEthClient.EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(block, nil).Times(1)
+		_, err := client.EthGetBlockByHashWithTxHashes(ctx, hash)
 		require.NoError(s.T(), err)
 	} else {
-		mockEthClient.EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
-		_, err := client.BlockByHash(ctx, hash)
+		mockEthClient.EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
+		_, err := client.EthGetBlockByHashWithTxHashes(ctx, hash)
 		require.Error(s.T(), err)
 	}
 }
