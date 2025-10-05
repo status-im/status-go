@@ -15,6 +15,7 @@ class TestMigrateNonProfileKeycardKeypairToApp:
         add_resp = self.account.accounts_service.add_keypair_via_seed_phrase(
             user_1.passphrase, self.account.password, keypair_name, wallet_account_details_derivation
         )
+        self.account.accounts_service.migrate_non_profile_keycard_keypair_to_app
         assert "error" not in add_resp
         add_result = add_resp
         assert add_result is not None
