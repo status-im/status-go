@@ -17,7 +17,7 @@
 // Package keystore implements encrypted storage of secp256k1 private keys.
 //
 // Keys are stored as encrypted JSON files according to the Web3 Secret Storage specification.
-// See https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition for more information.
+// See https://ethereum.org/en/developers/docs/data-structures-and-encoding/web3-secret-storage/ for more information.
 package keystore
 
 import (
@@ -37,8 +37,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/google/uuid"
-	"github.com/status-im/extkeys"
 )
 
 var (
@@ -52,7 +50,7 @@ var (
 )
 
 // KeyStoreType is the reflect type of a keystore backend.
-var KeyStoreType = reflect.TypeOf(&KeyStore{})
+var KeyStoreType = reflect.TypeFor[*KeyStore]()
 
 // KeyStoreScheme is the protocol scheme prefixing account and wallet URLs.
 const KeyStoreScheme = "keystore"
@@ -85,15 +83,6 @@ type unlocked struct {
 func NewKeyStore(keydir string, scryptN, scryptP int) *KeyStore {
 	keydir, _ = filepath.Abs(keydir)
 	ks := &KeyStore{storage: &keyStorePassphrase{keydir, scryptN, scryptP, false}}
-	ks.init(keydir)
-	return ks
-}
-
-// NewPlaintextKeyStore creates a keystore for the given directory.
-// Deprecated: Use NewKeyStore.
-func NewPlaintextKeyStore(keydir string) *KeyStore {
-	keydir, _ = filepath.Abs(keydir)
-	ks := &KeyStore{storage: &keyStorePlain{keydir}}
 	ks.init(keydir)
 	return ks
 }
@@ -236,11 +225,6 @@ func (ks *KeyStore) Accounts() []accounts.Account {
 	return ks.cache.accounts()
 }
 
-// AccountDecryptedKey returns decrypted key for account (provided that password is correct).
-func (ks *KeyStore) AccountDecryptedKey(a accounts.Account, auth string) (accounts.Account, *Key, error) {
-	return ks.getDecryptedKey(a, auth)
-}
-
 // Delete deletes the key matched by account if the passphrase is correct.
 // If the account contains no filename, the address must match a unique key.
 func (ks *KeyStore) Delete(a accounts.Account, passphrase string) error {
@@ -328,11 +312,10 @@ func (ks *KeyStore) Unlock(a accounts.Account, passphrase string) error {
 // Lock removes the private key with the given address from memory.
 func (ks *KeyStore) Lock(addr common.Address) error {
 	ks.mu.Lock()
-	if unl, found := ks.unlocked[addr]; found {
-		ks.mu.Unlock()
+	unl, found := ks.unlocked[addr]
+	ks.mu.Unlock()
+	if found {
 		ks.expire(addr, unl, time.Duration(0)*time.Nanosecond)
-	} else {
-		ks.mu.Unlock()
 	}
 	return nil
 }
@@ -467,68 +450,10 @@ func (ks *KeyStore) ImportECDSA(priv *ecdsa.PrivateKey, passphrase string) (acco
 
 	key := newKeyFromECDSA(priv)
 	if ks.cache.hasAddress(key.Address) {
-		return accounts.Account{}, ErrAccountAlreadyExists
-	}
-	return ks.importKey(key, passphrase)
-}
-
-// ImportSingleExtendedKey imports an extended key setting it in both the PrivateKey and ExtendedKey fields
-// of the Key struct.
-// ImportExtendedKey is used in older version of Status where PrivateKey is set to be the BIP44 key at index 0,
-// and ExtendedKey is the extended key of the BIP44 key at index 1.
-func (ks *KeyStore) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphrase string) (accounts.Account, error) {
-	privateKeyECDSA := extKey.ToECDSA()
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return accounts.Account{}, err
-	}
-	key := &Key{
-		Id:          id,
-		Address:     crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
-		PrivateKey:  privateKeyECDSA,
-		ExtendedKey: extKey,
-	}
-
-	if ks.cache.hasAddress(key.Address) {
-		return accounts.Account{}, ErrAccountAlreadyExists
-	}
-
-	return ks.importKey(key, passphrase)
-}
-
-// ImportExtendedKey stores ECDSA key (obtained from extended key) along with CKD#2 (root for sub-accounts)
-// If key file is not found, it is created. Key is encrypted with the given passphrase.
-// Deprecated: status-go is now using ImportSingleExtendedKey
-func (ks *KeyStore) ImportExtendedKey(extKey *extkeys.ExtendedKey, passphrase string) (accounts.Account, error) {
-	return ks.ImportExtendedKeyForPurpose(extkeys.KeyPurposeWallet, extKey, passphrase)
-}
-
-// ImportExtendedKeyForPurpose stores ECDSA key (obtained from extended key) along with CKD#2 (root for sub-accounts)
-// If key file is not found, it is created. Key is encrypted with the given passphrase.
-// Deprecated: status-go is now using ImportSingleExtendedKey
-func (ks *KeyStore) ImportExtendedKeyForPurpose(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, passphrase string) (accounts.Account, error) {
-	key, err := newKeyForPurposeFromExtendedKey(keyPurpose, extKey)
-	if err != nil {
-		zeroKey(key.PrivateKey)
-		return accounts.Account{}, err
-	}
-
-	// if account is already imported, return cached version
-	if ks.cache.hasAddress(key.Address) {
-		a := accounts.Account{
+		return accounts.Account{
 			Address: key.Address,
-		}
-		ks.cache.maybeReload()
-		ks.cache.mu.Lock()
-		a, err := ks.cache.find(a)
-		ks.cache.mu.Unlock()
-		if err != nil {
-			zeroKey(key.PrivateKey)
-			return a, err
-		}
-		return a, nil
+		}, ErrAccountAlreadyExists
 	}
-
 	return ks.importKey(key, passphrase)
 }
 
@@ -540,15 +465,6 @@ func (ks *KeyStore) importKey(key *Key, passphrase string) (accounts.Account, er
 	ks.cache.add(a)
 	ks.refreshWallets()
 	return a, nil
-}
-
-func (ks *KeyStore) IncSubAccountIndex(a accounts.Account, passphrase string) error {
-	a, key, err := ks.getDecryptedKey(a, passphrase)
-	if err != nil {
-		return err
-	}
-	key.SubAccountIndex++
-	return ks.storage.StoreKey(a.URL.Path, key, passphrase)
 }
 
 // Update changes the passphrase of an existing account.
@@ -582,12 +498,6 @@ func (ks *KeyStore) isUpdating() bool {
 
 // zeroKey zeroes a private key in memory.
 func zeroKey(k *ecdsa.PrivateKey) {
-	if k == nil {
-		return
-	}
-
 	b := k.D.Bits()
-	for i := range b {
-		b[i] = 0
-	}
+	clear(b)
 }

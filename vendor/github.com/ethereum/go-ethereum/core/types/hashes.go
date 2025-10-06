@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	// EmptyRootHash is the known root hash of an empty trie.
+	// EmptyRootHash is the known root hash of an empty merkle trie.
 	EmptyRootHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
 	// EmptyUncleHash is the known hash of the empty uncle set.
@@ -39,4 +39,13 @@ var (
 
 	// EmptyWithdrawalsHash is the known hash of the empty withdrawal set.
 	EmptyWithdrawalsHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+
+	// EmptyRequestsHash is the known hash of an empty request set, sha256("").
+	EmptyRequestsHash = common.HexToHash("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+
+	// EmptyVerkleHash is the known hash of an empty verkle trie.
+	EmptyVerkleHash = common.Hash{}
+
+	// EmptyBinaryHash is the known hash of an empty binary trie.
+	EmptyBinaryHash = common.Hash{}
 )
