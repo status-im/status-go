@@ -81,7 +81,7 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 	assert.Equal(t, expectedResponse, response)
 
 	// Check dApp in the database
-	dApp, err := persistence.SelectDAppByUrlAndClientID(state.walletDb, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(state.walletDb, request.URL, request.ClientID)
 	assert.NoError(t, err)
 	assert.Equal(t, request.Name, dApp.Name)
 	assert.Equal(t, request.IconURL, dApp.IconURL)

@@ -52,7 +52,7 @@ func TestRecallDAppPermission(t *testing.T) {
 	err := persistence.UpsertDApp(db, &dapp)
 	assert.NoError(t, err)
 
-	persistedDapp, err := persistence.SelectDAppByUrlAndClientID(db, dapp.URL, dapp.ClientID)
+	persistedDapp, err := persistence.SelectDApp(db, dapp.URL, dapp.ClientID)
 	assert.Equal(t, persistedDapp, &dapp)
 	assert.NoError(t, err)
 
@@ -66,7 +66,7 @@ func TestRecallDAppPermission(t *testing.T) {
 	err = clientHandler.RecallDAppPermissions(RecallDAppPermissionsArgs{URL: dapp.URL, ClientID: dapp.ClientID})
 	assert.ErrorIs(t, err, ErrDAppDoesNotHavePermissions)
 
-	recalledDapp, err := persistence.SelectDAppByUrlAndClientID(db, dapp.URL, dapp.ClientID)
+	recalledDapp, err := persistence.SelectDApp(db, dapp.URL, dapp.ClientID)
 
 	assert.Equal(t, recalledDapp, (*persistence.DApp)(nil))
 	assert.NoError(t, err)

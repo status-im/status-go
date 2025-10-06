@@ -36,7 +36,7 @@ func TestInsertAndSelectDApp(t *testing.T) {
 	err := UpsertDApp(db, &testDApp)
 	require.NoError(t, err)
 
-	dAppBack, err := SelectDAppByUrlAndClientID(db, testDApp.URL, testDApp.ClientID)
+	dAppBack, err := SelectDApp(db, testDApp.URL, testDApp.ClientID)
 	require.NoError(t, err)
 	require.Equal(t, &testDApp, dAppBack)
 }
@@ -58,7 +58,7 @@ func TestInsertAndUpdateDApp(t *testing.T) {
 	err = UpsertDApp(db, &updatedDApp)
 	require.NoError(t, err)
 
-	dAppBack, err := SelectDAppByUrlAndClientID(db, testDApp.URL, testDApp.ClientID)
+	dAppBack, err := SelectDApp(db, testDApp.URL, testDApp.ClientID)
 	require.NoError(t, err)
 	require.Equal(t, &updatedDApp, dAppBack)
 	require.NotEqual(t, &testDApp, dAppBack)
@@ -71,14 +71,14 @@ func TestInsertAndRemoveDApp(t *testing.T) {
 	err := UpsertDApp(db, &testDApp)
 	require.NoError(t, err)
 
-	dAppBack, err := SelectDAppByUrlAndClientID(db, testDApp.URL, testDApp.ClientID)
+	dAppBack, err := SelectDApp(db, testDApp.URL, testDApp.ClientID)
 	require.NoError(t, err)
 	require.Equal(t, &testDApp, dAppBack)
 
 	err = DeleteDApp(db, testDApp.URL, testDApp.ClientID)
 	require.NoError(t, err)
 
-	dAppBack, err = SelectDAppByUrlAndClientID(db, testDApp.URL, testDApp.ClientID)
+	dAppBack, err = SelectDApp(db, testDApp.URL, testDApp.ClientID)
 	require.NoError(t, err)
 	require.Empty(t, dAppBack)
 }
@@ -124,11 +124,11 @@ func TestMultipleClientsWithSameURL(t *testing.T) {
 	err = UpsertDApp(db, &dApp2)
 	require.NoError(t, err)
 
-	retrievedDApp1, err := SelectDAppByUrlAndClientID(db, dApp1.URL, dApp1.ClientID)
+	retrievedDApp1, err := SelectDApp(db, dApp1.URL, dApp1.ClientID)
 	require.NoError(t, err)
 	require.Equal(t, &dApp1, retrievedDApp1)
 
-	retrievedDApp2, err := SelectDAppByUrlAndClientID(db, dApp2.URL, dApp2.ClientID)
+	retrievedDApp2, err := SelectDApp(db, dApp2.URL, dApp2.ClientID)
 	require.NoError(t, err)
 	require.Equal(t, &dApp2, retrievedDApp2)
 
@@ -184,12 +184,12 @@ func TestDeleteSpecificClient(t *testing.T) {
 	err = DeleteDApp(db, dApp1.URL, dApp1.ClientID)
 	require.NoError(t, err)
 
-	deletedDApp1, err := SelectDAppByUrlAndClientID(db, dApp1.URL, dApp1.ClientID)
+	deletedDApp1, err := SelectDApp(db, dApp1.URL, dApp1.ClientID)
 	require.NoError(t, err)
 	require.Nil(t, deletedDApp1)
 
 	// Verify client2 still exists
-	stillExistsDApp2, err := SelectDAppByUrlAndClientID(db, dApp2.URL, dApp2.ClientID)
+	stillExistsDApp2, err := SelectDApp(db, dApp2.URL, dApp2.ClientID)
 	require.NoError(t, err)
 	require.Equal(t, &dApp2, stillExistsDApp2)
 }
@@ -221,11 +221,11 @@ func TestBackwardCompatibilityEmptyClientID(t *testing.T) {
 	err = UpsertDApp(db, &newDApp)
 	require.NoError(t, err)
 
-	retrievedOldDApp, err := SelectDAppByUrlAndClientID(db, oldDApp.URL, "")
+	retrievedOldDApp, err := SelectDApp(db, oldDApp.URL, "")
 	require.NoError(t, err)
 	require.Equal(t, &oldDApp, retrievedOldDApp)
 
-	retrievedNewDApp, err := SelectDAppByUrlAndClientID(db, newDApp.URL, newDApp.ClientID)
+	retrievedNewDApp, err := SelectDApp(db, newDApp.URL, newDApp.ClientID)
 	require.NoError(t, err)
 	require.Equal(t, &newDApp, retrievedNewDApp)
 
@@ -233,12 +233,12 @@ func TestBackwardCompatibilityEmptyClientID(t *testing.T) {
 	err = DeleteDApp(db, oldDApp.URL, "")
 	require.NoError(t, err)
 
-	deletedOldDApp, err := SelectDAppByUrlAndClientID(db, oldDApp.URL, "")
+	deletedOldDApp, err := SelectDApp(db, oldDApp.URL, "")
 	require.NoError(t, err)
 	require.Nil(t, deletedOldDApp)
 
 	// Verify new client still exists
-	stillExistsNewDApp, err := SelectDAppByUrlAndClientID(db, newDApp.URL, newDApp.ClientID)
+	stillExistsNewDApp, err := SelectDApp(db, newDApp.URL, newDApp.ClientID)
 	require.NoError(t, err)
 	require.Equal(t, &newDApp, stillExistsNewDApp)
 }

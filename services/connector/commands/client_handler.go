@@ -131,7 +131,7 @@ func (c *ClientSideHandler) RecallDAppPermissions(args RecallDAppPermissionsArgs
 		args.ClientID = DefaultClientID
 	}
 
-	dApp, err := persistence.SelectDAppByUrlAndClientID(c.Db, args.URL, args.ClientID)
+	dApp, err := persistence.SelectDApp(c.Db, args.URL, args.ClientID)
 	if err != nil {
 		return err
 	}

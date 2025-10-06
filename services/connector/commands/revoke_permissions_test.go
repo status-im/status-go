@@ -65,7 +65,7 @@ func TestRevokePermissionsSucceeded(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, result)
 
-	dApp, err := persistence.SelectDAppByUrlAndClientID(state.walletDb, testDAppData.URL, testDAppData.ClientID)
+	dApp, err := persistence.SelectDApp(state.walletDb, testDAppData.URL, testDAppData.ClientID)
 	assert.NoError(t, err)
 	assert.Nil(t, dApp)
 

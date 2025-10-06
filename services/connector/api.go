@@ -72,7 +72,7 @@ func NewAPI(s *Service) *API {
 }
 
 func (api *API) forwardRPC(ctx context.Context, request commands.RPCRequest) (interface{}, error) {
-	dApp, err := persistence.SelectDAppByUrlAndClientID(api.s.db, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(api.s.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -108,12 +108,13 @@ func (api *API) CallRPC(ctx context.Context, inputJSON string) (interface{}, err
 	return api.forwardRPC(ctx, request)
 }
 
+// Deprecated: Use RecallDAppPermissionV2 instead
 func (api *API) RecallDAppPermission(origin string) error {
-	// TODO: close the websocket connection
-	return api.c.RecallDAppPermissions(commands.RecallDAppPermissionsArgs{URL: origin, ClientID: ""})
+	return api.RecallDAppPermissionV2(origin, "")
 }
 
-func (api *API) RecallDAppPermissionWithClientID(origin string, clientID string) error {
+func (api *API) RecallDAppPermissionV2(origin string, clientID string) error {
+	// TODO: close the websocket connection
 	return api.c.RecallDAppPermissions(commands.RecallDAppPermissionsArgs{URL: origin, ClientID: clientID})
 }
 
