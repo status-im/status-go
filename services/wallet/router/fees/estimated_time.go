@@ -210,16 +210,16 @@ func (f *FeeManager) TransactionEstimatedTimeV2Legacy(ctx context.Context, chain
 	gasPrices := []*big.Int{}
 	for i := uint64(0); i < uint64(blocksToCheck); i++ {
 		blockNum := big.NewInt(0).SetUint64(latestBlockNum - i)
-		block, err := backend.BlockByNumber(ctx, blockNum)
+		block, err := backend.EthGetBlockByNumberWithFullTxs(ctx, blockNum)
 		if err != nil {
 			return 0
 		}
 
-		for _, tx := range block.Transactions() {
-			if tx.Type() != gethtypes.LegacyTxType && tx.Type() != gethtypes.AccessListTxType {
+		for _, tx := range block.Transactions {
+			if tx.Type != nil && *tx.Type != gethtypes.LegacyTxType && *tx.Type != gethtypes.AccessListTxType {
 				continue
 			}
-			gasPrices = append(gasPrices, tx.GasPrice())
+			gasPrices = append(gasPrices, tx.GasPrice)
 		}
 	}
 
