@@ -45,11 +45,28 @@ type (
 	}
 	hashNode  []byte
 	valueNode []byte
-)
 
-// nilValueNode is used when collapsing internal trie nodes for hashing, since
-// unset children need to serialize correctly.
-var nilValueNode = valueNode(nil)
+	// fullnodeEncoder is a type used exclusively for encoding fullNode.
+	// Briefly instantiating a fullnodeEncoder and initializing with
+	// existing slices is less memory intense than using the fullNode type.
+	fullnodeEncoder struct {
+		Children [17][]byte
+	}
+
+	// extNodeEncoder is a type used exclusively for encoding extension node.
+	// Briefly instantiating a extNodeEncoder and initializing with existing
+	// slices is less memory intense than using the shortNode type.
+	extNodeEncoder struct {
+		Key []byte
+		Val []byte
+	}
+
+	// leafNodeEncoder is a type used exclusively for encoding leaf node.
+	leafNodeEncoder struct {
+		Key []byte
+		Val []byte
+	}
+)
 
 // EncodeRLP encodes a full node into the consensus RLP format.
 func (n *fullNode) EncodeRLP(w io.Writer) error {
@@ -58,13 +75,17 @@ func (n *fullNode) EncodeRLP(w io.Writer) error {
 	return eb.Flush()
 }
 
-func (n *fullNode) copy() *fullNode   { copy := *n; return &copy }
-func (n *shortNode) copy() *shortNode { copy := *n; return &copy }
-
 // nodeFlag contains caching-related metadata about a node.
 type nodeFlag struct {
 	hash  hashNode // cached hash of the node (may be nil)
 	dirty bool     // whether the node has changes that must be written to the database
+}
+
+func (n nodeFlag) copy() nodeFlag {
+	return nodeFlag{
+		hash:  common.CopyBytes(n.hash),
+		dirty: n.dirty,
+	}
 }
 
 func (n *fullNode) cache() (hashNode, bool)  { return n.flags.hash, n.flags.dirty }
@@ -89,6 +110,7 @@ func (n *fullNode) fstring(ind string) string {
 	}
 	return resp + fmt.Sprintf("\n%s] ", ind)
 }
+
 func (n *shortNode) fstring(ind string) string {
 	return fmt.Sprintf("{%x: %v} ", n.Key, n.Val.fstring(ind+"  "))
 }
@@ -206,7 +228,9 @@ func decodeRef(buf []byte) (node, []byte, error) {
 			err := fmt.Errorf("oversized embedded node (size is %d bytes, want size < %d)", size, hashLen)
 			return nil, buf, err
 		}
-		n, err := decodeNode(nil, buf)
+		// The buffer content has already been copied or is safe to use;
+		// no additional copy is required.
+		n, err := decodeNodeUnsafe(nil, buf)
 		return n, rest, err
 	case kind == rlp.String && len(val) == 0:
 		// empty node

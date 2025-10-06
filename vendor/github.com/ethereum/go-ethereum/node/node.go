@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 
@@ -33,11 +34,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/prometheus/tsdb/fileutil"
+	"github.com/gofrs/flock"
 )
 
 // Node is a container on which services can be registered.
@@ -46,13 +48,13 @@ type Node struct {
 	config        *Config
 	accman        *accounts.Manager
 	log           log.Logger
-	keyDir        string            // key store directory
-	keyDirTemp    bool              // If true, key directory will be removed by Stop
-	dirLock       fileutil.Releaser // prevents concurrent use of instance directory
-	stop          chan struct{}     // Channel to wait for termination notifications
-	server        *p2p.Server       // Currently running P2P networking layer
-	startStopLock sync.Mutex        // Start/Stop are protected by an additional lock
-	state         int               // Tracks state of node lifecycle
+	keyDir        string        // key store directory
+	keyDirTemp    bool          // If true, key directory will be removed by Stop
+	dirLock       *flock.Flock  // prevents concurrent use of instance directory
+	stop          chan struct{} // Channel to wait for termination notifications
+	server        *p2p.Server   // Currently running P2P networking layer
+	startStopLock sync.Mutex    // Start/Stop are protected by an additional lock
+	state         int           // Tracks state of node lifecycle
 
 	lock          sync.Mutex
 	lifecycles    []Lifecycle // All registered backends, services, and auxiliary services that have a lifecycle
@@ -101,10 +103,11 @@ func New(conf *Config) (*Node, error) {
 	if strings.HasSuffix(conf.Name, ".ipc") {
 		return nil, errors.New(`Config.Name cannot end in ".ipc"`)
 	}
-
+	server := rpc.NewServer()
+	server.SetBatchLimits(conf.BatchRequestLimit, conf.BatchResponseMaxSize)
 	node := &Node{
 		config:        conf,
-		inprocHandler: rpc.NewServer(),
+		inprocHandler: server,
 		eventmux:      new(event.TypeMux),
 		log:           conf.Logger,
 		stop:          make(chan struct{}),
@@ -119,7 +122,7 @@ func New(conf *Config) (*Node, error) {
 	if err := node.openDataDir(); err != nil {
 		return nil, err
 	}
-	keyDir, isEphem, err := getKeyStoreDir(conf)
+	keyDir, isEphem, err := conf.GetKeyStoreDir()
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +130,7 @@ func New(conf *Config) (*Node, error) {
 	node.keyDirTemp = isEphem
 	// Creates an empty AccountManager with no backends. Callers (e.g. cmd/geth)
 	// are required to add the backends later on.
-	node.accman = accounts.NewManager(&accounts.Config{InsecureUnlockAllowed: conf.InsecureUnlockAllowed})
+	node.accman = accounts.NewManager(nil)
 
 	// Initialize the p2p server. This creates the node key and discovery databases.
 	node.server.Config.PrivateKey = node.config.NodeKey()
@@ -277,16 +280,6 @@ func (n *Node) openEndpoints() error {
 	return err
 }
 
-// containsLifecycle checks if 'lfs' contains 'l'.
-func containsLifecycle(lfs []Lifecycle, l Lifecycle) bool {
-	for _, obj := range lfs {
-		if obj == l {
-			return true
-		}
-	}
-	return false
-}
-
 // stopServices terminates running services, RPC and p2p networking.
 // It is the inverse of Start.
 func (n *Node) stopServices(running []Lifecycle) error {
@@ -320,33 +313,27 @@ func (n *Node) openDataDir() error {
 	}
 	// Lock the instance directory to prevent concurrent use by another instance as well as
 	// accidental use of the instance directory as a database.
-	release, _, err := fileutil.Flock(filepath.Join(instdir, "LOCK"))
-	if err != nil {
-		return convertFileLockError(err)
+	n.dirLock = flock.New(filepath.Join(instdir, "LOCK"))
+
+	if locked, err := n.dirLock.TryLock(); err != nil {
+		return err
+	} else if !locked {
+		return ErrDatadirUsed
 	}
-	n.dirLock = release
 	return nil
 }
 
 func (n *Node) closeDataDir() {
 	// Release instance directory lock.
-	if n.dirLock != nil {
-		if err := n.dirLock.Release(); err != nil {
-			n.log.Error("Can't release datadir lock", "err", err)
-		}
+	if n.dirLock != nil && n.dirLock.Locked() {
+		n.dirLock.Unlock()
 		n.dirLock = nil
 	}
 }
 
-// obtainJWTSecret loads the jwt-secret, either from the provided config,
-// or from the default location. If neither of those are present, it generates
-// a new secret and stores to the default location.
-func (n *Node) obtainJWTSecret(cliParam string) ([]byte, error) {
-	fileName := cliParam
-	if len(fileName) == 0 {
-		// no path provided, use default
-		fileName = n.ResolvePath(datadirJWTKey)
-	}
+// ObtainJWTSecret loads the jwt-secret from the provided config. If the file is not
+// present, it generates a new secret and stores to the given location.
+func ObtainJWTSecret(fileName string) ([]byte, error) {
 	// try reading from file
 	if data, err := os.ReadFile(fileName); err == nil {
 		jwtSecret := common.FromHex(strings.TrimSpace(string(data)))
@@ -372,11 +359,23 @@ func (n *Node) obtainJWTSecret(cliParam string) ([]byte, error) {
 	return jwtSecret, nil
 }
 
+// obtainJWTSecret loads the jwt-secret, either from the provided config,
+// or from the default location. If neither of those are present, it generates
+// a new secret and stores to the default location.
+func (n *Node) obtainJWTSecret(cliParam string) ([]byte, error) {
+	fileName := cliParam
+	if len(fileName) == 0 {
+		// no path provided, use default
+		fileName = n.ResolvePath(datadirJWTKey)
+	}
+	return ObtainJWTSecret(fileName)
+}
+
 // startRPC is a helper method to configure all the various RPC endpoints during node
 // startup. It's not meant to be called at any time afterwards as it makes certain
 // assumptions about the state of the node.
 func (n *Node) startRPC() error {
-	if err := n.startInProc(); err != nil {
+	if err := n.startInProc(n.rpcAPIs); err != nil {
 		return err
 	}
 
@@ -391,6 +390,11 @@ func (n *Node) startRPC() error {
 		openAPIs, allAPIs = n.getAPIs()
 	)
 
+	rpcConfig := rpcEndpointConfig{
+		batchItemLimit:         n.config.BatchRequestLimit,
+		batchResponseSizeLimit: n.config.BatchResponseMaxSize,
+	}
+
 	initHttp := func(server *httpServer, port int) error {
 		if err := server.setListenAddr(n.config.HTTPHost, port); err != nil {
 			return err
@@ -400,6 +404,7 @@ func (n *Node) startRPC() error {
 			Vhosts:             n.config.HTTPVirtualHosts,
 			Modules:            n.config.HTTPModules,
 			prefix:             n.config.HTTPPathPrefix,
+			rpcEndpointConfig:  rpcConfig,
 		}); err != nil {
 			return err
 		}
@@ -413,9 +418,10 @@ func (n *Node) startRPC() error {
 			return err
 		}
 		if err := server.enableWS(openAPIs, wsConfig{
-			Modules: n.config.WSModules,
-			Origins: n.config.WSOrigins,
-			prefix:  n.config.WSPathPrefix,
+			Modules:           n.config.WSModules,
+			Origins:           n.config.WSOrigins,
+			prefix:            n.config.WSPathPrefix,
+			rpcEndpointConfig: rpcConfig,
 		}); err != nil {
 			return err
 		}
@@ -429,26 +435,34 @@ func (n *Node) startRPC() error {
 		if err := server.setListenAddr(n.config.AuthAddr, port); err != nil {
 			return err
 		}
-		if err := server.enableRPC(allAPIs, httpConfig{
+		sharedConfig := rpcEndpointConfig{
+			jwtSecret:              secret,
+			batchItemLimit:         engineAPIBatchItemLimit,
+			batchResponseSizeLimit: engineAPIBatchResponseSizeLimit,
+			httpBodyLimit:          engineAPIBodyLimit,
+		}
+		err := server.enableRPC(allAPIs, httpConfig{
 			CorsAllowedOrigins: DefaultAuthCors,
 			Vhosts:             n.config.AuthVirtualHosts,
 			Modules:            DefaultAuthModules,
 			prefix:             DefaultAuthPrefix,
-			jwtSecret:          secret,
-		}); err != nil {
+			rpcEndpointConfig:  sharedConfig,
+		})
+		if err != nil {
 			return err
 		}
 		servers = append(servers, server)
+
 		// Enable auth via WS
 		server = n.wsServerForPort(port, true)
 		if err := server.setListenAddr(n.config.AuthAddr, port); err != nil {
 			return err
 		}
 		if err := server.enableWS(allAPIs, wsConfig{
-			Modules:   DefaultAuthModules,
-			Origins:   DefaultAuthOrigins,
-			prefix:    DefaultAuthPrefix,
-			jwtSecret: secret,
+			Modules:           DefaultAuthModules,
+			Origins:           DefaultAuthOrigins,
+			prefix:            DefaultAuthPrefix,
+			rpcEndpointConfig: sharedConfig,
 		}); err != nil {
 			return err
 		}
@@ -510,8 +524,8 @@ func (n *Node) stopRPC() {
 }
 
 // startInProc registers all RPC APIs on the inproc server.
-func (n *Node) startInProc() error {
-	for _, api := range n.rpcAPIs {
+func (n *Node) startInProc(apis []rpc.API) error {
+	for _, api := range apis {
 		if err := n.inprocHandler.RegisterName(api.Namespace, api.Service); err != nil {
 			return err
 		}
@@ -537,7 +551,7 @@ func (n *Node) RegisterLifecycle(lifecycle Lifecycle) {
 	if n.state != initializingState {
 		panic("can't register lifecycle on running/stopped node")
 	}
-	if containsLifecycle(n.lifecycles, lifecycle) {
+	if slices.Contains(n.lifecycles, lifecycle) {
 		panic(fmt.Sprintf("attempt to register lifecycle %T more than once", lifecycle))
 	}
 	n.lifecycles = append(n.lifecycles, lifecycle)
@@ -593,8 +607,8 @@ func (n *Node) RegisterHandler(name, path string, handler http.Handler) {
 }
 
 // Attach creates an RPC client attached to an in-process API handler.
-func (n *Node) Attach() (*rpc.Client, error) {
-	return rpc.DialInProc(n.inprocHandler), nil
+func (n *Node) Attach() *rpc.Client {
+	return rpc.DialInProc(n.inprocHandler)
 }
 
 // RPCHandler returns the in-process RPC request handler.
@@ -682,54 +696,61 @@ func (n *Node) EventMux() *event.TypeMux {
 	return n.eventmux
 }
 
-// OpenDatabase opens an existing database with the given name (or creates one if no
-// previous can be found) from within the node's instance directory. If the node is
-// ephemeral, a memory database is returned.
-func (n *Node) OpenDatabase(name string, cache, handles int, namespace string, readonly bool) (ethdb.Database, error) {
+// OpenDatabaseWithOptions opens an existing database with the given name (or creates one if no
+// previous can be found) from within the node's instance directory. If the node has no
+// data directory, an in-memory database is returned.
+func (n *Node) OpenDatabaseWithOptions(name string, opt DatabaseOptions) (ethdb.Database, error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	if n.state == closedState {
 		return nil, ErrNodeStopped
 	}
-
 	var db ethdb.Database
 	var err error
 	if n.config.DataDir == "" {
-		db = rawdb.NewMemoryDatabase()
+		db, _ = rawdb.Open(memorydb.New(), rawdb.OpenOptions{
+			MetricsNamespace: opt.MetricsNamespace,
+			ReadOnly:         opt.ReadOnly,
+		})
 	} else {
-		db, err = rawdb.NewLevelDBDatabase(n.ResolvePath(name), cache, handles, namespace, readonly)
+		opt.AncientsDirectory = n.ResolveAncient(name, opt.AncientsDirectory)
+		db, err = openDatabase(internalOpenOptions{
+			directory:       n.ResolvePath(name),
+			dbEngine:        n.config.DBEngine,
+			DatabaseOptions: opt,
+		})
 	}
-
 	if err == nil {
 		db = n.wrapDatabase(db)
 	}
 	return db, err
 }
 
+// OpenDatabase opens an existing database with the given name (or creates one if no
+// previous can be found) from within the node's instance directory.
+// If the node has no data directory, an in-memory database is returned.
+// Deprecated: use OpenDatabaseWithOptions instead.
+func (n *Node) OpenDatabase(name string, cache, handles int, namespace string, readonly bool) (ethdb.Database, error) {
+	return n.OpenDatabaseWithOptions(name, DatabaseOptions{
+		MetricsNamespace: namespace,
+		Cache:            cache,
+		Handles:          handles,
+		ReadOnly:         readonly,
+	})
+}
+
 // OpenDatabaseWithFreezer opens an existing database with the given name (or
-// creates one if no previous can be found) from within the node's data directory,
-// also attaching a chain freezer to it that moves ancient chain data from the
-// database to immutable append-only files. If the node is an ephemeral one, a
-// memory database is returned.
+// creates one if no previous can be found) from within the node's data directory.
+// If the node has no data directory, an in-memory database is returned.
+// Deprecated: use OpenDatabaseWithOptions instead.
 func (n *Node) OpenDatabaseWithFreezer(name string, cache, handles int, ancient string, namespace string, readonly bool) (ethdb.Database, error) {
-	n.lock.Lock()
-	defer n.lock.Unlock()
-	if n.state == closedState {
-		return nil, ErrNodeStopped
-	}
-
-	var db ethdb.Database
-	var err error
-	if n.config.DataDir == "" {
-		db = rawdb.NewMemoryDatabase()
-	} else {
-		db, err = rawdb.NewLevelDBDatabaseWithFreezer(n.ResolvePath(name), cache, handles, n.ResolveAncient(name, ancient), namespace, readonly)
-	}
-
-	if err == nil {
-		db = n.wrapDatabase(db)
-	}
-	return db, err
+	return n.OpenDatabaseWithOptions(name, DatabaseOptions{
+		AncientsDirectory: n.ResolveAncient(name, ancient),
+		MetricsNamespace:  namespace,
+		Cache:             cache,
+		Handles:           handles,
+		ReadOnly:          readonly,
+	})
 }
 
 // ResolvePath returns the absolute path of a resource in the instance directory.

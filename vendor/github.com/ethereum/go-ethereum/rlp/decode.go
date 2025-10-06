@@ -29,6 +29,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp/internal/rlpstruct"
+	"github.com/holiman/uint256"
 )
 
 //lint:ignore ST1012 EOL is not an error.
@@ -52,6 +53,7 @@ var (
 	errUintOverflow  = errors.New("rlp: uint overflow")
 	errNoPointer     = errors.New("rlp: interface given to Decode must be a pointer")
 	errDecodeIntoNil = errors.New("rlp: pointer given to Decode must not be nil")
+	errUint256Large  = errors.New("rlp: value too large for uint256")
 
 	streamPool = sync.Pool{
 		New: func() interface{} { return new(Stream) },
@@ -88,7 +90,7 @@ func Decode(r io.Reader, val interface{}) error {
 // DecodeBytes parses RLP data from b into val. Please see package-level documentation for
 // the decoding rules. The input must contain exactly one value and no trailing data.
 func DecodeBytes(b []byte, val interface{}) error {
-	r := bytes.NewReader(b)
+	r := (*sliceReader)(&b)
 
 	stream := streamPool.Get().(*Stream)
 	defer streamPool.Put(stream)
@@ -97,7 +99,7 @@ func DecodeBytes(b []byte, val interface{}) error {
 	if err := stream.Decode(val); err != nil {
 		return err
 	}
-	if r.Len() > 0 {
+	if len(b) > 0 {
 		return ErrMoreThanOneValue
 	}
 	return nil
@@ -146,8 +148,9 @@ func addErrorContext(err error, ctx string) error {
 }
 
 var (
-	decoderInterface = reflect.TypeOf(new(Decoder)).Elem()
-	bigInt           = reflect.TypeOf(big.Int{})
+	decoderInterface = reflect.TypeFor[Decoder]()
+	bigInt           = reflect.TypeFor[big.Int]()
+	u256Int          = reflect.TypeFor[uint256.Int]()
 )
 
 func makeDecoder(typ reflect.Type, tags rlpstruct.Tags) (dec decoder, err error) {
@@ -155,13 +158,17 @@ func makeDecoder(typ reflect.Type, tags rlpstruct.Tags) (dec decoder, err error)
 	switch {
 	case typ == rawValueType:
 		return decodeRawValue, nil
-	case typ.AssignableTo(reflect.PtrTo(bigInt)):
+	case typ.AssignableTo(reflect.PointerTo(bigInt)):
 		return decodeBigInt, nil
 	case typ.AssignableTo(bigInt):
 		return decodeBigIntNoPtr, nil
+	case typ == reflect.PointerTo(u256Int):
+		return decodeU256, nil
+	case typ == u256Int:
+		return decodeU256NoPtr, nil
 	case kind == reflect.Ptr:
 		return makePtrDecoder(typ, tags)
-	case reflect.PtrTo(typ).Implements(decoderInterface):
+	case reflect.PointerTo(typ).Implements(decoderInterface):
 		return decodeDecoder, nil
 	case isUint(kind):
 		return decodeUint, nil
@@ -235,9 +242,27 @@ func decodeBigInt(s *Stream, val reflect.Value) error {
 	return nil
 }
 
+func decodeU256NoPtr(s *Stream, val reflect.Value) error {
+	return decodeU256(s, val.Addr())
+}
+
+func decodeU256(s *Stream, val reflect.Value) error {
+	i := val.Interface().(*uint256.Int)
+	if i == nil {
+		i = new(uint256.Int)
+		val.Set(reflect.ValueOf(i))
+	}
+
+	err := s.ReadUint256(i)
+	if err != nil {
+		return wrapStreamError(err, val.Type())
+	}
+	return nil
+}
+
 func makeListDecoder(typ reflect.Type, tag rlpstruct.Tags) (decoder, error) {
 	etype := typ.Elem()
-	if etype.Kind() == reflect.Uint8 && !reflect.PtrTo(etype).Implements(decoderInterface) {
+	if etype.Kind() == reflect.Uint8 && !reflect.PointerTo(etype).Implements(decoderInterface) {
 		if typ.Kind() == reflect.Array {
 			return decodeByteArray, nil
 		}
@@ -346,7 +371,7 @@ func decodeByteArray(s *Stream, val reflect.Value) error {
 	if err != nil {
 		return err
 	}
-	slice := byteArrayBytes(val, val.Len())
+	slice := val.Bytes()
 	switch kind {
 	case Byte:
 		if len(slice) == 0 {
@@ -449,7 +474,7 @@ func makeSimplePtrDecoder(etype reflect.Type, etypeinfo *typeinfo) decoder {
 //
 // This decoder is used for pointer-typed struct fields with struct tag "nil".
 func makeNilPtrDecoder(etype reflect.Type, etypeinfo *typeinfo, ts rlpstruct.Tags) decoder {
-	typ := reflect.PtrTo(etype)
+	typ := reflect.PointerTo(etype)
 	nilPtr := reflect.Zero(typ)
 
 	// Determine the value kind that results in nil pointer.
@@ -487,7 +512,7 @@ func makeNilPtrDecoder(etype reflect.Type, etypeinfo *typeinfo, ts rlpstruct.Tag
 	}
 }
 
-var ifsliceType = reflect.TypeOf([]interface{}{})
+var ifsliceType = reflect.TypeFor[[]any]()
 
 func decodeInterface(s *Stream, val reflect.Value) error {
 	if val.Type().NumMethod() != 0 {
@@ -863,6 +888,45 @@ func (s *Stream) decodeBigInt(dst *big.Int) error {
 	return nil
 }
 
+// ReadUint256 decodes the next value as a uint256.
+func (s *Stream) ReadUint256(dst *uint256.Int) error {
+	var buffer []byte
+	kind, size, err := s.Kind()
+	switch {
+	case err != nil:
+		return err
+	case kind == List:
+		return ErrExpectedString
+	case kind == Byte:
+		buffer = s.uintbuf[:1]
+		buffer[0] = s.byteval
+		s.kind = -1 // re-arm Kind
+	case size == 0:
+		// Avoid zero-length read.
+		s.kind = -1
+	case size <= uint64(len(s.uintbuf)):
+		// All possible uint256 values fit into s.uintbuf.
+		buffer = s.uintbuf[:size]
+		if err := s.readFull(buffer); err != nil {
+			return err
+		}
+		// Reject inputs where single byte encoding should have been used.
+		if size == 1 && buffer[0] < 128 {
+			return ErrCanonSize
+		}
+	default:
+		return errUint256Large
+	}
+
+	// Reject leading zero bytes.
+	if len(buffer) > 0 && buffer[0] == 0 {
+		return ErrCanonInt
+	}
+	// Set the integer bytes.
+	dst.SetBytes(buffer)
+	return nil
+}
+
 // Decode decodes a value and stores the result in the value pointed
 // to by val. Please see the documentation for the Decode function
 // to learn about the decoding rules.
@@ -1041,9 +1105,7 @@ func (s *Stream) readUint(size byte) (uint64, error) {
 		return uint64(b), err
 	default:
 		buffer := s.uintbuf[:8]
-		for i := range buffer {
-			buffer[i] = 0
-		}
+		clear(buffer)
 		start := int(8 - size)
 		if err := s.readFull(buffer[start:]); err != nil {
 			return 0, err
@@ -1117,4 +1179,24 @@ func (s *Stream) listLimit() (inList bool, limit uint64) {
 		return false, 0
 	}
 	return true, s.stack[len(s.stack)-1]
+}
+
+type sliceReader []byte
+
+func (sr *sliceReader) Read(b []byte) (int, error) {
+	if len(*sr) == 0 {
+		return 0, io.EOF
+	}
+	n := copy(b, *sr)
+	*sr = (*sr)[n:]
+	return n, nil
+}
+
+func (sr *sliceReader) ReadByte() (byte, error) {
+	if len(*sr) == 0 {
+		return 0, io.EOF
+	}
+	b := (*sr)[0]
+	*sr = (*sr)[1:]
+	return b, nil
 }

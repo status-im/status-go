@@ -25,14 +25,23 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"github.com/ethereum/go-ethereum/log"
 )
 
+const (
+	// The limit of unix domain socket path diverse between OS, on Darwin it's 104 bytes
+	// but on Linux it's 108 byte, so we should depend on syscall.RawSockaddrUnix's
+	// definition dynamically
+	maxPathSize = len(syscall.RawSockaddrUnix{}.Path)
+)
+
 // ipcListen will create a Unix socket on the given endpoint.
 func ipcListen(endpoint string) (net.Listener, error) {
-	if len(endpoint) > int(max_path_size) {
-		log.Warn(fmt.Sprintf("The ipc endpoint is longer than %d characters. ", max_path_size),
+	// account for null-terminator too
+	if len(endpoint)+1 > maxPathSize {
+		log.Warn(fmt.Sprintf("The ipc endpoint is longer than %d characters. ", maxPathSize-1),
 			"endpoint", endpoint)
 	}
 

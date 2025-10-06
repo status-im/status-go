@@ -10,6 +10,8 @@ package secp256k1
 import (
 	"math/big"
 	"unsafe"
+
+	"github.com/ethereum/go-ethereum/common/math"
 )
 
 /*
@@ -21,7 +23,7 @@ extern int secp256k1_ext_scalar_mul(const secp256k1_context* ctx, const unsigned
 */
 import "C"
 
-func (BitCurve *BitCurve) ScalarMult(Bx, By *big.Int, scalar []byte) (*big.Int, *big.Int) {
+func (bitCurve *BitCurve) ScalarMult(Bx, By *big.Int, scalar []byte) (*big.Int, *big.Int) {
 	// Ensure scalar is exactly 32 bytes. We pad always, even if
 	// scalar is 32 bytes long, to avoid a timing side channel.
 	if len(scalar) > 32 {
@@ -34,8 +36,8 @@ func (BitCurve *BitCurve) ScalarMult(Bx, By *big.Int, scalar []byte) (*big.Int, 
 
 	// Do the multiplication in C, updating point.
 	point := make([]byte, 64)
-	readBits(Bx, point[:32])
-	readBits(By, point[32:])
+	math.ReadBits(Bx, point[:32])
+	math.ReadBits(By, point[32:])
 
 	pointPtr := (*C.uchar)(unsafe.Pointer(&point[0]))
 	scalarPtr := (*C.uchar)(unsafe.Pointer(&scalar[0]))
@@ -44,12 +46,8 @@ func (BitCurve *BitCurve) ScalarMult(Bx, By *big.Int, scalar []byte) (*big.Int, 
 	// Unpack the result and clear temporaries.
 	x := new(big.Int).SetBytes(point[:32])
 	y := new(big.Int).SetBytes(point[32:])
-	for i := range point {
-		point[i] = 0
-	}
-	for i := range padded {
-		scalar[i] = 0
-	}
+	clear(point)
+	clear(scalar)
 	if res != 1 {
 		return nil, nil
 	}

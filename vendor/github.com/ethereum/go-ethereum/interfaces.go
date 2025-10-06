@@ -29,8 +29,6 @@ import (
 // NotFound is returned by API methods if the requested item does not exist.
 var NotFound = errors.New("not found")
 
-// TODO: move subscription to package event
-
 // Subscription represents an event subscription where events are
 // delivered on a data channel.
 type Subscription interface {
@@ -126,6 +124,17 @@ type SyncProgress struct {
 	// "transaction indexing" fields
 	TxIndexFinishedBlocks  uint64 // Number of blocks whose transactions are already indexed
 	TxIndexRemainingBlocks uint64 // Number of blocks whose transactions are not indexed yet
+
+	// "historical state indexing" fields
+	StateIndexRemaining uint64 // Number of states remain unindexed
+}
+
+// Done returns the indicator if the initial sync is finished or not.
+func (prog SyncProgress) Done() bool {
+	if prog.CurrentBlock < prog.HighestBlock {
+		return false
+	}
+	return prog.TxIndexRemainingBlocks == 0 && prog.StateIndexRemaining == 0
 }
 
 // ChainSyncReader wraps access to the node's current sync status. If there's no
@@ -152,7 +161,7 @@ type CallMsg struct {
 	BlobHashes    []common.Hash
 
 	// For SetCodeTxType
-	AuthorizationList []struct{} // Dummy type to satisfy the interface
+	AuthorizationList []types.SetCodeAuthorization
 }
 
 // A ContractCaller provides contract calls, essentially transactions that are executed by
@@ -212,6 +221,16 @@ type GasPricer interface {
 	SuggestGasPrice(ctx context.Context) (*big.Int, error)
 }
 
+// GasPricer1559 provides access to the EIP-1559 gas price oracle.
+type GasPricer1559 interface {
+	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
+}
+
+// FeeHistoryReader provides access to the fee history oracle.
+type FeeHistoryReader interface {
+	FeeHistory(ctx context.Context, blockCount uint64, lastBlock *big.Int, rewardPercentiles []float64) (*FeeHistory, error)
+}
+
 // FeeHistory provides recent fee market data that consumers can use to determine
 // a reasonable maxPriorityFeePerGas value.
 type FeeHistory struct {
@@ -251,4 +270,14 @@ type GasEstimator interface {
 // pending state.
 type PendingStateEventer interface {
 	SubscribePendingTransactions(ctx context.Context, ch chan<- *types.Transaction) (Subscription, error)
+}
+
+// BlockNumberReader provides access to the current block number.
+type BlockNumberReader interface {
+	BlockNumber(ctx context.Context) (uint64, error)
+}
+
+// ChainIDReader provides access to the chain ID.
+type ChainIDReader interface {
+	ChainID(ctx context.Context) (*big.Int, error)
 }
