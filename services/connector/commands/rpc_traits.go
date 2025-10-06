@@ -22,9 +22,6 @@ const (
 	Method_RequestPermissions  = "wallet_requestPermissions"
 	Method_RevokePermissions   = "wallet_revokePermissions"
 	Method_SwitchEthereumChain = "wallet_switchEthereumChain"
-
-	// DefaultClientID for backward compatibility (browser extension doesn't provide clientId)
-	DefaultClientID = ""
 )
 
 // errors
@@ -113,9 +110,5 @@ func (r *RPCRequest) Validate() error {
 		return ErrRequestMissingDAppData
 	}
 
-	// Browser extension doesn't send ClientID
-	if r.ClientID == "" {
-		r.ClientID = DefaultClientID
-	}
 	return nil
 }

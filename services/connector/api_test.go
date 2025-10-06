@@ -36,9 +36,20 @@ func TestCallRPC(t *testing.T) {
 			request:     "{\"method\": \"wallet_switchEthereumChain\", \"params\": []}",
 			expectError: commands.ErrRequestMissingDAppData,
 		},
+		{
+			request: `{
+				"method": "eth_chainId",
+				"params": [],
+				"url": "https://example.com",
+				"name": "Example DApp",
+				"iconUrl": "https://example.com/icon.png",
+				"clientId": "wallet-connect"
+			}`,
+			expectError: ErrCannotOverrideClientIDForHttpConnection,
+		},
 	}
 
-	ctx := context.Background()
+	ctx := WithConnectionType(context.Background(), ConnectionTypeHTTP)
 	for _, tt := range tests {
 		t.Run(tt.request, func(t *testing.T) {
 			_, err := state.api.CallRPC(ctx, tt.request)

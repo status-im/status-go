@@ -126,11 +126,6 @@ func (c *ClientSideHandler) RecallDAppPermissions(args RecallDAppPermissionsArgs
 		return ErrEmptyUrl
 	}
 
-	// For backward compatibility with old clients(browser extension) that don't provide clientId
-	if args.ClientID == "" {
-		args.ClientID = DefaultClientID
-	}
-
 	dApp, err := persistence.SelectDApp(c.Db, args.URL, args.ClientID)
 	if err != nil {
 		return err
