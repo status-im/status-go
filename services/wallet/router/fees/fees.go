@@ -121,11 +121,11 @@ func (f *FeeManager) IsEIP1559Enabled(ctx context.Context, chainID uint64) (bool
 	if err != nil {
 		return false, err
 	}
-	block, err := backend.BlockByNumber(ctx, nil)
+	block, err := backend.EthGetBlockByNumberWithTxHashes(ctx, nil)
 	if err != nil {
 		return false, err
 	}
-	return block.BaseFee() != nil && block.BaseFee().Cmp(big.NewInt(0)) > 0, nil
+	return block.BaseFeePerGas != nil && block.BaseFeePerGas.Cmp(big.NewInt(0)) > 0, nil
 }
 
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address ethCommon.Address) (suggestedFees *SuggestedFees, noBaseFee bool, noPriorityFee bool, err error) {
