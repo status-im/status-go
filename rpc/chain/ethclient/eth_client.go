@@ -7,7 +7,7 @@ import (
 	"math/big"
 
 	ethereum "github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -16,10 +16,16 @@ import (
 )
 
 type ChainReader interface {
-	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
-	BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error)
-	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
+	EthGetBlockByHashWithTxHashes(ctx context.Context, hash common.Hash) (*ethclient.BlockWithTxHashes, error)
+	EthGetBlockByNumberWithTxHashes(ctx context.Context, number *big.Int) (*ethclient.BlockWithTxHashes, error)
+	EthGetBlockByHashWithFullTxs(ctx context.Context, hash common.Hash) (*ethclient.BlockWithFullTxs, error)
+	EthGetBlockByNumberWithFullTxs(ctx context.Context, number *big.Int) (*ethclient.BlockWithFullTxs, error)
+}
+
+type TransactionReader interface {
+	EthGetTransactionByHash(ctx context.Context, hash common.Hash) (*ethclient.Transaction, error)
+	EthGetTransactionReceipt(ctx context.Context, txHash common.Hash) (*ethclient.Receipt, error)
 }
 
 type CallClient interface {
@@ -40,7 +46,7 @@ type RPCClientInterface interface {
 type BaseEthClientInterface interface {
 	// External calls
 	ChainReader
-	ethereum.TransactionReader
+	TransactionReader
 	ethereum.ChainStateReader
 	ethereum.ChainSyncReader
 	ethereum.ContractCaller
@@ -52,7 +58,6 @@ type BaseEthClientInterface interface {
 	ethereum.GasEstimator
 	FeeHistory(ctx context.Context, blockCount uint64, lastBlock *big.Int, rewardPercentiles []float64) (*ethereum.FeeHistory, error)
 	BlockNumber(ctx context.Context) (uint64, error)
-	TransactionSender(ctx context.Context, tx *types.Transaction, block common.Hash, index uint) (common.Address, error)
 	// Internal calls
 	Close()
 }
