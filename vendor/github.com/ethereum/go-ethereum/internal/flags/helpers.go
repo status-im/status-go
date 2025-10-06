@@ -18,35 +18,34 @@ package flags
 
 import (
 	"fmt"
+	"os"
+	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/internal/version"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/mattn/go-isatty"
 	"github.com/urfave/cli/v2"
 )
+
+// usecolor defines whether the CLI help should use colored output or normal dumb
+// colorless terminal formatting.
+var usecolor = (isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())) && os.Getenv("TERM") != "dumb"
 
 // NewApp creates an app with sane defaults.
 func NewApp(usage string) *cli.App {
 	git, _ := version.VCS()
 	app := cli.NewApp()
 	app.EnableBashCompletion = true
-	app.Version = params.VersionWithCommit(git.Commit, git.Date)
+	app.Version = version.WithCommit(git.Commit, git.Date)
 	app.Usage = usage
-	app.Copyright = "Copyright 2013-2022 The go-ethereum Authors"
+	app.Copyright = "Copyright 2013-2025 The go-ethereum Authors"
 	app.Before = func(ctx *cli.Context) error {
 		MigrateGlobalFlags(ctx)
 		return nil
 	}
 	return app
-}
-
-// Merge merges the given flag slices.
-func Merge(groups ...[]cli.Flag) []cli.Flag {
-	var ret []cli.Flag
-	for _, group := range groups {
-		ret = append(ret, group...)
-	}
-	return ret
 }
 
 var migrationApplied = map[*cli.Command]struct{}{}
@@ -96,7 +95,7 @@ func MigrateGlobalFlags(ctx *cli.Context) {
 func doMigrateFlags(ctx *cli.Context) {
 	// Figure out if there are any aliases of commands. If there are, we want
 	// to ignore them when iterating over the flags.
-	var aliases = make(map[string]bool)
+	aliases := make(map[string]bool)
 	for _, fl := range ctx.Command.Flags {
 		for _, alias := range fl.Names()[1:] {
 			aliases[alias] = true
@@ -106,7 +105,7 @@ func doMigrateFlags(ctx *cli.Context) {
 		for _, parent := range ctx.Lineage()[1:] {
 			if parent.IsSet(name) {
 				// When iterating across the lineage, we will be served both
-				// the 'canon' and alias formats of all commmands. In most cases,
+				// the 'canon' and alias formats of all commands. In most cases,
 				// it's fine to set it in the ctx multiple times (one for each
 				// name), however, the Slice-flags are not fine.
 				// The slice-flags accumulate, so if we set it once as
@@ -129,6 +128,14 @@ func doMigrateFlags(ctx *cli.Context) {
 }
 
 func init() {
+	if usecolor {
+		// Annotate all help categories with colors
+		cli.AppHelpTemplate = regexp.MustCompile("[A-Z ]+:").ReplaceAllString(cli.AppHelpTemplate, "\u001B[33m$0\u001B[0m")
+
+		// Annotate flag categories with colors (private template, so need to
+		// copy-paste the entire thing here...)
+		cli.AppHelpTemplate = strings.ReplaceAll(cli.AppHelpTemplate, "{{template \"visibleFlagCategoryTemplate\" .}}", "{{range .VisibleFlagCategories}}\n   {{if .Name}}\u001B[33m{{.Name}}\u001B[0m\n\n   {{end}}{{$flglen := len .Flags}}{{range $i, $e := .Flags}}{{if eq (subtract $flglen $i) 1}}{{$e}}\n{{else}}{{$e}}\n   {{end}}{{end}}{{end}}")
+	}
 	cli.FlagStringer = FlagString
 }
 
@@ -138,37 +145,31 @@ func FlagString(f cli.Flag) string {
 	if !ok {
 		return ""
 	}
-
 	needsPlaceholder := df.TakesValue()
 	placeholder := ""
 	if needsPlaceholder {
 		placeholder = "value"
 	}
 
-	namesText := pad(cli.FlagNamePrefixer(df.Names(), placeholder), 30)
+	namesText := cli.FlagNamePrefixer(df.Names(), placeholder)
 
 	defaultValueString := ""
 	if s := df.GetDefaultText(); s != "" {
 		defaultValueString = " (default: " + s + ")"
 	}
-
-	usage := strings.TrimSpace(df.GetUsage())
 	envHint := strings.TrimSpace(cli.FlagEnvHinter(df.GetEnvVars(), ""))
-	if len(envHint) > 0 {
-		usage += " " + envHint
+	if envHint != "" {
+		envHint = " (" + envHint[1:len(envHint)-1] + ")"
 	}
-
+	usage := strings.TrimSpace(df.GetUsage())
 	usage = wordWrap(usage, 80)
 	usage = indent(usage, 10)
 
-	return fmt.Sprintf("\n    %s%s\n%s", namesText, defaultValueString, usage)
-}
-
-func pad(s string, length int) string {
-	if len(s) < length {
-		s += strings.Repeat(" ", length-len(s))
+	if usecolor {
+		return fmt.Sprintf("\n    \u001B[32m%-35s%-35s\u001B[0m%s\n%s", namesText, defaultValueString, envHint, usage)
+	} else {
+		return fmt.Sprintf("\n    %-35s%-35s%s\n%s", namesText, defaultValueString, envHint, usage)
 	}
-	return s
 }
 
 func indent(s string, nspace int) string {
@@ -212,4 +213,127 @@ func wordWrap(s string, width int) string {
 	}
 
 	return output.String()
+}
+
+// AutoEnvVars extends all the specific CLI flags with automatically generated
+// env vars by capitalizing the flag, replacing . with _ and prefixing it with
+// the specified string.
+//
+// Note, the prefix should *not* contain the separator underscore, that will be
+// added automatically.
+func AutoEnvVars(flags []cli.Flag, prefix string) {
+	for _, flag := range flags {
+		envvar := strings.ToUpper(prefix + "_" + strings.ReplaceAll(strings.ReplaceAll(flag.Names()[0], ".", "_"), "-", "_"))
+
+		switch flag := flag.(type) {
+		case *cli.StringFlag:
+			flag.EnvVars = append(flag.EnvVars, envvar)
+
+		case *cli.StringSliceFlag:
+			flag.EnvVars = append(flag.EnvVars, envvar)
+
+		case *cli.BoolFlag:
+			flag.EnvVars = append(flag.EnvVars, envvar)
+
+		case *cli.IntFlag:
+			flag.EnvVars = append(flag.EnvVars, envvar)
+
+		case *cli.Int64Flag:
+			flag.EnvVars = append(flag.EnvVars, envvar)
+
+		case *cli.Uint64Flag:
+			flag.EnvVars = append(flag.EnvVars, envvar)
+
+		case *cli.Float64Flag:
+			flag.EnvVars = append(flag.EnvVars, envvar)
+
+		case *cli.DurationFlag:
+			flag.EnvVars = append(flag.EnvVars, envvar)
+
+		case *cli.PathFlag:
+			flag.EnvVars = append(flag.EnvVars, envvar)
+
+		case *BigFlag:
+			flag.EnvVars = append(flag.EnvVars, envvar)
+
+		case *DirectoryFlag:
+			flag.EnvVars = append(flag.EnvVars, envvar)
+		}
+	}
+}
+
+// CheckEnvVars iterates over all the environment variables and checks if any of
+// them look like a CLI flag but is not consumed. This can be used to detect old
+// or mistyped names.
+func CheckEnvVars(ctx *cli.Context, flags []cli.Flag, prefix string) {
+	known := make(map[string]string)
+	for _, flag := range flags {
+		docflag, ok := flag.(cli.DocGenerationFlag)
+		if !ok {
+			continue
+		}
+		for _, envvar := range docflag.GetEnvVars() {
+			known[envvar] = flag.Names()[0]
+		}
+	}
+	keyvals := os.Environ()
+	sort.Strings(keyvals)
+
+	for _, keyval := range keyvals {
+		key := strings.Split(keyval, "=")[0]
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		if flag, ok := known[key]; ok {
+			if ctx.Count(flag) > 0 {
+				log.Info("Config environment variable found", "envvar", key, "shadowedby", "--"+flag)
+			} else {
+				log.Info("Config environment variable found", "envvar", key)
+			}
+		} else {
+			log.Warn("Unknown config environment variable", "envvar", key)
+		}
+	}
+}
+
+// CheckExclusive verifies that only a single instance of the provided flags was
+// set by the user. Each flag might optionally be followed by a string type to
+// specialize it further.
+func CheckExclusive(ctx *cli.Context, args ...any) {
+	set := make([]string, 0, 1)
+	for i := 0; i < len(args); i++ {
+		// Make sure the next argument is a flag and skip if not set
+		flag, ok := args[i].(cli.Flag)
+		if !ok {
+			panic(fmt.Sprintf("invalid argument, not cli.Flag type: %T", args[i]))
+		}
+		// Check if next arg extends current and expand its name if so
+		name := flag.Names()[0]
+
+		if i+1 < len(args) {
+			switch option := args[i+1].(type) {
+			case string:
+				// Extended flag check, make sure value set doesn't conflict with passed in option
+				if ctx.String(flag.Names()[0]) == option {
+					name += "=" + option
+					set = append(set, "--"+name)
+				}
+				// shift arguments and continue
+				i++
+				continue
+
+			case cli.Flag:
+			default:
+				panic(fmt.Sprintf("invalid argument, not cli.Flag or string extension: %T", args[i+1]))
+			}
+		}
+		// Mark the flag if it's set
+		if ctx.IsSet(flag.Names()[0]) {
+			set = append(set, "--"+name)
+		}
+	}
+	if len(set) > 1 {
+		fmt.Fprintf(os.Stderr, "Flags %v can't be used at the same time", strings.Join(set, ", "))
+		os.Exit(1)
+	}
 }
