@@ -524,7 +524,7 @@ func (s *Service) GetMasterTokenContractAddressFromHash(ctx context.Context, cha
 		return "", err
 	}
 
-	receipt, err := ethClient.TransactionReceipt(ctx, common.HexToHash(txHash))
+	receipt, err := ethClient.EthGetTransactionReceipt(ctx, common.HexToHash(txHash))
 	if err != nil {
 		return "", err
 	}
@@ -555,7 +555,7 @@ func (s *Service) GetOwnerTokenContractAddressFromHash(ctx context.Context, chai
 		return "", err
 	}
 
-	receipt, err := ethClient.TransactionReceipt(ctx, common.HexToHash(txHash))
+	receipt, err := ethClient.EthGetTransactionReceipt(ctx, common.HexToHash(txHash))
 	if err != nil {
 		return "", err
 	}
