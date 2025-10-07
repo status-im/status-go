@@ -1,7 +1,5 @@
 package efp
 
-//go:generate go tool mockgen -package=mock_efp -source=types.go -destination=mock/types.go
-
 import (
 	"context"
 
@@ -14,4 +12,3 @@ type FollowingDataProvider interface {
 	IsConnected() bool
 	FetchFollowingAddresses(ctx context.Context, userAddress common.Address) ([]FollowingAddress, error)
 }
-
