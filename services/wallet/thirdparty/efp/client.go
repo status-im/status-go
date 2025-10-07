@@ -17,12 +17,22 @@ const (
 	requestDelay = 100 * time.Millisecond
 )
 
+// ENSData represents ENS information from the EFP API
+type ENSData struct {
+	Name      string            `json:"name"`
+	Address   string            `json:"address"`
+	Avatar    string            `json:"avatar"`
+	Records   map[string]string `json:"records"`
+	UpdatedAt string            `json:"updated_at"`
+}
+
 // EFPFollowingRecord represents a single following record from the EFP API
 type EFPFollowingRecord struct {
 	Version    int      `json:"version"`
 	RecordType string   `json:"record_type"`
 	Data       string   `json:"data"` // Ethereum address
 	Tags       []string `json:"tags"`
+	ENS        *ENSData `json:"ens"` // Nullable ENS data
 }
 
 // EFPFollowingResponse represents the response from the EFP following endpoint
@@ -32,8 +42,11 @@ type EFPFollowingResponse struct {
 
 // FollowingAddress represents a processed following address for internal use
 type FollowingAddress struct {
-	Address common.Address `json:"address"`
-	Tags    []string       `json:"tags"`
+	Address common.Address    `json:"address"`
+	Tags    []string          `json:"tags"`
+	ENSName string            `json:"ensName"` // ENS name from API
+	Avatar  string            `json:"avatar"`  // Avatar URL from API
+	Records map[string]string `json:"records"` // Social links and other ENS records
 }
 
 type Client struct {
@@ -70,7 +83,7 @@ func (c *Client) IsConnected() bool {
 
 // FetchFollowingAddresses fetches the list of addresses that the given user is following
 func (c *Client) FetchFollowingAddresses(ctx context.Context, userAddress common.Address) ([]FollowingAddress, error) {
-	url := fmt.Sprintf("%s/users/%s/following", c.baseURL, userAddress.Hex())
+	url := fmt.Sprintf("%s/users/%s/following?include=ens", c.baseURL, userAddress.Hex())
 
 	response, err := c.httpClient.DoGetRequest(ctx, url, nil)
 	if err != nil {
@@ -103,6 +116,14 @@ func handleFollowingResponse(response []byte) ([]FollowingAddress, error) {
 			Address: common.HexToAddress(record.Data),
 			Tags:    record.Tags,
 		}
+
+		// Include ENS data if available
+		if record.ENS != nil {
+			followingAddr.ENSName = record.ENS.Name
+			followingAddr.Avatar = record.ENS.Avatar
+			followingAddr.Records = record.ENS.Records
+		}
+
 		result = append(result, followingAddr)
 	}
 
