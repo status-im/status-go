@@ -47,10 +47,12 @@ ifeq ($(MAKECMDGOALS),statusgo-android-library)
     HOST_OS ?= linux
     ifeq ($(ARCH),x86_64)
         MOBILE_GOARCH := amd64
+        ANDROID_CLANG_TARGET := x86_64-linux-android$(ANDROID_API)
     else
         MOBILE_GOARCH := $(ARCH)
+        ANDROID_CLANG_TARGET := aarch64-linux-android$(ANDROID_API)
     endif
-    ANDROID_BUILD_FLAGS := CC="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/clang --target=aarch64-linux-android$(ANDROID_API) --sysroot=$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/sysroot" CGO_CFLAGS="-Os -flto -fembed-bitcode" CGO_LDFLAGS="-Os -flto" CGO_ENABLED=1 GOOS=android GOARCH=$(MOBILE_GOARCH)
+    ANDROID_BUILD_FLAGS := CC="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/clang --target=$(ANDROID_CLANG_TARGET) --sysroot=$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/sysroot" CGO_CFLAGS="-Os -flto -fembed-bitcode" CGO_LDFLAGS="-Os -flto" CGO_ENABLED=1 GOOS=android GOARCH=$(MOBILE_GOARCH)
 endif
 
 ifeq ($(MAKECMDGOALS),statusgo-ios-library)
