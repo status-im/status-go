@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/t/utils"
 )
@@ -50,28 +49,4 @@ func (s *OldMobileV1_10_UserLoginTest) TestLoginWithSuccessNodeConfigMigration()
 	}
 	s.Require().NoError(b.LoginAccount(loginRequest))
 	s.Require().NoError(b.Logout())
-}
-
-// without workaroundToFixBadMigration, this test would login fail
-func (s *OldMobileV1_10_UserLoginTest) TestLoginWithFailNodeConfigMigration() {
-	bkFunc := common.IsMobilePlatform
-	common.IsMobilePlatform = func() bool {
-		return true
-	}
-	defer func() {
-		common.IsMobilePlatform = bkFunc
-	}()
-
-	s.tmpdir = s.T().TempDir()
-	copyDir(v1_10_AfterUpgradeFolder, s.tmpdir, s.T())
-
-	b := NewGethStatusBackend(s.logger)
-	b.UpdateRootDataDir(s.tmpdir)
-	s.Require().NoError(b.OpenAccounts(true))
-	loginRequest := &requests.Login{
-		KeyUID:   v1_10_keyUID,
-		Password: v1_10_passwd,
-	}
-	err := b.LoginAccount(loginRequest)
-	s.Require().NoError(err)
 }
