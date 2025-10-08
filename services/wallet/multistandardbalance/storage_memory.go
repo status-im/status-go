@@ -36,10 +36,12 @@ func updateIfNeeded[T any](entryMap map[BalancesKey]balanceEntry[T], key Balance
 
 	oldBalance := newEntry.balance
 	oldState = defaultState()
+	oldEntryExists := false
 	// Set oldState to the existing entry's state if it exists
 	if oldEntry, exists := entryMap[key]; exists {
 		oldBalance = oldEntry.balance
 		oldState = oldEntry.state
+		oldEntryExists = true
 	}
 
 	// Check if new state has a valid block number
@@ -52,7 +54,8 @@ func updateIfNeeded[T any](entryMap map[BalancesKey]balanceEntry[T], key Balance
 	if oldState.AtBlockNumber != nil && newEntry.state.AtBlockNumber.Cmp(oldState.AtBlockNumber) <= 0 {
 		return
 	}
-	balanceChanged = !isEqualFn(oldBalance, newEntry.balance)
+	// Report a change if the entry doesn't exist or the balance is different
+	balanceChanged = !oldEntryExists || !isEqualFn(oldBalance, newEntry.balance)
 
 	entryMap[key] = newEntry
 	return

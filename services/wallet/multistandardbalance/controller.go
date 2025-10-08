@@ -4,10 +4,13 @@ package multistandardbalance
 
 import (
 	"context"
+	"encoding/json"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
@@ -15,6 +18,8 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
+	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/transactions"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 
@@ -60,6 +65,8 @@ func DefaultControllerConfig() ControllerConfig {
 	}
 }
 
+type FetchConfig map[BalancesKey][]multistandardfetcher.ResultType
+
 type Controller struct {
 	config  ControllerConfig
 	storage Storage
@@ -73,12 +80,15 @@ type Controller struct {
 	tokenListProvider       TokenListProvider
 	collectibleListProvider CollectiblesListProvider
 	lastBlockManager        LastBlockManager
+	walletFeed              *event.Feed
+	walletEventsWatcher     *walletevent.Watcher
 
 	publisher *pubsub.Publisher
 
-	stopCh          chan struct{}
-	triggerFetchCh  chan bool
-	fetchDebounceFn func(f func())
+	stopCh             chan struct{}
+	fetchDebounceFn    func(f func())
+	pendingFullFetch   bool
+	pendingFetchConfig FetchConfig
 
 	logger *zap.Logger
 }
@@ -93,6 +103,7 @@ func NewController(
 	tokenListProvider TokenListProvider,
 	collectibleListProvider CollectiblesListProvider,
 	lastBlockManager LastBlockManager,
+	walletFeed *event.Feed,
 	logger *zap.Logger,
 ) *Controller {
 	return &Controller{
@@ -107,7 +118,8 @@ func NewController(
 		lastBlockManager:        lastBlockManager,
 		publisher:               pubsub.NewPublisher(),
 		fetchDebounceFn:         debounce.New(config.FetchDebounceTime),
-		triggerFetchCh:          make(chan bool),
+		pendingFetchConfig:      make(FetchConfig),
+		walletFeed:              walletFeed,
 		logger:                  logger,
 	}
 }
@@ -121,6 +133,7 @@ func (c *Controller) Start() {
 
 	c.startAccountsWatcher()
 	c.startNetworksWatcher()
+	c.startWalletEventsWatcher()
 	c.startFetcher()
 }
 
@@ -129,6 +142,8 @@ func (c *Controller) Stop() {
 		close(c.stopCh)
 		c.stopCh = nil
 	}
+
+	c.stopWalletEventsWatcher()
 }
 
 func (c *Controller) GetPublisher() *pubsub.Publisher {
@@ -140,31 +155,19 @@ func (c *Controller) startAccountsWatcher() {
 		return
 	}
 
-	removedCh, removedUnsubFn := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](c.accountsPublisher, 10)
 	addedCh, addedUnsubFn := pubsub.Subscribe[accountsevent.AccountsAddedEvent](c.accountsPublisher, 10)
 	go func() {
 		defer gocommon.LogOnPanic()
-		defer removedUnsubFn()
 		defer addedUnsubFn()
 		for {
 			select {
 			case <-c.stopCh:
 				return
-			case _, ok := <-removedCh:
-				if !ok {
-					return
-				}
-				c.triggerFetch(false)
-				accounts, err := c.getAllAccounts()
-				if err != nil {
-					continue
-				}
-				c.storage.ClearMissingAccounts(context.Background(), accounts)
 			case _, ok := <-addedCh:
 				if !ok {
 					return
 				}
-				c.triggerFetch(false)
+				c.triggerFetch()
 			}
 		}
 	}()
@@ -188,15 +191,70 @@ func (c *Controller) startNetworksWatcher() {
 				if !ok {
 					return
 				}
-				c.triggerFetch(false)
-				networks, err := c.getAllNetworks()
-				if err != nil {
-					continue
-				}
-				c.storage.ClearMissingChains(context.Background(), networks)
+				c.triggerFetch()
 			}
 		}
 	}()
+}
+
+func (c *Controller) startWalletEventsWatcher() {
+	if c.walletEventsWatcher != nil {
+		return
+	}
+
+	// Respond to any sent transaction update
+	walletEventCb := func(event walletevent.Event) {
+		switch event.Type {
+		case transactions.EventPendingTransactionUpdate:
+			var p transactions.PendingTxUpdatePayload
+			err := json.Unmarshal([]byte(event.Message), &p)
+			if err != nil {
+				return
+			}
+			if p.Deleted {
+				// Some pending transaction moved to its
+				// final state, trigger a fetch
+				fetchConfig := make(FetchConfig)
+				accounts := make([]common.Address, 0)
+				networks := make([]uint64, 0)
+				for _, sentTransaction := range p.TxDetails.SentTransactions {
+					accounts = append(accounts, common.BytesToAddress(sentTransaction.FromAddress.Bytes()))
+					accounts = append(accounts, common.BytesToAddress(sentTransaction.ToAddress.Bytes()))
+					networks = append(networks, sentTransaction.FromChain)
+					networks = append(networks, sentTransaction.ToChain)
+				}
+				for _, account := range accounts {
+					for _, network := range networks {
+						c.logger.Debug("triggering fetch due to pending transaction update", zap.Uint64("chainID", network), zap.String("account", gocommon.TruncateWithDot(account.String())))
+						// TODO: Add only relevant result types to the transaction type
+						// For now we simply fetch all result types. It shouldn't normally cause additional calls
+						// due to use of multicall
+						fetchConfig[BalancesKey{Account: account, ChainID: network}] = []multistandardfetcher.ResultType{
+							multistandardfetcher.ResultTypeNative,
+							multistandardfetcher.ResultTypeERC20,
+							multistandardfetcher.ResultTypeERC721,
+							multistandardfetcher.ResultTypeERC1155,
+						}
+					}
+				}
+				c.TriggerFetchWithConfig(fetchConfig)
+			}
+		default:
+			// Unrelated event, do not trigger a fetch
+			return
+		}
+	}
+
+	c.walletEventsWatcher = walletevent.NewWatcher(c.walletFeed, walletEventCb)
+
+	c.walletEventsWatcher.Start()
+}
+
+func (c *Controller) stopWalletEventsWatcher() {
+	if c.walletEventsWatcher != nil {
+		c.walletEventsWatcher.Stop()
+		c.walletEventsWatcher = nil
+	}
 }
 
 func (c *Controller) startFetcher() {
@@ -209,30 +267,30 @@ func (c *Controller) startFetcher() {
 			case <-c.stopCh:
 				return
 			case <-ticker.C:
-				// Force fetch regardless of last fetch time
-				c.triggerFetch(true)
-			case forced := <-c.triggerFetchCh:
-				ticker.Reset(c.config.FetchPeriod)
-				c.triggerFetch(forced)
+				c.TriggerFullFetch()
 			}
 		}
 	}()
 	// Trigger initial fetch
-	c.triggerFetch(true)
+	c.TriggerFullFetch()
 }
 
-func (c *Controller) TriggerFetch(forced bool) {
-	select {
-	case c.triggerFetchCh <- forced:
-	default:
-	}
+// Triggers delayed fetch for some accounts/networks/types, according to fetchConfig
+func (c *Controller) TriggerFetchWithConfig(fetchConfig FetchConfig) {
+	c.upsertFetchConfig(fetchConfig)
+	c.triggerFetch()
 }
 
-func (c *Controller) triggerFetch(forced bool) {
-	c.fetchDebounceFn(func() {
-		balancesToFetch := c.computeBalancesToFetch(forced)
-		c.triggerFetchNow(balancesToFetch)
-	})
+// Triggers delayed fetch for all accounts/networks/types
+func (c *Controller) TriggerFullFetch() {
+	c.mu.Lock()
+	c.pendingFullFetch = true
+	c.mu.Unlock()
+	c.triggerFetch()
+}
+
+func (c *Controller) triggerFetch() {
+	c.fetchDebounceFn(c.fetchNow)
 }
 
 // Needs to fetch if the balance has never been fetched or if the last fetch was more than fetchPeriod ago
@@ -264,8 +322,10 @@ func (c *Controller) getAllNetworks() ([]uint64, error) {
 	return chains, nil
 }
 
-// For all accounts and networks, check which balance types needs to be fetched
-func (c *Controller) computeBalancesToFetch(forced bool) map[BalancesKey][]multistandardfetcher.ResultType {
+// If fullFetch is true, fetch all balance types for all accounts and networks.
+// If fullFetch is false, fetch only the balance types for the accounts and networks that need to be fetched based on the last fetch time and
+// the pendingFetchConfig.
+func (c *Controller) computeBalancesToFetch(fullFetch bool, pendingFetchConfig FetchConfig) FetchConfig {
 	balancesToFetch := make(map[BalancesKey][]multistandardfetcher.ResultType)
 
 	accounts, err := c.getAllAccounts()
@@ -277,6 +337,9 @@ func (c *Controller) computeBalancesToFetch(forced bool) map[BalancesKey][]multi
 	if err != nil {
 		return nil
 	}
+
+	// Clear up dangling data from storage
+	c.storage.ClearMissingAccounts(context.Background(), accounts)
 	c.storage.ClearMissingChains(context.Background(), networks)
 
 	for _, account := range accounts {
@@ -284,17 +347,40 @@ func (c *Controller) computeBalancesToFetch(forced bool) map[BalancesKey][]multi
 			key := BalancesKey{Account: account, ChainID: network}
 
 			resultTypes := make([]multistandardfetcher.ResultType, 0, 4)
-			if _, state, err := c.storage.GetNativeBalance(context.Background(), key); err == nil && c.needsToFetch(state) || forced {
-				resultTypes = append(resultTypes, multistandardfetcher.ResultTypeNative)
-			}
-			if _, state, err := c.storage.GetERC20Balances(context.Background(), key); err == nil && c.needsToFetch(state) || forced {
-				resultTypes = append(resultTypes, multistandardfetcher.ResultTypeERC20)
-			}
-			if _, state, err := c.storage.GetERC721Balances(context.Background(), key); err == nil && c.needsToFetch(state) || forced {
-				resultTypes = append(resultTypes, multistandardfetcher.ResultTypeERC721)
-			}
-			if _, state, err := c.storage.GetERC1155Balances(context.Background(), key); err == nil && c.needsToFetch(state) || forced {
-				resultTypes = append(resultTypes, multistandardfetcher.ResultTypeERC1155)
+			if fullFetch {
+				resultTypes = []multistandardfetcher.ResultType{
+					multistandardfetcher.ResultTypeNative,
+					multistandardfetcher.ResultTypeERC20,
+					multistandardfetcher.ResultTypeERC721,
+					multistandardfetcher.ResultTypeERC1155,
+				}
+			} else {
+				// Insert values from pendingFetchConfig
+				resultTypes = append(resultTypes, pendingFetchConfig[key]...)
+
+				// Add remaining values that need to be fetched
+				stateMap := make(map[multistandardfetcher.ResultType]State)
+				if _, state, err := c.storage.GetNativeBalance(context.Background(), key); err == nil {
+					stateMap[multistandardfetcher.ResultTypeNative] = state
+				}
+				if _, state, err := c.storage.GetERC20Balances(context.Background(), key); err == nil {
+					stateMap[multistandardfetcher.ResultTypeERC20] = state
+				}
+				if _, state, err := c.storage.GetERC721Balances(context.Background(), key); err == nil {
+					stateMap[multistandardfetcher.ResultTypeERC721] = state
+				}
+				if _, state, err := c.storage.GetERC1155Balances(context.Background(), key); err == nil {
+					stateMap[multistandardfetcher.ResultTypeERC1155] = state
+				}
+
+				for resultType, state := range stateMap {
+					if slices.Contains(resultTypes, resultType) {
+						continue
+					}
+					if c.needsToFetch(state) {
+						resultTypes = append(resultTypes, resultType)
+					}
+				}
 			}
 
 			balancesToFetch[key] = resultTypes
@@ -304,27 +390,87 @@ func (c *Controller) computeBalancesToFetch(forced bool) map[BalancesKey][]multi
 	return balancesToFetch
 }
 
-func (c *Controller) triggerFetchNow(balancesToFetch map[BalancesKey][]multistandardfetcher.ResultType) {
+func (c *Controller) upsertFetchConfig(fetchConfig FetchConfig) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for key, resultTypes := range fetchConfig {
+		pendingFetchConfig := c.pendingFetchConfig[key]
+		for _, resultType := range resultTypes {
+			if !slices.Contains(pendingFetchConfig, resultType) {
+				pendingFetchConfig = append(pendingFetchConfig, resultType)
+			}
+		}
+		c.pendingFetchConfig[key] = pendingFetchConfig
+	}
+}
+
+func (c *Controller) popPendingFetchValues() (bool, FetchConfig) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	fullFetch := c.pendingFullFetch
+	c.pendingFullFetch = false
+	fetchConfig := c.pendingFetchConfig
+	c.pendingFetchConfig = make(FetchConfig)
+	return fullFetch, fetchConfig
+}
+
+func (c *Controller) fetchNow() {
 	c.logger.Debug("starting fetch")
-	fetchConfigs := c.buildFetchConfigs(balancesToFetch)
+	// Get the fullFetch flag + fetchConfig and reset them
+	fullFetch, fetchConfig := c.popPendingFetchValues()
+
+	balancesToFetch := c.computeBalancesToFetch(fullFetch, fetchConfig)
+	fetchConfigs := c.buildMultiStandardFetcherFetchConfigs(balancesToFetch)
 
 	if len(fetchConfigs) == 0 {
 		return
 	}
 
-	for chainID, fetchConfig := range fetchConfigs {
+	for chainID, chainFetchConfig := range fetchConfigs {
+		for _, address := range chainFetchConfig.Native {
+			c.logger.Debug(
+				"fetching Native balance",
+				zap.Uint64("chainID", chainID),
+				zap.String("address", gocommon.TruncateWithDot(address.String())),
+			)
+		}
+		for address, tokenList := range chainFetchConfig.ERC20 {
+			c.logger.Debug(
+				"fetching ERC20 balance",
+				zap.Uint64("chainID", chainID),
+				zap.String("address", gocommon.TruncateWithDot(address.String())),
+				zap.Int("tokenList", len(tokenList)),
+			)
+		}
+		for address, tokenList := range chainFetchConfig.ERC721 {
+			c.logger.Debug(
+				"fetching ERC721 balance",
+				zap.Uint64("chainID", chainID),
+				zap.String("address", gocommon.TruncateWithDot(address.String())),
+				zap.Int("tokenList", len(tokenList)),
+			)
+		}
+		for address, tokenList := range chainFetchConfig.ERC1155 {
+			c.logger.Debug(
+				"fetching ERC1155 balance",
+				zap.Uint64("chainID", chainID),
+				zap.String("address", gocommon.TruncateWithDot(address.String())),
+				zap.Int("tokenList", len(tokenList)),
+			)
+		}
+
 		ctx, cancel := context.WithCancel(context.Background())
 
-		resultsCh, err := c.fetcher.FetchBalances(ctx, chainID, fetchConfig)
+		resultsCh, err := c.fetcher.FetchBalances(ctx, chainID, chainFetchConfig)
 		if err != nil {
 			c.logger.Error("failed to fetch balances", zap.Uint64("chainID", chainID), zap.Error(err))
-			c.sendEventBalanceFetchFailedToStart(chainID, fetchConfig, err)
+			c.sendEventBalanceFetchFailedToStart(chainID, chainFetchConfig, err)
 			cancel()
 			continue
 		}
 
 		c.logger.Debug("fetch started", zap.Uint64("chainID", chainID))
-		c.sendEventBalanceFetchStarted(chainID, fetchConfig)
+		c.sendEventBalanceFetchStarted(chainID, chainFetchConfig)
 
 		go func() {
 			defer gocommon.LogOnPanic()
