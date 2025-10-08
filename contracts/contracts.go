@@ -6,9 +6,7 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/directory"
-	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/contracts/namewrapper"
 	"github.com/status-im/status-go/contracts/registrar"
@@ -19,7 +17,6 @@ import (
 )
 
 type ContractMakerIface interface {
-	NewEthScan(chainID uint64) (ethscan.BalanceScannerIface, uint, error)
 	NewERC20(chainID uint64, contractAddr common.Address) (ierc20.IERC20Iface, error)
 	NewERC20Caller(chainID uint64, contractAddr common.Address) (ierc20.IERC20CallerIface, error)
 	// TODO extend with other contracts
@@ -174,46 +171,6 @@ func (c *ContractMaker) NewDirectory(chainID uint64) (*directory.Directory, erro
 	}
 
 	return directory.NewDirectory(
-		contractAddr,
-		backend,
-	)
-}
-
-func (c *ContractMaker) NewEthScan(chainID uint64) (ethscan.BalanceScannerIface, uint, error) {
-	contractAddr, err := ethscan.ContractAddress(chainID)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	contractCreatedAt, err := ethscan.ContractCreatedAt(chainID)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	backend, err := c.RPCClient.EthClient(chainID)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	scanner, err := ethscan.NewBalanceScanner(
-		contractAddr,
-		backend,
-	)
-
-	return scanner, contractCreatedAt, err
-}
-
-func (c *ContractMaker) NewBalanceChecker(chainID uint64) (*balancechecker.BalanceChecker, error) {
-	contractAddr, err := balancechecker.ContractAddress(chainID)
-	if err != nil {
-		return nil, err
-	}
-
-	backend, err := c.RPCClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return balancechecker.NewBalanceChecker(
 		contractAddr,
 		backend,
 	)

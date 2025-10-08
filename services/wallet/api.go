@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -78,14 +79,34 @@ func (api *API) GetLastWalletTokenUpdate() map[common.Address]int64 {
 // GetBalancesByChain return a map with key as chain id and value as map of account address and map of token address and balance
 // [chainID][account][token]balance
 func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addresses, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
-	clients, err := api.s.rpcClient.EthClients(chainIDs)
-	if err != nil {
-		return nil, err
+	ret := make(map[uint64]map[common.Address]map[common.Address]*hexutil.Big)
+
+	for _, chainID := range chainIDs {
+		ret[chainID] = make(map[common.Address]map[common.Address]*hexutil.Big)
+		fetchResults, err := api.s.tokenBalancesFetcher.Fetch(ctx, chainID, tokens, addresses)
+		if err != nil {
+			return nil, err
+		}
+		for account, tokenBalances := range fetchResults {
+			ret[chainID][account] = make(map[common.Address]*hexutil.Big)
+			for token, balance := range tokenBalances {
+				ret[chainID][account][token] = (*hexutil.Big)(balance)
+			}
+		}
 	}
 
-	return api.s.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokens)
+	return ret, nil
 }
 
+// The client doesn't really need to force balance refreshes, it can just get them from the tokenbalances Storage.
+// Every reason for which reader used to trigger a fetch is already handled by the multistandardbalance Controller.
+// - Account addition
+// - Active network change / Testnet mode toggle
+// - App start
+// - Periodic refresh
+// The only outlier is the user-triggered refresh, which is handled in API method RestartWalletReloadTimer
+// This will be fully refactored soon to avoid the duplicate storage and simplify the API, for now we just use the tokenbalances Storage
+// and ignore the forceRefresh parameter.
 func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address, forceRefresh bool) (map[common.Address][]tokenTypes.StorageToken, error) {
 	activeNetworks, err := api.s.rpcClient.GetNetworkManager().GetActiveNetworks()
 	if err != nil {
@@ -93,12 +114,8 @@ func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []
 	}
 
 	chainIDs := wcommon.NetworksToChainIDs(activeNetworks)
-	clients, err := api.s.rpcClient.EthClients(chainIDs)
-	if err != nil {
-		return nil, err
-	}
 
-	return api.reader.FetchOrGetCachedWalletBalances(ctx, clients, addresses, forceRefresh)
+	return api.reader.GetCachedBalances(chainIDs, addresses)
 }
 
 type DerivedAddress struct {
@@ -518,19 +535,14 @@ func (api *API) AddressDetails(ctx context.Context, params *requests.AddressDeta
 		chainIDs = wcommon.NetworksToChainIDs(activeNetworks)
 	}
 
-	clients, err := api.s.rpcClient.EthClients(chainIDs)
-	if err != nil {
-		return nil, err
-	}
-
 	if params.TimeoutInMilliseconds > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(params.TimeoutInMilliseconds)*time.Millisecond)
 		defer cancel()
 	}
 
-	for _, client := range clients {
-		balance, err := api.s.tokenManager.GetChainBalance(ctx, client, common.Address(result.Address))
+	for _, chainID := range chainIDs {
+		balance, err := api.s.tokenBalancesFetcher.FetchSingle(ctx, chainID, tokenbalances.NativeTokenAddress, common.Address(result.Address))
 		if err != nil {
 			if err != nil && errors.Is(err, context.DeadlineExceeded) {
 				return result, nil
@@ -560,12 +572,7 @@ func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address s
 
 	result.AlreadyCreated = addressExists
 
-	chainClient, err := api.s.rpcClient.EthClient(chainID)
-	if err != nil {
-		return result, err
-	}
-
-	balance, err := api.s.tokenManager.GetChainBalance(ctx, chainClient, common.Address(result.Address))
+	balance, err := api.s.tokenBalancesFetcher.FetchSingle(ctx, chainID, tokenbalances.NativeTokenAddress, common.Address(result.Address))
 	if err != nil {
 		return result, err
 	}
@@ -830,7 +837,8 @@ func (api *API) SafeSignTypedDataForDApps(typedJson string, address string, pass
 }
 
 func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
-	return api.s.reader.Restart()
+	api.s.multistandardBalanceController.TriggerFullFetch()
+	return nil
 }
 
 func (api *API) IsChecksumValidForAddress(address string) (bool, error) {
