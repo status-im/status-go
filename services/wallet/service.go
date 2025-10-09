@@ -128,14 +128,6 @@ func NewService(
 		featureFlags.EnableCelerBridge = true
 	}
 
-	if config.WalletConfig.EnableMercuryoProvider {
-		featureFlags.EnableMercuryoProvider = true
-	}
-
-	if featureFlags.EnableMercuryoProvider {
-		cryptoOnRampProviders = append(cryptoOnRampProviders, onramp.NewMercuryoProvider(tokenManager))
-	}
-
 	cryptoOnRampManager := onramp.NewManager(cryptoOnRampProviders)
 
 	savedAddressesManager := &SavedAddressesManager{db: db}
