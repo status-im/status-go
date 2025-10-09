@@ -3,9 +3,9 @@ library 'status-jenkins-lib@v1.9.26'
 
 pipeline {
   agent {
-    dockerfile {
+    docker {
       label 'linuxcontainer'
-      filename 'linux.Dockerfile'
+      image 'harbor.status.im/infra/ci-build-containers:linux-base-1.0.0'
       dir '_assets/ci/'
       args '--volume=/nix:/nix ' +
            '--volume=/etc/nix:/etc/nix '

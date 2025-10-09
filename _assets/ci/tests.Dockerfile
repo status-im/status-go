@@ -1,13 +1,12 @@
-FROM debian:bookworm-slim
+FROM harbor.status.im/infra/ci-build-containers:linux-base-1.0.0
+
+USER root
 
 RUN apt-get update && apt-get install -yq --no-install-recommends --fix-missing \
-    curl \
-    ca-certificates \
     lsb-release \
     xz-utils \
     gnupg \
     wget \
-    git \
     build-essential \
     python3 \
     python3-pip \
@@ -31,16 +30,6 @@ RUN mkdir -p /etc/apt/keyrings && \
     docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -r jenkins --gid 1001 \
-    && useradd -r -m -g jenkins --uid 1001 -d /home/jenkins jenkins
-
-RUN groupadd -g 999 docker && \
-    usermod -a -G docker jenkins
-
 USER jenkins
-
-ENV PATH="${PATH}:/nix/var/nix/profiles/default/bin"
-ENV NIX_REMOTE=daemon
-ENV HOME=/home/jenkins
 
 ENTRYPOINT [""]
