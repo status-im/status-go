@@ -5,6 +5,9 @@ from requests import ReadTimeout
 
 from clients.status_backend import StatusBackend
 from clients.statusgo_container import StatusGoContainer
+from clients.anvil import Anvil
+from clients.foundry import Foundry
+from clients.contract_deployers.multicall3 import Multicall3Deployer
 from resources.constants import USE_IPV6
 
 
@@ -169,3 +172,18 @@ def close_status_backend_containers(request):
         except Exception as e:
             logging.error(f"Error cleaning up container: {e}")
     StatusGoContainer.all_containers = []
+
+
+@pytest.fixture(scope="session")
+def anvil_client():
+    return Anvil()
+
+
+@pytest.fixture(scope="session")
+def foundry_client():
+    return Foundry()
+
+
+@pytest.fixture(scope="session")
+def multicall3_deployer(foundry_client):
+    return Multicall3Deployer(foundry_client)

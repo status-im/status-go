@@ -9,6 +9,7 @@ import (
 
 	"gopkg.in/go-playground/validator.v9"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/pkg/security"
@@ -232,6 +233,8 @@ type WalletConfig struct {
 
 	TokensListsAutoRefreshInterval      int `json:"TokensListsAutoRefreshInterval"`      // in seconds
 	TokensListsAutoRefreshCheckInterval int `json:"TokensListsAutoRefreshCheckInterval"` // in seconds
+
+	MulticallOverrides map[uint64]common.Address `json:"MulticallOverrides"` // map[chainID]multicall3 contract address
 }
 
 type MarketDataProxyConfig struct {

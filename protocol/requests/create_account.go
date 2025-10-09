@@ -1,6 +1,7 @@
 package requests
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
 	utils "github.com/status-im/status-go/common"
@@ -94,6 +95,9 @@ type WalletConfig struct {
 	TokensListsAutoRefreshCheckInterval int `json:"tokensListsAutoRefreshCheckInterval"` // in seconds
 	MarketDataFullDataRefreshInterval   int `json:"marketDataFullDataRefreshInterval"`   // in seconds
 	MarketDataPriceRefreshInterval      int `json:"marketDataPriceRefreshInterval"`      // in seconds
+
+	MulticallOverrides map[uint64]common.Address `json:"multicallOverrides"` // map[chainID]multicall3 contract address
+
 }
 type WalletSecretsConfig struct {
 	PoktToken            security.SensitiveString `json:"poktToken"`

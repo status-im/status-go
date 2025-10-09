@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 	"github.com/status-im/go-wallet-sdk/pkg/contracts/multicall3"
 
@@ -20,15 +21,25 @@ type EthClientGetter interface {
 }
 
 type Fetcher struct {
-	ethClientGetter EthClientGetter
-	batchSize       int
+	ethClientGetter    EthClientGetter
+	batchSize          int
+	multicallOverrides map[uint64]common.Address
 }
 
-func NewFetcher(ethClientGetter EthClientGetter, batchSize int) *Fetcher {
+func NewFetcher(ethClientGetter EthClientGetter, batchSize int, multicallOverrides map[uint64]common.Address) *Fetcher {
 	return &Fetcher{
-		ethClientGetter: ethClientGetter,
-		batchSize:       batchSize,
+		ethClientGetter:    ethClientGetter,
+		batchSize:          batchSize,
+		multicallOverrides: multicallOverrides,
 	}
+}
+
+func (f *Fetcher) getMulticall3Address(chainID uint64) (common.Address, bool) {
+	multicallAddr, exists := f.multicallOverrides[chainID]
+	if exists {
+		return multicallAddr, true
+	}
+	return multicall3.GetMulticall3Address(int64(chainID))
 }
 
 func (f *Fetcher) FetchBalances(ctx context.Context, chainID uint64, config multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error) {
@@ -38,7 +49,7 @@ func (f *Fetcher) FetchBalances(ctx context.Context, chainID uint64, config mult
 	}
 
 	// Get multicall3 contract address
-	multicallAddr, exists := multicall3.GetMulticall3Address(int64(chainID))
+	multicallAddr, exists := f.getMulticall3Address(chainID)
 	if !exists {
 		return nil, errors.New("Multicall3 not supported on chain ID " + strconv.Itoa(int(chainID)))
 	}

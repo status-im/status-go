@@ -5,8 +5,18 @@ import docker
 from utils.config import Config
 from tenacity import retry, wait_fixed, stop_after_attempt
 from web3 import Web3
-from web3.types import TxData, TxReceipt
-from eth_typing.encoding import HexStr
+from web3.types import (
+    TxData,
+    TxReceipt,
+    RPCEndpoint,
+)
+from eth_typing import (
+    HexStr,
+)
+from typing import (
+    Union,
+)
+from hexbytes import HexBytes
 
 
 class Anvil(Web3):
@@ -58,3 +68,9 @@ class Anvil(Web3):
 
     def transaction_receipt(self, tx_hash: str) -> TxReceipt:
         return self.eth.get_transaction_receipt(HexStr(tx_hash))
+
+    def send_raw_transaction(self, transaction: Union[HexStr, bytes]) -> HexBytes:
+        return self.eth.send_raw_transaction(transaction)
+
+    def set_balance(self, address: str, raw_amount: int):
+        return self.provider.make_request(RPCEndpoint("anvil_setBalance"), [address, hex(raw_amount)])

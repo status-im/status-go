@@ -193,7 +193,7 @@ func NewService(
 	marketManager := market.NewManager(marketProviders, tokenManager, feed)
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 
-	multistandardBalanceFetcher := multistandardbalance.NewFetcher(rpcClient, multistandardbalance.DefaultBatchSize)
+	multistandardBalanceFetcher := multistandardbalance.NewFetcher(rpcClient, multistandardbalance.DefaultBatchSize, config.WalletConfig.MulticallOverrides)
 	multistandardBalanceStorage := multistandardbalance.NewStorageMemory()
 	multistandardBalanceController := multistandardbalance.NewController(
 		multistandardbalance.DefaultControllerConfig(),
