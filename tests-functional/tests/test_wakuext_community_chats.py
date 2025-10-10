@@ -1,4 +1,3 @@
-from enum import Enum
 from uuid import uuid4
 from datetime import datetime, timezone, timedelta
 import pytest
@@ -6,17 +5,7 @@ import pytest
 from steps.messenger import MessengerSteps
 from clients.services.wakuext import ActivityCenterNotificationType
 from clients.signals import SignalType
-
-
-class MutedType(Enum):
-    MuteFor15Min = 1
-    MuteFor1Hr = 2
-    MuteFor8Hr = 3
-    MuteFor1Week = 4
-    MuteTillUnmuted = 5
-    MuteTill1Min = 6
-    Unmuted = 7
-    MuteFor24Hr = 8
+from resources.enums import MuteType
 
 
 @pytest.mark.rpc
@@ -132,7 +121,7 @@ class TestCommunityChats(MessengerSteps):
         community_before = self.creator.wakuext_service.fetch_community(self.community_id)
         assert community_before.get("muted") is False
 
-        mute_resp = self.creator.wakuext_service.mute_community_chats(self.community_id, MutedType.MuteFor15Min.value)
+        mute_resp = self.creator.wakuext_service.mute_community_chats(self.community_id, MuteType.MUTE_FOR15_MIN.value)
         assert mute_resp is not None
 
         community_after_mute = self.creator.wakuext_service.fetch_community(self.community_id)
@@ -146,7 +135,7 @@ class TestCommunityChats(MessengerSteps):
         assert community_after_unmute.get("muted") is False
         assert community_after_unmute.get("muteTill") == "0001-01-01T00:00:00Z"
 
-    @pytest.mark.parametrize("muted_type", [mt.value for mt in MutedType])
+    @pytest.mark.parametrize("muted_type", [mt.value for mt in MuteType])
     def test_mute_types_are_applied(self, muted_type):
         create_resp = self.creator.wakuext_service.create_community_chat(self.community_id, self.chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
@@ -157,7 +146,7 @@ class TestCommunityChats(MessengerSteps):
         muted_flag = community_after_mute.get("muted")
         comm_mute_till = community_after_mute.get("muteTill")
 
-        if muted_type == MutedType.Unmuted.value:
+        if muted_type == MuteType.UNMUTED.value:
             assert muted_flag is False
         else:
             assert muted_flag is True
@@ -173,12 +162,12 @@ class TestCommunityChats(MessengerSteps):
 
         # map expected durations
         expected_map = {
-            MutedType.MuteFor15Min.value: timedelta(minutes=15),
-            MutedType.MuteFor1Hr.value: timedelta(hours=1),
-            MutedType.MuteFor8Hr.value: timedelta(hours=8),
-            MutedType.MuteFor24Hr.value: timedelta(hours=24),
-            MutedType.MuteFor1Week.value: timedelta(days=7),
-            MutedType.MuteTill1Min.value: timedelta(minutes=1),
+            MuteType.MUTE_FOR15_MIN.value: timedelta(minutes=15),
+            MuteType.MUTE_FOR1_HR.value: timedelta(hours=1),
+            MuteType.MUTE_FOR8_HR.value: timedelta(hours=8),
+            MuteType.MUTE_FOR24_HR.value: timedelta(hours=24),
+            MuteType.MUTE_FOR1_WEEK.value: timedelta(days=7),
+            MuteType.MUTE_TILL1_MIN.value: timedelta(minutes=1),
         }
 
         # allow some tolerance for clocks and propagation delays
@@ -222,7 +211,7 @@ class TestCommunityChats(MessengerSteps):
         self.member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=chat_id, timeout=10)
 
         # muting the community chats
-        self.member.wakuext_service.mute_community_chats(self.community_id, MutedType.MuteFor15Min.value)
+        self.member.wakuext_service.mute_community_chats(self.community_id, MuteType.MUTE_FOR15_MIN.value)
 
         text = f"Hi @{self.member.public_key}"
         # creator sends a chat message with a mention to trigger a notification
