@@ -968,6 +968,9 @@ func (w *Waku) subscribe(f *common.Filter) (string, error) {
 	}
 
 	if w.cfg.LightClient {
+		if w.filterManager == nil {
+			return id, nil
+		}
 		cf := protocol.NewContentFilter(f.PubsubTopic, f.ContentTopics.ContentTopics()...)
 		w.filterManager.SubscribeFilter(id, cf)
 	}
@@ -983,6 +986,9 @@ func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 	}
 
 	if w.cfg.LightClient {
+		if w.filterManager == nil {
+			return nil
+		}
 		w.filterManager.UnsubscribeFilter(id)
 	}
 
