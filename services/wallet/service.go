@@ -102,10 +102,6 @@ func NewService(
 
 	featureFlags := &protocolCommon.FeatureFlags{}
 
-	if config.WalletConfig.EnableMercuryoProvider {
-		featureFlags.EnableMercuryoProvider = true
-	}
-
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	blockChainState := blockchainstate.NewBlockChainState(rpcClient)
@@ -122,15 +118,6 @@ func NewService(
 
 		cryptoOnRampProviders = []onramp.Provider{
 			onramp.NewMoonPayProvider(),
-		}
-
-		if featureFlags.EnableMercuryoProvider {
-			params := onramp.MercuryoParams{
-				SignURL:      fmt.Sprintf("https://%s.api.status.im/mercuryo/sign/", statusProxyStageName),
-				SignUser:     config.WalletConfig.StatusProxyUser,
-				SignPassword: config.WalletConfig.StatusProxyPassword,
-			}
-			cryptoOnRampProviders = append(cryptoOnRampProviders, onramp.NewMercuryoProvider(tokenManager, params))
 		}
 
 		cryptoCompare := cryptocompare.NewClient()
