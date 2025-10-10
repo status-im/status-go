@@ -15,7 +15,7 @@ class SettingsService(Service):
         response = self.rpc_request("saveSetting", params)
         return response
 
-    def node_config(self):
+    def get_node_config(self):
         return self.rpc_request("nodeConfig")
 
     def news_feed_enabled(self):
