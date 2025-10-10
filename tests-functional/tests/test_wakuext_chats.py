@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -92,8 +92,6 @@ class TestChatActions(MessengerSteps):
         assert chat.get("muted", False) is True
         assert chat.get("muteTill", "") == result
 
-    @pytest.mark.skip(reason="Skipping mute chat tests due to failing on local build")
-    # TODO: check in nightly build locally
     @pytest.mark.parametrize(
         "mute_type, time_delta",
         [
@@ -113,11 +111,11 @@ class TestChatActions(MessengerSteps):
         chat_id = self.receiver.public_key
 
         result = self.sender.wakuext_service.mute_chat_v2(chat_id, mute_type)
-        actual = datetime.strptime(result, "%Y-%m-%dT%H:%M:%SZ")
+        actual = datetime.fromisoformat(result.replace("Z", "+00:00"))
 
-        expected = datetime.now() + time_delta
+        expected = datetime.now(timezone.utc) + time_delta
         diff = expected - actual
-        assert diff.total_seconds() < 2  # 2sec margin
+        assert abs(diff.total_seconds()) < 2  # 2 sec margin
 
         chat = self.sender.wakuext_service.chat(chat_id)
         assert chat.get("muted", False) is True
