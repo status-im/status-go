@@ -1,5 +1,7 @@
 package tokenbalances
 
+//go:generate go tool mockgen -package=mock_tokenbalances -source=fetcher.go -destination=mock/fetcher.go
+
 import (
 	"context"
 	"fmt"
@@ -13,6 +15,11 @@ import (
 
 type MultiStandardBalanceFetcher interface {
 	FetchBalances(ctx context.Context, chainID uint64, config multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error)
+}
+
+type FetcherIface interface {
+	Fetch(ctx context.Context, chainID uint64, tokenAddresses []ContractAddress, accountAddresses []AccountAddress) (map[AccountAddress]map[ContractAddress]*big.Int, error)
+	FetchSingle(ctx context.Context, chainID uint64, tokenAddress ContractAddress, accountAddress AccountAddress) (*big.Int, error)
 }
 
 type Fetcher struct {

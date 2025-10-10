@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/bep/debounce"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"

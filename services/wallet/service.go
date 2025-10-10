@@ -385,7 +385,7 @@ type Service struct {
 	transactionManager             *transfer.TransactionManager
 	pendingTxManager               *transactions.PendingTxTracker
 	multistandardBalanceController *multistandardbalance.Controller
-	tokenBalancesFetcher           *tokenbalances.Fetcher
+	tokenBalancesFetcher           tokenbalances.FetcherIface
 	tokenBalancesStorage           tokenbalances.Storage
 	transferDetectorController     *transferdetector.Controller
 	cryptoOnRampManager            *onramp.Manager
@@ -501,7 +501,7 @@ func (s *Service) GetTokenManager() *token.Manager {
 	return s.tokenManager
 }
 
-func (s *Service) GetTokenBalancesFetcher() *tokenbalances.Fetcher {
+func (s *Service) GetTokenBalancesFetcher() tokenbalances.FetcherIface {
 	return s.tokenBalancesFetcher
 }
 
