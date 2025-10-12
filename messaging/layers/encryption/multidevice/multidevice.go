@@ -2,7 +2,6 @@ package multidevice
 
 import (
 	"crypto/ecdsa"
-	"database/sql"
 
 	"github.com/status-im/status-go/crypto"
 )
@@ -42,14 +41,14 @@ type Config struct {
 }
 
 type Multidevice struct {
-	persistence *sqlitePersistence
+	persistence Persistence
 	config      *Config
 }
 
-func New(db *sql.DB, config *Config) *Multidevice {
+func New(persistence Persistence, config *Config) *Multidevice {
 	return &Multidevice{
 		config:      config,
-		persistence: newSQLitePersistence(db),
+		persistence: persistence,
 	}
 }
 

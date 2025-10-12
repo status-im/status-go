@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/status-im/migrate/v4"
 	"github.com/status-im/migrate/v4/database/sqlcipher"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
@@ -18,7 +19,7 @@ type PostStep struct {
 	RollBackVersion uint
 }
 
-var migrationTable = "status_go_" + sqlcipher.DefaultMigrationsTable
+var MigrationTableName = "status_go_" + sqlcipher.DefaultMigrationsTable
 
 type MigrateOptions struct {
 	MigrationTableName string
@@ -52,7 +53,7 @@ func Migrate(db *sql.DB, resources *bindata.AssetSource, options MigrateOptions)
 
 	migrationTableName := options.MigrationTableName
 	if len(migrationTableName) == 0 {
-		migrationTableName = migrationTable
+		migrationTableName = MigrationTableName
 	}
 	driver, err := sqlcipher.WithInstance(db, &sqlcipher.Config{
 		MigrationsTable: migrationTableName,
@@ -164,7 +165,7 @@ func getCurrentVersion(m *migrate.Migrate, db *sql.DB) (uint, error) {
 		return 0, fmt.Errorf("DB is dirty after migration version %d", lastVersion)
 	}
 	if err == migrate.ErrNilVersion {
-		lastVersion, _, err = GetLastMigrationVersion(db)
+		lastVersion, _, err = GetLastMigrationVersion(db, MigrationTableName)
 		return lastVersion, err
 	}
 	return lastVersion, nil
@@ -172,9 +173,9 @@ func getCurrentVersion(m *migrate.Migrate, db *sql.DB) (uint, error) {
 
 // GetLastMigrationVersion returns the last migration version stored in the migration table.
 // Returns 0 for version in case migrationTableExists is true
-func GetLastMigrationVersion(db *sql.DB) (version uint, migrationTableExists bool, err error) {
+func GetLastMigrationVersion(db *sql.DB, migrationTableName string) (version uint, migrationTableExists bool, err error) {
 	// Check if the migration table exists
-	row := db.QueryRow("SELECT exists(SELECT name FROM sqlite_master WHERE type='table' AND name=?)", migrationTable)
+	row := db.QueryRow("SELECT exists(SELECT name FROM sqlite_master WHERE type='table' AND name=?)", migrationTableName)
 	migrationTableExists = false
 	err = row.Scan(&migrationTableExists)
 	if err != nil && err != sql.ErrNoRows {
@@ -183,11 +184,52 @@ func GetLastMigrationVersion(db *sql.DB) (version uint, migrationTableExists boo
 
 	var lastMigration uint64 = 0
 	if migrationTableExists {
-		row = db.QueryRow("SELECT version FROM status_go_schema_migrations")
+		row = db.QueryRow(fmt.Sprintf("SELECT version FROM %s", migrationTableName))
 		err = row.Scan(&lastMigration)
 		if err != nil && err != sql.ErrNoRows {
 			return 0, true, err
 		}
 	}
 	return uint(lastMigration), migrationTableExists, nil
+}
+
+func CreateMigrationTable(db *sql.DB, name string, version uint) error {
+	row := db.QueryRow("SELECT exists(SELECT name FROM sqlite_master WHERE type='table' AND name=?)", name)
+	exists := false
+	err := row.Scan(&exists)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if exists {
+		return nil
+	}
+
+	// Create the table and insert the version
+	createTable := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (version uint64, dirty bool);`, name)
+	if _, err := db.Exec(createTable); err != nil {
+		return err
+	}
+	createIndex := fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);`, name)
+	if _, err := db.Exec(createIndex); err != nil {
+		return err
+	}
+	insertVersion := fmt.Sprintf(`INSERT INTO %s (version, dirty) VALUES (?, ?)`, name) // nolint:gosec
+	if _, err := db.Exec(insertVersion, version, false); err != nil {
+		return err
+	}
+	return nil
+}
+
+func LatestMigrationUpToVersion(assetNames []string, version uint) uint {
+	floor := uint(0)
+	for _, name := range assetNames {
+		m, err := source.DefaultParse(name)
+		if err != nil {
+			continue // ignore files that we can't parse
+		}
+		if m.Version <= version && (floor == 0 || m.Version > floor) {
+			floor = m.Version
+		}
+	}
+	return floor
 }

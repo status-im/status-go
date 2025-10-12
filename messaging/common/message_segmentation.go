@@ -165,7 +165,7 @@ func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
 		zap.Uint32("ParitySegmentIndex", segmentMessage.ParitySegmentIndex),
 		zap.Uint32("ParitySegmentsCount", segmentMessage.ParitySegmentsCount))
 
-	alreadyCompleted, err := s.persistence.IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash)
+	alreadyCompleted, err := s.persistence.SegmentationStorage().IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash)
 	if err != nil {
 		return err
 	}
@@ -173,12 +173,12 @@ func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
 		return ErrMessageSegmentsAlreadyCompleted
 	}
 
-	err = s.persistence.SaveMessageSegment(segmentMessage, message.TransportLayer.SigPubKey, time.Now().Unix())
+	err = s.persistence.SegmentationStorage().SaveMessageSegment(segmentMessage, message.TransportLayer.SigPubKey, time.Now().Unix())
 	if err != nil {
 		return err
 	}
 
-	segments, err := s.persistence.GetMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey)
+	segments, err := s.persistence.SegmentationStorage().GetMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey)
 	if err != nil {
 		return err
 	}
@@ -258,7 +258,7 @@ func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
 		return ErrMessageSegmentsHashMismatch
 	}
 
-	err = s.persistence.CompleteMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey, time.Now().Unix())
+	err = s.persistence.SegmentationStorage().CompleteMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey, time.Now().Unix())
 	if err != nil {
 		return err
 	}
@@ -271,12 +271,12 @@ func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
 func (s *MessageSender) CleanupSegments() error {
 	monthAgo := time.Now().AddDate(0, -1, 0).Unix()
 
-	err := s.persistence.RemoveMessageSegmentsOlderThan(monthAgo)
+	err := s.persistence.SegmentationStorage().RemoveMessageSegmentsOlderThan(monthAgo)
 	if err != nil {
 		return err
 	}
 
-	err = s.persistence.RemoveMessageSegmentsCompletedOlderThan(monthAgo)
+	err = s.persistence.SegmentationStorage().RemoveMessageSegmentsCompletedOlderThan(monthAgo)
 	if err != nil {
 		return err
 	}

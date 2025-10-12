@@ -221,31 +221,31 @@ func TestWakuProtectedTopicPersistence(t *testing.T) {
 	pubsubTopic := "test-topic"
 
 	// Insert protected topic
-	err = p.WakuInsertProtectedTopic(pubsubTopic, privKey, pubKey)
+	err = p.WakuStorage().InsertProtectedTopic(pubsubTopic, privKey, pubKey)
 	require.NoError(t, err)
 
 	// Fetch private key for topic
-	fetchedPrivKey, err := p.WakuFetchPrivateKeyForProtectedTopic(pubsubTopic)
+	fetchedPrivKey, err := p.WakuStorage().FetchPrivateKeyForProtectedTopic(pubsubTopic)
 	require.NoError(t, err)
 	require.NotNil(t, fetchedPrivKey)
 	require.Equal(t, privKey.D.Bytes(), fetchedPrivKey.D.Bytes())
 
 	// Fetch protected topics
-	topics, err := p.WakuProtectedTopics()
+	topics, err := p.WakuStorage().ProtectedTopics()
 	require.NoError(t, err)
 	require.Len(t, topics, 1)
 	require.Equal(t, pubsubTopic, topics[0].Topic)
 
 	// Delete protected topic
-	err = p.WakuDeleteProtectedTopic(pubsubTopic)
+	err = p.WakuStorage().DeleteProtectedTopic(pubsubTopic)
 	require.NoError(t, err)
 
 	// Ensure topic is deleted
-	topics, err = p.WakuProtectedTopics()
+	topics, err = p.WakuStorage().ProtectedTopics()
 	require.NoError(t, err)
 	require.Len(t, topics, 0)
 
-	fetchedPrivKey, err = p.WakuFetchPrivateKeyForProtectedTopic(pubsubTopic)
+	fetchedPrivKey, err = p.WakuStorage().FetchPrivateKeyForProtectedTopic(pubsubTopic)
 	require.NoError(t, err)
 	require.Nil(t, fetchedPrivKey)
 }

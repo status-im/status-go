@@ -90,7 +90,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	}
 
 	encryptor := encryption.New(
-		params.DB,
+		adapters.EncryptionPersistence(params.Persistence),
 		params.InstallationID,
 		config.logger,
 	)

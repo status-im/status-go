@@ -6,22 +6,21 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
+	datasyncproto "github.com/status-im/mvds/protobuf"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	datasyncproto "github.com/status-im/mvds/protobuf"
-
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/datasync"
 	"github.com/status-im/status-go/messaging/layers/encryption"
+	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/sqlite"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/t/helpers"
 )
@@ -56,13 +55,16 @@ func (s *MessageSenderSuite) SetupTest() {
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	database, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-	err = sqlite.Migrate(database)
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer(bindata.Resource(
+		migrations.AssetNames(),
+		func(name string) ([]byte, error) {
+			return migrations.Asset(name)
+		},
+	)))
 	s.Require().NoError(err)
 
 	encryptionProtocol := encryption.New(
-		database,
+		encryption.NewSQLitePersistence(db),
 		"installation-1",
 		s.logger,
 	)
@@ -80,7 +82,7 @@ func (s *MessageSenderSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
 
-	stubPersistence := NewStubPersistence()
+	stubPersistence := NewPersistenceInMemory()
 
 	transport, err := transport.NewTransport(
 		shh,
@@ -94,7 +96,7 @@ func (s *MessageSenderSuite) SetupTest() {
 
 	s.sender, err = NewMessageSender(
 		identity,
-		database,
+		db,
 		stubPersistence,
 		transport,
 		encryptionProtocol,
@@ -196,13 +198,16 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	s.Require().NoError(err)
 
 	// Create sender encryption protocol.
-	senderDatabase, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-	err = sqlite.Migrate(senderDatabase)
+	senderDatabase, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer(bindata.Resource(
+		migrations.AssetNames(),
+		func(name string) ([]byte, error) {
+			return migrations.Asset(name)
+		},
+	)))
 	s.Require().NoError(err)
 
 	senderEncryptionProtocol := encryption.New(
-		senderDatabase,
+		encryption.NewSQLitePersistence(senderDatabase),
 		"installation-2",
 		s.logger,
 	)
@@ -246,13 +251,16 @@ func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
 	s.Require().NoError(err)
 
 	// Create sender encryption protocol.
-	senderDatabase, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-	err = sqlite.Migrate(senderDatabase)
+	senderDatabase, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer(bindata.Resource(
+		migrations.AssetNames(),
+		func(name string) ([]byte, error) {
+			return migrations.Asset(name)
+		},
+	)))
 	s.Require().NoError(err)
 
 	senderEncryptionProtocol := encryption.New(
-		senderDatabase,
+		encryption.NewSQLitePersistence(senderDatabase),
 		"installation-2",
 		s.logger,
 	)

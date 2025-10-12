@@ -6,12 +6,12 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/t/helpers"
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/messaging/layers/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestSQLLitePersistenceTestSuite(t *testing.T) {
@@ -20,16 +20,18 @@ func TestSQLLitePersistenceTestSuite(t *testing.T) {
 
 type SQLLitePersistenceTestSuite struct {
 	suite.Suite
-	service *sqlitePersistence
+	service Persistence
 }
 
 func (s *SQLLitePersistenceTestSuite) SetupTest() {
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer(bindata.Resource(
+		migrations.AssetNames(),
+		func(name string) ([]byte, error) {
+			return migrations.Asset(name)
+		},
+	)))
 	s.Require().NoError(err)
-	err = sqlite.Migrate(db)
-	s.Require().NoError(err)
-
-	s.service = newSQLitePersistence(db)
+	s.service = NewSQLitePersistence(db)
 }
 
 func (s *SQLLitePersistenceTestSuite) TestPrivateBundle() {
@@ -341,23 +343,23 @@ func (s *SQLLitePersistenceTestSuite) TestRatchetInfoNoBundle() {
 func (s *SQLLitePersistenceTestSuite) TestGetHashRatchetKeyByID() {
 	key := &HashRatchetKeyCompatibility{
 		GroupID:   []byte{1, 2, 3},
-		keyID:     []byte{4, 5, 6},
+		KeyID:     []byte{4, 5, 6},
 		Timestamp: 1,
 		Key:       []byte{7, 8, 9},
 	}
 	err := s.service.SaveHashRatchetKey(key)
 	s.Require().NoError(err)
 
-	retrievedKey, err := s.service.GetHashRatchetKeyByID(key.keyID)
+	retrievedKey, err := s.service.GetHashRatchetKeyByID(key.KeyID)
 	s.Require().NoError(err)
 	s.Require().True(reflect.DeepEqual(key.GroupID, retrievedKey.GroupID))
-	s.Require().True(reflect.DeepEqual(key.keyID, retrievedKey.keyID))
+	s.Require().True(reflect.DeepEqual(key.KeyID, retrievedKey.KeyID))
 	s.Require().True(reflect.DeepEqual(key.Key, retrievedKey.Key))
 	s.Require().Equal(key.Timestamp, retrievedKey.Timestamp)
 
 	cachedKey, err := s.service.GetHashRatchetCache(retrievedKey, 0)
 	s.Require().NoError(err)
-	s.Require().True(reflect.DeepEqual(key.keyID, cachedKey.KeyID))
+	s.Require().True(reflect.DeepEqual(key.KeyID, cachedKey.KeyID))
 	s.Require().True(reflect.DeepEqual(key.Key, cachedKey.Key))
 	s.Require().EqualValues(0, cachedKey.SeqNo)
 
@@ -368,7 +370,7 @@ func (s *SQLLitePersistenceTestSuite) TestGetHashRatchetKeyByID() {
 
 	cachedKey, err = s.service.GetHashRatchetCache(retrievedKey, 0)
 	s.Require().NoError(err)
-	s.Require().True(reflect.DeepEqual(key.keyID, cachedKey.KeyID))
+	s.Require().True(reflect.DeepEqual(key.KeyID, cachedKey.KeyID))
 	s.Require().True(reflect.DeepEqual(key.Key, cachedKey.Key))
 	s.Require().EqualValues(1, cachedKey.SeqNo)
 
@@ -379,13 +381,13 @@ func (s *SQLLitePersistenceTestSuite) TestGetHashRatchetKeyByID() {
 
 	cachedKey, err = s.service.GetHashRatchetCache(retrievedKey, 0)
 	s.Require().NoError(err)
-	s.Require().True(reflect.DeepEqual(key.keyID, cachedKey.KeyID))
+	s.Require().True(reflect.DeepEqual(key.KeyID, cachedKey.KeyID))
 	s.Require().True(reflect.DeepEqual(key.Key, cachedKey.Key))
 	s.Require().EqualValues(4, cachedKey.SeqNo)
 
 	cachedKey, err = s.service.GetHashRatchetCache(retrievedKey, 1)
 	s.Require().NoError(err)
-	s.Require().True(reflect.DeepEqual(key.keyID, cachedKey.KeyID))
+	s.Require().True(reflect.DeepEqual(key.KeyID, cachedKey.KeyID))
 	s.Require().True(reflect.DeepEqual(key.Key, cachedKey.Key))
 	s.Require().EqualValues(1, cachedKey.SeqNo)
 }

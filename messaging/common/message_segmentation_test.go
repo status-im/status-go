@@ -9,13 +9,10 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestMessageSegmentationSuite(t *testing.T) {
@@ -41,18 +38,13 @@ func (s *MessageSegmentationSuite) SetupTest() {
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	database, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-	err = sqlite.Migrate(database)
-	s.Require().NoError(err)
-
 	s.logger, err = zap.NewDevelopment()
 	s.Require().NoError(err)
 
 	s.sender, err = NewMessageSender(
 		identity,
-		database,
-		NewStubPersistence(),
+		nil,
+		NewPersistenceInMemory(),
 		nil,
 		nil,
 		s.logger,

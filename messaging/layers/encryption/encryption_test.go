@@ -8,15 +8,13 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
-
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 var cleartext = []byte("hello")
@@ -38,25 +36,33 @@ type EncryptionServiceTestSuite struct {
 func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 	var err error
 
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer(bindata.Resource(
+		migrations.AssetNames(),
+		func(name string) ([]byte, error) {
+			return migrations.Asset(name)
+		},
+	)))
 	s.Require().NoError(err)
-	err = sqlite.Migrate(db)
-	s.Require().NoError(err)
+
 	config.InstallationID = aliceInstallationID
 	s.alice = NewWithEncryptorConfig(
-		db,
+		NewSQLitePersistence(db),
 		aliceInstallationID,
 		config,
 		s.logger.With(zap.String("user", "alice")),
 	)
 
-	db, err = helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err = helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer(bindata.Resource(
+		migrations.AssetNames(),
+		func(name string) ([]byte, error) {
+			return migrations.Asset(name)
+		},
+	)))
 	s.Require().NoError(err)
-	err = sqlite.Migrate(db)
-	s.Require().NoError(err)
+
 	config.InstallationID = bobInstallationID
 	s.bob = NewWithEncryptorConfig(
-		db,
+		NewSQLitePersistence(db),
 		bobInstallationID,
 		config,
 		s.logger.With(zap.String("user", "bob")),
@@ -1014,13 +1020,16 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetCompatibility() {
 	keyID1, err := s.bob.encryptor.GenerateHashRatchetKey(groupID)
 	s.Require().NoError(err)
 
+	alicePersistence, ok := s.alice.encryptor.persistence.(*SQLitePersistence)
+	s.Require().True(ok)
+
 	// We replicate the same error condition
 	timestamp32 := keyID1.DeprecatedKeyID()
-	_, err = s.alice.encryptor.persistence.DB.Exec("INSERT INTO hash_ratchet_encryption(group_id, deprecated_key_id, key, key_id) VALUES(?,?,?,?)", groupID, timestamp32, keyID1.Key, append(groupID, []byte("some-bytes")...))
+	_, err = alicePersistence.DB.Exec("INSERT INTO hash_ratchet_encryption(group_id, deprecated_key_id, key, key_id) VALUES(?,?,?,?)", groupID, timestamp32, keyID1.Key, append(groupID, []byte("some-bytes")...))
 	s.Require().NoError(err)
 
 	// We migrate
-	_, err = s.alice.encryptor.persistence.DB.Exec("UPDATE hash_ratchet_encryption SET key_timestamp = deprecated_key_id")
+	_, err = alicePersistence.DB.Exec("UPDATE hash_ratchet_encryption SET key_timestamp = deprecated_key_id")
 	s.Require().NoError(err)
 
 	payload1 := []byte("community msg 1")

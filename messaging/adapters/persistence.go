@@ -3,6 +3,8 @@ package adapters
 import (
 	"crypto/ecdsa"
 
+	"github.com/status-im/status-go/messaging/internal"
+	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
 	wakupersistence "github.com/status-im/status-go/messaging/waku/persistence"
@@ -15,11 +17,11 @@ type KeysPersistence struct {
 var _ transport.KeysPersistence = (*KeysPersistence)(nil)
 
 func (kp *KeysPersistence) All() (map[string][]byte, error) {
-	return kp.P.WakuKeys()
+	return kp.P.WakuStorage().Keys()
 }
 
 func (kp *KeysPersistence) Add(chatID string, key []byte) error {
-	return kp.P.AddWakuKey(chatID, key)
+	return kp.P.WakuStorage().AddKey(chatID, key)
 }
 
 type ProcessedMessageIDsCache struct {
@@ -48,19 +50,19 @@ type WakuProtectedTopics struct {
 var _ wakupersistence.ProtectedTopics = (*WakuProtectedTopics)(nil)
 
 func (wpt *WakuProtectedTopics) Insert(pubsubTopic string, privKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) error {
-	return wpt.P.WakuInsertProtectedTopic(pubsubTopic, privKey, publicKey)
+	return wpt.P.WakuStorage().InsertProtectedTopic(pubsubTopic, privKey, publicKey)
 }
 
 func (wpt *WakuProtectedTopics) Delete(pubsubTopic string) error {
-	return wpt.P.WakuDeleteProtectedTopic(pubsubTopic)
+	return wpt.P.WakuStorage().DeleteProtectedTopic(pubsubTopic)
 }
 
 func (wpt *WakuProtectedTopics) FetchPrivateKey(topic string) (*ecdsa.PrivateKey, error) {
-	return wpt.P.WakuFetchPrivateKeyForProtectedTopic(topic)
+	return wpt.P.WakuStorage().FetchPrivateKeyForProtectedTopic(topic)
 }
 
 func (wpt *WakuProtectedTopics) ProtectedTopics() ([]wakupersistence.ProtectedTopic, error) {
-	pt, err := wpt.P.WakuProtectedTopics()
+	pt, err := wpt.P.WakuStorage().ProtectedTopics()
 	if err != nil {
 		return nil, err
 	}
@@ -72,4 +74,16 @@ func (wpt *WakuProtectedTopics) ProtectedTopics() ([]wakupersistence.ProtectedTo
 		}
 	}
 	return result, nil
+}
+
+func EncryptionPersistence(p types.Persistence) encryption.Persistence {
+	encryptionStorage := p.EncryptionStorage()
+	if encryptionStorage == nil {
+		return nil
+	}
+	internal, ok := encryptionStorage.(*internal.SQLiteEncryptionPersistence)
+	if !ok {
+		panic("custom EncryptionPersistence implementations are not supported yet")
+	}
+	return internal.SQLitePersistence
 }

@@ -5,17 +5,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/helpers"
-
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
-
+	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/messaging/layers/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 const (
@@ -52,17 +50,18 @@ func setupUser(user string, s *EncryptionServiceMultiDeviceSuite, n int) error {
 	for i := 0; i < n; i++ {
 		installationID := fmt.Sprintf("%s%d", user, i+1)
 
-		db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-		if err != nil {
-			return err
-		}
-		err = sqlite.Migrate(db)
+		db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer(bindata.Resource(
+			migrations.AssetNames(),
+			func(name string) ([]byte, error) {
+				return migrations.Asset(name)
+			},
+		)))
 		if err != nil {
 			return err
 		}
 
 		protocol := New(
-			db,
+			NewSQLitePersistence(db),
 			installationID,
 			s.logger.With(zap.String("user", user)),
 		)

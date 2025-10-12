@@ -44,7 +44,7 @@ func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int
 }
 
 func doMigration(db *sql.DB) error {
-	lastMigration, migrationTableExists, err := sqlite.GetLastMigrationVersion(db)
+	lastMigration, migrationTableExists, err := sqlite.GetLastMigrationVersion(db, sqlite.MigrationTableName)
 	if err != nil {
 		return err
 	}
