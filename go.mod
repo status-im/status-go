@@ -52,7 +52,7 @@ require (
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/markdown v0.0.0-20250825083641-55c1df9bc05d
 	github.com/status-im/migrate/v4 v4.6.2-status.3
-	github.com/status-im/mvds v0.0.27-0.20241031073756-b192c603a75d
+	github.com/status-im/mvds v0.0.27-0.20251022120125-7bdc695d49c4
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
 	github.com/stretchr/testify v1.10.0
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
@@ -83,6 +83,7 @@ require (
 	github.com/btcsuite/btcd/btcutil v1.1.6
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/getsentry/sentry-go v0.29.1
+	github.com/golang-migrate/migrate/v4 v4.15.2
 	github.com/gorilla/sessions v1.2.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/ipfs/go-log/v2 v2.5.1
@@ -182,7 +183,6 @@ require (
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
-	github.com/golang-migrate/migrate/v4 v4.15.2 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect

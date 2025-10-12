@@ -2,11 +2,16 @@ package helpers
 
 import (
 	"database/sql"
+	"fmt"
 	"io/ioutil"
 	"os"
 
+	"github.com/google/uuid"
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
+
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/sqlite"
 )
 
 const kdfIterationsNumberForTests = 1
@@ -79,4 +84,32 @@ func ColumnExists(db *sql.DB, tableName string, columnName string) (bool, error)
 	}
 
 	return false, nil
+}
+
+type TestDBInitializer struct {
+	assetSources []*bindata.AssetSource
+}
+
+func NewTestDBInitializer(assetSource []*bindata.AssetSource) TestDBInitializer {
+	return TestDBInitializer{
+		assetSources: assetSource,
+	}
+}
+
+func (dbi TestDBInitializer) Initialize(dbPath string, password string, kdfIterations int) (*sql.DB, error) {
+	db, err := sqlite.OpenDB(dbPath, password, kdfIterations)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, as := range dbi.assetSources {
+		err = sqlite.Migrate(db, as, sqlite.MigrateOptions{
+			MigrationTableName: "status_schema_migrations_" + fmt.Sprintf("%x", uuid.New()),
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return db, nil
 }

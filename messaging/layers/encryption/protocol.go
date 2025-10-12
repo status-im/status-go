@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
-	"database/sql"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -89,12 +88,12 @@ var (
 
 // New creates a new ProtocolService instance
 func New(
-	db *sql.DB,
+	persistence Persistence,
 	installationID string,
 	logger *zap.Logger,
 ) *Protocol {
 	return NewWithEncryptorConfig(
-		db,
+		persistence,
 		installationID,
 		defaultEncryptorConfig(installationID, logger),
 		logger,
@@ -104,15 +103,15 @@ func New(
 // DB and migrations are shared between encryption package
 // and its sub-packages.
 func NewWithEncryptorConfig(
-	db *sql.DB,
+	persistence Persistence,
 	installationID string,
 	encryptorConfig encryptorConfig,
 	logger *zap.Logger,
 ) *Protocol {
 	return &Protocol{
-		encryptor: newEncryptor(db, encryptorConfig),
-		secret:    sharedsecret.New(db, logger),
-		multidevice: multidevice.New(db, &multidevice.Config{
+		encryptor: newEncryptor(persistence, encryptorConfig),
+		secret:    sharedsecret.New(persistence.SharedSecretStorage(), logger),
+		multidevice: multidevice.New(persistence.MultideviceStorage(), &multidevice.Config{
 			MaxInstallations: 3,
 			ProtocolVersion:  protocolVersion,
 			InstallationID:   installationID,

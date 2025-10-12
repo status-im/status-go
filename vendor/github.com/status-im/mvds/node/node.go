@@ -68,7 +68,7 @@ type Node struct {
 
 	ID state.PeerID
 
-	epochPersistence *epochSQLitePersistence
+	epochPersistence EpochPersistence
 	mode             Mode
 
 	subscription chan protobuf.Message
@@ -78,8 +78,41 @@ type Node struct {
 	logger *zap.Logger
 }
 
+type Persistence interface {
+	MessageStore() store.MessageStore
+	PeersStore() peers.Persistence
+	StateStore() state.SyncState
+	EpochStore() EpochPersistence
+}
+
+type sqlitePersistence struct {
+	db *sql.DB
+}
+
+var _ Persistence = (*sqlitePersistence)(nil)
+
+func NewSQLitePersistence(db *sql.DB) Persistence {
+	return &sqlitePersistence{db: db}
+}
+
+func (p *sqlitePersistence) MessageStore() store.MessageStore {
+	return store.NewPersistentMessageStore(p.db)
+}
+
+func (p *sqlitePersistence) PeersStore() peers.Persistence {
+	return peers.NewSQLitePersistence(p.db)
+}
+
+func (p *sqlitePersistence) StateStore() state.SyncState {
+	return state.NewPersistentSyncState(p.db)
+}
+
+func (p *sqlitePersistence) EpochStore() EpochPersistence {
+	return NewEpochSQLitePersistence(p.db)
+}
+
 func NewPersistentNode(
-	db *sql.DB,
+	persistence Persistence,
 	st transport.Transport,
 	id state.PeerID,
 	mode Mode,
@@ -96,12 +129,12 @@ func NewPersistentNode(
 		ID:                    id,
 		ctx:                   ctx,
 		cancel:                cancel,
-		store:                 store.NewPersistentMessageStore(db),
+		store:                 persistence.MessageStore(),
 		transport:             st,
-		peers:                 peers.NewSQLitePersistence(db),
-		syncState:             state.NewPersistentSyncState(db),
+		peers:                 persistence.PeersStore(),
+		syncState:             persistence.StateStore(),
 		payloads:              newPayloads(),
-		epochPersistence:      newEpochSQLitePersistence(db),
+		epochPersistence:      persistence.EpochStore(),
 		nextEpoch:             nextEpoch,
 		peerStatusChangeEvent: peerStatusChangeEvent,
 		logger:                logger.With(zap.Namespace("mvds")),

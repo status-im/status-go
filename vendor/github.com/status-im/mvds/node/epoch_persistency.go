@@ -6,15 +6,20 @@ import (
 	"github.com/status-im/mvds/state"
 )
 
-type epochSQLitePersistence struct {
+type EpochPersistence interface {
+	Get(nodeID state.PeerID) (epoch int64, err error)
+	Set(nodeID state.PeerID, epoch int64) error
+}
+
+type EpochSQLitePersistence struct {
 	db *sql.DB
 }
 
-func newEpochSQLitePersistence(db *sql.DB) *epochSQLitePersistence {
-	return &epochSQLitePersistence{db: db}
+func NewEpochSQLitePersistence(db *sql.DB) *EpochSQLitePersistence {
+	return &EpochSQLitePersistence{db: db}
 }
 
-func (p *epochSQLitePersistence) Get(nodeID state.PeerID) (epoch int64, err error) {
+func (p *EpochSQLitePersistence) Get(nodeID state.PeerID) (epoch int64, err error) {
 	row := p.db.QueryRow(`SELECT epoch FROM mvds_epoch WHERE peer_id = ?`, nodeID[:])
 	err = row.Scan(&epoch)
 	if err == sql.ErrNoRows {
@@ -23,7 +28,7 @@ func (p *epochSQLitePersistence) Get(nodeID state.PeerID) (epoch int64, err erro
 	return
 }
 
-func (p *epochSQLitePersistence) Set(nodeID state.PeerID, epoch int64) error {
+func (p *EpochSQLitePersistence) Set(nodeID state.PeerID, epoch int64) error {
 	_, err := p.db.Exec(`
 		INSERT OR REPLACE INTO mvds_epoch (peer_id, epoch) VALUES (?, ?)`,
 		nodeID[:],

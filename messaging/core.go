@@ -3,7 +3,6 @@ package messaging
 import (
 	"context"
 	"crypto/ecdsa"
-	"database/sql"
 	"sync"
 	"time"
 
@@ -12,9 +11,9 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	datasyncnode "github.com/status-im/mvds/node"
-	datasyncproto "github.com/status-im/mvds/protobuf"
-	"github.com/status-im/mvds/state"
+	mvdsnode "github.com/status-im/mvds/node"
+	mvdsproto "github.com/status-im/mvds/protobuf"
+	mvdsstate "github.com/status-im/mvds/state"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
@@ -43,8 +42,6 @@ var (
 type Core struct {
 	config
 
-	persistence types.Persistence
-
 	identity  *ecdsa.PrivateKey
 	waku      wakutypes.Waku
 	transport *transport.Transport
@@ -55,7 +52,7 @@ type Core struct {
 	quit chan struct{}
 
 	connectionState       connection.State
-	mvdsStatusChangeEvent chan datasyncnode.PeerStatusChangeEvent
+	mvdsStatusChangeEvent chan mvdsnode.PeerStatusChangeEvent
 
 	publisher *pubsub.Publisher
 
@@ -65,9 +62,6 @@ type Core struct {
 type CoreParams struct {
 	Identity       *ecdsa.PrivateKey
 	InstallationID string
-
-	DB          *sql.DB // FIXME: This should be removed once the database is not needed in the sender
-	Persistence types.Persistence
 
 	NodeKey       *ecdsa.PrivateKey
 	WakuConfig    params.WakuV2Config
@@ -80,8 +74,8 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	transport, err := transport.NewTransport(
 		waku,
 		params.Identity,
-		&adapters.KeysPersistence{P: params.Persistence},
-		&adapters.ProcessedMessageIDsCache{P: params.Persistence},
+		config.persistence.TransportStorage().KeysStorage(),
+		config.persistence.TransportStorage().ProcessedMessageIDsCacheStorage(),
 		config.envelopesMonitorConfig,
 		config.logger,
 	)
@@ -90,15 +84,16 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	}
 
 	encryptor := encryption.New(
-		params.DB,
+		config.persistence.EncryptionStorage(),
 		params.InstallationID,
 		config.logger,
 	)
 
 	sender, err := common.NewMessageSender(
 		params.Identity,
-		params.DB,
-		params.Persistence,
+		config.persistence.MessageSenderStorage(),
+		config.persistence.MVDSStorage(),
+		config.persistence.SegmentationStorage(),
 		transport,
 		encryptor,
 		config.logger,
@@ -109,14 +104,13 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 
 	return &Core{
 		config:                *config,
-		persistence:           params.Persistence,
 		identity:              params.Identity,
 		waku:                  waku,
 		transport:             transport,
 		sender:                sender,
 		encryptor:             encryptor,
 		quit:                  make(chan struct{}),
-		mvdsStatusChangeEvent: make(chan datasyncnode.PeerStatusChangeEvent, 5),
+		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
 		publisher:             pubsub.NewPublisher(),
 	}, nil
 }
@@ -124,8 +118,12 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 func NewCore(params CoreParams, options ...Options) (*Core, error) {
 	config := newConfig(options...)
 
+	if config.persistence == nil {
+		return nil, errors.New("persistence is not configured")
+	}
+
 	waku, err := newWaku(wakuParams{
-		persistence:                     params.Persistence,
+		persistence:                     config.persistence.WakuStorage(),
 		identity:                        params.Identity,
 		nodeKey:                         params.NodeKey,
 		wakuConfig:                      params.WakuConfig,
@@ -256,7 +254,7 @@ func (c *Core) stop() error {
 	return nil
 }
 
-func (c *Core) sendDataSync(receiver state.PeerID, payload *datasyncproto.Payload) error {
+func (c *Core) sendDataSync(receiver mvdsstate.PeerID, payload *mvdsproto.Payload) error {
 	ctx := context.Background()
 	if !payload.IsValid() {
 		c.logger.Error("payload is invalid")
@@ -329,9 +327,9 @@ func (c *Core) connectionChanged(state connection.State) {
 
 func (c *Core) resetDatasyncForPeer(publicKey *ecdsa.PublicKey, eventTime uint64) {
 	select {
-	case c.mvdsStatusChangeEvent <- datasyncnode.PeerStatusChangeEvent{
+	case c.mvdsStatusChangeEvent <- mvdsnode.PeerStatusChangeEvent{
 		PeerID:    datasyncpeer.PublicKeyToPeerID(*publicKey),
-		Status:    datasyncnode.OnlineStatus,
+		Status:    mvdsnode.OnlineStatus,
 		EventTime: eventTime,
 	}:
 	default:
@@ -369,7 +367,7 @@ func (c *Core) startCleanupLoop(name string, cleanupFunc func() error) {
 }
 
 type wakuParams struct {
-	persistence types.Persistence
+	persistence wakuv2.ProtectedTopicsPersistence
 
 	identity *ecdsa.PrivateKey
 	nodeKey  *ecdsa.PrivateKey
@@ -425,7 +423,7 @@ func newWaku(params wakuParams) (*wakuv2.Waku, error) {
 		params.nodeKey,
 		cfg,
 		params.logger,
-		&adapters.WakuProtectedTopics{P: params.persistence},
+		params.persistence,
 		params.timeSource,
 		params.onHistoricMessagesRequestFailed,
 		params.onPeerStats,

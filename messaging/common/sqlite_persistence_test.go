@@ -1,13 +1,15 @@
-package protocol
+package common
 
 import (
 	"testing"
 
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/messaging/common/migrations"
+	"github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestConfirmations(t *testing.T) {
@@ -23,32 +25,38 @@ func TestConfirmations(t *testing.T) {
 	publicKey2 := []byte("pk-2")
 	publicKey3 := []byte("pk-3")
 
-	db, err := openTestDB()
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     migrations.AssetNames(),
+			AssetFunc: migrations.Asset,
+		},
+	}))
 	require.NoError(t, err)
-	p := NewMessagingPersistence(db)
 
-	confirmation1 := &messagingtypes.RawMessageConfirmation{
+	p := NewSQLiteMessageSenderPersistence(db)
+
+	confirmation1 := &types.RawMessageConfirmation{
 		DataSyncID: dataSyncID1,
 		MessageID:  messageID1,
 		PublicKey:  publicKey1,
 	}
 
 	// Same datasyncID and same messageID, different pubkey
-	confirmation2 := &messagingtypes.RawMessageConfirmation{
+	confirmation2 := &types.RawMessageConfirmation{
 		DataSyncID: dataSyncID2,
 		MessageID:  messageID1,
 		PublicKey:  publicKey2,
 	}
 
 	// Different datasyncID and same messageID, different pubkey
-	confirmation3 := &messagingtypes.RawMessageConfirmation{
+	confirmation3 := &types.RawMessageConfirmation{
 		DataSyncID: dataSyncID3,
 		MessageID:  messageID1,
 		PublicKey:  publicKey3,
 	}
 
 	// Same dataSyncID, different messageID
-	confirmation4 := &messagingtypes.RawMessageConfirmation{
+	confirmation4 := &types.RawMessageConfirmation{
 		DataSyncID: dataSyncID4,
 		MessageID:  messageID2,
 		PublicKey:  publicKey1,
@@ -72,7 +80,7 @@ func TestConfirmations(t *testing.T) {
 	// We confirm the third datasync message, messageID1 should be confirmed
 	messageID, err = p.MarkAsConfirmed(dataSyncID3, false)
 	require.NoError(t, err)
-	require.Equal(t, messageID, types.HexBytes(messageID1))
+	require.Equal(t, messageID, cryptotypes.HexBytes(messageID1))
 }
 
 func TestConfirmationsAtLeastOne(t *testing.T) {
@@ -86,25 +94,31 @@ func TestConfirmationsAtLeastOne(t *testing.T) {
 	publicKey2 := []byte("pk-2")
 	publicKey3 := []byte("pk-3")
 
-	db, err := openTestDB()
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     migrations.AssetNames(),
+			AssetFunc: migrations.Asset,
+		},
+	}))
 	require.NoError(t, err)
-	p := NewMessagingPersistence(db)
 
-	confirmation1 := &messagingtypes.RawMessageConfirmation{
+	p := NewSQLiteMessageSenderPersistence(db)
+
+	confirmation1 := &types.RawMessageConfirmation{
 		DataSyncID: dataSyncID1,
 		MessageID:  messageID1,
 		PublicKey:  publicKey1,
 	}
 
 	// Same datasyncID and same messageID, different pubkey
-	confirmation2 := &messagingtypes.RawMessageConfirmation{
+	confirmation2 := &types.RawMessageConfirmation{
 		DataSyncID: dataSyncID2,
 		MessageID:  messageID1,
 		PublicKey:  publicKey2,
 	}
 
 	// Different datasyncID and same messageID, different pubkey
-	confirmation3 := &messagingtypes.RawMessageConfirmation{
+	confirmation3 := &types.RawMessageConfirmation{
 		DataSyncID: dataSyncID3,
 		MessageID:  messageID1,
 		PublicKey:  publicKey3,
@@ -118,19 +132,25 @@ func TestConfirmationsAtLeastOne(t *testing.T) {
 	messageID, err := p.MarkAsConfirmed(dataSyncID1, true)
 	require.NoError(t, err)
 	require.NotNil(t, messageID)
-	require.Equal(t, types.HexBytes(messageID1), messageID)
+	require.Equal(t, cryptotypes.HexBytes(messageID1), messageID)
 }
 
 func TestSaveHashRatchetMessage(t *testing.T) {
-	db, err := openTestDB()
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     migrations.AssetNames(),
+			AssetFunc: migrations.Asset,
+		},
+	}))
 	require.NoError(t, err)
-	p := NewMessagingPersistence(db)
+
+	p := NewSQLiteMessageSenderPersistence(db)
 
 	groupID1 := []byte("group-id-1")
 	groupID2 := []byte("group-id-2")
 	keyID := []byte("key-id")
 
-	message1 := &messagingtypes.ReceivedMessage{
+	message1 := &types.ReceivedMessage{
 		Hash:      []byte{1},
 		Sig:       []byte{2},
 		Timestamp: 2,
@@ -139,10 +159,10 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID1, keyID, message1))
 
-	message2 := &messagingtypes.ReceivedMessage{
+	message2 := &types.ReceivedMessage{
 		Hash:      []byte{2},
 		Sig:       []byte{2},
-		Topic:     messagingtypes.BytesToContentTopic([]byte{5}),
+		Topic:     types.BytesToContentTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
@@ -157,14 +177,20 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 }
 
 func TestDeleteHashRatchetMessage(t *testing.T) {
-	db, err := openTestDB()
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     migrations.AssetNames(),
+			AssetFunc: migrations.Asset,
+		},
+	}))
 	require.NoError(t, err)
-	p := NewMessagingPersistence(db)
+
+	p := NewSQLiteMessageSenderPersistence(db)
 
 	groupID := []byte("group-id")
 	keyID := []byte("key-id")
 
-	message1 := &messagingtypes.ReceivedMessage{
+	message1 := &types.ReceivedMessage{
 		Hash:      []byte{1},
 		Sig:       []byte{2},
 		Timestamp: 2,
@@ -173,10 +199,10 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message1))
 
-	message2 := &messagingtypes.ReceivedMessage{
+	message2 := &types.ReceivedMessage{
 		Hash:      []byte{2},
 		Sig:       []byte{2},
-		Topic:     messagingtypes.BytesToContentTopic([]byte{5}),
+		Topic:     types.BytesToContentTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
@@ -184,10 +210,10 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message2))
 
-	message3 := &messagingtypes.ReceivedMessage{
+	message3 := &types.ReceivedMessage{
 		Hash:      []byte{3},
 		Sig:       []byte{2},
-		Topic:     messagingtypes.BytesToContentTopic([]byte{5}),
+		Topic:     types.BytesToContentTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
@@ -206,46 +232,4 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, fetchedMessages)
 	require.Len(t, fetchedMessages, 1)
-}
-
-func TestWakuProtectedTopicPersistence(t *testing.T) {
-	db, err := openTestDB()
-	require.NoError(t, err)
-	p := NewMessagingPersistence(db)
-
-	// Generate ECDSA keys
-	privKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	pubKey := &privKey.PublicKey
-
-	pubsubTopic := "test-topic"
-
-	// Insert protected topic
-	err = p.WakuInsertProtectedTopic(pubsubTopic, privKey, pubKey)
-	require.NoError(t, err)
-
-	// Fetch private key for topic
-	fetchedPrivKey, err := p.WakuFetchPrivateKeyForProtectedTopic(pubsubTopic)
-	require.NoError(t, err)
-	require.NotNil(t, fetchedPrivKey)
-	require.Equal(t, privKey.D.Bytes(), fetchedPrivKey.D.Bytes())
-
-	// Fetch protected topics
-	topics, err := p.WakuProtectedTopics()
-	require.NoError(t, err)
-	require.Len(t, topics, 1)
-	require.Equal(t, pubsubTopic, topics[0].Topic)
-
-	// Delete protected topic
-	err = p.WakuDeleteProtectedTopic(pubsubTopic)
-	require.NoError(t, err)
-
-	// Ensure topic is deleted
-	topics, err = p.WakuProtectedTopics()
-	require.NoError(t, err)
-	require.Len(t, topics, 0)
-
-	fetchedPrivKey, err = p.WakuFetchPrivateKeyForProtectedTopic(pubsubTopic)
-	require.NoError(t, err)
-	require.Nil(t, fetchedPrivKey)
 }

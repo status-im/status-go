@@ -1,6 +1,8 @@
 package messaging
 
 import (
+	"database/sql"
+
 	"go.uber.org/zap"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -16,6 +18,7 @@ type config struct {
 	metricsEnabled                  bool
 	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
 	onPeerStats                     func(types.ConnStatus)
+	persistence                     Persistence
 }
 
 func newConfig(options ...Options) *config {
@@ -72,5 +75,20 @@ func WithHistoricMessagesRequestFailedHandler(onHistoricMessagesRequestFailed fu
 func WithPeerStatsHandler(onPeerStats func(types.ConnStatus)) Options {
 	return func(c *config) {
 		c.onPeerStats = onPeerStats
+	}
+}
+
+// WithSQLitePersistence sets up the messaging persistence using internal SQLite implementation.
+// Migrations must be applied beforehand. See SQLiteMigrate.
+func WithSQLitePersistence(db *sql.DB) Options {
+	return func(c *config) {
+		c.persistence = newSQLitePersistence(db)
+	}
+}
+
+// WithPersistence sets up the messaging persistence using the provided implementation.
+func WithPersistence(persistence Persistence) Options {
+	return func(c *config) {
+		c.persistence = persistence
 	}
 }

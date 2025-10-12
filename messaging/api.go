@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/connection"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
@@ -127,7 +128,11 @@ func (a *API) HandleSharedSecrets(secrets []*types.SharedSecret) error {
 }
 
 func (a *API) JoinPublicChat(chatID string) (*types.ChatFilter, error) {
-	return a.core.sender.JoinPublic(chatID)
+	f, err := a.core.sender.JoinPublic(chatID)
+	if err != nil {
+		return nil, err
+	}
+	return adapters.FromTransportFilter(f), nil
 }
 
 func (a *API) JoinPrivateChat(publicKey *ecdsa.PublicKey) (*types.ChatFilter, error) {
@@ -195,7 +200,7 @@ func (a *API) GetCurrentKeyForGroup(groupID []byte) (*encryption.HashRatchetKeyC
 }
 
 func (a *API) SaveHashRatchetMessage(groupID []byte, keyID []byte, m *types.ReceivedMessage) error {
-	return a.core.persistence.SaveHashRatchetMessage(groupID, keyID, m)
+	return a.core.sender.SaveHashRatchetMessage(groupID, keyID, m)
 }
 
 func (a *API) SendPubsubTopicKey(ctx context.Context, rawMessage *types.RawMessage) ([]byte, error) {
@@ -466,6 +471,10 @@ func (a *API) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID
 
 func (a *API) Metrics() string {
 	return a.core.metrics()
+}
+
+func (a *API) MarkAsConfirmed(dataSyncID []byte, atLeastOne bool) (messageID cryptotypes.HexBytes, err error) {
+	return a.core.sender.MarkAsConfirmed(dataSyncID, atLeastOne)
 }
 
 func ToContentTopic(s string) []byte {
