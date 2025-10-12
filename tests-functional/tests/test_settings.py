@@ -21,3 +21,9 @@ class TestSettings:
         assert cfg["WSPort"] == boot_api["wsPort"]
         assert cfg["HTTPEnabled"] == boot_api["httpEnabled"]
         assert cfg["HTTPPort"] == boot_api["httpPort"]
+
+    # def test_verify_node_config_enforce(self):
+    # forced_network_id = 4242
+
+    # cfg = self.config.settings_service.get_node_config()
+    # assert cfg["NetworkId"] == forced_network_id, f"Expected NetworkId={forced_network_id}, got {cfg['NetworkId']}"
