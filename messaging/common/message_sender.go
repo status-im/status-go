@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"crypto/ecdsa"
-	"database/sql"
 	"math/rand"
 	"sync"
 	"time"
@@ -20,12 +19,14 @@ import (
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/datasync"
 	datasyncpeer "github.com/status-im/status-go/messaging/datasync/peer"
 	messagingevents "github.com/status-im/status-go/messaging/events"
 	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
+	"github.com/status-im/status-go/messaging/layers/segmentation"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
@@ -47,14 +48,15 @@ const (
 var RekeyCompatibility = true
 
 type MessageSender struct {
-	identity    *ecdsa.PrivateKey
-	datasync    *datasync.DataSync
-	database    *sql.DB
-	transport   *transport.Transport
-	protocol    *encryption.Protocol
-	logger      *zap.Logger
-	persistence messagingtypes.Persistence
-	publisher   *pubsub.Publisher
+	identity                *ecdsa.PrivateKey
+	datasync                *datasync.DataSync
+	datasyncPersistence     datasyncnode.Persistence
+	transport               *transport.Transport
+	protocol                *encryption.Protocol
+	logger                  *zap.Logger
+	persistence             messagingtypes.MessageSenderPersistence
+	segmentationPersistence segmentation.Persistence
+	publisher               *pubsub.Publisher
 
 	datasyncEnabled bool
 
@@ -69,22 +71,24 @@ type MessageSender struct {
 
 func NewMessageSender(
 	identity *ecdsa.PrivateKey,
-	database *sql.DB, // FIXME
-	persistence messagingtypes.Persistence,
+	persistence messagingtypes.MessageSenderPersistence,
+	datasyncPersistence datasyncnode.Persistence,
+	segmentationPersistence segmentation.Persistence,
 	transport *transport.Transport,
 	enc *encryption.Protocol,
 	logger *zap.Logger,
 ) (*MessageSender, error) {
 	p := &MessageSender{
-		identity:        identity,
-		database:        database,
-		datasyncEnabled: true, // FIXME
-		protocol:        enc,
-		persistence:     persistence,
-		publisher:       pubsub.NewPublisher(),
-		transport:       transport,
-		logger:          logger,
-		ephemeralKeys:   make(map[string]*ecdsa.PrivateKey),
+		identity:                identity,
+		datasyncPersistence:     datasyncPersistence,
+		datasyncEnabled:         true, // FIXME
+		protocol:                enc,
+		persistence:             persistence,
+		segmentationPersistence: segmentationPersistence,
+		publisher:               pubsub.NewPublisher(),
+		transport:               transport,
+		logger:                  logger,
+		ephemeralKeys:           make(map[string]*ecdsa.PrivateKey),
 	}
 
 	return p, nil
@@ -106,7 +110,7 @@ func (s *MessageSender) StartDatasync(statusChangeEvent chan datasyncnode.PeerSt
 
 	dataSyncTransport := datasync.NewNodeTransport()
 	dataSyncNode, err := datasyncnode.NewPersistentNode(
-		s.database,
+		s.datasyncPersistence,
 		dataSyncTransport,
 		datasyncpeer.PublicKeyToPeerID(s.identity.PublicKey),
 		datasyncnode.BATCH,
@@ -1219,12 +1223,12 @@ func (s *MessageSender) notifyOnScheduledMessage(recipient *ecdsa.PublicKey, mes
 	})
 }
 
-func (s *MessageSender) JoinPublic(id string) (*messagingtypes.ChatFilter, error) {
+func (s *MessageSender) JoinPublic(id string) (*transport.Filter, error) {
 	filter, err := s.transport.JoinPublic(id)
 	if err != nil {
 		return nil, err
 	}
-	return adapters.FromTransportFilter(filter), nil
+	return filter, nil
 }
 
 func (s *MessageSender) getRandomEphemeralKey() *ecdsa.PrivateKey {
@@ -1278,6 +1282,14 @@ func (s *MessageSender) StopDatasync() {
 	if s.datasync != nil {
 		s.datasync.Stop()
 	}
+}
+
+func (s *MessageSender) MarkAsConfirmed(dataSyncID []byte, atLeastOne bool) (messageID cryptotypes.HexBytes, err error) {
+	return s.persistence.MarkAsConfirmed(dataSyncID, atLeastOne)
+}
+
+func (s *MessageSender) SaveHashRatchetMessage(groupID []byte, keyID []byte, m *messagingtypes.ReceivedMessage) error {
+	return s.persistence.SaveHashRatchetMessage(groupID, keyID, m)
 }
 
 // GetCurrentKeyForGroup returns the latest key timestampID belonging to a key group

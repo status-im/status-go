@@ -3,7 +3,6 @@ package sharedsecret
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"database/sql"
 	"errors"
 
 	"go.uber.org/zap"
@@ -21,17 +20,17 @@ type Secret struct {
 // are compressed.
 // TODO: make compression of public keys a responsibility  of sqlitePersistence instead of SharedSecret.
 type SharedSecret struct {
-	persistence *sqlitePersistence
+	persistence Persistence
 	logger      *zap.Logger
 }
 
-func New(db *sql.DB, logger *zap.Logger) *SharedSecret {
+func New(persistence Persistence, logger *zap.Logger) *SharedSecret {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
 	return &SharedSecret{
-		persistence: newSQLitePersistence(db),
+		persistence: persistence,
 		logger:      logger.With(zap.Namespace("SharedSecret")),
 	}
 }
@@ -73,12 +72,12 @@ func (s *SharedSecret) Agreed(myPrivateKey *ecdsa.PrivateKey, myInstallationID s
 	}
 
 	for _, installationID := range theirInstallationIDs {
-		if !response.installationIDs[installationID] {
+		if !response.InstallationIDs[installationID] {
 			return secret, false, nil
 		}
 	}
 
-	if !bytes.Equal(secret.Key, response.secret) {
+	if !bytes.Equal(secret.Key, response.Secret) {
 		return nil, false, errors.New("computed and saved secrets are different for a given identity")
 	}
 

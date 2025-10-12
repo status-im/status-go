@@ -1,14 +1,12 @@
-package persistence
+package wakuv2
 
-import (
-	"crypto/ecdsa"
-)
+import "crypto/ecdsa"
 
-type ProtectedTopics interface {
+type ProtectedTopicsPersistence interface {
 	Insert(pubsubTopic string, privKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) error
 	Delete(pubsubTopic string) error
 	FetchPrivateKey(topic string) (*ecdsa.PrivateKey, error)
-	ProtectedTopics() ([]ProtectedTopic, error)
+	All() ([]ProtectedTopic, error)
 }
 
 type ProtectedTopic struct {

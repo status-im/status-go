@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	encryptmigrations "github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	appmigrations "github.com/status-im/status-go/protocol/migrations"
 	push_notification_client_migrations "github.com/status-im/status-go/protocol/pushnotificationclient/migrations"
 	push_notification_server_migrations "github.com/status-im/status-go/protocol/pushnotificationserver/migrations"
@@ -19,10 +18,6 @@ type migrationsWithGetter struct {
 }
 
 var defaultMigrations = []migrationsWithGetter{
-	{
-		Names:  encryptmigrations.AssetNames(),
-		Getter: encryptmigrations.Asset,
-	},
 	{
 		Names:  appmigrations.AssetNames(),
 		Getter: appmigrations.Asset,

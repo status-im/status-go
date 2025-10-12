@@ -6,12 +6,12 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/t/helpers"
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
+	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/messaging/layers/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestSQLLitePersistenceTestSuite(t *testing.T) {
@@ -20,16 +20,18 @@ func TestSQLLitePersistenceTestSuite(t *testing.T) {
 
 type SQLLitePersistenceTestSuite struct {
 	suite.Suite
-	service *sqlitePersistence
+	service Persistence
 }
 
 func (s *SQLLitePersistenceTestSuite) SetupTest() {
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     migrations.AssetNames(),
+			AssetFunc: migrations.Asset,
+		},
+	}))
 	s.Require().NoError(err)
-	err = sqlite.Migrate(db)
-	s.Require().NoError(err)
-
-	s.service = newSQLitePersistence(db)
+	s.service = NewSQLitePersistence(db)
 }
 
 func (s *SQLLitePersistenceTestSuite) TestPrivateBundle() {

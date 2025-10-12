@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/status-im/migrate/v4"
 	"github.com/status-im/migrate/v4/database/sqlcipher"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
@@ -18,7 +19,9 @@ type PostStep struct {
 	RollBackVersion uint
 }
 
-var migrationTable = "status_go_" + sqlcipher.DefaultMigrationsTable
+func StatusMigrationTableName() string {
+	return "status_go_" + sqlcipher.DefaultMigrationsTable
+}
 
 type MigrateOptions struct {
 	MigrationTableName string
@@ -52,7 +55,7 @@ func Migrate(db *sql.DB, resources *bindata.AssetSource, options MigrateOptions)
 
 	migrationTableName := options.MigrationTableName
 	if len(migrationTableName) == 0 {
-		migrationTableName = migrationTable
+		migrationTableName = StatusMigrationTableName()
 	}
 	driver, err := sqlcipher.WithInstance(db, &sqlcipher.Config{
 		MigrationsTable: migrationTableName,
@@ -164,7 +167,7 @@ func getCurrentVersion(m *migrate.Migrate, db *sql.DB) (uint, error) {
 		return 0, fmt.Errorf("DB is dirty after migration version %d", lastVersion)
 	}
 	if err == migrate.ErrNilVersion {
-		lastVersion, _, err = GetLastMigrationVersion(db)
+		lastVersion, _, err = GetLastMigrationVersion(db, StatusMigrationTableName())
 		return lastVersion, err
 	}
 	return lastVersion, nil
@@ -172,9 +175,9 @@ func getCurrentVersion(m *migrate.Migrate, db *sql.DB) (uint, error) {
 
 // GetLastMigrationVersion returns the last migration version stored in the migration table.
 // Returns 0 for version in case migrationTableExists is true
-func GetLastMigrationVersion(db *sql.DB) (version uint, migrationTableExists bool, err error) {
+func GetLastMigrationVersion(db *sql.DB, migrationTableName string) (version uint, migrationTableExists bool, err error) {
 	// Check if the migration table exists
-	row := db.QueryRow("SELECT exists(SELECT name FROM sqlite_master WHERE type='table' AND name=?)", migrationTable)
+	row := db.QueryRow("SELECT exists(SELECT name FROM sqlite_master WHERE type='table' AND name=?)", migrationTableName)
 	migrationTableExists = false
 	err = row.Scan(&migrationTableExists)
 	if err != nil && err != sql.ErrNoRows {
@@ -183,11 +186,84 @@ func GetLastMigrationVersion(db *sql.DB) (version uint, migrationTableExists boo
 
 	var lastMigration uint64 = 0
 	if migrationTableExists {
-		row = db.QueryRow("SELECT version FROM status_go_schema_migrations")
+		row = db.QueryRow(fmt.Sprintf("SELECT version FROM %s", migrationTableName))
 		err = row.Scan(&lastMigration)
 		if err != nil && err != sql.ErrNoRows {
 			return 0, true, err
 		}
 	}
 	return uint(lastMigration), migrationTableExists, nil
+}
+
+// UpdateMigrationTableVersion migrates from one migration table to another, ensuring the table reflects the correct migration state.
+// Ensures migrationTableName exists and records the latest version from assetNames, capped at maxVersion.
+// Intended for migration table transitions and version synchronization.
+func UpdateMigrationTableVersion(db *sql.DB, migrationTableName string, assetNames []string, maxVersion uint) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			rollbackErr := tx.Rollback()
+			if rollbackErr != nil {
+				err = fmt.Errorf("failed to rollback transaction: %w; original error: %v", rollbackErr, err)
+			}
+		}
+	}()
+
+	row := tx.QueryRow("SELECT exists(SELECT name FROM sqlite_master WHERE type='table' AND name=?)", migrationTableName)
+	exists := false
+	err = row.Scan(&exists)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	if !exists {
+		createTable := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (version uint64, dirty bool);`, migrationTableName)
+		_, err = tx.Exec(createTable)
+		if err != nil {
+			return err
+		}
+		createIndex := fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);`, migrationTableName)
+		_, err = tx.Exec(createIndex)
+		if err != nil {
+			return err
+		}
+	}
+
+	version := getMaxMigrationVersion(assetNames, maxVersion)
+	if version > 0 {
+		// #nosec G201 -- migrationTableName is a trusted constant, not user input
+		deleteQuery := fmt.Sprintf("DELETE FROM %s", migrationTableName)
+		_, err = tx.Exec(deleteQuery)
+		if err != nil {
+			return err
+		}
+
+		insertVersion := fmt.Sprintf(`INSERT INTO %s (version, dirty)`, migrationTableName) + `VALUES (?, ?)`
+		_, err = tx.Exec(insertVersion, version, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit()
+
+	return err
+}
+
+func getMaxMigrationVersion(assetNames []string, max uint) uint {
+	floor := uint(0)
+	for _, name := range assetNames {
+		m, err := source.DefaultParse(name)
+		if err != nil {
+			continue // ignore files that we can't parse
+		}
+		if m.Version <= max && m.Version > floor {
+			floor = m.Version
+		}
+	}
+	return floor
 }

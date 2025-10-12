@@ -95,7 +95,6 @@ type Messenger struct {
 	identity                  *ecdsa.PrivateKey
 	signer                    communities.MessageSigner
 	messaging                 *messaging.API
-	messagingPersistence      *messagingPersistence
 	persistence               *sqlitePersistence
 	ensVerifier               *ens.Verifier
 	pushNotificationClient    *pushnotificationclient.Client
@@ -397,7 +396,6 @@ func NewMessenger(
 		config:                     &c,
 		identity:                   identity,
 		messaging:                  messaging,
-		messagingPersistence:       NewMessagingPersistence(database),
 		persistence:                sqlitePersistence,
 		communityTokensService:     c.communityTokensService,
 		pushNotificationClient:     pushNotificationClient,

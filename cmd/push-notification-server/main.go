@@ -122,10 +122,8 @@ func main() {
 
 	messaging, err := messaging.NewCore(
 		messaging.CoreParams{
-			Identity:    privateKey,
-			DB:          db,
-			Persistence: protocol.NewMessagingPersistence(db),
-			NodeKey:     nil,
+			Identity: privateKey,
+			NodeKey:  nil,
 			WakuConfig: params.WakuV2Config{
 				Enabled:        true,
 				Host:           "0.0.0.0",
@@ -144,6 +142,7 @@ func main() {
 			TimeSource:     timesource.DefaultService(),
 		},
 		messaging.WithLogger(logger.Named("messaging")),
+		messaging.WithSQLitePersistence(db),
 	)
 	if err != nil {
 		os.Exit(exitCodeCreateMessengerFailed)

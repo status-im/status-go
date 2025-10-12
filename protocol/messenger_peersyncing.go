@@ -27,7 +27,7 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 	for _, ack := range acks {
 		//get message ID from database by datasync ID, with at-least-one
 		// semantic
-		messageIDBytes, err := m.messagingPersistence.MarkAsConfirmed(ack, true)
+		messageIDBytes, err := m.messaging.MarkAsConfirmed(ack, true)
 		if err != nil {
 			m.logger.Info("got datasync acknowledge for message we don't have in db", zap.String("ack", hex.EncodeToString(ack)))
 			continue
