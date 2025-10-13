@@ -7,10 +7,10 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/crypto"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -30,7 +30,7 @@ func (m *Manager) HandleRequestToJoinPrivilegedUserSyncMessage(message *protobuf
 		state = RequestToJoinStateDeclined
 	}
 
-	myPk := common.PubkeyToHex(&m.identity.PublicKey)
+	myPk := crypto.PubkeyToHex(&m.identity.PublicKey)
 
 	requestsToJoin := make([]*RequestToJoin, 0)
 	for signer, requestToJoinProto := range message.RequestToJoin {
@@ -67,7 +67,7 @@ func (m *Manager) HandleRequestToJoinPrivilegedUserSyncMessage(message *protobuf
 
 func (m *Manager) HandleSyncAllRequestToJoinForNewPrivilegedMember(message *protobuf.CommunityPrivilegedUserSyncMessage, community *Community) ([]*RequestToJoin, error) {
 	nonAcceptedRequestsToJoin := []*RequestToJoin{}
-	myPk := common.PubkeyToHex(&m.identity.PublicKey)
+	myPk := crypto.PubkeyToHex(&m.identity.PublicKey)
 
 	for _, syncRequestToJoin := range message.SyncRequestsToJoin {
 		if syncRequestToJoin.PublicKey == myPk {

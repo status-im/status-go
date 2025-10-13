@@ -582,7 +582,7 @@ func (o *Community) GetMemberPubkeys() []*ecdsa.PublicKey {
 		pubkeys := make([]*ecdsa.PublicKey, len(o.config.CommunityDescription.Members))
 		i := 0
 		for hex := range o.config.CommunityDescription.Members {
-			pubkeys[i], _ = common.HexToPubkey(hex)
+			pubkeys[i], _ = crypto.HexToPubkey(hex)
 			i++
 		}
 		return pubkeys
@@ -682,7 +682,7 @@ func (o *Community) DeleteChat(chatID string) (*CommunityChanges, error) {
 
 func (o *Community) getMember(pk *ecdsa.PublicKey) *protobuf.CommunityMember {
 
-	key := common.PubkeyToHex(pk)
+	key := crypto.PubkeyToHex(pk)
 	member := o.config.CommunityDescription.Members[key]
 	return member
 }
@@ -710,7 +710,7 @@ func (o *Community) getChatMember(pk *ecdsa.PublicKey, chatID string) *protobuf.
 		return nil
 	}
 
-	key := common.PubkeyToHex(pk)
+	key := crypto.PubkeyToHex(pk)
 	member := chat.Members[key]
 
 	if member == nil && !channelHasPermissions(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
@@ -735,7 +735,7 @@ func (o *Community) IsBanned(pk *ecdsa.PublicKey) bool {
 
 func (o *Community) isBanned(pk *ecdsa.PublicKey) bool {
 
-	key := common.PubkeyToHex(pk)
+	key := crypto.PubkeyToHex(pk)
 
 	banned := slices.Contains(o.config.CommunityDescription.BanList, key)
 
@@ -837,7 +837,7 @@ func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*pro
 		return o.config.CommunityDescription, nil
 	}
 
-	key := common.PubkeyToHex(pk)
+	key := crypto.PubkeyToHex(pk)
 	delete(chat.Members, key)
 
 	if o.IsControlNode() {
@@ -850,7 +850,7 @@ func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*pro
 func (o *Community) RemoveOurselvesFromOrg(pk *ecdsa.PublicKey) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-	_ = o.RemoveMembersFromOrg([]string{common.PubkeyToHex(pk)})
+	_ = o.RemoveMembersFromOrg([]string{crypto.PubkeyToHex(pk)})
 	o.increaseClock()
 }
 
@@ -866,13 +866,13 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 		return nil, ErrCannotRemoveOwnerOrAdmin
 	}
 
-	pkStr := common.PubkeyToHex(pk)
+	pkStr := crypto.PubkeyToHex(pk)
 
 	if o.IsControlNode() {
 		_ = o.RemoveMembersFromOrg([]string{pkStr})
 		o.increaseClock()
 	} else {
-		err := o.addNewCommunityEvent(o.ToKickCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
+		err := o.addNewCommunityEvent(o.ToKickCommunityMemberCommunityEvent(crypto.PubkeyToHex(pk)))
 		if err != nil {
 			return nil, err
 		}
@@ -922,7 +922,7 @@ func (o *Community) RemoveMembersFromOrg(membersToRemove []string) *CommunityCha
 func (o *Community) RemoveAllUsersFromOrg() *CommunityChanges {
 	o.increaseClock()
 
-	myPublicKey := common.PubkeyToHex(o.MemberIdentity())
+	myPublicKey := crypto.PubkeyToHex(o.MemberIdentity())
 	member := o.config.CommunityDescription.Members[myPublicKey]
 
 	membersToRemove := o.config.CommunityDescription.Members
@@ -1002,7 +1002,7 @@ func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Commu
 		o.unbanUserFromCommunity(pk)
 		o.increaseClock()
 	} else {
-		err := o.addNewCommunityEvent(o.ToUnbanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
+		err := o.addNewCommunityEvent(o.ToUnbanCommunityMemberCommunityEvent(crypto.PubkeyToHex(pk)))
 		if err != nil {
 			return nil, err
 		}
@@ -1027,7 +1027,7 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey, communityBanInfo *
 		o.banUserFromCommunity(pk, communityBanInfo)
 		o.increaseClock()
 	} else {
-		pkStr := common.PubkeyToHex(pk)
+		pkStr := crypto.PubkeyToHex(pk)
 		err := o.addNewCommunityEvent(o.ToBanCommunityMemberCommunityEvent(pkStr))
 		if err != nil {
 			return nil, err
@@ -1395,8 +1395,8 @@ func (o *Community) GetFilteredPrivilegedMembers(skipMembers map[string]struct{}
 	members := o.GetMemberPubkeys()
 	for _, member := range members {
 		if len(skipMembers) > 0 {
-			if _, exist := skipMembers[common.PubkeyToHex(member)]; exist {
-				delete(skipMembers, common.PubkeyToHex(member))
+			if _, exist := skipMembers[crypto.PubkeyToHex(member)]; exist {
+				delete(skipMembers, crypto.PubkeyToHex(member))
 				continue
 			}
 		}
@@ -2103,7 +2103,7 @@ func (o *Community) VerifyGrantSignature(data []byte) (*protobuf.Grant, error) {
 		return nil, err
 	}
 
-	if !common.IsPubKeyEqual(o.ControlNode(), extractedPublicKey) {
+	if !crypto.IsPubKeyEqual(o.ControlNode(), extractedPublicKey) {
 		return nil, ErrInvalidGrant
 	}
 
@@ -2123,7 +2123,7 @@ func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) bool {
 	}
 
 	// community creator can always post, return immediately
-	if common.IsPubKeyEqual(pk, o.ControlNode()) || o.IsPrivilegedMember(pk) {
+	if crypto.IsPubKeyEqual(pk, o.ControlNode()) || o.IsPrivilegedMember(pk) {
 		return true
 	}
 
@@ -2138,7 +2138,7 @@ func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) bool {
 	}
 
 	// If community member, also check chat membership next
-	_, ok = o.config.CommunityDescription.Members[common.PubkeyToHex(pk)]
+	_, ok = o.config.CommunityDescription.Members[crypto.PubkeyToHex(pk)]
 	if !ok {
 		o.config.Logger.Debug("Community.CanView: not a community member", zap.String("chat-id", chatID))
 		return false
@@ -2153,7 +2153,7 @@ func (o *Community) CanView(pk *ecdsa.PublicKey, chatID string) bool {
 		return false
 	}
 
-	_, isChatMember := chat.Members[common.PubkeyToHex(pk)]
+	_, isChatMember := chat.Members[crypto.PubkeyToHex(pk)]
 	return isChatMember
 }
 
@@ -2163,13 +2163,13 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType prot
 		return false, nil
 	}
 
-	if o.IsPrivilegedMember(pk) || common.IsPubKeyEqual(pk, o.ControlNode()) {
+	if o.IsPrivilegedMember(pk) || crypto.IsPubKeyEqual(pk, o.ControlNode()) {
 		// If the user is a privileged member, they can post in any chat
 		return true, nil
 	}
 
 	chat := o.config.CommunityDescription.Chats[chatID]
-	member := chat.Members[common.PubkeyToHex(pk)]
+	member := chat.Members[crypto.PubkeyToHex(pk)]
 
 	// Channels with permissions require the member to be present
 	if member == nil && channelHasPermissions(o.ChatID(chatID), o.config.CommunityDescription.TokenPermissions) {
@@ -2307,7 +2307,7 @@ func (o *Community) CanManageUsersPublicKeys() ([]*ecdsa.PublicKey, error) {
 	roles := manageCommunityRoles()
 	for pkString, member := range o.config.CommunityDescription.Members {
 		if o.memberHasRoles(member, roles) {
-			pk, err := common.HexToPubkey(pkString)
+			pk, err := crypto.HexToPubkey(pkString)
 			if err != nil {
 				return nil, err
 			}
@@ -2332,7 +2332,7 @@ func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.Commu
 		return nil, ErrNotControlNode
 	}
 
-	memberKey := common.PubkeyToHex(publicKey)
+	memberKey := crypto.PubkeyToHex(publicKey)
 	changes := o.emptyCommunityChanges()
 
 	if o.config.CommunityDescription.Members == nil {
@@ -2359,7 +2359,7 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey,
 		return nil, ErrNotControlNode
 	}
 
-	memberKey := common.PubkeyToHex(publicKey)
+	memberKey := crypto.PubkeyToHex(publicKey)
 	changes := o.emptyCommunityChanges()
 
 	chat, ok := o.config.CommunityDescription.Chats[chatID]
@@ -2476,7 +2476,7 @@ func (d sortSlice) Less(i, j int) bool {
 }
 
 func (o *Community) unbanUserFromCommunity(pk *ecdsa.PublicKey) {
-	key := common.PubkeyToHex(pk)
+	key := crypto.PubkeyToHex(pk)
 	for i, v := range o.config.CommunityDescription.BanList {
 		if v == key {
 			o.config.CommunityDescription.BanList =
@@ -2491,7 +2491,7 @@ func (o *Community) unbanUserFromCommunity(pk *ecdsa.PublicKey) {
 }
 
 func (o *Community) banUserFromCommunity(pk *ecdsa.PublicKey, communityBanInfo *protobuf.CommunityBanInfo) {
-	key := common.PubkeyToHex(pk)
+	key := crypto.PubkeyToHex(pk)
 	if o.hasMember(pk) {
 		// Remove from org
 		delete(o.config.CommunityDescription.Members, key)
@@ -2520,7 +2520,7 @@ func (o *Community) banUserFromCommunity(pk *ecdsa.PublicKey, communityBanInfo *
 }
 
 func (o *Community) deleteBannedMemberAllMessages(pk *ecdsa.PublicKey) error {
-	key := common.PubkeyToHex(pk)
+	key := crypto.PubkeyToHex(pk)
 
 	if o.config.CommunityDescription.BannedMembers == nil {
 		return ErrBannedMemberNotFound
@@ -2670,7 +2670,7 @@ func (o *Community) validateEvent(event *CommunityEvent, signer *ecdsa.PublicKey
 	}
 
 	eventTargetRoles := []protobuf.CommunityMember_Roles{}
-	eventTargetPk, err := common.HexToPubkey(event.MemberToAction)
+	eventTargetPk, err := crypto.HexToPubkey(event.MemberToAction)
 	if err == nil {
 		eventTarget := o.getMember(eventTargetPk)
 		if eventTarget != nil {

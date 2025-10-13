@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -557,7 +556,7 @@ func TestMarshalContactJSON(t *testing.T) {
 	}
 	id, err := crypto.GenerateKey()
 	require.NoError(t, err)
-	contact.ID = common.PubkeyToHex(&id.PublicKey)
+	contact.ID = crypto.PubkeyToHex(&id.PublicKey)
 
 	encodedContact, err := json.Marshal(contact)
 

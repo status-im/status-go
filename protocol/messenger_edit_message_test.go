@@ -372,7 +372,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 			MessageId:   messageID,
 			ChatId:      theirChat.ID,
 		},
-		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
+		From: crypto.PubkeyToHex(&theirMessenger.identity.PublicKey),
 	}
 	state := &ReceivedMessageState{
 		Response: &MessengerResponse{},
@@ -418,7 +418,7 @@ func (s *MessengerEditMessageSuite) TestEditGroupChatMessage() {
 
 	s.Require().NoError(makeMutualContact(s.m, &theirMessenger.identity.PublicKey))
 
-	members := []string{common.PubkeyToHex(&theirMessenger.identity.PublicKey)}
+	members := []string{crypto.PubkeyToHex(&theirMessenger.identity.PublicKey)}
 	_, err = s.m.AddMembersToGroupChat(context.Background(), ourChat.ID, members)
 	s.NoError(err)
 
@@ -523,7 +523,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithMention() {
 	s.Require().NoError(err)
 
 	// Edit the message and add a mention
-	editedText := "edited text @" + common.PubkeyToHex(&s.privateKey.PublicKey)
+	editedText := "edited text @" + crypto.PubkeyToHex(&s.privateKey.PublicKey)
 	editedMessage := &requests.EditMessage{
 		ID:   messageID,
 		Text: editedText,

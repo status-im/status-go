@@ -11,6 +11,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -788,7 +789,7 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 }
 
 func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.UnbanUserFromCommunity) {
-	pubkey := common.PubkeyToHex(&base.GetMember().identity.PublicKey)
+	pubkey := crypto.PubkeyToHex(&base.GetMember().identity.PublicKey)
 
 	checkUnbanned := func(response *MessengerResponse) error {
 		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
@@ -1044,7 +1045,7 @@ func testCreateEditDeleteBecomeMemberPermission(base CommunityEventsTestsInterfa
 // To be removed in https://github.com/status-im/status-go/issues/4437
 func advertiseCommunityToUserOldWay(s *suite.Suite, community *communities.Community, owner *Messenger, user *Messenger) {
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -1117,7 +1118,7 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	acceptedRequestsPending, err := base.GetEventSender().AcceptedPendingRequestsToJoinForCommunity(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(acceptedRequestsPending, 1)
-	s.Require().Equal(acceptedRequestsPending[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	s.Require().Equal(acceptedRequestsPending[0].PublicKey, crypto.PubkeyToHex(&user.identity.PublicKey))
 
 	// control node receives community event with accepted membership request
 	_, err = WaitOnMessengerResponse(
@@ -1134,7 +1135,7 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().NoError(err)
 	// we expect 3 here (1 event senders, 1 member + 1 from user)
 	s.Require().Len(acceptedRequests, 3)
-	s.Require().Equal(acceptedRequests[2].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	s.Require().Equal(acceptedRequests[2].PublicKey, crypto.PubkeyToHex(&user.identity.PublicKey))
 
 	// user receives updated community
 	_, err = WaitOnMessengerResponse(
@@ -1161,7 +1162,7 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 		base.GetEventSender(),
 		func(r *MessengerResponse) bool {
 			acceptedRequests, err := base.GetEventSender().AcceptedRequestsToJoinForCommunity(community.ID())
-			return err == nil && len(acceptedRequests) == 2 && (acceptedRequests[1].PublicKey == common.PubkeyToHex(&user.identity.PublicKey))
+			return err == nil && len(acceptedRequests) == 2 && (acceptedRequests[1].PublicKey == crypto.PubkeyToHex(&user.identity.PublicKey))
 		},
 		"no updates from control node",
 	)
@@ -1226,7 +1227,7 @@ func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	acceptedPendingRequests, err := additionalEventSender.AcceptedPendingRequestsToJoinForCommunity(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(acceptedPendingRequests, 1)
-	s.Require().Equal(acceptedPendingRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	s.Require().Equal(acceptedPendingRequests[0].PublicKey, crypto.PubkeyToHex(&user.identity.PublicKey))
 
 	// event sender 1 changes its mind and rejects the request
 	rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: requestID}
@@ -1246,7 +1247,7 @@ func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	rejectedPendingRequests, err := additionalEventSender.DeclinedPendingRequestsToJoinForCommunity(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(rejectedPendingRequests, 1)
-	s.Require().Equal(rejectedPendingRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	s.Require().Equal(rejectedPendingRequests[0].PublicKey, crypto.PubkeyToHex(&user.identity.PublicKey))
 }
 
 func testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
@@ -1301,7 +1302,7 @@ func testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	rejectedPendingRequests, err := additionalEventSender.DeclinedPendingRequestsToJoinForCommunity(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(rejectedPendingRequests, 1)
-	s.Require().Equal(rejectedPendingRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	s.Require().Equal(rejectedPendingRequests[0].PublicKey, crypto.PubkeyToHex(&user.identity.PublicKey))
 
 	// event sender 1 changes its mind and accepts the request
 	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: requestID}
@@ -1322,7 +1323,7 @@ func testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	acceptedPendingRequests, err := additionalEventSender.AcceptedPendingRequestsToJoinForCommunity(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(acceptedPendingRequests, 1)
-	s.Require().Equal(acceptedPendingRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	s.Require().Equal(acceptedPendingRequests[0].PublicKey, crypto.PubkeyToHex(&user.identity.PublicKey))
 }
 
 func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {
@@ -1468,7 +1469,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 			return errors.New("rejected requests should be 1")
 		}
 
-		if rejectedRequests[0].PublicKey != common.PubkeyToHex(&user.identity.PublicKey) {
+		if rejectedRequests[0].PublicKey != crypto.PubkeyToHex(&user.identity.PublicKey) {
 			return errors.New("public key of rejected request not matching")
 		}
 
@@ -1504,7 +1505,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 			return errors.New("rejected requests should be 1")
 		}
 		// we expect user's request to join still to be rejected
-		if rejectedRequests[0].PublicKey != common.PubkeyToHex(&user.identity.PublicKey) {
+		if rejectedRequests[0].PublicKey != crypto.PubkeyToHex(&user.identity.PublicKey) {
 			return errors.New("public key of rejected request not matching")
 		}
 		return nil
@@ -1581,7 +1582,7 @@ func testEventSenderKickTheSameRole(base CommunityEventsTestsInterface, communit
 	// event sender tries to kick the member with the same role
 	_, err := base.GetEventSender().RemoveUserFromCommunity(
 		community.ID(),
-		common.PubkeyToHex(&base.GetEventSender().identity.PublicKey),
+		crypto.PubkeyToHex(&base.GetEventSender().identity.PublicKey),
 	)
 
 	s := base.GetSuite()
@@ -1593,7 +1594,7 @@ func testEventSenderKickControlNode(base CommunityEventsTestsInterface, communit
 	// event sender tries to kick the control node
 	_, err := base.GetEventSender().RemoveUserFromCommunity(
 		community.ID(),
-		common.PubkeyToHex(&base.GetControlNode().identity.PublicKey),
+		crypto.PubkeyToHex(&base.GetControlNode().identity.PublicKey),
 	)
 
 	s := base.GetSuite()
@@ -1606,7 +1607,7 @@ func testOwnerBanTheSameRole(base CommunityEventsTestsInterface, community *comm
 		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
-			User:        common.PubkeyToHexBytes(&base.GetEventSender().identity.PublicKey),
+			User:        crypto.PubkeyToHexBytes(&base.GetEventSender().identity.PublicKey),
 		},
 	)
 
@@ -1620,7 +1621,7 @@ func testOwnerBanControlNode(base CommunityEventsTestsInterface, community *comm
 		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
-			User:        common.PubkeyToHexBytes(&base.GetControlNode().identity.PublicKey),
+			User:        crypto.PubkeyToHexBytes(&base.GetControlNode().identity.PublicKey),
 		},
 	)
 
@@ -1635,7 +1636,7 @@ func testBanUnbanMember(base CommunityEventsTestsInterface, community *communiti
 		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
-			User:        common.PubkeyToHexBytes(&base.GetControlNode().identity.PublicKey),
+			User:        crypto.PubkeyToHexBytes(&base.GetControlNode().identity.PublicKey),
 		},
 	)
 	s := base.GetSuite()
@@ -1643,14 +1644,14 @@ func testBanUnbanMember(base CommunityEventsTestsInterface, community *communiti
 
 	banRequest := &requests.BanUserFromCommunity{
 		CommunityID: community.ID(),
-		User:        common.PubkeyToHexBytes(&base.GetMember().identity.PublicKey),
+		User:        crypto.PubkeyToHexBytes(&base.GetMember().identity.PublicKey),
 	}
 
 	banMember(base, banRequest)
 
 	unbanRequest := &requests.UnbanUserFromCommunity{
 		CommunityID: community.ID(),
-		User:        common.PubkeyToHexBytes(&base.GetMember().identity.PublicKey),
+		User:        crypto.PubkeyToHexBytes(&base.GetMember().identity.PublicKey),
 	}
 
 	unbanMember(base, unbanRequest)
@@ -2160,7 +2161,7 @@ func waitAndCheckRequestsToJoin(s *suite.Suite, user *Messenger, expectedLength 
 			}
 
 			for _, request := range requestsToJoin {
-				if request.PublicKey == common.PubkeyToHex(&user.identity.PublicKey) {
+				if request.PublicKey == crypto.PubkeyToHex(&user.identity.PublicKey) {
 					if len(request.RevealedAccounts) != 1 {
 						s.T().Log("our own requests to join must always have accounts revealed")
 						return false
@@ -2241,7 +2242,7 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 	acceptedRequestsPending, err := base.GetEventSender().AcceptedPendingRequestsToJoinForCommunity(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(acceptedRequestsPending, 1)
-	s.Require().Equal(acceptedRequestsPending[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	s.Require().Equal(acceptedRequestsPending[0].PublicKey, crypto.PubkeyToHex(&user.identity.PublicKey))
 
 	// control node receives community event with accepted membership request
 	_, err = WaitOnMessengerResponse(
@@ -2258,7 +2259,7 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 	s.Require().NoError(err)
 	// we expect 3 here (1 event senders, 1 member + 1 from user)
 	s.Require().Len(acceptedRequests, 3)
-	s.Require().Equal(acceptedRequests[2].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	s.Require().Equal(acceptedRequests[2].PublicKey, crypto.PubkeyToHex(&user.identity.PublicKey))
 
 	// user receives updated community
 	_, err = WaitOnMessengerResponse(
@@ -2285,7 +2286,7 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 		base.GetEventSender(),
 		func(r *MessengerResponse) bool {
 			acceptedRequests, err := base.GetEventSender().AcceptedRequestsToJoinForCommunity(community.ID())
-			return err == nil && len(acceptedRequests) == 2 && (acceptedRequests[1].PublicKey == common.PubkeyToHex(&user.identity.PublicKey))
+			return err == nil && len(acceptedRequests) == 2 && (acceptedRequests[1].PublicKey == crypto.PubkeyToHex(&user.identity.PublicKey))
 		},
 		"no updates from control node",
 	)
@@ -2357,7 +2358,7 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 	acceptedRequestsPending, err = base.GetEventSender().AcceptedPendingRequestsToJoinForCommunity(community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(acceptedRequestsPending, 1)
-	s.Require().Equal(acceptedRequestsPending[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	s.Require().Equal(acceptedRequestsPending[0].PublicKey, crypto.PubkeyToHex(&user.identity.PublicKey))
 
 	// control node receives community event with accepted membership request
 	_, err = WaitOnMessengerResponse(
@@ -2374,7 +2375,7 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 	s.Require().NoError(err)
 	// we expect 3 here (1 event senders, 1 member + 1 from user)
 	s.Require().Len(acceptedRequests, 3)
-	s.Require().Equal(acceptedRequests[2].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	s.Require().Equal(acceptedRequests[2].PublicKey, crypto.PubkeyToHex(&user.identity.PublicKey))
 
 	// user receives updated community
 	_, err = WaitOnMessengerResponse(
@@ -2401,7 +2402,7 @@ func testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(base CommunityEven
 		base.GetEventSender(),
 		func(r *MessengerResponse) bool {
 			acceptedRequests, err := base.GetEventSender().AcceptedRequestsToJoinForCommunity(community.ID())
-			return err == nil && len(acceptedRequests) == 2 && (acceptedRequests[1].PublicKey == common.PubkeyToHex(&user.identity.PublicKey))
+			return err == nil && len(acceptedRequests) == 2 && (acceptedRequests[1].PublicKey == crypto.PubkeyToHex(&user.identity.PublicKey))
 		},
 		"no updates from control node",
 	)
@@ -2417,7 +2418,7 @@ func testBanMemberWithDeletingAllMessages(base CommunityEventsTestsInterface, co
 	// verify that event sender can't ban a control node and delete his messages
 	banRequest := &requests.BanUserFromCommunity{
 		CommunityID:       community.ID(),
-		User:              common.PubkeyToHexBytes(&base.GetControlNode().identity.PublicKey),
+		User:              crypto.PubkeyToHexBytes(&base.GetControlNode().identity.PublicKey),
 		DeleteAllMessages: true,
 	}
 
@@ -2458,7 +2459,7 @@ func testBanMemberWithDeletingAllMessages(base CommunityEventsTestsInterface, co
 
 	waitOnMessengerResponse(s, checkMsgDelivered, base.GetEventSender())
 
-	banRequest.User = common.PubkeyToHexBytes(&base.GetMember().identity.PublicKey)
+	banRequest.User = crypto.PubkeyToHexBytes(&base.GetMember().identity.PublicKey)
 
 	banMember(base, banRequest)
 }

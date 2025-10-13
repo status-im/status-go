@@ -12,7 +12,6 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -65,9 +64,9 @@ func (s *CommunitySuite) SetupTest() {
 	s.Require().NoError(err)
 	s.member3 = member3
 
-	s.member1Key = common.PubkeyToHex(&s.member1.PublicKey)
-	s.member2Key = common.PubkeyToHex(&s.member2.PublicKey)
-	s.member3Key = common.PubkeyToHex(&s.member3.PublicKey)
+	s.member1Key = crypto.PubkeyToHex(&s.member1.PublicKey)
+	s.member2Key = crypto.PubkeyToHex(&s.member2.PublicKey)
+	s.member3Key = crypto.PubkeyToHex(&s.member3.PublicKey)
 
 }
 
@@ -92,8 +91,8 @@ func (s *CommunitySuite) TestHasPermission() {
 
 	communityDescription := &protobuf.CommunityDescription{}
 	communityDescription.Members = make(map[string]*protobuf.CommunityMember)
-	communityDescription.Members[common.PubkeyToHex(&ownerKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
-	communityDescription.Members[common.PubkeyToHex(&memberKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}}
+	communityDescription.Members[crypto.PubkeyToHex(&ownerKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
+	communityDescription.Members[crypto.PubkeyToHex(&memberKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}}
 
 	community.config = &Config{ID: &ownerKey.PublicKey, CommunityDescription: communityDescription}
 
@@ -267,11 +266,11 @@ func (s *CommunitySuite) TestRemoveUserFromChat() {
 	s.Require().True(org.HasMember(&s.member1.PublicKey))
 
 	// Check member has not been removed from org
-	_, ok := actualCommunity.Members[common.PubkeyToHex(&s.member1.PublicKey)]
+	_, ok := actualCommunity.Members[crypto.PubkeyToHex(&s.member1.PublicKey)]
 	s.Require().True(ok)
 
 	// Check member has been removed from chat
-	_, ok = actualCommunity.Chats[testChatID1].Members[common.PubkeyToHex(&s.member1.PublicKey)]
+	_, ok = actualCommunity.Chats[testChatID1].Members[crypto.PubkeyToHex(&s.member1.PublicKey)]
 	s.Require().False(ok)
 }
 
@@ -295,11 +294,11 @@ func (s *CommunitySuite) TestRemoveUserFormOrg() {
 	s.Require().False(org.HasMember(&s.member1.PublicKey))
 
 	// Check member has been removed from org
-	_, ok := actualCommunity.Members[common.PubkeyToHex(&s.member1.PublicKey)]
+	_, ok := actualCommunity.Members[crypto.PubkeyToHex(&s.member1.PublicKey)]
 	s.Require().False(ok)
 
 	// Check member has been removed from chat
-	_, ok = actualCommunity.Chats[testChatID1].Members[common.PubkeyToHex(&s.member1.PublicKey)]
+	_, ok = actualCommunity.Chats[testChatID1].Members[crypto.PubkeyToHex(&s.member1.PublicKey)]
 	s.Require().False(ok)
 }
 
@@ -315,7 +314,7 @@ func (s *CommunitySuite) TestRemoveOurselvesFormOrg() {
 	s.Require().False(org.HasMember(&s.member1.PublicKey))
 
 	// Check member has been removed from chat
-	_, ok := org.config.CommunityDescription.Chats[testChatID1].Members[common.PubkeyToHex(&s.member1.PublicKey)]
+	_, ok := org.config.CommunityDescription.Chats[testChatID1].Members[crypto.PubkeyToHex(&s.member1.PublicKey)]
 	s.Require().False(ok)
 }
 
@@ -464,7 +463,7 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 
 func (s *CommunitySuite) TestCanPostCanView() {
 	chatID := "chat-id"
-	memberKey := common.PubkeyToHex(&s.member1.PublicKey)
+	memberKey := crypto.PubkeyToHex(&s.member1.PublicKey)
 	// Member has no channel role
 	description := &protobuf.CommunityDescription{
 		Members: map[string]*protobuf.CommunityMember{
@@ -827,8 +826,8 @@ func (s *CommunitySuite) emptyCommunityDescriptionWithChat() *protobuf.Community
 
 	desc.Categories[testCategoryID1] = &protobuf.CommunityCategory{CategoryId: testCategoryID1, Name: testCategoryName1, Position: 0}
 	desc.Chats[testChatID1] = &protobuf.CommunityChat{Position: 0, Permissions: &protobuf.CommunityPermissions{}, Members: make(map[string]*protobuf.CommunityMember)}
-	desc.Members[common.PubkeyToHex(&s.member1.PublicKey)] = &protobuf.CommunityMember{}
-	desc.Chats[testChatID1].Members[common.PubkeyToHex(&s.member1.PublicKey)] = &protobuf.CommunityMember{}
+	desc.Members[crypto.PubkeyToHex(&s.member1.PublicKey)] = &protobuf.CommunityMember{}
+	desc.Chats[testChatID1].Members[crypto.PubkeyToHex(&s.member1.PublicKey)] = &protobuf.CommunityMember{}
 
 	return desc
 
@@ -1057,10 +1056,10 @@ func (s *CommunitySuite) TestMarshalJSON() {
 	// returns true if the user is the owner
 
 	communityDescription.Members = make(map[string]*protobuf.CommunityMember)
-	communityDescription.Members[common.PubkeyToHex(&ownerKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
-	communityDescription.Members[common.PubkeyToHex(&memberKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}}
+	communityDescription.Members[crypto.PubkeyToHex(&ownerKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
+	communityDescription.Members[crypto.PubkeyToHex(&memberKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}}
 	communityDescription.Chats[testChatID1] = &protobuf.CommunityChat{Members: make(map[string]*protobuf.CommunityMember), Identity: &protobuf.ChatIdentity{}}
-	communityDescription.Chats[testChatID1].Members[common.PubkeyToHex(&ownerKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
+	communityDescription.Chats[testChatID1].Members[crypto.PubkeyToHex(&ownerKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
 
 	// Test token gated community
 	s.Require().True(community.ChannelEncrypted(testChatID1))
@@ -1083,7 +1082,7 @@ func (s *CommunitySuite) TestMarshalJSON() {
 		"emoji":                   "",
 		"hideIfPermissionsNotMet": false,
 		"members": map[string]interface{}{
-			common.PubkeyToHex(&ownerKey.PublicKey): map[string]interface{}{
+			crypto.PubkeyToHex(&ownerKey.PublicKey): map[string]interface{}{
 				"roles": []interface{}{float64(1)},
 			},
 		},

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -90,7 +91,7 @@ func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() 
 
 	response, err := s.admin.AddRoleToMember(&requests.AddRoleToMember{
 		CommunityID: community.ID(),
-		User:        common.PubkeyToHexBytes(s.moderator.IdentityPublicKey()),
+		User:        crypto.PubkeyToHexBytes(s.moderator.IdentityPublicKey()),
 		Role:        protobuf.CommunityMember_ROLE_ADMIN,
 	})
 	s.Require().NoError(err)

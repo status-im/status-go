@@ -10,7 +10,6 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -74,9 +73,9 @@ func (s *CommunityEncryptionKeyActionSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.member3 = member3
 
-	s.member1Key = common.PubkeyToHex(&s.member1.PublicKey)
-	s.member2Key = common.PubkeyToHex(&s.member2.PublicKey)
-	s.member3Key = common.PubkeyToHex(&s.member3.PublicKey)
+	s.member1Key = crypto.PubkeyToHex(&s.member1.PublicKey)
+	s.member2Key = crypto.PubkeyToHex(&s.member2.PublicKey)
+	s.member3Key = crypto.PubkeyToHex(&s.member3.PublicKey)
 }
 
 func (s *CommunityEncryptionKeyActionSuite) TestEncryptionKeyNone() {

@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 
@@ -247,7 +248,7 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *pro
 		return err
 	}
 
-	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) { // Status message is ours
+	if crypto.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) { // Status message is ours
 		currentStatus, err := m.GetCurrentUserStatus()
 		if err != nil {
 			m.logger.Debug("Error obtaining latest status", zap.Error(err))

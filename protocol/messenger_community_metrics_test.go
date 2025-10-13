@@ -102,13 +102,13 @@ func (s *MessengerCommunityMetricsSuite) generateMessages(chatID string, communi
 				Timestamp: timestamp,
 			},
 			WhisperTimestamp: timestamp,
-			From:             common.PubkeyToHex(&s.m.identity.PublicKey),
+			From:             crypto.PubkeyToHex(&s.m.identity.PublicKey),
 			LocalChatID:      chatID,
 			CommunityID:      communityID,
 			ID:               types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d", chatID, communityID, timestamp)))),
 		}
 
-		err := message.PrepareContent(common.PubkeyToHex(&s.m.identity.PublicKey))
+		err := message.PrepareContent(crypto.PubkeyToHex(&s.m.identity.PublicKey))
 		s.Require().NoError(err)
 
 		messages = append(messages, message)

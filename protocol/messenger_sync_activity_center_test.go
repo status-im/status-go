@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 
@@ -170,7 +170,7 @@ func (s *MessengerSyncActivityCenterSuite) createClosedCommunity() types.HexByte
 }
 
 func (s *MessengerSyncActivityCenterSuite) addContactAndShareCommunity(userB *Messenger, communityID types.HexBytes) {
-	request := &requests.AddContact{ID: common.PubkeyToHex(&s.m2.identity.PublicKey)}
+	request := &requests.AddContact{ID: crypto.PubkeyToHex(&s.m2.identity.PublicKey)}
 	response, err := userB.AddContact(context.Background(), request)
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 2)

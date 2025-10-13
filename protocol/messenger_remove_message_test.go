@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/server"
@@ -169,7 +170,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageFirstThenMessage() {
 			MessageId:   messageID,
 			ChatId:      theirChat.ID,
 		},
-		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
+		From: crypto.PubkeyToHex(&theirMessenger.identity.PublicKey),
 	}
 
 	state := &ReceivedMessageState{
@@ -305,7 +306,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 			MessageId:   messageID1,
 			ChatId:      theirChat.ID,
 		},
-		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
+		From: crypto.PubkeyToHex(&theirMessenger.identity.PublicKey),
 	}
 
 	state := &ReceivedMessageState{
@@ -362,7 +363,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageWithAMention() {
 	s.Require().NoError(err)
 
 	inputMessage := buildTestMessage(*theirChat)
-	inputMessage.Text = "text with a mention @" + common.PubkeyToHex(&s.privateKey.PublicKey)
+	inputMessage.Text = "text with a mention @" + crypto.PubkeyToHex(&s.privateKey.PublicKey)
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 	s.Require().Len(sendResponse.Messages(), 1)
@@ -389,7 +390,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageWithAMention() {
 			MessageId:   messageID,
 			ChatId:      theirChat.ID,
 		},
-		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
+		From: crypto.PubkeyToHex(&theirMessenger.identity.PublicKey),
 	}
 
 	state := &ReceivedMessageState{
@@ -451,7 +452,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
 			MessageId:   ogMessage.ID,
 			ChatId:      theirChat.ID,
 		},
-		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
+		From: crypto.PubkeyToHex(&theirMessenger.identity.PublicKey),
 	}
 
 	state := &ReceivedMessageState{

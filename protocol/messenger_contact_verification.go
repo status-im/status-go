@@ -39,7 +39,7 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 	}
 
 	verifRequest := &verification.Request{
-		From:          common.PubkeyToHex(&m.identity.PublicKey),
+		From:          crypto.PubkeyToHex(&m.identity.PublicKey),
 		To:            contact.ID,
 		Challenge:     challenge,
 		RequestStatus: verification.RequestStatusPENDING,
@@ -164,7 +164,7 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 		return nil, verification.ErrVerificationRequestNotFound
 	}
 
-	if verifRequest.From != common.PubkeyToHex(&m.identity.PublicKey) {
+	if verifRequest.From != crypto.PubkeyToHex(&m.identity.PublicKey) {
 		return nil, errors.New("Can cancel only outgoing contact request")
 	}
 
@@ -786,7 +786,7 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 
 	id := state.CurrentMessageState.MessageID
 
-	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+	if crypto.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		return nil // Is ours, do nothing
 	}
 
@@ -877,7 +877,7 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 		return err
 	}
 
-	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+	if crypto.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		return nil // Is ours, do nothing
 	}
 
@@ -966,7 +966,7 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 }
 
 func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState, request *protobuf.DeclineContactVerification, statusMessage *messagingtypes.Message) error {
-	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+	if crypto.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		return nil // Is ours, do nothing
 	}
 
@@ -1157,7 +1157,7 @@ func (m *Messenger) createContactVerificationMessage(challenge string, chat *Cha
 	chatMessage.ContentType = protobuf.ChatMessage_IDENTITY_VERIFICATION
 	chatMessage.ContactVerificationState = verificationStatus
 
-	err := chatMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	err := chatMessage.PrepareContent(crypto.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return nil, err
 	}
@@ -1182,7 +1182,7 @@ func (m *Messenger) createLocalContactVerificationMessage(challenge string, chat
 		return nil, err
 	}
 
-	err = chatMessage.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	err = chatMessage.PrepareContent(crypto.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return nil, err
 	}

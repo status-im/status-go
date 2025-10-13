@@ -9,11 +9,11 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/crypto"
 	userimage "github.com/status-im/status-go/images"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -120,7 +120,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatCreation() {
 		defer TearDownMessenger(&s.Suite, creator)
 		defer TearDownMessenger(&s.Suite, member)
 
-		members := []string{common.PubkeyToHex(&member.identity.PublicKey)}
+		members := []string{crypto.PubkeyToHex(&member.identity.PublicKey)}
 
 		if testCase.creatorAddedMemberAsContact {
 			s.makeContact(creator, member)
@@ -183,7 +183,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersAddition() {
 		defer TearDownMessenger(&s.Suite, inviter)
 		defer TearDownMessenger(&s.Suite, member)
 
-		members := []string{common.PubkeyToHex(&member.identity.PublicKey)}
+		members := []string{crypto.PubkeyToHex(&member.identity.PublicKey)}
 
 		if testCase.inviterAddedMemberAsContact {
 			s.makeContact(inviter, member)
@@ -198,7 +198,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersAddition() {
 				groupChat = s.createEmptyGroupChat(inviter, fmt.Sprintf("test_group_chat_%d_%d", i, j))
 			} else {
 				s.makeContact(admin, inviter)
-				groupChat = s.createGroupChat(admin, fmt.Sprintf("test_group_chat_%d_%d", i, j), []string{common.PubkeyToHex(&inviter.identity.PublicKey)})
+				groupChat = s.createGroupChat(admin, fmt.Sprintf("test_group_chat_%d_%d", i, j), []string{crypto.PubkeyToHex(&inviter.identity.PublicKey)})
 				err := inviter.SaveChat(groupChat)
 				s.Require().NoError(err)
 			}
@@ -221,8 +221,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 	defer TearDownMessenger(&s.Suite, memberB)
 	defer TearDownMessenger(&s.Suite, memberC)
 
-	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey), common.PubkeyToHex(&memberB.identity.PublicKey),
-		common.PubkeyToHex(&memberC.identity.PublicKey)}
+	members := []string{crypto.PubkeyToHex(&memberA.identity.PublicKey), crypto.PubkeyToHex(&memberB.identity.PublicKey),
+		crypto.PubkeyToHex(&memberC.identity.PublicKey)}
 
 	s.makeMutualContacts(admin, memberA)
 	s.makeMutualContacts(admin, memberB)
@@ -233,13 +233,13 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 	s.verifyGroupChatCreated(memberB, true)
 	s.verifyGroupChatCreated(memberC, true)
 
-	_, err := memberA.RemoveMembersFromGroupChat(context.Background(), groupChat.ID, []string{common.PubkeyToHex(&memberB.identity.PublicKey),
-		common.PubkeyToHex(&memberC.identity.PublicKey)})
+	_, err := memberA.RemoveMembersFromGroupChat(context.Background(), groupChat.ID, []string{crypto.PubkeyToHex(&memberB.identity.PublicKey),
+		crypto.PubkeyToHex(&memberC.identity.PublicKey)})
 	s.Require().Error(err)
 
 	// only admin can remove members from the group
-	_, err = admin.RemoveMembersFromGroupChat(context.Background(), groupChat.ID, []string{common.PubkeyToHex(&memberB.identity.PublicKey),
-		common.PubkeyToHex(&memberC.identity.PublicKey)})
+	_, err = admin.RemoveMembersFromGroupChat(context.Background(), groupChat.ID, []string{crypto.PubkeyToHex(&memberB.identity.PublicKey),
+		crypto.PubkeyToHex(&memberC.identity.PublicKey)})
 	s.Require().NoError(err)
 
 	// ensure removal is propagated to other members
@@ -261,7 +261,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
 
 	s.makeMutualContacts(admin, member)
 
-	groupChat := s.createGroupChat(admin, "test_group_chat", []string{common.PubkeyToHex(&member.identity.PublicKey)})
+	groupChat := s.createGroupChat(admin, "test_group_chat", []string{crypto.PubkeyToHex(&member.identity.PublicKey)})
 	s.verifyGroupChatCreated(member, true)
 
 	response, err := admin.EditGroupChat(context.Background(), groupChat.ID, "test_admin_group", "#FF00FF", userimage.CroppedImage{})
@@ -331,7 +331,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatDeleteMemberMessage() {
 
 	s.makeMutualContacts(admin, member)
 
-	groupChat := s.createGroupChat(admin, "test_group_chat", []string{common.PubkeyToHex(&member.identity.PublicKey)})
+	groupChat := s.createGroupChat(admin, "test_group_chat", []string{crypto.PubkeyToHex(&member.identity.PublicKey)})
 	s.verifyGroupChatCreated(member, true)
 
 	ctx := context.Background()
@@ -369,7 +369,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
 
 	s.makeMutualContacts(admin, member)
 
-	groupChat := s.createGroupChat(admin, "test_group_chat", []string{common.PubkeyToHex(&member.identity.PublicKey)})
+	groupChat := s.createGroupChat(admin, "test_group_chat", []string{crypto.PubkeyToHex(&member.identity.PublicKey)})
 	s.verifyGroupChatCreated(member, true)
 
 	ctx := context.Background()
@@ -393,7 +393,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
 			MessageId:   inputMessage.ID,
 			ChatId:      groupChat.ID,
 		},
-		From: common.PubkeyToHex(&admin.identity.PublicKey),
+		From: crypto.PubkeyToHex(&admin.identity.PublicKey),
 	}
 
 	state := &ReceivedMessageState{
@@ -413,13 +413,13 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
 	defer TearDownMessenger(&s.Suite, admin)
 	defer TearDownMessenger(&s.Suite, memberA)
 
-	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey)}
+	members := []string{crypto.PubkeyToHex(&memberA.identity.PublicKey)}
 
 	s.makeMutualContacts(admin, memberA)
 
 	groupChat := s.createGroupChat(admin, "test_group_chat", members)
 
-	removeMembersResponse, err := admin.removeMembersFromGroupChat(context.Background(), groupChat, []string{common.PubkeyToHex(&memberA.identity.PublicKey)})
+	removeMembersResponse, err := admin.removeMembersFromGroupChat(context.Background(), groupChat, []string{crypto.PubkeyToHex(&memberA.identity.PublicKey)})
 	s.Require().NoError(err)
 
 	encodedMessage := removeMembersResponse.encodedProtobuf
@@ -463,7 +463,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersInfoSync() {
 	s.Require().NoError(memberA.settings.SaveSettingField(settings.DisplayName, "memberA"))
 	s.Require().NoError(memberB.settings.SaveSettingField(settings.DisplayName, "memberB"))
 
-	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey), common.PubkeyToHex(&memberB.identity.PublicKey)}
+	members := []string{crypto.PubkeyToHex(&memberA.identity.PublicKey), crypto.PubkeyToHex(&memberB.identity.PublicKey)}
 
 	s.makeMutualContacts(admin, memberA)
 	s.makeMutualContacts(admin, memberB)
@@ -490,7 +490,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersInfoSync() {
 			if err != nil {
 				return false
 			}
-			contact, ok := memberA.allContacts.Load(common.PubkeyToHex(&memberB.identity.PublicKey))
+			contact, ok := memberA.allContacts.Load(crypto.PubkeyToHex(&memberB.identity.PublicKey))
 			return ok && contact.DisplayName == "memberB" && contact.CustomizationColor == memberB.account.GetCustomizationColor()
 		},
 		"DisplayName is not the same",

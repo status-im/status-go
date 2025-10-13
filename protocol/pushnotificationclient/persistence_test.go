@@ -10,7 +10,6 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"
@@ -60,7 +59,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveServer() {
 	s.Require().Len(retrievedServers, 1)
 	s.Require().True(retrievedServers[0].Registered)
 	s.Require().Equal(int64(1), retrievedServers[0].RegisteredAt)
-	s.Require().True(common.IsPubKeyEqual(retrievedServers[0].PublicKey, &key.PublicKey))
+	s.Require().True(crypto.IsPubKeyEqual(retrievedServers[0].PublicKey, &key.PublicKey))
 	s.Require().Equal(testAccessToken, retrievedServers[0].AccessToken)
 
 	server.Registered = false
@@ -74,7 +73,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveServer() {
 	s.Require().Len(retrievedServers, 1)
 	s.Require().False(retrievedServers[0].Registered)
 	s.Require().Equal(int64(2), retrievedServers[0].RegisteredAt)
-	s.Require().True(common.IsPubKeyEqual(retrievedServers[0].PublicKey, &key.PublicKey))
+	s.Require().True(crypto.IsPubKeyEqual(retrievedServers[0].PublicKey, &key.PublicKey))
 }
 
 func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {

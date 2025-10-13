@@ -14,10 +14,10 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
 
 	"github.com/status-im/status-go/api/multiformat"
-	"github.com/status-im/status-go/protocol/common"
 )
 
 const (
@@ -248,7 +248,7 @@ func (m *MentionManager) getMentionableUsers(chatID string) (map[string]*Mention
 			return nil, err
 		}
 		for _, pk := range community.GetMemberPubkeys() {
-			publicKeys = append(publicKeys, common.PubkeyToHex(pk))
+			publicKeys = append(publicKeys, crypto.PubkeyToHex(pk))
 		}
 	case chat.Public():
 		m.allContacts.Range(func(pk string, _ *Contact) bool {

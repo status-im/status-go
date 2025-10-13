@@ -32,7 +32,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	communitiestoken "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/ens"
@@ -405,7 +404,7 @@ func tokenURIToCommunityID(tokenURI string) string {
 		return ""
 	}
 
-	pubKey, err := common.HexToPubkey(hexCommunityID)
+	pubKey, err := crypto.HexToPubkey(hexCommunityID)
 	if err != nil {
 		return ""
 	}

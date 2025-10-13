@@ -17,6 +17,7 @@ import (
 
 	"github.com/status-im/status-go/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -467,7 +468,7 @@ func createRequestToJoinCommunity(s *suite.Suite, communityID types.HexBytes, us
 		AirdropAddress:    airdropAddress}
 
 	if password != "" {
-		signingParams, err := user.GenerateJoiningCommunityRequestsForSigning(common.PubkeyToHex(&user.identity.PublicKey), communityID, request.AddressesToReveal)
+		signingParams, err := user.GenerateJoiningCommunityRequestsForSigning(crypto.PubkeyToHex(&user.identity.PublicKey), communityID, request.AddressesToReveal)
 		s.Require().NoError(err)
 
 		for i := range signingParams {
@@ -527,7 +528,7 @@ func requestToJoinCommunity(s *suite.Suite, controlNode *Messenger, user *Messen
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	requestToJoin := response.RequestsToJoinCommunity()[0]
-	s.Require().Equal(requestToJoin.PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	s.Require().Equal(requestToJoin.PublicKey, crypto.PubkeyToHex(&user.identity.PublicKey))
 
 	_, err = WaitOnMessengerResponse(
 		controlNode,
@@ -601,7 +602,7 @@ func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text stri
 func grantPermission(s *suite.Suite, community *communities.Community, controlNode *Messenger, target *Messenger, role protobuf.CommunityMember_Roles) {
 	responseAddRole, err := controlNode.AddRoleToMember(&requests.AddRoleToMember{
 		CommunityID: community.ID(),
-		User:        common.PubkeyToHexBytes(target.IdentityPublicKey()),
+		User:        crypto.PubkeyToHexBytes(target.IdentityPublicKey()),
 		Role:        role,
 	})
 	s.Require().NoError(err)

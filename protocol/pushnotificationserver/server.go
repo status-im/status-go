@@ -212,7 +212,7 @@ func (s *Server) verifyGrantSignature(clientPublicKey *ecdsa.PublicKey, accessTo
 		return err
 	}
 
-	if !common.IsPubKeyEqual(recoveredPublicKey, clientPublicKey) {
+	if !crypto.IsPubKeyEqual(recoveredPublicKey, clientPublicKey) {
 		return errors.New("pubkey mismatch")
 	}
 	return nil

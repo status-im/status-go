@@ -7,6 +7,7 @@ import (
 	"time"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/crypto"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 
@@ -106,7 +107,7 @@ func (m *Messenger) handleSendPrivateMessage(rawMessage *messagingtypes.RawMessa
 	for _, r := range rawMessage.Recipients {
 		_, err = m.messaging.SendPrivate(context.TODO(), r, rawMessage)
 		if err != nil {
-			err = errors.Wrap(err, fmt.Sprintf("Can't resend message with SendPrivate to %s", common.PubkeyToHex(r)))
+			err = errors.Wrap(err, fmt.Sprintf("Can't resend message with SendPrivate to %s", crypto.PubkeyToHex(r)))
 		}
 	}
 

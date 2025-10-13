@@ -908,7 +908,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	community := response.Communities()[0]
 
 	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, alice.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, alice.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -946,7 +946,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	s.Require().True(requestToJoin1.Our)
 	s.Require().NotEmpty(requestToJoin1.ID)
 	s.Require().NotEmpty(requestToJoin1.Clock)
-	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin1.PublicKey, crypto.PubkeyToHex(&alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
 	err = tt.RetryWithBackOff(func() error {

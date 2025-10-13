@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/verification"
 )
@@ -359,7 +358,7 @@ func buildContactFromPkString(pkString string) (*Contact, error) {
 }
 
 func BuildContactFromPublicKey(publicKey *ecdsa.PublicKey) (*Contact, error) {
-	id := common.PubkeyToHex(publicKey)
+	id := crypto.PubkeyToHex(publicKey)
 	return buildContact(id, publicKey)
 }
 
@@ -376,7 +375,7 @@ func getShortenedCompressedKey(publicKey string) string {
 }
 
 func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact, error) {
-	compressedKey, err := multiformat.SerializeLegacyKey(common.PubkeyToHex(publicKey))
+	compressedKey, err := multiformat.SerializeLegacyKey(crypto.PubkeyToHex(publicKey))
 	if err != nil {
 		return nil, err
 	}
@@ -433,7 +432,7 @@ func contactIDFromPublicKey(key *ecdsa.PublicKey) string {
 }
 
 func contactIDFromPublicKeyString(key string) (string, error) {
-	pubKey, err := common.HexToPubkey(key)
+	pubKey, err := crypto.HexToPubkey(key)
 	if err != nil {
 		return "", err
 	}

@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -236,7 +235,7 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 
 	rtj := &RequestToJoin{
 		ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8},
-		PublicKey:   common.PubkeyToHex(&s.identity.PublicKey),
+		PublicKey:   crypto.PubkeyToHex(&s.identity.PublicKey),
 		Clock:       clock,
 		CommunityID: com2.ID(),
 		State:       RequestToJoinStatePending,
@@ -558,7 +557,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 	// RTJ with 2 revealed Addresses
 	expectedRtj1 := &RequestToJoin{
 		ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8},
-		PublicKey:   common.PubkeyToHex(&s.identity.PublicKey),
+		PublicKey:   crypto.PubkeyToHex(&s.identity.PublicKey),
 		Clock:       clock,
 		CommunityID: communityID,
 		State:       RequestToJoinStateAccepted,
@@ -594,7 +593,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 	signature := []byte("test")
 	expectedRtj2 := &RequestToJoin{
 		ID:          types.HexBytes{8, 7, 6, 5, 4, 3, 2, 1},
-		PublicKey:   common.PubkeyToHex(&s.identity.PublicKey),
+		PublicKey:   crypto.PubkeyToHex(&s.identity.PublicKey),
 		Clock:       clock,
 		CommunityID: communityID,
 		State:       RequestToJoinStateAccepted,
@@ -626,7 +625,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 	// RTJ without RevealedAccounts
 	expectedRtjWithoutRevealedAccounts := &RequestToJoin{
 		ID:          types.HexBytes{1, 6, 6, 6, 6, 6, 6, 6},
-		PublicKey:   common.PubkeyToHex(&s.identity.PublicKey),
+		PublicKey:   crypto.PubkeyToHex(&s.identity.PublicKey),
 		Clock:       clock,
 		CommunityID: communityID,
 		State:       RequestToJoinStateAccepted,
@@ -643,7 +642,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 	// RTJ with RevealedAccount but with empty Address
 	expectedRtjWithEmptyAddress := &RequestToJoin{
 		ID:          types.HexBytes{2, 6, 6, 6, 6, 6, 6, 6},
-		PublicKey:   common.PubkeyToHex(&s.identity.PublicKey),
+		PublicKey:   crypto.PubkeyToHex(&s.identity.PublicKey),
 		Clock:       clock,
 		CommunityID: communityID,
 		State:       RequestToJoinStateAccepted,
@@ -698,7 +697,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestToJoinWithRevealedAddresses() 
 	communityID := types.HexBytes{7, 7, 7, 7, 7, 7, 7, 7}
 	revealedAddresses := []string{"address1", "address2", "address3"}
 	chainIds := []uint64{1, 2}
-	publicKey := common.PubkeyToHex(&s.identity.PublicKey)
+	publicKey := crypto.PubkeyToHex(&s.identity.PublicKey)
 	signature := []byte("test")
 
 	// No data in database
@@ -775,7 +774,7 @@ func (s *PersistenceSuite) TestAllNonApprovedCommunitiesRequestsToJoin() {
 
 		rtj := &RequestToJoin{
 			ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, byte(i)},
-			PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+			PublicKey:   crypto.PubkeyToHex(&identity.PublicKey),
 			Clock:       clock,
 			CommunityID: community.ID(),
 			State:       allStates[i],
@@ -981,7 +980,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinRevealedAddresses() {
 	communityID := types.HexBytes{7, 7, 7, 7, 7, 7, 7, 7}
 	revealedAddress := "address1"
 	chainIds := []uint64{1, 2}
-	publicKey := common.PubkeyToHex(&s.identity.PublicKey)
+	publicKey := crypto.PubkeyToHex(&s.identity.PublicKey)
 	signature := []byte("test")
 
 	// No data in database

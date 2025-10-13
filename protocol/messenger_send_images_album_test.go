@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -124,7 +125,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesWithMentionSend() 
 		outgoingMessage, err := buildImageWithoutAlbumIDMessage(*ourChat)
 		s.NoError(err)
 		outgoingMessage.Mentioned = true
-		outgoingMessage.Text = "hey @" + common.PubkeyToHex(&theirMessenger.identity.PublicKey)
+		outgoingMessage.Text = "hey @" + crypto.PubkeyToHex(&theirMessenger.identity.PublicKey)
 		album = append(album, outgoingMessage)
 	}
 
@@ -175,7 +176,7 @@ func (s *MessengerSendImagesAlbumSuite) TestSingleImageMessageWithMentionInCommu
 		outgoingMessage, err := buildImageWithoutAlbumIDMessage(*chat)
 		s.NoError(err)
 		outgoingMessage.Mentioned = true
-		outgoingMessage.Text = "hey @" + common.PubkeyToHex(&theirMessenger.identity.PublicKey)
+		outgoingMessage.Text = "hey @" + crypto.PubkeyToHex(&theirMessenger.identity.PublicKey)
 		album = append(album, outgoingMessage)
 	}
 
@@ -310,7 +311,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImagesMessageWithMentionInCommu
 		outgoingMessage, err := buildImageWithoutAlbumIDMessage(*chat)
 		s.NoError(err)
 		outgoingMessage.Mentioned = true
-		outgoingMessage.Text = "hey @" + common.PubkeyToHex(&theirMessenger.identity.PublicKey)
+		outgoingMessage.Text = "hey @" + crypto.PubkeyToHex(&theirMessenger.identity.PublicKey)
 		album = append(album, outgoingMessage)
 	}
 

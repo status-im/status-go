@@ -613,7 +613,7 @@ func (s *HandlersSuite) TestHandleAccountInitialsImpl() {
 	// pass a public key to generate ring
 	k, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	p.PublicKey = common.PubkeyToHex(&k.PublicKey)
+	p.PublicKey = crypto.PubkeyToHex(&k.PublicKey)
 	w = httptest.NewRecorder()
 	handleAccountInitialsImpl(db, s.logger, w, p)
 	s.Require().Equal(http.StatusOK, w.Code)
@@ -669,7 +669,7 @@ func (s *HandlersSuite) TestHandleAccountImagesImpl() {
 	// pass a public key to generate ring
 	k, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	p.PublicKey = common.PubkeyToHex(&k.PublicKey)
+	p.PublicKey = crypto.PubkeyToHex(&k.PublicKey)
 	w = httptest.NewRecorder()
 	s.server.handleAccountImagesImpl(w, p)
 	s.Require().Equal(http.StatusOK, w.Code)
