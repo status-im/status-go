@@ -297,7 +297,7 @@ func (m *Messenger) processDiscordMessages(discordChannel *discord.ExportedData,
 			ChatMessage:      &chatMessage,
 		}
 
-		err = messageToSave.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+		err = messageToSave.PrepareContent(crypto.PubkeyToHex(&m.identity.PublicKey))
 		if err != nil {
 			m.logger.Error("failed to prepare message content", zap.Error(err))
 			importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))
@@ -1350,7 +1350,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 					ChatMessage:      &chatMessage,
 				}
 
-				err = messageToSave.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+				err = messageToSave.PrepareContent(crypto.PubkeyToHex(&m.identity.PublicKey))
 				if err != nil {
 					m.logger.Error("failed to prepare message content", zap.Error(err))
 					importProgress.AddTaskError(discord.ImportMessagesTask, discord.Error(err.Error()))

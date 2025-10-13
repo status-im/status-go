@@ -12,7 +12,6 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -122,7 +121,7 @@ func createTokenMasterTokenCriteria() *protobuf.TokenCriteria {
 func (s *MessengerCommunitiesSharedMemberAddressSuite) createEditSharedAddressesRequest(communityID types.HexBytes) *requests.EditSharedAddresses {
 	request := &requests.EditSharedAddresses{CommunityID: communityID, AddressesToReveal: []string{aliceAddress2}, AirdropAddress: aliceAddress2}
 
-	signingParams, err := s.alice.GenerateJoiningCommunityRequestsForSigning(common.PubkeyToHex(&s.alice.identity.PublicKey), communityID, request.AddressesToReveal)
+	signingParams, err := s.alice.GenerateJoiningCommunityRequestsForSigning(crypto.PubkeyToHex(&s.alice.identity.PublicKey), communityID, request.AddressesToReveal)
 	s.Require().NoError(err)
 
 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
@@ -215,16 +214,16 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestJoinedCommunityMember
 
 	// Check owner's DB for revealed accounts
 	for pubKey := range community.Members() {
-		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
+		if pubKey != crypto.PubkeyToHex(&s.owner.identity.PublicKey) {
 			revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), pubKey)
 			s.Require().NoError(err)
 			switch pubKey {
-			case common.PubkeyToHex(&s.alice.identity.PublicKey):
+			case crypto.PubkeyToHex(&s.alice.identity.PublicKey):
 				s.Require().Len(revealedAccounts, 2)
 				s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
 				s.Require().Equal(revealedAccounts[1].Address, aliceAddress2)
 				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
-			case common.PubkeyToHex(&s.bob.identity.PublicKey):
+			case crypto.PubkeyToHex(&s.bob.identity.PublicKey):
 				s.Require().Len(revealedAccounts, 1)
 				s.Require().Equal(revealedAccounts[0].Address, bobAddress)
 				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
@@ -235,14 +234,14 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestJoinedCommunityMember
 	}
 
 	// Check Bob's DB for revealed accounts
-	revealedAccountsInBobsDB, err := s.bob.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	revealedAccountsInBobsDB, err := s.bob.communitiesManager.GetRevealedAddresses(community.ID(), crypto.PubkeyToHex(&s.bob.identity.PublicKey))
 	s.Require().NoError(err)
 	s.Require().Len(revealedAccountsInBobsDB, 1)
 	s.Require().Equal(revealedAccountsInBobsDB[0].Address, bobAddress)
 	s.Require().Equal(true, revealedAccountsInBobsDB[0].IsAirdropAddress)
 
 	// Check Alices's DB for revealed accounts
-	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().NoError(err)
 	s.Require().Len(revealedAccountsInAlicesDB, 2)
 	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress1)
@@ -261,7 +260,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestJoinedCommunityMember
 
 	s.Require().Equal(2, community.MembersCount())
 
-	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
+	alicePubkey := crypto.PubkeyToHex(&s.alice.identity.PublicKey)
 
 	// Check Alice's DB for revealed accounts
 	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
@@ -285,7 +284,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestJoinedCommunityMember
 
 	s.Require().Equal(2, community.MembersCount())
 
-	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
+	alicePubkey := crypto.PubkeyToHex(&s.alice.identity.PublicKey)
 
 	// Check Alice's DB for revealed accounts
 	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
@@ -301,7 +300,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestJoinedCommunityMember
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TestEditSharedAddresses() {
 	community, _ := createCommunity(&s.Suite, s.owner)
-	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
+	alicePubkey := crypto.PubkeyToHex(&s.alice.identity.PublicKey)
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
 	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress1})
@@ -438,7 +437,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestSharedAddressesReturn
 
 	s.joinCommunity(community, s.alice, alicePassword, []string{})
 
-	revealedAccounts, err := s.alice.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	revealedAccounts, err := s.alice.GetRevealedAccounts(community.ID(), crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().NoError(err)
 
 	revealedAddressesMap := make(map[string]struct{}, len(revealedAccounts))

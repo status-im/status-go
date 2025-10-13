@@ -169,7 +169,7 @@ func (m *Messenger) filtersForChat(chatID string) (messagingtypes.ChatFilters, e
 
 	if chat.OneToOne() {
 		// We sync our own topic and any eventual negotiated
-		publicKeys := []string{common.PubkeyToHex(&m.identity.PublicKey), chatID}
+		publicKeys := []string{crypto.PubkeyToHex(&m.identity.PublicKey), chatID}
 
 		filters = m.messaging.ChatFiltersByIdentities(publicKeys)
 
@@ -578,7 +578,7 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 			From: chat.SyncedTo,
 			To:   from,
 		},
-		From:             common.PubkeyToHex(&m.identity.PublicKey),
+		From:             crypto.PubkeyToHex(&m.identity.PublicKey),
 		WhisperTimestamp: timestamp,
 		LocalChatID:      chat.ID,
 		Seen:             true,

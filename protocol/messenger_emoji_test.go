@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -172,7 +171,7 @@ func (s *MessengerEmojiSuite) TestCompressedKeyReturnedWithEmoji() {
 	id, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	emojiReaction.From = common.PubkeyToHex(&id.PublicKey)
+	emojiReaction.From = crypto.PubkeyToHex(&id.PublicKey)
 	emojiReaction.LocalChatID = testPublicChatID
 	encodedReaction, err := json.Marshal(emojiReaction)
 	s.Require().NoError(err)
@@ -239,7 +238,7 @@ func (s *MessengerEmojiSuite) TestMaxEmojiReactionsPerMessage() {
 	messageState := bob.buildMessageState()
 	messageState.CurrentMessageState = &CurrentMessageState{
 		Contact: &Contact{
-			ID: common.PubkeyToHex(&alice.identity.PublicKey),
+			ID: crypto.PubkeyToHex(&alice.identity.PublicKey),
 		},
 	}
 

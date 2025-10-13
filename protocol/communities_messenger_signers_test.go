@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	utils "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/crypto"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -112,7 +113,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	s.Require().NoError(err)
 
 	// update mock - the signer for the community returned by the contracts should be john
-	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), crypto.PubkeyToHex(&s.john.identity.PublicKey))
 	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
 		&communities.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
 
@@ -139,7 +140,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	// Ownership token will be transferred to Alice and she will kick all members
 	// and request kicked members to rejoin
 	// the signer for the community returned by the contracts should be alice
-	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 
 	response, err := s.alice.PromoteSelfToControlNode(community.ID())
 	s.Require().NoError(err)
@@ -148,7 +149,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	community, err = s.alice.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().True(community.IsControlNode())
-	s.Require().True(common.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
+	s.Require().True(crypto.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
 	s.Require().True(community.IsOwner())
 
 	// check that Bob received kick event, also he will receive
@@ -197,7 +198,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	validateResults := func(messenger *Messenger) *communities.Community {
 		community, err = messenger.communitiesManager.GetByID(community.ID())
 		s.Require().NoError(err)
-		s.Require().True(common.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
+		s.Require().True(crypto.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
 		s.Require().Len(community.Members(), 2)
 		s.Require().True(community.HasMember(&messenger.identity.PublicKey))
 
@@ -307,7 +308,7 @@ func (s *MessengerCommunitiesSignersSuite) TestAutoAcceptOnOwnershipChangeReques
 	s.Require().NoError(err)
 
 	// set john as contract owner
-	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), crypto.PubkeyToHex(&s.john.identity.PublicKey))
 	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
 		&communities.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
 
@@ -332,7 +333,7 @@ func (s *MessengerCommunitiesSignersSuite) TestAutoAcceptOnOwnershipChangeReques
 	s.Require().NoError(err)
 
 	// simulate Alice received owner token
-	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 
 	// after receiving owner token - set up control node, set up owner role, kick all members
 	// and request kicked members to rejoin
@@ -342,7 +343,7 @@ func (s *MessengerCommunitiesSignersSuite) TestAutoAcceptOnOwnershipChangeReques
 	community, err = s.alice.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().True(community.IsControlNode())
-	s.Require().True(common.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
+	s.Require().True(crypto.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
 	s.Require().True(community.IsOwner())
 
 	// check that client received kick event
@@ -388,7 +389,7 @@ func (s *MessengerCommunitiesSignersSuite) TestAutoAcceptOnOwnershipChangeReques
 	validateResults := func(messenger *Messenger) *communities.Community {
 		community, err = messenger.communitiesManager.GetByID(community.ID())
 		s.Require().NoError(err)
-		s.Require().True(common.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
+		s.Require().True(crypto.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
 		s.Require().Len(community.Members(), 2)
 		s.Require().True(community.HasMember(&messenger.identity.PublicKey))
 
@@ -445,7 +446,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 	s.Require().NoError(err)
 
 	// update mock - the signer for the community returned by the contracts should be john
-	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), crypto.PubkeyToHex(&s.john.identity.PublicKey))
 	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
 		&communities.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
 
@@ -462,7 +463,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 	// Ownership token will be transferred to Alice and she will kick all members
 	// and request kicked members to rejoin
 	// the signer for the community returned by the contracts should be alice
-	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 
 	response, err := s.alice.PromoteSelfToControlNode(community.ID())
 	s.Require().NoError(err)
@@ -471,7 +472,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 	community, err = s.alice.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().True(community.IsControlNode())
-	s.Require().True(common.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
+	s.Require().True(crypto.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
 	s.Require().True(community.IsOwner())
 
 	// check that John received kick event, also he will receive
@@ -486,7 +487,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 	s.Require().NoError(err)
 
 	// Alice advertises community to Bob
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.bob.identity.PublicKey), &s.bob.identity.PublicKey, s.bob.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&s.bob.identity.PublicKey), &s.bob.identity.PublicKey, s.bob.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -580,7 +581,7 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 		s.Require().NoError(err)
 
 		// update mock - the signer for the community returned by the contracts should be john
-		s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
+		s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), crypto.PubkeyToHex(&s.john.identity.PublicKey))
 		s.collectiblesServiceMock.SetMockCommunityTokenData(communityToken)
 
 		// alice accepts community update
@@ -639,7 +640,7 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 
 	responseCommunity := messageState.Response.Communities()[0]
 	s.Require().Equal(community.IDString(), responseCommunity.IDString())
-	s.Require().True(common.IsPubKeyEqual(expectedControlNode, responseCommunity.ControlNode()))
+	s.Require().True(crypto.IsPubKeyEqual(expectedControlNode, responseCommunity.ControlNode()))
 }
 
 func (s *MessengerCommunitiesSignersSuite) TestSyncTokenGatedCommunity() {
@@ -688,7 +689,7 @@ func (s *MessengerCommunitiesSignersSuite) TestWithMintedOwnerTokenApplyCommunit
 	s.Require().NoError(err)
 
 	// Make sure there is no control node
-	s.Require().False(common.IsPubKeyEqual(community.ControlNode(), &s.john.identity.PublicKey))
+	s.Require().False(crypto.IsPubKeyEqual(community.ControlNode(), &s.john.identity.PublicKey))
 
 	// Trick. We need to remove the community private key otherwise the events
 	// will be signed and Events will be approved instead of being in Pending State.
@@ -749,7 +750,7 @@ func (s *MessengerCommunitiesSignersSuite) TestWithoutMintedOwnerTokenMakingDevi
 	community := s.createCommunity(s.john)
 
 	// Make sure there is no control node
-	s.Require().False(common.IsPubKeyEqual(community.ControlNode(), &s.john.identity.PublicKey))
+	s.Require().False(crypto.IsPubKeyEqual(community.ControlNode(), &s.john.identity.PublicKey))
 
 	response, err := s.john.PromoteSelfToControlNode(community.ID())
 	s.Require().Nil(response)
@@ -797,7 +798,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeDeviceChanged() {
 	s.Require().NoError(err)
 
 	// set john as contract owner
-	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), crypto.PubkeyToHex(&s.john.identity.PublicKey))
 	s.collectiblesServiceMock.SetMockCollectibleContractData(testChainID1, ownerTokenAddress,
 		&communities.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
 	s.collectiblesServiceMock.SetMockCollectibleContractData(testChainID1, tokenMasterTokenAddress,
@@ -805,7 +806,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeDeviceChanged() {
 
 	community, err = s.john.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
-	s.Require().True(common.IsPubKeyEqual(community.ControlNode(), &s.john.identity.PublicKey))
+	s.Require().True(crypto.IsPubKeyEqual(community.ControlNode(), &s.john.identity.PublicKey))
 
 	var tokenMasterTokenCriteria *protobuf.TokenCriteria
 	for _, permission := range community.TokenPermissions() {

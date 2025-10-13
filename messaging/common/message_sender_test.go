@@ -4,31 +4,26 @@ import (
 	"math"
 	"testing"
 
-	"github.com/status-im/status-go/messaging/adapters"
-	"github.com/status-im/status-go/messaging/layers/transport"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-	wakuv2 "github.com/status-im/status-go/messaging/waku"
-	wakutypes "github.com/status-im/status-go/messaging/waku/types"
-	"github.com/status-im/status-go/t/helpers"
-
-	"github.com/libp2p/go-libp2p/core/peer"
-
 	"github.com/golang/protobuf/proto"
-
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	datasyncproto "github.com/status-im/mvds/protobuf"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/datasync"
 	"github.com/status-im/status-go/messaging/layers/encryption"
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/messaging/layers/transport"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
+	wakuv2 "github.com/status-im/status-go/messaging/waku"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-
-	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestMessageSenderSuite(t *testing.T) {
@@ -370,7 +365,7 @@ func (s *MessageSenderSuite) TestGetEphemeralKey() {
 		key, err := s.sender.GetEphemeralKey()
 		s.Require().NoError(err)
 		s.Require().NotNil(key)
-		keyMap[common.PubkeyToHex(&key.PublicKey)] = true
+		keyMap[crypto.PubkeyToHex(&key.PublicKey)] = true
 	}
 	s.Require().Len(keyMap, maxMessageSenderEphemeralKeys)
 	// Add one more
@@ -378,5 +373,5 @@ func (s *MessageSenderSuite) TestGetEphemeralKey() {
 	s.Require().NoError(err)
 	s.Require().NotNil(key)
 
-	s.Require().True(keyMap[common.PubkeyToHex(&key.PublicKey)])
+	s.Require().True(keyMap[crypto.PubkeyToHex(&key.PublicKey)])
 }

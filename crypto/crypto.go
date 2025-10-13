@@ -132,6 +132,36 @@ func DecodePubkeyString(pubkey string) (*ecdsa.PublicKey, error) {
 	return key, nil
 }
 
+// IsPubKeyEqual checks that two public keys are equal
+func IsPubKeyEqual(a, b *ecdsa.PublicKey) bool {
+	// the curve is always the same, just compare the points
+	return a.X.Cmp(b.X) == 0 && a.Y.Cmp(b.Y) == 0
+}
+
+func PubkeysToHex(keys []*ecdsa.PublicKey) []string {
+	var result []string
+	for _, k := range keys {
+		result = append(result, PubkeyToHex(k))
+	}
+	return result
+}
+
+func PubkeyToHex(key *ecdsa.PublicKey) string {
+	return types.EncodeHex(FromECDSAPub(key))
+}
+
+func PubkeyToHexBytes(key *ecdsa.PublicKey) types.HexBytes {
+	return FromECDSAPub(key)
+}
+
+func HexToPubkey(pk string) (*ecdsa.PublicKey, error) {
+	bytes, err := types.DecodeHex(pk)
+	if err != nil {
+		return nil, err
+	}
+	return UnmarshalPubkey(bytes)
+}
+
 func MustDecodePubkeyString(pubkey string) *ecdsa.PublicKey {
 	pk, err := DecodePubkeyString(pubkey)
 	if err != nil {

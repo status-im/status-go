@@ -423,7 +423,7 @@ func (m *Messenger) GetProfileShowcaseForContact(contactID string, validate bool
 		return profileShowcase, nil
 	}
 
-	contactPubKey, err := common.HexToPubkey(contactID)
+	contactPubKey, err := crypto.HexToPubkey(contactID)
 	if err != nil {
 		return nil, err
 	}

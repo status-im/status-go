@@ -502,7 +502,7 @@ func (m *Messenger) HandleSyncInstallationContactV2(state *ReceivedMessageState,
 	removed := message.Removed && !message.Blocked
 	chat, ok := state.AllChats.Load(message.Id)
 	if !ok && (message.Added || message.HasAddedUs || message.Muted) && !removed {
-		pubKey, err := common.HexToPubkey(message.Id)
+		pubKey, err := crypto.HexToPubkey(message.Id)
 		if err != nil {
 			return err
 		}
@@ -611,7 +611,7 @@ func (m *Messenger) HandleSyncInstallationContactV2(state *ReceivedMessageState,
 				return err
 			}
 
-			err = m.ENSVerified(common.PubkeyToHex(publicKey), message.EnsName)
+			err = m.ENSVerified(crypto.PubkeyToHex(publicKey), message.EnsName)
 			if err != nil {
 				contact.ENSVerified = false
 			}
@@ -1117,7 +1117,7 @@ func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, mes
 func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message *protobuf.ContactUpdate, statusMessage *messagingtypes.Message) error {
 
 	logger := m.logger.With(zap.String("site", "HandleContactUpdate"))
-	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+	if crypto.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		logger.Warn("coming from us, ignoring")
 		return nil
 	}
@@ -1698,7 +1698,7 @@ func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, r
 		return err
 	}
 
-	response, err := m.RemoveUserFromCommunity(requestToLeaveProto.CommunityId, common.PubkeyToHex(signer))
+	response, err := m.RemoveUserFromCommunity(requestToLeaveProto.CommunityId, crypto.PubkeyToHex(signer))
 	if err != nil {
 		return err
 	}
@@ -1842,7 +1842,7 @@ func (m *Messenger) handleDeleteMessage(state *ReceivedMessageState, deleteMessa
 
 	var canDeleteMessageForEveryone = false
 	if originalMessage.From != deleteMessage.From {
-		fromPublicKey, err := common.HexToPubkey(deleteMessage.From)
+		fromPublicKey, err := crypto.HexToPubkey(deleteMessage.From)
 		if err != nil {
 			return err
 		}
@@ -2058,7 +2058,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	}
 
 	// is the message coming from us?
-	isSyncMessage := common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey)
+	isSyncMessage := crypto.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey)
 
 	if forceSeen || isSyncMessage {
 		receivedMessage.Seen = true
@@ -2118,7 +2118,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			return communities.ErrOrgNotFound
 		}
 
-		pk, err := common.HexToPubkey(state.CurrentMessageState.Contact.ID)
+		pk, err := crypto.HexToPubkey(state.CurrentMessageState.Contact.ID)
 		if err != nil {
 			return err
 		}
@@ -2480,7 +2480,7 @@ func (m *Messenger) matchChatEntity(chatEntity messagingtypes.ChatEntity, messag
 			return nil, ErrMessageForWrongChatType
 		}
 		return chat, nil
-	case chatEntity.GetMessageType() == protobuf.MessageType_ONE_TO_ONE && common.IsPubKeyEqual(chatEntity.GetSigPubKey(), &m.identity.PublicKey):
+	case chatEntity.GetMessageType() == protobuf.MessageType_ONE_TO_ONE && crypto.IsPubKeyEqual(chatEntity.GetSigPubKey(), &m.identity.PublicKey):
 		// It's a private message coming from us so we rely on Message.ChatID
 		// If chat does not exist, it should be created to support multidevice synchronization.
 		chatID := chatEntity.GetChatId()

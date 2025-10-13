@@ -21,7 +21,6 @@ import (
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -1712,7 +1711,7 @@ func (s *ManagerSuite) TestCommunityQueue() {
 
 	// set verifier public key
 	verifier.ownersMap = make(map[string]string)
-	verifier.ownersMap[community.IDString()] = common.PubkeyToHex(&owner.PublicKey)
+	verifier.ownersMap[community.IDString()] = crypto.PubkeyToHex(&owner.PublicKey)
 
 	description := community.config.CommunityDescription
 
@@ -1803,7 +1802,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSigners() {
 
 	// set verifier public key
 	verifier.ownersMap = make(map[string]string)
-	verifier.ownersMap[community.IDString()] = common.PubkeyToHex(&newOwner.PublicKey)
+	verifier.ownersMap[community.IDString()] = crypto.PubkeyToHex(&newOwner.PublicKey)
 
 	description := community.config.CommunityDescription
 
@@ -1932,7 +1931,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSignersIgnoreIfNotRetu
 
 	// set verifier public key
 	verifier.ownersMap = make(map[string]string)
-	verifier.ownersMap[community.IDString()] = common.PubkeyToHex(&oldOwner.PublicKey)
+	verifier.ownersMap[community.IDString()] = crypto.PubkeyToHex(&oldOwner.PublicKey)
 
 	description := community.config.CommunityDescription
 
@@ -2089,7 +2088,7 @@ func (s *ManagerSuite) TestDetermineChannelsForHRKeysRequest() {
 
 	channel := &protobuf.CommunityChat{
 		Members: map[string]*protobuf.CommunityMember{
-			common.PubkeyToHex(&s.manager.identity.PublicKey): {},
+			crypto.PubkeyToHex(&s.manager.identity.PublicKey): {},
 		},
 	}
 

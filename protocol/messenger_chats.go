@@ -5,9 +5,9 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/deprecation"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -249,7 +249,7 @@ func (m *Messenger) CreateProfileChat(request *requests.CreateProfileChat) (*Mes
 		return nil, err
 	}
 
-	publicKey, err := common.HexToPubkey(request.ID)
+	publicKey, err := crypto.HexToPubkey(request.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +307,7 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 	}
 
 	chatID := request.ID.String()
-	pk, err := common.HexToPubkey(chatID)
+	pk, err := crypto.HexToPubkey(chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +599,7 @@ func (m *Messenger) ensureMyOwnProfileChat() error {
 		return errors.New("profile chats are deprecated")
 	}
 
-	chatID := common.PubkeyToHex(&m.identity.PublicKey)
+	chatID := crypto.PubkeyToHex(&m.identity.PublicKey)
 	_, ok := m.allChats.Load(chatID)
 	if ok {
 		return nil

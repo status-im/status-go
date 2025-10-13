@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -76,7 +75,7 @@ func decodeCommunityID(serialisedPublicKey string) (string, error) {
 		return "", err
 	}
 
-	communityID, err := common.HexToPubkey(deserializedCommunityID)
+	communityID, err := crypto.HexToPubkey(deserializedCommunityID)
 	if err != nil {
 		return "", err
 	}
@@ -386,7 +385,7 @@ func parseCommunityChannelURLWithData(data string, chatKey string) (*URLDataResp
 }
 
 func (m *Messenger) ShareUserURLWithChatKey(contactID string) (string, error) {
-	publicKey, err := common.HexToPubkey(contactID)
+	publicKey, err := crypto.HexToPubkey(contactID)
 	if err != nil {
 		return "", err
 	}
@@ -410,7 +409,7 @@ func parseUserURLWithChatKey(urlData string) (*URLDataResponse, error) {
 		return nil, err
 	}
 
-	serializedPublicKey, err := multiformat.SerializeLegacyKey(common.PubkeyToHex(pubKey))
+	serializedPublicKey, err := multiformat.SerializeLegacyKey(crypto.PubkeyToHex(pubKey))
 	if err != nil {
 		return nil, err
 	}

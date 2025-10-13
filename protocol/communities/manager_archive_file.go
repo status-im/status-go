@@ -20,7 +20,6 @@ import (
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/signal"
 
@@ -265,7 +264,7 @@ func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBy
 			AnnounceList: defaultAnnounceList,
 		}
 		metaInfo.SetDefaults()
-		metaInfo.CreatedBy = common.PubkeyToHex(&m.identity.PublicKey)
+		metaInfo.CreatedBy = crypto.PubkeyToHex(&m.identity.PublicKey)
 
 		info := metainfo.Info{
 			PieceLength: int64(pieceLength),

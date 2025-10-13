@@ -528,7 +528,7 @@ func (c *Client) HandleContactCodeAdvertisement(clientPublicKey *ecdsa.PublicKey
 		return nil
 	}
 	// nothing to do for our own pubkey
-	if common.IsPubKeyEqual(clientPublicKey, &c.config.Identity.PublicKey) {
+	if crypto.IsPubKeyEqual(clientPublicKey, &c.config.Identity.PublicKey) {
 		return nil
 	}
 
@@ -593,7 +593,7 @@ func (c *Client) AddPushNotificationsServer(publicKey *ecdsa.PublicKey, serverTy
 	}
 
 	for _, server := range currentServers {
-		if common.IsPubKeyEqual(server.PublicKey, publicKey) {
+		if crypto.IsPubKeyEqual(server.PublicKey, publicKey) {
 			return errors.New("push notification server already added")
 		}
 	}
@@ -844,7 +844,7 @@ func (c *Client) handleMessageSent(e *messagingevents.MessageEvent) error {
 	}
 
 	// check if it's for one of our devices, do nothing in that case
-	if e.Recipient != nil && common.IsPubKeyEqual(e.Recipient, &c.config.Identity.PublicKey) {
+	if e.Recipient != nil && crypto.IsPubKeyEqual(e.Recipient, &c.config.Identity.PublicKey) {
 		return nil
 	}
 
@@ -1095,7 +1095,7 @@ func (c *Client) handleMessageScheduled(e *messagingevents.MessageEvent) error {
 	}
 
 	// check if it's for one of our devices, do nothing in that case
-	if e.Recipient != nil && common.IsPubKeyEqual(e.Recipient, &c.config.Identity.PublicKey) {
+	if e.Recipient != nil && crypto.IsPubKeyEqual(e.Recipient, &c.config.Identity.PublicKey) {
 		return nil
 	}
 
@@ -1109,7 +1109,7 @@ func (c *Client) handleMessageScheduled(e *messagingevents.MessageEvent) error {
 // shouldNotifyOn check whether we should notify a particular public-key/installation-id/message-id combination
 func (c *Client) shouldNotifyOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) (bool, error) {
 
-	if publicKey != nil && common.IsPubKeyEqual(publicKey, &c.config.Identity.PublicKey) {
+	if publicKey != nil && crypto.IsPubKeyEqual(publicKey, &c.config.Identity.PublicKey) {
 		return false, nil
 	}
 
@@ -1360,7 +1360,7 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 // the notification is sent using an ephemeral key to shield the real identity of the sender
 func (c *Client) SendNotification(publicKey *ecdsa.PublicKey, installationIDs []string, messageID []byte, chatID string, notificationType protobuf.PushNotification_PushNotificationType) ([]*PushNotificationInfo, error) {
 
-	if common.IsPubKeyEqual(publicKey, &c.config.Identity.PublicKey) {
+	if crypto.IsPubKeyEqual(publicKey, &c.config.Identity.PublicKey) {
 		return nil, nil
 	}
 
@@ -1642,7 +1642,7 @@ func (c *Client) handleGrant(clientPublicKey *ecdsa.PublicKey, serverPublicKey *
 		return err
 	}
 
-	if !common.IsPubKeyEqual(clientPublicKey, extractedPublicKey) {
+	if !crypto.IsPubKeyEqual(clientPublicKey, extractedPublicKey) {
 		return errors.New("invalid grant")
 	}
 	return nil

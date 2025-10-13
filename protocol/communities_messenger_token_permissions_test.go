@@ -615,7 +615,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPe
 	s.joinCommunity(community, s.bob)
 
 	// Verify that we have Bob's revealed account
-	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), crypto.PubkeyToHex(&s.bob.identity.PublicKey))
 	s.Require().NoError(err)
 	s.Require().Len(revealedAccounts, 1)
 	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
@@ -685,7 +685,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWit
 	s.joinCommunity(community, s.bob)
 
 	// Verify that we have Bob's revealed account
-	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), crypto.PubkeyToHex(&s.bob.identity.PublicKey))
 	s.Require().NoError(err)
 	s.Require().Len(revealedAccounts, 1)
 	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
@@ -763,7 +763,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 	s.joinCommunity(community, s.bob)
 
 	// Verify that we have Bob's revealed account
-	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), crypto.PubkeyToHex(&s.bob.identity.PublicKey))
 	s.Require().NoError(err)
 	s.Require().Len(revealedAccounts, 1)
 	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
@@ -885,7 +885,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 		if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
 			return false
 		}
-		_, ok = action.Members[common.PubkeyToHex(&s.bob.identity.PublicKey)]
+		_, ok = action.Members[crypto.PubkeyToHex(&s.bob.identity.PublicKey)]
 		return ok
 	})
 
@@ -1400,7 +1400,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 		if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
 			return false
 		}
-		_, ok = action.Members[common.PubkeyToHex(&s.bob.identity.PublicKey)]
+		_, ok = action.Members[crypto.PubkeyToHex(&s.bob.identity.PublicKey)]
 		return ok
 	})
 
@@ -1886,7 +1886,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 			return false
 		}
 
-		_, ok = action.Members[common.PubkeyToHex(&s.bob.identity.PublicKey)]
+		_, ok = action.Members[crypto.PubkeyToHex(&s.bob.identity.PublicKey)]
 		return ok
 	})
 
@@ -1976,7 +1976,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 			return false
 		}
 
-		_, ok = action.Members[common.PubkeyToHex(&s.bob.identity.PublicKey)]
+		_, ok = action.Members[crypto.PubkeyToHex(&s.bob.identity.PublicKey)]
 		return ok
 	}
 
@@ -2047,7 +2047,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissi
 		privateKey, err := crypto.GenerateKey()
 		s.Require().NoError(err)
 
-		memberPubKeyStr := common.PubkeyToHex(&privateKey.PublicKey)
+		memberPubKeyStr := crypto.PubkeyToHex(&privateKey.PublicKey)
 		requestId := communities.CalculateRequestID(memberPubKeyStr, community.ID())
 		requestToJoin.ID = requestId
 		requestToJoin.PublicKey = memberPubKeyStr
@@ -2166,7 +2166,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		if !ok || action.ActionType != communities.EncryptionKeyAdd {
 			return false
 		}
-		_, ok = action.Members[common.PubkeyToHex(&s.owner.identity.PublicKey)]
+		_, ok = action.Members[crypto.PubkeyToHex(&s.owner.identity.PublicKey)]
 		return ok
 	})
 
@@ -2297,7 +2297,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
 			return false
 		}
-		_, ok = action.Members[common.PubkeyToHex(&s.bob.identity.PublicKey)]
+		_, ok = action.Members[crypto.PubkeyToHex(&s.bob.identity.PublicKey)]
 		return ok
 	})
 

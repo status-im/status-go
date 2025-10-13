@@ -1763,7 +1763,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage messagingtyp
 		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
 		//message for sending to paired devices later
 		specCopyForPairedDevices := rawMessage
-		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || rawMessage.SkipEncryptionLayer {
+		if !crypto.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || rawMessage.SkipEncryptionLayer {
 			id, err = m.messaging.SendPrivate(ctx, publicKey, &rawMessage)
 
 			if err != nil {
@@ -1856,7 +1856,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage messagingtyp
 			// Filter out my key from the recipients
 			n := 0
 			for _, recipient := range rawMessage.Recipients {
-				if !common.IsPubKeyEqual(recipient, &m.identity.PublicKey) {
+				if !crypto.IsPubKeyEqual(recipient, &m.identity.PublicKey) {
 					rawMessage.Recipients[n] = recipient
 					n++
 				}
@@ -2047,7 +2047,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			message.OutgoingStatus = common.OutgoingStatusSent
 		}
 		message.ID = rawMessage.ID
-		err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+		err = message.PrepareContent(crypto.PubkeyToHex(&m.identity.PublicKey))
 		if err != nil {
 			return err
 		}
@@ -4061,7 +4061,7 @@ func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
 	chat, ok := m.allChats.Load(request.ChatID)
 	if !ok {
 		// Only one to one chan be muted when it's not in the database
-		publicKey, err := common.HexToPubkey(request.ChatID)
+		publicKey, err := crypto.HexToPubkey(request.ChatID)
 		if err != nil {
 			return time.Time{}, err
 		}
@@ -4564,7 +4564,7 @@ func (m *Messenger) ImageServerURL() string {
 }
 
 func (m *Messenger) myHexIdentity() string {
-	return common.PubkeyToHex(&m.identity.PublicKey)
+	return crypto.PubkeyToHex(&m.identity.PublicKey)
 }
 
 func (m *Messenger) GetMentionsManager() *MentionManager {

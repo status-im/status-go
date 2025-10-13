@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -38,12 +37,12 @@ func (s *CommunityBloomFilterSuite) TestBasic() {
 		Chats: map[string]*protobuf.CommunityChat{
 			encryptedChannelID: {
 				Members: map[string]*protobuf.CommunityMember{
-					common.PubkeyToHex(&memberIdentity.PublicKey): {},
+					crypto.PubkeyToHex(&memberIdentity.PublicKey): {},
 				},
 			},
 			nonEncryptedChannelID: {
 				Members: map[string]*protobuf.CommunityMember{
-					common.PubkeyToHex(&memberIdentity.PublicKey): {},
+					crypto.PubkeyToHex(&memberIdentity.PublicKey): {},
 				},
 			},
 		},

@@ -261,7 +261,7 @@ func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
 	if c.ChatType != ChatTypeOneToOne {
 		return nil, nil
 	}
-	return common.HexToPubkey(c.ID)
+	return crypto.HexToPubkey(c.ID)
 }
 
 func (c *Chat) Public() bool {
@@ -492,7 +492,7 @@ type ChatMember struct {
 }
 
 func (c ChatMember) PublicKey() (*ecdsa.PublicKey, error) {
-	return common.HexToPubkey(c.ID)
+	return crypto.HexToPubkey(c.ID)
 }
 
 func oneToOneChatID(publicKey *ecdsa.PublicKey) string {
@@ -692,7 +692,7 @@ func stringSliceToPublicKeys(slice []string) ([]*ecdsa.PublicKey, error) {
 	result := make([]*ecdsa.PublicKey, len(slice))
 	for idx, item := range slice {
 		var err error
-		result[idx], err = common.HexToPubkey(item)
+		result[idx], err = crypto.HexToPubkey(item)
 		if err != nil {
 			return nil, err
 		}

@@ -7,7 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -241,7 +241,7 @@ func (o *Community) applyEvent(communityEvent CommunityEvent) error {
 		}
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_BAN:
 		if o.IsControlNode() {
-			pk, err := common.HexToPubkey(communityEvent.MemberToAction)
+			pk, err := crypto.HexToPubkey(communityEvent.MemberToAction)
 			if err != nil {
 				return err
 			}
@@ -249,7 +249,7 @@ func (o *Community) applyEvent(communityEvent CommunityEvent) error {
 		}
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN:
 		if o.IsControlNode() {
-			pk, err := common.HexToPubkey(communityEvent.MemberToAction)
+			pk, err := crypto.HexToPubkey(communityEvent.MemberToAction)
 			if err != nil {
 				return err
 			}
@@ -259,7 +259,7 @@ func (o *Community) applyEvent(communityEvent CommunityEvent) error {
 		o.config.CommunityDescription.CommunityTokensMetadata = append(o.config.CommunityDescription.CommunityTokensMetadata, communityEvent.TokenMetadata)
 	case protobuf.CommunityEvent_COMMUNITY_DELETE_BANNED_MEMBER_MESSAGES:
 		if o.IsControlNode() {
-			pk, err := common.HexToPubkey(communityEvent.MemberToAction)
+			pk, err := crypto.HexToPubkey(communityEvent.MemberToAction)
 			if err != nil {
 				return err
 			}

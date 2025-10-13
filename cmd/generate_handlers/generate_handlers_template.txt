@@ -10,7 +10,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/protocol/protobuf"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
@@ -30,7 +30,7 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
 func (m *Messenger) {{.MethodName}}(messageState *ReceivedMessageState, protoBytes []byte, msg *messagingtypes.Message, filter messagingtypes.ChatFilter{{ if .FromArchiveArg }}, fromArchive bool{{ end }}) error {
 	m.logger.Info("handling {{ .ProtobufName}}")
 	{{ if .SyncMessage }}
-	if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+	if !crypto.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		m.logger.Warn("not coming from us, ignoring")
 		return nil
 	}
