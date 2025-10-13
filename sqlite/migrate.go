@@ -20,6 +20,12 @@ type PostStep struct {
 
 var migrationTable = "status_go_" + sqlcipher.DefaultMigrationsTable
 
+type MigrateOptions struct {
+	MigrationTableName string
+	CustomSteps        []*PostStep
+	UntilVersion       *uint
+}
+
 // Migrate database with option to augment the migration steps with additional processing using the customSteps
 // parameter. For each PostStep entry in customSteps the CustomMigration will be called after the migration step
 // with the matching Version number has been executed. If the CustomMigration returns an error, the migration process
@@ -38,14 +44,18 @@ var migrationTable = "status_go_" + sqlcipher.DefaultMigrationsTable
 //
 // untilVersion, for testing purposes optional parameter, can be used to limit the migration to a specific version.
 // Pass nil to migrate to the latest available version.
-func Migrate(db *sql.DB, resources *bindata.AssetSource, customSteps []*PostStep, untilVersion *uint) error {
+func Migrate(db *sql.DB, resources *bindata.AssetSource, options MigrateOptions) error {
 	source, err := bindata.WithInstance(resources)
 	if err != nil {
 		return fmt.Errorf("failed to create bindata migration source: %w", err)
 	}
 
+	migrationTableName := options.MigrationTableName
+	if len(migrationTableName) == 0 {
+		migrationTableName = migrationTable
+	}
 	driver, err := sqlcipher.WithInstance(db, &sqlcipher.Config{
-		MigrationsTable: migrationTable,
+		MigrationsTable: migrationTableName,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create sqlcipher driver: %w", err)
@@ -56,12 +66,12 @@ func Migrate(db *sql.DB, resources *bindata.AssetSource, customSteps []*PostStep
 		return fmt.Errorf("failed to create migration instance: %w", err)
 	}
 
-	if len(customSteps) == 0 {
-		return runRemainingMigrations(m, untilVersion)
+	if len(options.CustomSteps) == 0 {
+		return runRemainingMigrations(m, options.UntilVersion)
 	}
 
-	sort.Slice(customSteps, func(i, j int) bool {
-		return customSteps[i].Version < customSteps[j].Version
+	sort.Slice(options.CustomSteps, func(i, j int) bool {
+		return options.CustomSteps[i].Version < options.CustomSteps[j].Version
 	})
 
 	lastVersion, err := getCurrentVersion(m, db)
@@ -71,15 +81,15 @@ func Migrate(db *sql.DB, resources *bindata.AssetSource, customSteps []*PostStep
 
 	customIndex := 0
 	// ignore processed versions
-	for customIndex < len(customSteps) && customSteps[customIndex].Version <= lastVersion {
+	for customIndex < len(options.CustomSteps) && options.CustomSteps[customIndex].Version <= lastVersion {
 		customIndex++
 	}
 
-	if err := runCustomMigrations(m, db, customSteps, customIndex, untilVersion); err != nil {
+	if err := runCustomMigrations(m, db, options.CustomSteps, customIndex, options.UntilVersion); err != nil {
 		return err
 	}
 
-	return runRemainingMigrations(m, untilVersion)
+	return runRemainingMigrations(m, options.UntilVersion)
 }
 
 // runCustomMigrations performs source migrations from current to each custom steps, then runs custom migration callback
