@@ -739,3 +739,38 @@ class WakuextService(Service):
         params = [community_id]
         response = self.rpc_request("unMuteCommunityChats", params)
         return response
+
+    def accept_contact_verification_request(self, id: str, response: str):
+        params = [id, response]
+        response = self.rpc_request("acceptContactVerificationRequest", params)
+        return response
+
+    def decline_contact_verification_request(self, id: str):
+        params = [id]
+        response = self.rpc_request("declineContactVerificationRequest", params)
+        return response
+
+    def cancel_verification_request(self, id: str):
+        params = [id]
+        response = self.rpc_request("cancelVerificationRequest", params)
+        return response
+
+    def get_latest_verification_request_from(self, contact_id: str):
+        params = [contact_id]
+        response = self.rpc_request("getLatestVerificationRequestFrom", params)
+        return response
+
+    def send_contact_verification_request(self, contact_id: str, challenge: str):
+        params = [contact_id, challenge]
+        response = self.rpc_request("sendContactVerificationRequest", params)
+        return response
+
+    def get_received_verification_requests(self):
+        params = []
+        response = self.rpc_request("getReceivedVerificationRequests", params)
+        return response
+
+    def get_verification_request_sent_to(self, contact_id: str):
+        params = [contact_id]
+        response = self.rpc_request("getVerificationRequestSentTo", params)
+        return response
