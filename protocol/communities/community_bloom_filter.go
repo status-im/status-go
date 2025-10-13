@@ -9,7 +9,6 @@ import (
 	"github.com/bits-and-blooms/bloom/v3"
 
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -61,7 +60,7 @@ func generateBloomFilter(members map[string]*protobuf.CommunityMember, privateKe
 	filter := bloom.NewWithEstimates(numberOfItems, falsePositiveRate)
 
 	for pk := range members {
-		publicKey, err := common.HexToPubkey(pk)
+		publicKey, err := crypto.HexToPubkey(pk)
 		if err != nil {
 			return nil, err
 		}

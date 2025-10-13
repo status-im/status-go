@@ -40,7 +40,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/common"
 	identityUtils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
@@ -1089,7 +1088,7 @@ func CompressPublicKey(key string) string {
 
 // compressPublicKey compresses uncompressed 65-byte format to 33-byte compressed format.
 func compressPublicKey(key string) string {
-	pubKey, err := common.HexToPubkey(key)
+	pubKey, err := crypto.HexToPubkey(key)
 	if err != nil {
 		return makeJSONResponse(err)
 	}

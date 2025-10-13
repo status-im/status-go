@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -53,7 +53,7 @@ func (s *MessengerSyncContactRequestDecisionSuite) TestSyncAcceptContactRequest(
 		}
 	}
 	// send contact request to m/m2, m and m2 are paired
-	request := &requests.AddContact{ID: common.PubkeyToHex(&s.m2.identity.PublicKey)}
+	request := &requests.AddContact{ID: crypto.PubkeyToHex(&s.m2.identity.PublicKey)}
 	_, err := userB.AddContact(context.Background(), request)
 	s.Require().NoError(err)
 

@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -266,7 +265,7 @@ func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncInstalla
 }
 
 func (p *Persistence) queryCommunities(memberIdentity *ecdsa.PublicKey, query string) (response []*Community, err error) {
-	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity))
+	rows, err := p.db.Query(query, crypto.PubkeyToHex(memberIdentity))
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +340,7 @@ func (p *Persistence) rowsToCommunities(rows *sql.Rows) (comms []*Community, err
 func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
 	query := communitiesBaseQuery + ` WHERE c.Joined OR r.state = ?`
 
-	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
+	rows, err := p.db.Query(query, crypto.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +351,7 @@ func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ec
 func (p *Persistence) DeletedCommunities(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
 	query := communitiesBaseQuery + ` WHERE NOT c.Joined AND r.state != ?`
 
-	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
+	rows, err := p.db.Query(query, crypto.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +365,7 @@ func (p *Persistence) CommunitiesWithPrivateKey(memberIdentity *ecdsa.PublicKey)
 }
 
 func (p *Persistence) getByID(id []byte, memberIdentity *ecdsa.PublicKey) (*CommunityRecordBundle, error) {
-	r, err := scanCommunity(p.db.QueryRow(communitiesBaseQuery+` WHERE c.id = ?`, common.PubkeyToHex(memberIdentity), id).Scan)
+	r, err := scanCommunity(p.db.QueryRow(communitiesBaseQuery+` WHERE c.id = ?`, crypto.PubkeyToHex(memberIdentity), id).Scan)
 	return r, err
 }
 

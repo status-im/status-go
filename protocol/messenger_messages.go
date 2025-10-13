@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/crypto"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -31,7 +32,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		return nil, err
 	}
 
-	if message.From != common.PubkeyToHex(&m.identity.PublicKey) {
+	if message.From != crypto.PubkeyToHex(&m.identity.PublicKey) {
 		return nil, ErrInvalidEditOrDeleteAuthor
 	}
 
@@ -161,7 +162,7 @@ func (m *Messenger) CanDeleteMessageForEveryoneInPrivateGroupChat(chat *Chat, pu
 		return false
 	}
 	admins := group.Admins()
-	return stringSliceContains(admins, common.PubkeyToHex(publicKey))
+	return stringSliceContains(admins, crypto.PubkeyToHex(publicKey))
 }
 
 func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) (*MessengerResponse, error) {
@@ -178,7 +179,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 
 	var canDeleteMessageForEveryone = false
 	var deletedBy string
-	if message.From != common.PubkeyToHex(&m.identity.PublicKey) {
+	if message.From != crypto.PubkeyToHex(&m.identity.PublicKey) {
 		if message.MessageType == protobuf.MessageType_COMMUNITY_CHAT {
 			communityID := chat.CommunityID
 			canDeleteMessageForEveryone = m.CanDeleteMessageForEveryoneInCommunity(communityID, &m.identity.PublicKey)
@@ -407,7 +408,7 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 		}
 	}
 
-	err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	err := message.PrepareContent(crypto.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return err
 	}
@@ -423,7 +424,7 @@ func (m *Messenger) applyDeleteMessage(messageDeletes []*DeleteMessage, message 
 	message.Deleted = true
 	message.DeletedBy = messageDeletes[0].DeletedBy
 
-	err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	err := message.PrepareContent(crypto.PubkeyToHex(&m.identity.PublicKey))
 	if err != nil {
 		return err
 	}
@@ -483,7 +484,7 @@ func (m *Messenger) SendOneToOneMessage(request *requests.SendOneToOneMessage) (
 	_, ok := m.allChats.Load(chatID)
 	if !ok {
 		// Only one to one chan be muted when it's not in the database
-		publicKey, err := common.HexToPubkey(chatID)
+		publicKey, err := crypto.HexToPubkey(chatID)
 		if err != nil {
 			return nil, err
 		}

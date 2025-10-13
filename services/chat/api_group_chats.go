@@ -155,7 +155,7 @@ func (api *API) StartGroupChat(ctx context.Context, communityID types.HexBytes, 
 	var response *protocol.MessengerResponse
 	var err error
 	if len(members) == 1 {
-		memberPk, err := common.HexToPubkey(members[0])
+		memberPk, err := crypto.HexToPubkey(members[0])
 		if err != nil {
 			return nil, err
 		}

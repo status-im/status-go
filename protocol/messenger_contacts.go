@@ -125,7 +125,7 @@ func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, 
 	// Force activate chat
 	chat, ok := m.allChats.Load(contactRequest.From)
 	if !ok {
-		publicKey, err := common.HexToPubkey(contactRequest.From)
+		publicKey, err := crypto.HexToPubkey(contactRequest.From)
 		if err != nil {
 			return nil, err
 		}
@@ -620,7 +620,7 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 	} else {
 		contactRequest.ContactRequestState = common.ContactRequestStatePending
 	}
-	err := contactRequest.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	err := contactRequest.PrepareContent(crypto.PubkeyToHex(&m.identity.PublicKey))
 	return contactRequest, err
 }
 
@@ -780,7 +780,7 @@ func (m *Messenger) updateContactImagesURL(contact *Contact) error {
 			if err != nil {
 				return err
 			}
-			v.LocalURL = m.httpServer.MakeContactImageURL(common.PubkeyToHex(publicKey), k, v.Clock)
+			v.LocalURL = m.httpServer.MakeContactImageURL(crypto.PubkeyToHex(publicKey), k, v.Clock)
 			v.Payload = nil
 			contact.Images[k] = v
 		}

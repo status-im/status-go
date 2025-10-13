@@ -29,7 +29,6 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
@@ -398,7 +397,7 @@ func (s *MessageSender) sendCommunity(
 	}
 
 	s.logger.Debug("sent-message: community ",
-		zap.Strings("recipient", common.PubkeysToHex(rawMessage.Recipients)),
+		zap.Strings("recipient", crypto.PubkeysToHex(rawMessage.Recipients)),
 		zap.String("messageID", messageID.String()),
 		zap.String("messageType", "community"),
 		zap.Any("contentType", rawMessage.MessageType),
@@ -452,7 +451,7 @@ func (s *MessageSender) sendPrivate(
 			return nil, errors.Wrap(err, "failed to send message with datasync")
 		}
 		// We don't need to receive confirmations from our own devices
-		if !common.IsPubKeyEqual(recipient, &s.identity.PublicKey) {
+		if !crypto.IsPubKeyEqual(recipient, &s.identity.PublicKey) {
 			confirmation := &messagingtypes.RawMessageConfirmation{
 				DataSyncID: datasyncID,
 				MessageID:  messageID,
@@ -494,7 +493,7 @@ func (s *MessageSender) sendPrivate(
 		}
 
 		s.logger.Debug("sent-message: private skipProtocolLayer",
-			zap.String("recipient", common.PubkeyToHex(recipient)),
+			zap.String("recipient", crypto.PubkeyToHex(recipient)),
 			zap.String("messageID", messageID.String()),
 			zap.String("messageType", "private"),
 			zap.Any("contentType", rawMessage.MessageType),
@@ -514,7 +513,7 @@ func (s *MessageSender) sendPrivate(
 		}
 
 		s.logger.Debug("sent-message: private without datasync",
-			zap.String("recipient", common.PubkeyToHex(recipient)),
+			zap.String("recipient", crypto.PubkeyToHex(recipient)),
 			zap.String("messageID", messageID.String()),
 			zap.Any("contentType", rawMessage.MessageType),
 			zap.String("messageType", "private"),
@@ -772,7 +771,7 @@ func (s *MessageSender) SendPublic(
 	s.notifyOnSentMessage(sentMessage)
 
 	s.logger.Debug("sent-message: public message",
-		zap.Strings("recipient", common.PubkeysToHex(rawMessage.Recipients)),
+		zap.Strings("recipient", crypto.PubkeysToHex(rawMessage.Recipients)),
 		zap.String("messageID", messageID.String()),
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.String("messageType", "public"),

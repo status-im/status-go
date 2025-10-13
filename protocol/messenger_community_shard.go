@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -105,7 +104,7 @@ func (m *Messenger) verifyCommunitySignature(payload, signature, communityID []b
 	if err != nil {
 		return err
 	}
-	pubKeyStr := common.PubkeyToHex(pubKey)
+	pubKeyStr := crypto.PubkeyToHex(pubKey)
 
 	var ownerPublicKey string
 	if chainID > 0 {
@@ -119,7 +118,7 @@ func (m *Messenger) verifyCommunitySignature(payload, signature, communityID []b
 		if err != nil {
 			return err
 		}
-		ownerPublicKey = common.PubkeyToHex(communityPubkey)
+		ownerPublicKey = crypto.PubkeyToHex(communityPubkey)
 	}
 
 	if pubKeyStr != ownerPublicKey {

@@ -150,7 +150,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
 
 	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -205,7 +205,7 @@ func (s *MessengerCommunitiesSuite) TestJoiningOpenCommunityReturnsChatsResponse
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -241,7 +241,7 @@ func (s *MessengerCommunitiesSuite) TestJoiningOpenCommunityReturnsChatsResponse
 	s.Require().Equal(community.ID(), requestToJoin.CommunityID)
 	s.Require().NotEmpty(requestToJoin.ID)
 	s.Require().NotEmpty(requestToJoin.Clock)
-	s.Require().Equal(requestToJoin.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin.State)
 
@@ -348,7 +348,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(chats, 2)
 
 	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.bob.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.bob.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -801,7 +801,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -850,7 +850,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().True(requestToJoin1.Our)
 	s.Require().NotEmpty(requestToJoin1.ID)
 	s.Require().NotEmpty(requestToJoin1.Clock)
-	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin1.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(requestToJoin1.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
@@ -899,7 +899,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().False(requestToJoin2.Our)
 	s.Require().NotEmpty(requestToJoin2.ID)
 	s.Require().NotEmpty(requestToJoin2.Clock)
-	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin2.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(requestToJoin2.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
 
@@ -1008,7 +1008,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1046,7 +1046,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().Equal(community.ID(), requestToJoin.CommunityID)
 	s.Require().NotEmpty(requestToJoin.ID)
 	s.Require().NotEmpty(requestToJoin.Clock)
-	s.Require().Equal(requestToJoin.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin.State)
 
 	s.Require().Len(response.Communities(), 1)
@@ -1199,7 +1199,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1245,7 +1245,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().Equal(community.ID(), requestToJoin.CommunityID)
 	s.Require().NotEmpty(requestToJoin.ID)
 	s.Require().NotEmpty(requestToJoin.Clock)
-	s.Require().Equal(requestToJoin.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin.State)
 
 	s.Require().Len(response.Communities(), 1)
@@ -1451,7 +1451,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1490,7 +1490,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().True(requestToJoin1.Our)
 	s.Require().NotEmpty(requestToJoin1.ID)
 	s.Require().NotEmpty(requestToJoin1.Clock)
-	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin1.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(requestToJoin1.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
@@ -1542,7 +1542,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().False(requestToJoin2.Our)
 	s.Require().NotEmpty(requestToJoin2.ID)
 	s.Require().NotEmpty(requestToJoin2.Clock)
-	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin2.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(requestToJoin2.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
 
@@ -1603,7 +1603,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().False(cancelRequestToJoin2.Our)
 	s.Require().NotEmpty(cancelRequestToJoin2.ID)
 	s.Require().NotEmpty(cancelRequestToJoin2.Clock)
-	s.Require().Equal(cancelRequestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(cancelRequestToJoin2.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(cancelRequestToJoin2.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStateCanceled, cancelRequestToJoin2.State)
 }
@@ -1649,7 +1649,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().True(requestToJoin1.Our)
 	s.Require().NotEmpty(requestToJoin1.ID)
 	s.Require().NotEmpty(requestToJoin1.Clock)
-	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin1.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
 	// Make sure clock is not empty
@@ -1697,7 +1697,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().False(requestToJoin2.Our)
 	s.Require().NotEmpty(requestToJoin2.ID)
 	s.Require().NotEmpty(requestToJoin2.Clock)
-	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin2.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
 
 	s.Require().Equal(requestToJoin1.ID, requestToJoin2.ID)
@@ -1776,7 +1776,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	// We kick the member
 	response, err = s.bob.RemoveUserFromCommunity(
 		community.ID(),
-		common.PubkeyToHex(&s.alice.identity.PublicKey),
+		crypto.PubkeyToHex(&s.alice.identity.PublicKey),
 	)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1838,7 +1838,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().True(requestToJoin3.Our)
 	s.Require().NotEmpty(requestToJoin3.ID)
 	s.Require().NotEmpty(requestToJoin3.Clock)
-	s.Require().Equal(requestToJoin3.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin3.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin3.State)
 
 	s.Require().Len(response.Communities(), 1)
@@ -1868,7 +1868,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().False(requestToJoin4.Our)
 	s.Require().NotEmpty(requestToJoin4.ID)
 	s.Require().NotEmpty(requestToJoin4.Clock)
-	s.Require().Equal(requestToJoin4.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin4.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin4.State)
 
 	s.Require().Equal(requestToJoin3.ID, requestToJoin4.ID)
@@ -1892,7 +1892,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1931,7 +1931,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().True(requestToJoin1.Our)
 	s.Require().NotEmpty(requestToJoin1.ID)
 	s.Require().NotEmpty(requestToJoin1.Clock)
-	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin1.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
@@ -1988,7 +1988,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().False(requestToJoin2.Our)
 	s.Require().NotEmpty(requestToJoin2.ID)
 	s.Require().NotEmpty(requestToJoin2.Clock)
-	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin2.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
 
 	s.Require().Equal(requestToJoin1.ID, requestToJoin2.ID)
@@ -2213,7 +2213,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 	// Alice shares community with Bob
 	response, err = s.owner.ShareCommunity(&requests.ShareCommunity{
 		CommunityID:   community.ID(),
-		Users:         []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
+		Users:         []types.HexBytes{crypto.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
 		InviteMessage: inputMessageText,
 	})
 
@@ -2278,7 +2278,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.bob, s.alice)
 
 	// Add bob to contacts so it does not go on activity center
-	bobPk := common.PubkeyToHex(&s.bob.identity.PublicKey)
+	bobPk := crypto.PubkeyToHex(&s.bob.identity.PublicKey)
 	request := &requests.AddContact{ID: bobPk}
 	_, err = s.alice.AddContact(context.Background(), request)
 	s.Require().NoError(err)
@@ -2316,7 +2316,7 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
-			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+			User:        crypto.PubkeyToHexBytes(&s.alice.identity.PublicKey),
 		},
 	)
 	s.Require().NoError(err)
@@ -2363,7 +2363,7 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	response, err = s.owner.UnbanUserFromCommunity(
 		&requests.UnbanUserFromCommunity{
 			CommunityID: community.ID(),
-			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+			User:        crypto.PubkeyToHexBytes(&s.alice.identity.PublicKey),
 		},
 	)
 	s.Require().NoError(err)
@@ -2782,7 +2782,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Len(tcs1, 0, "Must have 0 communities")
 
 	// Bob the admin opens up a 1-1 chat with alice
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 	s.Require().NoError(s.bob.SaveChat(chat))
 
 	// Bob the admin shares with Alice, via public chat, an invite link to the new community
@@ -2833,7 +2833,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.True(aRtj.Our)
 	s.Require().NotEmpty(aRtj.ID)
 	s.Require().NotEmpty(aRtj.Clock)
-	s.Equal(aRtj.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Equal(aRtj.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Equal(aRtj.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Equal(communities.RequestToJoinStatePending, aRtj.State)
 
@@ -2924,7 +2924,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.False(bobRtj.Our)
 	s.Require().NotEmpty(bobRtj.ID)
 	s.Require().NotEmpty(bobRtj.Clock)
-	s.Equal(bobRtj.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Equal(bobRtj.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Equal(bobRtj.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Equal(communities.RequestToJoinStatePending, bobRtj.State)
 
@@ -3010,7 +3010,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	s.Len(tcs1, 0, "Must have 0 communities")
 
 	// Bob the admin opens up a 1-1 chat with alice
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
+	chat := CreateOneToOneChat(crypto.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 	s.Require().NoError(s.bob.SaveChat(chat))
 
 	// Bob the admin shares with Alice, via public chat, an invite link to the new community
@@ -3534,7 +3534,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
-			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+			User:        crypto.PubkeyToHexBytes(&s.alice.identity.PublicKey),
 		},
 	)
 	s.Require().NoError(err)
@@ -3849,7 +3849,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 
 	response, err = s.owner.BanUserFromCommunity(context.Background(), &requests.BanUserFromCommunity{
 		CommunityID: c.ID(),
-		User:        common.PubkeyToHexBytes(&s.bob.identity.PublicKey),
+		User:        crypto.PubkeyToHexBytes(&s.bob.identity.PublicKey),
 	})
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
@@ -3952,7 +3952,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 
 	response, err = s.owner.BanUserFromCommunity(context.Background(), &requests.BanUserFromCommunity{
 		CommunityID: c.ID(),
-		User:        common.PubkeyToHexBytes(&s.bob.identity.PublicKey),
+		User:        crypto.PubkeyToHexBytes(&s.bob.identity.PublicKey),
 	})
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
@@ -4045,7 +4045,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	s.Require().True(requestToJoin1.Our)
 	s.Require().NotEmpty(requestToJoin1.ID)
 	s.Require().NotEmpty(requestToJoin1.Clock)
-	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin1.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
 	messageState := s.alice.buildMessageState()
@@ -4098,7 +4098,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	s.Require().Equal(community.ID(), requestToJoin2.CommunityID)
 	s.Require().NotEmpty(requestToJoin2.ID)
 	s.Require().NotEmpty(requestToJoin2.Clock)
-	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(requestToJoin2.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
 
 	s.Require().Equal(requestToJoin1.ID, requestToJoin2.ID)
@@ -4182,7 +4182,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	s.Require().False(cancelRequestToJoin2.Our)
 	s.Require().NotEmpty(cancelRequestToJoin2.ID)
 	s.Require().NotEmpty(cancelRequestToJoin2.Clock)
-	s.Require().Equal(cancelRequestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(cancelRequestToJoin2.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityLastOpenedAt() {
@@ -4264,7 +4264,7 @@ func (s *MessengerCommunitiesSuite) TestBanUserAndDeleteAllUserMessages() {
 		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID:       community.ID(),
-			User:              common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+			User:              crypto.PubkeyToHexBytes(&s.alice.identity.PublicKey),
 			DeleteAllMessages: true,
 		},
 	)

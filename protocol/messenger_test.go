@@ -220,11 +220,11 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 	inputMessage1 := buildTestMessage(*chat)
 	inputMessage1.ID = "1"
 	inputMessage1.Seen = false
-	inputMessage1.Text = "hey @" + common.PubkeyToHex(&s.m.identity.PublicKey)
+	inputMessage1.Text = "hey @" + crypto.PubkeyToHex(&s.m.identity.PublicKey)
 	inputMessage1.Mentioned = true
 	inputMessage2 := buildTestMessage(*chat)
 	inputMessage2.ID = "2"
-	inputMessage2.Text = "hey @" + common.PubkeyToHex(&s.m.identity.PublicKey)
+	inputMessage2.Text = "hey @" + crypto.PubkeyToHex(&s.m.identity.PublicKey)
 	inputMessage2.Mentioned = true
 	inputMessage2.Seen = false
 
@@ -1220,7 +1220,7 @@ func (s *MessengerSuite) TestBlockContact() {
 	s.Require().NoError(err)
 
 	contact2 := Contact{
-		ID:                       common.PubkeyToHex(&key2.PublicKey),
+		ID:                       crypto.PubkeyToHex(&key2.PublicKey),
 		EnsName:                  "contact-name",
 		LastUpdated:              20,
 		ContactRequestLocalState: ContactRequestStateSent,
@@ -1418,7 +1418,7 @@ func (s *MessengerSuite) TestSharedSecretHandler() {
 func (s *MessengerSuite) TestCreateGroupChatWithMembers() {
 	members := []string{testPK}
 
-	pubKey, err := common.HexToPubkey(testPK)
+	pubKey, err := crypto.HexToPubkey(testPK)
 	s.Require().NoError(err)
 	s.Require().NoError(makeMutualContact(s.m, pubKey))
 
@@ -1826,8 +1826,8 @@ func (s *MessengerSuite) TestSendMessageMention() {
 	s.Require().NoError(alice.settings.SaveSettingField(settings.NotificationsEnabled, true))
 
 	// Create one-to-one chats
-	chat, chat2 := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.getTimesource()),
-		CreateOneToOneChat(common.PubkeyToHex(&bob.identity.PublicKey), &bob.identity.PublicKey, alice.getTimesource())
+	chat, chat2 := CreateOneToOneChat(crypto.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.getTimesource()),
+		CreateOneToOneChat(crypto.PubkeyToHex(&bob.identity.PublicKey), &bob.identity.PublicKey, alice.getTimesource())
 	s.Require().NoError(bob.SaveChat(chat))
 	s.Require().NoError(alice.SaveChat(chat2))
 

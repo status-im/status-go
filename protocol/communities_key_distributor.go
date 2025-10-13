@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/ecdsa"
 
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -57,7 +57,7 @@ func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.C
 	pubkeys := make([]*ecdsa.PublicKey, len(keyAction.Members))
 	i := 0
 	for hex := range keyAction.Members {
-		pubkeys[i], _ = common.HexToPubkey(hex)
+		pubkeys[i], _ = crypto.HexToPubkey(hex)
 		i++
 	}
 

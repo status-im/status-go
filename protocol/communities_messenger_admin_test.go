@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -233,7 +232,7 @@ func (s *AdminCommunityEventsSuite) TestOwnerKickControlNode() {
 
 func (s *AdminCommunityEventsSuite) TestAdminKickMember() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
-	kickMember(s, community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	kickMember(s, community.ID(), crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminBanAdmin() {

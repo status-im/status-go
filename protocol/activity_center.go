@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/verification"
@@ -168,7 +169,7 @@ func showMentionOrReplyActivityCenterNotification(publicKey ecdsa.PublicKey, mes
 		return true, ActivityCenterNotificationTypeMention
 	}
 
-	publicKeyString := common.PubkeyToHex(&publicKey)
+	publicKeyString := crypto.PubkeyToHex(&publicKey)
 	if responseTo != nil && responseTo.From == publicKeyString {
 		return true, ActivityCenterNotificationTypeReply
 	}

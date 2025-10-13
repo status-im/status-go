@@ -677,7 +677,7 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 			continue
 		}
 
-		m.logger.Info("validating community", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", common.PubkeyToHex(signer)))
+		m.logger.Info("validating community", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", crypto.PubkeyToHex(signer)))
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 		defer cancel()
@@ -688,7 +688,7 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 			continue
 		}
 
-		ownerPK, err := common.HexToPubkey(owner)
+		ownerPK, err := crypto.HexToPubkey(owner)
 		if err != nil {
 			m.logger.Error("failed to convert pk string to ecdsa", zap.Error(err))
 			continue
@@ -707,7 +707,7 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 
 		if response != nil {
 
-			m.logger.Info("community validated", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", common.PubkeyToHex(signer)))
+			m.logger.Info("community validated", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", crypto.PubkeyToHex(signer)))
 			m.publish(&Subscription{TokenCommunityValidated: response})
 			err := m.persistence.DeleteCommunitiesToValidateByCommunityID(community.id)
 			if err != nil {
@@ -855,7 +855,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	}
 
 	description.Members = make(map[string]*protobuf.CommunityMember)
-	description.Members[common.PubkeyToHex(&m.identity.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
+	description.Members[crypto.PubkeyToHex(&m.identity.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
 
 	err = ValidateCommunityDescription(description)
 	if err != nil {
@@ -1018,7 +1018,7 @@ func (rmr *reevaluateMembersResult) newPrivilegedRoles() (map[protobuf.Community
 
 	for memberKey, roles := range rmr.membersRoles {
 		if roles.hasChangedToPrivileged() || roles.hasChangedPrivilegedRole() {
-			memberPubKey, err := common.HexToPubkey(memberKey)
+			memberPubKey, err := crypto.HexToPubkey(memberKey)
 			if err != nil {
 				return nil, err
 			}
@@ -1097,12 +1097,12 @@ func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map
 	}
 
 	for memberKey := range community.Members() {
-		memberPubKey, err := common.HexToPubkey(memberKey)
+		memberPubKey, err := crypto.HexToPubkey(memberKey)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
+		if memberKey == crypto.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
 			continue
 		}
 
@@ -1199,7 +1199,7 @@ func (m *Manager) applyReevaluateMembersResult(communityID types.HexBytes, resul
 
 	// Remove members.
 	for memberKey := range result.membersToRemove {
-		memberPubKey, err := common.HexToPubkey(memberKey)
+		memberPubKey, err := crypto.HexToPubkey(memberKey)
 		if err != nil {
 			return nil, err
 		}
@@ -1211,7 +1211,7 @@ func (m *Manager) applyReevaluateMembersResult(communityID types.HexBytes, resul
 
 	// Ensure members have proper roles.
 	for memberKey, roles := range result.membersRoles {
-		memberPubKey, err := common.HexToPubkey(memberKey)
+		memberPubKey, err := crypto.HexToPubkey(memberKey)
 		if err != nil {
 			return nil, err
 		}
@@ -1238,7 +1238,7 @@ func (m *Manager) applyReevaluateMembersResult(communityID types.HexBytes, resul
 
 	// Remove members from channels.
 	for memberKey, channels := range result.membersToRemoveFromChannels {
-		memberPubKey, err := common.HexToPubkey(memberKey)
+		memberPubKey, err := crypto.HexToPubkey(memberKey)
 		if err != nil {
 			return nil, err
 		}
@@ -1253,7 +1253,7 @@ func (m *Manager) applyReevaluateMembersResult(communityID types.HexBytes, resul
 
 	// Add unprivileged members to channels.
 	for memberKey, channels := range result.membersToAddToChannels {
-		memberPubKey, err := common.HexToPubkey(memberKey)
+		memberPubKey, err := crypto.HexToPubkey(memberKey)
 		if err != nil {
 			return nil, err
 		}
@@ -2118,7 +2118,7 @@ func (m *Manager) GenerateRequestsToJoinForAutoApprovalOnNewOwnership(communityI
 
 func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uint64, payload []byte) error {
 
-	m.logger.Info("queuing community", zap.String("id", community.IDString()), zap.String("signer", common.PubkeyToHex(signer)))
+	m.logger.Info("queuing community", zap.String("id", community.IDString()), zap.String("signer", crypto.PubkeyToHex(signer)))
 
 	communityToValidate := communityToValidate{
 		id:         community.ID(),
@@ -2214,7 +2214,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	} else {
 		// only queue if already known control node is different than the signer
 		// and if the clock is greater
-		shouldQueue = shouldQueue && !common.IsPubKeyEqual(community.ControlNode(), signer) &&
+		shouldQueue = shouldQueue && !crypto.IsPubKeyEqual(community.ControlNode(), signer) &&
 			community.config.CommunityDescription.Clock < processedDescription.Clock
 		if shouldQueue {
 			return nil, m.Queue(signer, community, processedDescription.Clock, payload)
@@ -2225,21 +2225,21 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		// Override verified owner
 		m.logger.Info("updating verified owner",
 			zap.String("communityID", community.IDString()),
-			zap.String("verifiedOwner", common.PubkeyToHex(verifiedOwner)),
-			zap.String("signer", common.PubkeyToHex(signer)),
-			zap.String("controlNode", common.PubkeyToHex(community.ControlNode())),
+			zap.String("verifiedOwner", crypto.PubkeyToHex(verifiedOwner)),
+			zap.String("signer", crypto.PubkeyToHex(signer)),
+			zap.String("controlNode", crypto.PubkeyToHex(community.ControlNode())),
 		)
 
 		// If we are not the verified owner anymore, drop the private key
-		if !common.IsPubKeyEqual(verifiedOwner, &m.identity.PublicKey) {
+		if !crypto.IsPubKeyEqual(verifiedOwner, &m.identity.PublicKey) {
 			community.config.PrivateKey = nil
 		}
 
 		// new control node will be set in the 'UpdateCommunityDescription'
-		if !common.IsPubKeyEqual(verifiedOwner, signer) {
+		if !crypto.IsPubKeyEqual(verifiedOwner, signer) {
 			return nil, ErrNotAuthorized
 		}
-	} else if !common.IsPubKeyEqual(community.ControlNode(), signer) {
+	} else if !crypto.IsPubKeyEqual(community.ControlNode(), signer) {
 		return nil, ErrNotAuthorized
 	}
 
@@ -2318,7 +2318,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		}
 	}
 
-	pkString := common.PubkeyToHex(&m.identity.PublicKey)
+	pkString := crypto.PubkeyToHex(&m.identity.PublicKey)
 	if m.tokenManager != nil && description.CommunityTokensMetadata != nil && len(description.CommunityTokensMetadata) > 0 {
 		for _, tokenMetadata := range description.CommunityTokensMetadata {
 			if tokenMetadata.TokenType != protobuf.CommunityTokenType_ERC20 {
@@ -2543,11 +2543,11 @@ func (m *Manager) saveOrUpdateRequestToJoin(communityID types.HexBytes, requestT
 		// node already knows about this request to join, so let's compare clocks
 		// and update it if necessary
 		if existingRequestToJoin.Clock <= requestToJoin.Clock {
-			pk, err := common.HexToPubkey(existingRequestToJoin.PublicKey)
+			pk, err := crypto.HexToPubkey(existingRequestToJoin.PublicKey)
 			if err != nil {
 				return updated, err
 			}
-			err = m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), communityID, requestToJoin.State)
+			err = m.persistence.SetRequestToJoinState(crypto.PubkeyToHex(pk), communityID, requestToJoin.State)
 			if err != nil {
 				return updated, err
 			}
@@ -2668,17 +2668,17 @@ func (m *Manager) handleCommunityEventRequestRejected(community *Community, comm
 // if we are members
 func (m *Manager) markRequestToJoinAsAccepted(pk *ecdsa.PublicKey, community *Community) error {
 	if community.HasMember(pk) {
-		return m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), RequestToJoinStateAccepted)
+		return m.persistence.SetRequestToJoinState(crypto.PubkeyToHex(pk), community.ID(), RequestToJoinStateAccepted)
 	}
 	return nil
 }
 
 func (m *Manager) markRequestToJoinAsCanceled(pk *ecdsa.PublicKey, community *Community) error {
-	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), RequestToJoinStateCanceled)
+	return m.persistence.SetRequestToJoinState(crypto.PubkeyToHex(pk), community.ID(), RequestToJoinStateCanceled)
 }
 
 func (m *Manager) markRequestToJoinAsAcceptedPending(pk *ecdsa.PublicKey, community *Community) error {
-	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), RequestToJoinStateAcceptedPending)
+	return m.persistence.SetRequestToJoinState(crypto.PubkeyToHex(pk), community.ID(), RequestToJoinStateAcceptedPending)
 }
 
 func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
@@ -2733,7 +2733,7 @@ func (m *Manager) CancelRequestToJoin(request *requests.CancelRequestToJoinCommu
 		return nil, nil, err
 	}
 
-	pk, err := common.HexToPubkey(dbRequest.PublicKey)
+	pk, err := crypto.HexToPubkey(dbRequest.PublicKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -2833,7 +2833,7 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 	m.communityLock.Lock(dbRequest.CommunityID)
 	defer m.communityLock.Unlock(dbRequest.CommunityID)
 
-	pk, err := common.HexToPubkey(dbRequest.PublicKey)
+	pk, err := crypto.HexToPubkey(dbRequest.PublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -2972,7 +2972,7 @@ func (m *Manager) DeclineRequestToJoin(dbRequest *RequestToJoin) (*Community, er
 }
 
 func (m *Manager) shouldUserRetainDeclined(signer *ecdsa.PublicKey, community *Community, requestClock uint64) (bool, error) {
-	requestID := CalculateRequestID(common.PubkeyToHex(signer), types.HexBytes(community.IDString()))
+	requestID := CalculateRequestID(crypto.PubkeyToHex(signer), types.HexBytes(community.IDString()))
 	request, err := m.persistence.GetRequestToJoin(requestID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -3015,7 +3015,7 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 		return nil, err
 	}
 
-	requestToJoin, err := m.persistence.GetRequestToJoinByPk(common.PubkeyToHex(signer), community.ID(), RequestToJoinStateCanceled)
+	requestToJoin, err := m.persistence.GetRequestToJoinByPk(crypto.PubkeyToHex(signer), community.ID(), RequestToJoinStateCanceled)
 	if err != nil {
 		return nil, err
 	}
@@ -3055,7 +3055,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 	}
 
 	requestToJoin := &RequestToJoin{
-		PublicKey:          common.PubkeyToHex(signer),
+		PublicKey:          crypto.PubkeyToHex(signer),
 		Clock:              request.Clock,
 		ENSName:            request.EnsName,
 		CommunityID:        request.CommunityId,
@@ -3183,7 +3183,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 		return ErrNotOwner
 	}
 
-	publicKey := common.PubkeyToHex(signer)
+	publicKey := crypto.PubkeyToHex(signer)
 
 	if err := community.ValidateEditSharedAddresses(publicKey, request); err != nil {
 		return err
@@ -3227,7 +3227,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 			Type:        protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_MEMBER_EDIT_SHARED_ADDRESSES,
 			CommunityId: community.ID(),
 			SyncEditSharedAddresses: &protobuf.SyncCommunityEditSharedAddresses{
-				PublicKey:         common.PubkeyToHex(signer),
+				PublicKey:         crypto.PubkeyToHex(signer),
 				EditSharedAddress: request,
 			},
 		},
@@ -3532,7 +3532,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 	m.communityLock.Lock(request.CommunityId)
 	defer m.communityLock.Unlock(request.CommunityId)
 
-	pkString := common.PubkeyToHex(&m.identity.PublicKey)
+	pkString := crypto.PubkeyToHex(&m.identity.PublicKey)
 
 	community, err := m.GetByID(request.CommunityId)
 	if err != nil {
@@ -3562,7 +3562,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 }
 
 func (m *Manager) HandleCommunityRequestToLeave(signer *ecdsa.PublicKey, proto *protobuf.CommunityRequestToLeave) error {
-	requestToLeave := NewRequestToLeave(common.PubkeyToHex(signer), proto)
+	requestToLeave := NewRequestToLeave(crypto.PubkeyToHex(signer), proto)
 	if err := m.persistence.SaveRequestToLeave(requestToLeave); err != nil {
 		return err
 	}
@@ -3649,7 +3649,7 @@ func (m *Manager) GetCommunityRequestToJoinClock(pk *ecdsa.PublicKey, communityI
 		return 0, err
 	}
 
-	joinClock, err := m.persistence.GetRequestToJoinClockByPkAndCommunityID(common.PubkeyToHex(pk), communityIDBytes)
+	joinClock, err := m.persistence.GetRequestToJoinClockByPkAndCommunityID(crypto.PubkeyToHex(pk), communityIDBytes)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
@@ -3661,7 +3661,7 @@ func (m *Manager) GetCommunityRequestToJoinClock(pk *ecdsa.PublicKey, communityI
 }
 
 func (m *Manager) GetRequestToJoinByPkAndCommunityID(pk *ecdsa.PublicKey, communityID []byte) (*RequestToJoin, error) {
-	return m.persistence.GetRequestToJoinByPkAndCommunityID(common.PubkeyToHex(pk), communityID)
+	return m.persistence.GetRequestToJoinByPkAndCommunityID(crypto.PubkeyToHex(pk), communityID)
 }
 
 func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
@@ -3785,7 +3785,7 @@ func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunit
 	defer m.communityLock.Unlock(request.CommunityID)
 
 	id := request.CommunityID
-	publicKey, err := common.HexToPubkey(request.User.String())
+	publicKey, err := crypto.HexToPubkey(request.User.String())
 	if err != nil {
 		return nil, err
 	}
@@ -3813,7 +3813,7 @@ func (m *Manager) AddRoleToMember(request *requests.AddRoleToMember) (*Community
 	defer m.communityLock.Unlock(request.CommunityID)
 
 	id := request.CommunityID
-	publicKey, err := common.HexToPubkey(request.User.String())
+	publicKey, err := crypto.HexToPubkey(request.User.String())
 	if err != nil {
 		return nil, err
 	}
@@ -3847,7 +3847,7 @@ func (m *Manager) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (
 	defer m.communityLock.Unlock(request.CommunityID)
 
 	id := request.CommunityID
-	publicKey, err := common.HexToPubkey(request.User.String())
+	publicKey, err := crypto.HexToPubkey(request.User.String())
 	if err != nil {
 		return nil, err
 	}
@@ -3882,7 +3882,7 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 
 	id := request.CommunityID
 
-	publicKey, err := common.HexToPubkey(request.User.String())
+	publicKey, err := crypto.HexToPubkey(request.User.String())
 	if err != nil {
 		return nil, err
 	}
@@ -4035,7 +4035,7 @@ func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, co
 func (m *Manager) CreateRequestToJoin(request *requests.RequestToJoinCommunity, customizationColor multiaccountscommon.CustomizationColor) *RequestToJoin {
 	clock := uint64(time.Now().Unix())
 	requestToJoin := &RequestToJoin{
-		PublicKey:            common.PubkeyToHex(&m.identity.PublicKey),
+		PublicKey:            crypto.PubkeyToHex(&m.identity.PublicKey),
 		Clock:                clock,
 		ENSName:              request.ENSName,
 		CommunityID:          request.CommunityID,
@@ -4070,7 +4070,7 @@ func (m *Manager) SaveRequestToJoin(request *RequestToJoin) error {
 }
 
 func (m *Manager) CanceledRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
-	return m.persistence.CanceledRequestsToJoinForUser(common.PubkeyToHex(pk))
+	return m.persistence.CanceledRequestsToJoinForUser(crypto.PubkeyToHex(pk))
 }
 
 func (m *Manager) PendingRequestsToJoin() ([]*RequestToJoin, error) {
@@ -4078,7 +4078,7 @@ func (m *Manager) PendingRequestsToJoin() ([]*RequestToJoin, error) {
 }
 
 func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
-	return m.persistence.RequestsToJoinForUserByState(common.PubkeyToHex(pk), RequestToJoinStatePending)
+	return m.persistence.RequestsToJoinForUserByState(crypto.PubkeyToHex(pk), RequestToJoinStatePending)
 }
 
 func (m *Manager) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
@@ -4748,7 +4748,7 @@ func (m *Manager) RemoveUsersWithoutRevealedAccounts(community *Community, clock
 		return nil, err
 	}
 
-	myPk := common.PubkeyToHex(&m.identity.PublicKey)
+	myPk := crypto.PubkeyToHex(&m.identity.PublicKey)
 	membersToRemove := []string{}
 	for pk := range community.Members() {
 		if myPk == pk {
@@ -4964,7 +4964,7 @@ func (m *Manager) ShareRequestsToJoinWithPrivilegedMembers(community *Community,
 }
 
 func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Community, requestToJoin *RequestToJoin) error {
-	pk, err := common.HexToPubkey(requestToJoin.PublicKey)
+	pk, err := crypto.HexToPubkey(requestToJoin.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -4994,8 +4994,8 @@ func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Com
 
 	// do not sent to ourself and to the accepted user
 	skipMembers := make(map[string]struct{})
-	skipMembers[common.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
-	skipMembers[common.PubkeyToHex(pk)] = struct{}{}
+	skipMembers[crypto.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
+	skipMembers[crypto.PubkeyToHex(pk)] = struct{}{}
 
 	subscriptionMsg := &CommunityPrivilegedMemberSyncMessage{}
 

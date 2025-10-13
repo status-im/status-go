@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -230,7 +231,7 @@ func (m *Messenger) OnDatasyncOffer(response *messagingtypes.HandleMessageRespon
 		return nil
 	}
 
-	if common.PubkeyToHex(sender) == m.myHexIdentity() {
+	if crypto.PubkeyToHex(sender) == m.myHexIdentity() {
 		return nil
 	}
 
@@ -264,7 +265,7 @@ func (m *Messenger) OnDatasyncOffer(response *messagingtypes.HandleMessageRespon
 		return err
 	}
 	rawMessage := messagingtypes.RawMessage{
-		LocalChatID:         common.PubkeyToHex(sender),
+		LocalChatID:         crypto.PubkeyToHex(sender),
 		Payload:             payload,
 		Ephemeral:           true,
 		SkipApplicationWrap: true,
@@ -313,7 +314,7 @@ func (m *Messenger) canSyncCommunityMessageWith(chat *Chat, community *communiti
 }
 
 func (m *Messenger) canSyncOneToOneMessageWith(chat *Chat, peer *ecdsa.PublicKey) (bool, error) {
-	return chat.HasMember(common.PubkeyToHex(peer)), nil
+	return chat.HasMember(crypto.PubkeyToHex(peer)), nil
 }
 
 func (m *Messenger) OnDatasyncRequests(requester *ecdsa.PublicKey, messageIDs [][]byte) error {
@@ -333,7 +334,7 @@ func (m *Messenger) OnDatasyncRequests(requester *ecdsa.PublicKey, messageIDs []
 		if !canSync {
 			continue
 		}
-		idString := common.PubkeyToHex(requester) + types.Bytes2Hex(msg.ID)
+		idString := crypto.PubkeyToHex(requester) + types.Bytes2Hex(msg.ID)
 		lastRequested := m.peersyncingRequests[idString]
 		timeNow := m.GetCurrentTimeInMillis() / 1000
 		if lastRequested+30 < timeNow {
@@ -341,7 +342,7 @@ func (m *Messenger) OnDatasyncRequests(requester *ecdsa.PublicKey, messageIDs []
 
 			// Check permissions
 			rawMessage := messagingtypes.RawMessage{
-				LocalChatID:         common.PubkeyToHex(requester),
+				LocalChatID:         crypto.PubkeyToHex(requester),
 				Payload:             msg.Payload,
 				Ephemeral:           true,
 				SkipApplicationWrap: true,

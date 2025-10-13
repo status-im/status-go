@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 )
 
 const (
@@ -77,36 +76,6 @@ func Shake256(buf []byte) []byte {
 	h := make([]byte, 64)
 	sha3.ShakeSum256(h, buf)
 	return h
-}
-
-// IsPubKeyEqual checks that two public keys are equal
-func IsPubKeyEqual(a, b *ecdsa.PublicKey) bool {
-	// the curve is always the same, just compare the points
-	return a.X.Cmp(b.X) == 0 && a.Y.Cmp(b.Y) == 0
-}
-
-func PubkeysToHex(keys []*ecdsa.PublicKey) []string {
-	var result []string
-	for _, k := range keys {
-		result = append(result, PubkeyToHex(k))
-	}
-	return result
-}
-
-func PubkeyToHex(key *ecdsa.PublicKey) string {
-	return types.EncodeHex(crypto.FromECDSAPub(key))
-}
-
-func PubkeyToHexBytes(key *ecdsa.PublicKey) types.HexBytes {
-	return crypto.FromECDSAPub(key)
-}
-
-func HexToPubkey(pk string) (*ecdsa.PublicKey, error) {
-	bytes, err := types.DecodeHex(pk)
-	if err != nil {
-		return nil, err
-	}
-	return crypto.UnmarshalPubkey(bytes)
 }
 
 func MakeECDHSharedKey(yourPrivateKey *ecdsa.PrivateKey, theirPubKey *ecdsa.PublicKey) ([]byte, error) {

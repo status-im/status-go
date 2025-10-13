@@ -161,7 +161,7 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 }
 
 func (m *Messenger) publishCommunityEvents(community *communities.Community, msg *communities.CommunityEventsMessage) error {
-	m.logger.Debug("publishing community events", zap.String("admin-id", common.PubkeyToHex(&m.identity.PublicKey)), zap.Any("event", msg))
+	m.logger.Debug("publishing community events", zap.String("admin-id", crypto.PubkeyToHex(&m.identity.PublicKey)), zap.Any("event", msg))
 
 	payload, err := msg.Marshal()
 	if err != nil {
@@ -322,7 +322,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 			}
 
 			for pkString := range encryptionKeyActions.CommunityKeyAction.RemovedMembers {
-				pk, err := common.HexToPubkey(pkString)
+				pk, err := crypto.HexToPubkey(pkString)
 				if err != nil {
 					m.logger.Error("failed to decode public key", zap.Error(err), zap.String("pk", gocommon.TruncateWithDot(pkString)))
 				}
@@ -603,7 +603,7 @@ func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.
 		ChannelKeysActions: map[string]communities.EncryptionKeyAction{},
 	}
 
-	pkStr := common.PubkeyToHex(signer)
+	pkStr := crypto.PubkeyToHex(signer)
 	members := make(map[string]*protobuf.CommunityMember)
 	members[pkStr] = community.GetMember(signer)
 
@@ -649,7 +649,7 @@ func (m *Messenger) handleCommunitySharedAddressesRequest(state *ReceivedMessage
 		return communities.ErrMemberNotFound
 	}
 
-	pkStr := common.PubkeyToHex(signer)
+	pkStr := crypto.PubkeyToHex(signer)
 
 	revealedAccounts, err := m.communitiesManager.GetRevealedAddresses(community.ID(), pkStr)
 	if err != nil {
@@ -696,12 +696,12 @@ func (m *Messenger) handleCommunitySharedAddressesRequest(state *ReceivedMessage
 }
 
 func (m *Messenger) handleCommunitySharedAddressesResponse(state *ReceivedMessageState, community *communities.Community, signer *ecdsa.PublicKey, revealedAccounts []*protobuf.RevealedAccount) error {
-	isControlNodeMsg := common.IsPubKeyEqual(community.ControlNode(), signer)
+	isControlNodeMsg := crypto.IsPubKeyEqual(community.ControlNode(), signer)
 	if !isControlNodeMsg {
 		return errors.New(ErrSyncMessagesSentByNonControlNode)
 	}
 
-	requestID := communities.CalculateRequestID(common.PubkeyToHex(&m.identity.PublicKey), community.ID())
+	requestID := communities.CalculateRequestID(crypto.PubkeyToHex(&m.identity.PublicKey), community.ID())
 	err := m.communitiesManager.SaveRequestToJoinRevealedAddresses(requestID, revealedAccounts)
 	if err != nil {
 		return nil
@@ -792,7 +792,7 @@ func (m *Messenger) updateGrantsForControlledCommunities() {
 					m.logger.Error("error handling grant for controlled community", zap.Error(err))
 				}
 			} else {
-				memberPubKey, err := common.HexToPubkey(memberKey)
+				memberPubKey, err := crypto.HexToPubkey(memberKey)
 				if err != nil {
 					m.logger.Error("Pubkey decode ", zap.Error(err))
 				}
@@ -1105,7 +1105,7 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 		response.AddNotification(joinedNotification)
 
 		// Activity Center notification
-		requestID := communities.CalculateRequestID(common.PubkeyToHex(&m.identity.PublicKey), communityID)
+		requestID := communities.CalculateRequestID(crypto.PubkeyToHex(&m.identity.PublicKey), communityID)
 		notification, err := m.persistence.GetActivityCenterNotificationByID(requestID)
 		if err != nil {
 			return nil, err
@@ -1525,7 +1525,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 				return
 			}
 			for _, publicKey := range pks {
-				pkString := common.PubkeyToHex(publicKey)
+				pkString := crypto.PubkeyToHex(publicKey)
 				_, err = m.pushNotificationClient.SendNotification(publicKey, nil, requestToJoin.ID, pkString, protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY)
 				if err != nil {
 					m.logger.Error("error sending notification", zap.Error(err))
@@ -1614,7 +1614,7 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		requestToEditRevealedAccountsProto.RevealedAccounts = append(requestToEditRevealedAccountsProto.RevealedAccounts, revealedAcc)
 	}
 
-	requestID := communities.CalculateRequestID(common.PubkeyToHex(&m.identity.PublicKey), request.CommunityID)
+	requestID := communities.CalculateRequestID(crypto.PubkeyToHex(&m.identity.PublicKey), request.CommunityID)
 	err = m.communitiesManager.RemoveRequestToJoinRevealedAddresses(requestID)
 	if err != nil {
 		return nil, err
@@ -1681,7 +1681,7 @@ func (m *Messenger) PublishTokenActionToPrivilegedMembers(communityID []byte, ch
 	}
 
 	skipMembers := make(map[string]struct{})
-	skipMembers[common.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
+	skipMembers[crypto.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
 	privilegedMembers := community.GetFilteredPrivilegedMembers(skipMembers)
 
 	allRecipients := privilegedMembers[protobuf.CommunityMember_ROLE_OWNER]
@@ -1715,7 +1715,7 @@ func (m *Messenger) GetRevealedAccountsForAllMembers(communityID types.HexBytes)
 	}
 	membersRevealedAccounts := map[string][]*protobuf.RevealedAccount{}
 	for _, memberPubKey := range community.GetMemberPubkeys() {
-		memberPubKeyStr := common.PubkeyToHex(memberPubKey)
+		memberPubKeyStr := crypto.PubkeyToHex(memberPubKey)
 		accounts, err := m.communitiesManager.GetRevealedAddresses(communityID, memberPubKeyStr)
 		if err != nil {
 			return nil, err
@@ -1938,7 +1938,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 
 	if community.IsControlNode() {
 		// If we are the control node, we send the response to the user
-		pk, err := common.HexToPubkey(requestToJoin.PublicKey)
+		pk, err := crypto.HexToPubkey(requestToJoin.PublicKey)
 		if err != nil {
 			return nil, err
 		}
@@ -2434,7 +2434,7 @@ func (m *Messenger) InitCommunityFilters(c messagingtypes.CommunitiesToInitializ
 
 func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.ChatsToInitialize {
 	cID := o.IDString()
-	uncompressedPubKey := common.PubkeyToHex(o.PublicKey())[2:]
+	uncompressedPubKey := crypto.PubkeyToHex(o.PublicKey())[2:]
 	memberUpdateChannelID := o.MemberUpdateChannelID()
 
 	communityPubsubTopic := o.PubsubTopic()
@@ -3006,7 +3006,7 @@ func (m *Messenger) AllNonApprovedCommunitiesRequestsToJoin() ([]*communities.Re
 }
 
 func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) (*MessengerResponse, error) {
-	publicKey, err := common.HexToPubkey(pkString)
+	publicKey, err := crypto.HexToPubkey(pkString)
 	if err != nil {
 		return nil, err
 	}
@@ -3265,7 +3265,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 
 	// Check if we have been removed from a chat (ie no longer have access)
 	for channelID, changes := range communityResponse.Changes.ChatsModified {
-		if _, ok := changes.MembersRemoved[common.PubkeyToHex(&m.identity.PublicKey)]; ok {
+		if _, ok := changes.MembersRemoved[crypto.PubkeyToHex(&m.identity.PublicKey)]; ok {
 			chatID := community.ChatID(channelID)
 
 			if chat, ok := state.AllChats.Load(chatID); ok {
@@ -3482,7 +3482,7 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 	// Currently this type of msg coming from the control node.
 	// If it will change in the future, check that events types starting from
 	// CONTROL_NODE were sent by a control node
-	isControlNodeMsg := common.IsPubKeyEqual(community.ControlNode(), signer)
+	isControlNodeMsg := crypto.IsPubKeyEqual(community.ControlNode(), signer)
 	if !isControlNodeMsg {
 		return errors.New(ErrSyncMessagesSentByNonControlNode)
 	}
@@ -3534,7 +3534,7 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 
 	m.logger.Info("share address to the new owner ", zap.String("community id", community.IDString()))
 
-	pk := common.PubkeyToHex(&m.identity.PublicKey)
+	pk := crypto.PubkeyToHex(&m.identity.PublicKey)
 
 	requestToJoin, err := m.communitiesManager.GetCommunityRequestToJoinWithRevealedAddresses(pk, community.ID())
 	if err != nil {
@@ -4430,7 +4430,7 @@ func (m *Messenger) getSharedAddresses(communityID types.HexBytes, requestAddres
 	}
 
 	if len(requestAddresses) == 0 {
-		sharedAddresses, err := m.GetRevealedAccounts(communityID, common.PubkeyToHex(&m.identity.PublicKey))
+		sharedAddresses, err := m.GetRevealedAccounts(communityID, crypto.PubkeyToHex(&m.identity.PublicKey))
 		if err != nil {
 			return nil, err
 		}
@@ -4624,7 +4624,7 @@ func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID types.HexB
 	membersForAddresses := map[string]*Contact{}
 
 	for _, memberPubKey := range community.GetMemberPubkeys() {
-		memberPubKeyStr := common.PubkeyToHex(memberPubKey)
+		memberPubKeyStr := crypto.PubkeyToHex(memberPubKey)
 		revealedAccounts, err := m.communitiesManager.GetRevealedAddresses(communityID, memberPubKeyStr)
 		if err != nil {
 			return nil, err
@@ -4648,7 +4648,7 @@ func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID types.HexB
 
 func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) {
 	// Process any community changes
-	pkString := common.PubkeyToHex(&m.identity.PublicKey)
+	pkString := crypto.PubkeyToHex(&m.identity.PublicKey)
 	for _, changes := range messageState.Response.CommunityChanges {
 		if changes.ShouldMemberJoin {
 			response, err := m.joinCommunity(context.TODO(), changes.Community.ID(), false)
@@ -4877,7 +4877,7 @@ func (m *Messenger) DeleteCommunityMemberMessages(request *requests.DeleteCommun
 		return nil, communities.ErrNotEnoughPermissions
 	}
 
-	memberPubKey, err := common.HexToPubkey(request.MemberPubKey)
+	memberPubKey, err := crypto.HexToPubkey(request.MemberPubKey)
 	if err != nil {
 		return nil, err
 	}

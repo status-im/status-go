@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -93,7 +94,7 @@ func (s *MessengerShareMessageSuite) TestImageMessageSharing() {
 	shareResponse, err := s.m.ShareImageMessage(
 		&requests.ShareImageMessage{
 			MessageID: MessageID,
-			Users:     []types.HexBytes{common.PubkeyToHexBytes(&theirMessenger.identity.PublicKey)},
+			Users:     []types.HexBytes{crypto.PubkeyToHexBytes(&theirMessenger.identity.PublicKey)},
 		},
 	)
 

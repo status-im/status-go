@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	prot_common "github.com/status-im/status-go/protocol/common"
 )
 
 func GetSigner(chainID uint64, from types.Address, privateKey *ecdsa.PrivateKey) bind.SignerFn {
@@ -30,7 +29,7 @@ func DeserializePublicKey(compressedKey string) (types.HexBytes, error) {
 	secp256k1Code := "fe701"
 	pubKeyBytes := "0x" + strings.TrimPrefix(rawKey, secp256k1Code)
 
-	pubKey, err := prot_common.HexToPubkey(pubKeyBytes)
+	pubKey, err := crypto.HexToPubkey(pubKeyBytes)
 	if err != nil {
 		return nil, err
 	}

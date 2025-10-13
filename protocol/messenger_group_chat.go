@@ -725,10 +725,10 @@ func (m *Messenger) leaveGroupChat(ctx context.Context, response *MessengerRespo
 		return nil, ErrChatNotFound
 	}
 
-	amIMember := chat.HasMember(common.PubkeyToHex(&m.identity.PublicKey))
+	amIMember := chat.HasMember(crypto.PubkeyToHex(&m.identity.PublicKey))
 
 	if amIMember {
-		chat.RemoveMember(common.PubkeyToHex(&m.identity.PublicKey))
+		chat.RemoveMember(crypto.PubkeyToHex(&m.identity.PublicKey))
 
 		group, err := newProtocolGroupFromChat(chat)
 		if err != nil {

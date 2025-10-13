@@ -1270,7 +1270,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 		Clock:       4,
 		Timestamp:   1,
 		Text:        "some text",
-		ChatId:      common.PubkeyToHex(&s.m.identity.PublicKey),
+		ChatId:      crypto.PubkeyToHex(&s.m.identity.PublicKey),
 		MessageType: protobuf.MessageType_ONE_TO_ONE,
 		ContentType: protobuf.ChatMessage_CONTACT_REQUEST,
 	}
