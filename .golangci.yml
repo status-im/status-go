@@ -63,9 +63,7 @@ formatters:
       simplify: true
     goimports:
       local-prefixes:
-        - github.com/ethereum/go-ethereum
         - github.com/status-im/status-go
-        - github.com/waku-org/go-waku
   exclusions:
     generated: strict
     paths:
