@@ -250,15 +250,17 @@ type MarketDataProxyConfig struct {
 // there's a function called `startNode` will log NodeConfig which include WalletConfig
 func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Enabled                             bool `json:"Enabled"`
-		EnableMercuryoProvider              bool `json:"EnableMercuryoProvider"`
-		TokensListsAutoRefreshInterval      int  `json:"TokensListsAutoRefreshInterval"`
-		TokensListsAutoRefreshCheckInterval int  `json:"TokensListsAutoRefreshCheckInterval"`
+		Enabled                             bool                      `json:"Enabled"`
+		EnableMercuryoProvider              bool                      `json:"EnableMercuryoProvider"`
+		TokensListsAutoRefreshInterval      int                       `json:"TokensListsAutoRefreshInterval"`
+		TokensListsAutoRefreshCheckInterval int                       `json:"TokensListsAutoRefreshCheckInterval"`
+		MulticallOverrides                  map[uint64]common.Address `json:"MulticallOverrides"`
 	}{
 		Enabled:                             wc.Enabled,
 		EnableMercuryoProvider:              wc.EnableMercuryoProvider,
 		TokensListsAutoRefreshInterval:      wc.TokensListsAutoRefreshInterval,
 		TokensListsAutoRefreshCheckInterval: wc.TokensListsAutoRefreshCheckInterval,
+		MulticallOverrides:                  wc.MulticallOverrides,
 	})
 }
 
