@@ -14,16 +14,16 @@ from clients.expvar import ExpvarClient
 from clients.metrics import Events, StatusGoMetrics
 from clients.rpc import RpcClient
 from clients.services.accounts import AccountService
+from clients.services.appgeneral import AppgeneralService
 from clients.services.connector import ConnectorService
+from clients.services.eth import EthService
+from clients.services.multiaccounts import MultiAccountsService
 from clients.services.settings import SettingsService
 from clients.services.wakuext import (
     WakuextService,
     PushNotificationRegistrationTokenType,
 )
 from clients.services.wallet import WalletService
-from clients.services.multiaccounts import MultiAccountsService
-from clients.services.appgeneral import AppgeneralService
-from clients.services.eth import EthService
 from clients.signals import SignalClient, SignalType
 from clients.statusgo_container import StatusBackendContainer
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
@@ -374,7 +374,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         response = self.api_request(method, data)
         return response.content.decode()
 
-    def input_connection_string_for_bootstrapping(self, connection_string):
+    def input_connection_string_for_bootstrapping(self, connection_string, **kwargs):
         method = "InputConnectionStringForBootstrappingV2"
         # Empty user
         user = Account(
@@ -386,7 +386,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = {
             "connectionString": connection_string,
             "receiverClientConfig": {
-                "receiverConfig": {"createAccount": self._create_account_request(user)},
+                "receiverConfig": {"createAccount": self._create_account_request(user, **kwargs)},
                 "clientConfig": {},
             },
         }

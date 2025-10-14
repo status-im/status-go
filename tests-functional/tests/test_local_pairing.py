@@ -1,12 +1,14 @@
 import re
+
 import pytest
+
 from clients.api import ApiResponseError
 from clients.services.wakuext import ActivityCenterNotificationType, ContactRequestState
 from clients.signals import SignalType, LocalPairingEventType, LocalPairingEventAction
 from clients.status_backend import StatusBackend
 from resources.constants import Account
-from steps.messenger import MessengerSteps
 from resources.enums import MessageContentType
+from steps.messenger import MessengerSteps
 
 
 def check_server_sender_events(events):
@@ -119,9 +121,9 @@ def wait_for_action_of_type(backend: StatusBackend, action, type):
     )
 
 
-def pair_server_as_sender(sender, receiver, message_sync_enabled=False):
+def pair_server_as_sender(sender, receiver, message_sync_enabled=False, waku_light_client=False):
     connection_string = sender.get_connection_string_for_bootstrapping_another_device(message_sync_enabled)
-    response = receiver.input_connection_string_for_bootstrapping(connection_string)
+    response = receiver.input_connection_string_for_bootstrapping(connection_string, waku_light_client=waku_light_client)
     assert response["error"] is None
     assert response["keyUID"] == sender.key_uid
 
@@ -174,10 +176,11 @@ class TestLocalPairing(MessengerSteps):
         backend.wakuext_service.start_messenger()
         return backend
 
-    def test_pairing_server_as_sender(self):
+    @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["waku_light_client_False", "waku_light_client_True"])
+    def test_pairing_server_as_sender(self, waku_light_client):
         # Create users
-        alice = self.initialize_backend(self.await_signals, False)
-        bob = self.initialize_backend(self.await_signals, False)
+        alice = self.initialize_backend(self.await_signals, privileged=False)
+        bob = self.initialize_backend(self.await_signals, privileged=False)
 
         bob_second_device = StatusBackend(self.await_signals)
         bob_second_device.init_status_backend()
@@ -218,7 +221,7 @@ class TestLocalPairing(MessengerSteps):
         assert messages_map[message_id2]["text"] == "hello bob"
 
         # Local pairing WITH message syncing
-        pair_server_as_sender(bob, bob_second_device, True)
+        pair_server_as_sender(bob, bob_second_device, True, waku_light_client=waku_light_client)
 
         # Check sender signals
         events = bob.get_all_events(signal_type=SignalType.LOCAL_PAIRING.value)
@@ -299,7 +302,8 @@ class TestLocalPairing(MessengerSteps):
         messages = bob_second_device.wakuext_service.chat_messages(sender_chat_id, limit=10)["messages"]
         assert messages is None, "Messages found on paired device wrongly"
 
-    def test_pairing_three_devices(self):
+    @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["waku_light_client_False", "waku_light_client_True"])
+    def test_pairing_three_devices(self, waku_light_client):
         # Create users
         bob1 = self.initialize_backend(self.await_signals, False)
         bob2 = StatusBackend(self.await_signals)
@@ -323,7 +327,7 @@ class TestLocalPairing(MessengerSteps):
         login_paired_device(bob2, bob1.key_uid, bob1.password)
 
         # Pair third device from second device
-        pair_server_as_sender(bob2, bob3)
+        pair_server_as_sender(bob2, bob3, waku_light_client=waku_light_client)
 
         # Login on the third device
         login_paired_device(bob3, bob1.key_uid, bob1.password)
