@@ -34,6 +34,10 @@ var (
 		dBColumnName:   "backup_fetched",
 		valueHandler:   BoolHandler,
 	}
+	BackupPath = SettingField{
+		reactFieldName: "backup-path",
+		dBColumnName:   "backup_path",
+	}
 	ChaosMode = SettingField{
 		reactFieldName: "chaos-mode?",
 		dBColumnName:   "chaos_mode",
@@ -180,6 +184,11 @@ var (
 	LogLevel = SettingField{
 		reactFieldName: "log-level",
 		dBColumnName:   "log_level",
+	}
+	MessagesBackupEnabled = SettingField{
+		reactFieldName: "messages-backup-enabled?",
+		dBColumnName:   "messages_backup_enabled",
+		valueHandler:   BoolHandler,
 	}
 	MessagesFromContactsOnly = SettingField{
 		reactFieldName: "messages-from-contacts-only",
@@ -548,6 +557,7 @@ var (
 		AutoMessageEnabled,
 		BackupEnabled,
 		BackupFetched,
+		BackupPath,
 		Bio,
 		ChaosMode,
 		CollectibleGroupByCollection,
@@ -577,6 +587,7 @@ var (
 		LinkPreviewRequestEnabled,
 		LinkPreviewsEnabledSites,
 		LogLevel,
+		MessagesBackupEnabled,
 		MessagesFromContactsOnly,
 		Mnemonic,
 		MnemonicRemoved,

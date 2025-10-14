@@ -40,7 +40,7 @@ func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallati
 		return nil, err
 	}
 
-	if err = m.SyncDevices(context.Background(), "", "", nil); err != nil {
+	if err = m.SyncDevices(context.Background(), "", "", false, nil); err != nil {
 		return nil, err
 	}
 
@@ -157,9 +157,12 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, targetInstallation
 }
 
 // SyncDevices sends all public chats and contacts to paired devices
+// Also sends all messages if enabled
 // TODO remove use of photoPath in contacts
-func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, rawMessageHandler RawMessageHandler) (err error) {
+func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, messageSyncEnabled bool, rawMessageHandler RawMessageHandler) (err error) {
+	isLocalPairing := true
 	if rawMessageHandler == nil {
+		isLocalPairing = false
 		rawMessageHandler = m.dispatchMessage
 	}
 
@@ -310,6 +313,15 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
+	// Only sync messages when enabled by the user and on local pairing
+	// This is to avoid as much as possible the possibility of breaching user privacy
+	if messageSyncEnabled && isLocalPairing {
+		err = m.syncMessages(ctx, rawMessageHandler)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -448,6 +460,44 @@ func (m *Messenger) syncProfilePicturesFromDatabase(rawMessageHandler RawMessage
 		return err
 	}
 	return m.syncProfilePictures(rawMessageHandler, identityImages)
+}
+
+func (m *Messenger) syncMessages(ctx context.Context, rawMessageHandler RawMessageHandler) error {
+	backupMessages, err := m.persistence.AllMessagesForBackup()
+	if err != nil {
+		return err
+	}
+
+	// Sync messages in batches of 100
+	batchSize := 100
+	for i := 0; i < len(backupMessages); i += batchSize {
+		end := i + batchSize
+		if end > len(backupMessages) {
+			end = len(backupMessages)
+		}
+		batch := backupMessages[i:end]
+		batchMsg := &protobuf.BackedUpMessageBatch{Messages: batch}
+
+		encodedMessage, err := proto.Marshal(batchMsg)
+		if err != nil {
+			return err
+		}
+
+		_, chat := m.getLastClockWithRelatedChat()
+		rawMessage := common.RawMessage{
+			LocalChatID: chat.ID,
+			Payload:     encodedMessage,
+			MessageType: protobuf.ApplicationMetadataMessage_BACKED_UP_MESSAGE_BATCH,
+			ResendType:  common.ResendTypeDataSync,
+		}
+
+		_, err = rawMessageHandler(ctx, rawMessage)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (m *Messenger) InitInstallations() error {

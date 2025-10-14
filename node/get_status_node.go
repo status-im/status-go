@@ -2,11 +2,14 @@ package node
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -15,9 +18,12 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 
 	"github.com/status-im/status-go/account"
+	devicescommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/node/backup"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
@@ -41,6 +47,7 @@ import (
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/updates"
+	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/web3provider"
@@ -117,6 +124,8 @@ type StatusNode struct {
 	walletFeed   event.Feed
 	networksFeed event.Feed
 	settingsFeed event.Feed
+
+	localBackup *backup.Controller
 }
 
 // New makes new instance of StatusNode.
@@ -216,6 +225,94 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 	return n.startWithDB(config, options.AccountsManager)
 }
 
+func (n *StatusNode) StartLocalBackup(privateKey *ecdsa.PrivateKey) error {
+	if n.localBackup != nil {
+		return errors.New("local backup already started")
+	}
+
+	backupPath, err := n.accountsSrvc.GetBackupPath()
+	if err != nil {
+		return err
+	}
+	if backupPath == "" {
+		// No path set yet, set it to the user's config directory
+		dir, err := os.UserConfigDir()
+		// We do not return the error as it's not a major issue
+		if err != nil {
+			n.logger.Error("failed to get user config dir", zap.Error(err))
+		} else {
+			err = n.accountsSrvc.SetBackupPath(filepath.Join(dir, "Status", "backups"))
+			if err != nil {
+				n.logger.Error("failed to set backup path", zap.Error(err))
+			}
+		}
+	}
+
+	filenameGetter := func() (string, error) {
+		backupPath, err := n.accountsSrvc.GetBackupPath()
+		if err != nil {
+			return "", err
+		}
+
+		compressedPubKey, err := utils.SerializePublicKey(crypto.CompressPubkey(&privateKey.PublicKey))
+		if err != nil {
+			return "", err
+		}
+
+		var backupDir string
+		if backupPath != "" {
+			backupDir = backupPath
+		} else {
+			// If we still have an issue, hardcode to known paths
+			if devicescommon.OperatingSystemIs(devicescommon.AndroidPlatform) {
+				backupDir = "/storage/emulated/0/Documents/Status/Backups"
+			} else if devicescommon.OperatingSystemIs(devicescommon.IOSPlatform) {
+				backupDir = filepath.Join("/Documents", "Status", "Backups")
+			} else {
+				return "", err
+			}
+		}
+
+		fullPath := filepath.Join(backupDir, fmt.Sprintf("%s_user_data.bkp", compressedPubKey[len(compressedPubKey)-6:]))
+
+		return fullPath, nil
+	}
+
+	n.localBackup, err = backup.NewController(backup.BackupConfig{
+		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
+		FileNameGetter: filenameGetter,
+		BackupEnabled:  true,
+		Interval:       time.Minute * 30,
+	}, n.logger.Named("LocalBackup"))
+	if err != nil {
+		return err
+	}
+
+	if n.accountsSrvc != nil {
+		n.localBackup.Register("settings", n.accountsSrvc)
+	}
+
+	if n.walletSrvc != nil {
+		n.localBackup.Register("wallet", n.walletSrvc)
+	}
+
+	if n.statusPublicSrvc != nil {
+		n.localBackup.Register("messenger", n.statusPublicSrvc.Messenger())
+	}
+
+	n.localBackup.Start()
+
+	return nil
+}
+
+func (n *StatusNode) PerformLocalBackup() (string, error) {
+	return n.localBackup.PerformBackup()
+}
+
+func (n *StatusNode) LoadLocalBackup(filePath string) error {
+	return n.localBackup.LoadBackup(filePath)
+}
+
 func (n *StatusNode) SetMediaServerEnableTLS(enableTLS *bool) {
 	n.mediaServerEnableTLS = enableTLS
 }
@@ -302,6 +399,11 @@ func (n *StatusNode) Stop() error {
 
 	if !n.isRunning() {
 		return ErrNoRunningNode
+	}
+
+	if n.localBackup != nil {
+		n.localBackup.Stop()
+		n.localBackup = nil
 	}
 
 	return n.stop()

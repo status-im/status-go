@@ -8,6 +8,7 @@ const (
 
 	ArchivesRelativePath        = "data/archivedata"
 	TorrentTorrentsRelativePath = "data/torrents"
+	BackupsRelativePath         = "backups"
 
 	// SendTransactionMethodName https://docs.walletconnect.com/advanced/rpc-reference/ethereum-rpc#eth_sendtransaction
 	SendTransactionMethodName = "eth_sendTransaction"

@@ -55,12 +55,14 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rm
 		return nil, nil, nil, fmt.Errorf("keyUID not equal")
 	}
 
+	messageSyncEnabled := s.backend.LocalPairingStateManager.IsMessageSyncEnabled()
+
 	messenger.SetLocalPairing(true)
 	defer func() {
 		messenger.SetLocalPairing(false)
 	}()
 	rawMessageCollector := new(RawMessageCollector)
-	err = messenger.SyncDevices(context.TODO(), currentAccount.Name, currentAccount.Identicon, rawMessageCollector.dispatchMessage)
+	err = messenger.SyncDevices(context.TODO(), currentAccount.Name, currentAccount.Identicon, messageSyncEnabled, rawMessageCollector.dispatchMessage)
 	if err != nil {
 		return
 	}

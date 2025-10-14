@@ -146,6 +146,7 @@ func (b *GethStatusBackend) initialize() {
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
 	b.LocalPairingStateManager = new(statecontrol.ProcessStateManager)
 	b.LocalPairingStateManager.SetPairing(false)
+	b.LocalPairingStateManager.SetMessageSyncEnabled(false)
 }
 
 // StatusNode returns reference to node manager
@@ -2773,6 +2774,16 @@ func (b *GethStatusBackend) SelectAccount(loginParams account.LoginParams) error
 		return err
 	}
 
+	chatAccount, err := b.accountManager.SelectedChatAccount()
+	if err != nil {
+		return err
+	}
+
+	if err = b.statusNode.StartLocalBackup(chatAccount.AccountKey.PrivateKey); err != nil {
+		b.logger.Error("failed to start local backup", zap.Error(err))
+		// we don't return the error to avoid login failure
+	}
+
 	return nil
 }
 
@@ -2881,6 +2892,7 @@ func (b *GethStatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2
 
 // SignGroupMembership signs a piece of data containing membership information
 func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) {
+	fmt.Println("SignGroupMembership")
 	selectedChatAccount, err := b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return "", err

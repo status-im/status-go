@@ -63,6 +63,15 @@ func (api *SettingsAPI) NewsRSSEnabled() (bool, error) {
 	return api.db.NewsRSSEnabled()
 }
 
+// Backup Settings
+func (api *SettingsAPI) BackupPath() (string, error) {
+	return api.db.BackupPath()
+}
+
+func (api *SettingsAPI) MessagesBackupEnabled() (bool, error) {
+	return api.db.MessagesBackupEnabled()
+}
+
 // Notifications Settings
 func (api *SettingsAPI) NotificationsGetAllowNotifications() (bool, error) {
 	return api.db.GetAllowNotifications()

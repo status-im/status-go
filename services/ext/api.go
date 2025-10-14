@@ -1015,7 +1015,7 @@ func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.Messe
 }
 
 func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) error {
-	return api.service.messenger.SyncDevices(ctx, name, picture, nil)
+	return api.service.messenger.SyncDevices(ctx, name, picture, false, nil)
 }
 
 // Deprecated: Use EnableInstallationAndSync instead

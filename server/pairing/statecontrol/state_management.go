@@ -19,6 +19,9 @@ type ProcessStateManager struct {
 	pairing     bool
 	pairingLock sync.Mutex
 
+	messageSyncEnabled bool
+	messageSyncLock    sync.Mutex
+
 	// sessions represents a map[string]bool:
 	// where string is a ConnectionParams string and bool is the transfer success state of that connection string
 	sessions sync.Map
@@ -36,6 +39,20 @@ func (psm *ProcessStateManager) SetPairing(state bool) {
 	psm.pairingLock.Lock()
 	defer psm.pairingLock.Unlock()
 	psm.pairing = state
+}
+
+// IsMessageSyncEnabled returns if syncing messages is enabled by the User
+func (psm *ProcessStateManager) IsMessageSyncEnabled() bool {
+	psm.messageSyncLock.Lock()
+	defer psm.messageSyncLock.Unlock()
+	return psm.messageSyncEnabled
+}
+
+// SetMessageSyncEnabled sets the ProcessStateManager message sync state
+func (psm *ProcessStateManager) SetMessageSyncEnabled(state bool) {
+	psm.messageSyncLock.Lock()
+	defer psm.messageSyncLock.Unlock()
+	psm.messageSyncEnabled = state
 }
 
 // RegisterSession stores a sessionName with the default false value.

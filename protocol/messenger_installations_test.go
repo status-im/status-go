@@ -266,7 +266,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	// sync
-	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
+	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", false, nil)
 	s.Require().NoError(err)
 
 	var allChats []*Chat
