@@ -38,7 +38,18 @@
         };
         overlays = [
           pkgsOverlay
-          (final: prev: { nwaku = nwaku.packages.${system}; })
+          (final: prev: {
+            # Make nwaku available
+            nwaku = nwaku.packages.${system};
+
+            # 🧩 Add nim-sds dependency here (fetched once, no git clone)
+            nim-sds = prev.fetchFromGitHub {
+              owner = "waku-org";
+              repo = "nim-sds";
+              rev = "23d001adb94436d886d66258a11ae19669ac8f71";
+              sha256 = "sha256-2z/3VTWkN3UW3NdX6S+QK0s4sCdEqbRJRkKJQig7fJc=";
+            };
+          })
         ];
       }
     );
@@ -47,13 +58,35 @@
       default = pkgsFor.${system}.callPackage ./nix/shell.nix { };
     });
 
-    packages = forAllSystems (system: let
-      pkgs = pkgsFor.${system};
-      statusGo = import ./nix/pkgs/status-go { inherit self pkgs; };
-    in {
-      status-go-library = statusGo.library;
-      status-go-mobile-android = statusGo.mobile.android {};
-      status-go-mobile-ios = statusGo.mobile.ios {};
-    });
+    packages = forAllSystems (system:
+      let
+        pkgs = pkgsFor.${system};
+
+        # Import your Status Go packaging logic
+        statusGo = import ./nix/pkgs/status-go {
+          inherit self pkgs;
+        };
+
+        # 🧠 Wrap library to patch Makefile automatically
+        statusGoLibrary = pkgs.stdenv.mkDerivation {
+          inherit (statusGo.library) pname version src buildInputs;
+
+          # Copy all attributes from existing derivation
+          # Then patch the offending Makefile
+          patchPhase = ''
+            echo "Patching sds Makefile to avoid network clone..."
+            substituteInPlace vendor/github.com/waku-org/sds-go-bindings/sds/Makefile \
+              --replace-warn "git clone https://github.com/waku-org/nim-sds" \
+                        "cp -r ${pkgs.nim-sds} nim-sds"
+          '';
+
+          # Reuse buildPhase etc. if needed
+          inherit (statusGo.library) buildPhase installPhase;
+        };
+      in {
+        status-go-library = statusGoLibrary;
+        status-go-mobile-android = statusGo.mobile.android { };
+        status-go-mobile-ios = statusGo.mobile.ios { };
+      });
   };
 }
