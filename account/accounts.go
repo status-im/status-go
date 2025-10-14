@@ -21,6 +21,7 @@ import (
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/account/generator"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -99,10 +100,9 @@ type DefaultManager struct {
 	accountsGenerator *generator.Generator
 	onboarding        *Onboarding
 
-	selectedChatAccount           *SelectedExtKey // account that was processed during the last call to SelectAccount()
-	selectedChatAccountPrivateKey *ecdsa.PrivateKey
-	mainAccountAddress            types.Address
-	watchAddresses                []types.Address
+	selectedChatAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
+	mainAccountAddress  types.Address
+	watchAddresses      []types.Address
 
 	logger *zap.Logger
 }

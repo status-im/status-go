@@ -322,7 +322,6 @@ func TestDatabase_BackupPath(t *testing.T) {
 	require.Equal(t, testPath, settings.BackupPath)
 }
 
-
 func TestDatabase_MessagesBackupEnabled(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
