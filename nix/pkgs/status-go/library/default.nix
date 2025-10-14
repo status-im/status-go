@@ -47,6 +47,14 @@ in pkgs.buildGoModule {
   # ld flags and netgo tag are necessary for integration tests to work on MacOS
   # https://github.com/status-im/status-mobile/issues/20135
   buildPhase = ''
+    # Set Go cache inside writable directory
+    export GOCACHE=$NIX_BUILD_TOP/.gocache
+    mkdir -p $GOCACHE
+
+    # make sure Go modules build correctly
+    export GOPATH=$NIX_BUILD_TOP/go
+    export GO111MODULE=on
+
     runHook preBuild
     go build \
       -buildmode='c-archive' \
