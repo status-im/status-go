@@ -63,16 +63,16 @@
         pkgs = pkgsFor.${system};
 
         # Import your Status Go packaging logic
-        statusGo = import ./nix/pkgs/status-go {
-          inherit self pkgs;
-        };
-
-        # 🧠 Wrap library to patch Makefile automatically
+        statusGo = import ./nix/pkgs/status-go { inherit self pkgs; };
+      in
+      let
         statusGoLibrary = pkgs.stdenv.mkDerivation {
-          inherit (statusGo.library) pname version src buildInputs;
+          inherit (statusGo.library) pname version src nativeBuildInputs;
 
-          # Copy all attributes from existing derivation
-          # Then patch the offending Makefile
+          # Add Go, git, and GNU Make
+          buildInputs = statusGo.library.buildInputs ++ [ pkgs.go pkgs.git pkgs.gnumake pkgs.protobuf ];
+
+          # Patch sds Makefile to avoid network clone
           patchPhase = ''
             echo "Patching sds Makefile to avoid network clone..."
             substituteInPlace vendor/github.com/waku-org/sds-go-bindings/sds/Makefile \
@@ -81,7 +81,7 @@
           '';
 
           # Reuse buildPhase etc. if needed
-          inherit (statusGo.library) buildPhase installPhase;
+          inherit (statusGo.library) preBuild buildPhase installPhase;
         };
       in {
         status-go-library = statusGoLibrary;
