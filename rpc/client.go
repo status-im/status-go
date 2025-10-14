@@ -62,7 +62,7 @@ type ClientInterface interface {
 }
 
 type EthClientGetter interface {
-	GetEthClient(chainID uint64) (ethclient.EthClientInterface, error)
+	EthClient(chainID uint64) (ethclient.EthClientInterface, error)
 }
 
 // Client represents RPC client with custom routing

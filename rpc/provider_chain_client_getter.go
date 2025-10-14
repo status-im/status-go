@@ -14,6 +14,6 @@ func NewProviderChainClientGetter(provider string, client ClientInterface) *Prov
 	}
 }
 
-func (c *ProviderChainClientGetter) GetEthClient(chainID uint64) (ethclient.EthClientInterface, error) {
+func (c *ProviderChainClientGetter) EthClient(chainID uint64) (ethclient.EthClientInterface, error) {
 	return c.client.EthClientWithProvider(chainID, c.provider)
 }

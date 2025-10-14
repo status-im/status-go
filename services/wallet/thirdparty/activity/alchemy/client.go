@@ -31,7 +31,7 @@ func (c *Client) IsConnected() bool {
 }
 
 func (c *Client) IsChainSupported(chainID wc.ChainID) bool {
-	client, err := c.ethClientGetter.GetEthClient(uint64(chainID))
+	client, err := c.ethClientGetter.EthClient(uint64(chainID))
 	return err == nil && client != nil
 }
 
@@ -144,7 +144,7 @@ func (c *Client) FetchTransfers(ctx context.Context, chainID uint64, parameters 
 }
 
 func (c *Client) fetchActivity(ctx context.Context, chainID uint64, parameters GetAssetTransfersParams) (*GetAssetTranfersResponse, error) {
-	client, err := c.ethClientGetter.GetEthClient(chainID)
+	client, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
