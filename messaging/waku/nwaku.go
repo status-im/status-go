@@ -212,11 +212,11 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTo
 		}
 	}
 
-	var timesource gowakutimesource.Timesource
+	var wakuTimeSource gowakutimesource.Timesource
 	if ts != nil {
-		timesource = timesourceAdapter{ts}
+		wakuTimeSource = timesourceAdapter{ts}
 	} else {
-		timesource = timesource.Default()
+		wakuTimeSource = timesource.DefaultService()
 	}
 
 	cfg = setDefaults(cfg)
@@ -268,7 +268,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTo
 		dnsAddressCacheLock:             &sync.RWMutex{},
 		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
 		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
-		timesource:                      timesource,
+		timesource:                      wakuTimeSource,
 		storeMsgIDsMu:                   sync.RWMutex{},
 		logger:                          logger,
 		discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,
