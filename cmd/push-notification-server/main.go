@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/params"
@@ -27,7 +28,6 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -141,7 +141,7 @@ func main() {
 				ClusterID:            16,
 			},
 			InstallationID: installationID,
-			TimeSource:     timesource.Default(),
+			TimeSource:     timesource.DefaultService(),
 		},
 		messaging.WithLogger(logger.Named("messaging")),
 	)

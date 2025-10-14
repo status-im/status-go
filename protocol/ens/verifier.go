@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+
 	gocommon "github.com/status-im/status-go/common"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/internal/timesource"
@@ -18,14 +19,14 @@ type Verifier struct {
 	online          bool
 	persistence     *Persistence
 	logger          *zap.Logger
-	timesource      timesource.TimeSource
+	timesource      timesource.Provider
 	subscriptions   []chan []*VerificationRecord
 	rpcEndpoint     string
 	contractAddress string
 	quit            chan struct{}
 }
 
-func New(logger *zap.Logger, timesource timesource.TimeSource, db *sql.DB, rpcEndpoint, contractAddress string) *Verifier {
+func New(logger *zap.Logger, timesource timesource.Provider, db *sql.DB, rpcEndpoint, contractAddress string) *Verifier {
 	persistence := NewPersistence(db)
 	return &Verifier{
 		logger:          logger,

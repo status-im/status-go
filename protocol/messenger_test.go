@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -24,7 +25,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/timesource"
 )
 
 const (
