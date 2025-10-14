@@ -73,10 +73,14 @@ func NewTokenLists(appDb *sql.DB, walletDb *sql.DB) (*TokenLists, error) {
 // The auto-refresh interval is used to fetch the list of token lists from the remote source and update the local cache.
 // The auto-refresh check interval is used to check if the auto-refresh should be triggered.
 func (t *TokenLists) Start(ctx context.Context, remoteListUrl string, autoRefreshInterval time.Duration,
-	autoRefreshCheckInterval time.Duration) {
+	autoRefreshCheckInterval time.Duration, thirdpartyServicesEnabled bool) {
 	err := t.initializeTokensLists()
 	if err != nil {
 		logutils.ZapLogger().Error("Failed to initialize token lists", zap.Error(err))
+	}
+
+	if !thirdpartyServicesEnabled {
+		return
 	}
 
 	t.tokenListsFetcher.SetURLOfRemoteListOfTokenLists(remoteListUrl)

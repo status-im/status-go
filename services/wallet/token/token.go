@@ -24,6 +24,7 @@ import (
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/communities/token"
@@ -83,6 +84,7 @@ type ManagerInterface interface {
 type Manager struct {
 	balancefetcher.BalanceFetcher
 	db                   *sql.DB
+	settings             *settings.Database
 	RPCClient            rpc.ClientInterface
 	ContractMaker        *contracts.ContractMaker
 	networkManager       network.ManagerInterface
@@ -113,6 +115,11 @@ func NewTokenManager(
 ) *Manager {
 	maker, _ := contracts.NewContractMaker(RPCClient)
 
+	settings, err := settings.MakeNewDB(appDB)
+	if err != nil {
+		return nil
+	}
+
 	tokensLists, err := tokenlists.NewTokenLists(appDB, db)
 	if err != nil {
 		logutils.ZapLogger().Error("Failed to create token lists", zap.Error(err))
@@ -122,6 +129,7 @@ func NewTokenManager(
 	return &Manager{
 		BalanceFetcher:       balancefetcher.NewDefaultBalanceFetcher(maker),
 		db:                   db,
+		settings:             settings,
 		RPCClient:            RPCClient,
 		ContractMaker:        maker,
 		networkManager:       networkManager,
@@ -140,9 +148,15 @@ func (tm *Manager) Start(ctx context.Context, autoRefreshInterval time.Duration,
 	tm.stopCh = make(chan struct{})
 	tm.startAccountsWatcher()
 
+	thirdpartyServicesEnabled, err := tm.settings.ThirdpartyServicesEnabled()
+	if err != nil {
+		logutils.ZapLogger().Error("failed to get if thirdparty services are enabled", zap.Error(err))
+		return
+	}
+
 	// For now we don't have the list of tokens lists remotely set so we're uisng the harcoded default lists. Once we have it
 	//we will just need to update the empty string with the correct URL.
-	tm.tokenLists.Start(ctx, fetcher.RemoteListOfTokenLists, autoRefreshInterval, autoRefreshCheckInterval)
+	tm.tokenLists.Start(ctx, fetcher.RemoteListOfTokenLists, autoRefreshInterval, autoRefreshCheckInterval, thirdpartyServicesEnabled)
 }
 
 func (tm *Manager) startAccountsWatcher() {

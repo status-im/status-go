@@ -226,8 +226,9 @@ func TestSolvingCollision(t *testing.T) {
 	// start the auto-refresh process with a 5 second interval, and 1 second check interval
 	const autoRefreshInterval = 3 * time.Second
 	const autoRefreshCheckInterval = 1 * time.Second
+	const thirdpartyServicesEnabled = true
 
-	tokensLists.Start(context.Background(), server.URL, autoRefreshInterval, autoRefreshCheckInterval)
+	tokensLists.Start(context.Background(), server.URL, autoRefreshInterval, autoRefreshCheckInterval, thirdpartyServicesEnabled)
 
 	// the token lists should not be updated
 	allTokens = tokensLists.GetUniqueTokens()
