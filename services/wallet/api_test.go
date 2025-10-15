@@ -1,65 +1,24 @@
-package wallet
+package wallet_test
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
-	"time"
 
-	"github.com/status-im/status-go/params/networkhelper"
-	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/rpc/network/testutil"
-
-	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 
-	"go.uber.org/mock/gomock"
-
-	mock_reader "github.com/status-im/status-go/services/wallet/mock/reader"
-	mock_onramp "github.com/status-im/status-go/services/wallet/onramp/mock"
-
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/wallet/onramp"
-	"github.com/status-im/status-go/services/wallet/requests"
-	"github.com/status-im/status-go/services/wallet/token"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/walletconnect"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/services/wallet"
 )
-
-// TestAPI_GetWalletConnectActiveSessions tames coverage
-func TestAPI_GetWalletConnectActiveSessions(t *testing.T) {
-	db, close := walletconnect.SetupTestDB(t)
-	defer close()
-	api := &API{
-		s: &Service{db: db},
-	}
-
-	sessions, err := api.GetWalletConnectActiveSessions(context.Background(), 0)
-	require.NoError(t, err)
-	require.Equal(t, 0, len(sessions))
-}
 
 // TestAPI_HashMessageEIP191
 func TestAPI_HashMessageEIP191(t *testing.T) {
-	api := &API{}
+	api := &wallet.API{}
 
 	res := api.HashMessageEIP191(context.Background(), []byte("test"))
 	require.Equal(t, "0x4a5c5d454721bbbb25540c3317521e71c373ae36458f960d2ad46ef088110e95", res.String())
 }
 
 func TestAPI_IsChecksumValidForAddress(t *testing.T) {
-	api := &API{}
+	api := &wallet.API{}
 
 	res, err := api.IsChecksumValidForAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	require.NoError(t, err)
@@ -68,219 +27,4 @@ func TestAPI_IsChecksumValidForAddress(t *testing.T) {
 	res, err = api.IsChecksumValidForAddress("0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa")
 	require.NoError(t, err)
 	require.True(t, res)
-}
-
-func TestAPI_GetCryptoOnRamps(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	provider0 := mock_onramp.NewMockProvider(ctrl)
-	id0 := "provider0"
-	provider0.EXPECT().ID().Return(id0).AnyTimes()
-	provider1 := mock_onramp.NewMockProvider(ctrl)
-	id1 := "provider1"
-	provider1.EXPECT().ID().Return(id1).AnyTimes()
-	providers := []onramp.Provider{provider0, provider1}
-	onrampManager := onramp.NewManager(providers)
-
-	api := &API{
-		s: &Service{cryptoOnRampManager: onrampManager},
-	}
-
-	ctx := context.Background()
-
-	// Check returned providers
-	provider0.EXPECT().GetCryptoOnRamp(ctx).Return(onramp.CryptoOnRamp{ID: id0}, nil)
-	provider1.EXPECT().GetCryptoOnRamp(ctx).Return(onramp.CryptoOnRamp{ID: id1}, nil)
-
-	retProviders, err := api.GetCryptoOnRamps(ctx)
-	require.NoError(t, err)
-	require.Equal(t, len(providers), len(retProviders))
-	require.Equal(t, id0, retProviders[0].ID)
-	require.Equal(t, id1, retProviders[1].ID)
-
-	// Check error handling
-	provider0.EXPECT().GetCryptoOnRamp(ctx).Return(onramp.CryptoOnRamp{}, errors.New("error"))
-	provider1.EXPECT().GetCryptoOnRamp(ctx).Return(onramp.CryptoOnRamp{ID: id1}, nil)
-	retProviders, err = api.GetCryptoOnRamps(ctx)
-	require.NoError(t, err)
-	require.Equal(t, 1, len(retProviders))
-	require.Equal(t, id1, retProviders[0].ID)
-
-	// Check URL retrieval
-	provider1.EXPECT().GetURL(ctx, onramp.Parameters{}).Return("url", nil)
-	url, err := api.GetCryptoOnRampURL(ctx, id1, onramp.Parameters{})
-	require.NoError(t, err)
-	require.Equal(t, "url", url)
-}
-
-func TestAPI_GetAddressDetails(t *testing.T) {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
-	defer appDB.Close()
-
-	accountsDb, err := accounts.NewDB(appDB)
-	require.NoError(t, err)
-	defer accountsDb.Close()
-
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-	defer db.Close()
-
-	accountsPublisher := pubsub.NewPublisher()
-
-	chainID := uint64(1)
-	address := "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-
-	// Create a new server that delays the response by 1 second
-	serverWith1SecDelay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(1 * time.Second)
-		fmt.Fprintln(w, `{"result": "0x10"}`)
-	}))
-	defer serverWith1SecDelay.Close()
-
-	networks := []params.Network{
-		*testutil.CreateNetwork(chainID, "Ethereum Mainnet", []params.RpcProvider{
-			*params.NewProxyProvider(chainID, "Test Provider", security.NewSensitiveString(serverWith1SecDelay.URL+"/nodefleet/"), false),
-		},
-		),
-	}
-
-	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, security.NewSensitiveString(gofakeit.Username()), security.NewSensitiveString(gofakeit.LetterN(5)))
-	require.NotEmpty(t, networks)
-
-	config := rpc.ClientConfig{
-		UpstreamChainID: chainID,
-		Networks:        networks,
-		DB:              appDB,
-	}
-	c, err := rpc.NewClient(config)
-	require.NoError(t, err)
-
-	tokenManager := token.NewTokenManager(db, c, nil, nil, appDB, nil, nil, nil, accountsDb, token.NewPersistence(db))
-
-	service := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, tokenManager, "")
-
-	api := &API{
-		s: service,
-	}
-
-	// Test getting address details using `GetAddressDetails` call, that always waits for the request to finish
-	details, err := api.GetAddressDetails(context.Background(), 1, address)
-	require.NoError(t, err)
-	require.Equal(t, true, details.HasActivity)
-
-	// empty params
-	details, err = api.AddressDetails(context.Background(), &requests.AddressDetails{})
-	require.Error(t, err)
-	require.ErrorIs(t, err, requests.ErrAddresInvalid)
-	require.Nil(t, details)
-
-	// no response longer than the set timeout
-	details, err = api.AddressDetails(context.Background(), &requests.AddressDetails{
-		Address:               address,
-		TimeoutInMilliseconds: 500,
-	})
-	require.NoError(t, err)
-	require.Equal(t, false, details.HasActivity)
-
-	// timeout longer than the response time
-	details, err = api.AddressDetails(context.Background(), &requests.AddressDetails{
-		Address:               address,
-		TimeoutInMilliseconds: 1200,
-	})
-	require.NoError(t, err)
-	require.Equal(t, true, details.HasActivity)
-
-	// specific chain and timeout longer than the response time
-	details, err = api.AddressDetails(context.Background(), &requests.AddressDetails{
-		Address:               address,
-		ChainIDs:              []uint64{chainID},
-		TimeoutInMilliseconds: 1200,
-	})
-	require.NoError(t, err)
-	require.Equal(t, true, details.HasActivity)
-}
-
-// TestAPI_FetchOrGetCachedWalletBalances
-func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
-	defer appDB.Close()
-
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	mockReader := mock_reader.NewMockReaderInterface(mockCtrl)
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, `{"result": "0x10"}`)
-	}))
-	defer server.Close()
-
-	chainID := uint64(1)
-
-	networks := []params.Network{
-		{
-			ChainID:   chainID,
-			ChainName: "Ethereum Mainnet",
-			RpcProviders: []params.RpcProvider{
-				{
-					ChainID:      chainID,
-					Name:         "Test Provider",
-					URL:          security.NewSensitiveString(server.URL + "/nodefleet/"),
-					Type:         params.EmbeddedProxyProviderType,
-					Enabled:      true,
-					AuthType:     params.BasicAuth,
-					AuthLogin:    security.NewSensitiveString("user1"),
-					AuthPassword: security.NewSensitiveString("pass1"),
-				},
-			},
-		},
-	}
-	config := rpc.ClientConfig{
-		UpstreamChainID: chainID,
-		Networks:        networks,
-		DB:              appDB,
-	}
-	c, err := rpc.NewClient(config)
-	require.NoError(t, err)
-
-	testTokenAddress1 := common.Address{0x34}
-	testAccAddress1 := common.Address{0x12}
-	storageToken := tokentypes.StorageToken{
-		Token: tokentypes.Token{
-			Name:     "USD Tether",
-			Symbol:   "USDT",
-			Decimals: 18,
-		},
-		BalancesPerChain: map[uint64]tokentypes.ChainBalance{
-			1: {
-				RawBalance: "1000000000000000000",
-				Balance:    nil,
-				Address:    testAccAddress1,
-				ChainID:    1,
-				HasError:   false,
-			},
-		},
-	}
-	expectedTokens := map[common.Address][]tokentypes.StorageToken{
-		testAccAddress1: {storageToken},
-	}
-
-	mockReader.EXPECT().FetchOrGetCachedWalletBalances(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(expectedTokens, nil)
-
-	service := &Service{
-		rpcClient: c,
-	}
-
-	api := &API{
-		s:      service,
-		reader: mockReader,
-	}
-
-	forceRefresh := true
-	balances, err := api.FetchOrGetCachedWalletBalances(context.Background(), []common.Address{testTokenAddress1}, forceRefresh)
-	require.NoError(t, err)
-	require.NotNil(t, balances)
 }

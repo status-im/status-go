@@ -2,12 +2,16 @@ package api
 
 import (
 	"context"
+	"fmt"
+	"math/big"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/wallet/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/services/wallet/tokenbalances"
 )
 
 var _ communities.NetworkManager = (*CommunitiesNetworkManager)(nil)
@@ -48,28 +52,52 @@ func (m *CommunitiesTokenManager) FindOrCreateTokenByAddress(ctx context.Context
 }
 
 type CommunitiesTokenBalanceManager struct {
-	tokenManager *token.Manager
+	tokenBalancesFetcher *tokenbalances.Fetcher
+	tokenBalancesStorage tokenbalances.Storage
 }
 
-func NewCommunitiesTokenBalanceManager(tm *token.Manager) *CommunitiesTokenBalanceManager {
-	return &CommunitiesTokenBalanceManager{tokenManager: tm}
+func NewCommunitiesTokenBalanceManager(f *tokenbalances.Fetcher, s tokenbalances.Storage) *CommunitiesTokenBalanceManager {
+	return &CommunitiesTokenBalanceManager{tokenBalancesFetcher: f, tokenBalancesStorage: s}
 }
 
 func (m *CommunitiesTokenBalanceManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (communities.BalancesByChain, error) {
-	chainClients, err := m.tokenManager.RPCClient.EthClients(chainIDs)
-	if err != nil {
-		return nil, err
+	if m.tokenBalancesFetcher == nil {
+		return nil, fmt.Errorf("tokenBalancesFetcher is nil")
 	}
-
-	resp, err := m.tokenManager.GetBalancesByChain(context.Background(), chainClients, accounts, tokenAddresses)
-	return resp, err
+	ret := make(communities.BalancesByChain)
+	for _, chainID := range chainIDs {
+		ret[chainID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+		balances, err := m.tokenBalancesFetcher.Fetch(ctx, chainID, tokenAddresses, accounts)
+		if err != nil {
+			return nil, err
+		}
+		ret[chainID] = balancesToCommunitiesBalances(balances)
+	}
+	return ret, nil
 }
 
 func (m *CommunitiesTokenBalanceManager) GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (communities.BalancesByChain, error) {
-	resp, err := m.tokenManager.GetCachedBalancesByChain(accounts, tokenAddresses, chainIDs)
-	if err != nil {
-		return resp, err
+	if m.tokenBalancesStorage == nil {
+		return nil, fmt.Errorf("tokenBalancesStorage is nil")
 	}
+	ret := make(communities.BalancesByChain)
+	for _, chainID := range chainIDs {
+		balances, err := m.tokenBalancesStorage.GetBalances(ctx, chainID, tokenAddresses, accounts)
+		if err != nil {
+			return nil, err
+		}
+		ret[chainID] = balancesToCommunitiesBalances(balances)
+	}
+	return ret, nil
+}
 
-	return resp, nil
+func balancesToCommunitiesBalances(balances map[gethcommon.Address]map[gethcommon.Address]*big.Int) map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big {
+	ret := make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	for account, tokenBalances := range balances {
+		ret[account] = make(map[gethcommon.Address]*hexutil.Big)
+		for token, balance := range tokenBalances {
+			ret[account][token] = (*hexutil.Big)(balance)
+		}
+	}
+	return ret
 }

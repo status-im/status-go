@@ -3,7 +3,6 @@ import uuid as uuid_lib
 import pytest
 
 import resources.constants as constants
-from clients.anvil import Anvil
 from web3.types import Wei  # type: ignore
 
 from clients.signals import SignalType
@@ -27,8 +26,9 @@ class TestRouter:
     ]
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_recovered_profile):
-        self.rpc_client = backend_recovered_profile(name="main_user", user=user_1)
+    def setup_backend(self, backend_recovered_profile, anvil_client, multicall3_deployer):
+        self.anvil_client = anvil_client
+        self.rpc_client = backend_recovered_profile(name="main_user", user=user_1, multicall_contract_address=multicall3_deployer.contract_address)
 
     def test_tx_from_route(self):
         uuid = str(uuid_lib.uuid4())
@@ -64,7 +64,7 @@ class TestRouter:
         tx_status = wallet_utils.send_router_transactions_with_signatures(self.rpc_client, uuid, tx_signatures)
 
         # Check tx details
-        tx_data = Anvil().get_transaction(tx_status["hash"])
+        tx_data = self.anvil_client.get_transaction(tx_status["hash"])
 
         assert tx_data.get("value", 0) == int(amount_in, 16)
         assert tx_data.get("value", 0) == amount_in_wei

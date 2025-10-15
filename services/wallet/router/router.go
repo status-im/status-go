@@ -14,6 +14,8 @@ import (
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
+	communityToken "github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/collectibles"
@@ -26,7 +28,6 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
-	"github.com/status-im/status-go/services/wallet/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -38,6 +39,18 @@ var (
 		Policy: async.ReplacementPolicyCancelOld,
 	}
 )
+
+type TokenManager interface {
+	GetToken(chainID uint64, tokenSymbol string) *tokenTypes.Token
+	FindToken(network *params.Network, tokenSymbol string) *tokenTypes.Token
+	LookupToken(chainID *uint64, tokenSymbol string) (token *tokenTypes.Token, isNative bool)
+	GetCommunityTokenType(chainID uint64, tokenContractAddress string) (protobuf.CommunityTokenType, error)
+	GetCommunityTokenPrivilegesLevel(chainID uint64, tokenContractAddress string) (communityToken.PrivilegesLevel, error)
+}
+
+type TokenBalanceFetcher interface {
+	FetchSingle(ctx context.Context, chainID uint64, tokenAddress common.Address, accountAddress common.Address) (*big.Int, error)
+}
 
 func makeBalanceKey(chainID uint64, symbol string) string {
 	return fmt.Sprintf("%d-%s", chainID, symbol)
@@ -55,15 +68,16 @@ type SuggestedRoutes struct {
 }
 
 type Router struct {
-	rpcClient           *rpc.Client
-	transactor          *transactions.Transactor
-	tokenManager        *token.Manager
-	marketManager       *market.Manager
-	collectiblesService *collectibles.Service
-	collectiblesManager *collectibles.Manager
-	feesManager         *fees.FeeManager
-	pathProcessors      map[string]pathprocessor.PathProcessor
-	scheduler           *async.Scheduler
+	rpcClient            *rpc.Client
+	transactor           *transactions.Transactor
+	tokenManager         TokenManager
+	tokenBalancesFetcher TokenBalanceFetcher
+	marketManager        *market.Manager
+	collectiblesService  *collectibles.Service
+	collectiblesManager  *collectibles.Manager
+	feesManager          *fees.FeeManager
+	pathProcessors       map[string]pathprocessor.PathProcessor
+	scheduler            *async.Scheduler
 
 	activeBalanceMap sync.Map // map[string]*big.Int
 
@@ -79,17 +93,23 @@ type Router struct {
 	clientsForUpdatesPerChains sync.Map
 }
 
-func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager, marketManager *market.Manager,
+func NewRouter(
+	rpcClient *rpc.Client,
+	transactor *transactions.Transactor,
+	tokenManager TokenManager,
+	tokenBalancesFetcher TokenBalanceFetcher,
+	marketManager *market.Manager,
 	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager) *Router {
 	processors := make(map[string]pathprocessor.PathProcessor)
 
 	return &Router{
-		rpcClient:           rpcClient,
-		transactor:          transactor,
-		tokenManager:        tokenManager,
-		marketManager:       marketManager,
-		collectiblesService: collectibles,
-		collectiblesManager: collectiblesManager,
+		rpcClient:            rpcClient,
+		transactor:           transactor,
+		tokenManager:         tokenManager,
+		tokenBalancesFetcher: tokenBalancesFetcher,
+		marketManager:        marketManager,
+		collectiblesService:  collectibles,
+		collectiblesManager:  collectiblesManager,
 		feesManager: &fees.FeeManager{
 			RPCClient: rpcClient,
 		},

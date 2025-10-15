@@ -62,6 +62,7 @@ func TestController_DebounceTiming(t *testing.T) {
 	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, oldState, nil).AnyTimes()
+	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
 	storage.EXPECT().ClearMissingChains(gomock.Any(), []uint64{1}).AnyTimes()
 
 	// Mock token list provider
@@ -112,6 +113,7 @@ func TestController_DebounceTiming(t *testing.T) {
 		tokenListProvider,
 		collectibleListProvider,
 		lastBlockManager,
+		nil, // walletFeed
 		logger,
 	)
 
@@ -127,20 +129,20 @@ func TestController_DebounceTiming(t *testing.T) {
 	resetFetchCalls()
 
 	// Test debounce behavior - multiple rapid calls should only result in one fetch
-	controller.TriggerFetch(false)
-	controller.TriggerFetch(false)
-	controller.TriggerFetch(false)
+	controller.TriggerFullFetch()
+	controller.TriggerFullFetch()
+	controller.TriggerFullFetch()
 
 	// Wait for debounce time
 	time.Sleep(2 * debounceTime)
-	require.Equal(t, 1, getFetchCalls(), "Expected 1 fetch call after multiple consecutive TriggerFetch calls")
+	require.Equal(t, 1, getFetchCalls(), "Expected 1 fetch call after multiple consecutive TriggerFullFetch calls")
 	resetFetchCalls()
 
 	// Test that another call after debounce time works
-	controller.TriggerFetch(false)
+	controller.TriggerFullFetch()
 	// Wait for debounce time
 	time.Sleep(2 * debounceTime)
-	require.Equal(t, 1, getFetchCalls(), "Expected 1 fetch call after multiple consecutive TriggerFetch calls")
+	require.Equal(t, 1, getFetchCalls(), "Expected 1 fetch call after multiple consecutive TriggerFullFetch calls")
 	resetFetchCalls()
 }
 
@@ -183,6 +185,7 @@ func TestController_FetchPeriod(t *testing.T) {
 	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, oldState, nil).AnyTimes()
+	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
 	storage.EXPECT().ClearMissingChains(gomock.Any(), []uint64{1}).AnyTimes()
 
 	// Mock token list provider
@@ -233,6 +236,7 @@ func TestController_FetchPeriod(t *testing.T) {
 		tokenListProvider,
 		collectibleListProvider,
 		lastBlockManager,
+		nil, // walletFeed
 		logger,
 	)
 
@@ -256,17 +260,18 @@ func TestController_FetchPeriod(t *testing.T) {
 
 	// Wait a bit less than the period time
 	time.Sleep(config.FetchPeriod - 100*time.Millisecond)
-	controller.TriggerFetch(true)
+	controller.TriggerFullFetch()
 	require.Eventually(t, func() bool {
 		return getFetchCalls() == 1
-	}, 100*time.Millisecond, 10*time.Millisecond, "Expected 1 fetch call after TriggerFetch(true)")
+	}, 100*time.Millisecond, 10*time.Millisecond, "Expected 1 fetch call after TriggerFullFetch()")
 	resetFetchCalls()
 
-	// Periodic ticker should've been reset, so no extra calls until the next period
-	time.Sleep(config.FetchPeriod + 100*time.Millisecond)
+	// The periodic ticker continues independently, so after ~100ms more (to complete the period from last periodic fetch),
+	// another periodic fetch should happen
+	time.Sleep(200 * time.Millisecond)
 	require.Eventually(t, func() bool {
-		return getFetchCalls() == 1
-	}, 100*time.Millisecond, 10*time.Millisecond, "Expected 1 fetch call after TriggerFetch(true)")
+		return getFetchCalls() >= 1
+	}, 100*time.Millisecond, 10*time.Millisecond, "Expected at least 1 fetch call from periodic ticker")
 	resetFetchCalls()
 }
 
@@ -367,6 +372,7 @@ func TestController_BasicFlow(t *testing.T) {
 	// Mock LastBlockManager
 	lastBlockManager.EXPECT().SetLatestBlockNumber(gomock.Any(), gomock.Any()).AnyTimes()
 
+	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
 	storage.EXPECT().ClearMissingChains(gomock.Any(), []uint64{1, 2}).AnyTimes()
 
 	// Create some test contracts for ERC20, ERC721, and ERC1155
@@ -529,6 +535,7 @@ func TestController_BasicFlow(t *testing.T) {
 		tokenListProvider,
 		collectibleListProvider,
 		lastBlockManager,
+		nil, // walletFeed
 		logger,
 	)
 
@@ -717,14 +724,14 @@ func TestController_BasicFlow(t *testing.T) {
 	}, 100*time.Millisecond, 10*time.Millisecond, "Expected 2 chains to be fetched after Start")
 	resetFetchCalls()
 
-	// Trigger fetch with forced=false - should only fetch chains with old/never fetched states
-	controller.TriggerFetch(false)
+	// Trigger fetch with empty config - should only fetch chains with old/never fetched states
+	controller.TriggerFetchWithConfig(make(multistandardbalance.FetchConfig))
 
 	// Wait for the fetch to complete
 	require.Eventually(t, func() bool {
 		chains := getChainIDs()
 		return len(chains) == 2 // Should fetch chains 1 and 2
-	}, 100*time.Millisecond, 10*time.Millisecond, "Expected 2 chains to be fetched for non-forced trigger")
+	}, 100*time.Millisecond, 10*time.Millisecond, "Expected 2 chains to be fetched with TriggerFetchWithConfig")
 
 	// Verify that only chains with old/never fetched states were fetched
 	actualCalls := getFetchCalls()
@@ -757,27 +764,27 @@ func TestController_BasicFlow(t *testing.T) {
 	require.Len(t, config2.Native, 1, "Chain 2 should have 1 native account")
 	require.Contains(t, config2.Native, common.BytesToAddress(address1.Bytes()), "Chain 2 should include address1")
 
-	// Reset and test with forced=true - should fetch all chains
+	// Reset and test with full fetch - should fetch all chains
 	resetFetchCalls()
 
-	controller.TriggerFetch(true)
+	controller.TriggerFullFetch()
 
 	// Wait for the fetch to complete
 	require.Eventually(t, func() bool {
 		chains := getChainIDs()
-		return len(chains) == 2 // Should fetch both chains when forced
-	}, 100*time.Millisecond, 10*time.Millisecond, "Expected 2 chains to be fetched when forced=true")
+		return len(chains) == 2 // Should fetch both chains when full fetch
+	}, 100*time.Millisecond, 10*time.Millisecond, "Expected 2 chains to be fetched with TriggerFullFetch")
 
-	// Verify that all chains were fetched when forced=true
+	// Verify that all chains were fetched with TriggerFullFetch
 	actualCallsForced := getFetchCalls()
 	actualChainsForced := getChainIDs()
-	// Should have fetched both chains when forced=true
-	require.Len(t, actualChainsForced, 2, "Expected 2 chains to be fetched when forced=true")
-	require.Contains(t, actualChainsForced, uint64(1), "Expected chain 1 to be fetched when forced=true")
-	require.Contains(t, actualChainsForced, uint64(2), "Expected chain 2 to be fetched when forced=true")
+	// Should have fetched both chains with TriggerFullFetch
+	require.Len(t, actualChainsForced, 2, "Expected 2 chains to be fetched with TriggerFullFetch")
+	require.Contains(t, actualChainsForced, uint64(1), "Expected chain 1 to be fetched with TriggerFullFetch")
+	require.Contains(t, actualChainsForced, uint64(2), "Expected chain 2 to be fetched with TriggerFullFetch")
 
-	// Verify the configs contain all accounts when forced=true
-	require.Len(t, actualCallsForced, 2, "Expected 2 fetch calls to be made when forced")
+	// Verify the configs contain all accounts with TriggerFullFetch
+	require.Len(t, actualCallsForced, 2, "Expected 2 fetch calls to be made with TriggerFullFetch")
 
 	// Find configs for each chain
 	var config1Forced, config2Forced multistandardfetcher.FetchConfig
@@ -789,12 +796,12 @@ func TestController_BasicFlow(t *testing.T) {
 		}
 	}
 
-	// When forced=true, both chains should have both accounts
-	require.Len(t, config1Forced.Native, 2, "Chain 1 should have 2 native accounts when forced")
-	require.Contains(t, config1Forced.Native, common.BytesToAddress(address1.Bytes()), "Chain 1 should include address1 when forced")
-	require.Contains(t, config1Forced.Native, common.BytesToAddress(address2.Bytes()), "Chain 1 should include address2 when forced")
+	// With TriggerFullFetch, both chains should have both accounts
+	require.Len(t, config1Forced.Native, 2, "Chain 1 should have 2 native accounts with TriggerFullFetch")
+	require.Contains(t, config1Forced.Native, common.BytesToAddress(address1.Bytes()), "Chain 1 should include address1 with TriggerFullFetch")
+	require.Contains(t, config1Forced.Native, common.BytesToAddress(address2.Bytes()), "Chain 1 should include address2 with TriggerFullFetch")
 
-	require.Len(t, config2Forced.Native, 2, "Chain 2 should have 2 native accounts when forced")
-	require.Contains(t, config2Forced.Native, common.BytesToAddress(address1.Bytes()), "Chain 2 should include address1 when forced")
-	require.Contains(t, config2Forced.Native, common.BytesToAddress(address2.Bytes()), "Chain 2 should include address2 when forced")
+	require.Len(t, config2Forced.Native, 2, "Chain 2 should have 2 native accounts with TriggerFullFetch")
+	require.Contains(t, config2Forced.Native, common.BytesToAddress(address1.Bytes()), "Chain 2 should include address1 with TriggerFullFetch")
+	require.Contains(t, config2Forced.Native, common.BytesToAddress(address2.Bytes()), "Chain 2 should include address2 with TriggerFullFetch")
 }

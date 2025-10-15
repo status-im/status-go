@@ -26,7 +26,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
-	"github.com/status-im/status-go/services/wallet/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
@@ -137,12 +136,7 @@ func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network,
 }
 
 func (r *Router) getBalance(ctx context.Context, chainID uint64, token *tokenTypes.Token, account common.Address) (*big.Int, error) {
-	client, err := r.rpcClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.tokenManager.GetBalance(ctx, client, account, token.Address)
+	return r.tokenBalancesFetcher.FetchSingle(ctx, chainID, token.Address, account)
 }
 
 func (r *Router) resolveSuggestedNonceForPath(ctx context.Context, path *routes.Path, address common.Address, usedNonces map[uint64]uint64) error {
@@ -498,7 +492,7 @@ func ParseCollectibleID(ID string) (contractAddress common.Address, tokenID *big
 	return
 }
 
-func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *tokenTypes.Token {
+func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *tokenTypes.Token {
 	if !sendType.IsCollectiblesTransfer() {
 		return tokenManager.FindToken(network, tokenID)
 	}

@@ -53,6 +53,7 @@ controller := multistandardbalance.NewController(
     tokenListProvider,
     collectibleListProvider,
     lastBlockManager,
+    walletFeed,
     logger,
 )
 
@@ -72,7 +73,16 @@ controller := multistandardbalance.NewController(
 controller.Start()
 
 // Trigger balance fetches
-controller.TriggerFetch(false) // false = not forced
+controller.TriggerFullFetch() // Fetch all accounts/networks/types
+
+// Or trigger selective fetches
+fetchConfig := multistandardbalance.FetchConfig{
+    multistandardbalance.BalancesKey{Account: addr, ChainID: 1}: {
+        multistandardfetcher.ResultTypeNative,
+        multistandardfetcher.ResultTypeERC20,
+    },
+}
+controller.TriggerFetchWithConfig(fetchConfig)
 
 // Listen for events
 publisher := controller.GetPublisher()

@@ -35,7 +35,6 @@ import (
 	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/community"
-	"github.com/status-im/status-go/services/wallet/token/balancefetcher"
 	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
 	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -70,7 +69,6 @@ type addressTokenMap = map[common.Address]*tokenTypes.Token
 type storeMap = map[uint64]addressTokenMap
 
 type ManagerInterface interface {
-	balancefetcher.BalanceFetcher
 	LookupTokenIdentity(chainID uint64, address common.Address, native bool) *tokenTypes.Token
 	LookupToken(chainID *uint64, tokenSymbol string) (token *tokenTypes.Token, isNative bool)
 	GetTokensByChainIDs(chainIDs []uint64) ([]*tokenTypes.Token, error)
@@ -81,7 +79,6 @@ type ManagerInterface interface {
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
-	balancefetcher.BalanceFetcher
 	db                   *sql.DB
 	RPCClient            rpc.ClientInterface
 	ContractMaker        *contracts.ContractMaker
@@ -120,7 +117,6 @@ func NewTokenManager(
 	}
 
 	return &Manager{
-		BalanceFetcher:       balancefetcher.NewDefaultBalanceFetcher(maker),
 		db:                   db,
 		RPCClient:            RPCClient,
 		ContractMaker:        maker,

@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
+	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/services/wallet/transferdetector"
 
 	"github.com/ethereum/go-ethereum/event"
@@ -192,7 +193,7 @@ func NewService(
 	marketManager := market.NewManager(marketProviders, tokenManager, feed)
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 
-	multistandardBalanceFetcher := multistandardbalance.NewFetcher(rpcClient, multistandardbalance.DefaultBatchSize)
+	multistandardBalanceFetcher := multistandardbalance.NewFetcher(rpcClient, multistandardbalance.DefaultBatchSize, config.WalletConfig.MulticallOverrides)
 	multistandardBalanceStorage := multistandardbalance.NewStorageMemory()
 	multistandardBalanceController := multistandardbalance.NewController(
 		multistandardbalance.DefaultControllerConfig(),
@@ -204,8 +205,12 @@ func NewService(
 		NewMultistandardBalanceTokenListProvider(tokenManager),
 		NewMultistandardBalanceCollectiblesListProvider(ownership.NewOwnershipDB(db), collectibles.NewContractTypeDB(db)),
 		blockChainState,
+		feed,
 		logutils.ZapLogger().Named("MultistandardBalanceController"),
 	)
+
+	tokenBalancesFetcher := tokenbalances.NewFetcher(multistandardBalanceFetcher)
+	tokenBalancesStorage := tokenbalances.NewStorageMultistandardBalance(multistandardBalanceStorage)
 
 	transferDetectorController := transferdetector.NewController(
 		transferdetector.DefaultControllerConfig(),
@@ -223,8 +228,8 @@ func NewService(
 		token.NewPersistence(db),
 		feed,
 		multistandardBalanceController.GetPublisher(),
+		tokenBalancesStorage,
 		transferDetectorController.GetPublisher(),
-		blockChainState,
 	)
 
 	collectiblesPublisher := pubsub.NewPublisher()
@@ -255,7 +260,7 @@ func NewService(
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
-	router := router.NewRouter(rpcClient, transactor, tokenManager, marketManager, collectibles,
+	router := router.NewRouter(rpcClient, transactor, tokenManager, tokenBalancesFetcher, marketManager, collectibles,
 		collectiblesManager)
 	for _, processor := range pathProcessors {
 		router.AddPathProcessor(processor)
@@ -283,6 +288,8 @@ func NewService(
 		pendingTxManager:               pendingTxManager,
 		multistandardBalanceController: multistandardBalanceController,
 		transferDetectorController:     transferDetectorController,
+		tokenBalancesFetcher:           tokenBalancesFetcher,
+		tokenBalancesStorage:           tokenBalancesStorage,
 		cryptoOnRampManager:            cryptoOnRampManager,
 		collectiblesManager:            collectiblesManager,
 		collectibles:                   collectibles,
@@ -378,6 +385,8 @@ type Service struct {
 	transactionManager             *transfer.TransactionManager
 	pendingTxManager               *transactions.PendingTxTracker
 	multistandardBalanceController *multistandardbalance.Controller
+	tokenBalancesFetcher           tokenbalances.FetcherIface
+	tokenBalancesStorage           tokenbalances.Storage
 	transferDetectorController     *transferdetector.Controller
 	cryptoOnRampManager            *onramp.Manager
 	collectiblesManager            *collectibles.Manager
@@ -490,6 +499,14 @@ func (s *Service) GetTransactor() *transactions.Transactor {
 
 func (s *Service) GetTokenManager() *token.Manager {
 	return s.tokenManager
+}
+
+func (s *Service) GetTokenBalancesFetcher() tokenbalances.FetcherIface {
+	return s.tokenBalancesFetcher
+}
+
+func (s *Service) GetTokenBalancesStorage() tokenbalances.Storage {
+	return s.tokenBalancesStorage
 }
 
 func (s *Service) GetMarketManager() *market.Manager {

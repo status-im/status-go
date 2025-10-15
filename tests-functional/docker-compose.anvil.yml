@@ -1,6 +1,6 @@
 services:
   anvil:
-    image: ghcr.io/foundry-rs/foundry:latest
+    image: ghcr.io/foundry-rs/foundry:v1.4.0
     platform: linux/amd64
     command:
       - anvil --host 0.0.0.0 --block-time 2

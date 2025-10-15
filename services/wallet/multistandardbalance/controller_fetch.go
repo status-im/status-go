@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (c *Controller) buildFetchConfigs(balancesToFetch map[BalancesKey][]multistandardfetcher.ResultType) map[uint64]multistandardfetcher.FetchConfig {
+func (c *Controller) buildMultiStandardFetcherFetchConfigs(balancesToFetch map[BalancesKey][]multistandardfetcher.ResultType) map[uint64]multistandardfetcher.FetchConfig {
 	fetchConfigs := make(map[uint64]multistandardfetcher.FetchConfig)
 
 	for balancesKey, resultTypes := range balancesToFetch {
