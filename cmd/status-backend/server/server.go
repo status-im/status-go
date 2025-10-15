@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	_ "expvar"
+	"expvar"
 	"io"
 	"net"
 	"net/http"
@@ -21,6 +21,13 @@ import (
 	"github.com/status-im/status-go/cmd/status-backend/server/api"
 	"github.com/status-im/status-go/signal"
 )
+
+func init() {
+	expvar.Publish("numThreads", expvar.Func(func() any {
+		threadsCount, _ := runtime.ThreadCreateProfile([]runtime.StackRecord{})
+		return threadsCount
+	}))
+}
 
 type Server struct {
 	server      *http.Server
