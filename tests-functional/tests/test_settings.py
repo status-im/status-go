@@ -35,15 +35,27 @@ class TestSettings:
         assert isinstance(result, bool), f"Expected boolean, got {type(result)}"
         print(f"News feed enabled: {result}")
 
-    def test_toggle_news_feed_enabled(self):
-        self.config.settings_service.save_setting("news-feed-enabled?", False)
-        is_enabled = self.config.settings_service.news_feed_enabled()
-        assert is_enabled is False, "Expected False"
+    def test_news_notifications_enabled(self):
+        result = self.config.settings_service.news_notifications_enabled()
+        assert result is not None, "Expected a non-null result"
+        assert isinstance(result, bool), f"Expected bool, got {type(result)}"
 
-        # Optional: verify the raw settings map also reflects it
-        settings_map = self.config.settings_service.get_settings()
-        assert settings_map.get("news-feed-enabled?") is False
+    def test_toggle_news_notifications_enabled(self):
+        settings = self.config.settings_service
+        settings.save_setting("news-notifications-enabled?", True)
+        enabled_state = settings.news_notifications_enabled()
+        print(f"[Enabled] news-notifications-enabled = {enabled_state}")
+        assert enabled_state is True, "Expected news notifications to be enabled"
+        settings.save_setting("news-notifications-enabled?", False)
+        disabled_state = settings.news_notifications_enabled()
+        print(f"[Disabled] news-notifications-enabled = {disabled_state}")
+        assert disabled_state is False, "Expected news notifications to be disabled"
 
-        # Cleanup: re-enable
-        self.config.settings_service.save_setting("news-feed-enabled?", True)
-        assert self.config.settings_service.news_feed_enabled() is True
+    def test_toggle_news_rss_enabled(self):
+        s = self.config.settings_service
+        ret = s.save_setting("news-rss-enabled?", False)
+        assert ret is None
+        assert s.news_rss_enabled() is False
+        ret = s.save_setting("news-rss-enabled?", True)
+        assert ret is None
+        assert s.news_rss_enabled() is True
