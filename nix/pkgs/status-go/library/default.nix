@@ -55,6 +55,14 @@ in pkgs.buildGoModule {
     export GOPATH=$NIX_BUILD_TOP/go
     export GO111MODULE=on
 
+    # Patch env.sh now that nim-sds exists
+    echo "Patching env.sh to use Nix Nim..."
+    env_sh="vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/vendor/nimbus-build-system/scripts/env.sh"
+    if [ -f "$env_sh" ]; then
+      substituteInPlace "$env_sh" \
+        --replace-warn "/vendor/Nim/bin/nim" "${pkgs.nim}/bin/nim"
+    fi
+
     runHook preBuild
     go build \
       -buildmode='c-archive' \
