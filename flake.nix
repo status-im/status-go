@@ -87,10 +87,6 @@
             substituteInPlace vendor/github.com/waku-org/sds-go-bindings/sds/Makefile \
               --replace-warn "git clone https://github.com/waku-org/nim-sds" \
                         "cp -r ${pkgs.nim-sds} nim-sds"
-
-            echo "Patching env.sh to use Nix Nim..."
-            substituteInPlace vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/vendor/nimbus-build-system/scripts/env.sh \
-              --replace-warn "/vendor/Nim/bin/nim" "${pkgs.nim}/bin/nim"
           '';
 
           # Reuse buildPhase etc. if needed
