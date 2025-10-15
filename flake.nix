@@ -35,6 +35,9 @@
         inherit system;
         config = {
           android_sdk.accept_license = true;
+          android_sdk = if builtins.elem system [ "x86_64-linux" "x86_64-darwin" ]
+                        then pkgs.androidPkgs.sdk
+                        else null;
           allowUnfree = true;
         };
         overlays = [
