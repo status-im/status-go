@@ -1,6 +1,42 @@
 {
   "nodes": {
+    "nim-sds": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1760520486,
+        "narHash": "sha256-2iNag5FR2RdaTFYBrIyhUL4XMZs4Tacn7xkH5P3O/PA=",
+        "rev": "b74622da64826415dd87186f5c3caf1f6cc29646",
+        "revCount": 46,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/waku-org/nim-sds"
+      },
+      "original": {
+        "rev": "b74622da64826415dd87186f5c3caf1f6cc29646",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/waku-org/nim-sds"
+      }
+    },
     "nixpkgs": {
+      "locked": {
+        "lastModified": 1740603184,
+        "narHash": "sha256-t+VaahjQAWyA+Ctn2idyo1yxRIYpaDxMgHkgCNiMJa4=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "f44bd8ca21e026135061a0a57dcf3d0775b67a49",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "f44bd8ca21e026135061a0a57dcf3d0775b67a49",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
       "locked": {
         "lastModified": 1757590060,
         "narHash": "sha256-EWwwdKLMZALkgHFyKW7rmyhxECO74+N+ZO5xTDnY/5c=",
@@ -16,7 +52,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_2": {
+    "nixpkgs_3": {
       "locked": {
         "lastModified": 1740603184,
         "narHash": "sha256-t+VaahjQAWyA+Ctn2idyo1yxRIYpaDxMgHkgCNiMJa4=",
@@ -34,21 +70,21 @@
     },
     "nwaku": {
       "inputs": {
-        "nixpkgs": "nixpkgs_2",
+        "nixpkgs": "nixpkgs_3",
         "zerokit": "zerokit"
       },
       "locked": {
-        "lastModified": 1747983922,
-        "narHash": "sha256-zaS/kTsJ8Z7ugcsw0pob1wXmd9WfZ4ZPqpM8UB1R2Vk=",
+        "lastModified": 1760518176,
+        "narHash": "sha256-Jef8LBsX/OeBjkWmSXi/jQvW8dhnqHBz2+MF0HCHTzs=",
         "ref": "refs/heads/master",
-        "rev": "e755fd834f5f3d6fba216b09469316f0328b3b6f",
-        "revCount": 2040,
+        "rev": "7e5041d5e17d717f77fb74ffd876b987a0c6bf5d",
+        "revCount": 2156,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/waku-org/nwaku"
       },
       "original": {
-        "rev": "e755fd834f5f3d6fba216b09469316f0328b3b6f",
+        "rev": "7e5041d5e17d717f77fb74ffd876b987a0c6bf5d",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/waku-org/nwaku"
@@ -56,7 +92,8 @@
     },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs",
+        "nim-sds": "nim-sds",
+        "nixpkgs": "nixpkgs_2",
         "nwaku": "nwaku"
       }
     },
