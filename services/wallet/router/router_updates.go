@@ -10,7 +10,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 
@@ -28,7 +28,7 @@ var (
 )
 
 type fetchingLastBlock struct {
-	client    chain.ClientInterface
+	client    ethclient.EthClientInterface
 	lastBlock uint64
 	closeCh   chan struct{}
 }

@@ -92,9 +92,7 @@ type ednStickerPackInfo struct {
 func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager,
 	pendingTracker *transactions.PendingTxTracker, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
 	result := &API{
-		contractMaker: &contracts.ContractMaker{
-			RPCClient: rpcClient,
-		},
+		contractMaker:   contracts.NewContractMaker(rpcClient),
 		accountsManager: accountsManager,
 		accountsDB:      acc,
 		pendingTracker:  pendingTracker,

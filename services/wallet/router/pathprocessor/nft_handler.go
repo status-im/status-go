@@ -37,14 +37,14 @@ type NFTHandler interface {
 }
 
 type BaseNFTHandler struct {
-	rpcClient  rpc.ClientInterface
-	transactor transactions.TransactorIface
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
 }
 
-func NewBaseNFTHandler(rpcClient rpc.ClientInterface, transactor transactions.TransactorIface) *BaseNFTHandler {
+func NewBaseNFTHandler(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *BaseNFTHandler {
 	return &BaseNFTHandler{
-		rpcClient:  rpcClient,
-		transactor: transactor,
+		ethClientGetter: ethClientGetter,
+		transactor:      transactor,
 	}
 }
 
@@ -66,7 +66,7 @@ func (h *BaseNFTHandler) EstimateGas(params ProcessorInputParams, input []byte, 
 		return 0, ErrNoEstimationFound
 	}
 
-	ethClient, err := h.rpcClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := h.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, err
 	}

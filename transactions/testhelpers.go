@@ -10,6 +10,8 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
@@ -17,9 +19,6 @@ import (
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
-
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 type MockETHClient struct {
@@ -60,7 +59,7 @@ func (m *MockChainClient) SetAvailableClients(chainIDs []common.ChainID) *MockCh
 	return m
 }
 
-func (m *MockChainClient) AbstractEthClient(chainID common.ChainID) (ethclient.BatchCallClient, error) {
+func (m *MockChainClient) EthClient(chainID common.ChainID) (ethclient.BatchCallClient, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if _, ok := m.Clients[chainID]; !ok {
@@ -95,6 +94,16 @@ func GenerateTestPendingTransactions(start int, count int) []PendingTransaction 
 		*txs[i].AutoDelete = true   // set to true by default
 	}
 	return txs
+}
+
+func GenerateTestPendingTransactionsWithSummary(testTxs []TestTxSummary) []PendingTransaction {
+	genTxs := GenerateTestPendingTransactions(0, len(testTxs))
+	for i, tx := range testTxs {
+		if tx.Timestamp > 0 {
+			genTxs[i].Timestamp = uint64(tx.Timestamp)
+		}
+	}
+	return genTxs
 }
 
 // groupSliceInMap groups a slice of S into a map[K][]N using the getKeyValue function to extract the key and new value for each entry
@@ -132,12 +141,7 @@ type summaryTxPair struct {
 }
 
 func MockTestTransactions(t *testing.T, chainClient *MockChainClient, testTxs []TestTxSummary) []PendingTransaction {
-	genTxs := GenerateTestPendingTransactions(0, len(testTxs))
-	for i, tx := range testTxs {
-		if tx.Timestamp > 0 {
-			genTxs[i].Timestamp = uint64(tx.Timestamp)
-		}
-	}
+	genTxs := GenerateTestPendingTransactionsWithSummary(testTxs)
 
 	grouped := groupSliceInMap(genTxs, func(tx PendingTransaction, i int) (common.ChainID, summaryTxPair) {
 		return tx.ChainID, summaryTxPair{

@@ -199,7 +199,7 @@ func estimatedTimeV2(feeHistory *FeeHistory, txMaxFeePerGas *big.Int, txPriority
 }
 
 func (f *FeeManager) TransactionEstimatedTimeV2Legacy(ctx context.Context, chainID uint64, gasPrice *big.Int) uint {
-	backend, err := f.RPCClient.EthClient(chainID)
+	backend, err := f.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return 0
 	}

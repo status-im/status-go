@@ -29,9 +29,7 @@ type Manager struct {
 
 func NewManager(rpcClient *rpc.Client) *Manager {
 	return &Manager{
-		contractMaker: &communitytokens.CommunityTokensContractMaker{
-			RPCClient: rpcClient,
-		},
+		contractMaker: communitytokens.NewCommunityTokensContractMakerMaker(rpcClient),
 	}
 }
 

@@ -15,27 +15,26 @@ import (
 )
 
 type testState struct {
-	ctx        context.Context
-	mockCtrl   *gomock.Controller
-	rpcClient  *mock_rpcclient.MockClientInterface
-	feeManager *FeeManager
+	ctx             context.Context
+	mockCtrl        *gomock.Controller
+	ethClientGetter *mock_rpcclient.MockEthClientGetter
+	ethClient       *mock_client.MockClientInterface
+	feeManager      *FeeManager
 }
 
 func setupTest(t *testing.T) (state testState) {
 	state.ctx = context.Background()
 	state.mockCtrl = gomock.NewController(t)
-	state.rpcClient = mock_rpcclient.NewMockClientInterface(state.mockCtrl)
-	state.feeManager = &FeeManager{
-		RPCClient: state.rpcClient,
-	}
+	state.ethClient = mock_client.NewMockClientInterface(state.mockCtrl)
+	state.ethClientGetter = mock_rpcclient.NewMockEthClientGetter(state.mockCtrl)
+	state.ethClientGetter.EXPECT().EthClient(uint64(1)).Times(1).Return(state.ethClient, nil).AnyTimes()
+	state.feeManager = NewFeeManager(state.ethClientGetter)
 	return state
 }
 
 func TestEstimatedTime(t *testing.T) {
 	state := setupTest(t)
-	// no fee history
-	feeHistory := &FeeHistory{}
-	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", nil).Times(1).Return(nil)
+	state.ethClient.EXPECT().CallContext(gomock.Any(), gomock.Any(), "eth_feeHistory", uint64(10), "latest", nil).Times(1).Return(nil)
 
 	maxFeesPerGas := big.NewInt(2e9)
 	estimation := state.feeManager.TransactionEstimatedTime(context.Background(), uint64(1), maxFeesPerGas)
@@ -43,8 +42,8 @@ func TestEstimatedTime(t *testing.T) {
 	assert.Equal(t, Unknown, estimation)
 
 	// there is fee history
-	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", nil).Times(1).Return(nil).
-		Do(func(feeHistory, chainID, method any, args ...any) {
+	state.ethClient.EXPECT().CallContext(gomock.Any(), gomock.Any(), "eth_feeHistory", uint64(10), "latest", nil).Times(1).Return(nil).
+		Do(func(ctx, feeHistory, method any, args ...any) {
 			feeHistoryResponse := &FeeHistory{
 				BaseFeePerGas: []string{
 					"0x12f0e070b",
@@ -69,7 +68,7 @@ func TestEstimatedTimeV2(t *testing.T) {
 	state := setupTest(t)
 	// no fee history
 	feeHistory := &FeeHistory{}
-	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", []int{RewardPercentiles2}).Times(1).Return(nil)
+	state.ethClient.EXPECT().CallContext(gomock.Any(), feeHistory, "eth_feeHistory", uint64(10), "latest", []int{RewardPercentiles2}).Times(1).Return(nil)
 
 	maxFeesPerGas := big.NewInt(2e9)
 	priorityFeesPerGas := big.NewInt(2e8)
@@ -78,7 +77,7 @@ func TestEstimatedTimeV2(t *testing.T) {
 	assert.Equal(t, uint(0), estimation)
 
 	// there is fee history
-	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", []int{RewardPercentiles2}).Times(1).Return(nil).
+	state.ethClient.EXPECT().CallContext(gomock.Any(), feeHistory, "eth_feeHistory", uint64(10), "latest", []int{RewardPercentiles2}).Times(1).Return(nil).
 		Do(func(feeHistory, chainID, method any, args ...any) {
 			feeHistoryResponse := &FeeHistory{
 				BaseFeePerGas: []string{
@@ -101,7 +100,7 @@ func TestEstimatedTimeV2(t *testing.T) {
 	assert.Equal(t, uint(0), estimation)
 
 	// there is fee history and rewards
-	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", []int{RewardPercentiles2}).Times(1).Return(nil).
+	state.ethClient.EXPECT().CallContext(gomock.Any(), feeHistory, "eth_feeHistory", uint64(10), "latest", []int{RewardPercentiles2}).Times(1).Return(nil).
 		Do(func(feeHistory, chainID, method any, args ...any) {
 			feeHistoryResponse := &FeeHistory{
 				BaseFeePerGas: []string{
@@ -177,9 +176,8 @@ func TestSuggestedFeesForNotEIP1559CompatibleChains(t *testing.T) {
 	gasPrice := big.NewInt(1)
 	feeHistory := &FeeHistory{}
 	percentiles := []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3}
-	state.rpcClient.EXPECT().Call(feeHistory, chainID, "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil)
+	state.ethClient.EXPECT().CallContext(gomock.Any(), feeHistory, "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil)
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
-	state.rpcClient.EXPECT().EthClient(chainID).Times(2).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(gasPrice, nil)
 
 	suggestedFees, noBaseFee, noPriorityFee, err := state.feeManager.SuggestedFees(context.Background(), chainID, walletCommon.ZeroAddress())
@@ -257,7 +255,7 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 	chainID := uint64(1)
 	feeHistory := &FeeHistory{}
 	percentiles := []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3}
-	state.rpcClient.EXPECT().Call(feeHistory, chainID, "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil).
+	state.ethClient.EXPECT().CallContext(gomock.Any(), feeHistory, "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil).
 		Do(func(feeHistory, chainID, method any, args ...any) {
 			*feeHistory.(*FeeHistory) = *feeHistoryResponse
 		})

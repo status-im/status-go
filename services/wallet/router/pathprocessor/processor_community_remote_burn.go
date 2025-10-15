@@ -23,16 +23,16 @@ import (
 )
 
 type CommunityRemoteBurnProcessor struct {
-	contractMaker *communitytokens.CommunityTokensContractMaker
-	transactor    transactions.TransactorIface
+	contractMaker   *communitytokens.CommunityTokensContractMaker
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
 }
 
-func NewCommunityRemoteBurnProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *CommunityRemoteBurnProcessor {
+func NewCommunityRemoteBurnProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *CommunityRemoteBurnProcessor {
 	return &CommunityRemoteBurnProcessor{
-		contractMaker: &communitytokens.CommunityTokensContractMaker{
-			RPCClient: rpcClient,
-		},
-		transactor: transactor,
+		contractMaker:   communitytokens.NewCommunityTokensContractMakerMaker(ethClientGetter),
+		ethClientGetter: ethClientGetter,
+		transactor:      transactor,
 	}
 }
 
@@ -69,7 +69,7 @@ func (s *CommunityRemoteBurnProcessor) EstimateGas(params ProcessorInputParams, 
 		return 0, ErrNoEstimationFound
 	}
 
-	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createCommunityRemoteBurnErrorResponse(err)
 	}

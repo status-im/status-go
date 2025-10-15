@@ -30,7 +30,7 @@ import (
 	hopL2CctpImplementation "github.com/status-im/status-go/contracts/hop/l2Contracts/l2CctpImplementation"
 	hopL2OptimismBridge "github.com/status-im/status-go/contracts/hop/l2Contracts/l2OptimismBridge"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -132,22 +132,24 @@ func (bf *BonderFee) UnmarshalJSON(data []byte) error {
 }
 
 type HopBridgeProcessor struct {
-	transactor     transactions.TransactorIface
-	httpClient     *thirdparty.HTTPClient
-	tokenManager   *token.Manager
-	contractMaker  *contracts.ContractMaker
-	networkManager network.ManagerInterface
-	bonderFee      *sync.Map // [fromChainName-toChainName]BonderFee
+	transactor      transactions.TransactorIface
+	httpClient      *thirdparty.HTTPClient
+	tokenManager    *token.Manager
+	contractMaker   *contracts.ContractMaker
+	ethClientGetter rpc.EthClientGetter
+	networkManager  network.ManagerInterface
+	bonderFee       *sync.Map // [fromChainName-toChainName]BonderFee
 }
 
-func NewHopBridgeProcessor(rpcClient rpc.ClientInterface, transactor transactions.TransactorIface, tokenManager *token.Manager, networkManager network.ManagerInterface) *HopBridgeProcessor {
+func NewHopBridgeProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *token.Manager, networkManager network.ManagerInterface) *HopBridgeProcessor {
 	return &HopBridgeProcessor{
-		contractMaker:  &contracts.ContractMaker{RPCClient: rpcClient},
-		httpClient:     thirdparty.NewHTTPClient(),
-		transactor:     transactor,
-		tokenManager:   tokenManager,
-		networkManager: networkManager,
-		bonderFee:      &sync.Map{},
+		contractMaker:   contracts.NewContractMaker(ethClientGetter),
+		ethClientGetter: ethClientGetter,
+		httpClient:      thirdparty.NewHTTPClient(),
+		transactor:      transactor,
+		tokenManager:    tokenManager,
+		networkManager:  networkManager,
+		bonderFee:       &sync.Map{},
 	}
 }
 
@@ -282,7 +284,7 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams, input []by
 		return 0, createBridgeHopErrorResponse(err)
 	}
 
-	ethClient, err := h.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := h.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createBridgeHopErrorResponse(err)
 	}
@@ -325,7 +327,7 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, sig
 
 	var nonce uint64
 	if lastUsedNonce < 0 {
-		nonce, err = h.transactor.NextNonce(context.Background(), h.contractMaker.RPCClient, fromChain.ChainID, sendArgs.From)
+		nonce, err = h.transactor.NextNonce(context.Background(), h.ethClientGetter, fromChain.ChainID, sendArgs.From)
 		if err != nil {
 			return tx, createBridgeHopErrorResponse(err)
 		}
@@ -341,7 +343,7 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, sig
 		txOpts.Value = (*big.Int)(sendArgs.Value)
 	}
 
-	ethClient, err := h.contractMaker.RPCClient.EthClient(fromChain.ChainID)
+	ethClient, err := h.ethClientGetter.EthClient(fromChain.ChainID)
 	if err != nil {
 		return tx, createBridgeHopErrorResponse(err)
 	}
@@ -368,7 +370,7 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, sig
 	case hop.CctpL2Bridge:
 		tx, err = h.sendCctpL2BridgeTx(contractAddress, ethClient, sendArgs.ToChainID, common.Address(*sendArgs.To), txOpts, bonderFee)
 	case hop.L2Bridge:
-		tx, err = h.sendL2BridgeTx(contractAddress, ethClient, sendArgs.ToChainID, common.Address(*sendArgs.To), txOpts, bonderFee)
+		tx, err = h.sendL2BridgeTx(contractAddress, ethClient, sendArgs.FromChainID, sendArgs.ToChainID, common.Address(*sendArgs.To), txOpts, bonderFee)
 	default:
 		return tx, ErrContractTypeNotSupported
 	}
@@ -481,7 +483,7 @@ func (h *HopBridgeProcessor) packCctpL1BridgeTx(abi abi.ABI, toChainID uint64, t
 		bonderFee.BonderFee.Int)
 }
 
-func (h *HopBridgeProcessor) sendCctpL1BridgeTx(contractAddress common.Address, ethClient chain.ClientInterface, toChainID uint64,
+func (h *HopBridgeProcessor) sendCctpL1BridgeTx(contractAddress common.Address, ethClient ethclient.EthClientInterface, toChainID uint64,
 	to common.Address, txOpts *bind.TransactOpts, bonderFee *BonderFee) (tx *ethTypes.Transaction, err error) {
 	contractInstance, err := hopL1CctpImplementation.NewHopL1CctpImplementation(
 		contractAddress,
@@ -510,7 +512,7 @@ func (h *HopBridgeProcessor) packL1BridgeTx(abi abi.ABI, toChainID uint64, to co
 		walletCommon.ZeroBigIntValue())
 }
 
-func (h *HopBridgeProcessor) sendL1BridgeTx(contractAddress common.Address, ethClient chain.ClientInterface, toChainID uint64,
+func (h *HopBridgeProcessor) sendL1BridgeTx(contractAddress common.Address, ethClient ethclient.EthClientInterface, toChainID uint64,
 	to common.Address, txOpts *bind.TransactOpts, token *tokenTypes.Token, bonderFee *BonderFee) (tx *ethTypes.Transaction, err error) {
 	if token.IsNative() {
 		contractInstance, err := hopL1EthBridge.NewHopL1EthBridge(
@@ -580,7 +582,7 @@ func (h *HopBridgeProcessor) packCctpL2BridgeTx(abi abi.ABI, toChainID uint64, t
 		bonderFee.BonderFee.Int)
 }
 
-func (h *HopBridgeProcessor) sendCctpL2BridgeTx(contractAddress common.Address, ethClient chain.ClientInterface, toChainID uint64,
+func (h *HopBridgeProcessor) sendCctpL2BridgeTx(contractAddress common.Address, ethClient ethclient.EthClientInterface, toChainID uint64,
 	to common.Address, txOpts *bind.TransactOpts, bonderFee *BonderFee) (tx *ethTypes.Transaction, err error) {
 	contractInstance, err := hopL2CctpImplementation.NewHopL2CctpImplementation(
 		contractAddress,
@@ -611,7 +613,7 @@ func (h *HopBridgeProcessor) packL2AmmWrapperTx(abi abi.ABI, toChainID uint64, t
 		big.NewInt(bonderFee.DestinationDeadline))
 }
 
-func (h *HopBridgeProcessor) sendL2AmmWrapperTx(contractAddress common.Address, ethClient chain.ClientInterface, toChainID uint64,
+func (h *HopBridgeProcessor) sendL2AmmWrapperTx(contractAddress common.Address, ethClient ethclient.EthClientInterface, toChainID uint64,
 	to common.Address, txOpts *bind.TransactOpts, bonderFee *BonderFee) (tx *ethTypes.Transaction, err error) {
 	contractInstance, err := hopL2AmmWrapper.NewHopL2AmmWrapper(
 		contractAddress,
@@ -643,9 +645,8 @@ func (h *HopBridgeProcessor) packL2BridgeTx(abi abi.ABI, toChainID uint64, to co
 		big.NewInt(bonderFee.Deadline))
 }
 
-func (h *HopBridgeProcessor) sendL2BridgeTx(contractAddress common.Address, ethClient chain.ClientInterface, toChainID uint64,
+func (h *HopBridgeProcessor) sendL2BridgeTx(contractAddress common.Address, ethClient ethclient.EthClientInterface, fromChainID uint64, toChainID uint64,
 	to common.Address, txOpts *bind.TransactOpts, bonderFee *BonderFee) (tx *ethTypes.Transaction, err error) {
-	fromChainID := ethClient.NetworkID()
 	if fromChainID == walletCommon.OptimismMainnet ||
 		fromChainID == walletCommon.OptimismSepolia {
 		contractInstance, err := hopL2OptimismBridge.NewHopL2OptimismBridge(

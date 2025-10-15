@@ -81,7 +81,7 @@ type ManagerInterface interface {
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
 	db                   *sql.DB
-	RPCClient            rpc.ClientInterface
+	ethClientGetter      rpc.EthClientGetter
 	ContractMaker        *contracts.ContractMaker
 	networkManager       network.ManagerInterface
 	communityTokensDB    *communitytokensdatabase.Database
@@ -99,7 +99,7 @@ type Manager struct {
 
 func NewTokenManager(
 	db *sql.DB,
-	RPCClient rpc.ClientInterface,
+	ethClientGetter rpc.EthClientGetter,
 	communityManager *community.Manager,
 	networkManager network.ManagerInterface,
 	appDB *sql.DB,
@@ -109,7 +109,7 @@ func NewTokenManager(
 	accountsDB *accounts.Database,
 	tokenBalancesStorage TokenBalancesStorage,
 ) *Manager {
-	maker, _ := contracts.NewContractMaker(RPCClient)
+	maker := contracts.NewContractMaker(ethClientGetter)
 
 	tokensLists, err := tokenlists.NewTokenLists(appDB, db)
 	if err != nil {
@@ -119,7 +119,7 @@ func NewTokenManager(
 
 	return &Manager{
 		db:                   db,
-		RPCClient:            RPCClient,
+		ethClientGetter:      ethClientGetter,
 		ContractMaker:        maker,
 		networkManager:       networkManager,
 		communityManager:     communityManager,
@@ -359,7 +359,7 @@ func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *tokenTyp
 		// Token is invalid or is alrady discovered. Nothing to do here.
 		return
 	}
-	backend, err := tm.RPCClient.EthClient(token.ChainID)
+	backend, err := tm.ethClientGetter.EthClient(token.ChainID)
 	if err != nil {
 		return
 	}

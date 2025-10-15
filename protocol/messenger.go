@@ -452,11 +452,7 @@ func NewMessenger(
 	}
 
 	if c.rpcClient != nil {
-		contractMaker, err := contracts.NewContractMaker(c.rpcClient)
-		if err != nil {
-			return nil, err
-		}
-		messenger.contractMaker = contractMaker
+		messenger.contractMaker = contracts.NewContractMaker(c.rpcClient)
 	}
 
 	messenger.mentionsManager = NewMentionManager(messenger)

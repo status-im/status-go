@@ -79,7 +79,7 @@ type PendingTxTracker struct {
 	db                    *sql.DB
 	routeExecutionStorage *storage.DB
 	trackedTxDB           *DB
-	rpcClient             rpc.ClientInterface
+	ethClientGetter       rpc.EthClientGetter
 
 	eventFeed *event.Feed
 
@@ -87,12 +87,12 @@ type PendingTxTracker struct {
 	logger     *zap.Logger
 }
 
-func NewPendingTxTracker(db *sql.DB, rpcClient rpc.ClientInterface, eventFeed *event.Feed, checkInterval time.Duration) *PendingTxTracker {
+func NewPendingTxTracker(db *sql.DB, ethClientGetter rpc.EthClientGetter, eventFeed *event.Feed, checkInterval time.Duration) *PendingTxTracker {
 	tm := &PendingTxTracker{
 		db:                    db,
 		routeExecutionStorage: storage.NewDB(db),
 		trackedTxDB:           NewDB(db),
-		rpcClient:             rpcClient,
+		ethClientGetter:       ethClientGetter,
 		eventFeed:             eventFeed,
 		logger:                logutils.ZapLogger().Named("PendingTxTracker"),
 	}
@@ -127,7 +127,7 @@ func (tm *PendingTxTracker) fetchAndUpdateDB(ctx context.Context) bool {
 	// Batch request for each chain
 	for chainID, txs := range txsMap {
 		tm.logger.Debug("Processing PTs", zap.Stringer("chainID", chainID), zap.Int("count", len(txs)))
-		batchRes, err := fetchBatchTxStatus(ctx, tm.rpcClient, chainID, txs, tm.logger)
+		batchRes, err := fetchBatchTxStatus(ctx, tm.ethClientGetter, chainID, txs, tm.logger)
 		if err != nil {
 			tm.logger.Error("Failed to batch fetch pending transactions status for", zap.Stringer("chainID", chainID), zap.Error(err))
 			continue
@@ -172,8 +172,8 @@ func (nr *nullableReceipt) UnmarshalJSON(data []byte) error {
 
 // fetchBatchTxStatus returns not pending transactions (confirmed or errored)
 // it excludes the still pending or errored request from the result
-func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chainID common.ChainID, hashes []eth.Hash, logger *zap.Logger) ([]txStatusRes, error) {
-	chainClient, err := rpcClient.AbstractEthClient(chainID)
+func fetchBatchTxStatus(ctx context.Context, ethClientGetter rpc.EthClientGetter, chainID common.ChainID, hashes []eth.Hash, logger *zap.Logger) ([]txStatusRes, error) {
+	chainClient, err := ethClientGetter.EthClient(uint64(chainID))
 	if err != nil {
 		logger.Error("Failed to get chain client", zap.Error(err))
 		return nil, err

@@ -33,12 +33,12 @@ type SwapParaswapTxArgs struct {
 }
 
 type SwapParaswapProcessor struct {
-	rpcClient      *rpc.Client
-	paraswapClient paraswap.ClientInterface
-	tokenManager   *walletToken.Manager
-	transactor     transactions.TransactorIface
-	priceRoute     sync.Map // [fromChainName-toChainName-fromTokenSymbol-toTokenSymbol, paraswap.Route]
-	transactions   sync.Map // [fromChainName-toChainName-fromTokenSymbol-toTokenSymbol, paraswap.Transaction]
+	ethClientGetter rpc.EthClientGetter
+	paraswapClient  paraswap.ClientInterface
+	tokenManager    *walletToken.Manager
+	transactor      transactions.TransactorIface
+	priceRoute      sync.Map // [fromChainName-toChainName-fromTokenSymbol-toTokenSymbol, paraswap.Route]
+	transactions    sync.Map // [fromChainName-toChainName-fromTokenSymbol-toTokenSymbol, paraswap.Transaction]
 }
 
 const (
@@ -63,12 +63,12 @@ func getPartnerAddressAndFeePcnt(chainID uint64) (common.Address, float64) {
 	return common.Address{}, 0
 }
 
-func NewSwapParaswapProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *SwapParaswapProcessor {
+func NewSwapParaswapProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *SwapParaswapProcessor {
 	defaultChainID := walletCommon.EthereumMainnet
 	partnerAddress, partnerFeePcnt := getPartnerAddressAndFeePcnt(defaultChainID)
 
 	return &SwapParaswapProcessor{
-		rpcClient: rpcClient,
+		ethClientGetter: ethClientGetter,
 		paraswapClient: paraswap.NewClientV5(
 			defaultChainID,
 			partnerID,
@@ -289,7 +289,7 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 		return 0, createENSRegisterProcessorErrorResponse(err)
 	}
 
-	ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createENSRegisterProcessorErrorResponse(err)
 	}

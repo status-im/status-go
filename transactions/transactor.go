@@ -52,7 +52,7 @@ func (e *ErrBadNonce) Error() string {
 
 // Transactor is an interface that defines the methods for validating and sending transactions.
 type TransactorIface interface {
-	NextNonce(ctx context.Context, rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error)
+	NextNonce(ctx context.Context, ethClientGetter rpc.EthClientGetter, chainID uint64, from types.Address) (uint64, error)
 	EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error)
 	SendTransaction(sendArgs wallettypes.SendTxArgs, verifiedAccount *generator.Account, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error)
 	SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, nonce uint64, err error)
@@ -103,13 +103,13 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 	t.rpcCallTimeout = timeout
 }
 
-func (t *Transactor) NextNonce(ctx context.Context, rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error) {
-	wrapper := newRPCWrapper(rpcClient, chainID)
+func (t *Transactor) NextNonce(ctx context.Context, ethClientGetter rpc.EthClientGetter, chainID uint64, from types.Address) (uint64, error) {
+	wrapper := newRPCWrapper(ethClientGetter, chainID)
 	return wrapper.PendingNonceAt(ctx, common.Address(from))
 }
 
 func (t *Transactor) EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error) {
-	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, network.ChainID)
+	rpcWrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, network.ChainID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
@@ -131,13 +131,13 @@ func (t *Transactor) SendTransaction(sendArgs wallettypes.SendTxArgs, verifiedAc
 }
 
 func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, nonce uint64, err error) {
-	wrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
+	wrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, chainID)
 	hash, nonce, err = t.validateAndPropagate(wrapper, verifiedAccount, sendArgs, lastUsedNonce)
 	return
 }
 
 func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64) (tx *gethtypes.Transaction, nonce uint64, err error) {
-	wrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
+	wrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, chainID)
 	tx, err = t.validateAndBuildTransaction(wrapper, sendArgs, lastUsedNonce)
 	if err != nil {
 		return nil, 0, err
@@ -151,7 +151,7 @@ func (t *Transactor) AddSignatureToTransaction(chainID uint64, tx *gethtypes.Tra
 		return nil, ErrInvalidSignatureSize
 	}
 
-	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
+	rpcWrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, chainID)
 	chID := big.NewInt(int64(rpcWrapper.chainID))
 
 	signer := gethtypes.NewLondonSigner(chID)
@@ -164,7 +164,7 @@ func (t *Transactor) AddSignatureToTransaction(chainID uint64, tx *gethtypes.Tra
 }
 
 func (t *Transactor) SendRawTransaction(chainID uint64, rawTx string) error {
-	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
+	rpcWrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, chainID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
@@ -227,7 +227,7 @@ func (t *Transactor) sendTransaction(rpcWrapper *rpcWrapper, from common.Address
 }
 
 func (t *Transactor) SendTransactionWithSignature(from common.Address, symbol string, tx *gethtypes.Transaction) (hash types.Hash, err error) {
-	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, tx.ChainId().Uint64())
+	rpcWrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, tx.ChainId().Uint64())
 
 	return t.sendTransaction(rpcWrapper, from, symbol, tx)
 }
@@ -248,7 +248,7 @@ func (t *Transactor) BuildTransactionWithSignature(chainID uint64, args walletty
 	defer cancel()
 
 	tx := t.buildTransaction(args)
-	expectedNonce, err := t.NextNonce(ctx, t.rpcWrapper.RPCClient, chainID, args.From)
+	expectedNonce, err := t.NextNonce(ctx, t.rpcWrapper.ethClientGetter, chainID, args.From)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +275,7 @@ func (t *Transactor) HashTransaction(args wallettypes.SendTxArgs) (validatedArgs
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
 
-	nonce, err := t.NextNonce(ctx, t.rpcWrapper.RPCClient, t.rpcWrapper.chainID, args.From)
+	nonce, err := t.NextNonce(ctx, t.rpcWrapper.ethClientGetter, t.rpcWrapper.chainID, args.From)
 	if err != nil {
 		return validatedArgs, hash, err
 	}
@@ -376,7 +376,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args wa
 	} else {
 		// some chains, like arbitrum doesn't count pending txs in the nonce, so we need to calculate it manually
 		if lastUsedNonce < 0 {
-			nonce, err = t.NextNonce(ctx, rpcWrapper.RPCClient, rpcWrapper.chainID, args.From)
+			nonce, err = t.NextNonce(ctx, rpcWrapper.ethClientGetter, rpcWrapper.chainID, args.From)
 			if err != nil {
 				return tx, err
 			}

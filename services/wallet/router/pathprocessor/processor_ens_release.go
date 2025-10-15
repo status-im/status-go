@@ -21,18 +21,18 @@ import (
 )
 
 type ENSReleaseProcessor struct {
-	contractMaker *contracts.ContractMaker
-	transactor    transactions.TransactorIface
-	ensResolver   *ensresolver.EnsResolver
+	contractMaker   *contracts.ContractMaker
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
+	ensResolver     *ensresolver.EnsResolver
 }
 
-func NewENSReleaseProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, ensResolver *ensresolver.EnsResolver) *ENSReleaseProcessor {
+func NewENSReleaseProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, ensResolver *ensresolver.EnsResolver) *ENSReleaseProcessor {
 	return &ENSReleaseProcessor{
-		contractMaker: &contracts.ContractMaker{
-			RPCClient: rpcClient,
-		},
-		transactor:  transactor,
-		ensResolver: ensResolver,
+		contractMaker:   contracts.NewContractMaker(ethClientGetter),
+		ethClientGetter: ethClientGetter,
+		transactor:      transactor,
+		ensResolver:     ensResolver,
 	}
 }
 
@@ -77,7 +77,7 @@ func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams, input []b
 		return 0, createENSReleaseErrorResponse(err)
 	}
 
-	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createENSReleaseErrorResponse(err)
 	}

@@ -40,7 +40,7 @@ type Service struct {
 	activityFetcherManager ManagerIface
 	networksGetter         network.GetterInterface
 	accountsGetter         accounts.AccountsStorage
-	rpcClient              rpc.ClientInterface
+	ethClientGetter        rpc.EthClientGetter
 
 	networksPublisher *pubsub.Publisher
 	accountsPublisher *pubsub.Publisher
@@ -61,7 +61,7 @@ func NewService(
 	networksGetter network.GetterInterface,
 	accountsGetter accounts.AccountsStorage,
 	accountsPublisher *pubsub.Publisher,
-	rpcClient rpc.ClientInterface,
+	ethClientGetter rpc.EthClientGetter,
 	eventFeed *event.Feed,
 ) *Service {
 	logger := logutils.ZapLogger().Named("ActivityFetcher")
@@ -70,7 +70,7 @@ func NewService(
 		activityFetcherManager: activityFetcherManager,
 		networksGetter:         networksGetter,
 		accountsGetter:         accountsGetter,
-		rpcClient:              rpcClient,
+		ethClientGetter:        ethClientGetter,
 		networksPublisher:      networksGetter.GetPublisher(),
 		accountsPublisher:      accountsPublisher,
 		eventFeed:              eventFeed,
@@ -443,12 +443,12 @@ func (s *Service) startFetchActivity(ctx context.Context, fetcherID fetcherID) {
 func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account gethcommon.Address) {
 
 	// Get current block
-	rpcClient, err := s.rpcClient.EthClient(chainID)
+	ethClient, err := s.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		s.logger.Error("Failed to get rpc client", zap.Error(err))
 		return
 	}
-	currentBlock, err := rpcClient.BlockNumber(ctx)
+	currentBlock, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		s.logger.Error("Failed to get current block", zap.Error(err))
 		return

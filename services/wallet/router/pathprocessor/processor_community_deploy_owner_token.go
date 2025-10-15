@@ -27,16 +27,16 @@ import (
 )
 
 type CommunityDeployOwnerTokenProcessor struct {
-	contractMaker *communitytokens.CommunityTokensContractMaker
-	transactor    transactions.TransactorIface
+	contractMaker   *communitytokens.CommunityTokensContractMaker
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
 }
 
-func NewCommunityDeployOwnerTokenProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *CommunityDeployOwnerTokenProcessor {
+func NewCommunityDeployOwnerTokenProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *CommunityDeployOwnerTokenProcessor {
 	return &CommunityDeployOwnerTokenProcessor{
-		contractMaker: &communitytokens.CommunityTokensContractMaker{
-			RPCClient: rpcClient,
-		},
-		transactor: transactor,
+		contractMaker:   communitytokens.NewCommunityTokensContractMakerMaker(ethClientGetter),
+		ethClientGetter: ethClientGetter,
+		transactor:      transactor,
 	}
 }
 
@@ -138,7 +138,7 @@ func (s *CommunityDeployOwnerTokenProcessor) EstimateGas(params ProcessorInputPa
 		return 0, createCommunityDeployOwnerTokenErrorResponse(err)
 	}
 
-	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createCommunityDeployOwnerTokenErrorResponse(err)
 	}

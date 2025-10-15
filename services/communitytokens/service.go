@@ -48,6 +48,7 @@ type Service struct {
 	walletWatcher   *walletevent.Watcher
 	transactor      *transactions.Transactor
 	feeManager      *fees.FeeManager
+	ethClientGetter rpc.EthClientGetter
 }
 
 // Returns a new Collectibles Service.
@@ -60,7 +61,8 @@ func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsM
 		db:              communitytokensdatabase.NewCommunityTokensDatabase(appDb),
 		walletFeed:      walletFeed,
 		transactor:      transactor,
-		feeManager:      &fees.FeeManager{RPCClient: rpcClient},
+		feeManager:      fees.NewFeeManager(rpcClient),
+		ethClientGetter: rpcClient,
 	}
 }
 
@@ -520,7 +522,7 @@ func (s *Service) TemporaryOwnerContractAddress(hash string) string {
 }
 
 func (s *Service) GetMasterTokenContractAddressFromHash(ctx context.Context, chainID uint64, txHash string) (string, error) {
-	ethClient, err := s.manager.contractMaker.RPCClient.EthClient(chainID)
+	ethClient, err := s.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return "", err
 	}
@@ -551,7 +553,7 @@ func (s *Service) GetMasterTokenContractAddressFromHash(ctx context.Context, cha
 }
 
 func (s *Service) GetOwnerTokenContractAddressFromHash(ctx context.Context, chainID uint64, txHash string) (string, error) {
-	ethClient, err := s.manager.contractMaker.RPCClient.EthClient(chainID)
+	ethClient, err := s.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return "", err
 	}

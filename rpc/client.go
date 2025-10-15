@@ -22,8 +22,6 @@ import (
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/services/rpcstats"
-	"github.com/status-im/status-go/services/wallet/common"
 )
 
 const (
@@ -52,12 +50,8 @@ func init() {
 }
 
 type ClientInterface interface {
-	AbstractEthClient(chainID common.ChainID) (ethclient.BatchCallClient, error)
-	EthClient(chainID uint64) (chain.ClientInterface, error)
-	EthClients(chainIDs []uint64) (map[uint64]chain.ClientInterface, error)
+	EthClientGetter
 	EthClientWithProvider(chainID uint64, provider string) (ethclient.EthClientInterface, error)
-	CallContext(context context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error
-	Call(result interface{}, chainID uint64, method string, args ...interface{}) error
 	GetNetworkManager() *network.Manager
 }
 
@@ -65,12 +59,9 @@ type EthClientGetter interface {
 	EthClient(chainID uint64) (ethclient.EthClientInterface, error)
 }
 
-// Client represents RPC client with custom routing
-// scheme. It automatically decides where RPC call
-// goes - Upstream or Local node.
+// Client manages RPC clients for multiple chains with
+// multiple providers for each chain.
 type Client struct {
-	sync.RWMutex
-
 	UpstreamChainID uint64
 
 	rpcClientsMutex    sync.RWMutex
@@ -292,7 +283,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 }
 
 // EthClient returns ethclient.Client per chain
-func (c *Client) EthClient(chainID uint64) (chain.ClientInterface, error) {
+func (c *Client) EthClient(chainID uint64) (ethclient.EthClientInterface, error) {
 	client, err := c.getClientUsingCache(chainID)
 	if err != nil {
 		return nil, err
@@ -308,52 +299,4 @@ func (c *Client) EthClientWithProvider(chainID uint64, provider string) (ethclie
 	}
 
 	return client.GetProviderClient(provider), nil
-}
-
-// AbstractEthClient returns a partial abstraction used by new components for testing purposes
-func (c *Client) AbstractEthClient(chainID common.ChainID) (ethclient.BatchCallClient, error) {
-	client, err := c.getClientUsingCache(uint64(chainID))
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
-}
-
-func (c *Client) EthClients(chainIDs []uint64) (map[uint64]chain.ClientInterface, error) {
-	clients := make(map[uint64]chain.ClientInterface, 0)
-	for _, chainID := range chainIDs {
-		client, err := c.getClientUsingCache(chainID)
-		if err != nil {
-			return nil, err
-		}
-		clients[chainID] = client
-	}
-
-	return clients, nil
-}
-
-// SetClient strictly for testing purposes
-func (c *Client) SetClient(chainID uint64, client chain.ClientInterface) {
-	c.rpcClientsMutex.Lock()
-	defer c.rpcClientsMutex.Unlock()
-	c.rpcClients[chainID] = client
-}
-
-// Call is a wrapper around CallContext with background context
-func (c *Client) Call(result interface{}, chainID uint64, method string, args ...interface{}) error {
-	ctx := context.Background()
-	return c.CallContext(ctx, result, chainID, method, args...)
-}
-
-// CallContext selects an EthClient and calls CallContext on it.
-func (c *Client) CallContext(ctx context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error {
-	rpcstats.CountCall(method)
-
-	client, err := c.EthClient(chainID)
-	if err != nil {
-		return err
-	}
-
-	return client.CallContext(ctx, result, method, args...)
 }

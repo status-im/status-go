@@ -40,7 +40,7 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 
 	return &Manager{
 			db:                   walletDb,
-			RPCClient:            nil,
+			ethClientGetter:      nil,
 			ContractMaker:        nil,
 			networkManager:       nil,
 			communityTokensDB:    nil,
@@ -280,16 +280,13 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 
 	address := common.HexToAddress("0x1234")
 	accountsPublisher := pubsub.NewPublisher()
-	chainID := uint64(1)
 
 	config := rpc.ClientConfig{
-		UpstreamChainID: chainID,
-		Networks:        nil,
-		DB:              appDB,
+		Networks: nil,
+		DB:       appDB,
 	}
 	rpcClient, _ := rpc.NewClient(config)
 
-	rpcClient.UpstreamChainID = chainID
 	nm := network.NewManager(appDB, nil)
 	mediaServer, err := mediaserver.NewMediaServer(appDB, nil, nil, walletDB)
 	require.NoError(t, err)

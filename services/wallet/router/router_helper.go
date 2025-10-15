@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/contracts/hop"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -40,10 +40,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 		return false, nil, nil
 	}
 
-	contractMaker, err := contracts.NewContractMaker(r.rpcClient)
-	if err != nil {
-		return false, nil, err
-	}
+	contractMaker := contracts.NewContractMaker(r.rpcClient)
 
 	contract, err := contractMaker.NewERC20(params.FromChain.ChainID, params.FromToken.Address)
 	if err != nil {
@@ -96,7 +93,7 @@ func (r *Router) calculateL1Fee(chainID uint64, data []byte) (*big.Int, error) {
 	return CalculateL1Fee(chainID, data, ethClient)
 }
 
-func CalculateL1Fee(chainID uint64, data []byte, ethClient chain.ClientInterface) (*big.Int, error) {
+func CalculateL1Fee(chainID uint64, data []byte, ethClient ethclient.EthClientInterface) (*big.Int, error) {
 	oracleContractAddress, err := gaspriceproxy.ContractAddress(chainID)
 	if err != nil {
 		return nil, err

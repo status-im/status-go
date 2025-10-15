@@ -67,7 +67,6 @@ type EthClientInterface interface {
 	BaseEthClientInterface
 	// Additional external calls
 	RPCClientInterface
-	GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error)
 	bind.ContractCaller
 	bind.ContractBackend
 }
@@ -87,24 +86,6 @@ func NewEthClient(rpcClient *rpc.Client) *EthClient {
 
 func (ec *EthClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
 	return ec.rpcClient.BatchCallContext(ctx, b)
-}
-
-func (ec *EthClient) GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error) {
-	feeHistory, err := ec.FeeHistory(ctx, 1, blockNumber, nil)
-
-	if err != nil {
-		if err.Error() == "the method eth_feeHistory does not exist/is not available" {
-			return "", nil
-		}
-		return "", err
-	}
-
-	var baseGasFee string = ""
-	if len(feeHistory.BaseFee) > 0 {
-		baseGasFee = feeHistory.BaseFee[0].String()
-	}
-
-	return baseGasFee, err
 }
 
 func (ec *EthClient) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {

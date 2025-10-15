@@ -163,7 +163,7 @@ func (b *StatusNode) connectorService() *connector.Service {
 			b.logger.Named("connector"),
 			b.walletDB,
 			b.rpcClient,
-			&fees.FeeManager{RPCClient: b.rpcClient},
+			fees.NewFeeManager(b.rpcClient),
 			b.rpcClient.GetNetworkManager(),
 			&connector.Config{
 				WSHost: b.config.WSHost,

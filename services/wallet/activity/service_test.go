@@ -12,7 +12,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	ethclient "github.com/status-im/status-go/rpc/chain/ethclient"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -79,8 +79,8 @@ func setupTestService(tb testing.TB) (state testState) {
 
 	state.chainClient = transactions.NewMockChainClient()
 	state.rpcClient = mock_rpcclient.NewMockClientInterface(mockCtrl)
-	state.rpcClient.EXPECT().AbstractEthClient(gomock.Any()).DoAndReturn(func(chainID common.ChainID) (ethclient.BatchCallClient, error) {
-		return state.chainClient.AbstractEthClient(chainID)
+	state.rpcClient.EXPECT().EthClient(gomock.Any()).DoAndReturn(func(chainID common.ChainID) (ethclient.BatchCallClient, error) {
+		return state.chainClient.EthClient(chainID)
 	}).AnyTimes()
 
 	// Ensure we process pending transactions as needed, only once
@@ -90,7 +90,6 @@ func setupTestService(tb testing.TB) (state testState) {
 	state.service = NewService(db, accountsDB, state.tokenMock, state.collectiblesMock, state.eventFeed)
 	state.service.debounceDuration = 0
 	state.close = func() {
-		require.NoError(tb, state.pendingTracker.Stop())
 		require.NoError(tb, db.Close())
 		defer mockCtrl.Finish()
 	}
@@ -102,7 +101,7 @@ func setupTransactions(t *testing.T, state testState, txCount int, testTxs []tra
 	ch = make(chan walletevent.Event, 4)
 	sub := state.eventFeed.Subscribe(ch)
 
-	pendings = transactions.MockTestTransactions(t, state.chainClient, testTxs)
+	pendings = transactions.GenerateTestPendingTransactionsWithSummary(testTxs)
 	for _, p := range pendings {
 		allAddresses = append(allAddresses, p.From, p.To)
 	}

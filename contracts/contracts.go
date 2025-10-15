@@ -3,8 +3,6 @@ package contracts
 //go:generate go tool mockgen -source=contracts.go -destination=mock/contracts.go
 
 import (
-	"errors"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/contracts/directory"
 	"github.com/status-im/status-go/contracts/ierc20"
@@ -23,18 +21,15 @@ type ContractMakerIface interface {
 }
 
 type ContractMaker struct {
-	RPCClient rpc.ClientInterface
+	ethClientGetter rpc.EthClientGetter
 }
 
-func NewContractMaker(client rpc.ClientInterface) (*ContractMaker, error) {
-	if client == nil {
-		return nil, errors.New("could not initialize ContractMaker with an rpc client")
-	}
-	return &ContractMaker{RPCClient: client}, nil
+func NewContractMaker(client rpc.EthClientGetter) *ContractMaker {
+	return &ContractMaker{ethClientGetter: client}
 }
 
 func (c *ContractMaker) NewRegistryWithAddress(chainID uint64, address common.Address) (*resolver.ENSRegistryWithFallback, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +49,7 @@ func (c *ContractMaker) NewRegistry(chainID uint64) (*resolver.ENSRegistryWithFa
 }
 
 func (c *ContractMaker) NewPublicResolver(chainID uint64, resolverAddress *common.Address) (*resolver.PublicResolver, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +58,7 @@ func (c *ContractMaker) NewPublicResolver(chainID uint64, resolverAddress *commo
 }
 
 func (c *ContractMaker) NewUsernameRegistrar(chainID uint64, contractAddr common.Address) (*registrar.UsernameRegistrar, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +70,7 @@ func (c *ContractMaker) NewUsernameRegistrar(chainID uint64, contractAddr common
 }
 
 func (c *ContractMaker) NewERC20(chainID uint64, contractAddr common.Address) (ierc20.IERC20Iface, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +81,7 @@ func (c *ContractMaker) NewERC20(chainID uint64, contractAddr common.Address) (i
 	)
 }
 func (c *ContractMaker) NewERC20Caller(chainID uint64, contractAddr common.Address) (ierc20.IERC20CallerIface, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +95,7 @@ func (c *ContractMaker) NewSNT(chainID uint64) (*snt.SNT, error) {
 		return nil, err
 	}
 
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +109,7 @@ func (c *ContractMaker) NewStickerType(chainID uint64) (*stickers.StickerType, e
 		return nil, err
 	}
 
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +126,7 @@ func (c *ContractMaker) NewStickerMarket(chainID uint64) (*stickers.StickerMarke
 		return nil, err
 	}
 
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +143,7 @@ func (c *ContractMaker) NewStickerPack(chainID uint64) (*stickers.StickerPack, e
 		return nil, err
 	}
 
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +160,7 @@ func (c *ContractMaker) NewDirectory(chainID uint64) (*directory.Directory, erro
 		return nil, err
 	}
 
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +172,7 @@ func (c *ContractMaker) NewDirectory(chainID uint64) (*directory.Directory, erro
 }
 
 func (c *ContractMaker) NewNameWrapper(chainID uint64, address *common.Address) (*namewrapper.Namewrapper, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
