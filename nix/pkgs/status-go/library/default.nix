@@ -1,4 +1,4 @@
-{ 
+{
   pkgs,
   self,
   meta,
@@ -20,13 +20,14 @@ in pkgs.buildGoModule {
     fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
   in
     with pkgs; [
+      which
       mockgen
       protoc-gen-go
       protobuf3_24
       fakeGit
   ];
 
-  phases = ["unpackPhase" "configurePhase" "buildPhase"];
+  phases = ["unpackPhase" "configurePhase" "patchPhase" "buildPhase"];
 
   # https://pkg.go.dev/net#hdr-Name_Resolution
   # https://github.com/status-im/status-mobile/issues/19736
@@ -37,6 +38,17 @@ in pkgs.buildGoModule {
   # Since go 1.21 status-go compiled library includes references to cgo runtime.
   # FIXME: Remove this when go 1.23 or later versions fix this madness.
   allowGoReference = true;
+
+  # TODO: This is wrong, we shouldn't be building `nim-sds` as part of this derivtion.
+  # Instead we need to fix flake.nix in nim-sds and pull already built lib from that.
+  NIX_DEBUG = 1;
+  patchPhase = ''
+    pushd vendor/github.com/waku-org/sds-go-bindings
+    mkdir -p third_party
+    cp -r ${pkgs.nim-sds-src} third_party/nim-sds
+    chmod 775 -R third_party/nim-sds
+    popd
+  '';
 
   preBuild = ''
     go run cmd/library/*.go > $NIX_BUILD_TOP/main.go

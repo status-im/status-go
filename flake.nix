@@ -42,9 +42,7 @@
           (final: prev: {
             # Make nwaku available
             nwaku = nwaku.packages.${system};
-
-            # Make nim-sds available
-            nim-sds = nim-sds.packages.${system};
+            nim-sds-src = nim-sds.sourceInfo.outPath;
           })
         ];
       }
@@ -60,26 +58,8 @@
 
         # Import your Status Go packaging logic
         statusGo = import ./nix/pkgs/status-go { inherit self pkgs; };
-      in
-      let
-        statusGoLibrary = pkgs.stdenv.mkDerivation {
-          inherit (statusGo.library) pname version src nativeBuildInputs;
-
-          # Add Go, git, and GNU Make
-          buildInputs = statusGo.library.buildInputs ++ [ pkgs.nim-sds pkgs.go pkgs.git pkgs.gnumake pkgs.protobuf ];
-
-          patchPhase = ''
-            echo "Patching sds Makefile to avoid network clone..."
-            substituteInPlace vendor/github.com/waku-org/sds-go-bindings/sds/Makefile \
-              --replace-warn "git clone https://github.com/waku-org/nim-sds" \
-                            "cp -r ${pkgs.nim-sds}/. nim-sds"
-          '';
-
-          # Reuse buildPhase etc. if needed
-          inherit (statusGo.library) preBuild buildPhase installPhase;
-        };
       in {
-        status-go-library = statusGoLibrary;
+        status-go-library = statusGo.library;
         status-go-mobile-android = statusGo.mobile.android { };
         status-go-mobile-ios = statusGo.mobile.ios { };
       });
