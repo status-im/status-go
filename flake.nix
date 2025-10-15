@@ -42,13 +42,22 @@
             # Make nwaku available
             nwaku = nwaku.packages.${system};
 
-            # 🧩 Add nim-sds dependency here (fetched once, no git clone)
+            # Add nim-sds dependency here (fetched once, no git clone)
             nim-sds = prev.fetchFromGitHub {
               owner = "waku-org";
               repo = "nim-sds";
               rev = "23d001adb94436d886d66258a11ae19669ac8f71";
               sha256 = "sha256-2z/3VTWkN3UW3NdX6S+QK0s4sCdEqbRJRkKJQig7fJc=";
             };
+
+            # Add Nim compiler 2.2.4
+            nim = prev.nim.overrideAttrs (old: rec {
+              version = "2.2.4";
+              src = prev.fetchurl {
+                url = "https://github.com/nim-lang/Nim/archive/refs/tags/v2.2.4.tar.gz";
+                sha256 = "sha256-8Z35GS98nv1jj4u/YwzBhMyZUGEyNceiPZlZMmmx4t4=";
+              };
+            });
           })
         ];
       }
@@ -70,7 +79,7 @@
           inherit (statusGo.library) pname version src nativeBuildInputs;
 
           # Add Go, git, and GNU Make
-          buildInputs = statusGo.library.buildInputs ++ [ pkgs.go pkgs.git pkgs.gnumake pkgs.protobuf ];
+          buildInputs = statusGo.library.buildInputs ++ [ pkgs.go pkgs.git pkgs.gnumake pkgs.protobuf pkgs.nim ];
 
           # Patch sds Makefile to avoid network clone
           patchPhase = ''
