@@ -39,15 +39,14 @@ in pkgs.buildGoModule {
   # FIXME: Remove this when go 1.23 or later versions fix this madness.
   allowGoReference = true;
 
-  # TODO: This is wrong, we shouldn't be building `nim-sds` as part of this derivtion.
-  # Instead we need to fix flake.nix in nim-sds and pull already built lib from that.
   NIX_DEBUG = 1;
   patchPhase = ''
-    pushd vendor/github.com/waku-org/sds-go-bindings
-    mkdir -p third_party
-    cp -r ${pkgs.nim-sds-src} third_party/nim-sds
-    chmod 775 -R third_party/nim-sds
-    popd
+    mkdir -p vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build
+    mkdir -p vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library
+    chmod 775 -R vendor/github.com/waku-org/sds-go-bindings/third_party/
+
+    cp ${pkgs.lib-sds-pkg}/include/*h vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library
+    cp ${pkgs.lib-sds-pkg}/lib/* vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/
   '';
 
   preBuild = ''
@@ -74,6 +73,10 @@ in pkgs.buildGoModule {
       substituteInPlace "$env_sh" \
         --replace-warn "/vendor/Nim/bin/nim" "${pkgs.nim}/bin/nim"
     fi
+
+    # Avoid building nim-sds because the lib and header comes from nim-sds flake in patchPhase
+    substituteInPlace Makefile \
+      --replace-warn "cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build" "echo 'Skipping nim-sds build...'"
 
     runHook preBuild
     go build \
