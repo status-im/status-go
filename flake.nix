@@ -45,6 +45,7 @@
 
             # Make nim-sds available
             nim-sds = nim-sds.packages.${system};
+            nim-sds-out = nim-sds.packages.${system}.outPath;
           })
         ];
       }
@@ -72,7 +73,7 @@
             echo "Patching sds Makefile to avoid network clone..."
             substituteInPlace vendor/github.com/waku-org/sds-go-bindings/sds/Makefile \
               --replace-warn "git clone https://github.com/waku-org/nim-sds" \
-                            "cp -r ${toString pkgs.nim-sds} nim-sds"
+                            "cp -r ${pkgs.nim-sds-out}/. nim-sds"
           '';
 
           # Reuse buildPhase etc. if needed
