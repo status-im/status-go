@@ -30,10 +30,10 @@ func TestStorageMemory_UpdateNativeBalance(t *testing.T) {
 		FetchedAt:     time.Now().Unix(),
 	}
 
-	// Test first update
+	// Test first update (initial update always reports a balance change)
 	balanceChanged, oldState, err := storage.UpdateNativeBalance(ctx, key, balance, state)
 	require.NoError(t, err)
-	assert.False(t, balanceChanged)
+	assert.True(t, balanceChanged)
 	assert.Equal(t, multistandardbalance.NeverFetched, oldState.FetchedAt)
 
 	// Test update with same block number (should not update)
@@ -114,10 +114,10 @@ func TestStorageMemory_UpdateERC20Balances(t *testing.T) {
 		FetchedAt:     time.Now().Unix(),
 	}
 
-	// Test first update
+	// Test first update (initial update always reports a balance change)
 	balanceChanged, oldState, err := storage.UpdateERC20Balances(ctx, key, balances, state)
 	require.NoError(t, err)
-	assert.False(t, balanceChanged)
+	assert.True(t, balanceChanged)
 	assert.Equal(t, multistandardbalance.NeverFetched, oldState.FetchedAt)
 
 	// Test update with same balances
@@ -203,10 +203,10 @@ func TestStorageMemory_UpdateERC721Balances(t *testing.T) {
 		FetchedAt:     time.Now().Unix(),
 	}
 
-	// Test first update
+	// Test first update (initial update always reports a balance change)
 	balanceChanged, oldState, err := storage.UpdateERC721Balances(ctx, key, balances, state)
 	require.NoError(t, err)
-	assert.False(t, balanceChanged)
+	assert.True(t, balanceChanged)
 	assert.Equal(t, multistandardbalance.NeverFetched, oldState.FetchedAt)
 
 	// Test update with same balances
@@ -281,10 +281,10 @@ func TestStorageMemory_UpdateERC1155Balances(t *testing.T) {
 		FetchedAt:     time.Now().Unix(),
 	}
 
-	// Test first update
+	// Test first update (initial update always reports a balance change)
 	balanceChanged, oldState, err := storage.UpdateERC1155Balances(ctx, key, balances, state)
 	require.NoError(t, err)
-	assert.False(t, balanceChanged)
+	assert.True(t, balanceChanged)
 	assert.Equal(t, multistandardbalance.NeverFetched, oldState.FetchedAt)
 
 	// Test update with same balances

@@ -1,11 +1,11 @@
-from clients.smart_contract_runner import SmartContractRunner
+from clients.foundry import Foundry
 from resources.constants import DEPLOYER_ACCOUNT
 
 
 class CommunitiesDeployer:
 
-    def __init__(self, smart_contract_runner: SmartContractRunner):
-        self.deploy_output = smart_contract_runner.clone_and_run(
+    def __init__(self, foundry: Foundry):
+        self.deploy_output = foundry.clone_and_run(
             github_org="status-im",
             github_repo="communities-contracts",
             smart_contract_dir="script",

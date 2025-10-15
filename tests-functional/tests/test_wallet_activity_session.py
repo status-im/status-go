@@ -4,7 +4,6 @@ import uuid as uuid_lib
 import pytest
 from web3 import Web3
 
-from clients.anvil import Anvil
 from clients.contract_deployers.communities import CommunitiesDeployer
 from clients.contract_deployers.snt import (
     SNTDeployer,
@@ -12,7 +11,6 @@ from clients.contract_deployers.snt import (
     SNT_TOKEN_CONTROLLER_ABI,
 )
 from clients.signals import SignalType
-from clients.smart_contract_runner import SmartContractRunner
 from resources.constants import DEPLOYER_ACCOUNT
 from resources.constants import user_1, user_2
 from utils import wallet_utils
@@ -65,18 +63,19 @@ class TestWalletActivitySession:
         self.anvil_client.eth.wait_for_transaction_receipt(tx_hash)
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_recovered_profile):
+    def setup_backend(self, backend_recovered_profile, anvil_client, foundry_client, multicall3_deployer):
         # Setup contracts and deployers
-        self.anvil_client = Anvil()
+        self.anvil_client = anvil_client
         self.anvil_client.eth.default_account = Web3.to_checksum_address(DEPLOYER_ACCOUNT.address)
-        self.smart_contract_runner = SmartContractRunner()
-        self.snt_deployer = SNTDeployer(self.smart_contract_runner)
-        self.communities_deployer = CommunitiesDeployer(self.smart_contract_runner)
+        self.snt_deployer = SNTDeployer(foundry_client)
+        self.communities_deployer = CommunitiesDeployer(foundry_client)
         self.erc20_token_list = {"SNT": self.snt_deployer.snt_contract_address}
         token_overrides = self._token_list_to_token_overrides(self.erc20_token_list)
 
         # Create backend
-        self.rpc_client = backend_recovered_profile(name="rpc_client", user=user_1, token_overrides=token_overrides)
+        self.rpc_client = backend_recovered_profile(
+            name="rpc_client", user=user_1, token_overrides=token_overrides, multicall_contract_address=multicall3_deployer.contract_address
+        )
 
         self.mint_snt(user_1.address, 1000000000000000000000000)
 

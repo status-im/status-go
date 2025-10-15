@@ -2348,7 +2348,7 @@ func (b *GethStatusBackend) initProtocol() error {
 		TimeSource:             b.statusNode.TimeSource(),
 		MetricsEnabled:         b.prometheusMetrics != nil,
 		TokenManager:           NewCommunitiesTokenManager(b.statusNode.TokenManager()),
-		TokenBalanceManager:    NewCommunitiesTokenBalanceManager(b.statusNode.TokenManager()),
+		TokenBalanceManager:    NewCommunitiesTokenBalanceManager(b.statusNode.TokenBalancesFetcher(), b.statusNode.TokenBalancesStorage()),
 		NetworkManager:         NewCommunitiesNetworkManager(b.statusNode.RPCClient().GetNetworkManager()),
 	}
 	err = st.InitProtocol(params)

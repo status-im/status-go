@@ -9,6 +9,7 @@ import (
 
 	"gopkg.in/go-playground/validator.v9"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/pkg/security"
@@ -232,6 +233,8 @@ type WalletConfig struct {
 
 	TokensListsAutoRefreshInterval      int `json:"TokensListsAutoRefreshInterval"`      // in seconds
 	TokensListsAutoRefreshCheckInterval int `json:"TokensListsAutoRefreshCheckInterval"` // in seconds
+
+	MulticallOverrides map[uint64]common.Address `json:"MulticallOverrides"` // map[chainID]multicall3 contract address
 }
 
 type MarketDataProxyConfig struct {
@@ -247,15 +250,17 @@ type MarketDataProxyConfig struct {
 // there's a function called `startNode` will log NodeConfig which include WalletConfig
 func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Enabled                             bool `json:"Enabled"`
-		EnableMercuryoProvider              bool `json:"EnableMercuryoProvider"`
-		TokensListsAutoRefreshInterval      int  `json:"TokensListsAutoRefreshInterval"`
-		TokensListsAutoRefreshCheckInterval int  `json:"TokensListsAutoRefreshCheckInterval"`
+		Enabled                             bool                      `json:"Enabled"`
+		EnableMercuryoProvider              bool                      `json:"EnableMercuryoProvider"`
+		TokensListsAutoRefreshInterval      int                       `json:"TokensListsAutoRefreshInterval"`
+		TokensListsAutoRefreshCheckInterval int                       `json:"TokensListsAutoRefreshCheckInterval"`
+		MulticallOverrides                  map[uint64]common.Address `json:"MulticallOverrides"`
 	}{
 		Enabled:                             wc.Enabled,
 		EnableMercuryoProvider:              wc.EnableMercuryoProvider,
 		TokensListsAutoRefreshInterval:      wc.TokensListsAutoRefreshInterval,
 		TokensListsAutoRefreshCheckInterval: wc.TokensListsAutoRefreshCheckInterval,
+		MulticallOverrides:                  wc.MulticallOverrides,
 	})
 }
 

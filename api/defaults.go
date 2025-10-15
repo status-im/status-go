@@ -201,6 +201,9 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if walletRequest.MarketDataPriceRefreshInterval != 0 {
 		walletConfig.MarketDataProxyConfig.PriceRefreshInterval = walletRequest.MarketDataPriceRefreshInterval
 	}
+	if len(walletRequest.MulticallOverrides) > 0 {
+		walletConfig.MulticallOverrides = walletRequest.MulticallOverrides
+	}
 
 	if !request.StatusProxyUser.Empty() {
 		walletConfig.StatusProxyUser = request.StatusProxyUser

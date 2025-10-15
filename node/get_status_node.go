@@ -53,6 +53,7 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/transactions"
 )
@@ -503,4 +504,18 @@ func (n *StatusNode) GetWalletDB() *sql.DB {
 
 func (n *StatusNode) TokenManager() *token.Manager {
 	return n.tokenManager
+}
+
+func (n *StatusNode) TokenBalancesFetcher() *tokenbalances.Fetcher {
+	if n.walletSrvc != nil {
+		n.walletSrvc.GetTokenBalancesFetcher()
+	}
+	return nil
+}
+
+func (n *StatusNode) TokenBalancesStorage() tokenbalances.Storage {
+	if n.walletSrvc != nil {
+		return n.walletSrvc.GetTokenBalancesStorage()
+	}
+	return nil
 }
