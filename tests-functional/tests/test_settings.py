@@ -22,8 +22,28 @@ class TestSettings:
         assert cfg["HTTPEnabled"] == boot_api["httpEnabled"]
         assert cfg["HTTPPort"] == boot_api["httpPort"]
 
-    # def test_verify_node_config_enforce(self):
-    # forced_network_id = 4242
+    def test_verify_node_config_enforce(self, backend_new_profile):
+        forced_network_id = 4242
+        forced = backend_new_profile("forced_network", network_id=forced_network_id)
+        cfg = forced.settings_service.get_node_config()
+        network_id = cfg.get("NetworkId", cfg.get("networkId"))
+        assert network_id is not None, f"NetworkId key missing in node config: {cfg}"
+        assert int(network_id) == forced_network_id, f"Expected NetworkId={forced_network_id}, got {network_id}"
 
-    # cfg = self.config.settings_service.get_node_config()
-    # assert cfg["NetworkId"] == forced_network_id, f"Expected NetworkId={forced_network_id}, got {cfg['NetworkId']}"
+    def test_news_feed_enabled(self):
+        result = self.config.settings_service.news_feed_enabled()
+        assert isinstance(result, bool), f"Expected boolean, got {type(result)}"
+        print(f"News feed enabled: {result}")
+
+    def test_toggle_news_feed_enabled(self):
+        self.config.settings_service.save_setting("news-feed-enabled?", False)
+        is_enabled = self.config.settings_service.news_feed_enabled()
+        assert is_enabled is False, "Expected False"
+
+        # Optional: verify the raw settings map also reflects it
+        settings_map = self.config.settings_service.get_settings()
+        assert settings_map.get("news-feed-enabled?") is False
+
+        # Cleanup: re-enable
+        self.config.settings_service.save_setting("news-feed-enabled?", True)
+        assert self.config.settings_service.news_feed_enabled() is True
