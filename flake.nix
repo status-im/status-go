@@ -18,9 +18,10 @@
     nixpkgs.url = "github:NixOS/nixpkgs/0ef228213045d2cdb5a169a95d63ded38670b293";
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
     nwaku.url = "git+https://github.com/waku-org/nwaku?submodules=1&rev=e755fd834f5f3d6fba216b09469316f0328b3b6f";
+    nim-sds.url = "git+https://github.com/waku-org/nim-sds?submodules=1&rev=23d001adb94436d886d66258a11ae19669ac8f71";
   };
 
-  outputs = { self, nixpkgs, nwaku }:
+  outputs = { self, nixpkgs, nwaku, nim-sds }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -42,22 +43,8 @@
             # Make nwaku available
             nwaku = nwaku.packages.${system};
 
-            # Add nim-sds dependency here (fetched once, no git clone)
-            nim-sds = prev.fetchFromGitHub {
-              owner = "waku-org";
-              repo = "nim-sds";
-              rev = "23d001adb94436d886d66258a11ae19669ac8f71";
-              sha256 = "sha256-2z/3VTWkN3UW3NdX6S+QK0s4sCdEqbRJRkKJQig7fJc=";
-            };
-
-            # Add Nim compiler 2.2.4
-            nim = prev.nim.overrideAttrs (old: rec {
-              version = "2.2.4";
-              src = prev.fetchurl {
-                url = "https://github.com/nim-lang/Nim/archive/refs/tags/v2.2.4.tar.gz";
-                sha256 = "sha256-8Z35GS98nv1jj4u/YwzBhMyZUGEyNceiPZlZMmmx4t4=";
-              };
-            });
+            # Make nim-sds available
+            nim-sds = nim-sds.packages.${system};
           })
         ];
       }
@@ -79,15 +66,7 @@
           inherit (statusGo.library) pname version src nativeBuildInputs;
 
           # Add Go, git, and GNU Make
-          buildInputs = statusGo.library.buildInputs ++ [ pkgs.go pkgs.git pkgs.gnumake pkgs.protobuf pkgs.nim ];
-
-          # Patch sds Makefile to avoid network clone
-          patchPhase = ''
-            echo "Patching sds Makefile to avoid network clone..."
-            substituteInPlace vendor/github.com/waku-org/sds-go-bindings/sds/Makefile \
-              --replace-warn "git clone https://github.com/waku-org/nim-sds" \
-                        "cp -r ${pkgs.nim-sds} nim-sds"
-          '';
+          buildInputs = statusGo.library.buildInputs ++ [ pkgs.go pkgs.git pkgs.gnumake pkgs.protobuf ];
 
           # Reuse buildPhase etc. if needed
           inherit (statusGo.library) preBuild buildPhase installPhase;
