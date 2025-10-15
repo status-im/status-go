@@ -1,9 +1,10 @@
 import logging
-import requests
-import time
 import threading
+import time
 from dataclasses import dataclass
 from typing import Optional
+
+import requests
 
 
 @dataclass
@@ -23,7 +24,6 @@ class GoMemoryStats:
     heap_objects: int  # Number of heap objects
     gc_cpu_fraction: float  # GC CPU fraction
     num_gc: int  # Number of GC runs
-    timestamp: float  # Timestamp when stats were collected
 
 
 class ExpvarClient:
@@ -41,7 +41,7 @@ class ExpvarClient:
         self._stop_monitoring = None
         self.monitor_thread = None
 
-    def get_memory_stats(self, timeout: int = 10) -> Optional[GoMemoryStats]:
+    def get_expvars(self, timeout: int = 10) -> Optional[dict]:
         """
         Get memory statistics from /debug/vars endpoint
 
@@ -54,35 +54,49 @@ class ExpvarClient:
         try:
             response = requests.get(f"{self.base_url}/debug/vars", timeout=timeout)
             response.raise_for_status()
-
             data = response.json()
-            memstats = data.get("memstats", {})
-            if not memstats:
-                logging.warning("No memstats found in /debug/vars response")
-                return None
-
-            return GoMemoryStats(
-                alloc_bytes=memstats.get("Alloc", 0),
-                total_alloc_bytes=memstats.get("TotalAlloc", 0),
-                sys_bytes=memstats.get("Sys", 0),
-                mallocs=memstats.get("Mallocs", 0),
-                frees=memstats.get("Frees", 0),
-                heap_alloc_bytes=memstats.get("HeapAlloc", 0),
-                heap_sys_bytes=memstats.get("HeapSys", 0),
-                heap_idle_bytes=memstats.get("HeapIdle", 0),
-                heap_in_use_bytes=memstats.get("HeapInuse", 0),
-                heap_released_bytes=memstats.get("HeapReleased", 0),
-                heap_objects=memstats.get("HeapObjects", 0),
-                gc_cpu_fraction=memstats.get("GCCPUFraction", 0.0),
-                num_gc=memstats.get("NumGC", 0),
-                timestamp=time.time(),
-            )
+            data["timestamp"] = time.time()
+            return data
 
         except requests.exceptions.RequestException as e:
             raise e
         except Exception as e:
             logging.error(f"Error parsing /debug/vars response: {e}")
             return None
+
+    @staticmethod
+    def parse_expvars(data):
+        memstats = data.get("memstats", {})
+        if not memstats:
+            raise ValueError("memstats not found in /debug/vars response")
+
+        return GoMemoryStats(
+            alloc_bytes=memstats.get("Alloc", 0),
+            total_alloc_bytes=memstats.get("TotalAlloc", 0),
+            sys_bytes=memstats.get("Sys", 0),
+            mallocs=memstats.get("Mallocs", 0),
+            frees=memstats.get("Frees", 0),
+            heap_alloc_bytes=memstats.get("HeapAlloc", 0),
+            heap_sys_bytes=memstats.get("HeapSys", 0),
+            heap_idle_bytes=memstats.get("HeapIdle", 0),
+            heap_in_use_bytes=memstats.get("HeapInuse", 0),
+            heap_released_bytes=memstats.get("HeapReleased", 0),
+            heap_objects=memstats.get("HeapObjects", 0),
+            gc_cpu_fraction=memstats.get("GCCPUFraction", 0.0),
+            num_gc=memstats.get("NumGC", 0),
+        )
+
+    @staticmethod
+    def parse_num_goroutines(data):
+        return data.get("numGoroutine", 0)
+
+    @staticmethod
+    def parse_num_threads(data):
+        return data.get("numThreads", 0)
+
+    @staticmethod
+    def parse_timestamp(data):
+        return data.get("timestamp", 0)
 
     def start_monitoring(self, interval: float = 1.0):
         """Start independent Go metrics monitoring thread
@@ -96,9 +110,9 @@ class ExpvarClient:
         def monitor_go_metrics():
             while self._stop_monitoring and not self._stop_monitoring.is_set():
                 try:
-                    memory_stats = self.get_memory_stats()
-                    if memory_stats:
-                        self.go_metrics.append(memory_stats)
+                    expvars = self.get_expvars()
+                    if expvars:
+                        self.go_metrics.append(expvars)
 
                     # Wait for the specified interval or until stop event is set
                     self._stop_monitoring.wait(timeout=interval)
