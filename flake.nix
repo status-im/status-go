@@ -34,9 +34,9 @@
       system: import nixpkgs {
         inherit system;
         config = {
-          android_sdk.accept_license = true;
+          # Only set android_sdk for supported systems
           android_sdk = if builtins.elem system [ "x86_64-linux" "x86_64-darwin" ]
-                        then pkgs.androidPkgs.sdk
+                        then { accept_license = true; }
                         else null;
           allowUnfree = true;
         };
