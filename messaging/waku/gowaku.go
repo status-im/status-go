@@ -589,7 +589,7 @@ func (w *Waku) GetStats() types.StatsSummary {
 	}
 }
 
-func (w *Waku) runPeerExchangeLoop() {
+func (w *Waku) peerExchangeLoop() {
 	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
 
@@ -598,24 +598,49 @@ func (w *Waku) runPeerExchangeLoop() {
 		return
 	}
 
-	ticker := time.NewTicker(time.Second * 5)
-	defer ticker.Stop()
+	logger := w.logger.Named("peer-exchange")
 
 	for {
 		select {
 		case <-w.ctx.Done():
-			w.logger.Debug("Peer exchange loop stopped")
+			logger.Debug("peer exchange loop stopped")
 			return
-		case <-ticker.C:
-			w.logger.Debug("Running peer exchange loop")
-			err := w.node.PeerExchange().Request(
+
+		case status, ok := <-w.topicHealthStatusChan:
+			if !ok {
+				logger.Debug("topic health status channel closed")
+				return
+			}
+
+			logger.Debug("topic health status changed",
+				zap.String("topic", status.Topic),
+				zap.Stringer("status", status.Health),
+			)
+
+			if status.Health == peermanager.SufficientlyHealthy {
+				continue
+			}
+
+			pubsubTopic, err := protocol.ToWakuPubsubTopic(status.Topic)
+			if err != nil {
+				logger.Error("could not convert topic to waku pubsub topic", zap.Error(err))
+				continue
+			}
+
+			shardPubsubTopic, err := protocol.ToShardPubsubTopic(pubsubTopic)
+			if err != nil {
+				logger.Error("failed to convert topic to shard pubsub topic", zap.Error(err))
+				continue
+			}
+
+			err = w.node.PeerExchange().Request(
 				w.ctx,
 				w.cfg.DiscoveryLimit,
 				peer_exchange.WithAutomaticPeerSelection(),
-				peer_exchange.FilterByShard(int(w.defaultShardInfo.ClusterID), int(w.defaultShardInfo.ShardIDs[0])),
+				peer_exchange.FilterByShard(int(shardPubsubTopic.Cluster()), int(shardPubsubTopic.Shard())),
 			)
 			if err != nil {
-				w.logger.Error("could not request peers via peer exchange", zap.Error(err))
+				logger.Error("could not request peers via peer exchange", zap.Error(err))
 			}
 		}
 	}
@@ -1125,7 +1150,7 @@ func (w *Waku) Start() error {
 	}
 
 	w.wg.Add(1)
-	go w.runPeerExchangeLoop()
+	go w.peerExchangeLoop()
 
 	if w.cfg.EnableMissingMessageVerification {
 		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
