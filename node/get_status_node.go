@@ -54,6 +54,7 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/transactions"
 )
 
