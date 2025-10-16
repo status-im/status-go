@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+
 	collectibles "github.com/status-im/status-go/services/wallet/collectibles"
 	collectibles_ownership "github.com/status-im/status-go/services/wallet/collectibles/ownership"
 	w_common "github.com/status-im/status-go/services/wallet/common"

@@ -15,6 +15,7 @@ import (
 	gethParams "github.com/ethereum/go-ethereum/params"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"

@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/event"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/server"

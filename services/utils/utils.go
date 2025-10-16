@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"

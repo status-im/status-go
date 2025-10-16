@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/constants"

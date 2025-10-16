@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 

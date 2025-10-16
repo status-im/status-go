@@ -8,6 +8,7 @@ import (
 
 	geth_common "github.com/ethereum/go-ethereum/common"
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/rpc"

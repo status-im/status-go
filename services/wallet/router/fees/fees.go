@@ -6,6 +6,7 @@ import (
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/common"

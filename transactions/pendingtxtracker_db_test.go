@@ -8,6 +8,7 @@ import (
 	crypto_rand "crypto/rand"
 
 	eth "github.com/ethereum/go-ethereum/common"
+
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/t/helpers"

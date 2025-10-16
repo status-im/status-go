@@ -10,6 +10,7 @@ import (
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethParams "github.com/ethereum/go-ethereum/params"
+
 	"github.com/status-im/status-go/params"
 )
 

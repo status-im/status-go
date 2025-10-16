@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/protocol/zaputil"
 )
 
