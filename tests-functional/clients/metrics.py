@@ -7,9 +7,8 @@ from dataclasses import dataclass
 
 import matplotlib
 import matplotlib.pyplot as plt
-from genson.schema.strategies import Object
 
-from expvar import ExpvarClient
+from clients.expvar import ExpvarClient
 
 matplotlib.use("Agg")  # Use non-interactive backend
 logging.getLogger("matplotlib.font_manager").setLevel(logging.WARNING)
@@ -245,7 +244,7 @@ class StatusGoMetrics:
     def __init__(
         self,
         container_stats: list[ContainerStats] | None = None,
-        go_metrics: list[Object] | None = None,
+        go_metrics: list[dict] | None = None,
         events: Events | None = None,
         version: str = "",
         stats: list[ContainerStats] | None = None,
