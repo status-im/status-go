@@ -7,6 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
@@ -36,7 +37,6 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/timesource"
 )
 
 var (
@@ -374,9 +374,13 @@ func (b *StatusNode) personalService() *personal.Service {
 	return b.personalSrvc
 }
 
-func (b *StatusNode) TimeSource() *timesource.NTPTimeSource {
+func (b *StatusNode) TimeSource() timesource.Provider {
 	if b.timeSourceSrvc == nil {
-		b.timeSourceSrvc = timesource.Default()
+		if privateMode {
+			b.timeSourceSrvc = timesource.LocalService()
+		} else {
+			b.timeSourceSrvc = timesource.DefaultService()
+		}
 	}
 	return b.timeSourceSrvc
 }

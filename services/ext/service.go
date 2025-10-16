@@ -103,7 +103,7 @@ type InitProtocolParams struct {
 	WalletService          *wallet.Service
 	CommunityTokensService *communitytokens.Service
 	AccountsPublisher      *pubsub.Publisher
-	TimeSource             timesource.TimeSource
+	TimeSource             timesource.Provider
 	MetricsEnabled         bool
 	TokenManager           communities.TokenManager
 	TokenBalanceManager    communities.TokenBalanceManager

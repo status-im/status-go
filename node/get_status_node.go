@@ -23,6 +23,7 @@ import (
 	common2 "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -54,7 +55,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
-	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -63,6 +63,9 @@ var (
 	ErrNodeRunning   = errors.New("node is already running")
 	ErrNoRunningNode = errors.New("there is no running node")
 )
+
+// FIXME: This is temporal and will be replaced with the actual setting
+const privateMode = false
 
 // StatusNode abstracts contained geth node and provides helper methods to
 // interact with it.
@@ -107,7 +110,7 @@ type StatusNode struct {
 	walletSrvc             *wallet.Service
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
-	timeSourceSrvc         *timesource.NTPTimeSource
+	timeSourceSrvc         timesource.Service
 	wakuV2ExtSrvc          *wakuv2ext.Service
 	ensSrvc                *ens.Service
 	communityTokensSrvc    *communitytokens.Service

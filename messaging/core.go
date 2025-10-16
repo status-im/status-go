@@ -73,7 +73,7 @@ type CoreParams struct {
 	WakuConfig    params.WakuV2Config
 	ClusterConfig params.ClusterConfig
 
-	TimeSource timesource.TimeSource
+	TimeSource timesource.Provider
 }
 
 func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, error) {
@@ -381,7 +381,7 @@ type wakuParams struct {
 	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
 	onPeerStats                     func(wakutypes.ConnStatus)
 
-	timeSource timesource.TimeSource
+	timeSource timesource.Provider
 
 	logger *zap.Logger
 }

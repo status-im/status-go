@@ -82,6 +82,9 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
+	"github.com/waku-org/go-waku/waku/v2/node"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
@@ -90,10 +93,6 @@ import (
 	"github.com/status-im/status-go/messaging/waku/common"
 	"github.com/status-im/status-go/messaging/waku/persistence"
 	"github.com/status-im/status-go/messaging/waku/types"
-	ntptimesource "github.com/status-im/status-go/timesource"
-
-	"github.com/waku-org/go-waku/waku/v2/node"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 )
 
 const messageQueueLimit = 1024
@@ -188,7 +187,7 @@ type Waku struct {
 
 	logger *zap.Logger
 
-	timesource timesource.TimeSource
+	timesource timesource.Provider
 
 	// seededBootnodesForDiscV5 indicates whether we manage to retrieve discovery
 	// bootnodes successfully
@@ -221,7 +220,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTopicsPersistence persistence.ProtectedTopics, ts timesource.TimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTopicsPersistence persistence.ProtectedTopics, ts timesource.Provider, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -231,7 +230,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTo
 	}
 
 	if ts == nil {
-		ts = ntptimesource.Default()
+		ts = timesource.DefaultService()
 	}
 
 	cfg = setDefaults(cfg)
