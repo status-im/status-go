@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/contracts"
 	gaspriceproxy "github.com/status-im/status-go/contracts/gas-price-proxy"
 	"github.com/status-im/status-go/contracts/hop"

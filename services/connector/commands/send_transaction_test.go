@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/crypto/types"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	"github.com/status-im/status-go/services/wallet/router/fees"

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
+
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )

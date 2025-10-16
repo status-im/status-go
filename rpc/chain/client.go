@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/circuitbreaker"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"

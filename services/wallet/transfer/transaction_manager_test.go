@@ -13,6 +13,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"

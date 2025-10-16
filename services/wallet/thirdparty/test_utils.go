@@ -6,6 +6,7 @@ import (
 	"math/rand"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"

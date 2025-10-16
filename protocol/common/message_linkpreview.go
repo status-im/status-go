@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"

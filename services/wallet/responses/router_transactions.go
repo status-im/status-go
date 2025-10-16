@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/services/wallet/requests"

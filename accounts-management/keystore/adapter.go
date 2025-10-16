@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
+
 	"github.com/status-im/status-go/accounts-management/keystore/internal/geth"
 	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"

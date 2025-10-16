@@ -7,6 +7,7 @@ import (
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethCommon "github.com/ethereum/go-ethereum/common"
+
 	gaspriceproxy "github.com/status-im/status-go/contracts/gas-price-proxy"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )

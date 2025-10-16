@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 

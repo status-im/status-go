@@ -11,6 +11,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/messaging/waku/common"
 )

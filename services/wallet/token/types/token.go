@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/services/wallet/community"
 
 	wallet_common "github.com/status-im/status-go/services/wallet/common"

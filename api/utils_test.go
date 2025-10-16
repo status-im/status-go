@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/services/personal"

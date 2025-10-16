@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/status-im/status-go/services/wallet/common"
 )
 

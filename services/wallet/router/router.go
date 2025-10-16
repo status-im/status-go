@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"

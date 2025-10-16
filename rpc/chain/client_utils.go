@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/params"
 )
 

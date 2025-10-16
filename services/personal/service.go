@@ -4,6 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"

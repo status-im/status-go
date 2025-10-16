@@ -7,6 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiAccCommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/protobuf"
