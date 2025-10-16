@@ -3,10 +3,11 @@
 set -euo pipefail
 
 # Get latest tag
-latest_tag=$(git describe --tags develop)
+latest_tag=$(git describe --tags)
+branch_name="generated/${latest_tag}"
 
 # Create branch
-git checkout -b "generated/${latest_tag}"
+git checkout -b "${branch_name}"
 
 # Un-gitignore generated files
 sed -i '' '/# generated files/,/^$/ s/^/#/' .gitignore
@@ -21,4 +22,4 @@ sed -i '' 's/-dirty$//' pkg/version/VERSION
 git add .gitignore
 git add .
 git commit -m "feat_: version ${latest_tag} with generated files included"
-git push origin
+git push origin "${branch_name}"
