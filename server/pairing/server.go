@@ -13,9 +13,8 @@ import (
 	errorspkg "github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/timesource"
-
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/server"
 )

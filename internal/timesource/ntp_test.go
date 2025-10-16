@@ -174,7 +174,7 @@ func TestComputeOffset(t *testing.T) {
 func TestNTPTimeSource(t *testing.T) {
 	for _, tc := range newTestCases() {
 		t.Run(tc.description, func(t *testing.T) {
-			source := &NTPTimeSource{
+			source := &ntpTimeSource{
 				servers:         tc.servers,
 				allowedFailures: tc.allowedFailures,
 				timeQuery:       tc.query,
@@ -202,7 +202,7 @@ func TestRunningPeriodically(t *testing.T) {
 	slowHits := 1
 
 	t.Run(tc.description, func(t *testing.T) {
-		source := &NTPTimeSource{
+		source := &ntpTimeSource{
 			servers:           tc.servers,
 			allowedFailures:   tc.allowedFailures,
 			timeQuery:         tc.query,
@@ -212,7 +212,7 @@ func TestRunningPeriodically(t *testing.T) {
 		}
 		lastCall := time.Now()
 		// we're simulating a calls to updateOffset, testing ntp calls happens
-		// on NTPTimeSource specified periods (fastNTPSyncPeriod & slowNTPSyncPeriod)
+		// on ntpTimeSource specified periods (fastNTPSyncPeriod & slowNTPSyncPeriod)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		source.runPeriodically(context.TODO(), func() error {
@@ -263,7 +263,7 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 	}
 
 	currentTime := time.Now()
-	ts := NTPTimeSource{
+	ts := ntpTimeSource{
 		servers:           tc.servers,
 		allowedFailures:   tc.allowedFailures,
 		timeQuery:         tc.query,
@@ -289,7 +289,7 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 
 func TestGetCurrentTimeOffline(t *testing.T) {
 	// covers https://github.com/status-im/status-desktop/issues/12691
-	ts := &NTPTimeSource{
+	ts := &ntpTimeSource{
 		servers:           defaultServers,
 		allowedFailures:   DefaultMaxAllowedFailures,
 		fastNTPSyncPeriod: 1 * time.Millisecond,
@@ -322,7 +322,7 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 	}
 
 	// Create a time source with our mocks
-	ts := &NTPTimeSource{
+	ts := &ntpTimeSource{
 		servers:           []string{"test-server"},
 		allowedFailures:   0,
 		fastNTPSyncPeriod: 1 * time.Hour,
@@ -438,7 +438,7 @@ func TestTimeTrackingInitialization(t *testing.T) {
 	}
 
 	// Create the time source with our controlled functions
-	ts := &NTPTimeSource{
+	ts := &ntpTimeSource{
 		servers:           mockedServers,
 		allowedFailures:   DefaultMaxAllowedFailures,
 		fastNTPSyncPeriod: 1 * time.Hour, // Use long periods to avoid actual periodic updates during test
@@ -486,7 +486,7 @@ func TestTimeChangeDetectionSkippedWhenNotInitialized(t *testing.T) {
 	}
 
 	// Create the time source with our controlled functions
-	ts := &NTPTimeSource{
+	ts := &ntpTimeSource{
 		servers:           mockedServers,
 		allowedFailures:   DefaultMaxAllowedFailures,
 		fastNTPSyncPeriod: 1 * time.Hour,
@@ -529,7 +529,7 @@ func TestTimeChangeDetectionWithUpdateFailure(t *testing.T) {
 	}
 
 	// Create the time source with our controlled functions
-	ts := &NTPTimeSource{
+	ts := &ntpTimeSource{
 		servers:           mockedServers,
 		allowedFailures:   DefaultMaxAllowedFailures,
 		fastNTPSyncPeriod: 1 * time.Hour,

@@ -54,6 +54,9 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
+	"github.com/waku-org/waku-go-bindings/waku"
+	bindingscommon "github.com/waku-org/waku-go-bindings/waku/common"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
@@ -62,12 +65,8 @@ import (
 	"github.com/status-im/status-go/messaging/waku/common"
 	"github.com/status-im/status-go/messaging/waku/persistence"
 	"github.com/status-im/status-go/messaging/waku/types"
-	ntptimesource "github.com/status-im/status-go/timesource"
 
-	"github.com/waku-org/waku-go-bindings/waku"
-	bindingscommon "github.com/waku-org/waku-go-bindings/waku/common"
-
-	node "github.com/waku-org/go-waku/waku/v2/node"
+	"github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 )
 
@@ -182,7 +181,7 @@ type Waku struct {
 // timesource provided in constructor is managed by status-go; go-waku must not invoke Start or Stop.
 // The adapter only fulfills the required interface; Start and Stop are no-ops.
 type timesourceAdapter struct {
-	timesource.TimeSource
+	timesource.Provider
 }
 
 func (t timesourceAdapter) Start(ctx context.Context) error { return nil }
@@ -204,7 +203,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTopicsPersistence persistence.ProtectedTopics, ts timesource.TimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTopicsPersistence persistence.ProtectedTopics, ts timesource.Provider, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -213,11 +212,11 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTo
 		}
 	}
 
-	var timesource gowakutimesource.Timesource
+	var wakuTimeSource gowakutimesource.Timesource
 	if ts != nil {
-		timesource = timesourceAdapter{ts}
+		wakuTimeSource = timesourceAdapter{ts}
 	} else {
-		timesource = ntptimesource.Default()
+		wakuTimeSource = timesource.DefaultService()
 	}
 
 	cfg = setDefaults(cfg)
@@ -269,7 +268,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTo
 		dnsAddressCacheLock:             &sync.RWMutex{},
 		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
 		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
-		timesource:                      timesource,
+		timesource:                      wakuTimeSource,
 		storeMsgIDsMu:                   sync.RWMutex{},
 		logger:                          logger,
 		discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,

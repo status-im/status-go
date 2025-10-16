@@ -125,7 +125,7 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 	return offsets[mid], nil
 }
 
-var defaultTimeSource = &NTPTimeSource{
+var defaultNTPTimeSource = &ntpTimeSource{
 	servers:           defaultServers,
 	allowedFailures:   DefaultMaxAllowedFailures,
 	fastNTPSyncPeriod: FastNTPSyncPeriod,
@@ -134,14 +134,9 @@ var defaultTimeSource = &NTPTimeSource{
 	now:               time.Now,
 }
 
-// Default initializes time source with default config values.
-func Default() *NTPTimeSource {
-	return defaultTimeSource
-}
-
-// NTPTimeSource provides source of time that tries to be resistant to time skews.
+// ntpTimeSource provides source of time that tries to be resistant to time skews.
 // It does so by periodically querying time offset from ntp servers.
-type NTPTimeSource struct {
+type ntpTimeSource struct {
 	servers           []string
 	allowedFailures   int
 	fastNTPSyncPeriod time.Duration
@@ -160,7 +155,7 @@ type NTPTimeSource struct {
 
 // Now returns time adjusted by latest known offset
 // and detects system time changes
-func (s *NTPTimeSource) Now() time.Time {
+func (s *ntpTimeSource) Now() time.Time {
 	s.timeDataMu.RLock()
 
 	currentTime := s.now()
@@ -197,7 +192,7 @@ func (s *NTPTimeSource) Now() time.Time {
 	return adjustedTime
 }
 
-func (s *NTPTimeSource) updateOffset() error {
+func (s *ntpTimeSource) updateOffset() error {
 	offset, err := computeOffset(s.timeQuery, s.servers, s.allowedFailures)
 	if err != nil {
 		logutils.ZapLogger().Error("failed to compute offset", zap.Error(err))
@@ -208,14 +203,14 @@ func (s *NTPTimeSource) updateOffset() error {
 	defer s.timeDataMu.Unlock()
 	s.latestOffset = offset
 	//TBD: if we found offset is too large, we should notify user that system time might not be accurate via emit signal,
-	// and because go-waku doesn't use NTPTimeSource ATM (it just use time.Now()), this might be a problem for MissingMessageVerifier work normally.
+	// and because go-waku doesn't use ntpTimeSource ATM (it just use time.Now()), this might be a problem for MissingMessageVerifier work normally.
 	// e.g. might get errInvalidTimeRange when validate StoreQueryRequest
 	return nil
 }
 
-// runPeriodically runs periodically the given function based on NTPTimeSource
+// runPeriodically runs periodically the given function based on ntpTimeSource
 // synchronization limits (fastNTPSyncPeriod / slowNTPSyncPeriod)
-func (s *NTPTimeSource) runPeriodically(ctx context.Context, fn func() error, starWithSlowSyncPeriod bool) {
+func (s *ntpTimeSource) runPeriodically(ctx context.Context, fn func() error, starWithSlowSyncPeriod bool) {
 	if s.started {
 		return
 	}
@@ -243,7 +238,7 @@ func (s *NTPTimeSource) runPeriodically(ctx context.Context, fn func() error, st
 }
 
 // Start initializes the local offset and starts a goroutine that periodically updates the local offset.
-func (s *NTPTimeSource) Start(ctx context.Context) error {
+func (s *ntpTimeSource) Start(ctx context.Context) error {
 	s.stateMu.Lock()
 	defer s.stateMu.Unlock()
 	if s.started {
@@ -272,7 +267,7 @@ func (s *NTPTimeSource) Start(ctx context.Context) error {
 }
 
 // Stop goroutine that updates time source.
-func (s *NTPTimeSource) Stop() {
+func (s *ntpTimeSource) Stop() {
 	if s.cancel == nil {
 		return
 	}
@@ -280,7 +275,7 @@ func (s *NTPTimeSource) Stop() {
 	s.started = false
 }
 
-func (s *NTPTimeSource) GetCurrentTime() time.Time {
+func (s *ntpTimeSource) GetCurrentTime() time.Time {
 	err := s.Start(context.Background())
 	if err != nil {
 		panic("could not obtain timesource: " + err.Error())
@@ -288,12 +283,12 @@ func (s *NTPTimeSource) GetCurrentTime() time.Time {
 	return s.Now()
 }
 
-func (s *NTPTimeSource) GetCurrentTimeInMillis() uint64 {
+func (s *ntpTimeSource) GetCurrentTimeInMillis() uint64 {
 	return convertToMillis(s.GetCurrentTime())
 }
 
 func GetCurrentTime() time.Time {
-	ts := Default()
+	ts := DefaultService()
 	err := ts.Start(context.Background())
 	if err != nil {
 		panic("could not obtain timesource: " + err.Error())

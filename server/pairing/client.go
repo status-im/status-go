@@ -17,10 +17,10 @@ import (
 
 	"github.com/status-im/status-go/api"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/timesource"
 )
 
 /*

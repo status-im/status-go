@@ -3,8 +3,7 @@ package accounts
 import (
 	"errors"
 
-	"github.com/status-im/status-go/timesource"
-
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/server"
 
 	"github.com/status-im/status-go/images"
