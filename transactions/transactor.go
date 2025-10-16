@@ -1,6 +1,6 @@
 package transactions
 
-//go:generate go tool mockgen -package=mock_transactor -source=transactor.go -destination=mock/transactor.go
+//go:generate go tool mockgen -package=mock_transactions -source=transactor.go -destination=mock/transactor.go
 
 import (
 	"bytes"
@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
@@ -66,7 +67,7 @@ type TransactorIface interface {
 // It uses upstream to propagate transactions to the Ethereum network.
 type Transactor struct {
 	ethClientGetter rpc.EthClientGetter
-	pendingTracker  *PendingTxTracker
+	pendingTracker  *pendingtxtracker.PendingTxTracker
 	sendTxTimeout   time.Duration
 	rpcCallTimeout  time.Duration
 	logger          *zap.Logger
@@ -81,7 +82,7 @@ func NewTransactor() *Transactor {
 }
 
 // SetPendingTracker sets a pending tracker.
-func (t *Transactor) SetPendingTracker(tracker *PendingTxTracker) {
+func (t *Transactor) SetPendingTracker(tracker *pendingtxtracker.PendingTxTracker) {
 	t.pendingTracker = tracker
 }
 
@@ -153,7 +154,7 @@ func (t *Transactor) SendRawTransaction(chainID uint64, rawTx string) error {
 	return rpcWrapper.SendRawTransaction(ctx, rawTx)
 }
 
-func createPendingTransaction(from common.Address, symbol string, chainID uint64, tx *gethtypes.Transaction) (pTx *PendingTransaction) {
+func createPendingTransaction(from common.Address, symbol string, chainID uint64, tx *gethtypes.Transaction) (pTx *pendingtxtracker.PendingTransaction) {
 	var toAddress common.Address
 	if tx.To() != nil {
 		toAddress = *tx.To()
@@ -164,7 +165,7 @@ func createPendingTransaction(from common.Address, symbol string, chainID uint64
 		toAddress = common.Address(toAddr)
 	}
 
-	pTx = &PendingTransaction{
+	pTx = &pendingtxtracker.PendingTransaction{
 		Hash:       tx.Hash(),
 		Timestamp:  uint64(time.Now().Unix()),
 		Value:      bigint.BigInt{Int: tx.Value()},
@@ -172,7 +173,7 @@ func createPendingTransaction(from common.Address, symbol string, chainID uint64
 		To:         toAddress,
 		Nonce:      tx.Nonce(),
 		Data:       string(tx.Data()),
-		Type:       WalletTransfer,
+		Type:       pendingtxtracker.WalletTransfer,
 		ChainID:    wallet_common.ChainID(chainID),
 		Symbol:     symbol,
 		AutoDelete: new(bool),

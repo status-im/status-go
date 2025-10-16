@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
-	"github.com/status-im/status-go/transactions"
 
 	"github.com/ethereum/go-ethereum/event"
 
@@ -35,6 +34,7 @@ import (
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
@@ -212,9 +212,9 @@ func (b *StatusNode) ensService(timesource func() time.Time) *ens.Service {
 	return b.ensSrvc
 }
 
-func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *transactions.PendingTxTracker {
+func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *pendingtxtracker.PendingTxTracker {
 	if b.pendingTracker == nil {
-		b.pendingTracker = transactions.NewPendingTxTracker(b.walletDB, b.rpcClient, walletFeed, transactions.PendingCheckInterval)
+		b.pendingTracker = pendingtxtracker.NewPendingTxTracker(b.walletDB, pendingtxtracker.NewBatchTxStatusFetcher(b.rpcClient, b.logger.Named("PendingTxTracker")), walletFeed, pendingtxtracker.PendingCheckInterval)
 		if b.transactor != nil {
 			b.transactor.SetPendingTracker(b.pendingTracker)
 		}
@@ -326,7 +326,7 @@ func appendIf(condition bool, services []common.StatusService, service common.St
 	return append(services, service)
 }
 
-func (b *StatusNode) PendingTracker() *transactions.PendingTxTracker {
+func (b *StatusNode) PendingTracker() *pendingtxtracker.PendingTxTracker {
 	return b.pendingTracker
 }
 

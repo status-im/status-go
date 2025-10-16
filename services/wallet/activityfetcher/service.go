@@ -19,8 +19,8 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/transactions"
 )
 
 const (
@@ -130,8 +130,8 @@ func (s *Service) startTransactionWatcher() {
 
 func (s *Service) handleWalletEvent(event walletevent.Event) {
 	switch event.Type {
-	case transactions.EventPendingTransactionStatusChanged:
-		var payload transactions.StatusChangedPayload
+	case pendingtxtracker.EventPendingTransactionStatusChanged:
+		var payload pendingtxtracker.StatusChangedPayload
 		if err := json.Unmarshal([]byte(event.Message), &payload); err != nil {
 			s.logger.Error("Failed to extract transaction status payload", zap.Error(err))
 			return

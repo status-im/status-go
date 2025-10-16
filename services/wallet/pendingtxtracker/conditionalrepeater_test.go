@@ -1,4 +1,4 @@
-package transactions
+package pendingtxtracker_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,10 +14,10 @@ func TestConditionalRepeater_RunOnce(t *testing.T) {
 	var wg sync.WaitGroup
 	runCount := 0
 	wg.Add(1)
-	taskRunner := NewConditionalRepeater(1*time.Nanosecond, func(ctx context.Context) bool {
+	taskRunner := pendingtxtracker.NewConditionalRepeater(1*time.Nanosecond, func(ctx context.Context) bool {
 		runCount++
 		defer wg.Done()
-		return WorkDone
+		return pendingtxtracker.WorkDone
 	})
 	taskRunner.RunUntilDone()
 	// Wait for task to run
@@ -29,7 +30,7 @@ func TestConditionalRepeater_RunUntilDone_MultipleCalls(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(5)
 	runCount := 0
-	taskRunner := NewConditionalRepeater(1*time.Nanosecond, func(ctx context.Context) bool {
+	taskRunner := pendingtxtracker.NewConditionalRepeater(1*time.Nanosecond, func(ctx context.Context) bool {
 		runCount++
 		wg.Done()
 		return runCount == 5
@@ -48,7 +49,7 @@ func TestConditionalRepeater_Stop(t *testing.T) {
 	taskRunningWG.Add(1)
 	taskCanceledWG.Add(1)
 	taskFinishedWG.Add(1)
-	taskRunner := NewConditionalRepeater(1*time.Nanosecond, func(ctx context.Context) bool {
+	taskRunner := pendingtxtracker.NewConditionalRepeater(1*time.Nanosecond, func(ctx context.Context) bool {
 		defer taskFinishedWG.Done()
 		select {
 		case <-ctx.Done():
@@ -67,7 +68,7 @@ func TestConditionalRepeater_Stop(t *testing.T) {
 			require.Fail(t, "task should be canceled")
 		}
 
-		return WorkDone
+		return pendingtxtracker.WorkDone
 	})
 	taskRunner.RunUntilDone()
 	taskRunningWG.Wait()

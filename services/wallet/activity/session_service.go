@@ -17,10 +17,10 @@ import (
 	"github.com/status-im/status-go/services/wallet/activityfetcher"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/routeexecution"
 	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/transactions"
 
 	"go.uber.org/zap"
 )
@@ -292,9 +292,9 @@ func (s *Service) processEvents(ctx context.Context) {
 		select {
 		case event := <-s.ch:
 			switch event.Type {
-			case transactions.EventPendingTransactionUpdate:
+			case pendingtxtracker.EventPendingTransactionUpdate:
 				eventCount++
-				var payload transactions.PendingTxUpdatePayload
+				var payload pendingtxtracker.PendingTxUpdatePayload
 				if err := json.Unmarshal([]byte(event.Message), &payload); err != nil {
 					logutils.ZapLogger().Error("Error unmarshalling PendingTxUpdatePayload", zap.Error(err))
 					continue
@@ -304,9 +304,9 @@ func (s *Service) processEvents(ctx context.Context) {
 					Hash:    payload.Hash,
 				})
 				debounceProcessChangesFn()
-			case transactions.EventPendingTransactionStatusChanged:
+			case pendingtxtracker.EventPendingTransactionStatusChanged:
 				eventCount++
-				var payload transactions.StatusChangedPayload
+				var payload pendingtxtracker.StatusChangedPayload
 				if err := json.Unmarshal([]byte(event.Message), &payload); err != nil {
 					logutils.ZapLogger().Error("Error unmarshalling StatusChangedPayload", zap.Error(err))
 					continue

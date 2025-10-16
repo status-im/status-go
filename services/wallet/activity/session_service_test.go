@@ -9,7 +9,7 @@ import (
 
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +20,7 @@ func TestService_IncrementalUpdateOnTop(t *testing.T) {
 	defer state.close()
 
 	transactionCount := 2
-	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
+	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []pendingtxtracker.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
 	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{Types: allActivityTypesFilter(), Statuses: allActivityStatusesFilter(), Assets: allTokensFilter()}, 5, V2)
@@ -92,7 +92,7 @@ func TestService_IncrementalUpdateMixed(t *testing.T) {
 
 	transactionCount := 5
 	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount,
-		[]transactions.TestTxSummary{
+		[]pendingtxtracker.TestTxSummary{
 			{DontConfirm: true, Timestamp: 2},
 			{DontConfirm: true, Timestamp: 4},
 			{DontConfirm: true, Timestamp: 6},
@@ -145,7 +145,7 @@ func TestService_IncrementalUpdateFetchWindow(t *testing.T) {
 	defer state.close()
 
 	transactionCount := 5
-	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
+	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []pendingtxtracker.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
 	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2, V2)
@@ -195,7 +195,7 @@ func TestService_IncrementalUpdateFetchWindowNoReset(t *testing.T) {
 	defer state.close()
 
 	transactionCount := 5
-	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
+	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []pendingtxtracker.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
 	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2, V2)
@@ -245,7 +245,7 @@ func TestService_MultiThread(t *testing.T) {
 			require.Greater(t, sessionID, SessionID(0))
 
 			transactionCount := 5
-			_, _, _, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
+			_, _, _, cleanup := setupTransactions(t, state, transactionCount, []pendingtxtracker.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 			defer cleanup()
 
 			const m = 10

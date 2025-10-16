@@ -29,6 +29,7 @@ import (
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
@@ -88,8 +89,8 @@ func (s *Service) Start() error {
 }
 
 func (s *Service) handleWalletEvent(event walletevent.Event) {
-	if event.Type == transactions.EventPendingTransactionStatusChanged {
-		var p transactions.StatusChangedPayload
+	if event.Type == pendingtxtracker.EventPendingTransactionStatusChanged {
+		var p pendingtxtracker.StatusChangedPayload
 		err := json.Unmarshal([]byte(event.Message), &p)
 		if err != nil {
 			logutils.ZapLogger().Error(errors.Wrap(err, fmt.Sprintf("can't parse transaction message %v\n", event.Message)).Error())

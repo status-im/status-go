@@ -53,6 +53,7 @@ import (
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/community"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/transactions"
@@ -118,7 +119,7 @@ type StatusNode struct {
 	stickersSrvc           *stickers.Service
 	chatSrvc               *chat.Service
 	updatesSrvc            *updates.Service
-	pendingTracker         *transactions.PendingTxTracker
+	pendingTracker         *pendingtxtracker.PendingTxTracker
 	connectorSrvc          *connector.Service
 	appGeneralSrvc         *appgeneral.Service
 	ethSrvc                *eth.Service

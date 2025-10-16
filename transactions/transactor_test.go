@@ -213,7 +213,7 @@ func (s *TransactorSuite) TestGasValues() {
 			}
 			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil)
 
-			hash, _, err := s.manager.SendTransactionWithChainID(1, args, -1, selectedAccount)
+			hash, _, err := s.manager.SendTransactionWithChainID(1337, args, -1, selectedAccount)
 			s.NoError(err)
 			s.False(reflect.DeepEqual(hash, common.Hash{}))
 		})
