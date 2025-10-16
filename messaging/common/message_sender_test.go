@@ -12,11 +12,14 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/datasync"
 	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
+	encryptionmigrations "github.com/status-im/status-go/messaging/layers/encryption/migrations"
+	"github.com/status-im/status-go/messaging/layers/segmentation"
+	segmentationmigrations "github.com/status-im/status-go/messaging/layers/segmentation/migrations"
 	"github.com/status-im/status-go/messaging/layers/transport"
+	transportmigrations "github.com/status-im/status-go/messaging/layers/transport/migrations"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
@@ -55,12 +58,16 @@ func (s *MessageSenderSuite) SetupTest() {
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer(bindata.Resource(
-		migrations.AssetNames(),
-		func(name string) ([]byte, error) {
-			return migrations.Asset(name)
-		},
-	)))
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer(nil))
+	s.Require().NoError(err)
+
+	err = transportmigrations.Migrate(db)
+	s.Require().NoError(err)
+
+	err = segmentationmigrations.Migrate(db)
+	s.Require().NoError(err)
+
+	err = encryptionmigrations.Migrate(db)
 	s.Require().NoError(err)
 
 	encryptionProtocol := encryption.New(
@@ -82,13 +89,11 @@ func (s *MessageSenderSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
 
-	stubPersistence := NewPersistenceInMemory()
-
 	transport, err := transport.NewTransport(
 		shh,
 		identity,
-		&adapters.KeysPersistence{P: stubPersistence},
-		&adapters.ProcessedMessageIDsCache{P: stubPersistence},
+		transport.NewSQLiteKeysPersistence(db),
+		transport.NewSQLiteProcessedMessageIDsCachePersistence(db),
 		&transport.EnvelopesMonitorConfig{},
 		s.logger,
 	)
@@ -97,7 +102,8 @@ func (s *MessageSenderSuite) SetupTest() {
 	s.sender, err = NewMessageSender(
 		identity,
 		db,
-		stubPersistence,
+		NewMessageSenderPersistenceInMemory(),
+		segmentation.NewSQLitePersistence(db),
 		transport,
 		encryptionProtocol,
 		s.logger,

@@ -15,6 +15,19 @@ CREATE TABLE IF NOT EXISTS mailserver_topics_new (
     PRIMARY KEY(topic, pubsub_topic)
 ) WITHOUT ROWID;
 
+/*
+    Ensure mailserver_topics exists in case this migration is executed independently,
+    without prior Status context migrations. This guarantees compatibility and prevents
+    failures due to missing tables during standalone migration runs.
+*/
+CREATE TABLE IF NOT EXISTS mailserver_topics (
+    topic VARCHAR PRIMARY KEY,
+    chat_ids VARCHAR,
+    last_request INTEGER DEFAULT 1,
+    discovery BOOLEAN DEFAULT FALSE,
+    negotiated BOOLEAN DEFAULT FALSE
+) WITHOUT ROWID;
+
 INSERT INTO mailserver_topics_new 
 SELECT topic, "/waku/2/default-waku/proto", chat_ids, last_request, discovery, negotiated
 FROM mailserver_topics;

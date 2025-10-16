@@ -80,8 +80,8 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	transport, err := transport.NewTransport(
 		waku,
 		params.Identity,
-		&adapters.KeysPersistence{P: params.Persistence},
-		&adapters.ProcessedMessageIDsCache{P: params.Persistence},
+		adapters.NewKeysPersistence(params.Persistence),
+		adapters.NewProcessedMessageIDsCache(params.Persistence),
 		config.envelopesMonitorConfig,
 		config.logger,
 	)
@@ -90,7 +90,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	}
 
 	encryptor := encryption.New(
-		adapters.EncryptionPersistence(params.Persistence),
+		adapters.NewEncryptionPersistence(params.Persistence),
 		params.InstallationID,
 		config.logger,
 	)
@@ -98,7 +98,8 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	sender, err := common.NewMessageSender(
 		params.Identity,
 		params.DB,
-		params.Persistence,
+		params.Persistence.MessageSenderStorage(),
+		adapters.NewSegmentationPersistence(params.Persistence),
 		transport,
 		encryptor,
 		config.logger,
@@ -425,7 +426,7 @@ func newWaku(params wakuParams) (*wakuv2.Waku, error) {
 		params.nodeKey,
 		cfg,
 		params.logger,
-		&adapters.WakuProtectedTopics{P: params.persistence},
+		adapters.NewWakuProtectedTopics(params.persistence),
 		params.timeSource,
 		params.onHistoricMessagesRequestFailed,
 		params.onPeerStats,

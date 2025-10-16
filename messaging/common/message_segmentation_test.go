@@ -10,9 +10,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/messaging/layers/segmentation"
+	segmentationmigrations "github.com/status-im/status-go/messaging/layers/segmentation/migrations"
 	"github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestMessageSegmentationSuite(t *testing.T) {
@@ -41,10 +44,17 @@ func (s *MessageSegmentationSuite) SetupTest() {
 	s.logger, err = zap.NewDevelopment()
 	s.Require().NoError(err)
 
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer(nil))
+	s.Require().NoError(err)
+
+	err = segmentationmigrations.Migrate(db)
+	s.Require().NoError(err)
+
 	s.sender, err = NewMessageSender(
 		identity,
 		nil,
-		NewPersistenceInMemory(),
+		NewMessageSenderPersistenceInMemory(),
+		segmentation.NewSQLitePersistence(db),
 		nil,
 		nil,
 		s.logger,

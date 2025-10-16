@@ -25,6 +25,7 @@ import (
 	messagingevents "github.com/status-im/status-go/messaging/events"
 	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
+	"github.com/status-im/status-go/messaging/layers/segmentation"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
@@ -46,14 +47,15 @@ const (
 var RekeyCompatibility = true
 
 type MessageSender struct {
-	identity    *ecdsa.PrivateKey
-	datasync    *datasync.DataSync
-	database    *sql.DB
-	transport   *transport.Transport
-	protocol    *encryption.Protocol
-	logger      *zap.Logger
-	persistence messagingtypes.Persistence
-	publisher   *pubsub.Publisher
+	identity                *ecdsa.PrivateKey
+	datasync                *datasync.DataSync
+	database                *sql.DB
+	transport               *transport.Transport
+	protocol                *encryption.Protocol
+	logger                  *zap.Logger
+	persistence             messagingtypes.MessageSenderPersistence
+	segmentationPersistence segmentation.Persistence
+	publisher               *pubsub.Publisher
 
 	datasyncEnabled bool
 
@@ -69,21 +71,23 @@ type MessageSender struct {
 func NewMessageSender(
 	identity *ecdsa.PrivateKey,
 	database *sql.DB, // FIXME
-	persistence messagingtypes.Persistence,
+	persistence messagingtypes.MessageSenderPersistence,
+	segmentationPersistence segmentation.Persistence,
 	transport *transport.Transport,
 	enc *encryption.Protocol,
 	logger *zap.Logger,
 ) (*MessageSender, error) {
 	p := &MessageSender{
-		identity:        identity,
-		database:        database,
-		datasyncEnabled: true, // FIXME
-		protocol:        enc,
-		persistence:     persistence,
-		publisher:       pubsub.NewPublisher(),
-		transport:       transport,
-		logger:          logger,
-		ephemeralKeys:   make(map[string]*ecdsa.PrivateKey),
+		identity:                identity,
+		database:                database,
+		datasyncEnabled:         true, // FIXME
+		protocol:                enc,
+		persistence:             persistence,
+		segmentationPersistence: segmentationPersistence,
+		publisher:               pubsub.NewPublisher(),
+		transport:               transport,
+		logger:                  logger,
+		ephemeralKeys:           make(map[string]*ecdsa.PrivateKey),
 	}
 
 	return p, nil
@@ -1218,12 +1222,12 @@ func (s *MessageSender) notifyOnScheduledMessage(recipient *ecdsa.PublicKey, mes
 	})
 }
 
-func (s *MessageSender) JoinPublic(id string) (*messagingtypes.ChatFilter, error) {
+func (s *MessageSender) JoinPublic(id string) (*transport.Filter, error) {
 	filter, err := s.transport.JoinPublic(id)
 	if err != nil {
 		return nil, err
 	}
-	return adapters.FromTransportFilter(filter), nil
+	return filter, nil
 }
 
 func (s *MessageSender) getRandomEphemeralKey() *ecdsa.PrivateKey {

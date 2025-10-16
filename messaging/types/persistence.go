@@ -6,28 +6,26 @@ import (
 
 type Persistence interface {
 	WakuStorage() WakuPersistence
+	TransportStorage() TransportPersistence
 	SegmentationStorage() SegmentationPersistence
 	EncryptionStorage() EncryptionPersistence
-
-	MessageCacheAdd(ids []string, timestamp uint64) error
-	MessageCacheClear() error
-	MessageCacheClearOlderThan(timestamp uint64) error
-	MessageCacheHits(ids []string) (map[string]bool, error)
-
-	InsertPendingConfirmation(confirmation *RawMessageConfirmation) error
-	SaveHashRatchetMessage(groupID []byte, keyID []byte, m *ReceivedMessage) error
-	GetHashRatchetMessages(keyID []byte) ([]*ReceivedMessage, error)
-	DeleteHashRatchetMessages(ids [][]byte) error
-	DeleteHashRatchetMessagesOlderThan(timestamp int64) error
+	MessageSenderStorage() MessageSenderPersistence
 }
 
 type WakuPersistence interface {
-	Keys() (map[string][]byte, error)
-	AddKey(chatID string, key []byte) error
 	InsertProtectedTopic(pubsubTopic string, privKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) error
 	DeleteProtectedTopic(pubsubTopic string) error
 	FetchPrivateKeyForProtectedTopic(topic string) (*ecdsa.PrivateKey, error)
 	ProtectedTopics() ([]ProtectedTopicRecord, error)
+}
+
+type TransportPersistence interface {
+	Keys() (map[string][]byte, error)
+	AddKey(chatID string, key []byte) error
+	MessageCacheAdd(ids []string, timestamp uint64) error
+	MessageCacheClear() error
+	MessageCacheClearOlderThan(timestamp uint64) error
+	MessageCacheHits(ids []string) (map[string]bool, error)
 }
 
 type SegmentationPersistence interface {
@@ -46,6 +44,14 @@ type EncryptionPersistence interface {
 	SharedSecretStorage() SharedSecretPersistence
 	MultideviceStorage() MultidevicePersistence
 	HashRatchetStorage() HashRatchetPersistence
+}
+
+type MessageSenderPersistence interface {
+	InsertPendingConfirmation(confirmation *RawMessageConfirmation) error
+	SaveHashRatchetMessage(groupID []byte, keyID []byte, m *ReceivedMessage) error
+	GetHashRatchetMessages(keyID []byte) ([]*ReceivedMessage, error)
+	DeleteHashRatchetMessages(ids [][]byte) error
+	DeleteHashRatchetMessagesOlderThan(timestamp int64) error
 }
 
 type ProtectedTopicRecord struct {

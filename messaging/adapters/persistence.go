@@ -5,70 +5,113 @@ import (
 
 	"github.com/status-im/status-go/messaging/internal"
 	"github.com/status-im/status-go/messaging/layers/encryption"
+	"github.com/status-im/status-go/messaging/layers/segmentation"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
-	wakupersistence "github.com/status-im/status-go/messaging/waku/persistence"
+	waku "github.com/status-im/status-go/messaging/waku"
 )
 
-type KeysPersistence struct {
+func NewKeysPersistence(p types.Persistence) transport.KeysPersistence {
+	transportStorage := p.TransportStorage()
+	if transportStorage == nil {
+		return nil
+	}
+
+	internal, ok := transportStorage.(*internal.SQLiteTransportPersistence)
+	if ok {
+		return internal.SQLiteKeysPersistence
+	}
+
+	return &keysPersistence{P: p}
+}
+
+type keysPersistence struct {
 	P types.Persistence
 }
 
-var _ transport.KeysPersistence = (*KeysPersistence)(nil)
+var _ transport.KeysPersistence = (*keysPersistence)(nil)
 
-func (kp *KeysPersistence) All() (map[string][]byte, error) {
-	return kp.P.WakuStorage().Keys()
+func (kp *keysPersistence) All() (map[string][]byte, error) {
+	return kp.P.TransportStorage().Keys()
 }
 
-func (kp *KeysPersistence) Add(chatID string, key []byte) error {
-	return kp.P.WakuStorage().AddKey(chatID, key)
+func (kp *keysPersistence) Add(chatID string, key []byte) error {
+	return kp.P.TransportStorage().AddKey(chatID, key)
 }
 
-type ProcessedMessageIDsCache struct {
+func NewProcessedMessageIDsCache(p types.Persistence) transport.ProcessedMessageIDsCachePersistence {
+	transportStorage := p.TransportStorage()
+	if transportStorage == nil {
+		return nil
+	}
+
+	internal, ok := transportStorage.(*internal.SQLiteTransportPersistence)
+	if ok {
+		return internal.SQLiteProcessedMessageIDsCachePersistence
+	}
+
+	return &processedMessageIDsCache{P: p}
+}
+
+type processedMessageIDsCache struct {
 	P types.Persistence
 }
 
-var _ transport.ProcessedMessageIDsCachePersistence = (*ProcessedMessageIDsCache)(nil)
+var _ transport.ProcessedMessageIDsCachePersistence = (*processedMessageIDsCache)(nil)
 
-func (pm *ProcessedMessageIDsCache) Clear() error {
-	return pm.P.MessageCacheClear()
+func (pm *processedMessageIDsCache) Clear() error {
+	return pm.P.TransportStorage().MessageCacheClear()
 }
-func (pm *ProcessedMessageIDsCache) Hits(ids []string) (map[string]bool, error) {
-	return pm.P.MessageCacheHits(ids)
+func (pm *processedMessageIDsCache) Hits(ids []string) (map[string]bool, error) {
+	return pm.P.TransportStorage().MessageCacheHits(ids)
 }
-func (pm *ProcessedMessageIDsCache) Add(ids []string, timestamp uint64) error {
-	return pm.P.MessageCacheAdd(ids, timestamp)
+func (pm *processedMessageIDsCache) Add(ids []string, timestamp uint64) error {
+	return pm.P.TransportStorage().MessageCacheAdd(ids, timestamp)
 }
-func (pm *ProcessedMessageIDsCache) Clean(timestamp uint64) error {
-	return pm.P.MessageCacheClearOlderThan(timestamp)
+func (pm *processedMessageIDsCache) Clean(timestamp uint64) error {
+	return pm.P.TransportStorage().MessageCacheClearOlderThan(timestamp)
 }
 
-type WakuProtectedTopics struct {
+func NewWakuProtectedTopics(p types.Persistence) waku.ProtectedTopicsPersistence {
+	wakuStorage := p.WakuStorage()
+	if wakuStorage == nil {
+		return nil
+	}
+
+	internal, ok := wakuStorage.(*internal.SQLiteWakuPersistence)
+	if ok {
+		return internal.SQLiteProtectedTopicsPersistence
+	}
+
+	return &wakuProtectedTopics{P: p}
+}
+
+type wakuProtectedTopics struct {
 	P types.Persistence
 }
 
-var _ wakupersistence.ProtectedTopics = (*WakuProtectedTopics)(nil)
+var _ waku.ProtectedTopicsPersistence = (*wakuProtectedTopics)(nil)
 
-func (wpt *WakuProtectedTopics) Insert(pubsubTopic string, privKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) error {
+func (wpt *wakuProtectedTopics) Insert(pubsubTopic string, privKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) error {
 	return wpt.P.WakuStorage().InsertProtectedTopic(pubsubTopic, privKey, publicKey)
 }
 
-func (wpt *WakuProtectedTopics) Delete(pubsubTopic string) error {
+func (wpt *wakuProtectedTopics) Delete(pubsubTopic string) error {
 	return wpt.P.WakuStorage().DeleteProtectedTopic(pubsubTopic)
 }
 
-func (wpt *WakuProtectedTopics) FetchPrivateKey(topic string) (*ecdsa.PrivateKey, error) {
+func (wpt *wakuProtectedTopics) FetchPrivateKey(topic string) (*ecdsa.PrivateKey, error) {
 	return wpt.P.WakuStorage().FetchPrivateKeyForProtectedTopic(topic)
 }
 
-func (wpt *WakuProtectedTopics) ProtectedTopics() ([]wakupersistence.ProtectedTopic, error) {
+func (wpt *wakuProtectedTopics) All() ([]waku.ProtectedTopic, error) {
 	pt, err := wpt.P.WakuStorage().ProtectedTopics()
 	if err != nil {
 		return nil, err
 	}
-	result := make([]wakupersistence.ProtectedTopic, len(pt))
+	result := make([]waku.ProtectedTopic, len(pt))
 	for i, p := range pt {
-		result[i] = wakupersistence.ProtectedTopic{
+		result[i] = waku.ProtectedTopic{
 			PubKey: p.PubKey,
 			Topic:  p.Topic,
 		}
@@ -76,7 +119,19 @@ func (wpt *WakuProtectedTopics) ProtectedTopics() ([]wakupersistence.ProtectedTo
 	return result, nil
 }
 
-func EncryptionPersistence(p types.Persistence) encryption.Persistence {
+func NewSegmentationPersistence(p types.Persistence) segmentation.Persistence {
+	segmentationStorage := p.SegmentationStorage()
+	if segmentationStorage == nil {
+		return nil
+	}
+	internal, ok := segmentationStorage.(*internal.SQLiteSegmentationPersistence)
+	if !ok {
+		panic("custom SegmentationPersistence implementations are not supported yet")
+	}
+	return internal.SQLitePersistence
+}
+
+func NewEncryptionPersistence(p types.Persistence) encryption.Persistence {
 	encryptionStorage := p.EncryptionStorage()
 	if encryptionStorage == nil {
 		return nil

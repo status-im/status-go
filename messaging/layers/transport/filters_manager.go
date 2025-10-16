@@ -28,11 +28,6 @@ type RawFilter struct {
 	SymKeyID string
 }
 
-type KeysPersistence interface {
-	All() (map[string][]byte, error)
-	Add(chatID string, key []byte) error
-}
-
 type FiltersService interface {
 	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
 	DeleteKeyPair(keyID string) bool

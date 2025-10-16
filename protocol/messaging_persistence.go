@@ -2,21 +2,14 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"database/sql"
-	"errors"
-	"fmt"
 	"strings"
 	"time"
 
-	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/protobuf"
 )
-
-const tableName = "wakuv2_keys"
 
 type messagingPersistence struct {
 	db *sql.DB
@@ -28,316 +21,24 @@ func NewMessagingPersistence(db *sql.DB) *messagingPersistence {
 	return &messagingPersistence{db: db}
 }
 
-type wakuPersistence struct {
-	db *sql.DB
-}
-
-var _ messagingtypes.WakuPersistence = (*wakuPersistence)(nil)
-
-func (w *wakuPersistence) AddKey(chatID string, key []byte) error {
-	statement := fmt.Sprintf("INSERT INTO %s(chat_id, key) VALUES(?, ?)", tableName) // nolint:gosec
-	stmt, err := w.db.Prepare(statement)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(chatID, key)
-	return err
-}
-
-func (w *wakuPersistence) Keys() (map[string][]byte, error) {
-	keys := make(map[string][]byte)
-
-	statement := fmt.Sprintf("SELECT chat_id, key FROM %s", tableName) // nolint: gosec
-
-	stmt, err := w.db.Prepare(statement)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.Query()
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var (
-			chatID string
-			key    []byte
-		)
-
-		err := rows.Scan(&chatID, &key)
-		if err != nil {
-			return nil, err
-		}
-		keys[chatID] = key
-	}
-
-	return keys, nil
-}
-
-func (w *wakuPersistence) InsertProtectedTopic(pubsubTopic string, privKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) error {
-	var privKeyBytes []byte
-	if privKey != nil {
-		privKeyBytes = crypto.FromECDSA(privKey)
-	}
-	pubKeyBytes := crypto.FromECDSAPub(publicKey)
-
-	_, err := w.db.Exec("INSERT OR REPLACE INTO pubsubtopic_signing_key (topic, priv_key, pub_key) VALUES (?, ?, ?)",
-		pubsubTopic, privKeyBytes, pubKeyBytes)
-	return err
-}
-
-func (w *wakuPersistence) FetchPrivateKeyForProtectedTopic(topic string) (*ecdsa.PrivateKey, error) {
-	var privKeyBytes []byte
-	err := w.db.QueryRow("SELECT priv_key FROM pubsubtopic_signing_key WHERE topic = ?", topic).Scan(&privKeyBytes)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return crypto.ToECDSA(privKeyBytes)
-}
-
-func (w *wakuPersistence) ProtectedTopics() ([]messagingtypes.ProtectedTopicRecord, error) {
-	rows, err := w.db.Query("SELECT pub_key, topic FROM pubsubtopic_signing_key")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var result []messagingtypes.ProtectedTopicRecord
-	for rows.Next() {
-		var pubKeyBytes []byte
-		var topic string
-		err := rows.Scan(&pubKeyBytes, &topic)
-		if err != nil {
-			return nil, err
-		}
-
-		pubk, err := crypto.UnmarshalPubkey(pubKeyBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		result = append(result, messagingtypes.ProtectedTopicRecord{
-			PubKey: pubk,
-			Topic:  topic,
-		})
-	}
-
-	return result, nil
-}
-
-func (w *wakuPersistence) DeleteProtectedTopic(pubsubTopic string) error {
-	_, err := w.db.Exec("DELETE FROM pubsubtopic_signing_key WHERE topic = ?", pubsubTopic)
-	return err
-}
-
-type segmentationPersistence struct {
-	db *sql.DB
-}
-
-var _ messagingtypes.SegmentationPersistence = (*segmentationPersistence)(nil)
-
-func (s *segmentationPersistence) IsMessageAlreadyCompleted(hash []byte) (bool, error) {
-	var alreadyCompleted int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM message_segments_completed WHERE hash = ?", hash).Scan(&alreadyCompleted)
-	if err != nil {
-		return false, err
-	}
-	return alreadyCompleted > 0, nil
-}
-
-func (s *segmentationPersistence) SaveMessageSegment(segment *messagingtypes.SegmentMessage, sigPubKey *ecdsa.PublicKey, timestamp int64) error {
-	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
-
-	_, err := s.db.Exec("INSERT INTO message_segments (hash, segment_index, segments_count, parity_segment_index, parity_segments_count, sig_pub_key, payload, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		segment.EntireMessageHash, segment.Index, segment.SegmentsCount, segment.ParitySegmentIndex, segment.ParitySegmentsCount, sigPubKeyBlob, segment.Payload, timestamp)
-
-	return err
-}
-
-// Get ordered message segments for given hash
-func (s *segmentationPersistence) GetMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey) ([]*messagingtypes.SegmentMessage, error) {
-	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
-
-	rows, err := s.db.Query(`
-		SELECT
-			hash, segment_index, segments_count, parity_segment_index, parity_segments_count, payload
-		FROM
-			message_segments
-		WHERE
-			hash = ? AND sig_pub_key = ?
-		ORDER BY
-			(segments_count = 0) ASC, -- Prioritize segments_count > 0
-			segment_index ASC,
-			parity_segment_index ASC`,
-		hash, sigPubKeyBlob)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var segments []*messagingtypes.SegmentMessage
-	for rows.Next() {
-		segment := &messagingtypes.SegmentMessage{
-			SegmentMessage: &protobuf.SegmentMessage{},
-		}
-		err := rows.Scan(&segment.EntireMessageHash, &segment.Index, &segment.SegmentsCount, &segment.ParitySegmentIndex, &segment.ParitySegmentsCount, &segment.Payload)
-		if err != nil {
-			return nil, err
-		}
-		segments = append(segments, segment)
-	}
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-
-	return segments, nil
-}
-
-func (s *segmentationPersistence) RemoveMessageSegmentsOlderThan(timestamp int64) error {
-	_, err := s.db.Exec("DELETE FROM message_segments WHERE timestamp < ?", timestamp)
-	return err
-}
-
-func (s *segmentationPersistence) CompleteMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey, timestamp int64) error {
-	tx, err := s.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-
-	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
-
-	_, err = tx.Exec("DELETE FROM message_segments WHERE hash = ? AND sig_pub_key = ?", hash, sigPubKeyBlob)
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.Exec("INSERT INTO message_segments_completed (hash, sig_pub_key, timestamp) VALUES (?,?,?)", hash, sigPubKeyBlob, timestamp)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (s *segmentationPersistence) RemoveMessageSegmentsCompletedOlderThan(timestamp int64) error {
-	_, err := s.db.Exec("DELETE FROM message_segments_completed WHERE timestamp < ?", timestamp)
-	return err
-}
-
 func (m *messagingPersistence) WakuStorage() messagingtypes.WakuPersistence {
-	return &wakuPersistence{db: m.db}
+	return messaging.NewWakuSQLitePersistence(m.db)
+}
+
+func (m *messagingPersistence) TransportStorage() messagingtypes.TransportPersistence {
+	return messaging.NewTransportSQLitePersistence(m.db)
 }
 
 func (m *messagingPersistence) SegmentationStorage() messagingtypes.SegmentationPersistence {
-	return &segmentationPersistence{db: m.db}
+	return messaging.NewSegmentationSQLitePersistence(m.db)
 }
 
 func (m *messagingPersistence) EncryptionStorage() messagingtypes.EncryptionPersistence {
 	return messaging.NewEncryptionSQLitePersistence(m.db)
 }
 
-func (m *messagingPersistence) MessageCacheClear() error {
-	_, err := m.db.Exec("DELETE FROM transport_message_cache")
-	return err
-}
-
-func (m *messagingPersistence) MessageCacheHits(ids []string) (map[string]bool, error) {
-	hits := make(map[string]bool)
-
-	// Split the results into batches of 999 items.
-	// To prevent excessive memory allocations, the maximum value of a host parameter number
-	// is SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999
-	batch := 999
-	for i := 0; i < len(ids); i += batch {
-		j := i + batch
-		if j > len(ids) {
-			j = len(ids)
-		}
-
-		currentBatch := ids[i:j]
-
-		idsArgs := make([]interface{}, 0, len(currentBatch))
-		for _, id := range currentBatch {
-			idsArgs = append(idsArgs, id)
-		}
-
-		inVector := strings.Repeat("?, ", len(currentBatch)-1) + "?"
-		query := "SELECT id FROM transport_message_cache WHERE id IN (" + inVector + ")" // nolint: gosec
-
-		rows, err := m.db.Query(query, idsArgs...)
-		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var id string
-			err := rows.Scan(&id)
-			if err != nil {
-				return nil, err
-			}
-			hits[id] = true
-		}
-	}
-
-	return hits, nil
-}
-
-func (m *messagingPersistence) MessageCacheAdd(ids []string, timestamp uint64) (err error) {
-	var tx *sql.Tx
-	tx, err = m.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return
-	}
-
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-
-	for _, id := range ids {
-
-		var stmt *sql.Stmt
-		stmt, err = tx.Prepare(`INSERT INTO transport_message_cache(id,timestamp) VALUES (?, ?)`)
-		if err != nil {
-			return
-		}
-		defer stmt.Close()
-
-		_, err = stmt.Exec(id, timestamp)
-		if err != nil {
-			return
-		}
-	}
-
-	return
-}
-
-func (m *messagingPersistence) MessageCacheClearOlderThan(timestamp uint64) error {
-	_, err := m.db.Exec(`DELETE FROM transport_message_cache WHERE timestamp < ?`, timestamp)
-	return err
+func (m *messagingPersistence) MessageSenderStorage() messagingtypes.MessageSenderPersistence {
+	return m
 }
 
 func (m *messagingPersistence) InsertPendingConfirmation(confirmation *messagingtypes.RawMessageConfirmation) error {

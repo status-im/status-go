@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
@@ -206,46 +205,4 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, fetchedMessages)
 	require.Len(t, fetchedMessages, 1)
-}
-
-func TestWakuProtectedTopicPersistence(t *testing.T) {
-	db, err := openTestDB()
-	require.NoError(t, err)
-	p := NewMessagingPersistence(db)
-
-	// Generate ECDSA keys
-	privKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	pubKey := &privKey.PublicKey
-
-	pubsubTopic := "test-topic"
-
-	// Insert protected topic
-	err = p.WakuStorage().InsertProtectedTopic(pubsubTopic, privKey, pubKey)
-	require.NoError(t, err)
-
-	// Fetch private key for topic
-	fetchedPrivKey, err := p.WakuStorage().FetchPrivateKeyForProtectedTopic(pubsubTopic)
-	require.NoError(t, err)
-	require.NotNil(t, fetchedPrivKey)
-	require.Equal(t, privKey.D.Bytes(), fetchedPrivKey.D.Bytes())
-
-	// Fetch protected topics
-	topics, err := p.WakuStorage().ProtectedTopics()
-	require.NoError(t, err)
-	require.Len(t, topics, 1)
-	require.Equal(t, pubsubTopic, topics[0].Topic)
-
-	// Delete protected topic
-	err = p.WakuStorage().DeleteProtectedTopic(pubsubTopic)
-	require.NoError(t, err)
-
-	// Ensure topic is deleted
-	topics, err = p.WakuStorage().ProtectedTopics()
-	require.NoError(t, err)
-	require.Len(t, topics, 0)
-
-	fetchedPrivKey, err = p.WakuStorage().FetchPrivateKeyForProtectedTopic(pubsubTopic)
-	require.NoError(t, err)
-	require.Nil(t, fetchedPrivKey)
 }

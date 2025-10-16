@@ -127,7 +127,11 @@ func (a *API) HandleSharedSecrets(secrets []*types.SharedSecret) error {
 }
 
 func (a *API) JoinPublicChat(chatID string) (*types.ChatFilter, error) {
-	return a.core.sender.JoinPublic(chatID)
+	f, err := a.core.sender.JoinPublic(chatID)
+	if err != nil {
+		return nil, err
+	}
+	return adapters.FromTransportFilter(f), nil
 }
 
 func (a *API) JoinPrivateChat(publicKey *ecdsa.PublicKey) (*types.ChatFilter, error) {
@@ -195,7 +199,7 @@ func (a *API) GetCurrentKeyForGroup(groupID []byte) (*encryption.HashRatchetKeyC
 }
 
 func (a *API) SaveHashRatchetMessage(groupID []byte, keyID []byte, m *types.ReceivedMessage) error {
-	return a.core.persistence.SaveHashRatchetMessage(groupID, keyID, m)
+	return a.core.persistence.MessageSenderStorage().SaveHashRatchetMessage(groupID, keyID, m)
 }
 
 func (a *API) SendPubsubTopicKey(ctx context.Context, rawMessage *types.RawMessage) ([]byte, error) {

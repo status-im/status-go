@@ -100,9 +100,11 @@ func (dbi TestDBInitializer) Initialize(dbPath string, password string, kdfItera
 		return nil, err
 	}
 
-	err = sqlite.Migrate(db, dbi.assetSource, sqlite.MigrateOptions{})
-	if err != nil {
-		return nil, err
+	if dbi.assetSource != nil {
+		err = sqlite.Migrate(db, dbi.assetSource, sqlite.MigrateOptions{})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return db, nil
