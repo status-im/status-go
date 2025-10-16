@@ -1,6 +1,7 @@
 package communities
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,16 +27,18 @@ type CodexIndexDownloader struct {
 	codexClient    *CodexClient
 	indexCid       string
 	filePath       string
-	datasetSize    int64 // stores the dataset size from the manifest
-	bytesCompleted int64 // tracks download progress
+	datasetSize    int64           // stores the dataset size from the manifest
+	bytesCompleted int64           // tracks download progress
+	cancelChan     <-chan struct{} // for cancellation support
 }
 
 // NewCodexIndexDownloader creates a new index downloader
-func NewCodexIndexDownloader(codexClient *CodexClient, indexCid string, filePath string) *CodexIndexDownloader {
+func NewCodexIndexDownloader(codexClient *CodexClient, indexCid string, filePath string, cancelChan <-chan struct{}) *CodexIndexDownloader {
 	return &CodexIndexDownloader{
 		codexClient: codexClient,
 		indexCid:    indexCid,
 		filePath:    filePath,
+		cancelChan:  cancelChan,
 	}
 }
 
@@ -49,10 +52,35 @@ func (d *CodexIndexDownloader) GotManifest() <-chan struct{} {
 		// Reset datasetSize to 0 to indicate no successful fetch yet
 		d.datasetSize = 0
 
+		// Check for cancellation before starting
+		select {
+		case <-d.cancelChan:
+			return // Exit without closing channel - cancellation
+		default:
+		}
+
+		// Create cancellable context for HTTP request
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Monitor for cancellation in separate goroutine
+		go func() {
+			select {
+			case <-d.cancelChan:
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+
 		// Fetch manifest from Codex
 		url := fmt.Sprintf("%s/api/codex/v1/data/%s/network/manifest", d.codexClient.BaseURL, d.indexCid)
 
-		resp, err := d.codexClient.Client.Get(url)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return
+		}
+
+		resp, err := d.codexClient.Client.Do(req)
 		if err != nil {
 			// Don't close channel on error - let timeout handle it
 			return
@@ -99,6 +127,27 @@ func (d *CodexIndexDownloader) DownloadIndexFile() error {
 	d.bytesCompleted = 0
 
 	go func() {
+		// Check for cancellation before starting
+		select {
+		case <-d.cancelChan:
+			return // Exit early if cancelled
+		default:
+		}
+
+		// Create cancellable context
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Monitor for cancellation
+		go func() {
+			select {
+			case <-d.cancelChan:
+				cancel() // Cancel download immediately
+			case <-ctx.Done():
+				// Context already cancelled, nothing to do
+			}
+		}()
+
 		// Create the output file
 		file, err := os.Create(d.filePath)
 		if err != nil {
@@ -113,8 +162,8 @@ func (d *CodexIndexDownloader) DownloadIndexFile() error {
 			completed: &d.bytesCompleted,
 		}
 
-		// Use CodexClient to download and stream to file
-		err = d.codexClient.Download(d.indexCid, progressWriter)
+		// Use CodexClient to download and stream to file with context for cancellation
+		err = d.codexClient.DownloadWithContext(ctx, d.indexCid, progressWriter)
 		if err != nil {
 			// TODO: Consider logging the error or exposing it somehow
 			return

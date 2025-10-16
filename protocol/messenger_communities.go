@@ -3825,7 +3825,17 @@ importMessageArchivesLoop:
 			// wait for all archives to be processed first
 			downloadedArchiveID := archiveIDsToImport[0]
 
-			archiveMessages, err := m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
+			var archiveMessages []*protobuf.WakuMessage
+			preference, err := m.communitiesManager.GetArchiveDistributionPreference(communityID)
+			if err != nil {
+				m.logger.Warn("failed to get archive distribution preference, using torrent", zap.Error(err))
+				preference = "torrent"
+			}
+			if preference == "codex" {
+				archiveMessages, err = m.archiveManager.ExtractMessagesFromCodexHistoryArchive(communityID, downloadedArchiveID)
+			} else {
+				archiveMessages, err = m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
+			}
 			if err != nil {
 				if errors.Is(err, messagingtypes.ErrHashRatchetGroupIDNotFound) {
 					// In case we're missing hash ratchet keys, best we can do is

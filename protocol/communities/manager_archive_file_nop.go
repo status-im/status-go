@@ -46,10 +46,18 @@ func (amm *ArchiveFileManagerNop) ExtractMessagesFromHistoryArchive(communityID 
 	return nil, nil
 }
 
+func (amm *ArchiveFileManagerNop) ExtractMessagesFromCodexHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error) {
+	return nil, nil
+}
+
 func (amm *ArchiveFileManagerNop) GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error) {
 	return "", nil
 }
 
 func (amm *ArchiveFileManagerNop) LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error) {
+	return nil, nil
+}
+
+func (amm *ArchiveFileManagerNop) CodexLoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.CodexWakuMessageArchiveIndex, error) {
 	return nil, nil
 }

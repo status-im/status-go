@@ -132,7 +132,6 @@ type Manager struct {
 	mediaServer              server.MediaServerInterface
 	communityImageVersions   map[string]uint32
 	cache                    *ttlcache.Cache[string, ReadonlyCommunity]
-
 }
 
 type CommunityLock struct {
@@ -200,6 +199,7 @@ type ArchiveFileService interface {
 	GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error)
 	SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error
 	ExtractMessagesFromHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error)
+	ExtractMessagesFromCodexHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error)
 	GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error)
 	GetHistoryArchiveIndexCid(communityID types.HexBytes) (string, error)
 	LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error)
@@ -2282,7 +2282,6 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 			}
 		}
 
-
 	}
 
 	pkString := crypto.PubkeyToHex(&m.identity.PublicKey)
@@ -3687,19 +3686,17 @@ func (m *Manager) GetArchiveDistributionPreference(communityID types.HexBytes) (
 	return m.persistence.GetArchiveDistributionPreference(communityID)
 }
 
-	func (m *Manager) SetArchiveDistributionPreference(communityID types.HexBytes, preference string) error {
-		// Validate preference value
-		switch preference {
-		case ArchiveDistributionMethodAuto, ArchiveDistributionMethodTorrent, ArchiveDistributionMethodCodex:
-			// Valid preference
-		default:
-			return errors.New("invalid archive distribution preference")
-		}
-		
-		return m.persistence.SetArchiveDistributionPreference(communityID, preference)
+func (m *Manager) SetArchiveDistributionPreference(communityID types.HexBytes, preference string) error {
+	// Validate preference value
+	switch preference {
+	case ArchiveDistributionMethodAuto, ArchiveDistributionMethodTorrent, ArchiveDistributionMethodCodex:
+		// Valid preference
+	default:
+		return errors.New("invalid archive distribution preference")
 	}
 
-
+	return m.persistence.SetArchiveDistributionPreference(communityID, preference)
+}
 
 func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	m.communityLock.Lock(id)

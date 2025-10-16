@@ -10,6 +10,7 @@
 package communities
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"os"
 	"path"
@@ -681,6 +682,56 @@ func (m *ArchiveFileManager) ExtractMessagesFromHistoryArchive(communityID types
 		m.logger.Error("failed failed to read archive data", zap.Error(err))
 		return nil, err
 	}
+
+	archive := &protobuf.WakuMessageArchive{}
+
+	err = proto.Unmarshal(data, archive)
+	if err != nil {
+		pk, err := crypto.DecompressPubkey(communityID)
+		if err != nil {
+			m.logger.Error("failed to decompress community pubkey", zap.Error(err))
+			return nil, err
+		}
+
+		decryptedData, err := m.messaging.DecryptMessage(m.identity, pk, data)
+		if err != nil {
+			m.logger.Error("failed to decrypt message archive", zap.Error(err))
+			return nil, err
+		}
+
+		err = proto.Unmarshal(decryptedData, archive)
+		if err != nil {
+			m.logger.Error("failed to unmarshal message archive", zap.Error(err))
+			return nil, err
+		}
+	}
+	return archive.Messages, nil
+}
+
+func (m *ArchiveFileManager) ExtractMessagesFromCodexHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error) {
+	index, err := m.CodexLoadHistoryArchiveIndexFromFile(m.identity, communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := index.Archives[archiveID]
+	cid := metadata.Cid
+
+	codexClient := NewCodexClient("localhost", "8001")
+
+	var buf bytes.Buffer
+	err = codexClient.LocalDownload(cid, &buf)
+	if err != nil {
+		m.logger.Error("failed to download archive from codex", zap.Error(err))
+		return nil, err
+	}
+	data := buf.Bytes()
+
+	m.logger.Debug("extracting messages from history archive",
+		zap.String("communityID", communityID.String()),
+		zap.String("archiveID", archiveID),
+		zap.String("cid", cid),
+	)
 
 	archive := &protobuf.WakuMessageArchive{}
 
