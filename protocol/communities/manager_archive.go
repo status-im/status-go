@@ -82,6 +82,7 @@ func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 	return &ArchiveManager{
 		torrentConfig:               amc.TorrentConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
+		indexCidTasks:               make(map[string]string),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
 
 		logger:      amc.Logger,
@@ -482,7 +483,18 @@ func (m *ArchiveManager) UnseedHistoryArchiveTorrent(communityID types.HexBytes)
 }
 
 func (m *ArchiveManager) UnseedHistoryArchiveIndexCid(communityID types.HexBytes) {
-	// ToDo: consider "unpinning" the index Cid, so that it is no longer advertised on DHT
+	id := communityID.String()
+
+	if cid, exists := m.indexCidTasks[id]; exists {
+		m.logger.Debug("Unseeding index CID for community", zap.String("id", id), zap.String("cid", cid))
+		// ToDo: consider "unpinning" the index Cid, so that it is no longer advertised on DHT
+		// For now, we remove it from tracking and could delete the local index file
+		delete(m.indexCidTasks, id)
+
+		// Optional: Remove local index file if we want to clean up storage
+		// indexFilePath := m.ArchiveFileManager.codexArchiveIndexFile(id)
+		// os.Remove(indexFilePath)
+	}
 }
 
 func (m *ArchiveManager) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool {
@@ -691,9 +703,12 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 	// Set CodexClient timeout to be select timeout + 30s to ensure HTTP request doesn't timeout first
 	codexClient.SetRequestTimeout(50 * time.Second)
 
+	// Create separate cancel channel for the index downloader to avoid channel competition
+	indexDownloaderCancel := make(chan struct{})
+
 	// Create index downloader with path to index file using helper function
 	indexFilePath := m.ArchiveFileManager.codexArchiveIndexFile(id)
-	indexDownloader := NewCodexIndexDownloader(codexClient, indexCid, indexFilePath)
+	indexDownloader := NewCodexIndexDownloader(codexClient, indexCid, indexFilePath, indexDownloaderCancel)
 
 	m.logger.Debug("fetching history index from Codex", zap.String("indexCid", indexCid))
 	select {
@@ -701,6 +716,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 		return nil, ErrIndexCidTimedout
 	case <-cancelTask:
 		m.logger.Debug("cancelled fetching history index from Codex")
+		close(indexDownloaderCancel) // Forward cancellation to index downloader
 		downloadTaskInfo.Cancelled = true
 		return downloadTaskInfo, nil
 	case <-indexDownloader.GotManifest():
@@ -726,6 +742,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 			select {
 			case <-cancelTask:
 				m.logger.Debug("cancelled downloading archive index")
+				close(indexDownloaderCancel) // Forward cancellation to index downloader
 				downloadTaskInfo.Cancelled = true
 				return downloadTaskInfo, nil
 			case <-ticker.C:
@@ -749,19 +766,52 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 					downloadTaskInfo.TotalDownloadedArchivesCount = len(existingArchiveIDs)
 					downloadTaskInfo.TotalArchivesCount = len(index.Archives)
 
-					// Create and start the archive downloader using the protobuf index directly
-					archiveDownloader := NewCodexArchiveDownloader(codexClient, index, id, existingArchiveIDs)
+					// Create message handler function that processes messages through the same pipeline as torrents
+					// messageHandler := func(messages []*protobuf.WakuMessage) error {
+					// 	// Process messages in chunks like torrent archives (importMessagesChunkSize = 10)
+					// 	chunkSize := 10
+					// 	for i := 0; i < len(messages); i += chunkSize {
+					// 		end := i + chunkSize
+					// 		if end > len(messages) {
+					// 			end = len(messages)
+					// 		}
+					// 		messagesChunk := messages[i:end]
+
+					// 		// This would normally call m.handleArchiveMessages(messagesChunk)
+					// 		// For now, we just log the processing (TODO: integrate with messenger)
+					// 		m.logger.Debug("processing message chunk", zap.Int("count", len(messagesChunk)))
+					// 	}
+					// 	return nil
+					// }
+
+					// Create the archive processor
+					// processor := NewCodexArchiveMessageProcessor(m.identity, m.messaging, m.persistence, m.logger, messageHandler)
+
+					// Set up callback for when archives are processed
+					// processor.SetOnArchiveProcessed(func(hash string, from, to uint64) {
+					// 	// Publish download signal (signaling that the archive was processed)
+					// 	m.publisher.publish(&Subscription{
+					// 		HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
+					// 			CommunityID: communityID.String(),
+					// 			From:        int(from),
+					// 			To:          int(to),
+					// 		},
+					// 	})
+
+					// 	m.logger.Debug("archive processed successfully",
+					// 		zap.String("hash", hash),
+					// 		zap.Uint64("from", from),
+					// 		zap.Uint64("to", to))
+					// })
+
+					// Create separate cancel channel for the archive downloader to avoid channel competition
+					archiveDownloaderCancel := make(chan struct{})
+
+					// Create the archive downloader using the protobuf index directly
+					archiveDownloader := NewCodexArchiveDownloader(codexClient, index, id, existingArchiveIDs, archiveDownloaderCancel)
 
 					// Set up callback for when individual archives are downloaded
-					archiveDownloader.SetOnArchiveDownloaded(func(hash string, from, to uint64) {
-						// Save the archive ID to persistence
-						err := m.persistence.SaveMessageArchiveID(communityID, hash)
-						if err != nil {
-							m.logger.Error("couldn't save message archive ID", zap.Error(err))
-							return
-						}
-
-						// Publish download signal
+					archiveDownloader.SetOnArchiveDownloaded(func(hash string, from, to uint64, archiveData []byte) {
 						m.publisher.publish(&Subscription{
 							HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
 								CommunityID: communityID.String(),
@@ -774,6 +824,14 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 							zap.String("hash", hash),
 							zap.Uint64("from", from),
 							zap.Uint64("to", to))
+						// Process the downloaded archive data
+						// err := processor.ProcessArchiveData(communityID, hash, archiveData, from, to)
+						// if err != nil {
+						// 	m.logger.Error("failed to process downloaded archive",
+						// 		zap.String("hash", hash),
+						// 		zap.Error(err))
+						// 	return
+						// }
 					})
 
 					err = archiveDownloader.StartDownload()
@@ -796,10 +854,16 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 						select {
 						case <-cancelTask:
 							m.logger.Debug("cancelled downloading individual archives")
+							close(archiveDownloaderCancel)
 							downloadTaskInfo.Cancelled = true
 							return downloadTaskInfo, nil
 						case <-archiveTicker.C:
-							if archiveDownloader.IsDownloadComplete() {
+							if archiveDownloader.IsDownloadComplete() || archiveDownloader.IsCancelled() {
+								if archiveDownloader.IsCancelled() {
+									m.logger.Debug("archive download was cancelled")
+									downloadTaskInfo.Cancelled = true
+									return downloadTaskInfo, nil
+								}
 								if downloadError := archiveDownloader.GetDownloadError(); downloadError != nil {
 									m.logger.Error("archive download failed", zap.Error(downloadError))
 									return nil, fmt.Errorf("archive download failed: %w", downloadError)
