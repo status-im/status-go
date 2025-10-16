@@ -1,15 +1,14 @@
 import json
 import logging
 import os
-import time
 import statistics
-
+import time
 from dataclasses import dataclass
 
 import matplotlib
 import matplotlib.pyplot as plt
 
-from clients.expvar import GoMemoryStats
+from clients.expvar import ExpvarClient
 
 matplotlib.use("Agg")  # Use non-interactive backend
 logging.getLogger("matplotlib.font_manager").setLevel(logging.WARNING)
@@ -245,7 +244,7 @@ class StatusGoMetrics:
     def __init__(
         self,
         container_stats: list[ContainerStats] | None = None,
-        go_metrics: list[GoMemoryStats] | None = None,
+        go_metrics: list[dict] | None = None,
         events: Events | None = None,
         version: str = "",
         stats: list[ContainerStats] | None = None,
@@ -266,6 +265,7 @@ class StatusGoMetrics:
 
         self.container_stats = container_stats or []
         self.go_metrics = go_metrics or []
+        self._memory_stats = [ExpvarClient.parse_expvars(metric) for metric in self.go_metrics]
         self.events = events or Events()
         self.timestamp = time.time()
         self.version = version
@@ -306,12 +306,14 @@ class StatusGoMetrics:
             last_stat.network.rx_errors + last_stat.network.tx_errors + last_stat.network.rx_dropped + last_stat.network.tx_dropped
         )
 
-    def _calculate_go_metrics(self):
+    def _calculate_memory_stats(self):
+        """Calculate memory statistics from collected go metrics"""
+
         # Convert to MB for consistency
         mb = 1024 * 1024
 
-        total_memory = [metric.sys_bytes - metric.heap_released_bytes for metric in self.go_metrics]
-        idle_memory = [metric.heap_idle_bytes - metric.heap_released_bytes for metric in self.go_metrics]
+        total_memory = [metric.sys_bytes - metric.heap_released_bytes for metric in self._memory_stats]
+        idle_memory = [metric.heap_idle_bytes - metric.heap_released_bytes for metric in self._memory_stats]
 
         if total_memory:
             self.total_memory_median = statistics.median(total_memory) / mb
@@ -321,7 +323,15 @@ class StatusGoMetrics:
             self.idle_memory_max = max(idle_memory) / mb
 
         # Final GC count from the last sample
-        self.final_gc_count = self.go_metrics[-1].num_gc
+        self.final_gc_count = self._memory_stats[-1].num_gc
+
+    def _calculate_go_metrics(self):
+        """Calculate summary metrics from collected Go memory data"""
+        self._calculate_memory_stats()
+        self._num_goroutines = [ExpvarClient.parse_num_goroutines(metric) for metric in self.go_metrics]
+        self.num_goroutines_max = max(self._num_goroutines)
+        self._num_threads = [ExpvarClient.parse_num_threads(metric) for metric in self.go_metrics]
+        self.num_threads_max = max(self._num_threads)
 
     def _calculate_metrics(self):
         """Calculate summary metrics from collected data"""
@@ -374,6 +384,8 @@ class StatusGoMetrics:
                         "max": self.total_memory_max,
                     },
                     "gc_count": self.final_gc_count,
+                    "num_goroutines_max": self.num_goroutines_max,
+                    "num_threads_max": self.num_threads_max,
                 },
             },
         }
@@ -394,7 +406,7 @@ class StatusGoMetrics:
         mb = 1024 * 1024
 
         # Create a figure with four subplots (CPU, Memory, Network, and Accumulated Network)
-        fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(12, 18), sharex=True)
+        fig, (ax1, ax2, ax3, ax4, ax5, ax6) = plt.subplots(6, 1, figsize=(12, 18), sharex=True)
         fig.suptitle(title, fontsize=16, y=0.98)
 
         # Extract data from container stats
@@ -415,10 +427,10 @@ class StatusGoMetrics:
         tx_bytes_mb = [bytes / mb for bytes in tx_bytes]
 
         # Extract data from Go metrics independently
-        go_timestamps = [metric.timestamp for metric in self.go_metrics]
-        sys_values = [metric.sys_bytes / mb for metric in self.go_metrics]
-        actual_memory_values = [(metric.sys_bytes - metric.heap_released_bytes) / mb for metric in self.go_metrics]
-        could_be_released = [(metric.heap_idle_bytes - metric.heap_released_bytes) / mb for metric in self.go_metrics]
+        go_timestamps = [ExpvarClient.parse_timestamp(metric) for metric in self.go_metrics]
+        sys_values = [metric.sys_bytes / mb for metric in self._memory_stats]
+        actual_memory_values = [(metric.sys_bytes - metric.heap_released_bytes) / mb for metric in self._memory_stats]
+        could_be_released = [(metric.heap_idle_bytes - metric.heap_released_bytes) / mb for metric in self._memory_stats]
 
         # Convert to relative time (use container start time if available, otherwise Go metrics start time)
         go_start_time = start_time if self.container_stats else go_timestamps[0]
@@ -483,6 +495,17 @@ class StatusGoMetrics:
         ax4.set_ylim(bottom=0)
         ax4.legend(loc="best")
 
+        # Number of goroutines plot
+        ax5.plot(go_time_points, self._num_goroutines, "g-", label="Number of Goroutines", linewidth=2)
+        ax5.plot(go_time_points, self._num_threads, "b-", label="Number of Threads", linewidth=2)
+        ax5.set_xlabel("Time (seconds)")
+        ax5.set_ylabel("Numbers")
+        ax5.set_title("Various Numbers Over Time")
+        ax5.grid(True)
+        ax5.set_xlim(left=0)
+        ax5.set_ylim(bottom=0)
+        ax5.legend(loc="best")
+
         # Add vertical lines for events across all plots
         if self.events and hasattr(self.events, "events") and self.events.events:
             for event_name, event_timestamp in self.events.events.items():
@@ -492,7 +515,7 @@ class StatusGoMetrics:
                 # Only add lines for events that occur within our time range
                 if container_time_points and 0 <= event_time <= max(container_time_points):
                     # Add vertical line to all subplots
-                    for ax in [ax1, ax2, ax3, ax4]:
+                    for ax in [ax1, ax2, ax3, ax4, ax5]:
                         ax.axvline(x=event_time, color="black", linestyle="--", alpha=0.7, linewidth=1)
 
                     # Add an event label to the top plot (CPU) to avoid cluttering
@@ -520,9 +543,9 @@ class StatusGoMetrics:
         # Adjust layout to make room for the statistics text at the bottom
         plt.tight_layout(rect=(0, 0.15, 1, 1))
 
-        ax5.axis("off")
-        ax5.invert_yaxis()
-        ax5.text(0.5, 0.5, stats_text, verticalalignment="top")
+        ax6.axis("off")
+        ax6.invert_yaxis()
+        ax6.text(0.5, 0.5, stats_text, verticalalignment="top")
 
         # Save the figure
         if output_path is None:

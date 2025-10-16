@@ -14,16 +14,16 @@ from clients.expvar import ExpvarClient
 from clients.metrics import Events, StatusGoMetrics
 from clients.rpc import RpcClient
 from clients.services.accounts import AccountService
+from clients.services.appgeneral import AppgeneralService
 from clients.services.connector import ConnectorService
+from clients.services.eth import EthService
+from clients.services.multiaccounts import MultiAccountsService
 from clients.services.settings import SettingsService
 from clients.services.wakuext import (
     WakuextService,
     PushNotificationRegistrationTokenType,
 )
 from clients.services.wallet import WalletService
-from clients.services.multiaccounts import MultiAccountsService
-from clients.services.appgeneral import AppgeneralService
-from clients.services.eth import EthService
 from clients.signals import SignalClient, SignalType
 from clients.statusgo_container import StatusBackendContainer
 from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
@@ -447,7 +447,12 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         go_metrics = self.expvar_client.stop_monitoring()
 
         # Create PerformanceMetrics with independent arrays
-        return StatusGoMetrics(container_stats=container_stats, go_metrics=go_metrics, events=self.events, version=self.version)
+        return StatusGoMetrics(
+            container_stats=container_stats,
+            go_metrics=go_metrics,
+            events=self.events,
+            version=self.version,
+        )
 
     def start_performance_monitoring(self):
         """Start performance monitoring with independent threads"""
