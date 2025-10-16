@@ -8,6 +8,7 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/requests"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"

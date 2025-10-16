@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
+
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"

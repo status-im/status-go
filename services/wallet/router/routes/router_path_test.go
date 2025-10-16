@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"

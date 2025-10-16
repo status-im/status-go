@@ -10,6 +10,7 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/pkg/security"

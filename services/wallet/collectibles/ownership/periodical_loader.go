@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/pkg/pubsub"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"

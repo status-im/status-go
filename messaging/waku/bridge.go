@@ -2,6 +2,7 @@ package wakuv2
 
 import (
 	"github.com/ethereum/go-ethereum/event"
+
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging/waku/common"

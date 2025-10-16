@@ -63,7 +63,8 @@ coverage.html
 
 Session.vim
 .undodir/*
-/.idea/
+.idea/*
+!.idea/codeStyles/
 /.vscode/
 /cmd/*/.ethereum/
 *.iml

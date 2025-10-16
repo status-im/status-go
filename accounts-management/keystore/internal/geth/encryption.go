@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/extkeys"
 
 	"github.com/ethereum/go-ethereum/common/math"
+
 	"github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto"
 )

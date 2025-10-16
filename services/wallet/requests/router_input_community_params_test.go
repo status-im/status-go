@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 

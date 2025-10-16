@@ -12,6 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/circuitbreaker"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"

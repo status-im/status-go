@@ -309,19 +309,7 @@ clean-release:
 	rm -rf $(RELEASE_DIR)
 
 lint-fix:
-	find . \
-		-name '*.go' \
-		-and -not -name '*.pb.go' \
-		-and -not -name 'bindata*' \
-		-and -not -name 'migrations.go' \
-		-and -not -name 'messenger_handlers.go' \
-		-and -not -name '*/mock/*' \
-		-and -not -name 'mock.go' \
-		-and -not -wholename '*/vendor/*' \
-		-exec goimports \
-		-local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go,github.com/status-im/markdown' \
-		-w {} \;
-	$(MAKE) vendor
+	golangci-lint --build-tags '$(BUILD_TAGS)' run --fix ./...
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
