@@ -98,9 +98,8 @@ func TestGetClientsUsingCache(t *testing.T) {
 		security.NewSensitiveString(password))
 
 	config := ClientConfig{
-		UpstreamChainID: 1,
-		Networks:        networks,
-		DB:              db,
+		Networks: networks,
+		DB:       db,
 	}
 
 	c, err := NewClient(config)

@@ -153,43 +153,10 @@ func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*tokenTypes.To
 	return rst, err
 }
 
-// @deprecated
-func (api *API) GetCustomTokens(ctx context.Context) ([]*tokenTypes.Token, error) {
-	logutils.ZapLogger().Debug("call to get custom tokens")
-	rst, err := api.s.tokenManager.GetCustoms(true)
-	logutils.ZapLogger().Debug("result from database for custom tokens", zap.Int("len", len(rst)))
-	return rst, err
-}
-
 func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*tokenTypes.Token, error) {
 	logutils.ZapLogger().Debug("call to get discover token")
 	token, err := api.s.tokenManager.DiscoverToken(ctx, chainID, address)
 	return token, err
-}
-
-func (api *API) AddCustomToken(ctx context.Context, token tokenTypes.Token) error {
-	logutils.ZapLogger().Debug("call to create or edit custom token")
-	if token.ChainID == 0 {
-		token.ChainID = api.s.rpcClient.UpstreamChainID
-	}
-	err := api.s.tokenManager.UpsertCustom(token)
-	logutils.ZapLogger().Debug("result from database for create or edit custom token", zap.Error(err))
-	return err
-}
-
-// @deprecated
-func (api *API) DeleteCustomToken(ctx context.Context, address common.Address) error {
-	logutils.ZapLogger().Debug("call to remove custom token")
-	err := api.s.tokenManager.DeleteCustom(api.s.rpcClient.UpstreamChainID, address)
-	logutils.ZapLogger().Debug("result from database for remove custom token", zap.Error(err))
-	return err
-}
-
-func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, address common.Address) error {
-	logutils.ZapLogger().Debug("call to remove custom token")
-	err := api.s.tokenManager.DeleteCustom(chainID, address)
-	logutils.ZapLogger().Debug("result from database for remove custom token", zap.Error(err))
-	return err
 }
 
 // @deprecated

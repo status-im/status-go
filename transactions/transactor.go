@@ -14,7 +14,6 @@ import (
 
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
@@ -54,7 +53,6 @@ func (e *ErrBadNonce) Error() string {
 type TransactorIface interface {
 	NextNonce(ctx context.Context, ethClientGetter rpc.EthClientGetter, chainID uint64, from types.Address) (uint64, error)
 	EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error)
-	SendTransaction(sendArgs wallettypes.SendTxArgs, verifiedAccount *generator.Account, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error)
 	SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, nonce uint64, err error)
 	ValidateAndBuildTransaction(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64) (tx *gethtypes.Transaction, nonce uint64, err error)
 	AddSignatureToTransaction(chainID uint64, tx *gethtypes.Transaction, sig []byte) (*gethtypes.Transaction, error)
@@ -67,12 +65,11 @@ type TransactorIface interface {
 // Transactor validates, signs transactions.
 // It uses upstream to propagate transactions to the Ethereum network.
 type Transactor struct {
-	rpcWrapper     *rpcWrapper
-	pendingTracker *PendingTxTracker
-	sendTxTimeout  time.Duration
-	rpcCallTimeout time.Duration
-	networkID      uint64
-	logger         *zap.Logger
+	ethClientGetter rpc.EthClientGetter
+	pendingTracker  *PendingTxTracker
+	sendTxTimeout   time.Duration
+	rpcCallTimeout  time.Duration
+	logger          *zap.Logger
 }
 
 // NewTransactor returns a new Manager.
@@ -88,19 +85,9 @@ func (t *Transactor) SetPendingTracker(tracker *PendingTxTracker) {
 	t.pendingTracker = tracker
 }
 
-// SetNetworkID selects a correct network.
-func (t *Transactor) SetNetworkID(networkID uint64) {
-	t.networkID = networkID
-}
-
-func (t *Transactor) NetworkID() uint64 {
-	return t.networkID
-}
-
-// SetRPC sets RPC params, a client and a timeout
-func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
-	t.rpcWrapper = newRPCWrapper(rpcClient, rpcClient.UpstreamChainID)
-	t.rpcCallTimeout = timeout
+func (t *Transactor) SetEthClientGetter(ethClientGetter rpc.EthClientGetter, rpcCallTimeout time.Duration) {
+	t.ethClientGetter = ethClientGetter
+	t.rpcCallTimeout = rpcCallTimeout
 }
 
 func (t *Transactor) NextNonce(ctx context.Context, ethClientGetter rpc.EthClientGetter, chainID uint64, from types.Address) (uint64, error) {
@@ -109,7 +96,7 @@ func (t *Transactor) NextNonce(ctx context.Context, ethClientGetter rpc.EthClien
 }
 
 func (t *Transactor) EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error) {
-	rpcWrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, network.ChainID)
+	rpcWrapper := newRPCWrapper(t.ethClientGetter, network.ChainID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
@@ -124,20 +111,14 @@ func (t *Transactor) EstimateGas(network *params.Network, from common.Address, t
 	return rpcWrapper.EstimateGas(ctx, msg)
 }
 
-// SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.
-func (t *Transactor) SendTransaction(sendArgs wallettypes.SendTxArgs, verifiedAccount *generator.Account, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error) {
-	hash, nonce, err = t.validateAndPropagate(t.rpcWrapper, verifiedAccount, sendArgs, lastUsedNonce)
-	return
-}
-
 func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, nonce uint64, err error) {
-	wrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, chainID)
+	wrapper := newRPCWrapper(t.ethClientGetter, chainID)
 	hash, nonce, err = t.validateAndPropagate(wrapper, verifiedAccount, sendArgs, lastUsedNonce)
 	return
 }
 
 func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64) (tx *gethtypes.Transaction, nonce uint64, err error) {
-	wrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, chainID)
+	wrapper := newRPCWrapper(t.ethClientGetter, chainID)
 	tx, err = t.validateAndBuildTransaction(wrapper, sendArgs, lastUsedNonce)
 	if err != nil {
 		return nil, 0, err
@@ -151,7 +132,7 @@ func (t *Transactor) AddSignatureToTransaction(chainID uint64, tx *gethtypes.Tra
 		return nil, ErrInvalidSignatureSize
 	}
 
-	rpcWrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, chainID)
+	rpcWrapper := newRPCWrapper(t.ethClientGetter, chainID)
 	chID := big.NewInt(int64(rpcWrapper.chainID))
 
 	signer := gethtypes.NewLondonSigner(chID)
@@ -164,7 +145,7 @@ func (t *Transactor) AddSignatureToTransaction(chainID uint64, tx *gethtypes.Tra
 }
 
 func (t *Transactor) SendRawTransaction(chainID uint64, rawTx string) error {
-	rpcWrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, chainID)
+	rpcWrapper := newRPCWrapper(t.ethClientGetter, chainID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
@@ -227,7 +208,7 @@ func (t *Transactor) sendTransaction(rpcWrapper *rpcWrapper, from common.Address
 }
 
 func (t *Transactor) SendTransactionWithSignature(from common.Address, symbol string, tx *gethtypes.Transaction) (hash types.Hash, err error) {
-	rpcWrapper := newRPCWrapper(t.rpcWrapper.ethClientGetter, tx.ChainId().Uint64())
+	rpcWrapper := newRPCWrapper(t.ethClientGetter, tx.ChainId().Uint64())
 
 	return t.sendTransaction(rpcWrapper, from, symbol, tx)
 }
@@ -248,7 +229,7 @@ func (t *Transactor) BuildTransactionWithSignature(chainID uint64, args walletty
 	defer cancel()
 
 	tx := t.buildTransaction(args)
-	expectedNonce, err := t.NextNonce(ctx, t.rpcWrapper.ethClientGetter, chainID, args.From)
+	expectedNonce, err := t.NextNonce(ctx, t.ethClientGetter, chainID, args.From)
 	if err != nil {
 		return nil, err
 	}
@@ -263,86 +244,6 @@ func (t *Transactor) BuildTransactionWithSignature(chainID uint64, args walletty
 	}
 
 	return txWithSignature, nil
-}
-
-func (t *Transactor) HashTransaction(args wallettypes.SendTxArgs) (validatedArgs wallettypes.SendTxArgs, hash types.Hash, err error) {
-	if !args.Valid() {
-		return validatedArgs, hash, wallettypes.ErrInvalidSendTxArgs
-	}
-
-	validatedArgs = args
-
-	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
-	defer cancel()
-
-	nonce, err := t.NextNonce(ctx, t.rpcWrapper.ethClientGetter, t.rpcWrapper.chainID, args.From)
-	if err != nil {
-		return validatedArgs, hash, err
-	}
-
-	gasPrice := (*big.Int)(args.GasPrice)
-	gasFeeCap := (*big.Int)(args.MaxFeePerGas)
-	gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
-	if args.GasPrice == nil && !args.IsDynamicFeeTx() {
-		gasPrice, err = t.rpcWrapper.SuggestGasPrice(ctx)
-		if err != nil {
-			return validatedArgs, hash, err
-		}
-	}
-
-	chainID := big.NewInt(int64(t.networkID))
-	value := (*big.Int)(args.Value)
-
-	var gas uint64
-	if args.Gas == nil {
-		var (
-			gethTo    common.Address
-			gethToPtr *common.Address
-		)
-		if args.To != nil {
-			gethTo = common.Address(*args.To)
-			gethToPtr = &gethTo
-		}
-		if args.IsDynamicFeeTx() {
-			gas, err = t.rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
-				From:      common.Address(args.From),
-				To:        gethToPtr,
-				GasFeeCap: gasFeeCap,
-				GasTipCap: gasTipCap,
-				Value:     value,
-				Data:      args.GetInput(),
-			})
-		} else {
-			gas, err = t.rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
-				From:     common.Address(args.From),
-				To:       gethToPtr,
-				GasPrice: gasPrice,
-				Value:    value,
-				Data:     args.GetInput(),
-			})
-		}
-		if err != nil {
-			return validatedArgs, hash, err
-		}
-	} else {
-		gas = uint64(*args.Gas)
-	}
-
-	newNonce := hexutil.Uint64(nonce)
-	newGas := hexutil.Uint64(gas)
-	validatedArgs.Nonce = &newNonce
-	if !args.IsDynamicFeeTx() {
-		validatedArgs.GasPrice = (*hexutil.Big)(gasPrice)
-	} else {
-		validatedArgs.MaxPriorityFeePerGas = (*hexutil.Big)(gasTipCap)
-		validatedArgs.MaxPriorityFeePerGas = (*hexutil.Big)(gasFeeCap)
-	}
-	validatedArgs.Gas = &newGas
-
-	tx := t.buildTransaction(validatedArgs)
-	hash = types.Hash(gethtypes.NewLondonSigner(chainID).Hash(tx))
-
-	return validatedArgs, hash, nil
 }
 
 // make sure that only account which created the tx can complete it

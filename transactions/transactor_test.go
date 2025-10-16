@@ -13,11 +13,10 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
+	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
-
-	statusRpc "github.com/status-im/status-go/rpc"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -31,7 +30,6 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
 	mock_fake "github.com/status-im/status-go/transactions/fake"
@@ -61,32 +59,20 @@ func (s *TransactorSuite) SetupTest() {
 
 	// expected by simulated backend
 	chainID := gethparams.AllEthashProtocolChanges.ChainID.Uint64()
-	db, err := sqlite.OpenUnecryptedDB(sqlite.InMemoryPath) // dummy to make rpc.Client happy
-	s.Require().NoError(err)
-
-	config := statusRpc.ClientConfig{
-		UpstreamChainID: chainID,
-		Networks:        nil,
-		DB:              db,
-	}
-	rpcClient, _ := statusRpc.NewClient(config)
-
-	rpcClient.UpstreamChainID = chainID
 
 	ethClients := []ethclient.RPSLimitedEthClientInterface{
 		ethclient.NewRPSLimitedEthClient(s.client, rpclimiter.NewRPCRpsLimiter(), "local-1-chain-id-1-circuit", "local-1-chain-id-1-provider"),
 	}
 	localClient := chain.NewClient(ethClients, chainID, nil)
-	rpcClient.SetClient(chainID, localClient)
+	ethClientGetter := mock_rpcclient.NewMockEthClientGetter(s.txServiceMockCtrl)
+	ethClientGetter.EXPECT().EthClient(chainID).Return(localClient, nil).AnyTimes()
 
 	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", "/tmp", chainID)
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig
 
 	s.manager = NewTransactor()
-	s.manager.sendTxTimeout = time.Second
-	s.manager.SetNetworkID(chainID)
-	s.manager.SetRPC(rpcClient, time.Second)
+	s.manager.SetEthClientGetter(ethClientGetter, time.Second)
 }
 
 func (s *TransactorSuite) TearDownTest() {
@@ -227,7 +213,7 @@ func (s *TransactorSuite) TestGasValues() {
 			}
 			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil)
 
-			hash, _, err := s.manager.SendTransaction(args, selectedAccount, -1)
+			hash, _, err := s.manager.SendTransactionWithChainID(1, args, -1, selectedAccount)
 			s.NoError(err)
 			s.False(reflect.DeepEqual(hash, common.Hash{}))
 		})
@@ -352,7 +338,7 @@ func (s *TransactorSuite) TestArgsValidation() {
 	}
 	s.False(args.Valid())
 	selectedAccount := generator.NewAccount(nil, nil)
-	_, _, err := s.manager.SendTransaction(args, selectedAccount, -1)
+	_, _, err := s.manager.SendTransactionWithChainID(1, args, -1, selectedAccount)
 	s.EqualError(err, wallettypes.ErrInvalidSendTxArgs.Error())
 }
 
@@ -366,12 +352,12 @@ func (s *TransactorSuite) TestAccountMismatch() {
 	var err error
 
 	// missing account
-	_, _, err = s.manager.SendTransaction(args, nil, -1)
+	_, _, err = s.manager.SendTransactionWithChainID(1, args, -1, nil)
 	s.EqualError(err, accsmanagement.ErrNoAccountSelected.Error())
 
 	// mismatched accounts
 	selectedAccount := generator.NewAccount(nil, nil)
-	_, _, err = s.manager.SendTransaction(args, selectedAccount, -1)
+	_, _, err = s.manager.SendTransactionWithChainID(1, args, -1, selectedAccount)
 	s.EqualError(err, wallettypes.ErrInvalidTxSender.Error())
 }
 
@@ -462,42 +448,6 @@ func (s *TransactorSuite) TestSendTransactionWithSignature_InvalidSignature() {
 	args := wallettypes.SendTxArgs{}
 	_, err := s.manager.BuildTransactionWithSignature(1, args, []byte{})
 	s.Equal(ErrInvalidSignatureSize, err)
-}
-
-func (s *TransactorSuite) TestHashTransaction() {
-	privKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	address := crypto.PubkeyToAddress(privKey.PublicKey)
-
-	remoteNonce := hexutil.Uint64(1)
-	txNonce := hexutil.Uint64(0)
-	from := address
-	to := address
-	value := (*hexutil.Big)(big.NewInt(10))
-	gas := hexutil.Uint64(21000)
-	gasPrice := (*hexutil.Big)(big.NewInt(2000000000))
-
-	args := wallettypes.SendTxArgs{
-		From:     from,
-		To:       &to,
-		Gas:      &gas,
-		GasPrice: gasPrice,
-		Value:    value,
-		Nonce:    &txNonce,
-		Data:     nil,
-	}
-
-	s.txServiceMock.EXPECT().
-		GetTransactionCount(gomock.Any(), common.Address(address), gethrpc.PendingBlockNumber).
-		Return(&remoteNonce, nil)
-
-	newArgs, hash, err := s.manager.HashTransaction(args)
-	s.Require().NoError(err)
-	// args should be updated with the right nonce
-	s.NotEqual(*args.Nonce, *newArgs.Nonce)
-	s.Equal(remoteNonce, *newArgs.Nonce)
-
-	s.NotEqual(common.Hash{}, hash)
 }
 
 func (s *TransactorSuite) TestStoreAndTrackPendingTx() {

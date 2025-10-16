@@ -22,7 +22,6 @@ import (
 
 	"github.com/imdario/mergo"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
@@ -1938,8 +1937,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		return
 	}
 
-	b.transactor.SetNetworkID(config.NetworkID)
-	b.transactor.SetRPC(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
+	b.transactor.SetEthClientGetter(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
 
 	signal.SendNodeStarted()
 
@@ -1994,15 +1992,10 @@ func (b *GethStatusBackend) CallInProcessRPC(inputJSON string) string {
 	return b.statusNode.CallInProcessRPC(inputJSON)
 }
 
+// @deprecated
 // SendTransaction creates a new transaction and waits until it's complete.
 func (b *GethStatusBackend) SendTransaction(sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
-	verifiedAccount, err := b.getVerifiedWalletAccount(sendArgs.From.String(), password)
-	if err != nil {
-		return hash, err
-	}
-
-	hash, _, err = b.transactor.SendTransaction(sendArgs, verifiedAccount, -1)
-	return hash, err
+	return types.Hash{}, errors.New("method not supported")
 }
 
 func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
@@ -2015,18 +2008,15 @@ func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs 
 	return hash, err
 }
 
+// @deprecated
 func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs wallettypes.SendTxArgs, sig []byte) (hash types.Hash, err error) {
-	txWithSignature, err := b.transactor.BuildTransactionWithSignature(b.transactor.NetworkID(), sendArgs, sig)
-	if err != nil {
-		return hash, err
-	}
-
-	return b.transactor.SendTransactionWithSignature(common.Address(sendArgs.From), sendArgs.Symbol, txWithSignature)
+	return types.Hash{}, errors.New("method not supported")
 }
 
+// @deprecated
 // HashTransaction validate the transaction and returns new sendArgs and the transaction hash.
 func (b *GethStatusBackend) HashTransaction(sendArgs wallettypes.SendTxArgs) (wallettypes.SendTxArgs, types.Hash, error) {
-	return b.transactor.HashTransaction(sendArgs)
+	return wallettypes.SendTxArgs{}, types.Hash{}, errors.New("method not supported")
 }
 
 // SignMessage checks the pwd vs the selected account and passes on the signParams

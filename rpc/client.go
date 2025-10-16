@@ -62,8 +62,6 @@ type EthClientGetter interface {
 // Client manages RPC clients for multiple chains with
 // multiple providers for each chain.
 type Client struct {
-	UpstreamChainID uint64
-
 	rpcClientsMutex    sync.RWMutex
 	rpcClients         map[uint64]chain.ClientInterface
 	rpsLimiterMutex    sync.RWMutex
@@ -84,7 +82,6 @@ var verifProxyInitFn func(c *Client)
 
 // ClientConfig holds the configuration for initializing a new Client.
 type ClientConfig struct {
-	UpstreamChainID   uint64
 	Networks          []params.Network
 	DB                *sql.DB
 	AccountsPublisher *pubsub.Publisher
@@ -116,8 +113,6 @@ func NewClient(config ClientConfig) (*Client, error) {
 		accountsPublisher:  config.AccountsPublisher,
 		signalsTransmitter: NewSignalsTransmitter(networkManager.GetPublisher()),
 	}
-
-	c.UpstreamChainID = config.UpstreamChainID
 
 	if verifProxyInitFn != nil {
 		verifProxyInitFn(&c)

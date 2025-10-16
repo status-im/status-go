@@ -392,7 +392,6 @@ func (n *StatusNode) createAndStartTokenManager() error {
 
 func (n *StatusNode) setupRPCClient() (err error) {
 	config := rpc.ClientConfig{
-		UpstreamChainID:   n.config.NetworkID,
 		Networks:          n.config.Networks,
 		DB:                n.appDB,
 		AccountsPublisher: n.accountsPublisher,
