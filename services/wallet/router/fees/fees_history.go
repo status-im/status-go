@@ -28,7 +28,11 @@ func getFeeHistoryBlockCount(chainID uint64) uint64 {
 
 func (f *FeeManager) getFeeHistory(ctx context.Context, chainID uint64, blockCount uint64, newestBlock string, rewardPercentiles []int) (*FeeHistory, error) {
 	feeHistory := &FeeHistory{}
-	err := f.RPCClient.Call(feeHistory, chainID, "eth_feeHistory", blockCount, newestBlock, rewardPercentiles)
+	ethClient, err := f.ethClientGetter.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+	err = ethClient.CallContext(ctx, feeHistory, "eth_feeHistory", blockCount, newestBlock, rewardPercentiles)
 	return feeHistory, err
 }
 
@@ -49,7 +53,11 @@ func (f *FeeManager) getGaslessParamsForAccount(ctx context.Context, chainID uin
 		PriorityFeePerGas string `json:"priorityFeePerGas"`
 	}
 
-	err = f.RPCClient.CallContext(ctx, &result, chainID, "linea_estimateGas", walletCommon.ToCallArg(msg))
+	ethClient, err := f.ethClientGetter.EthClient(chainID)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = ethClient.CallContext(ctx, &result, "linea_estimateGas", walletCommon.ToCallArg(msg))
 	if err != nil {
 		return
 	}
@@ -73,7 +81,7 @@ func (f *FeeManager) GetL1Fee(ctx context.Context, chainID uint64, input []byte)
 		return 0, nil
 	}
 
-	ethClient, err := f.RPCClient.EthClient(chainID)
+	ethClient, err := f.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return 0, err
 	}

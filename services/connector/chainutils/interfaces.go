@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 )
 
@@ -16,5 +16,5 @@ type FeeManager interface {
 }
 
 type EthClientGetter interface {
-	EthClient(chainID uint64) (chain.ClientInterface, error)
+	EthClient(chainID uint64) (ethclient.EthClientInterface, error)
 }

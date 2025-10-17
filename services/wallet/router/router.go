@@ -111,11 +111,9 @@ func NewRouter(
 		marketManager:        marketManager,
 		collectiblesService:  collectibles,
 		collectiblesManager:  collectiblesManager,
-		feesManager: &fees.FeeManager{
-			RPCClient: rpcClient,
-		},
-		pathProcessors: processors,
-		scheduler:      async.NewScheduler(),
+		feesManager:          fees.NewFeeManager(rpcClient),
+		pathProcessors:       processors,
+		scheduler:            async.NewScheduler(),
 	}
 }
 

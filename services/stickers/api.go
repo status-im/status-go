@@ -25,7 +25,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )
 
 const maxConcurrentRequests = 3
@@ -45,7 +45,7 @@ type API struct {
 	contractMaker   *contracts.ContractMaker
 	accountsManager *accsmanagement.AccountsManager
 	accountsDB      *accounts.Database
-	pendingTracker  *transactions.PendingTxTracker
+	pendingTracker  *pendingtxtracker.PendingTxTracker
 
 	downloader *ipfs.Downloader
 	httpServer *server.MediaServer
@@ -90,11 +90,9 @@ type ednStickerPackInfo struct {
 }
 
 func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager,
-	pendingTracker *transactions.PendingTxTracker, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
+	pendingTracker *pendingtxtracker.PendingTxTracker, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
 	result := &API{
-		contractMaker: &contracts.ContractMaker{
-			RPCClient: rpcClient,
-		},
+		contractMaker:   contracts.NewContractMaker(rpcClient),
 		accountsManager: accountsManager,
 		accountsDB:      acc,
 		pendingTracker:  pendingTracker,

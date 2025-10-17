@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/leaderboard"
 	"github.com/status-im/status-go/services/wallet/onramp"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/fees"
@@ -42,7 +43,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/transactions"
 
 	"github.com/status-im/go-wallet-sdk/pkg/ethclient"
 )
@@ -153,48 +153,15 @@ func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*tokenTypes.To
 	return rst, err
 }
 
-// @deprecated
-func (api *API) GetCustomTokens(ctx context.Context) ([]*tokenTypes.Token, error) {
-	logutils.ZapLogger().Debug("call to get custom tokens")
-	rst, err := api.s.tokenManager.GetCustoms(true)
-	logutils.ZapLogger().Debug("result from database for custom tokens", zap.Int("len", len(rst)))
-	return rst, err
-}
-
 func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*tokenTypes.Token, error) {
 	logutils.ZapLogger().Debug("call to get discover token")
 	token, err := api.s.tokenManager.DiscoverToken(ctx, chainID, address)
 	return token, err
 }
 
-func (api *API) AddCustomToken(ctx context.Context, token tokenTypes.Token) error {
-	logutils.ZapLogger().Debug("call to create or edit custom token")
-	if token.ChainID == 0 {
-		token.ChainID = api.s.rpcClient.UpstreamChainID
-	}
-	err := api.s.tokenManager.UpsertCustom(token)
-	logutils.ZapLogger().Debug("result from database for create or edit custom token", zap.Error(err))
-	return err
-}
-
-// @deprecated
-func (api *API) DeleteCustomToken(ctx context.Context, address common.Address) error {
-	logutils.ZapLogger().Debug("call to remove custom token")
-	err := api.s.tokenManager.DeleteCustom(api.s.rpcClient.UpstreamChainID, address)
-	logutils.ZapLogger().Debug("result from database for remove custom token", zap.Error(err))
-	return err
-}
-
-func (api *API) DeleteCustomTokenByChainID(ctx context.Context, chainID uint64, address common.Address) error {
-	logutils.ZapLogger().Debug("call to remove custom token")
-	err := api.s.tokenManager.DeleteCustom(chainID, address)
-	logutils.ZapLogger().Debug("result from database for remove custom token", zap.Error(err))
-	return err
-}
-
 // @deprecated
 // Not used by status-desktop anymore
-func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.PendingTransaction, error) {
+func (api *API) GetPendingTransactions(ctx context.Context) ([]*pendingtxtracker.PendingTransaction, error) {
 	logutils.ZapLogger().Debug("wallet.api.GetPendingTransactions")
 	rst, err := api.s.pendingTxManager.GetAllPending()
 	logutils.ZapLogger().Debug("wallet.api.GetPendingTransactions RESULT", zap.Int("len", len(rst)))
@@ -620,7 +587,7 @@ func (api *API) BuildRawTransaction(ctx context.Context, chainID uint64, sendTxA
 	return api.s.transactionManager.BuildRawTransaction(chainID, params, sig)
 }
 
-func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64, txType transactions.PendingTrxType,
+func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64, txType pendingtxtracker.PendingTrxType,
 	sendTxArgsJSON string, signature string) (hash types.Hash, err error) {
 	logutils.ZapLogger().Debug("[WalletAPI::SendTransactionWithSignature]",
 		zap.Uint64("chainID", chainID),

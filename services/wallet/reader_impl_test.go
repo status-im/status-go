@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/services/wallet/testutils"
 	mock_balance_persistence "github.com/status-im/status-go/services/wallet/token/mock/balance_persistence"
 	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
@@ -198,7 +198,7 @@ func TestFetchBalancesInternal(t *testing.T) {
 	addresses := []common.Address{testAccAddress1, testAccAddress2}
 	tokenAddresses := []common.Address{testTokenAddress1, testTokenAddress2}
 	ctx := context.TODO()
-	clients := map[uint64]chain.ClientInterface{}
+	clients := map[uint64]ethclient.EthClientInterface{}
 
 	// Note: fetchBalances now uses tokenBalancesStorage.GetBalances instead of GetBalancesByChain
 	// This test is now indirectly covered by higher-level tests

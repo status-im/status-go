@@ -22,16 +22,15 @@ import (
 )
 
 type StickersBuyProcessor struct {
-	contractMaker *contracts.ContractMaker
-	transactor    transactions.TransactorIface
+	contractMaker   *contracts.ContractMaker
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
 }
 
-func NewStickersBuyProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *StickersBuyProcessor {
+func NewStickersBuyProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *StickersBuyProcessor {
 	return &StickersBuyProcessor{
-		contractMaker: &contracts.ContractMaker{
-			RPCClient: rpcClient,
-		},
-		transactor: transactor,
+		contractMaker: contracts.NewContractMaker(ethClientGetter),
+		transactor:    transactor,
 	}
 }
 
@@ -102,7 +101,7 @@ func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams, input []
 		return 0, createStickersBuyErrorResponse(err)
 	}
 
-	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createStickersBuyErrorResponse(err)
 	}

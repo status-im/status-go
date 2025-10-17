@@ -29,9 +29,9 @@ type ERC721Handler struct {
 	*BaseNFTHandler
 }
 
-func NewERC721Handler(rpcClient rpc.ClientInterface, transactor transactions.TransactorIface) *ERC721Handler {
+func NewERC721Handler(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *ERC721Handler {
 	return &ERC721Handler{
-		BaseNFTHandler: NewBaseNFTHandler(rpcClient, transactor),
+		BaseNFTHandler: NewBaseNFTHandler(ethClientGetter, transactor),
 	}
 }
 
@@ -77,7 +77,7 @@ func (h *ERC721Handler) checkIfFunctionExists(params ProcessorInputParams, funct
 		return err
 	}
 
-	ethClient, err := h.rpcClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := h.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return err
 	}

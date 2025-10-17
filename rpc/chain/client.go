@@ -25,8 +25,6 @@ import (
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
-	"github.com/status-im/status-go/rpc/chain/tagger"
 	"github.com/status-im/status-go/services/rpcstats"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 
@@ -36,74 +34,18 @@ import (
 type ClientInterface interface {
 	ethclient.EthClientInterface
 	NetworkID() uint64
-	ToBigInt() *big.Int
-	GetConnectionStatus() rpcstatus.StatusType
-	GetLimiter() rpclimiter.RequestLimiter
-	SetLimiter(rpclimiter.RequestLimiter)
 	GetProviderClient(provider string) ethclient.EthClientInterface
-}
-
-type HealthMonitor interface {
-	GetCircuitBreaker() *circuitbreaker.CircuitBreaker
-	SetCircuitBreaker(cb *circuitbreaker.CircuitBreaker)
-}
-
-type Copyable interface {
-	Copy() interface{}
-}
-
-// ClientWithTag Shallow copy of the client with a deep copy of tag and group tag
-// To avoid passing tags as parameter to every chain call, it is sufficient for now
-// to set the tag and group tag once on the client
-func ClientWithTag(chainClient ClientInterface, tag, groupTag string) ClientInterface {
-	newClient := chainClient
-	if tagIface, ok := chainClient.(tagger.Tagger); ok {
-		tagIface = tagger.DeepCopyTagger(tagIface)
-		tagIface.SetTag(tag)
-		tagIface.SetGroupTag(groupTag)
-		newClient = tagIface.(ClientInterface)
-	}
-
-	return newClient
 }
 
 type ClientWithFallback struct {
 	ChainID                uint64
 	ethClients             []ethclient.RPSLimitedEthClientInterface
-	commonLimiter          rpclimiter.RequestLimiter
 	circuitbreaker         *circuitbreaker.CircuitBreaker
 	providersHealthManager *healthmanager.ProvidersHealthManager
-
-	tag      string // tag for the limiter
-	groupTag string // tag for the limiter group
 
 	done   chan struct{}  // channel to signal client closure
 	wg     sync.WaitGroup // wait group to track active operations
 	closed atomic.Bool    // flag to track if client is closed
-}
-
-func (c *ClientWithFallback) Copy() interface{} {
-	clientCopy := c.createCopy()
-	return clientCopy
-}
-
-func (c *ClientWithFallback) createCopy() *ClientWithFallback {
-	// Create a new ClientWithFallback with copied values
-	clientCopy := &ClientWithFallback{
-		ChainID:                c.ChainID,
-		ethClients:             c.ethClients,
-		commonLimiter:          c.commonLimiter,
-		circuitbreaker:         c.circuitbreaker,
-		providersHealthManager: c.providersHealthManager,
-		tag:                    c.tag,
-		groupTag:               c.groupTag,
-		done:                   make(chan struct{}),
-	}
-
-	// Copy the closed value
-	clientCopy.closed.Store(c.closed.Load())
-
-	return clientCopy
 }
 
 // Don't mark connection as failed if we get one of these errors
@@ -198,16 +140,6 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (i
 		case <-ctx.Done():
 		}
 	}()
-
-	if c.commonLimiter != nil {
-		if allow, err := c.commonLimiter.Allow(c.tag); !allow {
-			return nil, fmt.Errorf("tag=%s, %w", c.tag, err)
-		}
-
-		if allow, err := c.commonLimiter.Allow(c.groupTag); !allow {
-			return nil, fmt.Errorf("groupTag=%s, %w", c.groupTag, err)
-		}
-	}
 
 	cmd := circuitbreaker.NewCommand(ctx, nil)
 	// Try making requests with each RPC provider.
@@ -741,66 +673,6 @@ func (c *ClientWithFallback) BatchCallContext(ctx context.Context, b []rpc.Batch
 		},
 	)
 	return err
-}
-
-func (c *ClientWithFallback) ToBigInt() *big.Int {
-	return big.NewInt(int64(c.ChainID))
-}
-
-func (c *ClientWithFallback) GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error) {
-	rpcstats.CountCall("eth_GetBaseFeeFromBlock")
-
-	feeHistory, err := c.FeeHistory(ctx, 1, blockNumber, nil)
-
-	if err != nil {
-		if err.Error() == "the method eth_feeHistory does not exist/is not available" {
-			return "", nil
-		}
-		return "", err
-	}
-
-	var baseGasFee = ""
-	if len(feeHistory.BaseFee) > 0 {
-		baseGasFee = feeHistory.BaseFee[0].String()
-	}
-
-	return baseGasFee, err
-}
-
-func (c *ClientWithFallback) Tag() string {
-	return c.tag
-}
-
-func (c *ClientWithFallback) SetTag(tag string) {
-	c.tag = tag
-}
-
-func (c *ClientWithFallback) GroupTag() string {
-	return c.groupTag
-}
-
-func (c *ClientWithFallback) SetGroupTag(tag string) {
-	c.groupTag = tag
-}
-
-func (c *ClientWithFallback) DeepCopyTag() tagger.Tagger {
-	return c.createCopy()
-}
-
-func (c *ClientWithFallback) GetLimiter() rpclimiter.RequestLimiter {
-	return c.commonLimiter
-}
-
-func (c *ClientWithFallback) SetLimiter(limiter rpclimiter.RequestLimiter) {
-	c.commonLimiter = limiter
-}
-
-func (c *ClientWithFallback) GetCircuitBreaker() *circuitbreaker.CircuitBreaker {
-	return c.circuitbreaker
-}
-
-func (c *ClientWithFallback) SetCircuitBreaker(cb *circuitbreaker.CircuitBreaker) {
-	c.circuitbreaker = cb
 }
 
 func convertFunctorCallStatuses(statuses []circuitbreaker.FunctorCallStatus, methodName string) (result []rpcstatus.RpcProviderCallStatus) {

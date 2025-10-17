@@ -21,6 +21,7 @@ import (
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/services/wallet/router/routes"
@@ -28,7 +29,6 @@ import (
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -133,9 +133,9 @@ func saveRouteData(t *testing.T, db *sql.DB, routeInputParams *requests.RouteInp
 
 // saveTrackedTransaction saves a tracked transaction to the database
 func saveTrackedTransaction(t *testing.T, db *sql.DB, chainID uint64, txHash eth.Hash, timestamp int64) {
-	trackedTxDB := transactions.NewDB(db)
-	err := trackedTxDB.PutTx(transactions.TrackedTx{
-		ID: transactions.TxIdentity{
+	trackedTxDB := pendingtxtracker.NewDB(db)
+	err := trackedTxDB.PutTx(pendingtxtracker.TrackedTx{
+		ID: pendingtxtracker.TxIdentity{
 			ChainID: walletCommon.ChainID(chainID),
 			Hash:    txHash,
 		},
@@ -209,9 +209,9 @@ func insertTestPendingTransaction(t *testing.T, db *sql.DB, chainID uint64, txHa
 
 	saveRouteData(t, db, routeInputParams, routerPath, txData)
 
-	trackedTxDB := transactions.NewDB(db)
-	err := trackedTxDB.PutTx(transactions.TrackedTx{
-		ID: transactions.TxIdentity{
+	trackedTxDB := pendingtxtracker.NewDB(db)
+	err := trackedTxDB.PutTx(pendingtxtracker.TrackedTx{
+		ID: pendingtxtracker.TxIdentity{
 			ChainID: walletCommon.ChainID(chainID),
 			Hash:    txHash,
 		},

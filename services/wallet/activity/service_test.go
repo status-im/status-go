@@ -12,15 +12,13 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	ethclient "github.com/status-im/status-go/rpc/chain/ethclient"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
-	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
+	mock_pendingtxtracker "github.com/status-im/status-go/services/wallet/pendingtxtracker/mock"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/mock"
@@ -58,9 +56,8 @@ type testState struct {
 	tokenMock        *mock_token.MockManagerInterface
 	collectiblesMock *mockCollectiblesManager
 	close            func()
-	pendingTracker   *transactions.PendingTxTracker
-	chainClient      *transactions.MockChainClient
-	rpcClient        *mock_rpcclient.MockClientInterface
+	pendingTracker   *pendingtxtracker.PendingTxTracker
+	txStatusFetcher  *mock_pendingtxtracker.MockTxStatusFetcher
 }
 
 func setupTestService(tb testing.TB) (state testState) {
@@ -77,20 +74,14 @@ func setupTestService(tb testing.TB) (state testState) {
 	state.tokenMock = mock_token.NewMockManagerInterface(mockCtrl)
 	state.collectiblesMock = &mockCollectiblesManager{}
 
-	state.chainClient = transactions.NewMockChainClient()
-	state.rpcClient = mock_rpcclient.NewMockClientInterface(mockCtrl)
-	state.rpcClient.EXPECT().AbstractEthClient(gomock.Any()).DoAndReturn(func(chainID common.ChainID) (ethclient.BatchCallClient, error) {
-		return state.chainClient.AbstractEthClient(chainID)
-	}).AnyTimes()
-
+	state.txStatusFetcher = mock_pendingtxtracker.NewMockTxStatusFetcher(mockCtrl)
 	// Ensure we process pending transactions as needed, only once
 	pendingCheckInterval := time.Second
-	state.pendingTracker = transactions.NewPendingTxTracker(db, state.rpcClient, state.eventFeed, pendingCheckInterval)
+	state.pendingTracker = pendingtxtracker.NewPendingTxTracker(db, state.txStatusFetcher, state.eventFeed, pendingCheckInterval)
 
 	state.service = NewService(db, accountsDB, state.tokenMock, state.collectiblesMock, state.eventFeed)
 	state.service.debounceDuration = 0
 	state.close = func() {
-		require.NoError(tb, state.pendingTracker.Stop())
 		require.NoError(tb, db.Close())
 		defer mockCtrl.Finish()
 	}
@@ -98,11 +89,11 @@ func setupTestService(tb testing.TB) (state testState) {
 	return state
 }
 
-func setupTransactions(t *testing.T, state testState, txCount int, testTxs []transactions.TestTxSummary) (allAddresses []eth.Address, pendings []transactions.PendingTransaction, ch chan walletevent.Event, cleanup func()) {
+func setupTransactions(t *testing.T, state testState, txCount int, testTxs []pendingtxtracker.TestTxSummary) (allAddresses []eth.Address, pendings []*pendingtxtracker.PendingTransaction, ch chan walletevent.Event, cleanup func()) {
 	ch = make(chan walletevent.Event, 4)
 	sub := state.eventFeed.Subscribe(ch)
 
-	pendings = transactions.MockTestTransactions(t, state.chainClient, testTxs)
+	pendings = pendingtxtracker.GenerateTestPendingTransactionsWithSummary(testTxs, 5)
 	for _, p := range pendings {
 		allAddresses = append(allAddresses, p.From, p.To)
 	}
@@ -142,7 +133,7 @@ func validateSessionUpdateEvent(t *testing.T, ch chan walletevent.Event, filterR
 		select {
 		case res := <-ch:
 			switch res.Type {
-			case transactions.EventPendingTransactionUpdate:
+			case pendingtxtracker.EventPendingTransactionUpdate:
 				pendingTransactionUpdate++
 			case EventActivitySessionUpdated:
 				payload, err := walletevent.GetPayload[SessionUpdate](res)

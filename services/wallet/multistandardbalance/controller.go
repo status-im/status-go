@@ -18,8 +18,8 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/transactions"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 
@@ -205,8 +205,8 @@ func (c *Controller) startWalletEventsWatcher() {
 	// Respond to any sent transaction update
 	walletEventCb := func(event walletevent.Event) {
 		switch event.Type {
-		case transactions.EventPendingTransactionUpdate:
-			var p transactions.PendingTxUpdatePayload
+		case pendingtxtracker.EventPendingTransactionUpdate:
+			var p pendingtxtracker.PendingTxUpdatePayload
 			err := json.Unmarshal([]byte(event.Message), &p)
 			if err != nil {
 				return

@@ -24,16 +24,16 @@ import (
 )
 
 type CommunityDeployCollectiblesProcessor struct {
-	contractMaker *communitytokens.CommunityTokensContractMaker
-	transactor    transactions.TransactorIface
+	contractMaker   *communitytokens.CommunityTokensContractMaker
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
 }
 
-func NewCommunityDeployCollectiblesProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *CommunityDeployCollectiblesProcessor {
+func NewCommunityDeployCollectiblesProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *CommunityDeployCollectiblesProcessor {
 	return &CommunityDeployCollectiblesProcessor{
-		contractMaker: &communitytokens.CommunityTokensContractMaker{
-			RPCClient: rpcClient,
-		},
-		transactor: transactor,
+		contractMaker:   communitytokens.NewCommunityTokensContractMakerMaker(ethClientGetter),
+		ethClientGetter: ethClientGetter,
+		transactor:      transactor,
 	}
 }
 
@@ -76,7 +76,7 @@ func (s *CommunityDeployCollectiblesProcessor) EstimateGas(params ProcessorInput
 		return 0, ErrNoEstimationFound
 	}
 
-	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createCommunityDeployCollectiblesErrorResponse(err)
 	}

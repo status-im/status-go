@@ -86,43 +86,6 @@ func TestClient_Fallbacks(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestClientWithFallback_Copy(t *testing.T) {
-	client, _, cleanup := setupClientTest(t)
-	defer cleanup()
-
-	// Setup test values
-	testTag := "test-tag"
-	testGroupTag := "test-group-tag"
-
-	// Set values on the original client
-	client.tag = testTag
-	client.groupTag = testGroupTag
-
-	// Copy the client
-	clientCopy := client.Copy().(*ClientWithFallback)
-
-	// Check that the copy has the same values
-	require.Equal(t, client.ChainID, clientCopy.ChainID)
-	require.Equal(t, client.tag, clientCopy.tag)
-	require.Equal(t, client.groupTag, clientCopy.groupTag)
-
-	// Verify that both clients have the same ethClients slice
-	require.Equal(t, len(client.ethClients), len(clientCopy.ethClients))
-	for i := 0; i < len(client.ethClients); i++ {
-		require.Equal(t, client.ethClients[i], clientCopy.ethClients[i])
-	}
-
-	// Check that pointer values are the same (shallow copy)
-	require.Same(t, client.circuitbreaker, clientCopy.circuitbreaker)
-	require.Same(t, client.providersHealthManager, clientCopy.providersHealthManager)
-
-	// Modify the copy, ensure it doesn't affect the original
-	clientCopy.tag = "new-tag"
-	clientCopy.groupTag = "new-group-tag"
-	require.Equal(t, testTag, client.tag)
-	require.Equal(t, testGroupTag, client.groupTag)
-}
-
 // Helper function to get a comparable value for function pointers
 func getFuncPtr(f func(uint64, string)) uintptr {
 	if f == nil {

@@ -22,17 +22,17 @@ import (
 
 func NewEnsResolver(rpcClient *rpc.Client) *EnsResolver {
 	return &EnsResolver{
-		contractMaker: &contracts.ContractMaker{
-			RPCClient: rpcClient,
-		},
-		addrPerChain: make(map[uint64]common.Address),
+		contractMaker:   contracts.NewContractMaker(rpcClient),
+		ethClientGetter: rpcClient,
+		addrPerChain:    make(map[uint64]common.Address),
 
 		quit: make(chan struct{}),
 	}
 }
 
 type EnsResolver struct {
-	contractMaker *contracts.ContractMaker
+	contractMaker   *contracts.ContractMaker
+	ethClientGetter rpc.EthClientGetter
 
 	addrPerChain      map[uint64]common.Address
 	addrPerChainMutex sync.Mutex
@@ -72,7 +72,7 @@ func (e *EnsResolver) Resolver(ctx context.Context, chainID uint64, username str
 }
 
 func (e *EnsResolver) GetName(ctx context.Context, chainID uint64, address common.Address) (string, error) {
-	backend, err := e.contractMaker.RPCClient.EthClient(chainID)
+	backend, err := e.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return "", err
 	}

@@ -68,9 +68,8 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	require.NotEmpty(t, networks)
 
 	config := rpc.ClientConfig{
-		UpstreamChainID: chainID,
-		Networks:        networks,
-		DB:              appDB,
+		Networks: networks,
+		DB:       appDB,
 	}
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)

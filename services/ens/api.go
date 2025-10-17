@@ -21,10 +21,10 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens/ensresolver"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )
 
-func NewAPI(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, pendingTracker *transactions.PendingTxTracker,
+func NewAPI(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, pendingTracker *pendingtxtracker.PendingTxTracker,
 	config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
 	return &API{
 		ensResolver: ensresolver.NewEnsResolver(rpcClient),
@@ -51,7 +51,7 @@ type syncUsernameDetail func(context.Context, *UsernameDetail) error
 type API struct {
 	ensResolver     *ensresolver.EnsResolver
 	accountsManager *accsmanagement.AccountsManager
-	pendingTracker  *transactions.PendingTxTracker
+	pendingTracker  *pendingtxtracker.PendingTxTracker
 	config          *params.NodeConfig
 
 	db                 *Database
