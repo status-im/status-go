@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )
 
 func TestConditionalRepeater_RunOnce(t *testing.T) {

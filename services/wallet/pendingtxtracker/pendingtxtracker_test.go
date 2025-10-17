@@ -12,6 +12,7 @@ import (
 
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
+
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	mock_pendingtxtracker "github.com/status-im/status-go/services/wallet/pendingtxtracker/mock"
 

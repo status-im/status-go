@@ -11,6 +11,7 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 	"github.com/status-im/go-wallet-sdk/pkg/contracts/multicall3"
+
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 )
 

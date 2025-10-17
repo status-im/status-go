@@ -10,10 +10,11 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/rpc"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/common"
-	"go.uber.org/zap"
 )
 
 type TxStatusRes struct {

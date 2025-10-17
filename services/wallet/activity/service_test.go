@@ -89,7 +89,7 @@ func setupTestService(tb testing.TB) (state testState) {
 	return state
 }
 
-func setupTransactions(t *testing.T, state testState, txCount int, testTxs []pendingtxtracker.TestTxSummary) (allAddresses []eth.Address, pendings []pendingtxtracker.PendingTransaction, ch chan walletevent.Event, cleanup func()) {
+func setupTransactions(t *testing.T, state testState, txCount int, testTxs []pendingtxtracker.TestTxSummary) (allAddresses []eth.Address, pendings []*pendingtxtracker.PendingTransaction, ch chan walletevent.Event, cleanup func()) {
 	ch = make(chan walletevent.Event, 4)
 	sub := state.eventFeed.Subscribe(ch)
 

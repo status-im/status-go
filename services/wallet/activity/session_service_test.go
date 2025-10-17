@@ -30,7 +30,7 @@ func TestService_IncrementalUpdateOnTop(t *testing.T) {
 	filterResponseCount := validateFilteringDone(t, ch, 2, nil, nil)
 
 	exp := pendings[0]
-	err := state.pendingTracker.StoreAndTrackPendingTx(&exp)
+	err := state.pendingTracker.StoreAndTrackPendingTx(exp)
 	require.NoError(t, err)
 
 	vFn := getValidateSessionUpdateHasNewOnTopFn(t)
@@ -107,7 +107,7 @@ func TestService_IncrementalUpdateMixed(t *testing.T) {
 	filterResponseCount := validateFilteringDone(t, ch, 5, nil, nil)
 
 	for i := range pendings {
-		err := state.pendingTracker.StoreAndTrackPendingTx(&pendings[i])
+		err := state.pendingTracker.StoreAndTrackPendingTx(pendings[i])
 		require.NoError(t, err)
 	}
 
@@ -155,7 +155,7 @@ func TestService_IncrementalUpdateFetchWindow(t *testing.T) {
 	filterResponseCount := validateFilteringDone(t, ch, 2, nil, nil)
 
 	exp := pendings[0]
-	err := state.pendingTracker.StoreAndTrackPendingTx(&exp)
+	err := state.pendingTracker.StoreAndTrackPendingTx(exp)
 	require.NoError(t, err)
 
 	vFn := getValidateSessionUpdateHasNewOnTopFn(t)
@@ -208,7 +208,7 @@ func TestService_IncrementalUpdateFetchWindowNoReset(t *testing.T) {
 	}, nil)
 
 	exp := pendings[0]
-	err := state.pendingTracker.StoreAndTrackPendingTx(&exp)
+	err := state.pendingTracker.StoreAndTrackPendingTx(exp)
 	require.NoError(t, err)
 
 	vFn := getValidateSessionUpdateHasNewOnTopFn(t)

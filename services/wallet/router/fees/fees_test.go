@@ -27,7 +27,7 @@ func setupTest(t *testing.T) (state testState) {
 	state.mockCtrl = gomock.NewController(t)
 	state.ethClient = mock_client.NewMockClientInterface(state.mockCtrl)
 	state.ethClientGetter = mock_rpcclient.NewMockEthClientGetter(state.mockCtrl)
-	state.ethClientGetter.EXPECT().EthClient(uint64(1)).Times(1).Return(state.ethClient, nil).AnyTimes()
+	state.ethClientGetter.EXPECT().EthClient(uint64(1)).Return(state.ethClient, nil).AnyTimes()
 	state.feeManager = NewFeeManager(state.ethClientGetter)
 	return state
 }
@@ -77,8 +77,8 @@ func TestEstimatedTimeV2(t *testing.T) {
 	assert.Equal(t, uint(0), estimation)
 
 	// there is fee history
-	state.ethClient.EXPECT().CallContext(gomock.Any(), feeHistory, "eth_feeHistory", uint64(10), "latest", []int{RewardPercentiles2}).Times(1).Return(nil).
-		Do(func(feeHistory, chainID, method any, args ...any) {
+	state.ethClient.EXPECT().CallContext(gomock.Any(), feeHistory, "eth_feeHistory", uint64(10), "latest", []int{RewardPercentiles2}).Times(1).
+		DoAndReturn(func(ctx context.Context, result interface{}, method string, args ...any) error {
 			feeHistoryResponse := &FeeHistory{
 				BaseFeePerGas: []string{
 					"0x12f0e070b",
@@ -90,7 +90,8 @@ func TestEstimatedTimeV2(t *testing.T) {
 					"0x137da8d22",
 				},
 			}
-			*feeHistory.(*FeeHistory) = *feeHistoryResponse
+			*result.(*FeeHistory) = *feeHistoryResponse
+			return nil
 		})
 
 	maxFeesPerGas = big.NewInt(100e9)
@@ -100,8 +101,8 @@ func TestEstimatedTimeV2(t *testing.T) {
 	assert.Equal(t, uint(0), estimation)
 
 	// there is fee history and rewards
-	state.ethClient.EXPECT().CallContext(gomock.Any(), feeHistory, "eth_feeHistory", uint64(10), "latest", []int{RewardPercentiles2}).Times(1).Return(nil).
-		Do(func(feeHistory, chainID, method any, args ...any) {
+	state.ethClient.EXPECT().CallContext(gomock.Any(), feeHistory, "eth_feeHistory", uint64(10), "latest", []int{RewardPercentiles2}).Times(1).
+		DoAndReturn(func(ctx context.Context, result interface{}, method string, args ...any) error {
 			feeHistoryResponse := &FeeHistory{
 				BaseFeePerGas: []string{
 					"0x12f0e070b",
@@ -160,7 +161,8 @@ func TestEstimatedTimeV2(t *testing.T) {
 					},
 				},
 			}
-			*feeHistory.(*FeeHistory) = *feeHistoryResponse
+			*result.(*FeeHistory) = *feeHistoryResponse
+			return nil
 		})
 
 	estimation = state.feeManager.TransactionEstimatedTimeV2(context.Background(), uint64(1), maxFeesPerGas, priorityFeesPerGas)
