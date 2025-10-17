@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -34,6 +35,7 @@ type CodexArchiveDownloader struct {
 	totalDownloadedArchivesCount int
 	currentArchiveHash           string
 	archiveDownloadProgress      map[string]int64 // hash -> bytes downloaded
+	archiveDownloadCancel        map[string]chan struct{}
 	mu                           sync.RWMutex
 
 	// Download control
@@ -56,6 +58,7 @@ func NewCodexArchiveDownloader(codexClient *CodexClient, index *protobuf.CodexWa
 		totalArchivesCount:           len(index.Archives),
 		totalDownloadedArchivesCount: len(existingArchiveIDs),
 		archiveDownloadProgress:      make(map[string]int64),
+		archiveDownloadCancel:        make(map[string]chan struct{}),
 	}
 }
 
@@ -74,6 +77,12 @@ func (d *CodexArchiveDownloader) GetTotalDownloadedArchivesCount() int {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.totalDownloadedArchivesCount
+}
+
+func (d *CodexArchiveDownloader) GetPendingArchivesCount() int {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return len(d.archiveDownloadCancel)
 }
 
 // GetCurrentArchiveHash returns the hash of the currently downloading archive
@@ -113,6 +122,9 @@ func (d *CodexArchiveDownloader) IsCancelled() bool {
 
 // StartDownload begins downloading all missing archives
 func (d *CodexArchiveDownloader) StartDownload() error {
+	if d.totalArchivesCount == 0 {
+		return fmt.Errorf("no archives to download")
+	}
 	go func() {
 		err := d.downloadAllArchives()
 		d.mu.Lock()
@@ -150,18 +162,42 @@ func (d *CodexArchiveDownloader) downloadAllArchives() error {
 		}
 	}
 
+	// Monitor for cancellation in a separate goroutine
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-d.cancelChan:
+				d.mu.Lock()
+				for hash, cancelChan := range d.archiveDownloadCancel {
+					select {
+					case <-cancelChan:
+						// Already closed
+					default:
+						close(cancelChan) // Safe to close
+					}
+					delete(d.archiveDownloadCancel, hash)
+				}
+				d.cancelled = true
+				d.mu.Unlock()
+				return // Exit goroutine after cancellation
+			case <-ticker.C:
+				// Check if downloads are complete
+				d.mu.RLock()
+				complete := d.downloadComplete
+				d.mu.RUnlock()
+
+				if complete {
+					return // Exit goroutine when downloads complete
+				}
+			}
+		}
+	}()
+
 	// Download each missing archive
 	for _, archive := range archivesList {
-		// Check for cancellation
-		select {
-		case <-d.cancelChan:
-			d.mu.Lock()
-			d.cancelled = true
-			d.mu.Unlock()
-			return nil // Return nil to indicate graceful cancellation
-		default:
-		}
-
 		// Check if we already have this archive
 		hasArchive := false
 		for _, existingHash := range d.existingArchiveIDs {
@@ -174,29 +210,43 @@ func (d *CodexArchiveDownloader) downloadAllArchives() error {
 			continue
 		}
 
-		// Set current archive
+		archiveCancelChan := make(chan struct{})
+
 		d.mu.Lock()
 		d.currentArchiveHash = archive.hash
 		d.archiveDownloadProgress[archive.hash] = 0
+		d.archiveDownloadCancel[archive.hash] = archiveCancelChan
 		d.mu.Unlock()
 
-		// Download this archive using its CID
-		err := d.downloadSingleArchive(archive.hash, archive.cid)
-		if err != nil {
-			return fmt.Errorf("failed to download archive %s: %w", archive.hash, err)
-		}
-
-		// Update progress (callback is handled in downloadSingleArchive)
-		d.mu.Lock()
-		d.totalDownloadedArchivesCount++
-		d.mu.Unlock()
+		// Download this archive in parallel
+		go func(archiveHash, archiveCid string, archiveCancel chan struct{}) {
+			err := d.downloadSingleArchive(archiveHash, archiveCid, archiveCancel)
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			
+			if err != nil {
+				// Store the last error encountered
+				d.downloadError = err
+			} else {
+				// Only increment on successful download
+				d.totalDownloadedArchivesCount++
+			}
+			
+			// Remove from active downloads
+			delete(d.archiveDownloadCancel, archiveHash)
+			
+			// Check if all downloads are complete
+			if len(d.archiveDownloadCancel) == 0 {
+				d.downloadComplete = true
+			}
+		}(archive.hash, archive.cid, archiveCancelChan)
 	}
 
 	return nil
 }
 
 // downloadSingleArchive downloads a single archive by its CID
-func (d *CodexArchiveDownloader) downloadSingleArchive(hash, cid string) error {
+func (d *CodexArchiveDownloader) downloadSingleArchive(hash, cid string, cancelChan <-chan struct{}) error {
 	// Create a context that can be cancelled via our cancel channel
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -204,7 +254,7 @@ func (d *CodexArchiveDownloader) downloadSingleArchive(hash, cid string) error {
 	// Monitor for cancellation in a separate goroutine
 	go func() {
 		select {
-		case <-d.cancelChan:
+		case <-cancelChan:
 			cancel() // Cancel the download immediately
 		case <-ctx.Done():
 			// Context already cancelled, nothing to do

@@ -766,44 +766,6 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 					downloadTaskInfo.TotalDownloadedArchivesCount = len(existingArchiveIDs)
 					downloadTaskInfo.TotalArchivesCount = len(index.Archives)
 
-					// Create message handler function that processes messages through the same pipeline as torrents
-					// messageHandler := func(messages []*protobuf.WakuMessage) error {
-					// 	// Process messages in chunks like torrent archives (importMessagesChunkSize = 10)
-					// 	chunkSize := 10
-					// 	for i := 0; i < len(messages); i += chunkSize {
-					// 		end := i + chunkSize
-					// 		if end > len(messages) {
-					// 			end = len(messages)
-					// 		}
-					// 		messagesChunk := messages[i:end]
-
-					// 		// This would normally call m.handleArchiveMessages(messagesChunk)
-					// 		// For now, we just log the processing (TODO: integrate with messenger)
-					// 		m.logger.Debug("processing message chunk", zap.Int("count", len(messagesChunk)))
-					// 	}
-					// 	return nil
-					// }
-
-					// Create the archive processor
-					// processor := NewCodexArchiveMessageProcessor(m.identity, m.messaging, m.persistence, m.logger, messageHandler)
-
-					// Set up callback for when archives are processed
-					// processor.SetOnArchiveProcessed(func(hash string, from, to uint64) {
-					// 	// Publish download signal (signaling that the archive was processed)
-					// 	m.publisher.publish(&Subscription{
-					// 		HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
-					// 			CommunityID: communityID.String(),
-					// 			From:        int(from),
-					// 			To:          int(to),
-					// 		},
-					// 	})
-
-					// 	m.logger.Debug("archive processed successfully",
-					// 		zap.String("hash", hash),
-					// 		zap.Uint64("from", from),
-					// 		zap.Uint64("to", to))
-					// })
-
 					// Create separate cancel channel for the archive downloader to avoid channel competition
 					archiveDownloaderCancel := make(chan struct{})
 
@@ -824,14 +786,6 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 							zap.String("hash", hash),
 							zap.Uint64("from", from),
 							zap.Uint64("to", to))
-						// Process the downloaded archive data
-						// err := processor.ProcessArchiveData(communityID, hash, archiveData, from, to)
-						// if err != nil {
-						// 	m.logger.Error("failed to process downloaded archive",
-						// 		zap.String("hash", hash),
-						// 		zap.Error(err))
-						// 	return
-						// }
 					})
 
 					err = archiveDownloader.StartDownload()
@@ -865,8 +819,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 									return downloadTaskInfo, nil
 								}
 								if downloadError := archiveDownloader.GetDownloadError(); downloadError != nil {
-									m.logger.Error("archive download failed", zap.Error(downloadError))
-									return nil, fmt.Errorf("archive download failed: %w", downloadError)
+									m.logger.Warn("at least one archive download failed", zap.Error(downloadError))
 								}
 
 								// Update final progress
@@ -883,20 +836,16 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 										IndexCid:    true,  // Downloaded via Codex CID
 									},
 								})
-								m.logger.Debug("finished downloading all archives from Codex")
+								m.logger.Debug("finished downloading archives from Codex")
 								return downloadTaskInfo, nil
 							} else {
 								// Update progress
 								downloadTaskInfo.TotalDownloadedArchivesCount = archiveDownloader.GetTotalDownloadedArchivesCount()
-								currentArchive := archiveDownloader.GetCurrentArchiveHash()
-								if currentArchive != "" {
-									progress := archiveDownloader.GetArchiveDownloadProgress(currentArchive)
-									m.logger.Debug("downloading archive",
-										zap.String("hash", currentArchive),
-										zap.Int64("bytes", progress),
-										zap.Int("completed", downloadTaskInfo.TotalDownloadedArchivesCount),
-										zap.Int("total", downloadTaskInfo.TotalArchivesCount))
-								}
+								m.logger.Debug("downloading archives",
+									zap.Int("completed", downloadTaskInfo.TotalDownloadedArchivesCount),
+									zap.Int("total", downloadTaskInfo.TotalArchivesCount),
+									zap.Int("inProgress", archiveDownloader.GetPendingArchivesCount()),
+								)
 							}
 						}
 					}
