@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -26,7 +25,6 @@ import (
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/services/rpcstats"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
 
 	sdkethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
 )
@@ -592,10 +590,6 @@ func (c *ClientWithFallback) FeeHistory(ctx context.Context, blockCount uint64, 
 }
 
 func (c *ClientWithFallback) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error) {
-	if c.ChainID == walletCommon.StatusNetworkSepolia {
-		return c.LineaEstimateGas(ctx, msg)
-	}
-
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_EstimateGas",
@@ -611,32 +605,20 @@ func (c *ClientWithFallback) EstimateGas(ctx context.Context, msg ethereum.CallM
 	return res.(uint64), nil
 }
 
-func (c *ClientWithFallback) LineaEstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error) {
-	if c.ChainID != walletCommon.StatusNetworkSepolia {
-		return 0, errors.New("LineaEstimateGas should be used for Status network only")
-	}
-
-	const method = "linea_estimateGas"
+func (c *ClientWithFallback) LineaEstimateGas(ctx context.Context, msg ethereum.CallMsg) (*sdkethclient.LineaEstimateGasResult, error) {
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
-			MethodName: method,
+			MethodName: "linea_estimateGas",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
-				var result struct {
-					GasLimit hexutil.Uint64 `json:"gasLimit"`
-				}
-				err := client.CallContext(ctx, &result, method, walletCommon.ToCallArg(msg))
-				if err != nil {
-					return nil, err
-				}
-
-				return uint64(result.GasLimit), nil
+				return client.LineaEstimateGas(ctx, msg)
 			},
 		},
 	)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return res.(uint64), nil
+
+	return res.(*sdkethclient.LineaEstimateGasResult), nil
 }
 
 func (c *ClientWithFallback) SendTransaction(ctx context.Context, tx *types.Transaction) error {

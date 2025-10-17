@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -50,11 +51,13 @@ type Service struct {
 	transactor      *transactions.Transactor
 	feeManager      *fees.FeeManager
 	ethClientGetter rpc.EthClientGetter
+	logger          *zap.Logger
 }
 
 // Returns a new Collectibles Service.
 func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, config *params.NodeConfig, appDb *sql.DB,
 	walletFeed *event.Feed, transactor *transactions.Transactor) *Service {
+	logger := logutils.ZapLogger().Named("communitytokens")
 	return &Service{
 		manager:         NewManager(rpcClient),
 		accountsManager: accountsManager,
@@ -62,8 +65,9 @@ func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsM
 		db:              communitytokensdatabase.NewCommunityTokensDatabase(appDb),
 		walletFeed:      walletFeed,
 		transactor:      transactor,
-		feeManager:      fees.NewFeeManager(rpcClient),
+		feeManager:      fees.NewFeeManager(rpcClient, logger.Named("feeManager")),
 		ethClientGetter: rpcClient,
+		logger:          logger,
 	}
 }
 
@@ -93,14 +97,14 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 		var p pendingtxtracker.StatusChangedPayload
 		err := json.Unmarshal([]byte(event.Message), &p)
 		if err != nil {
-			logutils.ZapLogger().Error(errors.Wrap(err, fmt.Sprintf("can't parse transaction message %v\n", event.Message)).Error())
+			s.logger.Error(errors.Wrap(err, fmt.Sprintf("can't parse transaction message %v\n", event.Message)).Error())
 			return
 		}
 		if p.Status == ac.Pending {
 			return
 		}
 		if p.SendDetails == nil {
-			logutils.ZapLogger().Error(errors.Wrap(err, fmt.Sprintf("cannot resolve details for tx hash %v on chain %v\n", p.Hash, p.ChainID)).Error())
+			s.logger.Error(errors.Wrap(err, fmt.Sprintf("cannot resolve details for tx hash %v on chain %v\n", p.Hash, p.ChainID)).Error())
 			return
 		}
 
@@ -152,7 +156,7 @@ func (s *Service) handleAirdropCommunityToken(status string, toAddress common.Ad
 		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
 			communityToken.Address, protobuf.CommunityTokenAction_AIRDROP)
 		if publishErr != nil {
-			logutils.ZapLogger().Warn("can't publish airdrop action")
+			s.logger.Warn("can't publish airdrop action")
 		}
 	}
 	return communityToken, err
@@ -166,7 +170,7 @@ func (s *Service) handleRemoteDestructCollectible(status string, toAddress commo
 		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
 			communityToken.Address, protobuf.CommunityTokenAction_REMOTE_DESTRUCT)
 		if publishErr != nil {
-			logutils.ZapLogger().Warn("can't publish remote destruct action")
+			s.logger.Warn("can't publish remote destruct action")
 		}
 	}
 	return communityToken, err
@@ -193,7 +197,7 @@ func (s *Service) handleBurnCommunityToken(status string, toAddress common.Addre
 		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
 			communityToken.Address, protobuf.CommunityTokenAction_BURN)
 		if publishErr != nil {
-			logutils.ZapLogger().Warn("can't publish burn action")
+			s.logger.Warn("can't publish burn action")
 		}
 	}
 	return communityToken, err

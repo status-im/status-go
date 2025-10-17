@@ -2,20 +2,18 @@ package fees
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/common"
-)
 
-const (
-	RewardPercentiles1 = 10
-	RewardPercentiles2 = 45
-	RewardPercentiles3 = 90
+	"github.com/status-im/go-wallet-sdk/pkg/gas"
 )
 
 type GasFeeMode int
@@ -25,6 +23,16 @@ const (
 	GasFeeMedium
 	GasFeeHigh
 	GasFeeCustom
+)
+
+type TransactionEstimation int
+
+const (
+	Unknown TransactionEstimation = iota
+	LessThanOneMinute
+	LessThanThreeMinutes
+	LessThanFiveMinutes
+	MoreThanFiveMinutes
 )
 
 var (
@@ -97,10 +105,10 @@ func (m *MaxFeesLevels) FeeFor(mode GasFeeMode) (*big.Int, *big.Int, uint, error
 	}
 
 	if mode == GasFeeHigh {
-		return m.High.ToInt(), m.HighPriority.ToInt(), m.MediumEstimatedTime, nil
+		return m.High.ToInt(), m.HighPriority.ToInt(), m.HighEstimatedTime, nil
 	}
 
-	return m.Medium.ToInt(), m.MediumPriority.ToInt(), m.HighEstimatedTime, nil
+	return m.Medium.ToInt(), m.MediumPriority.ToInt(), m.MediumEstimatedTime, nil
 }
 
 func (s *SuggestedFees) FeeFor(mode GasFeeMode) (*big.Int, *big.Int, uint, error) {
@@ -109,113 +117,156 @@ func (s *SuggestedFees) FeeFor(mode GasFeeMode) (*big.Int, *big.Int, uint, error
 
 type FeeManager struct {
 	ethClientGetter rpc.EthClientGetter
+	logger          *zap.Logger
 }
 
-func NewFeeManager(ethClientGetter rpc.EthClientGetter) *FeeManager {
-	return &FeeManager{ethClientGetter: ethClientGetter}
+func NewFeeManager(ethClientGetter rpc.EthClientGetter, logger *zap.Logger) *FeeManager {
+	return &FeeManager{
+		ethClientGetter: ethClientGetter,
+		logger:          logger,
+	}
 }
 
-func (f *FeeManager) IsEIP1559Enabled(ctx context.Context, chainID uint64) (bool, error) {
-	// Since the Status Network is gasless chain, but EIP-1559 compatible, we should not rely on checking the BaseFeePerGas, that's why we have this special case.
-	eip1559Enabled, err := common.IsPartiallyOrFullyGaslessChainEIP1559Compatible(chainID)
-	if err == nil {
-		return eip1559Enabled, nil
+func chainIDToClass(chainID uint64) (gas.ChainClass, error) {
+	switch chainID {
+	case common.EthereumMainnet, common.EthereumSepolia, common.AnvilMainnet, common.BSCMainnet, common.BSCTestnet:
+		return gas.ChainClassL1, nil
+	case common.ArbitrumMainnet, common.ArbitrumSepolia:
+		return gas.ChainClassArbStack, nil
+	case common.OptimismMainnet, common.OptimismSepolia, common.BaseMainnet, common.BaseSepolia:
+		return gas.ChainClassOPStack, nil
+	case common.StatusNetworkSepolia:
+		return gas.ChainClassLineaStack, nil
+	}
+	return "", fmt.Errorf("chainID class identification not handled for chainID: %d", chainID)
+}
+
+func buildConfig(chainID uint64) (gas.ChainParameters, gas.SuggestionsConfig, error) {
+	class, err := chainIDToClass(chainID)
+	if err != nil {
+		return gas.ChainParameters{}, gas.SuggestionsConfig{}, err
 	}
 
-	backend, err := f.ethClientGetter.EthClient(chainID)
-	if err != nil {
-		return false, err
+	config := gas.DefaultConfig(class)
+	params := gas.ChainParameters{
+		ChainClass:       class,
+		NetworkBlockTime: common.GetBlockCreationTimeForChain(chainID).Seconds(),
 	}
-	block, err := backend.EthGetBlockByNumberWithTxHashes(ctx, nil)
-	if err != nil {
-		return false, err
-	}
-	return block.BaseFeePerGas != nil && block.BaseFeePerGas.Cmp(big.NewInt(0)) > 0, nil
+
+	return params, config, nil
 }
 
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address ethCommon.Address) (suggestedFees *SuggestedFees, noBaseFee bool, noPriorityFee bool, err error) {
-	blockCount := getFeeHistoryBlockCount(chainID)
-	feeHistory, err := f.getFeeHistory(ctx, chainID, blockCount, "latest", []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3})
+	params, config, err := buildConfig(chainID)
 	if err != nil {
-		suggestedFees, err = f.getNonEIP1559SuggestedFees(ctx, chainID)
-		return
+		return nil, false, false, err
 	}
 
-	var (
-		lowPriorityFeePerGasLowerBound *big.Int
-		mediumPriorityFeePerGas        *big.Int
-		maxPriorityFeePerGasUpperBound *big.Int
-		baseFee                        *big.Int
+	f.logger.Debug("Getting Tx Suggestions",
+		zap.String("chainID", fmt.Sprintf("%d", chainID)),
+		zap.Any("params", params),
+		zap.Any("config", config),
 	)
 
-	if chainID == common.StatusNetworkSepolia {
-		baseFee, lowPriorityFeePerGasLowerBound, err = f.getGaslessParamsForAccount(ctx, chainID, address)
-		if err != nil {
-			return
-		}
-
-		mediumPriorityFeePerGas = new(big.Int).Set(lowPriorityFeePerGasLowerBound)
-		maxPriorityFeePerGasUpperBound = new(big.Int).Set(lowPriorityFeePerGasLowerBound)
-
-		noBaseFee = baseFee == nil || baseFee.Cmp(common.ZeroBigIntValue()) == 0
-		noPriorityFee = lowPriorityFeePerGasLowerBound == nil || lowPriorityFeePerGasLowerBound.Cmp(common.ZeroBigIntValue()) == 0
-	} else {
-		lowPriorityFeePerGasLowerBound, mediumPriorityFeePerGas, maxPriorityFeePerGasUpperBound, baseFee, err = getEIP1559SuggestedFees(chainID, feeHistory)
-		if err != nil || len(feeHistory.Reward) < int(blockCount) {
-			suggestedFees, err = f.getNonEIP1559SuggestedFees(ctx, chainID)
-			return
-		}
+	ethClient, err := f.ethClientGetter.EthClient(chainID)
+	if err != nil {
+		return nil, false, false, err
 	}
+
+	suggestion, err := gas.GetTxSuggestions(ctx, ethClient, params, config, nil)
+	if err != nil {
+		return nil, false, false, err
+	}
+
+	f.logger.Debug("Got Tx Suggestions",
+		zap.String("chainID", fmt.Sprintf("%d", chainID)),
+		zap.Any("suggestion", suggestion),
+	)
+
+	feeSuggestions := suggestion.FeeSuggestions
 
 	suggestedFees = &SuggestedFees{
 		GasPrice:             big.NewInt(0),
-		BaseFee:              baseFee,
-		CurrentBaseFee:       baseFee,
-		MaxPriorityFeePerGas: mediumPriorityFeePerGas,
-		MaxPriorityFeeSuggestedBounds: &MaxPriorityFeesSuggestedBounds{
-			Lower: lowPriorityFeePerGasLowerBound,
-			Upper: maxPriorityFeePerGasUpperBound,
+		BaseFee:              feeSuggestions.EstimatedBaseFee,
+		MaxPriorityFeePerGas: feeSuggestions.Medium.MaxPriorityFeePerGas,
+		L1GasFee:             big.NewFloat(0),
+
+		NonEIP1559Fees: nil,
+		MaxFeesLevels: &MaxFeesLevels{
+			Low:                 (*hexutil.Big)(feeSuggestions.Low.MaxFeePerGas),
+			LowPriority:         (*hexutil.Big)(feeSuggestions.Low.MaxPriorityFeePerGas),
+			LowEstimatedTime:    uint(feeSuggestions.LowInclusion.MinTimeUntilInclusion),
+			Medium:              (*hexutil.Big)(feeSuggestions.Medium.MaxFeePerGas),
+			MediumPriority:      (*hexutil.Big)(feeSuggestions.Medium.MaxPriorityFeePerGas),
+			MediumEstimatedTime: uint(feeSuggestions.MediumInclusion.MinTimeUntilInclusion),
+			High:                (*hexutil.Big)(feeSuggestions.High.MaxFeePerGas),
+			HighPriority:        (*hexutil.Big)(feeSuggestions.High.MaxPriorityFeePerGas),
+			HighEstimatedTime:   uint(feeSuggestions.HighInclusion.MinTimeUntilInclusion),
 		},
+		MaxPriorityFeeSuggestedBounds: &MaxPriorityFeesSuggestedBounds{
+			Lower: feeSuggestions.PriorityFeeLowerBound,
+			Upper: feeSuggestions.PriorityFeeUpperBound,
+		},
+		CurrentBaseFee: feeSuggestions.EstimatedBaseFee,
 		EIP1559Enabled: true,
 	}
 
-	if chainID == common.EthereumMainnet || chainID == common.EthereumSepolia || chainID == common.AnvilMainnet {
-		networkCongestion := calculateNetworkCongestion(feeHistory)
-
-		baseFeeFloat := new(big.Float).SetUint64(baseFee.Uint64())
-		baseFeeFloat.Mul(baseFeeFloat, big.NewFloat(networkCongestion))
-		additionBasedOnCongestion := new(big.Int)
-		baseFeeFloat.Int(additionBasedOnCongestion)
-
-		mediumBaseFee := new(big.Int).Add(baseFee, additionBasedOnCongestion)
-
-		highBaseFee := new(big.Int).Mul(baseFee, big.NewInt(2))
-		highBaseFee.Add(highBaseFee, additionBasedOnCongestion)
-
-		suggestedFees.MaxFeesLevels = &MaxFeesLevels{
-			Low:            (*hexutil.Big)(new(big.Int).Add(baseFee, lowPriorityFeePerGasLowerBound)),
-			LowPriority:    (*hexutil.Big)(lowPriorityFeePerGasLowerBound),
-			Medium:         (*hexutil.Big)(new(big.Int).Add(mediumBaseFee, mediumPriorityFeePerGas)),
-			MediumPriority: (*hexutil.Big)(mediumPriorityFeePerGas),
-			High:           (*hexutil.Big)(new(big.Int).Add(highBaseFee, maxPriorityFeePerGasUpperBound)),
-			HighPriority:   (*hexutil.Big)(maxPriorityFeePerGasUpperBound),
-		}
-	} else {
-		suggestedFees.MaxFeesLevels = &MaxFeesLevels{
-			Low:            (*hexutil.Big)(new(big.Int).Add(baseFee, lowPriorityFeePerGasLowerBound)),
-			LowPriority:    (*hexutil.Big)(lowPriorityFeePerGasLowerBound),
-			Medium:         (*hexutil.Big)(new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(4)), mediumPriorityFeePerGas)),
-			MediumPriority: (*hexutil.Big)(mediumPriorityFeePerGas),
-			High:           (*hexutil.Big)(new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(10)), maxPriorityFeePerGasUpperBound)),
-			HighPriority:   (*hexutil.Big)(maxPriorityFeePerGasUpperBound),
-		}
+	noBaseFee = false
+	estimatedBaseFee := suggestion.FeeSuggestions.EstimatedBaseFee
+	if estimatedBaseFee != nil && estimatedBaseFee.Sign() == 0 {
+		noBaseFee = true
 	}
 
-	suggestedFees.MaxFeesLevels.LowEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Low.ToInt(), suggestedFees.MaxFeesLevels.LowPriority.ToInt(), chainID, 1)
-	suggestedFees.MaxFeesLevels.MediumEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Medium.ToInt(), suggestedFees.MaxFeesLevels.MediumPriority.ToInt(), chainID, 1)
-	suggestedFees.MaxFeesLevels.HighEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.High.ToInt(), suggestedFees.MaxFeesLevels.HighPriority.ToInt(), chainID, 1)
+	noPriorityFee = false
+	estimatedPriorityFeeLowerBound := suggestion.FeeSuggestions.PriorityFeeLowerBound
+	if estimatedPriorityFeeLowerBound != nil && estimatedPriorityFeeLowerBound.Sign() == 0 {
+		noPriorityFee = true
+	}
+
+	f.logger.Debug("Suggested fees",
+		zap.String("chainID", fmt.Sprintf("%d", chainID)),
+		zap.Any("suggestedFees", suggestedFees),
+		zap.Bool("noBaseFee", noBaseFee),
+		zap.Bool("noPriorityFee", noPriorityFee),
+	)
 
 	return
+}
+
+func (f *FeeManager) EstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Int, priorityFee *big.Int) (uint, error) {
+	params, config, err := buildConfig(chainID)
+	if err != nil {
+		return 0, err
+	}
+
+	ethClient, err := f.ethClientGetter.EthClient(chainID)
+	if err != nil {
+		return 0, err
+	}
+
+	estimatedTime, err := gas.EstimateInclusion(ctx, ethClient, params, config, gas.Fee{
+		MaxFeePerGas:         maxFeePerGas,
+		MaxPriorityFeePerGas: priorityFee,
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	time := uint(0)
+	if estimatedTime.MinTimeUntilInclusion < 0 || estimatedTime.MaxTimeUntilInclusion < 0 {
+		// Some value is unbounded, take whichever is valid
+		time = uint(max(estimatedTime.MinTimeUntilInclusion, estimatedTime.MaxTimeUntilInclusion))
+	} else {
+		// Take the average
+		time = uint((estimatedTime.MinTimeUntilInclusion + estimatedTime.MaxTimeUntilInclusion) / 2)
+	}
+
+	return time, nil
+}
+
+// Remove when WalletConnect is reworked to use the router and API method `GetTransactionEstimatedTime` is removed
+func (f *FeeManager) EstimatedTimeLevel(ctx context.Context, chainID uint64, gasPrice *big.Int) (TransactionEstimation, error) {
+	return LessThanOneMinute, nil
 }
 
 // //////////////////////////////////////////////////////////////////////////////
@@ -226,19 +277,20 @@ func (f *FeeManager) SuggestedFeesGwei(ctx context.Context, chainID uint64) (*Su
 	if err != nil {
 		return nil, err
 	}
+
+	if !fees.EIP1559Enabled {
+		return nil, ErrEIP1559IncompaibleChain
+	}
+
 	feesGwei := &SuggestedFeesGwei{
 		EIP1559Enabled: fees.EIP1559Enabled,
 	}
-	if feesGwei.EIP1559Enabled {
-		feesGwei.GasPrice = common.WeiToGwei(fees.GasPrice)
-		feesGwei.BaseFee = common.WeiToGwei(fees.BaseFee)
-		feesGwei.MaxPriorityFeePerGas = common.WeiToGwei(fees.MaxPriorityFeePerGas)
-		feesGwei.MaxFeePerGasLow = common.WeiToGwei(fees.MaxFeesLevels.Low.ToInt())
-		feesGwei.MaxFeePerGasMedium = common.WeiToGwei(fees.MaxFeesLevels.Medium.ToInt())
-		feesGwei.MaxFeePerGasHigh = common.WeiToGwei(fees.MaxFeesLevels.High.ToInt())
-	} else {
-		feesGwei.GasPrice = common.WeiToGwei(fees.NonEIP1559Fees.GasPrice.ToInt())
-	}
+	feesGwei.GasPrice = common.WeiToGwei(fees.GasPrice)
+	feesGwei.BaseFee = common.WeiToGwei(fees.BaseFee)
+	feesGwei.MaxPriorityFeePerGas = common.WeiToGwei(fees.MaxPriorityFeePerGas)
+	feesGwei.MaxFeePerGasLow = common.WeiToGwei(fees.MaxFeesLevels.Low.ToInt())
+	feesGwei.MaxFeePerGasMedium = common.WeiToGwei(fees.MaxFeesLevels.Medium.ToInt())
+	feesGwei.MaxFeePerGasHigh = common.WeiToGwei(fees.MaxFeesLevels.High.ToInt())
 
 	return feesGwei, nil
 }

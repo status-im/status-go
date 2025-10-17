@@ -18,6 +18,7 @@ import (
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/accounts-management/generator"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
@@ -443,21 +444,34 @@ func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int,
 }
 
 func (t *Transactor) logNewTx(args wallettypes.SendTxArgs, gas uint64, gasPrice *big.Int, value *big.Int) {
-	t.logger.Info("New transaction",
-		zap.Stringer("From", args.From),
-		zap.Stringer("To", args.To),
-		zap.Uint64("Gas", gas),
-		zap.Stringer("GasPrice", gasPrice),
-		zap.Stringer("Value", value),
-	)
+	if args.IsDynamicFeeTx() {
+		t.logger.Info("New dynamic fee transaction",
+			zap.String("From", gocommon.TruncateWithDot(args.From.Hex())),
+			zap.String("To", gocommon.TruncateWithDot(args.To.Hex())),
+			zap.Uint64("Gas", gas),
+			zap.Stringer("GasTipCap", (*big.Int)(args.MaxPriorityFeePerGas)),
+			zap.Stringer("GasFeeCap", (*big.Int)(args.MaxFeePerGas)),
+			zap.Stringer("Value", value),
+		)
+	} else {
+		t.logger.Info("New legacy transaction",
+			zap.String("From", gocommon.TruncateWithDot(args.From.Hex())),
+			zap.String("To", gocommon.TruncateWithDot(args.To.Hex())),
+			zap.Uint64("Gas", gas),
+			zap.Stringer("GasPrice", gasPrice),
+			zap.Stringer("Value", value),
+		)
+	}
 }
 
 func (t *Transactor) logNewContract(args wallettypes.SendTxArgs, gas uint64, gasPrice *big.Int, value *big.Int, nonce uint64) {
+	contractAddress := crypto.CreateAddress(args.From, nonce)
+
 	t.logger.Info("New contract",
-		zap.Stringer("From", args.From),
+		zap.String("From", gocommon.TruncateWithDot(args.From.Hex())),
 		zap.Uint64("Gas", gas),
 		zap.Stringer("GasPrice", gasPrice),
 		zap.Stringer("Value", value),
-		zap.Stringer("Contract address", crypto.CreateAddress(args.From, nonce)),
+		zap.String("Contract address", gocommon.TruncateWithDot(contractAddress.Hex())),
 	)
 }

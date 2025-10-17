@@ -89,8 +89,21 @@ func TestSendTransactionWithSignalTimout(t *testing.T) {
 	state.ethClientGetter.EXPECT().EthClient(uint64(1)).AnyTimes().Return(mockedChainClient, nil)
 	state.feeManager.EXPECT().SuggestedFees(gomock.Any(), uint64(1), common.Address(accountAddress)).Times(1).Return(
 		&fees.SuggestedFees{
-			GasPrice:       big.NewInt(1),
-			EIP1559Enabled: false,
+			GasPrice:             big.NewInt(1),
+			BaseFee:              big.NewInt(1),
+			MaxPriorityFeePerGas: big.NewInt(1),
+			MaxFeesLevels: &fees.MaxFeesLevels{
+				Low:                 (*hexutil.Big)(big.NewInt(1)),
+				LowPriority:         (*hexutil.Big)(big.NewInt(1)),
+				LowEstimatedTime:    1,
+				Medium:              (*hexutil.Big)(big.NewInt(1)),
+				MediumPriority:      (*hexutil.Big)(big.NewInt(1)),
+				MediumEstimatedTime: 1,
+				High:                (*hexutil.Big)(big.NewInt(1)),
+				HighPriority:        (*hexutil.Big)(big.NewInt(1)),
+				HighEstimatedTime:   1,
+			},
+			EIP1559Enabled: true,
 		}, false, false, nil)
 
 	_, err = state.cmd.Execute(state.ctx, request)
@@ -136,8 +149,21 @@ func TestSendTransactionWithSignalAccepted(t *testing.T) {
 	state.ethClientGetter.EXPECT().EthClient(uint64(1)).AnyTimes().Return(mockedChainClient, nil)
 	state.feeManager.EXPECT().SuggestedFees(gomock.Any(), uint64(1), common.Address(accountAddress)).Times(1).Return(
 		&fees.SuggestedFees{
-			GasPrice:       big.NewInt(1),
-			EIP1559Enabled: false,
+			GasPrice:             big.NewInt(1),
+			BaseFee:              big.NewInt(1),
+			MaxPriorityFeePerGas: big.NewInt(1),
+			MaxFeesLevels: &fees.MaxFeesLevels{
+				Low:                 (*hexutil.Big)(big.NewInt(1)),
+				LowPriority:         (*hexutil.Big)(big.NewInt(1)),
+				LowEstimatedTime:    1,
+				Medium:              (*hexutil.Big)(big.NewInt(1)),
+				MediumPriority:      (*hexutil.Big)(big.NewInt(1)),
+				MediumEstimatedTime: 1,
+				High:                (*hexutil.Big)(big.NewInt(1)),
+				HighPriority:        (*hexutil.Big)(big.NewInt(1)),
+				HighEstimatedTime:   1,
+			},
+			EIP1559Enabled: true,
 		}, false, false, nil)
 
 	response, err := state.cmd.Execute(state.ctx, request)
@@ -180,8 +206,21 @@ func TestSendTransactionWithSignalRejected(t *testing.T) {
 	state.ethClientGetter.EXPECT().EthClient(uint64(1)).AnyTimes().Return(mockedChainClient, nil)
 	state.feeManager.EXPECT().SuggestedFees(gomock.Any(), uint64(1), common.Address(accountAddress)).Times(1).Return(
 		&fees.SuggestedFees{
-			GasPrice:       big.NewInt(1),
-			EIP1559Enabled: false,
+			GasPrice:             big.NewInt(1),
+			BaseFee:              big.NewInt(1),
+			MaxPriorityFeePerGas: big.NewInt(1),
+			MaxFeesLevels: &fees.MaxFeesLevels{
+				Low:                 (*hexutil.Big)(big.NewInt(1)),
+				LowPriority:         (*hexutil.Big)(big.NewInt(1)),
+				LowEstimatedTime:    1,
+				Medium:              (*hexutil.Big)(big.NewInt(1)),
+				MediumPriority:      (*hexutil.Big)(big.NewInt(1)),
+				MediumEstimatedTime: 1,
+				High:                (*hexutil.Big)(big.NewInt(1)),
+				HighPriority:        (*hexutil.Big)(big.NewInt(1)),
+				HighEstimatedTime:   1,
+			},
+			EIP1559Enabled: true,
 		}, false, false, nil)
 
 	_, err = state.cmd.Execute(state.ctx, request)
