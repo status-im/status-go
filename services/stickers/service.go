@@ -11,12 +11,12 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )
 
 // NewService initializes service instance.
 func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, config *params.NodeConfig,
-	downloader *ipfs.Downloader, httpServer *server.MediaServer, pendingTracker *transactions.PendingTxTracker) *Service {
+	downloader *ipfs.Downloader, httpServer *server.MediaServer, pendingTracker *pendingtxtracker.PendingTxTracker) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Service{

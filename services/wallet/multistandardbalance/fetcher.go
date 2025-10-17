@@ -12,13 +12,13 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 	"github.com/status-im/go-wallet-sdk/pkg/contracts/multicall3"
 
-	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 )
 
 const DefaultBatchSize = 10000
 
 type EthClientGetter interface {
-	EthClient(chainID uint64) (chain.ClientInterface, error)
+	EthClient(chainID uint64) (ethclient.EthClientInterface, error)
 }
 
 type Fetcher struct {

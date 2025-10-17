@@ -108,7 +108,11 @@ func (s *SuggestedFees) FeeFor(mode GasFeeMode) (*big.Int, *big.Int, uint, error
 }
 
 type FeeManager struct {
-	RPCClient rpc.ClientInterface
+	ethClientGetter rpc.EthClientGetter
+}
+
+func NewFeeManager(ethClientGetter rpc.EthClientGetter) *FeeManager {
+	return &FeeManager{ethClientGetter: ethClientGetter}
 }
 
 func (f *FeeManager) IsEIP1559Enabled(ctx context.Context, chainID uint64) (bool, error) {
@@ -118,7 +122,7 @@ func (f *FeeManager) IsEIP1559Enabled(ctx context.Context, chainID uint64) (bool
 		return eip1559Enabled, nil
 	}
 
-	backend, err := f.RPCClient.EthClient(chainID)
+	backend, err := f.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return false, err
 	}

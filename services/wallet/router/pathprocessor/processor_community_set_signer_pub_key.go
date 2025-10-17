@@ -23,16 +23,16 @@ import (
 )
 
 type CommunitySetSignerPubKeyProcessor struct {
-	contractMaker *communitytokens.CommunityTokensContractMaker
-	transactor    transactions.TransactorIface
+	contractMaker   *communitytokens.CommunityTokensContractMaker
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
 }
 
-func NewCommunitySetSignerPubKeyProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *CommunitySetSignerPubKeyProcessor {
+func NewCommunitySetSignerPubKeyProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *CommunitySetSignerPubKeyProcessor {
 	return &CommunitySetSignerPubKeyProcessor{
-		contractMaker: &communitytokens.CommunityTokensContractMaker{
-			RPCClient: rpcClient,
-		},
-		transactor: transactor,
+		contractMaker:   communitytokens.NewCommunityTokensContractMakerMaker(ethClientGetter),
+		ethClientGetter: ethClientGetter,
+		transactor:      transactor,
 	}
 }
 
@@ -66,7 +66,7 @@ func (s *CommunitySetSignerPubKeyProcessor) EstimateGas(params ProcessorInputPar
 		return 0, ErrNoEstimationFound
 	}
 
-	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createCommunitySetSignerPubKeyErrorResponse(err)
 	}

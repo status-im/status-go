@@ -45,7 +45,7 @@ func scaleBaseFeePerGas(value string) (*big.Int, error) {
 }
 
 func (f *FeeManager) getNonEIP1559SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
-	backend, err := f.RPCClient.EthClient(chainID)
+	backend, err := f.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}

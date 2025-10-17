@@ -1,8 +1,6 @@
 package communitytokens
 
 import (
-	"errors"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
@@ -14,19 +12,16 @@ import (
 )
 
 type CommunityTokensContractMaker struct {
-	RPCClient rpc.ClientInterface
+	ethClientGetter rpc.EthClientGetter
 }
 
-func NewCommunityTokensContractMakerMaker(client rpc.ClientInterface) (*CommunityTokensContractMaker, error) {
-	if client == nil {
-		return nil, errors.New("rpc client is required")
-	}
-	return &CommunityTokensContractMaker{RPCClient: client}, nil
+func NewCommunityTokensContractMakerMaker(ethClientGetter rpc.EthClientGetter) *CommunityTokensContractMaker {
+	return &CommunityTokensContractMaker{ethClientGetter: ethClientGetter}
 }
 
 func (c *CommunityTokensContractMaker) NewOwnerTokenInstance(chainID uint64, contractAddress common.Address,
 ) (*ownertoken.OwnerToken, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +30,7 @@ func (c *CommunityTokensContractMaker) NewOwnerTokenInstance(chainID uint64, con
 
 func (c *CommunityTokensContractMaker) NewMasterTokenInstance(chainID uint64, contractAddress common.Address,
 ) (*mastertoken.MasterToken, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +39,7 @@ func (c *CommunityTokensContractMaker) NewMasterTokenInstance(chainID uint64, co
 
 func (c *CommunityTokensContractMaker) NewCollectiblesInstance(chainID uint64, contractAddress common.Address,
 ) (*collectibles.Collectibles, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +48,7 @@ func (c *CommunityTokensContractMaker) NewCollectiblesInstance(chainID uint64, c
 
 func (c *CommunityTokensContractMaker) NewAssetsInstance(chainID uint64, contractAddress common.Address,
 ) (*assets.Assets, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +57,7 @@ func (c *CommunityTokensContractMaker) NewAssetsInstance(chainID uint64, contrac
 
 func (c *CommunityTokensContractMaker) NewCommunityTokenDeployerInstance(chainID uint64, contractAddress common.Address,
 ) (*communitytokendeployer.CommunityTokenDeployer, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +65,7 @@ func (c *CommunityTokensContractMaker) NewCommunityTokenDeployerInstance(chainID
 }
 
 func (c *CommunityTokensContractMaker) NewCommunityOwnerTokenRegistryInstance(chainID uint64, contractAddress common.Address) (*communityownertokenregistry.CommunityOwnerTokenRegistry, error) {
-	backend, err := c.RPCClient.EthClient(chainID)
+	backend, err := c.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}

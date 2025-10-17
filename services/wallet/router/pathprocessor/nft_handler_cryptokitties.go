@@ -33,9 +33,9 @@ type CryptoKittiesHandler struct {
 	*BaseNFTHandler
 }
 
-func NewCryptoKittiesHandler(rpcClient rpc.ClientInterface, transactor transactions.TransactorIface) *CryptoKittiesHandler {
+func NewCryptoKittiesHandler(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *CryptoKittiesHandler {
 	return &CryptoKittiesHandler{
-		BaseNFTHandler: NewBaseNFTHandler(rpcClient, transactor),
+		BaseNFTHandler: NewBaseNFTHandler(ethClientGetter, transactor),
 	}
 }
 

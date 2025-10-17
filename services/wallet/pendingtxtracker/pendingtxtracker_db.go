@@ -1,4 +1,4 @@
-package transactions
+package pendingtxtracker
 
 import (
 	"database/sql"

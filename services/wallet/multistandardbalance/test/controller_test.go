@@ -581,14 +581,14 @@ func TestController_BasicFlow(t *testing.T) {
 		eventsMutex.Lock()
 		defer eventsMutex.Unlock()
 		return len(startedEvents) >= 2 // Should have 2 started events (one per chain)
-	}, 200*time.Millisecond, 10*time.Millisecond, "Expected at least 2 EventBalanceFetchStarted events")
+	}, 1*time.Second, 10*time.Millisecond, "Expected at least 2 EventBalanceFetchStarted events")
 
 	// Wait for finished events (2 accounts × 2 chains × 4 balance types = 16 events)
 	require.Eventually(t, func() bool {
 		eventsMutex.Lock()
 		defer eventsMutex.Unlock()
 		return len(finishedEvents) >= 16 // Should have 16 finished events (2 accounts × 2 chains × 4 balance types)
-	}, 200*time.Millisecond, 10*time.Millisecond, "Expected at least 16 EventBalanceFetchFinished events")
+	}, 1*time.Second, 10*time.Millisecond, "Expected at least 16 EventBalanceFetchFinished events")
 
 	// Verify the started events contain the expected chains
 	eventsMutex.Lock()

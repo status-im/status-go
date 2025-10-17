@@ -11,6 +11,7 @@ import (
 
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/services/wallet/transferdetector"
@@ -90,7 +91,7 @@ func NewService(
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
 	ensResolver *ensresolver.EnsResolver,
-	pendingTxManager *transactions.PendingTxTracker,
+	pendingTxManager *pendingtxtracker.PendingTxTracker,
 	feed *event.Feed,
 	mediaServer *server.MediaServer,
 	tokenManager *token.Manager,
@@ -383,7 +384,7 @@ type Service struct {
 	communityManager               *community.Manager
 	savedAddressesManager          *SavedAddressesManager
 	transactionManager             *transfer.TransactionManager
-	pendingTxManager               *transactions.PendingTxTracker
+	pendingTxManager               *pendingtxtracker.PendingTxTracker
 	multistandardBalanceController *multistandardbalance.Controller
 	tokenBalancesFetcher           tokenbalances.FetcherIface
 	tokenBalancesStorage           tokenbalances.Storage

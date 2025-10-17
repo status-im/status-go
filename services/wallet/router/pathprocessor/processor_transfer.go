@@ -19,12 +19,12 @@ import (
 )
 
 type TransferProcessor struct {
-	rpcClient  *rpc.Client
-	transactor transactions.TransactorIface
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
 }
 
-func NewTransferProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *TransferProcessor {
-	return &TransferProcessor{rpcClient: rpcClient, transactor: transactor}
+func NewTransferProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *TransferProcessor {
+	return &TransferProcessor{ethClientGetter: ethClientGetter, transactor: transactor}
 }
 
 func createTransferErrorResponse(err error) error {
@@ -89,7 +89,7 @@ func (s *TransferProcessor) EstimateGas(params ProcessorInputParams, input []byt
 			return 0, createTransferErrorResponse(err)
 		}
 	} else {
-		ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
+		ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 		if err != nil {
 			return 0, createTransferErrorResponse(err)
 		}

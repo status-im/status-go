@@ -25,16 +25,16 @@ import (
 )
 
 type CommunityMintTokensProcessor struct {
-	contractMaker *communitytokens.CommunityTokensContractMaker
-	transactor    transactions.TransactorIface
+	contractMaker   *communitytokens.CommunityTokensContractMaker
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
 }
 
-func NewCommunityMintTokensProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *CommunityMintTokensProcessor {
+func NewCommunityMintTokensProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *CommunityMintTokensProcessor {
 	return &CommunityMintTokensProcessor{
-		contractMaker: &communitytokens.CommunityTokensContractMaker{
-			RPCClient: rpcClient,
-		},
-		transactor: transactor,
+		contractMaker:   communitytokens.NewCommunityTokensContractMakerMaker(ethClientGetter),
+		ethClientGetter: ethClientGetter,
+		transactor:      transactor,
 	}
 }
 
@@ -105,7 +105,7 @@ func (s *CommunityMintTokensProcessor) EstimateGas(params ProcessorInputParams, 
 		return 0, createENSReleaseErrorResponse(err)
 	}
 
-	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createCommunityMintTokensErrorResponse(err)
 	}

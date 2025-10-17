@@ -21,18 +21,18 @@ import (
 )
 
 type ENSPublicKeyProcessor struct {
-	contractMaker *contracts.ContractMaker
-	transactor    transactions.TransactorIface
-	ensResolver   *ensresolver.EnsResolver
+	contractMaker   *contracts.ContractMaker
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
+	ensResolver     *ensresolver.EnsResolver
 }
 
-func NewENSPublicKeyProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, ensResolver *ensresolver.EnsResolver) *ENSPublicKeyProcessor {
+func NewENSPublicKeyProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, ensResolver *ensresolver.EnsResolver) *ENSPublicKeyProcessor {
 	return &ENSPublicKeyProcessor{
-		contractMaker: &contracts.ContractMaker{
-			RPCClient: rpcClient,
-		},
-		transactor:  transactor,
-		ensResolver: ensResolver,
+		contractMaker:   contracts.NewContractMaker(ethClientGetter),
+		ethClientGetter: ethClientGetter,
+		transactor:      transactor,
+		ensResolver:     ensResolver,
 	}
 }
 
@@ -77,7 +77,7 @@ func (s *ENSPublicKeyProcessor) EstimateGas(params ProcessorInputParams, input [
 		return 0, createENSPublicKeyErrorResponse(err)
 	}
 
-	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, err
 	}

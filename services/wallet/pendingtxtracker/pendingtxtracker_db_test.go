@@ -1,4 +1,4 @@
-package transactions_test
+package pendingtxtracker_test
 
 import (
 	"math/rand"
@@ -11,8 +11,8 @@ import (
 
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/require"
@@ -31,9 +31,9 @@ func getRandomStatus() ac.TxStatus {
 	return ac.Pending
 }
 
-func getRandomTrackedTx() transactions.TrackedTx {
-	tx := transactions.TrackedTx{
-		ID: transactions.TxIdentity{
+func getRandomTrackedTx() pendingtxtracker.TrackedTx {
+	tx := pendingtxtracker.TrackedTx{
+		ID: pendingtxtracker.TxIdentity{
 			ChainID: common.ChainID(rand.Uint64() % 10), // nolint: gosec
 			Hash:    eth.Hash{},
 		},
@@ -47,11 +47,11 @@ func getRandomTrackedTx() transactions.TrackedTx {
 
 func getTestData() []struct {
 	name string
-	tx   transactions.TrackedTx
+	tx   pendingtxtracker.TrackedTx
 } {
 	testData := make([]struct {
 		name string
-		tx   transactions.TrackedTx
+		tx   pendingtxtracker.TrackedTx
 	}, 10)
 
 	for i := range testData {
@@ -69,7 +69,7 @@ func Test_PuTrackedTx(t *testing.T) {
 		require.NoError(t, closeFn())
 	}()
 
-	db := transactions.NewDB(walletDB)
+	db := pendingtxtracker.NewDB(walletDB)
 
 	for _, tt := range getTestData() {
 		t.Run(tt.name, func(t *testing.T) {

@@ -27,12 +27,12 @@ type ERC1155TxArgs struct {
 }
 
 type ERC1155Processor struct {
-	rpcClient  *rpc.Client
-	transactor transactions.TransactorIface
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
 }
 
-func NewERC1155Processor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *ERC1155Processor {
-	return &ERC1155Processor{rpcClient: rpcClient, transactor: transactor}
+func NewERC1155Processor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *ERC1155Processor {
+	return &ERC1155Processor{ethClientGetter: ethClientGetter, transactor: transactor}
 }
 
 func createERC1155ErrorResponse(err error) error {
@@ -81,7 +81,7 @@ func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams, input []byte
 		return 0, ErrNoEstimationFound
 	}
 
-	ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
+	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createERC1155ErrorResponse(err)
 	}

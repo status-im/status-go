@@ -33,9 +33,9 @@ type CryptoPunksHandler struct {
 	*BaseNFTHandler
 }
 
-func NewCryptoPunksHandler(rpcClient rpc.ClientInterface, transactor transactions.TransactorIface) *CryptoPunksHandler {
+func NewCryptoPunksHandler(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *CryptoPunksHandler {
 	return &CryptoPunksHandler{
-		BaseNFTHandler: NewBaseNFTHandler(rpcClient, transactor),
+		BaseNFTHandler: NewBaseNFTHandler(ethClientGetter, transactor),
 	}
 }
 

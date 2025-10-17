@@ -23,23 +23,23 @@ type ERC721TxArgs struct {
 
 // NFTProcessor handles NFT transfers using strategy pattern
 type NFTProcessor struct {
-	rpcClient  rpc.ClientInterface
-	transactor transactions.TransactorIface
-	handlers   []NFTHandler
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
+	handlers        []NFTHandler
 }
 
-func NewNFTProcessor(rpcClient rpc.ClientInterface, transactor transactions.TransactorIface) *NFTProcessor {
+func NewNFTProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *NFTProcessor {
 	processor := &NFTProcessor{
-		rpcClient:  rpcClient,
-		transactor: transactor,
-		handlers:   make([]NFTHandler, 0),
+		ethClientGetter: ethClientGetter,
+		transactor:      transactor,
+		handlers:        make([]NFTHandler, 0),
 	}
 
 	// Register handlers in order of priority
 	// Specialized handlers first, then generic ERC721
-	processor.handlers = append(processor.handlers, NewCryptoKittiesHandler(rpcClient, transactor))
-	processor.handlers = append(processor.handlers, NewCryptoPunksHandler(rpcClient, transactor))
-	processor.handlers = append(processor.handlers, NewERC721Handler(rpcClient, transactor))
+	processor.handlers = append(processor.handlers, NewCryptoKittiesHandler(ethClientGetter, transactor))
+	processor.handlers = append(processor.handlers, NewCryptoPunksHandler(ethClientGetter, transactor))
+	processor.handlers = append(processor.handlers, NewERC721Handler(ethClientGetter, transactor))
 
 	return processor
 }
