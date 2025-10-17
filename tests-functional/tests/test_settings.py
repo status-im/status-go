@@ -1,5 +1,6 @@
 import pytest
 from clients.api import ApiResponseError
+import datetime
 
 
 @pytest.mark.rpc
@@ -211,3 +212,115 @@ class TestSettings:
         assert got is not None, "Expected non-null value from getter"
         assert isinstance(got, str), f"Expected str, got {type(got)}"
         assert got == value, f"Expected '{value}', got '{got}'"
+
+    def test_notifications_get_contact_requests(self):
+        result = self.config.settings_service.notifications_get_contact_requests()
+        print("Returned value from NotificationsGetContactRequests():", result)
+        assert result is not None, "Expected non-null result from NotificationsGetContactRequests()"
+        assert isinstance(result, str), f"Expected type str, got {type(result)}"
+
+    @pytest.mark.parametrize("invalid_value", [123, True, {"key": "value"}, ["list"], 4.56])
+    def test_notifications_set_contact_requests_rejects_wrong_types_and_preserves_value(self, invalid_value):
+        original_value = self.config.settings_service.notifications_get_contact_requests()
+        print(f"Original NotificationsGetContactRequests value: {original_value!r}")
+        print(f"Trying to set invalid value of type {type(invalid_value)}: {invalid_value}")
+        with pytest.raises(ApiResponseError):
+            self.config.settings_service.notifications_set_contact_requests(invalid_value)
+        current_value = self.config.settings_service.notifications_get_contact_requests()
+        print(f"Value after invalid attempt: {current_value!r}")
+        assert current_value == original_value, f"Value changed after invalid set attempt. Expected {original_value!r}, got {current_value!r}"
+
+    @pytest.mark.parametrize("valid_value", ["SendAlerts", "TurnOff", "NULL"])
+    def test_notifications_set_and_get_contact_requests(self, valid_value):
+        print(f"Setting NotificationsSetContactRequests to: {valid_value!r}")
+        set_result = self.config.settings_service.notifications_set_contact_requests(valid_value)
+        print("Setter result:", set_result)
+        get_result = self.config.settings_service.notifications_get_contact_requests()
+        print("Getter result:", get_result)
+        assert get_result is not None, "Expected non-null value from getter"
+        assert isinstance(get_result, str), f"Expected string from getter, got {type(get_result)}"
+        assert get_result == valid_value, f"Expected getter to return '{valid_value}', but got '{get_result}'"
+
+    def test_notifications_get_identity_verification_requests(self):
+        result = self.config.settings_service.notifications_get_identity_verification_requests()
+        print("IdentityVerificationRequests value:", result)
+        assert isinstance(result, str), f"Expected string, got {type(result)}"
+        valid_values = ["SendAlerts", "TurnOff"]
+        assert result in valid_values, f"Unexpected value: {result}"
+
+    @pytest.mark.xfail(reason="API accepts wrong values")
+    @pytest.mark.parametrize(
+        "invalid_value",
+        [
+            "",
+            "🚫wrong",
+            "invalid",
+            "123",
+            123,
+            True,
+            "@!#%$",
+        ],
+    )
+    def test_notifications_set_identity_verification_requests_rejects_invalid_values(self, invalid_value):
+        original_value = self.config.settings_service.notifications_get_identity_verification_requests()
+        print(f"Original IdentityVerificationRequests value: {original_value}")
+        print(f"Testing invalid input: {invalid_value!r} ({type(invalid_value)})")
+        with pytest.raises(ApiResponseError):
+            self.config.settings_service.notifications_set_identity_verification_requests(invalid_value)
+        current_value = self.config.settings_service.notifications_get_identity_verification_requests()
+        assert current_value == original_value, f"Value changed after invalid input {invalid_value!r}: expected {original_value}, got {current_value}"
+        assert current_value in ["SendAlerts", "TurnOff"], f"Unexpected stored value: {current_value}"
+
+    def test_notifications_get_sound_enabled(self):
+        result = self.config.settings_service.notifications_get_sound_enabled()
+        print("Sound enabled status:", result)
+        assert result is not None, "Expected non-null result"
+        assert isinstance(result, bool), f"Expected bool, got {type(result)}"
+
+    def test_toggle_notifications_sound_enabled(self):
+        initial_value = self.config.settings_service.notifications_get_sound_enabled()
+        print(f"Initial sound enabled value: {initial_value}")
+        assert isinstance(initial_value, bool), f"Expected bool, got {type(initial_value)}"
+        new_value = not initial_value
+        self.config.settings_service.notifications_set_sound_enabled(new_value)
+        updated_value = self.config.settings_service.notifications_get_sound_enabled()
+        print(f"Updated sound enabled value: {updated_value}")
+        assert updated_value == new_value, f"Expected sound enabled to be {new_value}, but got {updated_value}"
+        self.config.settings_service.notifications_set_sound_enabled(initial_value)
+        reverted_value = self.config.settings_service.notifications_get_sound_enabled()
+        print(f"Reverted sound enabled value: {reverted_value}")
+        assert reverted_value == initial_value, "Failed to revert sound enabled to its original state"
+
+    @pytest.mark.parametrize("invalid_value", ["true", 1, 0, [], {}, "False"])
+    def test_notifications_set_sound_enabled_invalid_type(self, invalid_value):
+        initial_value = self.config.settings_service.notifications_get_sound_enabled()
+        print(f"Initial sound enabled value: {initial_value}")
+        try:
+            self.config.settings_service.notifications_set_sound_enabled(invalid_value)
+        except Exception as e:
+            print(f"Expected error for invalid value {invalid_value}: {e}")
+
+        final_value = self.config.settings_service.notifications_get_sound_enabled()
+        print(f"Final sound enabled value after invalid set: {final_value}")
+        assert final_value == initial_value, f"Sound enabled changed after invalid input {invalid_value}"
+
+    def test_thirdparty_services_enabled(self):
+        result = self.config.settings_service.thirdparty_services_enabled()
+        print(f"Third-party services enabled: {result}")
+        assert result is not None, "Expected a non-null result"
+        assert isinstance(result, bool), f"Expected bool, got {type(result)}"
+
+    def test_last_tokens_update_type_check(self):
+        result = self.config.settings_service.last_tokens_update()
+        print("Last tokens update:", result)
+        assert result is not None, "Expected non-null timestamp"
+        assert isinstance(result, str), f"Expected string, got {type(result)}"
+
+    def test_last_tokens_update_returns_valid_iso_datetime(self):
+        result = self.config.settings_service.last_tokens_update()
+        print("Last tokens update:", result)
+
+        try:
+            _ = datetime.datetime.fromisoformat(result.replace("Z", "+00:00"))
+        except Exception as e:
+            pytest.fail(f"Returned value is not a valid ISO datetime string: {result}. Error: {e}")
