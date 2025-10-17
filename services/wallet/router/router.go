@@ -92,6 +92,8 @@ type Router struct {
 	lastInputParams      *requests.RouteInputParams
 
 	clientsForUpdatesPerChains sync.Map
+
+	logger *zap.Logger
 }
 
 func NewRouter(
@@ -103,6 +105,7 @@ func NewRouter(
 	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager) *Router {
 	processors := make(map[string]pathprocessor.PathProcessor)
 
+	logger := logutils.ZapLogger().Named("router")
 	return &Router{
 		rpcClient:            rpcClient,
 		transactor:           transactor,
@@ -111,9 +114,10 @@ func NewRouter(
 		marketManager:        marketManager,
 		collectiblesService:  collectibles,
 		collectiblesManager:  collectiblesManager,
-		feesManager:          fees.NewFeeManager(rpcClient),
+		feesManager:          fees.NewFeeManager(rpcClient, logger.Named("feeManager")),
 		pathProcessors:       processors,
 		scheduler:            async.NewScheduler(),
+		logger:               logger,
 	}
 }
 
@@ -449,7 +453,7 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 	err = r.checkBalancesForRouteAndAdjustAmountIn(route)
 	if err != nil {
 		// don't return here, cause we have to return the route anywaye, even there are balance issues
-		logutils.ZapLogger().Error("router.checkBalancesForRouteAndAdjustAmountIn error", zap.Error(err))
+		r.logger.Error("router.checkBalancesForRouteAndAdjustAmountIn error", zap.Error(err))
 	}
 
 	if err == nil && len(route) == 0 {
@@ -646,7 +650,7 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 	)
 
 	appendProcessorErrorFn := func(processorName string, sendType sendtype.SendType, fromChainID uint64, toChainID uint64, amount *big.Int, err error) {
-		logutils.ZapLogger().Error("router.resolveRoute error",
+		r.logger.Error("router.resolveRoute error",
 			zap.String("processor", processorName),
 			zap.Int("sendType", int(sendType)),
 			zap.Uint64("fromChainId", fromChainID),
@@ -941,7 +945,7 @@ func (r *Router) makeSuggestedRoute(input *requests.RouteInputParams, route rout
 		prices, errPrices = fetchPrices(input.SendType, r.marketManager, []string{input.TokenID, input.ToTokenID})
 		// error while fetching prices should not block the route evaluation, don't return, just log the error
 		if errPrices != nil {
-			logutils.ZapLogger().Error("router.checkRoute error fetching prices",
+			r.logger.Error("router.checkRoute error fetching prices",
 				zap.String("input.TokenID", input.TokenID),
 				zap.String("input.ToTokenID", input.ToTokenID),
 				zap.Error(errPrices))

@@ -159,11 +159,12 @@ func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
 
 func (b *StatusNode) connectorService() *connector.Service {
 	if b.connectorSrvc == nil {
+		logger := b.logger.Named("connector")
 		b.connectorSrvc = connector.NewService(
-			b.logger.Named("connector"),
+			logger,
 			b.walletDB,
 			b.rpcClient,
-			fees.NewFeeManager(b.rpcClient),
+			fees.NewFeeManager(b.rpcClient, logger.Named("feeManager")),
 			b.rpcClient.GetNetworkManager(),
 			&connector.Config{
 				WSHost: b.config.WSHost,

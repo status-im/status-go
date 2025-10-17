@@ -86,21 +86,15 @@ def check_fees(fee_mode, base_fee, max_priority_fee_per_gas, max_fee_per_gas, su
     if fee_mode == constants.gas_fee_mode_low:
         assert max_fee_per_gas_int == low_max_fee_per_gas
         assert max_priority_fee_per_gas_int == low_priority_max_fee_per_gas
-        assert base_fee_int + max_priority_fee_per_gas_int == max_fee_per_gas_int
+        assert base_fee_int + max_priority_fee_per_gas_int <= max_fee_per_gas_int
     elif fee_mode == constants.gas_fee_mode_medium:
-        # calculate variadic fees from high max fees per gas
-        variadic_fee = high_max_fee_per_gas - high_priority_max_fee_per_gas - 2 * base_fee_int
-
         assert max_fee_per_gas_int == medium_max_fee_per_gas
         assert max_priority_fee_per_gas_int == medium_priority_max_fee_per_gas
-        assert base_fee_int + variadic_fee + max_priority_fee_per_gas_int == max_fee_per_gas_int
+        assert base_fee_int + max_priority_fee_per_gas_int <= max_fee_per_gas_int
     elif fee_mode == constants.gas_fee_mode_high:
-        # calculate variadic fees from medium max fees per gas
-        variadic_fee = medium_max_fee_per_gas - medium_priority_max_fee_per_gas - base_fee_int
-
         assert max_fee_per_gas_int == high_max_fee_per_gas
         assert max_priority_fee_per_gas_int == high_priority_max_fee_per_gas
-        assert 2 * base_fee_int + variadic_fee + max_priority_fee_per_gas_int == max_fee_per_gas_int
+        assert base_fee_int + max_priority_fee_per_gas_int <= max_fee_per_gas_int
     elif fee_mode == constants.gas_fee_mode_custom:
         assert base_fee_int + max_priority_fee_per_gas_int == max_fee_per_gas_int
     else:

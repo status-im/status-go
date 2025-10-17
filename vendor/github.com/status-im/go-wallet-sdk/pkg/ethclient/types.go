@@ -420,6 +420,15 @@ type withdrawalJSON struct {
 	Amount         *hexutil.Big   `json:"amount"`
 }
 
+// Transaction types.
+const (
+	LegacyTxType     = 0x00
+	AccessListTxType = 0x01
+	DynamicFeeTxType = 0x02
+	BlobTxType       = 0x03
+	SetCodeTxType    = 0x04
+)
+
 // Transaction represents a transaction in the Ethereum blockchain
 type Transaction struct {
 	BlockHash            *common.Hash

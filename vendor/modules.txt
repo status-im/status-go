@@ -1197,7 +1197,7 @@ github.com/status-im/doubleratchet
 # github.com/status-im/extkeys v1.4.0
 ## explicit; go 1.23.0
 github.com/status-im/extkeys
-# github.com/status-im/go-wallet-sdk v0.0.0-20250924175027-d5faf23a5ef7
+# github.com/status-im/go-wallet-sdk v0.0.0-20251017215230-2ff9d97b6bb3
 ## explicit; go 1.23.0
 github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher
 github.com/status-im/go-wallet-sdk/pkg/contracts/erc1155
@@ -1207,6 +1207,7 @@ github.com/status-im/go-wallet-sdk/pkg/contracts/multicall3
 github.com/status-im/go-wallet-sdk/pkg/ethclient
 github.com/status-im/go-wallet-sdk/pkg/eventfilter
 github.com/status-im/go-wallet-sdk/pkg/eventlog
+github.com/status-im/go-wallet-sdk/pkg/gas
 github.com/status-im/go-wallet-sdk/pkg/multicall
 # github.com/status-im/markdown v0.0.0-20250825083641-55c1df9bc05d
 ## explicit; go 1.12

@@ -58,6 +58,7 @@ type BaseEthClientInterface interface {
 	ethereum.GasEstimator
 	FeeHistory(ctx context.Context, blockCount uint64, lastBlock *big.Int, rewardPercentiles []float64) (*ethereum.FeeHistory, error)
 	BlockNumber(ctx context.Context) (uint64, error)
+	LineaEstimateGas(ctx context.Context, msg ethereum.CallMsg) (*ethclient.LineaEstimateGasResult, error)
 	// Internal calls
 	Close()
 }
