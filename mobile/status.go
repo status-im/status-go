@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"runtime"
 	"time"
 	"unsafe"
 
@@ -38,7 +37,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
 	identityUtils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
@@ -799,47 +797,6 @@ func hashMessage(message string) string {
 		code = c
 	}
 	return prepareJSONResponseWithCode(fmt.Sprintf("0x%x", hash), err, code)
-}
-
-func StartCPUProfile(dataDir string) string {
-	return callWithResponse(startCPUProfile, dataDir)
-}
-
-// startCPUProfile runs pprof for CPU.
-func startCPUProfile(dataDir string) string {
-	err := profiling.StartCPUProfile(dataDir)
-	return makeJSONResponse(err)
-}
-
-func StopCPUProfiling() string {
-	return callWithResponse(stopCPUProfiling)
-}
-
-// stopCPUProfiling stops pprof for cpu.
-func stopCPUProfiling() string { //nolint: deadcode
-	err := profiling.StopCPUProfile()
-	return makeJSONResponse(err)
-}
-
-func WriteHeapProfile(dataDir string) string {
-	return callWithResponse(writeHeapProfile, dataDir)
-}
-
-// writeHeapProfile starts pprof for heap
-func writeHeapProfile(dataDir string) string { //nolint: deadcode
-	err := profiling.WriteHeapFile(dataDir)
-	return makeJSONResponse(err)
-}
-
-// StartProfiling starts profiling and HTTP server for pprof
-func StartProfiling(address string) string {
-	return callWithResponse(startProfiling, address)
-}
-
-func startProfiling(address string) string {
-	runtime.SetMutexProfileFraction(5)
-	profiling.NewProfiler(address).Go()
-	return makeJSONResponse(nil)
 }
 
 func makeJSONResponse(err error) string {
