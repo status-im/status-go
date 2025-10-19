@@ -53,10 +53,9 @@ require (
 	github.com/status-im/markdown v0.0.0-20250825083641-55c1df9bc05d
 	github.com/status-im/migrate/v4 v4.6.2-status.3
 	github.com/status-im/mvds v0.0.27-0.20241031073756-b192c603a75d
-	github.com/status-im/tcp-shaker v1.1.1-status
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
 	github.com/stretchr/testify v1.10.0
-	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
+	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/wealdtech/go-ens/v3 v3.5.0
 	github.com/wealdtech/go-multicodec v1.4.0
 	github.com/xeipuuv/gojsonschema v1.2.0
