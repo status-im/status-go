@@ -160,7 +160,7 @@ class WakuextService(Service):
         return response
 
     def create_group_chat_with_members(self, pubkey_list: list, group_chat_name: str):
-        params = [None, group_chat_name, pubkey_list]
+        params = [group_chat_name, pubkey_list]
         response = self.rpc_request("createGroupChatWithMembers", params)
         return response
 
@@ -170,7 +170,7 @@ class WakuextService(Service):
         return response
 
     def leave_group_chat(self, chat_id: str, remove: bool):
-        params = [None, chat_id, remove]
+        params = [chat_id, remove]
         response = self.rpc_request("leaveGroupChat", params)
         return response
 
@@ -180,17 +180,17 @@ class WakuextService(Service):
         return response
 
     def add_members_to_group_chat(self, chat_id: str, members: list):
-        params = [None, chat_id, members]
+        params = [chat_id, members]
         response = self.rpc_request("addMembersToGroupChat", params)
         return response
 
     def remove_member_from_group_chat(self, chat_id: str, member: str):
-        params = [None, chat_id, member]
+        params = [chat_id, member]
         response = self.rpc_request("removeMemberFromGroupChat", params)
         return response
 
     def remove_members_from_group_chat(self, chat_id: str, members: list):
-        params = [None, chat_id, members]
+        params = [chat_id, members]
         response = self.rpc_request("removeMembersFromGroupChat", params)
         return response
 
@@ -200,12 +200,12 @@ class WakuextService(Service):
         return response
 
     def change_group_chat_name(self, chat_id: str, name: str):
-        params = [None, chat_id, name]
+        params = [chat_id, name]
         response = self.rpc_request("changeGroupChatName", params)
         return response
 
     def send_group_chat_invitation_request(self, chat_id: str, admin_pk: str, message: str):
-        params = [None, chat_id, admin_pk, message]
+        params = [chat_id, admin_pk, message]
         response = self.rpc_request("sendGroupChatInvitationRequest", params)
         return response
 
@@ -214,7 +214,7 @@ class WakuextService(Service):
         return response
 
     def send_group_chat_invitation_rejection(self, invitation_request_id: str):
-        params = [None, invitation_request_id]
+        params = [invitation_request_id]
         response = self.rpc_request("sendGroupChatInvitationRejection", params)
         return response
 
