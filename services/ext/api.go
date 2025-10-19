@@ -53,11 +53,11 @@ func NewPublicAPI(s *Service) *PublicAPI {
 	}
 }
 
-func (api *PublicAPI) LeaveGroupChat(ctx Context, chatID string, remove bool) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.LeaveGroupChat(ctx, chatID, remove)
 }
 
-func (api *PublicAPI) CreateGroupChatWithMembers(ctx Context, name string, members []string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) CreateGroupChatWithMembers(ctx context.Context, name string, members []string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateGroupChatWithMembers(ctx, name, members)
 }
 
@@ -65,19 +65,19 @@ func (api *PublicAPI) CreateGroupChatFromInvitation(name string, chatID string, 
 	return api.service.messenger.CreateGroupChatFromInvitation(name, chatID, adminPK)
 }
 
-func (api *PublicAPI) AddMembersToGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) AddMembersToGroupChat(ctx context.Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AddMembersToGroupChat(ctx, chatID, members)
 }
 
-func (api *PublicAPI) RemoveMemberFromGroupChat(ctx Context, chatID string, member string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) RemoveMemberFromGroupChat(ctx context.Context, chatID string, member string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemoveMembersFromGroupChat(ctx, chatID, []string{member})
 }
 
-func (api *PublicAPI) RemoveMembersFromGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) RemoveMembersFromGroupChat(ctx context.Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemoveMembersFromGroupChat(ctx, chatID, members)
 }
 
-func (api *PublicAPI) AddAdminsToGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) AddAdminsToGroupChat(ctx context.Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AddAdminsToGroupChat(ctx, chatID, members)
 }
 
@@ -85,11 +85,11 @@ func (api *PublicAPI) ConfirmJoiningGroup(ctx context.Context, chatID string) (*
 	return api.service.messenger.ConfirmJoiningGroup(ctx, chatID)
 }
 
-func (api *PublicAPI) ChangeGroupChatName(ctx Context, chatID string, name string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) ChangeGroupChatName(ctx context.Context, chatID string, name string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.ChangeGroupChatName(ctx, chatID, name)
 }
 
-func (api *PublicAPI) SendGroupChatInvitationRequest(ctx Context, chatID string, adminPK string, message string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) SendGroupChatInvitationRequest(ctx context.Context, chatID string, adminPK string, message string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendGroupChatInvitationRequest(ctx, chatID, adminPK, message)
 }
 
@@ -97,7 +97,7 @@ func (api *PublicAPI) GetGroupChatInvitations() ([]*protocol.GroupChatInvitation
 	return api.service.messenger.GetGroupChatInvitations()
 }
 
-func (api *PublicAPI) SendGroupChatInvitationRejection(ctx Context, invitationRequestID string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) SendGroupChatInvitationRejection(ctx context.Context, invitationRequestID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendGroupChatInvitationRejection(ctx, invitationRequestID)
 }
 
