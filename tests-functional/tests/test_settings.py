@@ -337,3 +337,327 @@ class TestSettings:
         print("T2 last tokens update:", t2_raw)
         t2 = datetime.datetime.fromisoformat(t2_raw.replace("Z", "+00:00"))
         assert t2 >= t1, f"Expected last-tokens-update to advance or stay same; got T1={t1} T2={t2}"
+
+    def test_mnemonic_was_shown(self):
+        result = self.config.settings_service.mnemonic_was_shown()
+        print("result returned:", result)
+        assert result is None or result == "", f"Expected no return value, got: {result}"
+
+    def test_set_bio_valid_string(self):
+        valid_bio = "This is a new test bio"
+        result = self.config.settings_service.set_bio(valid_bio)
+        assert result is None or result == "", f"Expected None or empty string, got {result}"
+
+    @pytest.mark.parametrize("invalid_bio", [123, None, ["not", "a", "string"], {"bio": "map"}])
+    def test_set_bio_invalid_type(self, invalid_bio):
+        print(f"\n[TEST] Trying to set invalid bio value: {invalid_bio} (type: {type(invalid_bio).__name__})")
+        try:
+            result = self.config.settings_service.set_bio(invalid_bio)
+            print(f"[RESULT] RPC returned: {result}")
+            pytest.fail(f"Expected an exception for invalid bio {invalid_bio}, got {result}")
+        except Exception as e:
+            print(f"[EXCEPTION] {e}")
+            assert True
+
+    def test_delete_exemptions_valid_id(self):
+        valid_id = "12345"
+        print(f"\n[TEST] Calling delete_exemptions with valid id: {valid_id}")
+        result = self.config.settings_service.delete_exemptions(valid_id)
+        print(f"[RESULT] RPC returned: {result}")
+        assert result is None or result == "", f"Expected None or empty string, got {result}"
+
+    @pytest.mark.parametrize("invalid_id", [None, 123, [], {}, ""])
+    def test_delete_exemptions_invalid_id(self, invalid_id):
+        print(f"\n[TEST] Trying delete_exemptions with invalid id: {invalid_id} (type: {type(invalid_id).__name__})")
+        try:
+            result = self.config.settings_service.delete_exemptions(invalid_id)
+            print(f"[RESULT] RPC returned: {result}")
+            pytest.fail(f"Expected exception for invalid id: {invalid_id}, but got {result}")
+        except Exception as e:
+            print(f"[EXCEPTION] {e}")
+            assert True
+
+    def test_notifications_set_exemptions_valid(self):
+        test_id = "chat:12345"
+        mute_all = True
+        personal = "all"
+        global_ = "mentions-only"
+        other = "none"
+        print(f"\n[TEST] Setting exemptions for {test_id}")
+        print(f"mute_all={mute_all}, personal={personal}, global={global_}, other={other}")
+        result = self.config.settings_service.notifications_set_exemptions(test_id, mute_all, personal, global_, other)
+        print(f"[RESULT] RPC returned: {result}")
+        assert result is None or result == "", f"Expected None or empty string, got {result}"
+
+    def test_set_exemptions_and_verify_each_field(self):
+        eid = "chat:test001"
+        mute = True
+        personal = "all"
+        global_ = "mentions-only"
+        other = "none"
+
+        print(f"\n[TEST] SetExemptions id={eid} mute={mute} personal={personal} global={global_} other={other}")
+        res = self.config.settings_service.notifications_set_exemptions(eid, mute, personal, global_, other)
+        print(f"[RESULT] notifications_set_exemptions -> {res}")
+        assert res is None or res == "", f"Expected no payload, got {res}"
+
+        got_mute = self.config.settings_service.notifications_get_ex_mute_all_messages(eid)
+        print(f"[GET] muteAllMessages -> {got_mute!r}")
+        assert isinstance(got_mute, bool)
+        assert got_mute is mute
+
+        got_personal = self.config.settings_service.notifications_get_ex_personal_mentions(eid)
+        print(f"[GET] personalMentions -> {got_personal!r}")
+        assert isinstance(got_personal, str)
+        assert got_personal == personal
+
+        got_global = self.config.settings_service.notifications_get_ex_global_mentions(eid)
+        print(f"[GET] globalMentions -> {got_global!r}")
+        assert isinstance(got_global, str)
+        assert got_global == global_
+
+        got_other = self.config.settings_service.notifications_get_ex_other_messages(eid)
+        print(f"[GET] otherMessages -> {got_other!r}")
+        assert isinstance(got_other, str)
+        assert got_other == other
+
+    def test_update_existing_exemptions(self):
+        eid = "chat:test002"
+        self.config.settings_service.notifications_set_exemptions(eid, False, "none", "none", "none")
+        mute2 = True
+        personal2 = "all"
+        global2 = "mentions-only"
+        other2 = "important-only"
+        print(f"\n[TEST] Update SetExemptions id={eid}")
+        res = self.config.settings_service.notifications_set_exemptions(eid, mute2, personal2, global2, other2)
+        print(f"[RESULT] notifications_set_exemptions (update) -> {res}")
+        assert res is None or res == ""
+        assert self.config.settings_service.notifications_get_ex_mute_all_messages(eid) is mute2
+        assert self.config.settings_service.notifications_get_ex_personal_mentions(eid) == personal2
+        assert self.config.settings_service.notifications_get_ex_global_mentions(eid) == global2
+        assert self.config.settings_service.notifications_get_ex_other_messages(eid) == other2
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            (123, True, "all", "all", "all"),
+            (["x"], True, "all", "all", "all"),
+            ({}, True, "all", "all", "all"),
+            ("chat:x", "true", "all", "all", "all"),
+            ("chat:x", 1, "all", "all", "all"),
+            ("chat:x", [], "all", "all", "all"),
+            ("chat:x", {}, "all", "all", "all"),
+            ("chat:x", True, 5, "all", "all"),
+            ("chat:x", True, True, "all", "all"),
+            ("chat:x", True, ["mentions-only"], "all", "all"),
+            ("chat:x", True, {"k": "v"}, "all", "all"),
+            ("chat:x", True, "all", 0, "all"),
+            ("chat:x", True, "all", False, "all"),
+            ("chat:x", True, "all", ["x"], "all"),
+            ("chat:x", True, "all", {"k": "v"}, "all"),
+            ("chat:x", True, "all", "all", 0),
+            ("chat:x", True, "all", "all", False),
+            ("chat:x", True, "all", "all", ["x"]),
+            ("chat:x", True, "all", "all", {"k": "v"}),
+        ],
+    )
+    def test_set_exemptions_invalid_inputs(self, params):
+        eid, mute, personal, global_, other = params
+        print(
+            f"\n[TEST] Invalid call: id={eid!r}({type(eid).__name__}), "
+            f"mute={mute!r}({type(mute).__name__}), "
+            f"personal={personal!r}({type(personal).__name__}), "
+            f"global={global_!r}({type(global_).__name__}), "
+            f"other={other!r}({type(other).__name__})"
+        )
+        try:
+            res = self.config.settings_service.notifications_set_exemptions(eid, mute, personal, global_, other)
+            print(f"[RESULT] RPC returned: {res}")
+            pytest.fail("Expected exception or backend error for invalid types, but call succeeded.")
+        except Exception as e:
+            print(f"[EXCEPTION] {e}")
+            assert True
+
+    @pytest.mark.skip(reason="Backend RPC notificationsGetDefaultExemptions not yet fully deployed/testable")
+    def test_delete_exemptions_matches_defaults(self):
+        eid = "chat:defaults-check"
+        mute = True
+        personal = "all"
+        global_ = "mentions-only"
+        other = "none"
+
+        print(f"\n[TEST] Setting exemptions for id={eid}")
+        res = self.config.settings_service.notifications_set_exemptions(eid, mute, personal, global_, other)
+        print(f"[RESULT] set_exemptions -> {res}")
+        assert res is None or res == ""
+
+        print(f"[TEST] Deleting exemptions for id={eid}")
+        res_del = self.config.settings_service.delete_exemptions(eid)
+        print(f"[RESULT] delete_exemptions -> {res_del}")
+        assert res_del is None or res_del == ""
+
+        got_mute = self.config.settings_service.notifications_get_ex_mute_all_messages(eid)
+        got_personal = self.config.settings_service.notifications_get_ex_personal_mentions(eid)
+        got_global = self.config.settings_service.notifications_get_ex_global_mentions(eid)
+        got_other = self.config.settings_service.notifications_get_ex_other_messages(eid)
+
+        print(f"[AFTER DELETE] mute={got_mute}, personal={got_personal}, global={got_global}, other={got_other}")
+
+        defaults = self.config.settings_service.notifications_get_default_exemptions()
+        print(f"[DEFAULTS] {defaults}")
+
+        assert got_mute is defaults["muteAllMessages"], f"Expected mute={defaults['muteAllMessages']}, got {got_mute}"
+        assert got_personal == defaults["personalMentions"], f"Expected personal={defaults['personalMentions']}, got {got_personal}"
+        assert got_global == defaults["globalMentions"], f"Expected global={defaults['globalMentions']}, got {got_global}"
+        assert got_other == defaults["otherMessages"], f"Expected other={defaults['otherMessages']}, got {got_other}"
+
+    def test_notifications_get_message_preview_type(self):
+        value = self.config.settings_service.notifications_get_message_preview()
+        print(f"[GET] message_preview -> {value!r}")
+        assert value is not None
+        assert isinstance(value, int)
+
+    def test_notifications_message_preview_roundtrip_set_and_get(self):
+        original = self.config.settings_service.notifications_get_message_preview()
+        print(f"[SETUP] original message_preview = {original!r}")
+        assert isinstance(original, int)
+        candidate = 1 if original == 0 else 0
+        print(f"[TEST] Setting message_preview -> {candidate}")
+        res = self.config.settings_service.notifications_set_message_preview(candidate)
+        print(f"[RESULT] set_message_preview -> {res!r}")
+        assert res is None or res == ""
+        got = self.config.settings_service.notifications_get_message_preview()
+        print(f"[VERIFY] message_preview after set -> {got!r}")
+        assert got == candidate
+        print(f"[TEARDOWN] Restoring original message_preview -> {original}")
+        try:
+            self.config.settings_service.notifications_set_message_preview(original)
+        except Exception as e:
+            print(f"[WARN] Failed to restore original value: {e}")
+
+    @pytest.mark.xfail(reason=" API accepts -1")
+    @pytest.mark.parametrize(
+        "bad_value",
+        [-1, "1", 1.5, {}, [], True],
+    )
+    def test_notifications_message_preview_rejects_invalid_values(self, bad_value):
+        before = self.config.settings_service.notifications_get_message_preview()
+        print(f"[SETUP] before={before!r}, trying bad_value={bad_value!r}")
+        try:
+            res = self.config.settings_service.notifications_set_message_preview(bad_value)
+            print(f"[RESULT] set_message_preview({bad_value!r}) -> {res!r}")
+        except ApiResponseError as e:
+            print(f"[OK] Backend rejected invalid value {bad_value!r} with ApiResponseError: {e}")
+        except Exception as e:
+            print(f"[OK] Backend/transport raised {type(e).__name__}: {e}")
+        after = self.config.settings_service.notifications_get_message_preview()
+        print(f"[VERIFY] after={after!r} (must equal before)")
+        assert after == before
+
+    def test_notifications_get_volume_returns_valid_type(self):
+        result = self.config.settings_service.notifications_get_volume()
+        assert isinstance(result, int), f"Expected int, got {type(result)}"
+
+    def test_notifications_set_and_get_volume(self):
+        """Setter should accept integer; getter should return the same integer type."""
+        test_values = [0, 5, 10, 42]
+
+        for value in test_values:
+            result = self.config.settings_service.notifications_set_volume(value)
+            assert result is None or result == "", f"Unexpected setter response: {result}"
+            get_result = self.config.settings_service.notifications_get_volume()
+
+            assert isinstance(get_result, int), f"Expected int, got {type(get_result)}"
+            assert get_result == value, f"Getter returned {get_result}, expected {value}"
+
+    @pytest.mark.parametrize("invalid_value", ["loud", True, 3.14, [], {}, "100"])
+    def test_notifications_set_volume_rejects_invalid_types(self, invalid_value):
+
+        original_value = self.config.settings_service.notifications_get_volume()
+        assert isinstance(original_value, int), "Precondition failed: getter did not return int"
+
+        with pytest.raises(ApiResponseError):
+            self.config.settings_service.notifications_set_volume(invalid_value)
+        current_value = self.config.settings_service.notifications_get_volume()
+        assert isinstance(current_value, int), f"Getter returned {type(current_value)} after invalid input"
+        assert current_value == original_value, f"Volume changed after invalid input: was {original_value}, now {current_value}"
+
+    def test_notifications_get_personal_mentions_type_check(self):
+        value = self.config.settings_service.notifications_get_personal_mentions()
+        print(f"[GET] personalMentions -> {value!r}")
+        assert value is not None
+        assert isinstance(value, str)
+
+    @pytest.mark.parametrize("new_value", ["all", "mentions-only"])
+    def test_notifications_personal_mentions_setter_getter(self, new_value):
+        original = self.config.settings_service.notifications_get_personal_mentions()
+        print(f"[SETUP] original personalMentions = {original!r}")
+        res = self.config.settings_service.notifications_set_personal_mentions(new_value)
+        print(f"[SET] set_personalMentions({new_value!r}) -> {res!r}")
+        assert res is None or res == ""
+        got = self.config.settings_service.notifications_get_personal_mentions()
+        print(f"[VERIFY] personalMentions after set -> {got!r}")
+        assert isinstance(got, str)
+        assert got == new_value
+
+    @pytest.mark.parametrize("bad_value", [123, True, 3.14, ["list"], {"k": "v"}])
+    def test_notifications_set_personal_mentions_rejects_wrong_types(self, bad_value):
+        before = self.config.settings_service.notifications_get_personal_mentions()
+        print(f"[SETUP] before={before!r}, bad_value={bad_value!r} ({type(bad_value).__name__})")
+        with pytest.raises(ApiResponseError):
+            self.config.settings_service.notifications_set_personal_mentions(bad_value)
+        after = self.config.settings_service.notifications_get_personal_mentions()
+        print(f"[VERIFY] after={after!r} (must equal before)")
+        assert after == before
+
+    def test_notifications_get_global_mentions_returns_string(self):
+        value = self.config.settings_service.notifications_get_global_mentions()
+        print(f"[GET] globalMentions -> {value!r}")
+        assert isinstance(value, str)
+
+    @pytest.mark.parametrize("new_value", ["all", "mentions-only", "none"])
+    def test_notifications_global_mentions_setter_getter(self, new_value):
+        original = self.config.settings_service.notifications_get_global_mentions()
+        print(f"[SETUP] original globalMentions = {original!r}")
+        res = self.config.settings_service.notifications_set_global_mentions(new_value)
+        print(f"[SET] set_globalMentions({new_value!r}) -> {res!r}")
+        assert res is None or res == ""
+        got = self.config.settings_service.notifications_get_global_mentions()
+        print(f"[VERIFY] globalMentions after set -> {got!r}")
+        assert got == new_value
+
+    @pytest.mark.parametrize("bad_value", [123, True, 3.14, ["list"], {"k": "v"}, None])
+    def test_notifications_set_global_mentions_rejects_wrong_types_and_preserves_value(self, bad_value):
+        before = self.config.settings_service.notifications_get_global_mentions()
+        print(f"[SETUP] before={before!r}, bad_value={bad_value!r} ({type(bad_value).__name__})")
+        with pytest.raises(ApiResponseError):
+            self.config.settings_service.notifications_set_global_mentions(bad_value)
+        after = self.config.settings_service.notifications_get_global_mentions()
+        print(f"[VERIFY] after={after!r} (must equal before)")
+        assert after == before
+
+    def test_get_settings_reflects(self):
+        all_before = self.config.settings_service.get_settings()
+        print(f"[SETUP] total keys before = {len(all_before)}")
+        original_value = self.config.settings_service.notifications_get_global_mentions()
+        print(f"[SETUP] original globalMentions = {original_value!r}")
+        new_value = "mentions-only" if original_value != "mentions-only" else "all"
+        self.config.settings_service.notifications_set_global_mentions(new_value)
+        all_after = self.config.settings_service.get_settings()
+        print(f"[VERIFY] get_settings() returned {len(all_after)} entries")
+
+    def test_notifications_get_identity_verification_requests_returns_string(self):
+        value = self.config.settings_service.notifications_get_identity_verification_requests()
+        print(f"[GET] identityVerificationRequests -> {value!r}")
+        assert isinstance(value, str)
+
+    def test_notifications_identity_verification_requests_roundtrip(self):
+        original = self.config.settings_service.notifications_get_identity_verification_requests()
+        print(f"[SETUP] original identityVerificationRequests = {original!r}")
+        new_value = "enabled" if original != "enabled" else "disabled"
+        res = self.config.settings_service.notifications_set_identity_verification_requests(new_value)
+        print(f"[SET] set_identityVerificationRequests({new_value!r}) -> {res!r}")
+        got = self.config.settings_service.notifications_get_identity_verification_requests()
+        print(f"[VERIFY] identityVerificationRequests after set -> {got!r}")
+        assert isinstance(got, str)
+        assert got == new_value

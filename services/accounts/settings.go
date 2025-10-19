@@ -10,6 +10,23 @@ import (
 	"github.com/status-im/status-go/protocol"
 )
 
+type ExemptionsDefaultsDTO struct {
+	MuteAllMessages  bool   `json:"muteAllMessages"`
+	PersonalMentions string `json:"personalMentions"`
+	GlobalMentions   string `json:"globalMentions"`
+	OtherMessages    string `json:"otherMessages"`
+}
+
+func (api *SettingsAPI) NotificationsGetDefaultExemptions() (ExemptionsDefaultsDTO, error) {
+	d := api.db.GetDefaultExemptions()
+	return ExemptionsDefaultsDTO{
+		MuteAllMessages:  d.MuteAllMessages,
+		PersonalMentions: d.PersonalMentions,
+		GlobalMentions:   d.GlobalMentions,
+		OtherMessages:    d.OtherMessages,
+	}, nil
+}
+
 func NewSettingsAPI(messenger **protocol.Messenger, db *accounts.Database, config *params.NodeConfig) *SettingsAPI {
 	return &SettingsAPI{
 		messenger: messenger,
@@ -201,3 +218,4 @@ func (api *SettingsAPI) LastTokensUpdate() (time.Time, error) {
 func (api *SettingsAPI) ThirdpartyServicesEnabled() (bool, error) {
 	return api.db.ThirdpartyServicesEnabled()
 }
+

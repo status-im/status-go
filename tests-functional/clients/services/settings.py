@@ -112,7 +112,6 @@ class SettingsService(Service):
         params = [value]
         return self.rpc_request("notificationsSetMessagePreview", params)
 
-    # Notifications Exemption Settings
     def notifications_get_ex_mute_all_messages(self, id: str):
         params = [id]
         return self.rpc_request("notificationsGetExMuteAllMessages", params)
@@ -137,7 +136,6 @@ class SettingsService(Service):
         params = [id]
         return self.rpc_request("deleteExemptions", params)
 
-    # Other settings
     def set_bio(self, bio: str):
         params = [bio]
         return self.rpc_request("setBio", params)
@@ -150,3 +148,6 @@ class SettingsService(Service):
 
     def thirdparty_services_enabled(self):
         return self.rpc_request("thirdpartyServicesEnabled")
+
+    def notifications_get_default_exemptions(self):
+        return self.rpc_request("notificationsGetDefaultExemptions")
