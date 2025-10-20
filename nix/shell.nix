@@ -24,7 +24,7 @@ in mkShell {
   ];
 
   shellHook = lib.optionalString (!isMacM1) ''
-    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${pkgs.lib-sds-pkg}/lib/
+    export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:${pkgs.lib-sds-pkg}/lib/
     ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
     ANDROID_NDK=$ANDROID_HOME/ndk-bundle
     ANDROID_SDK_ROOT=$ANDROID_HOME
