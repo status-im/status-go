@@ -24,11 +24,6 @@ in mkShell {
   ];
 
   shellHook = lib.optionalString (!isMacM1) ''
-    if [ "$(uname -m)" = "arm64" ]; then
-      export NIXPKGS_SYSTEM_OVERRIDE=x86_64-darwin
-      echo "Forcing Nix to use x86_64-darwin for Android SDK support"
-    fi
-
     echo "Patching env.sh to use Nix Nim..."
     env_sh="vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/vendor/nimbus-build-system/scripts/env.sh"
 
