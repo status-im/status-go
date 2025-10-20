@@ -27,17 +27,18 @@ in mkShell {
     echo "Patching env.sh to use Nix Nim..."
     env_sh="vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/vendor/nimbus-build-system/scripts/env.sh"
     if [ -f "$env_sh" ]; then
-      ${pkgs.substitute}/bin/substituteInPlace "$env_sh" \
+      ${pkgs.gnused}/bin/substituteInPlace "$env_sh" \
         --replace-warn "/vendor/Nim/bin/nim" "${pkgs.nim}/bin/nim"
     fi
 
     export NIM_SDS_REPO_PATH=${pkgs.nim-sds-src}
     export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:${pkgs.lib-sds-pkg}/lib/
-    ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
-    ANDROID_NDK=$ANDROID_HOME/ndk-bundle
-    ANDROID_SDK_ROOT=$ANDROID_HOME
-    ANDROID_NDK_HOME=$ANDROID_NDK
-  '' + lib.optionalString (stdenv.isDarwin) ''
+    export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
+    export ANDROID_NDK=\$ANDROID_HOME/ndk-bundle
+    export ANDROID_SDK_ROOT=\$ANDROID_HOME
+    export ANDROID_NDK_HOME=\$ANDROID_NDK
+  ''
+  + lib.optionalString (stdenv.isDarwin) ''
     export PATH="/usr/bin:$PATH"
   '';
   # Sandbox causes Xcode issues on MacOS. Requires sandbox=relaxed.
