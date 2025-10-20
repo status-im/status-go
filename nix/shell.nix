@@ -25,19 +25,7 @@ in mkShell {
 
   shellHook = lib.optionalString (!isMacM1) ''
     echo "Patching Makefile to avoid building libsds. Later, we'll retrieve the lib from nix store"
-    # Detect OS
-    if [[ "$(uname)" == "Darwin" ]]; then
-      echo "Detected MacOS"
-      SED_INPLACE=(-i '')
-    else
-      echo "Detected Linux"
-      SED_INPLACE=(-i)
-    fi
-
-    # Run sed in-place
-    sed "${SED_INPLACE[@]}" \
-        's|cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build|echo "Skipping nim-sds build..."|' \
-        Makefile
+    perl -pi -e 's|cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build|echo "Skipping nim-sds build..."|' Makefile
 
     export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:${pkgs.lib-sds-pkg}/lib/
     ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
