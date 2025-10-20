@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"runtime"
 	"time"
 	"unsafe"
 
@@ -38,7 +37,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
 	identityUtils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
@@ -799,47 +797,6 @@ func hashMessage(message string) string {
 		code = c
 	}
 	return prepareJSONResponseWithCode(fmt.Sprintf("0x%x", hash), err, code)
-}
-
-func StartCPUProfile(dataDir string) string {
-	return callWithResponse(startCPUProfile, dataDir)
-}
-
-// startCPUProfile runs pprof for CPU.
-func startCPUProfile(dataDir string) string {
-	err := profiling.StartCPUProfile(dataDir)
-	return makeJSONResponse(err)
-}
-
-func StopCPUProfiling() string {
-	return callWithResponse(stopCPUProfiling)
-}
-
-// stopCPUProfiling stops pprof for cpu.
-func stopCPUProfiling() string { //nolint: deadcode
-	err := profiling.StopCPUProfile()
-	return makeJSONResponse(err)
-}
-
-func WriteHeapProfile(dataDir string) string {
-	return callWithResponse(writeHeapProfile, dataDir)
-}
-
-// writeHeapProfile starts pprof for heap
-func writeHeapProfile(dataDir string) string { //nolint: deadcode
-	err := profiling.WriteHeapFile(dataDir)
-	return makeJSONResponse(err)
-}
-
-// StartProfiling starts profiling and HTTP server for pprof
-func StartProfiling(address string) string {
-	return callWithResponse(startProfiling, address)
-}
-
-func startProfiling(address string) string {
-	runtime.SetMutexProfileFraction(5)
-	profiling.NewProfiler(address).Go()
-	return makeJSONResponse(nil)
 }
 
 func makeJSONResponse(err error) string {
@@ -1758,145 +1715,8 @@ func validateConnectionString(cs string) string {
 	return err.Error()
 }
 
-// Deprecated: Use EncodeTransferV2 instead.
-func EncodeTransfer(to string, value string) string {
-	return callWithResponse(encodeTransfer, to, value)
-}
-
-func encodeTransfer(to string, value string) string {
-	result, err := abi_spec.EncodeTransfer(to, value)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to encode transfer", zap.String("to", gocommon.TruncateWithDot(to)), zap.String("value", gocommon.TruncateWithDot(value)), zap.Error(err))
-		return ""
-	}
-	return result
-}
-
-func EncodeTransferV2(requestJSON string) string {
-	return callWithResponse(encodeTransferV2, requestJSON)
-}
-
-func encodeTransferV2(requestJSON string) string {
-	var request requests.EncodeTransfer
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	return encodeTransfer(request.To, request.Value)
-}
-
-// Deprecated: Use EncodeFunctionCallV2 instead.
-func EncodeFunctionCall(method string, paramsJSON string) string {
-	return callWithResponse(encodeFunctionCall, method, paramsJSON)
-}
-
-func encodeFunctionCall(method string, paramsJSON string) string {
-	result, err := abi_spec.Encode(method, paramsJSON)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to encode function call", zap.String("method", method), zap.String("paramsJSON", paramsJSON), zap.Error(err))
-		return ""
-	}
-	return result
-}
-
-// Deprecated: no usage in mobile, we might implemented it within other functions
-func EncodeFunctionCallV2(requestJSON string) string {
-	return callWithResponse(encodeFunctionCallV2, requestJSON)
-}
-
-func encodeFunctionCallV2(requestJSON string) string {
-	var request requests.EncodeFunctionCall
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	return encodeFunctionCall(request.Method, request.ParamsJSON)
-}
-
-// Deprecated: no usage in mobile
-func DecodeParameters(decodeParamJSON string) string {
-	return decodeParameters(decodeParamJSON)
-}
-
-func decodeParameters(decodeParamJSON string) string {
-	decodeParam := struct {
-		BytesString string   `json:"bytesString"`
-		Types       []string `json:"types"`
-	}{}
-	err := json.Unmarshal([]byte(decodeParamJSON), &decodeParam)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to unmarshal json when decoding parameters", zap.String("decodeParamJSON", decodeParamJSON), zap.Error(err))
-		return ""
-	}
-	result, err := abi_spec.Decode(decodeParam.BytesString, decodeParam.Types)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to decode parameters", zap.String("decodeParamJSON", decodeParamJSON), zap.Error(err))
-		return ""
-	}
-	bytes, err := json.Marshal(result)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to marshal result", zap.Any("result", result), zap.String("decodeParamJSON", decodeParamJSON), zap.Error(err))
-		return ""
-	}
-	return string(bytes)
-}
-
-func HexToNumber(hex string) string {
-	return callWithResponse(hexToNumber, hex)
-}
-
-func hexToNumber(hex string) string {
-	return abi_spec.HexToNumber(hex)
-}
-
-func NumberToHex(numString string) string {
-	return callWithResponse(numberToHex, numString)
-}
-
-func numberToHex(numString string) string {
-	return abi_spec.NumberToHex(numString)
-}
-
 func Sha3(str string) string {
 	return "0x" + abi_spec.Sha3(str)
-}
-
-// Deprecated: no usage in mobile
-func Utf8ToHex(str string) string {
-	return callWithResponse(utf8ToHex, str)
-}
-
-func utf8ToHex(str string) string {
-	hexString, err := abi_spec.Utf8ToHex(str)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to convert utf8 to hex", zap.String("str", str), zap.Error(err))
-	}
-	return hexString
-}
-
-func HexToUtf8(hexString string) string {
-	return callWithResponse(hexToUtf8, hexString)
-}
-
-func hexToUtf8(hexString string) string {
-	str, err := abi_spec.HexToUtf8(hexString)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to convert hex to utf8", zap.String("hexString", gocommon.TruncateWithDot(hexString)), zap.Error(err))
-	}
-	return str
-}
-
-func CheckAddressChecksum(address string) string {
-	return callWithResponse(checkAddressChecksum, address)
-}
-
-func checkAddressChecksum(address string) string {
-	valid, err := abi_spec.CheckAddressChecksum(address)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to invoke check address checksum", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
-	}
-	result, _ := json.Marshal(valid)
-	return string(result)
 }
 
 func IsAddress(address string) string {
@@ -1910,18 +1730,6 @@ func isAddress(address string) string {
 	}
 	result, _ := json.Marshal(valid)
 	return string(result)
-}
-
-func ToChecksumAddress(address string) string {
-	return callWithResponse(toChecksumAddress, address)
-}
-
-func toChecksumAddress(address string) string {
-	address, err := abi_spec.ToChecksumAddress(address)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to convert to checksum address", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
-	}
-	return address
 }
 
 func DeserializeAndCompressKey(DesktopKey string) string {
