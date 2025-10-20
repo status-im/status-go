@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -58,10 +59,16 @@ func generateAppDB(outDir string) error {
 
 	// Use the same initializer the app uses
 	var init appdatabase.DbInitializer
-	_, err := init.Initialize(path, password, kdfIterationsNumber)
+	db, err := init.Initialize(path, password, kdfIterationsNumber)
 	if err != nil {
 		return err
 	}
+
+	err = sqlite.Migrate(db)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
