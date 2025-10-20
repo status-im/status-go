@@ -1,5 +1,10 @@
 # Makefile for SDS Go Bindings
 
+# The NIM_SDS_REPO_PATH env var should be defined beforehand and it represents the absolute path
+# to the cloned nim-sds repository, i.e, ....../third_party/nim-sds
+export CGO_CFLAGS="-I${NIM_SDS_REPO_PATH}/library/"
+export CGO_LDFLAGS="-L${NIM_SDS_REPO_PATH}/build -lsds -Wl,-rpath,${NIM_SDS_REPO_PATH}/build"
+
 .PHONY: all clean prepare build-libsds build
 
 # Default target
@@ -10,8 +15,8 @@ prepare:
 	@echo "Creating third_party directory..."
 	@mkdir -p ../third_party
 
-	@echo "Cloning nim-sds repository..."
 	@if [ ! -d "../third_party/nim-sds" ]; then \
+		echo "Cloning nim-sds repository..." ; \
 		cd ../third_party/ && \
 		git clone https://github.com/waku-org/nim-sds && \
 		cd nim-sds && \
