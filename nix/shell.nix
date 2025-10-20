@@ -27,6 +27,7 @@ in mkShell {
     echo "Patching Makefile to avoid building libsds. Later, we'll retrieve the lib from nix store"
     perl -pi -e 's|cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build|echo "Skipping nim-sds build..."|' Makefile
 
+    export NIM_SDS_REPO_PATH=${pkgs.nim-sds-src}
     export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:${pkgs.lib-sds-pkg}/lib/
     ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
     ANDROID_NDK=$ANDROID_HOME/ndk-bundle

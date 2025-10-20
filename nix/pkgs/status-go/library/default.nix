@@ -66,6 +66,8 @@ in pkgs.buildGoModule {
     export GOPATH=$NIX_BUILD_TOP/go
     export GO111MODULE=on
 
+    export NIM_SDS_REPO_PATH=vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/
+
     # Patch env.sh now that nim-sds exists
     echo "Patching env.sh to use Nix Nim..."
     env_sh="vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/vendor/nimbus-build-system/scripts/env.sh"
