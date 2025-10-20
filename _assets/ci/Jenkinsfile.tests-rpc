@@ -70,7 +70,7 @@ pipeline {
             passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
     ),
         ]) {
-          nix.develop('make test-functional', pure: false)
+          nix.develop('make USE_SYSTEM_NIM=1 test-functional', pure: false)
         }
       } }
     }
