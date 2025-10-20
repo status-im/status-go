@@ -218,4 +218,3 @@ func (api *SettingsAPI) LastTokensUpdate() (time.Time, error) {
 func (api *SettingsAPI) ThirdpartyServicesEnabled() (bool, error) {
 	return api.db.ThirdpartyServicesEnabled()
 }
-
