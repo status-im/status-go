@@ -67,6 +67,8 @@ in pkgs.buildGoModule {
     export GO111MODULE=on
 
     export NIM_SDS_REPO_PATH=${pkgs.nim-sds-src}/
+    export CGO_CFLAGS="-I$NIM_SDS_REPO_PATH/library/"
+    export CGO_LDFLAGS="-L$NIM_SDS_REPO_PATH/build -lsds -Wl,-rpath,$NIM_SDS_REPO_PATH/build"
 
     # Patch env.sh now that nim-sds exists
     echo "Patching env.sh to use Nix Nim..."
