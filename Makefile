@@ -204,10 +204,14 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 #----------------
 all: $(GO_CMD_NAMES)
 
+LIBS_DIR := $(abspath ./libs)
+
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
 $(GO_CMD_BUILDS): generate $(LIBWAKU) $(LIBSDS)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LIBS_DIR)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" \
 	go build -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
@@ -283,6 +287,125 @@ clean-libsds:
 rebuild-libsds: | clean-libsds $(LIBSDS)
 
 # Status-go targets
+
+#----------------
+# Codex
+#----------------
+.PHONY: fetch-libcodex test-libcodex clean-libcodex
+
+UNAME_M := $(shell uname -m)
+ifneq ($(filter $(UNAME_M),x86_64 amd64 i686 i386),)
+  CODEX_ARCH := amd64
+else ifneq ($(filter $(UNAME_M),aarch64 arm64 arm),)
+  CODEX_ARCH := arm64
+else
+  CODEX_ARCH := $(UNAME_M)
+endif
+
+CODEX_VERSION ?= "v0.0.22"
+CODEX_DOWNLOAD_URL := "https://github.com/codex-storage/codex-go-bindings/releases/download/$(CODEX_VERSION)/codex-${detected_OS}-${CODEX_ARCH}.zip"
+
+ifeq ($(USE_CODEX),true)
+BUILD_TAGS += use_codex
+endif
+
+fetch-libcodex:
+	@echo "Fetching libcodex from GitHub Actions from: ${CODEX_DOWNLOAD_URL}"
+	curl -fSL --create-dirs -o $(LIBS_DIR)/codex-${detected_OS}-${CODEX_ARCH}.zip ${CODEX_DOWNLOAD_URL}
+	unzip -o -qq $(LIBS_DIR)/codex-${detected_OS}-${CODEX_ARCH}.zip -d $(LIBS_DIR)
+	rm -f $(LIBS_DIR)/codex*.zip
+
+# Add rpath to libstdc++ to avoid runtime errors with NIX
+ifeq ($(detected_OS),Darwin)
+	CXXLIB      := $(shell $(CXX) -print-file-name=libc++.1.dylib)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR):$(CXXLIB_DIR):$(DYLD_LIBRARY_PATH)
+    LD_NAME := DYLD_LIBRARY_PATH
+else ifeq ($(detected_OS),Windows)
+	CXXLIB      := $(shell $(CXX) -print-file-name=libstdc++-6.dll)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR);$(CXXLIB_DIR);$(PATH)
+    LD_NAME := PATH
+else
+	CXXLIB      := $(shell $(CXX) -print-file-name=libstdc++.so.6)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR):$(CXXLIB_DIR):$(LD_LIBRARY_PATH)
+    LD_NAME := LD_LIBRARY_PATH
+endif
+
+build-libsds: $(LIBSDS)
+
+build-libsds-android: clone-nim-sds
+	@echo "Building nim-sds for Android" $(LIBSDS)
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android ARCH=arm64 ANDROID_NDK_ROOT=$(ANDROID_NDK_ROOT) USE_SYSTEM_NIM=1 SHELL=/bin/bash
+
+build-libsds-ios: clone-nim-sds
+	@echo "Building nim-sds for iOS" $(LIBSDS)
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-ios USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
+
+clean-libsds:
+	@echo "Removing libsds"
+	rm $(LIBSDS)
+
+rebuild-libsds: | clean-libsds $(LIBSDS)
+
+# Status-go targets
+
+#----------------
+# Codex
+#----------------
+.PHONY: fetch-libcodex test-libcodex clean-libcodex
+
+UNAME_M := $(shell uname -m)
+ifneq ($(filter $(UNAME_M),x86_64 amd64 i686 i386),)
+  CODEX_ARCH := amd64
+else ifneq ($(filter $(UNAME_M),aarch64 arm64 arm),)
+  CODEX_ARCH := arm64
+else
+  CODEX_ARCH := $(UNAME_M)
+endif
+
+CODEX_VERSION ?= "v0.0.22"
+CODEX_DOWNLOAD_URL := "https://github.com/codex-storage/codex-go-bindings/releases/download/$(CODEX_VERSION)/codex-${detected_OS}-${CODEX_ARCH}.zip"
+
+ifeq ($(USE_CODEX),true)
+BUILD_TAGS += use_codex
+endif
+
+fetch-libcodex:
+	@echo "Fetching libcodex from GitHub Actions from: ${CODEX_DOWNLOAD_URL}"
+	curl -fSL --create-dirs -o $(LIBS_DIR)/codex-${detected_OS}-${CODEX_ARCH}.zip ${CODEX_DOWNLOAD_URL}
+	unzip -o -qq $(LIBS_DIR)/codex-${detected_OS}-${CODEX_ARCH}.zip -d $(LIBS_DIR)
+	rm -f $(LIBS_DIR)/codex*.zip
+
+# Add rpath to libstdc++ to avoid runtime errors with NIX
+ifeq ($(detected_OS),Darwin)
+	CXXLIB      := $(shell $(CXX) -print-file-name=libc++.1.dylib)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR):$(CXXLIB_DIR):$(DYLD_LIBRARY_PATH)
+    LD_NAME := DYLD_LIBRARY_PATH
+else ifeq ($(detected_OS),Windows)
+	CXXLIB      := $(shell $(CXX) -print-file-name=libstdc++-6.dll)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR);$(CXXLIB_DIR);$(PATH)
+    LD_NAME := PATH
+else
+	CXXLIB      := $(shell $(CXX) -print-file-name=libstdc++.so.6)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR):$(CXXLIB_DIR):$(LD_LIBRARY_PATH)
+    LD_NAME := LD_LIBRARY_PATH
+endif
+
+test-libcodex: |
+	$(LD_NAME)="$(LD_PATH)" \
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="-I$(LIBS_DIR)" \
+	CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" \
+	go test -tags '$(BUILD_TAGS) use_codex' -run TestCodexStart ./codex/... -v -json | jq -r '.Output'
+
+clean-libcodex:
+	@echo "Removing libcodex"
+	rm -Rf $(LIBS_DIR)/*
 
 statusgo: ##@build Build status-go as status-backend server
 statusgo: build/bin/status-backend

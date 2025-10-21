@@ -116,3 +116,6 @@ pkg/sentry/SENTRY_PRODUCTION
 
 go.work
 go.work.sum
+
+# Libs directory (Codex)
+libs

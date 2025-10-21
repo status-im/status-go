@@ -1,6 +1,8 @@
 {
-  "go.testTags": "gowaku_skip_migrations,gowaku_no_rln,codex_integration",
-  "cSpell.words": ["unmarshalling"],
+  "go.testTags": "gowaku_skip_migrations,gowaku_no_rln,use_codex,codex_integration",
+  "cSpell.words": [
+    "unmarshalling"
+  ],
   "gopls": {
     "formatting.local": "github.com/status-im/status-go",
     "build.buildFlags": [
@@ -12,5 +14,10 @@
   // I use "goimports" instead of "gofmt"
   // because it does the same thing but also formats imports
   "go.formatTool": "goimports",
+  "go.toolsEnvVars": {
+    "CGO_ENABLED": "1",
+    "CGO_CFLAGS": "-I${workspaceFolder}/libs",
+    "CGO_LDFLAGS": "-L${workspaceFolder}/libs -lcodex -Wl,-rpath,${workspaceFolder}/libs"
+  },
   "idf.pythonInstallPath": "/usr/bin/python"
 }
