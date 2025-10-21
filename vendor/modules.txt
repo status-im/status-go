@@ -1364,7 +1364,7 @@ github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-pc-windows-gnu
 github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-unknown-linux-gnu
 github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-unknown-linux-musl
 github.com/waku-org/go-zerokit-rln-x86_64/rln
-# github.com/waku-org/sds-go-bindings v0.0.0-20251020212900-b5014429651a
+# github.com/waku-org/sds-go-bindings v0.0.0-20251021224905-911541c82b4d
 ## explicit; go 1.24.0
 github.com/waku-org/sds-go-bindings/sds
 # github.com/waku-org/waku-go-bindings v0.0.0-20250714110306-6feba5b0df4d
