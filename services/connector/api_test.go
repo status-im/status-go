@@ -10,8 +10,7 @@ import (
 )
 
 func TestCallRPC(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+	state := setupTests(t)
 
 	tests := []struct {
 		request     string
