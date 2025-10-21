@@ -14,8 +14,6 @@ RUN apt-get update && apt-get install -yq --no-install-recommends --fix-missing 
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ln -s /usr/bin/python3 /usr/bin/python
-
 RUN mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/debian/gpg  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
     gpg --no-default-keyring --keyring /etc/apt/keyrings/docker.gpg --fingerprint | \
