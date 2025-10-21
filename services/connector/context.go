@@ -31,7 +31,7 @@ func GetConnectionType(ctx context.Context) ConnectionType {
 	if connType, ok := ctx.Value(connectionTypeKey).(ConnectionType); ok {
 		return connType
 	}
-	return ConnectionTypeInternal // default to trusted
+	return ConnectionTypeHTTP // default to untrusted
 }
 
 // IsUntrustedConnection checks if the connection is from HTTP/WebSocket

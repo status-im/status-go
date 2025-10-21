@@ -10,8 +10,7 @@ import (
 )
 
 func TestCallRPC_UntrustedConnection(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+	state := setupTests(t)
 
 	tests := []struct {
 		request     string
@@ -61,8 +60,7 @@ func TestCallRPC_UntrustedConnection(t *testing.T) {
 }
 
 func TestCallRPC_TrustedConnectionRequiresClientID(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+	state := setupTests(t)
 
 	// Trusted connection (Internal) without ClientID should fail
 	ctx := WithConnectionType(context.Background(), ConnectionTypeInternal)
@@ -81,8 +79,7 @@ func TestCallRPC_TrustedConnectionRequiresClientID(t *testing.T) {
 }
 
 func TestCallRPC_TrustedConnectionWithClientID(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+	state := setupTests(t)
 
 	ctx := WithConnectionType(context.Background(), ConnectionTypeInternal)
 
@@ -95,7 +92,7 @@ func TestCallRPC_TrustedConnectionWithClientID(t *testing.T) {
 		"clientId": "status-desktop"
 	}`
 
-	_, err := state.api.CallRPC(ctx, request)
-	require.Error(t, err)
-	require.NotEqual(t, ErrEmptyClientIDFromTrustedConnection, err)
+	result, err := state.api.CallRPC(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, result)
 }
