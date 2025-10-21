@@ -21,6 +21,8 @@ in mkShell {
     go golangci-lint go-junit-report gopls codecov-cli go-generate-fast
     protobuf3_24 protoc-gen-go gotestsum openjdk openssl
     rustc cargo
+    gnused   # make sure sed is available
+    nim
   ];
 
   shellHook = lib.optionalString (!isMacM1) ''
