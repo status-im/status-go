@@ -5,17 +5,17 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1760550973,
-        "narHash": "sha256-sjShb9EozgVRZc6tVc2hFzKwk0Wc3JIqSSOg23pswI4=",
+        "lastModified": 1761008109,
+        "narHash": "sha256-HW8tqtlkUg5vDyzZ9Ok6Hd6biZww9RyDhu7vDnY59sU=",
         "ref": "refs/heads/master",
-        "rev": "972d7862fca9c3a114e3840cc44b863cb7ca90c2",
-        "revCount": 55,
+        "rev": "35c0f1964dbaee24f885dee8530357c3e17fdc33",
+        "revCount": 56,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/waku-org/nim-sds"
       },
       "original": {
-        "rev": "972d7862fca9c3a114e3840cc44b863cb7ca90c2",
+        "rev": "35c0f1964dbaee24f885dee8530357c3e17fdc33",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/waku-org/nim-sds"
