@@ -25,11 +25,10 @@ in mkShell {
 
   shellHook = lib.optionalString (!isMacM1) ''
     echo "Patching env.sh to use Nix Nim..."
-    env_sh="$PWD/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/vendor/nimbus-build-system/scripts/env.sh"
+    env_sh="${toString ./vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/vendor/nimbus-build-system/scripts/env.sh}"
     if [ -f "$env_sh" ]; then
       echo "Replacing nim by ${pkgs.nim}/bin/nim"
-      ${pkgs.gnused}/bin/substituteInPlace "$env_sh" \
-        --replace-warn "/vendor/Nim/bin/nim" "${pkgs.nim}/bin/nim"
+      ${pkgs.gnused}/bin/sed -i 's#/vendor/Nim/bin/nim#${pkgs.nim}/bin/nim#g' "$env_sh"
     else
       echo "Warning: $env_sh not found (PWD=$PWD)"
     fi
