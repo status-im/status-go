@@ -52,8 +52,11 @@
       }
     );
   in {
-    devShells = forAllSystems (system: {
-      default = pkgsFor.${system}.callPackage ./nix/shell.nix { };
+    devShells = forAllSystems (system: let pkgs = pkgsFor.${system}; in {
+      default = pkgs.callPackage ./nix/shell.nix {
+        sdsHeaderPath = "${pkgs.lib-sds-pkg}/include";
+        sdsLibPath    = "${pkgs.lib-sds-pkg}/lib";
+      };
     });
 
     packages = forAllSystems (system:

@@ -1,5 +1,7 @@
 {
   pkgs,
+  sdsHeaderPath,
+  sdsLibPath
 }:
 
 let
@@ -23,7 +25,12 @@ in mkShell {
     rustc cargo
     gnused   # make sure sed is available
     nim
+    lib-sds-pkg
   ];
+
+  # Export environment variables
+  NIM_SDS_HEADER_PATH = sdsHeaderPath;
+  NIM_SDS_LIB_PATH    = sdsLibPath;
 
   shellHook = lib.optionalString (!isMacM1) ''
     echo "Patching env.sh to use Nix Nim..."
@@ -35,8 +42,6 @@ in mkShell {
       echo "Warning: $env_sh not found (PWD=$PWD)"
     fi
 
-    export NIM_SDS_REPO_PATH=${pkgs.nim-sds-src}
-    export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:${pkgs.lib-sds-pkg}/lib/
     export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
     export ANDROID_NDK=\$ANDROID_HOME/ndk-bundle
     export ANDROID_SDK_ROOT=\$ANDROID_HOME
