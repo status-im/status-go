@@ -24,8 +24,7 @@ import (
 
 func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	t.Skip("Broken by PR-6882, must fix")
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+	state := setupTests(t)
 
 	accountAddress := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 	expectedHash := types.BytesToHash(types.FromHex("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"))
@@ -144,8 +143,7 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 }
 
 func TestForwardedRPCs(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+	state := setupTests(t)
 
 	ethClientMock := mock_client.NewMockClientInterface(state.mockCtrl)
 
@@ -191,8 +189,7 @@ func TestForwardedRPCs(t *testing.T) {
 }
 
 func TestRequestAccountsAfterPermissionsRevokeTest(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+	state := setupTests(t)
 
 	accountAddress := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 	dAppPermissionRevoked := false

@@ -868,19 +868,6 @@ func (api *PublicAPI) CreateCommunityTokenDeploymentSignature(ctx context.Contex
 	return api.service.messenger.CreateCommunityTokenDeploymentSignature(ctx, chainID, addressFrom, communityID)
 }
 
-// wallet connect session apis
-func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, request *requests.AddWalletConnectSession) error {
-	return api.service.messenger.AddWalletConnectSession(request)
-}
-
-func (api *PublicAPI) GetWalletConnectSession(ctx context.Context) ([]protocol.WalletConnectSession, error) {
-	return api.service.messenger.GetWalletConnectSession()
-}
-
-func (api *PublicAPI) DestroyWalletConnectSession(ctx context.Context, PeerID string) error {
-	return api.service.messenger.DestroyWalletConnectSession(PeerID)
-}
-
 // Saved Addresses APIs
 func (api *PublicAPI) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAddress) error {
 	return api.service.messenger.UpsertSavedAddress(ctx, sa)

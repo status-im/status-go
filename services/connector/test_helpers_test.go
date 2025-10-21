@@ -33,29 +33,29 @@ type testState struct {
 	api             *API
 }
 
-func createDB(t *testing.T) (*sql.DB, func()) {
+func createDB(t *testing.T) *sql.DB {
 	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "browser-connect-tests-")
 	require.NoError(t, err)
-	return db, func() { require.NoError(t, cleanup()) }
+	t.Cleanup(func() {
+		require.NoError(t, cleanup())
+	})
+	return db
 }
 
-func createWalletDB(t *testing.T) (db *sql.DB, close func()) {
+func createWalletDB(t *testing.T) (db *sql.DB) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
-	return db, func() {
+	t.Cleanup(func() {
 		require.NoError(t, db.Close())
-	}
+	})
+	return db
 }
 
-func setupTests(t *testing.T) (state testState, close func()) {
+func setupTests(t *testing.T) (state testState) {
 	state.ctx = context.Background()
 
-	var (
-		closeDb       func()
-		closeWalletDb func()
-	)
-	state.db, closeDb = createDB(t)
-	state.walletDb, closeWalletDb = createWalletDB(t)
+	state.db = createDB(t)
+	state.walletDb = createWalletDB(t)
 
 	config := params.NodeConfig{
 		NetworkID: 10,
@@ -100,8 +100,5 @@ func setupTests(t *testing.T) (state testState, close func()) {
 
 	state.api = NewAPI(state.service)
 
-	return state, func() {
-		closeDb()
-		closeWalletDb()
-	}
+	return state
 }
