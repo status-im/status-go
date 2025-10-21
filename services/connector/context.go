@@ -38,8 +38,3 @@ func GetConnectionType(ctx context.Context) ConnectionType {
 func IsUntrustedConnection(ctx context.Context) bool {
 	return GetConnectionType(ctx) == ConnectionTypeHTTP
 }
-
-// IsTrustedConnection checks if the connection is from internal CallRPC (status-desktop)
-func IsTrustedConnection(ctx context.Context) bool {
-	return GetConnectionType(ctx) == ConnectionTypeInternal
-}

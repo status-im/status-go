@@ -12,6 +12,7 @@ import (
 var (
 	ErrInvalidResponseFromForwardedRpc         = errors.New("invalid response from forwarded RPC")
 	ErrCannotOverrideClientIDForHttpConnection = errors.New("cannot override clientId for HTTP connection")
+	ErrEmptyClientIDFromTrustedConnection      = errors.New("trusted connection must provide a clientId")
 )
 
 type API struct {
@@ -99,8 +100,15 @@ func (api *API) CallRPC(ctx context.Context, inputJSON string) (interface{}, err
 	}
 
 	// This prevents external clients from spoofing ClientID to impersonate trusted clients
-	if IsUntrustedConnection(ctx) && request.ClientID != "" {
-		return "", ErrCannotOverrideClientIDForHttpConnection
+	if IsUntrustedConnection(ctx) {
+		if request.ClientID != "" {
+			return "", ErrCannotOverrideClientIDForHttpConnection
+		}
+	} else {
+		// Trusted connections MUST provide a ClientID
+		if request.ClientID == "" {
+			return "", ErrEmptyClientIDFromTrustedConnection
+		}
 	}
 
 	if command, exists := api.r.GetCommand(request.Method); exists {

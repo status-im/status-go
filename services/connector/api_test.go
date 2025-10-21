@@ -9,8 +9,9 @@ import (
 	"github.com/status-im/status-go/services/connector/commands"
 )
 
-func TestCallRPC(t *testing.T) {
-	state := setupTests(t)
+func TestCallRPC_UntrustedConnection(t *testing.T) {
+	state, closeFn := setupTests(t)
+	t.Cleanup(closeFn)
 
 	tests := []struct {
 		request     string
@@ -57,4 +58,44 @@ func TestCallRPC(t *testing.T) {
 			require.Equal(t, tt.expectError, err)
 		})
 	}
+}
+
+func TestCallRPC_TrustedConnectionRequiresClientID(t *testing.T) {
+	state, closeFn := setupTests(t)
+	t.Cleanup(closeFn)
+
+	// Trusted connection (Internal) without ClientID should fail
+	ctx := WithConnectionType(context.Background(), ConnectionTypeInternal)
+
+	request := `{
+		"method": "eth_chainId",
+		"params": [],
+		"url": "https://example.com",
+		"name": "Example DApp",
+		"iconUrl": "https://example.com/icon.png"
+	}`
+
+	_, err := state.api.CallRPC(ctx, request)
+	require.Error(t, err)
+	require.Equal(t, ErrEmptyClientIDFromTrustedConnection, err)
+}
+
+func TestCallRPC_TrustedConnectionWithClientID(t *testing.T) {
+	state, closeFn := setupTests(t)
+	t.Cleanup(closeFn)
+
+	ctx := WithConnectionType(context.Background(), ConnectionTypeInternal)
+
+	request := `{
+		"method": "eth_chainId",
+		"params": [],
+		"url": "https://example.com",
+		"name": "Example DApp",
+		"iconUrl": "https://example.com/icon.png",
+		"clientId": "status-desktop"
+	}`
+
+	_, err := state.api.CallRPC(ctx, request)
+	require.Error(t, err)
+	require.NotEqual(t, ErrEmptyClientIDFromTrustedConnection, err)
 }
