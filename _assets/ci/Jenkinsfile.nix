@@ -27,7 +27,7 @@ pipeline {
     stage('Build library') {
       steps {
         script {
-          nix.flake("status-go-library")
+          nix.flake("status-go-library", "--show-trace --print-build-logs --print-out-paths")
         }
       }
     }
