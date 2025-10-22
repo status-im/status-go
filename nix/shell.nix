@@ -33,15 +33,6 @@ in mkShell {
   NIM_SDS_LIB_PATH    = sdsLibPath;
 
   shellHook = lib.optionalString (!isMacM1) ''
-    echo "Patching env.sh to use Nix Nim..."
-    env_sh="/go/src/github.com/status-im/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/vendor/nimbus-build-system/scripts/env.sh"
-    if [ -f "$env_sh" ]; then
-      echo "Replacing nim by ${pkgs.nim}/bin/nim"
-      ${pkgs.gnused}/bin/sed -i 's#/vendor/Nim/bin/nim#${pkgs.nim}/bin/nim#g' "$env_sh"
-    else
-      echo "Warning: $env_sh not found (PWD=$PWD)"
-    fi
-
     export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
     export ANDROID_NDK=\$ANDROID_HOME/ndk-bundle
     export ANDROID_SDK_ROOT=\$ANDROID_HOME
