@@ -63,8 +63,8 @@ pipeline {
     /* Ensure env var is set on first run. */
     USE_NWAKU = "${params.USE_NWAKU}"
 
-    NIM_SDS_HEADER_PATH = "${REPO_SRC}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library/"
-    NIM_SDS_LIB_PATH    = "${REPO_SRC}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/"
+    NIM_SDS_HEADER_PATH = "${env.WORKSPACE}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library/"
+    NIM_SDS_LIB_PATH    = "${env.WORKSPACE}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/"
 
     /* fixes nim cache collision */
     XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
