@@ -1,9 +1,8 @@
 # Makefile for SDS Go Bindings
 
-# The NIM_SDS_REPO_PATH env var should be defined beforehand and it represents the absolute path
-# to the cloned nim-sds repository, i.e, ....../third_party/nim-sds
-export CGO_CFLAGS="-I${NIM_SDS_REPO_PATH}/library/"
-export CGO_LDFLAGS="-L${NIM_SDS_REPO_PATH}/build -lsds -Wl,-rpath,${NIM_SDS_REPO_PATH}/build"
+# The NIM_SDS_LIB_PATH and NIM_SDS_HEADER_PATH env vars should be defined beforehand
+export CGO_CFLAGS="-I${NIM_SDS_HEADER_PATH}/"
+export CGO_LDFLAGS="-L${NIM_SDS_LIB_PATH}/ -lsds -Wl,-rpath,${NIM_SDS_LIB_PATH}/"
 
 .PHONY: all clean prepare build-libsds build
 
