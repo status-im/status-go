@@ -1,12 +1,12 @@
-package types
+package segmentation
 
-import "github.com/status-im/status-go/protocol/protobuf"
+import "github.com/status-im/status-go/messaging/layers/segmentation/protobuf"
 
-type SegmentMessage struct {
+type Message struct {
 	*protobuf.SegmentMessage
 }
 
-func (s *SegmentMessage) IsValid() bool {
+func (s *Message) IsValid() bool {
 	// Check if the hash length is valid (32 bytes for Keccak256)
 	if len(s.EntireMessageHash) != 32 {
 		return false
@@ -25,6 +25,6 @@ func (s *SegmentMessage) IsValid() bool {
 	return s.SegmentsCount >= 2 || s.ParitySegmentsCount > 0
 }
 
-func (s *SegmentMessage) IsParityMessage() bool {
+func (s *Message) IsParityMessage() bool {
 	return s.SegmentsCount == 0 && s.ParitySegmentsCount > 0
 }

@@ -48,15 +48,15 @@ const (
 var RekeyCompatibility = true
 
 type MessageSender struct {
-	identity                *ecdsa.PrivateKey
-	datasync                *datasync.DataSync
-	datasyncPersistence     datasyncnode.Persistence
-	transport               *transport.Transport
-	protocol                *encryption.Protocol
-	logger                  *zap.Logger
-	persistence             messagingtypes.MessageSenderPersistence
-	segmentationPersistence segmentation.Persistence
-	publisher               *pubsub.Publisher
+	identity            *ecdsa.PrivateKey
+	datasync            *datasync.DataSync
+	datasyncPersistence datasyncnode.Persistence
+	transport           *transport.Transport
+	segmenter           *segmentation.Segmenter
+	protocol            *encryption.Protocol
+	logger              *zap.Logger
+	persistence         messagingtypes.MessageSenderPersistence
+	publisher           *pubsub.Publisher
 
 	datasyncEnabled bool
 
@@ -79,16 +79,16 @@ func NewMessageSender(
 	logger *zap.Logger,
 ) (*MessageSender, error) {
 	p := &MessageSender{
-		identity:                identity,
-		datasyncPersistence:     datasyncPersistence,
-		datasyncEnabled:         true, // FIXME
-		protocol:                enc,
-		persistence:             persistence,
-		segmentationPersistence: segmentationPersistence,
-		publisher:               pubsub.NewPublisher(),
-		transport:               transport,
-		logger:                  logger,
-		ephemeralKeys:           make(map[string]*ecdsa.PrivateKey),
+		identity:            identity,
+		datasyncPersistence: datasyncPersistence,
+		datasyncEnabled:     true, // FIXME
+		transport:           transport,
+		segmenter:           segmentation.NewSegmenter(segmentationPersistence, logger),
+		protocol:            enc,
+		persistence:         persistence,
+		publisher:           pubsub.NewPublisher(),
+		logger:              logger,
+		ephemeralKeys:       make(map[string]*ecdsa.PrivateKey),
 	}
 
 	return p, nil
@@ -837,13 +837,11 @@ func (s *MessageSender) HandleMessages(msg *messagingtypes.ReceivedMessage) (*me
 			return nil, s.persistence.SaveHashRatchetMessage(info.GroupID, info.KeyID, msg)
 		}
 
-		// The current message segment has been successfully retrieved.
-		// However, the collection of segments is not yet complete.
-		if err == ErrMessageSegmentsIncomplete {
-			return nil, nil
-		}
-
 		return nil, err
+	}
+
+	if response == nil {
+		return nil, nil
 	}
 
 	// Process queued hash ratchet messages
@@ -906,8 +904,7 @@ func (h *handleMessageResponse) Messages() []*messagingtypes.Message {
 }
 
 func (s *MessageSender) handleMessage(receivedMsg *messagingtypes.ReceivedMessage) (*handleMessageResponse, error) {
-	logger := s.logger.With(zap.String("site", "handleMessage"))
-	hlogger := logger.With(zap.String("hash", types.EncodeHex(receivedMsg.Hash)))
+	hlogger := s.logger.Named("handleMessage").With(zap.String("hash", types.EncodeHex(receivedMsg.Hash)))
 
 	message := &messagingtypes.Message{}
 
@@ -924,18 +921,14 @@ func (s *MessageSender) handleMessage(receivedMsg *messagingtypes.ReceivedMessag
 		return nil, err
 	}
 
-	err = s.handleSegmentationLayer(message)
+	isSegmentMessage, completed, err := s.handleSegmentationLayer(message)
 	if err != nil {
-		// Segments not completed yet, stop processing
-		if err == ErrMessageSegmentsIncomplete {
-			return nil, err
-		}
-		// Segments already completed, stop processing
-		if err == ErrMessageSegmentsAlreadyCompleted {
-			return nil, err
-		}
+		return nil, err
+	}
 
-		// Not a critical error; message wasn't segmented, proceed with next layers.
+	// Segments not completed yet, stop processing
+	if isSegmentMessage && !completed {
+		return nil, nil
 	}
 
 	err = s.handleEncryptionLayer(context.Background(), message)

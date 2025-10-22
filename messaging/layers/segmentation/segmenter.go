@@ -1,67 +1,57 @@
-package common
+package segmentation
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"math"
 	"time"
 
+	"github.com/cockroachdb/errors"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
-	"github.com/jinzhu/copier"
 	"github.com/klauspost/reedsolomon"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/messaging/waku/types"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/messaging/layers/segmentation/protobuf"
 )
-
-var ErrMessageSegmentsIncomplete = errors.New("message segments incomplete")
-var ErrMessageSegmentsAlreadyCompleted = errors.New("message segments already completed")
-var ErrMessageSegmentsInvalidPayload = errors.New("invalid segment payload")
-var ErrMessageSegmentsHashMismatch = errors.New("hash of entire payload does not match")
-var ErrMessageSegmentsInvalidParity = errors.New("invalid parity segments")
 
 const (
 	segmentsParityRate          = 0.125
 	segmentsReedsolomonMaxCount = 256
 )
 
-func (s *MessageSender) segmentMessage(newMessage *wakutypes.NewMessage) ([]*wakutypes.NewMessage, error) {
-	// We set the max message size to 3/4 of the allowed message size, to leave
-	// room for segment message metadata.
-	newMessages, err := segmentMessage(newMessage, int(s.transport.MaxMessageSize()/4*3))
-	s.logger.Debug("message segmented", zap.Int("segments", len(newMessages)))
-	return newMessages, err
+var ErrIncomplete = errors.New("message segments incomplete")
+var ErrAlreadyCompleted = errors.New("message segments already completed")
+var ErrInvalidPayload = errors.New("invalid segment payload")
+var ErrHashMismatch = errors.New("hash of entire payload does not match")
+var ErrInvalidParity = errors.New("invalid parity segments")
+
+type Segmenter struct {
+	persistence Persistence
+	logger      *zap.Logger
 }
 
-func replicateMessageWithNewPayload(message *wakutypes.NewMessage, payload []byte) (*wakutypes.NewMessage, error) {
-	copy := &wakutypes.NewMessage{}
-	err := copier.Copy(copy, message)
-	if err != nil {
-		return nil, err
+func NewSegmenter(persistence Persistence, logger *zap.Logger) *Segmenter {
+	return &Segmenter{
+		persistence: persistence,
+		logger:      logger.Named("segmentation"),
 	}
-
-	copy.Payload = payload
-	return copy, nil
 }
 
-// Segments message into smaller chunks if the size exceeds segmentSize.
-func segmentMessage(newMessage *wakutypes.NewMessage, segmentSize int) ([]*wakutypes.NewMessage, error) {
-	if len(newMessage.Payload) <= segmentSize {
-		return []*wakutypes.NewMessage{newMessage}, nil
+func (s *Segmenter) Segment(payload []byte, segmentSize int) ([][]byte, error) {
+	if len(payload) <= segmentSize {
+		return [][]byte{payload}, nil
 	}
 
-	entireMessageHash := crypto.Keccak256(newMessage.Payload)
-	entirePayloadSize := len(newMessage.Payload)
+	entireMessageHash := crypto.Keccak256(payload)
+	entirePayloadSize := len(payload)
 
 	segmentsCount := int(math.Ceil(float64(entirePayloadSize) / float64(segmentSize)))
 	paritySegmentsCount := int(math.Floor(float64(segmentsCount) * segmentsParityRate))
 
 	segmentPayloads := make([][]byte, segmentsCount+paritySegmentsCount)
-	segmentMessages := make([]*wakutypes.NewMessage, segmentsCount)
+	segmentMessages := make([][]byte, segmentsCount)
 
 	for start, index := 0, 0; start < entirePayloadSize; start += segmentSize {
 		end := start + segmentSize
@@ -69,7 +59,7 @@ func segmentMessage(newMessage *wakutypes.NewMessage, segmentSize int) ([]*wakut
 			end = entirePayloadSize
 		}
 
-		segmentPayload := newMessage.Payload[start:end]
+		segmentPayload := payload[start:end]
 		segmentWithMetadata := &protobuf.SegmentMessage{
 			EntireMessageHash: entireMessageHash,
 			Index:             uint32(index),
@@ -80,13 +70,9 @@ func segmentMessage(newMessage *wakutypes.NewMessage, segmentSize int) ([]*wakut
 		if err != nil {
 			return nil, err
 		}
-		segmentMessage, err := replicateMessageWithNewPayload(newMessage, marshaledSegmentWithMetadata)
-		if err != nil {
-			return nil, err
-		}
 
 		segmentPayloads[index] = segmentPayload
-		segmentMessages[index] = segmentMessage
+		segmentMessages[index] = marshaledSegmentWithMetadata
 		index++
 	}
 
@@ -129,62 +115,50 @@ func segmentMessage(newMessage *wakutypes.NewMessage, segmentSize int) ([]*wakut
 		if err != nil {
 			return nil, err
 		}
-		segmentMessage, err := replicateMessageWithNewPayload(newMessage, marshaledSegmentWithMetadata)
-		if err != nil {
-			return nil, err
-		}
 
-		segmentMessages = append(segmentMessages, segmentMessage)
+		segmentMessages = append(segmentMessages, marshaledSegmentWithMetadata)
 		index++
 	}
 
 	return segmentMessages, nil
 }
 
-// handleSegmentationLayer is capable of reconstructing the message from both complete and partial sets of data segments.
-// It has capability to perform forward error correction.
-func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
-	logger := s.logger.Named("handleSegmentationLayer").With(zap.String("hash", cryptotypes.HexBytes(message.TransportLayer.Hash).String()))
-
-	segmentMessage := &types.SegmentMessage{
+func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey) ([]byte, error) {
+	segmentMessage := &Message{
 		SegmentMessage: &protobuf.SegmentMessage{},
 	}
-	err := proto.Unmarshal(message.TransportLayer.Payload, segmentMessage.SegmentMessage)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal SegmentMessage")
+	err := proto.Unmarshal(payload, segmentMessage.SegmentMessage)
+	if err != nil || !segmentMessage.IsValid() {
+		return nil, ErrInvalidPayload
 	}
 
-	if !segmentMessage.IsValid() {
-		return ErrMessageSegmentsInvalidPayload
-	}
-
-	logger.Debug("handling message segment",
+	s.logger.Debug("handling message segment",
 		zap.String("EntireMessageHash", cryptotypes.HexBytes(segmentMessage.EntireMessageHash).String()),
 		zap.Uint32("Index", segmentMessage.Index),
 		zap.Uint32("SegmentsCount", segmentMessage.SegmentsCount),
 		zap.Uint32("ParitySegmentIndex", segmentMessage.ParitySegmentIndex),
 		zap.Uint32("ParitySegmentsCount", segmentMessage.ParitySegmentsCount))
 
-	alreadyCompleted, err := s.segmentationPersistence.IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash)
+	alreadyCompleted, err := s.persistence.IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if alreadyCompleted {
-		return ErrMessageSegmentsAlreadyCompleted
+		return nil, ErrAlreadyCompleted
 	}
 
-	err = s.segmentationPersistence.SaveMessageSegment(segmentMessage, message.TransportLayer.SigPubKey, time.Now().Unix())
+	err = s.persistence.SaveMessageSegment(segmentMessage, sigPubKey, time.Now().Unix())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	segments, err := s.segmentationPersistence.GetMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey)
+	segments, err := s.persistence.GetMessageSegments(segmentMessage.EntireMessageHash, sigPubKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(segments) == 0 {
-		return errors.New("unexpected state: no segments found after save operation") // This should theoretically never occur.
+		return nil, errors.New("unexpected state: no segments found after save operation") // This should theoretically never occur.
 	}
 
 	firstSegmentMessage := segments[0]
@@ -192,7 +166,7 @@ func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
 
 	// First segment message must not be a parity message.
 	if firstSegmentMessage.IsParityMessage() || len(segments) != int(firstSegmentMessage.SegmentsCount) {
-		return ErrMessageSegmentsIncomplete
+		return nil, ErrIncomplete
 	}
 
 	payloads := make([][]byte, firstSegmentMessage.SegmentsCount+lastSegmentMessage.ParitySegmentsCount)
@@ -206,7 +180,7 @@ func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
 	} else {
 		enc, err := reedsolomon.New(int(firstSegmentMessage.SegmentsCount), int(lastSegmentMessage.ParitySegmentsCount))
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		var lastNonParitySegmentPayload []byte
@@ -227,15 +201,15 @@ func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
 
 		err = enc.Reconstruct(payloads)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		ok, err := enc.Verify(payloads)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !ok {
-			return ErrMessageSegmentsInvalidParity
+			return nil, ErrInvalidParity
 		}
 
 		if lastNonParitySegmentPayload != nil {
@@ -248,35 +222,31 @@ func (s *MessageSender) handleSegmentationLayer(message *types.Message) error {
 	for i := 0; i < int(firstSegmentMessage.SegmentsCount); i++ {
 		_, err := entirePayload.Write(payloads[i])
 		if err != nil {
-			return errors.Wrap(err, "failed to write segment payload")
+			return nil, errors.Wrap(err, "failed to write segment payload")
 		}
 	}
 
 	// Sanity check.
 	entirePayloadHash := crypto.Keccak256(entirePayload.Bytes())
 	if !bytes.Equal(entirePayloadHash, segmentMessage.EntireMessageHash) {
-		return ErrMessageSegmentsHashMismatch
+		return nil, ErrHashMismatch
 	}
 
-	err = s.segmentationPersistence.CompleteMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey, time.Now().Unix())
+	err = s.persistence.CompleteMessageSegments(segmentMessage.EntireMessageHash, sigPubKey, time.Now().Unix())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	message.TransportLayer.Payload = entirePayload.Bytes()
-
-	return nil
+	return entirePayload.Bytes(), nil
 }
 
-func (s *MessageSender) CleanupSegments() error {
-	monthAgo := time.Now().AddDate(0, -1, 0).Unix()
-
-	err := s.segmentationPersistence.RemoveMessageSegmentsOlderThan(monthAgo)
+func (s *Segmenter) CleanupStaleSegments(olderThan time.Time) error {
+	err := s.persistence.RemoveMessageSegmentsOlderThan(olderThan.Unix())
 	if err != nil {
 		return err
 	}
 
-	err = s.segmentationPersistence.RemoveMessageSegmentsCompletedOlderThan(monthAgo)
+	err = s.persistence.RemoveMessageSegmentsCompletedOlderThan(olderThan.Unix())
 	if err != nil {
 		return err
 	}

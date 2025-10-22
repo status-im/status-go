@@ -352,7 +352,7 @@ func (s *MessageSenderSuite) TestHandleSegmentMessages() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	segmentedMessages, err := segmentMessage(&wakutypes.NewMessage{Payload: wrappedPayload}, int(math.Ceil(float64(len(wrappedPayload))/2)))
+	segmentedMessages, err := s.sender.segmentMessageWithSize(&wakutypes.NewMessage{Payload: wrappedPayload}, int(math.Ceil(float64(len(wrappedPayload))/2)))
 	s.Require().NoError(err)
 	s.Require().Len(segmentedMessages, 2)
 
@@ -379,7 +379,7 @@ func (s *MessageSenderSuite) TestHandleSegmentMessages() {
 
 	// Receiving another segment after the message has been reassembled is considered an error
 	_, err = s.sender.HandleMessages(message)
-	s.Require().ErrorIs(err, ErrMessageSegmentsAlreadyCompleted)
+	s.Require().ErrorIs(err, segmentation.ErrAlreadyCompleted)
 }
 
 func (s *MessageSenderSuite) TestGetEphemeralKey() {
