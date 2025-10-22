@@ -428,6 +428,11 @@ func createAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
+	logutils.ZapLogger().Debug("<<< createAccountAndLogin",
+		zap.String("request", requestJSON),
+		zap.String("rootDataDir", request.RootDataDir),
+	)
+
 	err = request.Validate(&requests.CreateAccountValidation{
 		AllowEmptyDisplayName: true,
 	})
@@ -1537,6 +1542,12 @@ func inputConnectionStringForBootstrapping(cs, configJSON string) string {
 
 	var conf pairing.ReceiverClientConfig
 	err = json.Unmarshal([]byte(configJSON), &conf)
+
+	logutils.ZapLogger().Debug("<<< inputConnectionStringForBootstrapping",
+		zap.String("cs", cs),
+		zap.String("configJSON", configJSON),
+	)
+
 	if err != nil {
 		logutils.ZapLogger().Error("error parsing config", zap.Error(err), zap.String("config", configJSON))
 		err = errors2.Wrap(err, "could not unmarshal config")
