@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/brianvoe/gofakeit/v6"
 
@@ -46,4 +47,13 @@ func TestIntendedPanic(t *testing.T) {
 	require.PanicsWithError(t, message, func() {
 		IntendedPanic(message)
 	})
+}
+
+func TestEscapeString(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	const string_2 = `C:\Users\anast\status-desktop\`
+	const string_3 = `C:\\Users\\anast\\status-desktop\\`
+	logger.Info("test log", zap.String("string_2", string_2), zap.String("string_3", string_3))
 }
