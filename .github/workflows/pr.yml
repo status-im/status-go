@@ -51,16 +51,24 @@ jobs:
       - name: Generate
         env:
           GO_GENERATE_FAST_DIR: ~/.cache/go-generate-fast
+          NIM_SDS_HEADER_PATH: /home/runner/work/status-go/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library/
+          NIM_SDS_LIB_PATH: /home/runner/work/status-go/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/
         run: |
           make generate
 
       - name: golangci-lint
+        env:
+          NIM_SDS_HEADER_PATH: /home/runner/work/status-go/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library/
+          NIM_SDS_LIB_PATH: /home/runner/work/status-go/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.3.1
           args: --build-tags=gowaku_no_rln
 
       - name: lint-panics
+        env:
+          NIM_SDS_HEADER_PATH: /home/runner/work/status-go/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library/
+          NIM_SDS_LIB_PATH: /home/runner/work/status-go/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/
         run: |
           make lint-panics
 
