@@ -18,7 +18,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/0ef228213045d2cdb5a169a95d63ded38670b293";
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
     nwaku.url = "git+https://github.com/waku-org/nwaku?submodules=1&rev=7e5041d5e17d717f77fb74ffd876b987a0c6bf5d";
-    nim-sds.url = "git+https://github.com/waku-org/nim-sds?submodules=1&rev=52966cb87485db8da4048bcdfb26b510c70238ee";
+    nim-sds.url = "git+https://github.com/waku-org/nim-sds?submodules=1&rev=9fa8c7cd64b6af468ca13d3c58964979037e5018";
   };
 
   outputs = { self, nixpkgs, nwaku, nim-sds }:
