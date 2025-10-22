@@ -67,8 +67,8 @@ jobs:
 
       - name: lint-panics
         env:
-          NIM_SDS_HEADER_PATH: /home/runner/work/status-go/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library/
-          NIM_SDS_LIB_PATH: /home/runner/work/status-go/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/
+          CGO_CFLAGS: "-I${{ github.workspace }}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library"
+          CGO_LDFLAGS: "-L${{ github.workspace }}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build -lsds -Wl,-rpath,${{ github.workspace }}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build"
         run: |
           make lint-panics
 
