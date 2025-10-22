@@ -190,6 +190,10 @@ endif
 #----------------
 .PHONY: fetch-libcodex test-libcodex clean-libcodex
 
+ifeq ($(USE_CODEX),true)
+BUILD_TAGS += use_codex
+endif
+
 UNAME_M := $(shell uname -m)
 ifneq ($(filter $(UNAME_M),x86_64 amd64 i686 i386),)
   CODEX_ARCH := amd64
@@ -199,24 +203,26 @@ else
   CODEX_ARCH := $(UNAME_M)
 endif
 
-CODEX_VERSION ?= "v0.0.22"
-CODEX_DOWNLOAD_URL := "https://github.com/codex-storage/codex-go-bindings/releases/download/$(CODEX_VERSION)/codex-${detected_OS}-${CODEX_ARCH}.zip"
-
-ifeq ($(USE_CODEX),true)
-BUILD_TAGS += use_codex
+ifeq ($(detected_OS),Darwin)
+CODEX_OS := "macos"
+else
+CODEX_OS := $(detected_OS)
 endif
 
+CODEX_VERSION ?= "v0.0.22"
+CODEX_DOWNLOAD_URL := "https://github.com/codex-storage/codex-go-bindings/releases/download/$(CODEX_VERSION)/codex-${CODEX_OS}-${CODEX_ARCH}.zip"
+
 fetch-libcodex:
-	@echo "Fetching libcodex from GitHub Actions from: ${CODEX_DOWNLOAD_URL}"
-	curl -fSL --create-dirs -o $(LIBS_DIR)/codex-${detected_OS}-${CODEX_ARCH}.zip ${CODEX_DOWNLOAD_URL}
-	unzip -o -qq $(LIBS_DIR)/codex-${detected_OS}-${CODEX_ARCH}.zip -d $(LIBS_DIR)
+	@echo "Fetching libcodex from GitHub Actions from: ${CODEX_DOWNLOAD_URL} ${OS} ${HOST_OS}"
+	curl -fSL --create-dirs -o $(LIBS_DIR)/codex-${CODEX_OS}-${CODEX_ARCH}.zip ${CODEX_DOWNLOAD_URL}
+	unzip -o -qq $(LIBS_DIR)/codex-${CODEX_OS}-${CODEX_ARCH}.zip -d $(LIBS_DIR)
 	rm -f $(LIBS_DIR)/codex*.zip
 
 # Add rpath to libstdc++ to avoid runtime errors with NIX
-test-libcodex: export CGO_ENABLED=1
-test-libcodex: export CGO_CFLAGS="-I$(LIBS_DIR)"
-test-libcodex: export CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" 
 test-libcodex: |
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="-I$(LIBS_DIR)" \
+	CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" \
 	go test -tags '$(BUILD_TAGS) use_codex' -run TestCodexStart ./codex/... -v -json | jq -r '.Output'
 
 clean-libcodex:
