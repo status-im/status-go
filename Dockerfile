@@ -42,7 +42,7 @@ RUN if [ "$enable_go_cache" = "true" ]; then \
     fi
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
     --mount=type=cache,target="/root/.cache/go-generate-fast",id=statusgo-build-$cache_id \
-    make USE_SYSTEM_NIM=1 $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" \
+    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" \
       GO_GENERATE_FAST_RECACHE=$([ "$enable_go_cache" = "true" ] && echo false || echo true) \
       GO_GENERATE_FAST_DIR="/root/.cache/go-generate-fast"
 
