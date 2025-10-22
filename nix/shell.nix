@@ -28,10 +28,6 @@ in mkShell {
     lib-sds-pkg
   ];
 
-  # Export environment variables
-  NIM_SDS_HEADER_PATH = sdsHeaderPath;
-  NIM_SDS_LIB_PATH    = sdsLibPath;
-
   shellHook = lib.optionalString (!isMacM1) ''
     export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
     export ANDROID_NDK=\$ANDROID_HOME/ndk-bundle
