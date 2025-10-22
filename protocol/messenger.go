@@ -367,6 +367,7 @@ func NewMessenger(
 
 	amc := &communities.ArchiveManagerConfig{
 		TorrentConfig: c.torrentConfig,
+		CodexConfig:   &c.codexConfig,
 		Logger:        logger,
 		Persistence:   communitiesManager.GetPersistence(),
 		Messaging:     messaging,

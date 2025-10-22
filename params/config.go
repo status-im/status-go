@@ -9,6 +9,7 @@ import (
 
 	"gopkg.in/go-playground/validator.v9"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/crypto"
@@ -211,6 +212,8 @@ type NodeConfig struct {
 	// OTELConfig provides configuration for OpenTelemetry tracing
 	OTELConfig OTELConfig
 
+	CodexConfig codex.Config
+
 	OutputMessageCSVEnabled bool
 }
 
@@ -407,6 +410,10 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			DataDir:    dataDir + "/archivedata",
 			TorrentDir: dataDir + "/torrents",
 		},
+		CodexConfig: codex.Config{
+			BlockRetries: 5,
+			DataDir:      dataDir + "/codexdata",
+		},
 	}
 
 	return config, nil
@@ -485,6 +492,9 @@ func (c *NodeConfig) validateChildStructs(validate *validator.Validate) error {
 	if err := c.TorrentConfig.Validate(validate); err != nil {
 		return err
 	}
+	if err := Validate(c.CodexConfig, validate); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -513,6 +523,19 @@ func (c *TorrentConfig) Validate(validate *validator.Validate) error {
 	if c.Enabled && (c.DataDir == "" || c.TorrentDir == "") {
 		return fmt.Errorf("TorrentConfig.DataDir and TorrentConfig.TorrentDir cannot be \"\"")
 	}
+	return nil
+}
+
+func Validate(c codex.Config, validate *validator.Validate) error {
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+
+	// TODO uncomment when DataDir is mandatory
+	// Need to check if the codex config should be saved in db
+	// if c.DataDir == "" {
+	// 	return fmt.Errorf("CodexConfig.DataDir cannot be \"\"")
+	// }
 	return nil
 }
 

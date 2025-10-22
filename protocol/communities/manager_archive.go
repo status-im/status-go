@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
+
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
@@ -59,6 +61,8 @@ type EncodedArchiveData struct {
 type ArchiveManager struct {
 	torrentConfig                *params.TorrentConfig
 	torrentClient                *torrent.Client
+	codexConfig                  *codex.Config
+	codexClient                  *CodexClient
 	torrentTasks                 map[string]metainfo.Hash
 	indexCidTasks                map[string]string
 	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
@@ -103,12 +107,23 @@ func (m *ArchiveManager) SetOnline(online bool) {
 				m.logger.Error("couldn't start torrent client", zap.Error(err))
 			}
 		}
+
+		if m.codexConfig != nil && !m.codexClientStarted() {
+			err := m.StartCodexClient()
+			if err != nil {
+				m.logger.Error("couldn't start codex client", zap.Error(err))
+			}
+		}
 	}
 }
 
 func (m *ArchiveManager) SetTorrentConfig(config *params.TorrentConfig) {
 	m.torrentConfig = config
 	m.ArchiveFileManager.torrentConfig = config
+}
+
+func (m *ArchiveManager) SetCodexConfig(config *codex.Config) {
+	m.codexConfig = config
 }
 
 // getTCPandUDPport will return the same port number given if != 0,
@@ -199,21 +214,67 @@ func (m *ArchiveManager) StartTorrentClient() error {
 	return nil
 }
 
+func (m *ArchiveManager) StartCodexClient() error {
+	if m.codexConfig == nil {
+		return fmt.Errorf("can't start codex client: missing codexConfig")
+	}
+
+	if m.codexClientStarted() {
+		return nil
+	}
+
+	var err error
+	client, err := NewCodexClient(*m.codexConfig)
+	if err != nil {
+		return err
+	}
+	m.codexClient = &client
+	m.ArchiveFileManager.codexClient = &client
+
+	return m.codexClient.Start()
+}
+
 func (m *ArchiveManager) Stop() error {
-	if m.torrentClientStarted() {
+	if m.torrentClientStarted() || m.codexClientStarted() {
 		m.stopHistoryArchiveTasksIntervals()
+	}
+
+	errs := []error{}
+	if m.torrentClientStarted() {
 		m.logger.Info("Stopping torrent client")
-		errs := m.torrentClient.Close()
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
+		errs = m.torrentClient.Close()
 		m.torrentClient = nil
 	}
+
+	if m.codexClientStarted() {
+		m.logger.Info("Stopping codex client")
+
+		e := m.codexClient.Stop()
+		if e != nil {
+			errs = append(errs, e)
+		}
+
+		e = m.codexClient.Destroy()
+		if e != nil {
+			errs = append(errs, e)
+		}
+
+		m.codexClient = nil
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
 	return nil
 }
 
 func (m *ArchiveManager) torrentClientStarted() bool {
 	return m.torrentClient != nil
+}
+
+func (m *ArchiveManager) codexClientStarted() bool {
+	return m.codexClient != nil
 }
 
 func (m *ArchiveManager) IsReady() bool {
@@ -222,7 +283,8 @@ func (m *ArchiveManager) IsReady() bool {
 	// be instantiated (for example in case of port conflicts)
 	return m.torrentConfig != nil &&
 		m.torrentConfig.Enabled &&
-		m.torrentClientStarted()
+		m.torrentClientStarted() &&
+		m.codexClientStarted()
 }
 
 func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error) {
@@ -698,17 +760,12 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 	m.indexCidTasks[id] = indexCid
 	timeout := time.After(20 * time.Second)
 
-	// Create CodexClient and CodexIndexDownloader instances on demand for this request
-	codexClient := NewCodexClient("localhost", "8001")
-	// Set CodexClient timeout to be select timeout + 30s to ensure HTTP request doesn't timeout first
-	codexClient.SetRequestTimeout(50 * time.Second)
-
 	// Create separate cancel channel for the index downloader to avoid channel competition
 	indexDownloaderCancel := make(chan struct{})
 
 	// Create index downloader with path to index file using helper function
 	indexFilePath := m.ArchiveFileManager.codexArchiveIndexFile(id)
-	indexDownloader := NewCodexIndexDownloader(codexClient, indexCid, indexFilePath, indexDownloaderCancel, m.logger)
+	indexDownloader := NewCodexIndexDownloader(m.codexClient, indexCid, indexFilePath, indexDownloaderCancel, m.logger)
 
 	m.logger.Debug("fetching history index from Codex", zap.String("indexCid", indexCid))
 	select {
@@ -777,7 +834,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 					archiveDownloaderCancel := make(chan struct{})
 
 					// Create the archive downloader using the protobuf index directly
-					archiveDownloader := NewCodexArchiveDownloader(codexClient, index, id, existingArchiveIDs, archiveDownloaderCancel, m.logger)
+					archiveDownloader := NewCodexArchiveDownloader(m.codexClient, index, id, existingArchiveIDs, archiveDownloaderCancel, m.logger)
 
 					// Set up callback for when individual archives are downloaded
 					archiveDownloader.SetOnArchiveDownloaded(func(hash string, from, to uint64) {

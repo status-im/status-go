@@ -615,6 +615,10 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 			"DataDir": "` + testContext.config.RootDataDir + `/archivedata",
 			"TorrentDir": "` + testContext.config.RootDataDir + `/torrents"
 		},
+		"CodexConfig": {
+			"data-dir": "` + testContext.config.RootDataDir + `/codexdata",
+			"block-retries": 5
+		},
 		"RuntimeLogLevel": "INFO",
 		"LogLevel": "DEBUG"
 	}`

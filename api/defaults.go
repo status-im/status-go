@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"path/filepath"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
+
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	gocommon "github.com/status-im/status-go/common"
@@ -349,6 +351,11 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	}
 	if request.TorrentConfigPort != nil {
 		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
+	}
+
+	nodeConfig.CodexConfig = codex.Config{
+		DataDir:      filepath.Join(nodeConfig.RootDataDir, params.ArchivesRelativePath),
+		BlockRetries: params.BlockRetries,
 	}
 
 	if request.APIConfig != nil {
