@@ -205,13 +205,15 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 LIBS_DIR := $(abspath ./libs)
+CGO_CFLAGS += -I$(LIBS_DIR)
+CGO_LDFLAGS += -L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
 $(GO_CMD_BUILDS): generate $(LIBWAKU) $(LIBSDS)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	CGO_ENABLED=1 \
-	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LIBS_DIR)" \
-	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" \
+	CGO_CFLAGS="$(CGO_CFLAGS)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 	go build -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
