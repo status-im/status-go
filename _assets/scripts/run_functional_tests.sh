@@ -6,6 +6,8 @@ GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/_assets/scripts/colors.sh"
 source "${GIT_ROOT}/_assets/scripts/codecov.sh"
 
+export LD_LIBRARY_PATH="${GIT_ROOT}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/:${LD_LIBRARY_PATH}"
+
 : "${FUNCTIONAL_TESTS_LOG_LEVEL:=INFO}"
 : "${FUNCTIONAL_TESTS_REPORT_CODECOV:=false}"
 
