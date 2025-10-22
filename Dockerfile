@@ -10,6 +10,19 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# ---------------------------------------------------------
+# Install Nim 2.2.4
+# ---------------------------------------------------------
+ENV NIM_VERSION=2.2.4
+ENV PATH=/root/.nimble/bin:$PATH
+
+RUN curl https://nim-lang.org/choosenim/init.sh -sSf -o init.sh && \
+    bash init.sh -y && \
+    rm init.sh && \
+    choosenim $NIM_VERSION && \
+    nim --version
+# ---------------------------------------------------------
+
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
 ARG build_target='cmd'
