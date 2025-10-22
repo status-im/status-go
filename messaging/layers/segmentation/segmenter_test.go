@@ -1,21 +1,17 @@
-package common
+package segmentation
 
 import (
 	_ "embed"
-	"math"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/messaging/layers/segmentation"
-	segmentationmigrations "github.com/status-im/status-go/messaging/layers/segmentation/migrations"
-	"github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/messaging/waku/types"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/messaging/layers/segmentation/migrations"
+	"github.com/status-im/status-go/messaging/layers/segmentation/protobuf"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -26,9 +22,8 @@ func TestMessageSegmentationSuite(t *testing.T) {
 type MessageSegmentationSuite struct {
 	suite.Suite
 
-	sender      *MessageSender
+	segmenter   *Segmenter
 	testPayload []byte
-	logger      *zap.Logger
 }
 
 func (s *MessageSegmentationSuite) SetupSuite() {
@@ -39,30 +34,18 @@ func (s *MessageSegmentationSuite) SetupSuite() {
 }
 
 func (s *MessageSegmentationSuite) SetupTest() {
-	identity, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	s.logger, err = zap.NewDevelopment()
-	s.Require().NoError(err)
-
 	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
 		{
-			Names:     segmentationmigrations.AssetNames(),
-			AssetFunc: segmentationmigrations.Asset,
+			Names:     migrations.AssetNames(),
+			AssetFunc: migrations.Asset,
 		},
 	}))
 	s.Require().NoError(err)
 
-	s.sender, err = NewMessageSender(
-		identity,
-		nil,
-		nil,
-		segmentation.NewSQLitePersistence(db),
-		nil,
-		nil,
-		s.logger,
+	s.segmenter = NewSegmenter(
+		NewSQLitePersistence(db),
+		zap.Must(zap.NewDevelopment()),
 	)
-	s.Require().NoError(err)
 }
 
 func (s *MessageSegmentationSuite) SetupSubTest() {
@@ -146,13 +129,13 @@ func (s *MessageSegmentationSuite) TestHandleSegmentationLayer() {
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			segmentedMessages, err := segmentMessage(&wakutypes.NewMessage{Payload: s.testPayload}, int(math.Ceil(float64(len(s.testPayload))/float64(tc.segmentsCount))))
+			signer, err := crypto.GenerateKey()
+			s.Require().NoError(err)
+
+			segSize := (len(s.testPayload) + tc.segmentsCount - 1) / tc.segmentsCount // ceil[len(testPayload)/segmentsCount]
+			segmentedMessages, err := s.segmenter.Segment(s.testPayload, segSize)
 			s.Require().NoError(err)
 			s.Require().Len(segmentedMessages, tc.segmentsCount+tc.expectedParitySegmentsCount)
-
-			message := &types.Message{TransportLayer: types.TransportLayer{
-				SigPubKey: &s.sender.identity.PublicKey,
-			}}
 
 			messageRecreated := false
 			handledSegments := []int{}
@@ -160,20 +143,17 @@ func (s *MessageSegmentationSuite) TestHandleSegmentationLayer() {
 			for i, segmentIndex := range tc.retrievedSegments {
 				s.T().Log("i=", i, "segmentIndex=", segmentIndex)
 
-				message.TransportLayer.Payload = segmentedMessages[segmentIndex].Payload
-
-				err = s.sender.handleSegmentationLayer(message)
-
+				reconstructedPayload, err := s.segmenter.Reconstruct(segmentedMessages[segmentIndex], &signer.PublicKey)
 				handledSegments = append(handledSegments, segmentIndex)
 
 				if len(handledSegments) < tc.segmentsCount {
-					s.Require().ErrorIs(err, ErrMessageSegmentsIncomplete)
+					s.Require().ErrorIs(err, ErrIncomplete)
 				} else if len(handledSegments) == tc.segmentsCount {
 					s.Require().NoError(err)
-					s.Require().ElementsMatch(s.testPayload, message.TransportLayer.Payload)
+					s.Require().ElementsMatch(s.testPayload, reconstructedPayload)
 					messageRecreated = true
 				} else {
-					s.Require().ErrorIs(err, ErrMessageSegmentsAlreadyCompleted)
+					s.Require().ErrorIs(err, ErrAlreadyCompleted)
 				}
 			}
 
@@ -191,7 +171,7 @@ func (s *MessageSegmentationSuite) TestProtobufMissDecoding() {
 	// any byte sequence, and if the structure coincidentally matches valid encoding
 	// patterns (e.g., varint or byte fields), it produces seemingly valid but incorrect results.
 
-	segmentedMessage := types.SegmentMessage{
+	segmentedMessage := Message{
 		SegmentMessage: &protobuf.SegmentMessage{},
 	}
 

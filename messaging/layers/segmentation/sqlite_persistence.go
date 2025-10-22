@@ -7,8 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/messaging/layers/segmentation/protobuf"
 )
 
 type SQLitePersistence struct {
@@ -28,7 +27,7 @@ func (s *SQLitePersistence) IsMessageAlreadyCompleted(hash []byte) (bool, error)
 	return alreadyCompleted > 0, nil
 }
 
-func (s *SQLitePersistence) SaveMessageSegment(segment *types.SegmentMessage, sigPubKey *ecdsa.PublicKey, timestamp int64) error {
+func (s *SQLitePersistence) SaveMessageSegment(segment *Message, sigPubKey *ecdsa.PublicKey, timestamp int64) error {
 	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
 
 	_, err := s.db.Exec("INSERT INTO message_segments (hash, segment_index, segments_count, parity_segment_index, parity_segments_count, sig_pub_key, payload, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -38,7 +37,7 @@ func (s *SQLitePersistence) SaveMessageSegment(segment *types.SegmentMessage, si
 }
 
 // Get ordered message segments for given hash
-func (s *SQLitePersistence) GetMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey) ([]*types.SegmentMessage, error) {
+func (s *SQLitePersistence) GetMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey) ([]*Message, error) {
 	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
 
 	rows, err := s.db.Query(`
@@ -58,9 +57,9 @@ func (s *SQLitePersistence) GetMessageSegments(hash []byte, sigPubKey *ecdsa.Pub
 	}
 	defer rows.Close()
 
-	var segments []*types.SegmentMessage
+	var segments []*Message
 	for rows.Next() {
-		segment := &types.SegmentMessage{
+		segment := &Message{
 			SegmentMessage: &protobuf.SegmentMessage{},
 		}
 		err := rows.Scan(&segment.EntireMessageHash, &segment.Index, &segment.SegmentsCount, &segment.ParitySegmentIndex, &segment.ParitySegmentsCount, &segment.Payload)
