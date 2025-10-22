@@ -165,15 +165,13 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 LIBS_DIR := $(abspath ./libs)
-CGO_CFLAGS += -I$(LIBS_DIR)
-CGO_LDFLAGS += -L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
 $(GO_CMD_BUILDS): generate
+$(GO_CMD_BUILDS): export CGO_ENABLED=1
+$(GO_CMD_BUILDS): export CGO_CFLAGS=-I$(LIBS_DIR)
+$(GO_CMD_BUILDS): export CGO_LDFLAGS=-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
-	CGO_ENABLED=1 \
-	CGO_CFLAGS="$(CGO_CFLAGS)" \
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
@@ -215,28 +213,10 @@ fetch-libcodex:
 	rm -f $(LIBS_DIR)/codex*.zip
 
 # Add rpath to libstdc++ to avoid runtime errors with NIX
-ifeq ($(detected_OS),Darwin)
-	CXXLIB      := $(shell $(CXX) -print-file-name=libc++.1.dylib)
-	CXXLIB_DIR  := $(dir $(CXXLIB))
-	LD_PATH := $(LIBS_DIR):$(CXXLIB_DIR):$(DYLD_LIBRARY_PATH)
-    LD_NAME := DYLD_LIBRARY_PATH
-else ifeq ($(detected_OS),Windows)
-	CXXLIB      := $(shell $(CXX) -print-file-name=libstdc++-6.dll)
-	CXXLIB_DIR  := $(dir $(CXXLIB))
-	LD_PATH := $(LIBS_DIR);$(CXXLIB_DIR);$(PATH)
-    LD_NAME := PATH
-else
-	CXXLIB      := $(shell $(CXX) -print-file-name=libstdc++.so.6)
-	CXXLIB_DIR  := $(dir $(CXXLIB))
-	LD_PATH := $(LIBS_DIR):$(CXXLIB_DIR):$(LD_LIBRARY_PATH)
-    LD_NAME := LD_LIBRARY_PATH
-endif
-
+test-libcodex: export CGO_ENABLED=1
+test-libcodex: export CGO_CFLAGS="-I$(LIBS_DIR)"
+test-libcodex: export CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" 
 test-libcodex: |
-	$(LD_NAME)="$(LD_PATH)" \
-	CGO_ENABLED=1 \
-	CGO_CFLAGS="-I$(LIBS_DIR)" \
-	CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" \
 	go test -tags '$(BUILD_TAGS) use_codex' -run TestCodexStart ./codex/... -v -json | jq -r '.Output'
 
 clean-libcodex:
@@ -386,6 +366,14 @@ clean-libwaku:
 
 rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
+test: export CGO_ENABLED=1
+test: export CGO_CFLAGS=-I$(LIBS_DIR)
+test: export CGO_LDFLAGS=-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)
+ifeq ($(detected_OS),Darwin)
+test: export DYLD_LIBRARY_PATH := $(LIBS_DIR):$(DYLD_LIBRARY_PATH)
+else
+test: export LD_LIBRARY_PATH := $(LIBS_DIR):$(LD_LIBRARY_PATH)
+endif
 test: test-unit ##@tests Run basic, short tests during development
 
 test-unit-prep: generate
@@ -410,6 +398,7 @@ test-unit: ##@tests Run unit and integration tests
 test-unit-network: test-unit-prep
 test-unit-network: export UNIT_TEST_RERUN_FAILS ?= false
 test-unit-network: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./tests-unit-network/...)
+
 test-unit-network: ##@tests Run unit and integration tests with network access
 	./_assets/scripts/run_unit_tests.sh
 

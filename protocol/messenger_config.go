@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
+
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
@@ -76,6 +78,7 @@ type config struct {
 	clusterConfig          params.ClusterConfig
 	browserDatabase        *browsers.Database
 	torrentConfig          *params.TorrentConfig
+	codexConfig            codex.Config
 	walletService          *wallet.Service
 	communityTokensService communities.CommunityTokensServiceInterface
 	httpServer             *server.MediaServer
@@ -337,6 +340,13 @@ func WithAccountsPublisher(publisher *pubsub.Publisher) Option {
 func WithENSVerifier(ensVerifier *ens.Verifier) func(c *config) error {
 	return func(c *config) error {
 		c.ensVerifier = ensVerifier
+		return nil
+	}
+}
+
+func WithCodexConfig(codexConfig codex.Config) func(c *config) error {
+	return func(c *config) error {
+		c.codexConfig = codexConfig
 		return nil
 	}
 }

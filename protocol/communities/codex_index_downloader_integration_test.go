@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -39,14 +40,16 @@ type CodexIndexDownloaderIntegrationTestSuite struct {
 func (suite *CodexIndexDownloaderIntegrationTestSuite) SetupSuite() {
 	suite.host = communities.GetEnvOrDefault("CODEX_HOST", "localhost")
 	suite.port = communities.GetEnvOrDefault("CODEX_API_PORT", "8001")
-	suite.client = communities.NewCodexClient(suite.host, suite.port)
-
-	// Optional request timeout override
-	if ms := os.Getenv("CODEX_TIMEOUT_MS"); ms != "" {
-		if d, err := time.ParseDuration(ms + "ms"); err == nil {
-			suite.client.SetRequestTimeout(d)
-		}
+	client, err := communities.NewCodexClient(codex.Config{
+		DataDir:        suite.T().TempDir(),
+		LogFormat:      codex.LogFormatNoColors,
+		MetricsEnabled: false,
+		BlockRetries:   5,
+	})
+	if err != nil {
+		suite.T().Fatalf("Failed to create Codex client: %v", err)
 	}
+	suite.client = &client
 
 	// Create logger
 	suite.logger, _ = zap.NewDevelopment()

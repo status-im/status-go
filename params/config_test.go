@@ -29,6 +29,10 @@ func TestNewConfigFromJSON(t *testing.T) {
 			"DataDir": "` + tmpDir + `/archivedata",
 			"TorrentDir": "` + tmpDir + `/torrents"
 		},
+		"CodexConfig": {
+			"data-dir": "` + tmpDir + `/codexdata",
+			"block-retries": 5
+		},
 		"RuntimeLogLevel": "DEBUG"
 	}`
 	c, err := params.NewConfigFromJSON(json)
@@ -40,6 +44,8 @@ func TestNewConfigFromJSON(t *testing.T) {
 	require.Equal(t, tmpDir+"/archivedata", c.TorrentConfig.DataDir)
 	require.Equal(t, tmpDir+"/torrents", c.TorrentConfig.TorrentDir)
 	require.Equal(t, "DEBUG", c.RuntimeLogLevel)
+	require.Equal(t, tmpDir+"/codexdata", c.CodexConfig.DataDir)
+	require.Equal(t, 5, c.CodexConfig.BlockRetries)
 }
 
 // TestNodeConfigValidate checks validation of individual fields.
@@ -179,6 +185,18 @@ func TestNodeConfigValidate(t *testing.T) {
       }`,
 			Error: `TorrentConfig.DataDir and TorrentConfig.TorrentDir cannot be ""`,
 		},
+		// 	{
+		// 		Name: "Validate that CodexConfig.DataDir can't be empty string",
+		// 		Config: `{
+		// 			"NetworkId": 1,
+		// 			"RootDataDir": "/some/dir",
+		// 			"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
+		//     "CodexConfig": {
+		//       "data-dir": ""
+		//     }
+		//   }`,
+		// 		Error: `CodexConfig.DataDir cannot be ""`,
+		// 	},
 	}
 
 	for _, tc := range testCases {

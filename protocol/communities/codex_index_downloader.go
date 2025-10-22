@@ -13,6 +13,19 @@ import (
 	"go.uber.org/zap"
 )
 
+// ManifestResponse represents the response from Codex manifest API
+type ManifestResponse struct {
+	CID      string `json:"cid"`
+	Manifest struct {
+		TreeCID     string `json:"treeCid"`
+		DatasetSize int64  `json:"datasetSize"`
+		BlockSize   int    `json:"blockSize"`
+		Protected   bool   `json:"protected"`
+		Filename    string `json:"filename"`
+		Mimetype    string `json:"mimetype"`
+	} `json:"manifest"`
+}
+
 // CodexIndexDownloader handles downloading index files from Codex storage
 type CodexIndexDownloader struct {
 	codexClient      CodexClientInterface
@@ -79,25 +92,17 @@ func (d *CodexIndexDownloader) GotManifest() <-chan struct{} {
 				zap.String("indexCid", d.indexCid),
 				zap.Error(err))
 			// Don't close channel on error - let timeout handle it
-			// This is to fit better in the original status-go app
 			return
 		}
 
 		// Verify that the CID matches our configured indexCid
-		if manifest.CID != d.indexCid {
-			d.mu.Lock()
-			d.downloadError = fmt.Errorf("manifest CID mismatch: expected %s, got %s", d.indexCid, manifest.CID)
-			d.mu.Unlock()
-			d.logger.Debug("manifest CID mismatch",
-				zap.String("expected", d.indexCid),
-				zap.String("got", manifest.CID))
+		if manifest.Cid != d.indexCid {
+			// Don't close channel on error - let timeout handle it
 			return
 		}
 
 		// Store the dataset size for later use - this indicates success
-		d.mu.Lock()
-		d.datasetSize = manifest.Manifest.DatasetSize
-		d.mu.Unlock()
+		d.datasetSize = int64(manifest.DatasetSize)
 
 		// Success! Close the channel to signal completion
 		close(ch)

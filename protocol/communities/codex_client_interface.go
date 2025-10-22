@@ -3,7 +3,8 @@ package communities
 import (
 	"context"
 	"io"
-	"time"
+
+	"github.com/codex-storage/codex-go-bindings/codex"
 )
 
 //go:generate go tool mockgen -package=mock_communities -source=codex_client_interface.go -destination=mock/communities/codex_client_interface.go
@@ -21,16 +22,13 @@ type CodexClientInterface interface {
 	LocalDownloadWithContext(ctx context.Context, cid string, output io.Writer) error
 
 	// Async download methods
-	TriggerDownload(cid string) (*CodexManifest, error)
-	TriggerDownloadWithContext(ctx context.Context, cid string) (*CodexManifest, error)
+	TriggerDownload(cid string) (codex.Manifest, error)
+	TriggerDownloadWithContext(ctx context.Context, cid string) (codex.Manifest, error)
 
 	// Manifest methods
-	FetchManifestWithContext(ctx context.Context, cid string) (*CodexManifest, error)
+	FetchManifestWithContext(ctx context.Context, cid string) (codex.Manifest, error)
 
 	// CID management methods
 	HasCid(cid string) (bool, error)
 	RemoveCid(cid string) error
-
-	// Configuration methods
-	SetRequestTimeout(timeout time.Duration)
 }

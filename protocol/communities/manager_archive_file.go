@@ -32,11 +32,11 @@ import (
 
 type ArchiveFileManager struct {
 	torrentConfig *params.TorrentConfig
-
-	logger      *zap.Logger
-	persistence *Persistence
-	identity    *ecdsa.PrivateKey
-	messaging   *messaging.API
+	codexClient   *CodexClient
+	logger        *zap.Logger
+	persistence   *Persistence
+	identity      *ecdsa.PrivateKey
+	messaging     *messaging.API
 
 	publisher Publisher
 }
@@ -50,6 +50,10 @@ func NewArchiveFileManager(amc *ArchiveManagerConfig) *ArchiveFileManager {
 		messaging:     amc.Messaging,
 		publisher:     amc.Publisher,
 	}
+}
+
+func (m *ArchiveFileManager) SetCodexClient(codexClient *CodexClient) {
+	m.codexClient = codexClient
 }
 
 func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBytes, msgs []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
@@ -453,8 +457,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 			}
 
 			// upload archive to codex and get CID back
-			client := NewCodexClient("localhost", "8080") // make this configurable
-			cid, err := client.UploadArchive(encodedArchive)
+			cid, err := m.codexClient.UploadArchive(encodedArchive)
 			if err != nil {
 				m.logger.Error("failed to upload to codex", zap.Error(err))
 				return codexArchiveIDs, err
@@ -499,8 +502,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 		}
 
 		// upload index file to codex
-		client := NewCodexClient("localhost", "8080") // make this configurable
-		cid, err := client.UploadArchive(codexIndexBytes)
+		cid, err := m.codexClient.UploadArchive(codexIndexBytes)
 		if err != nil {
 			m.logger.Error("failed to upload to codex", zap.Error(err))
 			return codexArchiveIDs, err
@@ -717,10 +719,8 @@ func (m *ArchiveFileManager) ExtractMessagesFromCodexHistoryArchive(communityID 
 	metadata := index.Archives[archiveID]
 	cid := metadata.Cid
 
-	codexClient := NewCodexClient("localhost", "8001")
-
 	var buf bytes.Buffer
-	err = codexClient.LocalDownload(cid, &buf)
+	err = m.codexClient.LocalDownload(cid, &buf)
 	if err != nil {
 		m.logger.Error("failed to download archive from codex", zap.Error(err))
 		return nil, err
