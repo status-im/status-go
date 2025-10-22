@@ -16,12 +16,12 @@ in mkShell {
   name = "status-go-shell";
 
   buildInputs = with pkgs;
-    lib.optionals (stdenv.isDarwin) [ xcodeWrapper ] ++ [
+    lib.optionals (stdenv.isDarwin) [ xcodeWrapper llvmPackages.openmp ] ++ [
     git jq which
     go golangci-lint go-junit-report gopls codecov-cli go-generate-fast
     protobuf3_24 protoc-gen-go gotestsum openjdk openssl
     rustc cargo
-  ];
+  ] ++ lib.optionals (!stdenv.isDarwin) [ gcc ];
 
   shellHook = lib.optionalString (!isMacM1) ''
     ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
@@ -30,6 +30,9 @@ in mkShell {
     ANDROID_NDK_HOME=$ANDROID_NDK
   '' + lib.optionalString (stdenv.isDarwin) ''
     export PATH="/usr/bin:$PATH"
+    export DYLD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.llvmPackages.openmp ]}:$DYLD_LIBRARY_PATH
+  '' + lib.optionalString (!stdenv.isDarwin) ''
+    export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.libgcc.lib ]}:$LD_LIBRARY_PATH
   '';
   # Sandbox causes Xcode issues on MacOS. Requires sandbox=relaxed.
   # https://github.com/status-im/status-mobile/pull/13912
