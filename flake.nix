@@ -42,11 +42,20 @@
         };
         overlays = [
           pkgsOverlay
-          (final: prev: {
+          (final: prev: let
+            libSds = nim-sds.packages.${system}.libsds;
+          in {
             # Make nwaku available
             nwaku = nwaku.packages.${system};
-            nim-sds-src = nim-sds.sourceInfo.outPath;
-            lib-sds-pkg = nim-sds.packages.${system}.libsds;
+
+            # Wrap nim-sds package so its dependencies propagate
+            lib-sds-pkg = libSds.overrideAttrs (old: {
+              propagatedBuildInputs = with final; [
+                openssl
+                gmp
+                nim-unwrapped-2_2
+              ];
+            });
           })
         ];
       }
