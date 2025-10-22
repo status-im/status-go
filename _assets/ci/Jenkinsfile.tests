@@ -133,6 +133,8 @@ pipeline {
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"
         NWAKU_REST_PORT = "${env.NWAKU_REST_PORT}"
+        NIM_SDS_HEADER_PATH = "${REPO_SRC}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library/"
+        NIM_SDS_LIB_PATH    = "${REPO_SRC}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/"
       }
       steps { script {
         def ipAddress = sh(script: "hostname -I | awk '{print \$1}'", returnStdout: true).trim()
