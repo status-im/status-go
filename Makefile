@@ -291,6 +291,8 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
+generate-sds: export NIM_SDS_HEADER_PATH=$(GIT_ROOT)vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library
+generate-sds: export NIM_SDS_LIB_PATH=$(GIT_ROOT)vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build
 generate-sds:  ##@ Build libsds third_party
 	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build
 
@@ -298,8 +300,6 @@ generate-sds-android:  ##@ Build libsds third_party for Android
 	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build-android
 
 generate: generate-sds
-generate: export NIM_SDS_HEADER_PATH=$(GIT_ROOT)vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library
-generate: export NIM_SDS_LIB_PATH=$(GIT_ROOT)vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build
 generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
 generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
 generate: export GO_GENERATE_FAST_DEBUG ?= false
