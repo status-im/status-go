@@ -32,7 +32,6 @@ import (
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/syncing"
@@ -2282,11 +2281,6 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		}
 	}
 
-	err = m.addPeersyncingMessage(chat, state.CurrentMessageState.StatusMessage)
-	if err != nil {
-		m.logger.Warn("failed to add peersyncing message", zap.Error(err))
-	}
-
 	receivedAContactRequest := false
 	// If we receive some propagated state from someone who's not
 	// our paired device, we handle it
@@ -2388,28 +2382,6 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	state.Response.AddMessage(receivedMessage)
 
 	return nil
-}
-
-func (m *Messenger) addPeersyncingMessage(chat *Chat, msg *messagingtypes.Message) error {
-	if msg == nil {
-		return nil
-	}
-	var syncMessageType peersyncing.SyncMessageType
-	if chat.OneToOne() {
-		syncMessageType = peersyncing.SyncMessageOneToOneType
-	} else if chat.CommunityChat() {
-		syncMessageType = peersyncing.SyncMessageCommunityType
-	} else if chat.PrivateGroupChat() {
-		syncMessageType = peersyncing.SyncMessagePrivateGroup
-	}
-	syncMessage := peersyncing.SyncMessage{
-		Type:      syncMessageType,
-		ID:        msg.ApplicationLayer.ID,
-		ChatID:    []byte(chat.ID),
-		Payload:   msg.EncryptionLayer.Payload,
-		Timestamp: uint64(msg.TransportLayer.Message.Timestamp),
-	}
-	return m.peersyncing.Add(syncMessage)
 }
 
 func (m *Messenger) HandleChatMessage(state *ReceivedMessageState, message *protobuf.ChatMessage, statusMessage *messagingtypes.Message, fromArchive bool) error {

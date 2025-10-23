@@ -428,11 +428,6 @@ class WakuextService(Service):
         response = self.rpc_request("setSyncingOnMobileNetwork", params)
         return response
 
-    def toggle_peer_syncing(self, enabled: bool):
-        args = {"enabled": enabled}
-        response = self.rpc_request("togglePeerSyncing", [args])
-        return response
-
     def status_updates(self):
         params = []
         response = self.rpc_request("statusUpdates", params)
