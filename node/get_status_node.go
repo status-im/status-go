@@ -43,6 +43,7 @@ import (
 	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/services/newsfeed"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcstats"
@@ -123,6 +124,7 @@ type StatusNode struct {
 	connectorSrvc          *connector.Service
 	appGeneralSrvc         *appgeneral.Service
 	ethSrvc                *eth.Service
+	newsfeedSrvc           *newsfeed.Service
 
 	walletFeed        event.Feed
 	accountsPublisher *pubsub.Publisher
@@ -333,6 +335,12 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 		return err
 	}
 
+	// Run migrations
+	err := n.runServicesMigrations()
+	if err != nil {
+		return errorspkg.Wrap(err, "failed to run services migrations")
+	}
+
 	// Register services
 
 	for _, service := range n.services {
@@ -346,7 +354,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 
 	// Start services
 
-	err := n.timeSourceSrvc.Start(context.Background())
+	err = n.timeSourceSrvc.Start(context.Background())
 	if err != nil {
 		return errorspkg.Wrap(err, "failed to start time source")
 	}
@@ -456,6 +464,7 @@ func (n *StatusNode) Stop() error {
 	n.publicMethods = make(map[string]bool)
 	n.pendingTracker = nil
 	n.appGeneralSrvc = nil
+	n.newsfeedSrvc = nil
 
 	n.logger.Debug("status node stopped")
 	return errors.Join(errs...)

@@ -7,9 +7,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cockroachdb/errors"
+
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/protocol/sqlite"
+	protocolsqlite "github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/services/newsfeed"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -64,9 +67,14 @@ func generateAppDB(outDir string) error {
 		return err
 	}
 
-	err = sqlite.Migrate(db)
+	err = protocolsqlite.Migrate(db)
 	if err != nil {
 		return err
+	}
+
+	err = newsfeed.SQLiteMigrate(db)
+	if err != nil {
+		return errors.Wrap(err, "failed to migrate newsfeed")
 	}
 
 	return nil
