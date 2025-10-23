@@ -179,6 +179,17 @@ ifeq ($(USE_NWAKU),true)
 	@echo "Building libwaku"
 	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
 endif
+build-libwaku: $(LIBWAKU)
+
+test-libwaku: | $(LIBWAKU)
+	go test -tags '$(BUILD_TAGS) use_nwaku' -run TestDial ./wakuv2/... -count 1 -v -json | jq -r '.Output'
+
+clean-libwaku:
+	@echo "Removing libwaku"
+	rm $(LIBWAKU)
+
+rebuild-libwaku: | clean-libwaku $(LIBWAKU)
+
 
 statusgo: ##@build Build status-go as status-backend server
 statusgo: build/bin/status-backend
@@ -221,8 +232,6 @@ statusgo-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-g
 		./build/bin/statusgo-lib
 	@echo "Static library built:"
 	@ls -la build/bin/libstatus.*
-
-build-libwaku: $(LIBWAKU)
 
 statusgo-shared-library: generate
 statusgo-shared-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as shared library for current platform
@@ -313,15 +322,6 @@ lint-fix:
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
-
-test-libwaku: | $(LIBWAKU)
-	go test -tags '$(BUILD_TAGS) use_nwaku' -run TestDial ./wakuv2/... -count 1 -v -json | jq -r '.Output'
-
-clean-libwaku:
-	@echo "Removing libwaku"
-	rm $(LIBWAKU)
-
-rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
 test: test-unit ##@tests Run basic, short tests during development
 
