@@ -28,7 +28,16 @@ in mkShell {
     lib-sds-pkg
   ];
 
-  shellHook = lib.optionalString (!isMacM1) ''
+  shellHook = ''
+    export NIM_SDS_LIB_PATH=${pkgs.lib-sds-pkg}/lib
+    export NIM_SDS_HEADER_PATH=${pkgs.lib-sds-pkg}/include
+
+    export CGO_CFLAGS="-I$NIM_SDS_HEADER_PATH"
+    export CGO_LDFLAGS="-L$NIM_SDS_LIB_PATH -lsds -Wl,-rpath,$NIM_SDS_LIB_PATH"
+    export LD_LIBRARY_PATH="$NIM_SDS_LIB_PATH"
+
+  ''
+  + lib.optionalString (!isMacM1) ''
     export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
     export ANDROID_NDK=\$ANDROID_HOME/ndk-bundle
     export ANDROID_SDK_ROOT=\$ANDROID_HOME
