@@ -10,18 +10,6 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# ---------------------------------------------------------
-# Install Nim 2.2.4
-# ---------------------------------------------------------
-ENV NIM_VERSION=2.2.4
-ENV PATH=/root/.nimble/bin:$PATH
-
-RUN curl https://nim-lang.org/choosenim/init.sh -sSf -o init.sh && \
-    bash init.sh -y && \
-    rm init.sh && \
-    choosenim $NIM_VERSION && \
-    nim --version
-# ---------------------------------------------------------
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
@@ -40,6 +28,7 @@ ARG enable_go_cache=true
 RUN if [ "$enable_go_cache" = "true" ]; then \
       go env -w GOCACHE=/root/.cache/go-build; \
     fi
+RUN rm /go/src/github.com/status-im/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/vendor/nimbus-build-system/vendor/Nim/bin/nim*
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
     --mount=type=cache,target="/root/.cache/go-generate-fast",id=statusgo-build-$cache_id \
     make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" \

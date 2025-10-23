@@ -92,6 +92,11 @@ GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
+export NIM_SDS_HEADER_PATH=$(GIT_ROOT)/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library
+export NIM_SDS_LIB_PATH=$(GIT_ROOT)/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build
+export CGO_CFLAGS=-I${NIM_SDS_HEADER_PATH}/
+export CGO_LDFLAGS=-L${NIM_SDS_LIB_PATH}/ -lsds -Wl,-rpath,${NIM_SDS_LIB_PATH}/
+
 BUILD_TAGS ?= gowaku_no_rln
 
 ifeq ($(USE_NWAKU), true)
@@ -203,7 +208,7 @@ run-status-backend: ##@run Start status-backend server listening to localhost:PO
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
 
-cmd: ##@build Build all public apps in ./cmd
+cmd: generate-sds
 cmd: status-backend push-notification-server
 
 status-go-deps:
@@ -291,8 +296,6 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
-generate-sds: export NIM_SDS_HEADER_PATH=$(GIT_ROOT)vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library
-generate-sds: export NIM_SDS_LIB_PATH=$(GIT_ROOT)vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build
 generate-sds:  ##@ Build libsds third_party
 	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build
 
