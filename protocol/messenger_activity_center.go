@@ -247,6 +247,10 @@ func (m *Messenger) MarkActivityCenterNotificationsDeleted(ctx context.Context, 
 	return response, nil
 }
 
+func (m *Messenger) AddActivityCenterNotification(response *MessengerResponse, notification *ActivityCenterNotification, syncAction func(context.Context, []types.HexBytes, uint64) error) error {
+	return m.addActivityCenterNotification(response, notification, syncAction)
+}
+
 func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, notification *ActivityCenterNotification, syncAction func(context.Context, []types.HexBytes, uint64) error) error {
 	_, err := m.persistence.SaveActivityCenterNotification(notification, true)
 	if err != nil {

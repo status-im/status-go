@@ -390,6 +390,20 @@ func (b *StatusNode) timeSourceNow() func() time.Time {
 	return b.TimeSource().Now
 }
 
+type NewsFeedActivityCenter struct {
+	m *protocol.Messenger
+}
+
+func NewNewsFeedActivityCenter(m *protocol.Messenger) *NewsFeedActivityCenter {
+	return &NewsFeedActivityCenter{
+		m: m,
+	}
+}
+
+func (ac *NewsFeedActivityCenter) AddNotification(response *protocol.MessengerResponse, notification *protocol.ActivityCenterNotification) error {
+	return ac.m.AddActivityCenterNotification(response, notification, nil)
+}
+
 func (b *StatusNode) Cleanup() error {
 	if b.Config() != nil && b.Config().WalletConfig.Enabled {
 		if b.walletSrvc != nil {
