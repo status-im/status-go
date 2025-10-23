@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -43,11 +44,9 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
-	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -167,10 +166,6 @@ type Messenger struct {
 
 	// enables control over chat messages iteration
 	retrievedMessagesIteratorFactory func(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) MessagesIterator
-
-	peersyncing         *peersyncing.PeerSyncing
-	peersyncingOffers   map[string]uint64
-	peersyncingRequests map[string]uint64
 
 	newsFeedManager *newsfeed.NewsFeedManager
 }
@@ -420,9 +415,6 @@ func NewMessenger(
 		database:              database,
 		multiAccounts:         c.multiAccount,
 		settings:              settings,
-		peersyncing:           peersyncing.New(peersyncing.Config{Database: database, Timesource: messaging}),
-		peersyncingOffers:     make(map[string]uint64),
-		peersyncingRequests:   make(map[string]uint64),
 		verificationDatabase:  verification.NewPersistence(database),
 		mailserversDatabase:   c.mailserversDatabase,
 		account:               c.account,
@@ -599,7 +591,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 			return nil, err
 		}
 	}
-	m.startPeerSyncingLoop()
 	m.startSyncSettingsLoop()
 	m.startSettingsChangesLoop()
 	m.startCommunityRekeyLoop()
@@ -2056,37 +2047,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			return err
 		}
 
-		var syncMessageType peersyncing.SyncMessageType
-		if chat.OneToOne() {
-			syncMessageType = peersyncing.SyncMessageOneToOneType
-		} else if chat.CommunityChat() {
-			syncMessageType = peersyncing.SyncMessageCommunityType
-		} else if chat.PrivateGroupChat() {
-			syncMessageType = peersyncing.SyncMessagePrivateGroup
-		}
-
-		wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender)
-		if err != nil {
-			return errors.Wrap(err, "failed to wrap message")
-		}
-
-		syncMessage := peersyncing.SyncMessage{
-			Type:      syncMessageType,
-			ID:        types.Hex2Bytes(rawMessage.ID),
-			ChatID:    []byte(chat.ID),
-			Payload:   wrappedMessage,
-			Timestamp: m.getTimesource().GetCurrentTime() / 1000,
-		}
-
-		// If the chat type is not supported, skip saving it
-		if syncMessageType == 0 {
-			return nil
-		}
-
 		// ensure that the message is saved only once
 		rawMessage.BeforeDispatch = nil
 
-		return m.peersyncing.Add(syncMessage)
+		return m.persistence.SaveMessages([]*common.Message{message})
 	}
 
 	rawMessage, err = m.dispatchMessage(ctx, rawMessage)
@@ -3165,10 +3129,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 				Messages:   statusMessages,
 			})
 
-			err = m.handleDatasyncMetadata(handleMessagesResponse)
-			if err != nil {
-				m.logger.Warn("failed to handle datasync metadata", zap.Error(err))
-			}
+			m.markDeliveredMessages(handleMessagesResponse.DatasyncAcks)
 
 			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
 
@@ -3272,6 +3233,45 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 	}
 
 	return m.saveDataAndPrepareResponse(messageState)
+}
+
+func (m *Messenger) markDeliveredMessages(acks [][]byte) {
+	for _, ack := range acks {
+		//get message ID from database by datasync ID, with at-least-one
+		// semantic
+		messageIDBytes, err := m.messaging.MarkAsConfirmed(ack, true)
+		if err != nil {
+			m.logger.Info("got datasync acknowledge for message we don't have in db", zap.String("ack", hex.EncodeToString(ack)))
+			continue
+		}
+
+		messageID := messageIDBytes.String()
+		//mark messages as delivered
+
+		m.logger.Debug("got datasync acknowledge for message", zap.String("ack", hex.EncodeToString(ack)), zap.String("messageID", messageID))
+
+		err = m.UpdateMessageOutgoingStatus(messageID, common.OutgoingStatusDelivered)
+		if err != nil {
+			m.logger.Debug("Can't set message status as delivered", zap.Error(err))
+		}
+
+		err = m.UpdateRawMessageSent(messageID, true)
+		if err != nil {
+			m.logger.Debug("can't set raw message as sent", zap.Error(err))
+		}
+
+		m.messaging.ConfirmMessageDelivered(messageID)
+
+		//send signal to client that message status updated
+		if m.config.messengerSignalsHandler != nil {
+			message, err := m.persistence.MessageByID(messageID)
+			if err != nil {
+				m.logger.Debug("Can't get message from database", zap.Error(err))
+				continue
+			}
+			m.config.messengerSignalsHandler.MessageDelivered(message.LocalChatID, messageID)
+		}
+	}
 }
 
 func (m *Messenger) deleteNotification(response *MessengerResponse, installationID string) error {

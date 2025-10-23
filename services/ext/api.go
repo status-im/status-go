@@ -1274,10 +1274,6 @@ func (api *PublicAPI) ToggleUseMailservers(value bool) error {
 	return api.service.messenger.ToggleUseMailservers(value)
 }
 
-func (api *PublicAPI) TogglePeerSyncing(request *requests.TogglePeerSyncingRequest) error {
-	return api.service.messenger.TogglePeerSyncing(request)
-}
-
 func (api *PublicAPI) SetSyncingOnMobileNetwork(request *requests.SetSyncingOnMobileNetwork) error {
 	return api.service.messenger.SetSyncingOnMobileNetwork(request)
 }

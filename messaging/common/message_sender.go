@@ -789,35 +789,26 @@ func (s *MessageSender) SendPublic(
 
 // unwrapDatasyncMessage tries to unwrap message as datasync one and in case of success
 // returns cloned messages with replaced payloads
-func (s *MessageSender) unwrapDatasyncMessage(m *messagingtypes.Message, response *handleMessageResponse) error {
-
+func (s *MessageSender) unwrapDatasyncMessage(m *messagingtypes.Message) ([]*messagingtypes.Message, [][]byte, error) {
 	datasyncMessage, err := s.datasync.Unwrap(
 		m.SigPubKey(),
 		m.EncryptionLayer.Payload,
 	)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
-	response.DatasyncSender = m.SigPubKey()
-	response.DatasyncAcks = append(response.DatasyncAcks, datasyncMessage.Acks...)
-	response.DatasyncRequests = append(response.DatasyncRequests, datasyncMessage.Requests...)
-	for _, o := range datasyncMessage.GroupOffers {
-		for _, mID := range o.MessageIds {
-			response.DatasyncOffers = append(response.DatasyncOffers, messagingtypes.DatasyncOffer{GroupID: o.GroupId, MessageID: mID})
-		}
-	}
-
+	var statusMessages []*messagingtypes.Message
 	for _, ds := range datasyncMessage.Messages {
 		message, err := m.Clone()
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 		message.EncryptionLayer.Payload = ds.Body
-		response.DatasyncMessages = append(response.DatasyncMessages, message)
-
+		statusMessages = append(statusMessages, message)
 	}
-	return nil
+
+	return statusMessages, datasyncMessage.Acks, nil
 }
 
 // HandleMessages expects a whisper message as input, and it will go through
@@ -877,23 +868,15 @@ func (s *MessageSender) HandleMessages(msg *messagingtypes.ReceivedMessage) (*me
 
 func (h *handleMessageResponse) toPublicResponse() *messagingtypes.HandleMessageResponse {
 	return &messagingtypes.HandleMessageResponse{
-		Hash:             h.Hash,
-		StatusMessages:   h.Messages(),
-		DatasyncSender:   h.DatasyncSender,
-		DatasyncAcks:     h.DatasyncAcks,
-		DatasyncOffers:   h.DatasyncOffers,
-		DatasyncRequests: h.DatasyncRequests,
+		StatusMessages: h.Messages(),
+		DatasyncAcks:   h.DatasyncAcks,
 	}
 }
 
 type handleMessageResponse struct {
-	Hash             []byte
 	Message          *messagingtypes.Message
 	DatasyncMessages []*messagingtypes.Message
-	DatasyncSender   *ecdsa.PublicKey
 	DatasyncAcks     [][]byte
-	DatasyncOffers   []messagingtypes.DatasyncOffer
-	DatasyncRequests [][]byte
 }
 
 func (h *handleMessageResponse) Messages() []*messagingtypes.Message {
@@ -909,7 +892,6 @@ func (s *MessageSender) handleMessage(receivedMsg *messagingtypes.ReceivedMessag
 	message := &messagingtypes.Message{}
 
 	response := &handleMessageResponse{
-		Hash:             receivedMsg.Hash,
 		Message:          message,
 		DatasyncMessages: []*messagingtypes.Message{},
 		DatasyncAcks:     [][]byte{},
@@ -942,8 +924,11 @@ func (s *MessageSender) handleMessage(receivedMsg *messagingtypes.ReceivedMessag
 	}
 
 	if s.datasync != nil && s.datasyncEnabled {
-		err := s.unwrapDatasyncMessage(message, response)
-		if err != nil {
+		statusMessages, datasyncAcks, err := s.unwrapDatasyncMessage(message)
+		if err == nil {
+			response.DatasyncMessages = append(response.DatasyncMessages, statusMessages...)
+			response.DatasyncAcks = append(response.DatasyncAcks, datasyncAcks...)
+		} else {
 			hlogger.Debug("failed to handle datasync message", zap.Error(err))
 		}
 	}

@@ -222,7 +222,6 @@ type Settings struct {
 	CollectibleGroupByCollection        bool                          `json:"collectible-group-by-collection?,omitempty"`
 	CollectibleGroupByCommunity         bool                          `json:"collectible-group-by-community?,omitempty"`
 	URLUnfurlingMode                    URLUnfurlingModeType          `json:"url-unfurling-mode,omitempty"`
-	PeerSyncingEnabled                  bool                          `json:"peer-syncing-enabled?,omitempty"`
 	AutoRefreshTokensEnabled            bool                          `json:"auto-refresh-tokens-enabled,omitempty"`
 	LastTokensUpdate                    time.Time                     `json:"last-tokens-update,omitempty"`
 	ThirdpartyServicesEnabled           bool                          `json:"thirdparty_services_enabled,omitempty"`
