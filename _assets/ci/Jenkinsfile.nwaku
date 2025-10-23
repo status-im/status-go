@@ -79,6 +79,8 @@ pipeline {
                 sh "mkdir -p \$(dirname ${REPO_SRC})"
                 sh "ln -s ${WORKSPACE} ${REPO_SRC}"
               }
+            // Clean up any existing nwaku directory
+            sh "rm -rf ${NWAKU_SOURCE_DIR} || true"
           }
       }
   }
@@ -141,6 +143,7 @@ pipeline {
      success { script { github.notifyPR(true) } }
      failure { script { github.notifyPR(false) } }
      cleanup {
+       sh "rm -rf ${env.NWAKU_SOURCE_DIR} || true"
        cleanWs()
        dir("${env.WORKSPACE}@tmp") { deleteDir() }
      }
