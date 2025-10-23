@@ -8,13 +8,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	mvdsnode "github.com/status-im/mvds/node"
+	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
 	datasyncproto "github.com/status-im/mvds/protobuf"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
 	messagesendermigrations "github.com/status-im/status-go/messaging/common/migrations"
-	"github.com/status-im/status-go/messaging/datasync"
 	"github.com/status-im/status-go/messaging/layers/encryption"
 	encryptionmigrations "github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/messaging/layers/segmentation"
@@ -77,6 +77,9 @@ func (s *MessageSenderSuite) SetupTest() {
 			AssetFunc: messagesendermigrations.Asset,
 		},
 	}))
+	s.Require().NoError(err)
+
+	err = mvdsmigrations.Migrate(db)
 	s.Require().NoError(err)
 
 	encryptionProtocol := encryption.New(
@@ -165,9 +168,6 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	ds := datasync.New(nil, nil, false, s.sender.logger)
-	s.sender.datasync = ds
-
 	dataSyncMessage := datasyncproto.Payload{
 		Messages: []*datasyncproto.Message{
 			{Body: wrappedPayload},
@@ -178,6 +178,9 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	message := &messagingtypes.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = marshalledDataSyncMessage
+
+	err = s.sender.StartReliability(nil, nil)
+	s.Require().NoError(err)
 
 	response, err := s.sender.HandleMessages(message)
 	s.Require().NoError(err)
@@ -241,8 +244,8 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = encryptedPayload
 
-	ds := datasync.New(nil, nil, false, s.sender.logger)
-	s.sender.datasync = ds
+	err = s.sender.StartReliability(nil, nil)
+	s.Require().NoError(err)
 
 	response, err := s.sender.HandleMessages(message)
 	s.Require().NoError(err)

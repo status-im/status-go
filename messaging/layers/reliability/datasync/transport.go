@@ -27,6 +27,8 @@ type NodeTransport struct {
 	dispatch func(state.PeerID, *protobuf.Payload) error
 }
 
+var _ transport.Transport = (*NodeTransport)(nil)
+
 func NewNodeTransport() *NodeTransport {
 	return &NodeTransport{
 		packets: make(chan transport.Packet),
