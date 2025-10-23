@@ -63,6 +63,7 @@ type ArchiveManager struct {
 	torrentClient                *torrent.Client
 	codexConfig                  *codex.Config
 	codexClient                  *CodexClient
+	isCodexClientStarted         bool
 	torrentTasks                 map[string]metainfo.Hash
 	indexCidTasks                map[string]string
 	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
@@ -108,7 +109,7 @@ func (m *ArchiveManager) SetOnline(online bool) {
 			}
 		}
 
-		if m.codexConfig != nil && !m.codexClientStarted() {
+		if m.codexConfig != nil && !m.isCodexClientStarted {
 			err := m.StartCodexClient()
 			if err != nil {
 				m.logger.Error("couldn't start codex client", zap.Error(err))
@@ -219,7 +220,7 @@ func (m *ArchiveManager) StartCodexClient() error {
 		return fmt.Errorf("can't start codex client: missing codexConfig")
 	}
 
-	if m.codexClientStarted() {
+	if m.isCodexClientStarted {
 		return nil
 	}
 
@@ -230,12 +231,13 @@ func (m *ArchiveManager) StartCodexClient() error {
 	}
 	m.codexClient = &client
 	m.ArchiveFileManager.codexClient = &client
+	m.isCodexClientStarted = true
 
 	return m.codexClient.Start()
 }
 
 func (m *ArchiveManager) Stop() error {
-	if m.torrentClientStarted() || m.codexClientStarted() {
+	if m.torrentClientStarted() || m.isCodexClientStarted {
 		m.stopHistoryArchiveTasksIntervals()
 	}
 
@@ -246,7 +248,7 @@ func (m *ArchiveManager) Stop() error {
 		m.torrentClient = nil
 	}
 
-	if m.codexClientStarted() {
+	if m.isCodexClientStarted {
 		m.logger.Info("Stopping codex client")
 
 		e := m.codexClient.Stop()
@@ -259,6 +261,7 @@ func (m *ArchiveManager) Stop() error {
 			errs = append(errs, e)
 		}
 
+		m.isCodexClientStarted = false
 		m.codexClient = nil
 	}
 
@@ -273,10 +276,6 @@ func (m *ArchiveManager) torrentClientStarted() bool {
 	return m.torrentClient != nil
 }
 
-func (m *ArchiveManager) codexClientStarted() bool {
-	return m.codexClient != nil
-}
-
 func (m *ArchiveManager) IsReady() bool {
 	// Simply checking for `torrentConfig.Enabled` isn't enough
 	// as there's a possibility that the torrent client couldn't
@@ -284,7 +283,7 @@ func (m *ArchiveManager) IsReady() bool {
 	return m.torrentConfig != nil &&
 		m.torrentConfig.Enabled &&
 		m.torrentClientStarted() &&
-		m.codexClientStarted()
+		m.isCodexClientStarted
 }
 
 func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error) {
