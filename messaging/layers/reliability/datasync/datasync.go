@@ -10,7 +10,7 @@ import (
 	datasynctransport "github.com/status-im/mvds/transport"
 	"go.uber.org/zap"
 
-	datasyncpeer "github.com/status-im/status-go/messaging/datasync/peer"
+	datasyncpeer "github.com/status-im/status-go/messaging/layers/reliability/datasync/peer"
 )
 
 type DataSync struct {

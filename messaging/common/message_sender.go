@@ -9,9 +9,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
-	datasyncnode "github.com/status-im/mvds/node"
-	datasyncproto "github.com/status-im/mvds/protobuf"
-	"github.com/status-im/mvds/state"
+	mvdsnode "github.com/status-im/mvds/node"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -21,11 +19,10 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging/adapters"
-	"github.com/status-im/status-go/messaging/datasync"
-	datasyncpeer "github.com/status-im/status-go/messaging/datasync/peer"
 	messagingevents "github.com/status-im/status-go/messaging/events"
 	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
+	"github.com/status-im/status-go/messaging/layers/reliability"
 	"github.com/status-im/status-go/messaging/layers/segmentation"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
@@ -37,9 +34,6 @@ import (
 
 // Whisper message properties.
 const (
-	// largeSizeInBytes is when should we be using a lower POW.
-	// Roughly this is 50KB
-	largeSizeInBytes              = 50000
 	maxMessageSenderEphemeralKeys = 3
 )
 
@@ -48,17 +42,14 @@ const (
 var RekeyCompatibility = true
 
 type MessageSender struct {
-	identity            *ecdsa.PrivateKey
-	datasync            *datasync.DataSync
-	datasyncPersistence datasyncnode.Persistence
-	transport           *transport.Transport
-	segmenter           *segmentation.Segmenter
-	protocol            *encryption.Protocol
-	logger              *zap.Logger
-	persistence         messagingtypes.MessageSenderPersistence
-	publisher           *pubsub.Publisher
-
-	datasyncEnabled bool
+	identity    *ecdsa.PrivateKey
+	transport   *transport.Transport
+	segmenter   *segmentation.Segmenter
+	protocol    *encryption.Protocol
+	reliability *reliability.Reliability
+	logger      *zap.Logger
+	persistence messagingtypes.MessageSenderPersistence
+	publisher   *pubsub.Publisher
 
 	// ephemeralKeys is a map that contains the ephemeral keys of the client, used
 	// to decrypt messages
@@ -72,23 +63,24 @@ type MessageSender struct {
 func NewMessageSender(
 	identity *ecdsa.PrivateKey,
 	persistence messagingtypes.MessageSenderPersistence,
-	datasyncPersistence datasyncnode.Persistence,
+	mvdsPersistence mvdsnode.Persistence,
 	segmentationPersistence segmentation.Persistence,
 	transport *transport.Transport,
-	enc *encryption.Protocol,
+	encryptor *encryption.Protocol,
 	logger *zap.Logger,
 ) (*MessageSender, error) {
+	logger = logger.Named("message_sender")
+
 	p := &MessageSender{
-		identity:            identity,
-		datasyncPersistence: datasyncPersistence,
-		datasyncEnabled:     true, // FIXME
-		transport:           transport,
-		segmenter:           segmentation.NewSegmenter(segmentationPersistence, logger),
-		protocol:            enc,
-		persistence:         persistence,
-		publisher:           pubsub.NewPublisher(),
-		logger:              logger,
-		ephemeralKeys:       make(map[string]*ecdsa.PrivateKey),
+		identity:      identity,
+		transport:     transport,
+		segmenter:     segmentation.NewSegmenter(segmentationPersistence, logger),
+		protocol:      encryptor,
+		reliability:   reliability.NewReliability(mvdsPersistence, identity, logger),
+		persistence:   persistence,
+		publisher:     pubsub.NewPublisher(),
+		logger:        logger,
+		ephemeralKeys: make(map[string]*ecdsa.PrivateKey),
 	}
 
 	return p, nil
@@ -96,38 +88,11 @@ func NewMessageSender(
 
 func (s *MessageSender) Stop() {
 	s.publisher.Close()
-	s.StopDatasync()
+	s.StopReliability()
 }
 
 func (s *MessageSender) SetHandleSharedSecrets(handler func([]*sharedsecret.Secret) error) {
 	s.handleSharedSecrets = handler
-}
-
-func (s *MessageSender) StartDatasync(statusChangeEvent chan datasyncnode.PeerStatusChangeEvent, handler func(peer state.PeerID, payload *datasyncproto.Payload) error) error {
-	if !s.datasyncEnabled {
-		return nil
-	}
-
-	dataSyncTransport := datasync.NewNodeTransport()
-	dataSyncNode, err := datasyncnode.NewPersistentNode(
-		s.datasyncPersistence,
-		dataSyncTransport,
-		datasyncpeer.PublicKeyToPeerID(s.identity.PublicKey),
-		datasyncnode.BATCH,
-		datasync.CalculateSendTime,
-		statusChangeEvent,
-		s.logger,
-	)
-	if err != nil {
-		return err
-	}
-
-	s.datasync = datasync.New(dataSyncNode, dataSyncTransport, true, s.logger)
-
-	s.datasync.Init(handler, s.logger)
-	s.datasync.Start(datasync.DatasyncTicker)
-
-	return nil
 }
 
 // SendPrivate takes encoded data, encrypts it and sends through the wire.
@@ -448,25 +413,10 @@ func (s *MessageSender) sendPrivate(
 	// earlier than the scheduled
 	s.notifyOnScheduledMessage(recipient, rawMessage)
 
-	if s.datasync != nil && s.datasyncEnabled && rawMessage.ResendType == messagingtypes.ResendTypeDataSync {
-		// No need to call transport tracking.
-		// It is done in a data sync dispatch step.
-		datasyncID, err := s.addToDataSync(recipient, wrappedMessage)
+	if rawMessage.ResendType == messagingtypes.ResendTypeDataSync {
+		err = s.sendWithReliability(recipient, messageID, wrappedMessage)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to send message with datasync")
-		}
-		// We don't need to receive confirmations from our own devices
-		if !crypto.IsPubKeyEqual(recipient, &s.identity.PublicKey) {
-			confirmation := &messagingtypes.RawMessageConfirmation{
-				DataSyncID: datasyncID,
-				MessageID:  messageID,
-				PublicKey:  crypto.CompressPubkey(recipient),
-			}
-
-			err = s.persistence.InsertPendingConfirmation(confirmation)
-			if err != nil {
-				return nil, err
-			}
+			s.logger.Error("failed to send a private message with reliability", zap.Error(err))
 		}
 	} else if rawMessage.SkipEncryptionLayer {
 
@@ -787,30 +737,6 @@ func (s *MessageSender) SendPublic(
 	return messageID, nil
 }
 
-// unwrapDatasyncMessage tries to unwrap message as datasync one and in case of success
-// returns cloned messages with replaced payloads
-func (s *MessageSender) unwrapDatasyncMessage(m *messagingtypes.Message) ([]*messagingtypes.Message, [][]byte, error) {
-	datasyncMessage, err := s.datasync.Unwrap(
-		m.SigPubKey(),
-		m.EncryptionLayer.Payload,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var statusMessages []*messagingtypes.Message
-	for _, ds := range datasyncMessage.Messages {
-		message, err := m.Clone()
-		if err != nil {
-			return nil, nil, err
-		}
-		message.EncryptionLayer.Payload = ds.Body
-		statusMessages = append(statusMessages, message)
-	}
-
-	return statusMessages, datasyncMessage.Acks, nil
-}
-
 // HandleMessages expects a whisper message as input, and it will go through
 // a series of transformations until the message is parsed into an application
 // layer message, or in case of Raw methods, the processing stops at the layer
@@ -923,14 +849,12 @@ func (s *MessageSender) handleMessage(receivedMsg *messagingtypes.ReceivedMessag
 		}
 	}
 
-	if s.datasync != nil && s.datasyncEnabled {
-		statusMessages, datasyncAcks, err := s.unwrapDatasyncMessage(message)
-		if err == nil {
-			response.DatasyncMessages = append(response.DatasyncMessages, statusMessages...)
-			response.DatasyncAcks = append(response.DatasyncAcks, datasyncAcks...)
-		} else {
-			hlogger.Debug("failed to handle datasync message", zap.Error(err))
-		}
+	statusMessages, datasyncAcks, err := s.handleReliabilityLayer(message)
+	if err == nil {
+		response.DatasyncMessages = append(response.DatasyncMessages, statusMessages...)
+		response.DatasyncAcks = append(response.DatasyncAcks, datasyncAcks...)
+	} else {
+		hlogger.Debug("failed to handle datasync message", zap.Error(err))
 	}
 
 	for _, msg := range response.Messages() {
@@ -1019,26 +943,6 @@ func (s *MessageSender) wrapMessageV1(rawMessage *messagingtypes.RawMessage) ([]
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 	return wrappedMessage, nil
-}
-
-func (s *MessageSender) addToDataSync(publicKey *ecdsa.PublicKey, message []byte) ([]byte, error) {
-	groupID := datasync.ToOneToOneGroupID(&s.identity.PublicKey, publicKey)
-	peerID := datasyncpeer.PublicKeyToPeerID(*publicKey)
-	exist, err := s.datasync.IsPeerInGroup(groupID, peerID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to check if peer is in group")
-	}
-	if !exist {
-		if err := s.datasync.AddPeer(groupID, peerID); err != nil {
-			return nil, errors.Wrap(err, "failed to add peer")
-		}
-	}
-	id, err := s.datasync.AppendMessage(groupID, message)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to append message to datasync")
-	}
-
-	return id[:], nil
 }
 
 // sendPrivateRawMessage sends a message not wrapped in an encryption layer
@@ -1254,12 +1158,6 @@ func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*wakutypes.NewM
 		Payload: payload,
 	}
 	return newMessage, nil
-}
-
-func (s *MessageSender) StopDatasync() {
-	if s.datasync != nil {
-		s.datasync.Stop()
-	}
 }
 
 func (s *MessageSender) MarkAsConfirmed(dataSyncID []byte, atLeastOne bool) (messageID cryptotypes.HexBytes, err error) {

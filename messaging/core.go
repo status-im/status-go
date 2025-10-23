@@ -21,10 +21,10 @@ import (
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
-	datasyncpeer "github.com/status-im/status-go/messaging/datasync/peer"
 	"github.com/status-im/status-go/messaging/events"
 	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
+	datasyncpeer "github.com/status-im/status-go/messaging/layers/reliability/datasync/peer"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
@@ -167,7 +167,7 @@ func (c *Core) start() error {
 	c.sender.SetHandleSharedSecrets(func(s []*sharedsecret.Secret) error {
 		return c.API().HandleSharedSecrets(adapters.FromEncryptionSharedSecrets(s))
 	})
-	err = c.sender.StartDatasync(c.mvdsStatusChangeEvent, c.sendDataSync)
+	err = c.sender.StartReliability(c.mvdsStatusChangeEvent, c.sendDataSync)
 	if err != nil {
 		return err
 	}
@@ -314,11 +314,11 @@ func (c *Core) connectionChanged(state connection.State) {
 	c.transport.ConnectionChanged(state)
 
 	if !c.connectionState.Offline && state.Offline {
-		c.sender.StopDatasync()
+		c.sender.StopReliability()
 	}
 
 	if c.connectionState.Offline && !state.Offline {
-		err := c.sender.StartDatasync(c.mvdsStatusChangeEvent, c.sendDataSync)
+		err := c.sender.StartReliability(c.mvdsStatusChangeEvent, c.sendDataSync)
 		if err != nil {
 			c.logger.Error("failed to start datasync", zap.Error(err))
 		}
