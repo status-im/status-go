@@ -217,26 +217,6 @@ var (
 		dBColumnName:   "networks",
 		valueHandler:   JSONBlobHandler,
 	}
-	NewsFeedEnabled = SettingField{
-		reactFieldName: "news-feed-enabled?",
-		dBColumnName:   "news_feed_enabled",
-		valueHandler:   BoolHandler,
-	}
-	NewsFeedLastFetchedTimestamp = SettingField{
-		reactFieldName: "news-feed-last-fetched-timestamp",
-		dBColumnName:   "news_feed_last_fetched_timestamp",
-		valueHandler:   TimeHandler,
-	}
-	NewsNotificationsEnabled = SettingField{
-		reactFieldName: "news-notifications-enabled?",
-		dBColumnName:   "news_notifications_enabled",
-		valueHandler:   BoolHandler,
-	}
-	NewsRSSEnabled = SettingField{
-		reactFieldName: "news-rss-enabled?",
-		dBColumnName:   "news_rss_enabled",
-		valueHandler:   BoolHandler,
-	}
 	NodeConfig = SettingField{
 		reactFieldName: "node-config",
 		dBColumnName:   "node_config",
@@ -568,10 +548,6 @@ var (
 		Name,
 		NetworksCurrentNetwork,
 		NetworksNetworks,
-		NewsFeedEnabled,
-		NewsFeedLastFetchedTimestamp,
-		NewsNotificationsEnabled,
-		NewsRSSEnabled,
 		MessengerNotificationsEnabled,
 		NodeConfig,
 		NotificationsEnabled,

@@ -157,10 +157,6 @@ type Settings struct {
 	Networks             *json.RawMessage `json:"networks/networks"`
 	// NotificationsEnabled indicates whether local notifications should be enabled (android only)
 	NotificationsEnabled         bool             `json:"notifications-enabled?,omitempty"`
-	NewsFeedEnabled              bool             `json:"news-feed-enabled?,omitempty"`
-	NewsFeedLastFetchedTimestamp time.Time        `json:"news-feed-last-fetched-timestamp,omitempty"`
-	NewsNotificationsEnabled     bool             `json:"news-notifications-enabled?,omitempty"`
-	NewsRSSEnabled               bool             `json:"news-rss-enabled?,omitempty"`
 	PhotoPath                    string           `json:"photo-path"`
 	PinnedMailserver             *json.RawMessage `json:"pinned-mailservers,omitempty"`
 	// PreferredName represents the user's preferred Ethereum Name Service (ENS) name.
