@@ -348,7 +348,6 @@ func buildMessengerOptions(
 		protocol.WithCommunityTokensService(communityTokensService),
 		protocol.WithAccountsManager(accountsManager),
 		protocol.WithAccountsPublisher(accountsPublisher),
-		protocol.WithNewsFeed(),
 		protocol.WithMessageSigner(personalService),
 		protocol.WithTokenManager(tokenManager),
 		protocol.WithTokenBalanceManager(tokenBalanceManager),

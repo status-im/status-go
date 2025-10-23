@@ -1132,23 +1132,6 @@ func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids
 	return err
 }
 
-// FetchNewsMessages fetches news messages from the News Feed
-// and returns a MessengerResponse containing the AC notifications
-func (api *PublicAPI) FetchNewsMessages() (*protocol.MessengerResponse, error) {
-	m := api.service.messenger
-	return m.FetchNewsMessages()
-}
-
-func (api *PublicAPI) ToggleNewsFeedEnabled(value bool) error {
-	m := api.service.messenger
-	return m.ToggleNewsFeedEnabled(value)
-}
-
-func (api *PublicAPI) ToggleNewsRSSEnabled(value bool) error {
-	m := api.service.messenger
-	return m.ToggleNewsRSSEnabled(value)
-}
-
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RequestAllHistoricMessages(false)
 }
