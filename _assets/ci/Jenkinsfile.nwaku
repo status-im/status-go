@@ -64,6 +64,9 @@ pipeline {
     /* Ensure env var is set on first run. */
     USE_NWAKU = "${params.USE_NWAKU}"
 
+    /* nwaku source directory */
+    NWAKU_SOURCE_DIR = "${WORKSPACE}/../nwaku"
+
     /* fixes nim cache collision */
     XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
   }
@@ -90,6 +93,16 @@ pipeline {
     stage('Generate') {
       steps { script {
         nix.develop('make generate', pure: false)
+      }
+    }
+  }
+
+    stage('Clone nwaku') {
+      when {
+        expression { params.USE_NWAKU == true }
+      }
+      steps { script {
+        nix.develop('make clone-nwaku', pure: false)
       }
     }
   }
