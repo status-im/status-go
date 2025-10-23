@@ -94,7 +94,13 @@ GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 BUILD_TAGS ?= gowaku_no_rln
 
 ifeq ($(USE_NWAKU), true)
-BUILD_TAGS += use_nwaku
+    BUILD_TAGS += use_nwaku
+    ifndef NWAKU_SOURCE_DIR
+        $(error NWAKU_SOURCE_DIR must be set when USE_NWAKU is true)
+    endif
+    LIBWAKU := $(NWAKU_SOURCE_DIR)/build/libwaku.$(LIBWAKU_EXT)
+    CGO_CFLAGS+=-I$(NWAKU_SOURCE_DIR)/library
+	CGO_LDFLAGS+=-L$(NWAKU_SOURCE_DIR)/build -lwaku -Wl,-rpath,$(NWAKU_SOURCE_DIR)/build
 endif
 
 BUILD_FLAGS ?= -ldflags=""
@@ -168,20 +174,21 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
-$(GO_CMD_BUILDS): generate
+$(GO_CMD_BUILDS): generate $(LIBWAKU)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
 	@echo "Compilation done."
 	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
-LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(LIBWAKU_EXT)
 $(LIBWAKU):
 ifeq ($(USE_NWAKU),true)
-	@echo "Building libwaku"
-	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
+	@echo "Building libwaku" $(LIBWAKU)
+	$(MAKE) -C $(NWAKU_SOURCE_DIR) SHELL=/bin/bash
 endif
+
 build-libwaku: $(LIBWAKU)
 
 test-libwaku: | $(LIBWAKU)
@@ -193,6 +200,11 @@ clean-libwaku:
 
 rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
+clone-nwaku: NWAKU_SOURCE_DIR ?= $(GIT_ROOT)/../nwaku
+clone-nwaku: NWAKU_VERSION ?= v0.37.0-rc.3
+clone-nwaku: ##@build Clone or checkout nwaku v0.37.0-rc.3 into ../nwaku
+	@echo "Cloning nwaku $(NWAKU_VERSION)..."
+	git clone --branch $(NWAKU_VERSION) https://github.com/waku-org/nwaku.git $(NWAKU_SOURCE_DIR)
 
 statusgo: ##@build Build status-go as status-backend server
 statusgo: build/bin/status-backend
@@ -227,6 +239,7 @@ statusgo-c-bindings:
 statusgo-library: generate
 statusgo-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
