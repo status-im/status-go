@@ -59,11 +59,6 @@ run_test_for_packages() {
 
   echo -e "${GRN}Testing:${RST} ${log_message}. Iteration ${iteration}. -test.count=${count}. Timeout: ${timeout}"
 
-  echo "AAAAA jamon"
-  echo "GIT_ROOT is ${GIT_ROOT}"
-  echo "LD_LIBRARY_PATH is ${LD_LIBRARY_PATH}"
-  ls ${GIT_ROOT}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/
-
   gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"
   if [[ "${CI}" == 'true' ]]; then
     gotestsum_flags="${gotestsum_flags} --junitfile=${report_file} --rerun-fails-report=${rerun_report_file}"
