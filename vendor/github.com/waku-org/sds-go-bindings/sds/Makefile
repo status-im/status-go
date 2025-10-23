@@ -11,19 +11,23 @@ all: build
 
 # Prepare third_party directory and clone nim-sds
 prepare:
-	@echo "Creating third_party directory..."
+	@echo "Preparing third_party directory..."
 	@mkdir -p ../third_party
 
-	@if [ ! -d "../third_party/nim-sds" ]; then \
-		echo "Cloning nim-sds repository..." ; \
-		cd ../third_party/ && \
-		git clone https://github.com/waku-org/nim-sds && \
-		cd nim-sds && \
-		git checkout master; \
-		make update; \
+	@echo "Setting up nim-sds..."
+	@if [ ! -d "../third_party/nim-sds/.git" ]; then \
+		echo "Cloning nim-sds repository..."; \
+		git clone https://github.com/waku-org/nim-sds ../third_party/nim-sds; \
 	else \
 		echo "nim-sds repository already exists."; \
 	fi
+
+	@echo "Updating nim-sds to get vendors and compile nim in nimbus-build-system..."
+	@cd ../third_party/nim-sds && \
+		git fetch origin && \
+		git checkout master && \
+		echo "Running 'make update'..." && \
+		make update
 
 # Build SDS Go Bindings
 build: prepare
