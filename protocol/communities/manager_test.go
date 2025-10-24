@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -65,6 +66,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 
 	amc := &ArchiveManagerConfig{
 		TorrentConfig: buildTorrentConfig(),
+		CodexConfig:   buildCodexConfig(),
 		Logger:        logger,
 		Persistence:   m.GetPersistence(),
 		Messaging:     nil,
@@ -483,6 +485,17 @@ func (s *ManagerSuite) TestStartAndStopTorrentClient() {
 	_, err = os.Stat(s.archiveManager.torrentConfig.DataDir)
 	s.Require().NoError(err)
 	s.Require().Equal(s.archiveManager.torrentClientStarted(), true)
+}
+
+func (s *ManagerSuite) TestStartAndStopCodexClient() {
+	err := s.archiveManager.StartCodexClient()
+	s.Require().NoError(err)
+	s.Require().NotNil(s.archiveManager.codexClient)
+	defer s.archiveManager.Stop() //nolint: errcheck
+
+	_, err = os.Stat(s.archiveManager.codexConfig.DataDir)
+	s.Require().NoError(err)
+	s.Require().Equal(s.archiveManager.isCodexClientStarted, true)
 }
 
 func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
@@ -1635,6 +1648,14 @@ func buildTorrentConfig() *params.TorrentConfig {
 		DataDir:    os.TempDir() + "/archivedata",
 		TorrentDir: os.TempDir() + "/torrents",
 		Port:       0,
+	}
+}
+
+func buildCodexConfig() *codex.Config {
+	return &codex.Config{
+		DataDir:      os.TempDir() + "/codexdata",
+		BlockRetries: 5,
+		LogLevel:     "ERROR",
 	}
 }
 
