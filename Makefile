@@ -297,10 +297,10 @@ setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
 generate-sds:  ##@ Build libsds third_party
-	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build
+	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
 
 generate-sds-android:  ##@ Build libsds third_party for Android
-	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build-android
+	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build-android USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
 
 generate: generate-sds
 generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
