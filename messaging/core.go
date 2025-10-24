@@ -163,10 +163,6 @@ func (c *Core) start() error {
 		}
 	}
 
-	// set shared secret handles
-	c.sender.SetHandleSharedSecrets(func(s []*sharedsecret.Secret) error {
-		return c.API().HandleSharedSecrets(adapters.FromEncryptionSharedSecrets(s))
-	})
 	err = c.sender.StartReliability(c.mvdsStatusChangeEvent, c.sendDataSync)
 	if err != nil {
 		return err
@@ -178,7 +174,7 @@ func (c *Core) start() error {
 	}
 
 	// handle stored shared secrets
-	err = c.API().HandleSharedSecrets(adapters.FromEncryptionSharedSecrets(subscriptions.SharedSecrets))
+	err = c.sender.HandleSharedSecrets(subscriptions.SharedSecrets)
 	if err != nil {
 		return err
 	}
@@ -289,7 +285,7 @@ func (c *Core) sendDataSync(receiver mvdsstate.PeerID, payload *mvdsproto.Payloa
 
 	// The shared secret needs to be handle before we send a message
 	// otherwise the topic might not be set up before we receive a message
-	err = c.API().HandleSharedSecrets([]*types.SharedSecret{adapters.FromEncryptionSharedSecret(messageSpec.SharedSecret)})
+	err = c.sender.HandleSharedSecrets([]*sharedsecret.Secret{messageSpec.SharedSecret})
 	if err != nil {
 		return err
 	}

@@ -1410,11 +1410,6 @@ func (s *MessengerSuite) TestContactPersistence() {
 	s.Require().True(savedContacts[0].added())
 }
 
-func (s *MessengerSuite) TestSharedSecretHandler() {
-	err := s.m.messaging.HandleSharedSecrets(nil)
-	s.NoError(err)
-}
-
 func (s *MessengerSuite) TestCreateGroupChatWithMembers() {
 	members := []string{testPK}
 

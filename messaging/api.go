@@ -17,7 +17,6 @@ import (
 
 	"github.com/status-im/status-go/connection"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
 	"github.com/status-im/status-go/messaging/layers/encryption"
@@ -110,20 +109,6 @@ func (a *API) UpdateFilterEphemerality(chatID string, ephemeral bool) error {
 
 	transportFilter.Ephemeral = ephemeral
 
-	return nil
-}
-
-func (a *API) HandleSharedSecrets(secrets []*types.SharedSecret) error {
-	for _, secret := range secrets {
-		fSecret := ethtypes.NegotiatedSecret{
-			PublicKey: secret.Identity,
-			Key:       secret.Key,
-		}
-		_, err := a.core.transport.ProcessNegotiatedSecret(fSecret)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
