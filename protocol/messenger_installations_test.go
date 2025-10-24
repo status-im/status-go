@@ -16,6 +16,7 @@ import (
 	userimage "github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/server"
@@ -68,7 +69,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	contactKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
+	contact, err := contacts.BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
 	response, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: contact.ID, CustomizationColor: string(multiaccountscommon.CustomizationColorRed)})
 	s.Require().NoError(err)
@@ -87,14 +88,14 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 
 	actualContact := response.Contacts[0]
 	s.Require().Equal(contact.ID, actualContact.ID)
-	s.Require().True(actualContact.added())
+	s.Require().True(actualContact.Added())
 
 	// Simulate update from contact
 	contact.LastUpdated = 10
 	contact.DisplayName = "display-name"
 	contact.CustomizationColor = multiaccountscommon.CustomizationColorRed
 
-	s.Require().NoError(s.m.persistence.SaveContacts([]*Contact{contact}))
+	s.Require().NoError(s.m.persistence.SaveContacts([]*contacts.Contact{contact}))
 	// Trigger syncing of contact
 	err = s.m.syncContact(context.Background(), contact, s.m.dispatchMessage)
 	s.Require().NoError(err)
@@ -136,7 +137,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	contactKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
+	contact, err := contacts.BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
 
 	// mock added as mutual contact
@@ -268,7 +269,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	var allChats []*Chat
-	var actualContact *Contact
+	var actualContact *contacts.Contact
 	var bookmarks []*browsers.Bookmark
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
@@ -334,11 +335,11 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().Equal("", oneToOneChat.Name) // We set 1-1 chat names to "" because the name is not good
 	s.Require().True(oneToOneChat.Active)
 
-	s.Require().True(actualContact.added())
+	s.Require().True(actualContact.Added())
 	s.Require().Equal("Test Nickname", actualContact.LocalNickname)
 	s.Require().Equal(multiaccountscommon.CustomizationColorRed, actualContact.CustomizationColor)
-	s.Require().True(actualContact.hasAddedUs())
-	s.Require().True(actualContact.mutual())
+	s.Require().True(actualContact.HasAddedUs())
+	s.Require().True(actualContact.Mutual())
 
 	bookmarks, err = theirMessenger.browserDatabase.GetBookmarks()
 	s.Require().NoError(err)

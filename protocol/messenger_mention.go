@@ -16,6 +16,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/contacts"
 
 	"github.com/status-im/status-go/api/multiformat"
 )
@@ -70,7 +71,7 @@ type searchablePhrase struct {
 }
 
 type MentionableUser struct {
-	*Contact
+	*contacts.Contact
 
 	searchablePhrases []searchablePhrase
 
@@ -102,7 +103,7 @@ func (c *MentionableUser) MarshalJSON() ([]byte, error) {
 		PrimaryName:   c.PrimaryName(),
 		SecondaryName: c.SecondaryName(),
 		ENSVerified:   c.ENSVerified,
-		Added:         c.added(),
+		Added:         c.Added(),
 		DisplayName:   c.GetDisplayName(),
 		Key:           c.Key,
 		Match:         c.Match,
@@ -251,7 +252,7 @@ func (m *MentionManager) getMentionableUsers(chatID string) (map[string]*Mention
 			publicKeys = append(publicKeys, crypto.PubkeyToHex(pk))
 		}
 	case chat.Public():
-		m.allContacts.Range(func(pk string, _ *Contact) bool {
+		m.allContacts.Range(func(pk string, _ *contacts.Contact) bool {
 			publicKeys = append(publicKeys, pk)
 			return true
 		})
@@ -272,7 +273,7 @@ func (m *MentionManager) getMentionableUsers(chatID string) (map[string]*Mention
 func (m *MentionManager) addMentionableUser(mentionableUsers map[string]*MentionableUser, publicKey string) error {
 	contact, ok := m.allContacts.Load(publicKey)
 	if !ok {
-		c, err := buildContactFromPkString(publicKey)
+		c, err := contacts.BuildContactFromPkString(publicKey)
 		if err != nil {
 			return err
 		}
@@ -706,7 +707,7 @@ func findMatchInPhrases(user *MentionableUser, searchedText string) string {
 // findMatchInNames searches for a matching phrase in MentionableUser's primary and secondary names.
 func findMatchInNames(user *MentionableUser, searchedText string) string {
 	var match string
-	for _, name := range user.names() {
+	for _, name := range user.Names() {
 		if hasMatchingPrefix(name, searchedText) {
 			match = name
 		}
@@ -721,7 +722,7 @@ func hasMatchingPrefix(text, searchedText string) bool {
 
 func isMentioned(user *MentionableUser, text string) bool {
 	regexStr := ""
-	for i, name := range user.names() {
+	for i, name := range user.Names() {
 		if name == "" {
 			continue
 		}
@@ -788,7 +789,7 @@ func filterWithFullMatch(userSuggestions map[string]*MentionableUser, text strin
 	}
 	result := make(map[string]*MentionableUser)
 	for pk, user := range userSuggestions {
-		for _, name := range user.names() {
+		for _, name := range user.Names() {
 			if strings.ToLower(name) == text {
 				result[pk] = user
 			}
@@ -834,7 +835,7 @@ func replaceMentions(text string, users map[string]*MentionableUser, idxs []int,
 
 func addSearchablePhrases(user *MentionableUser) *MentionableUser {
 	if !user.Blocked {
-		searchablePhrases := user.names()
+		searchablePhrases := user.Names()
 		for _, s := range searchablePhrases {
 			if s != "" {
 				newWords := []string{s}

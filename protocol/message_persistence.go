@@ -14,6 +14,7 @@ import (
 
 	"github.com/status-im/markdown"
 
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -2505,7 +2506,7 @@ func (db sqlitePersistence) UpdateMessageOutgoingStatus(id string, newOutgoingSt
 }
 
 // BlockContact updates a contact, deletes all the messages and 1-to-1 chat, updates the unread messages count and returns a map with the new count
-func (db sqlitePersistence) BlockContact(contact *Contact, isDesktopFunc bool) ([]*Chat, error) {
+func (db sqlitePersistence) BlockContact(contact *contacts.Contact, isDesktopFunc bool) ([]*Chat, error) {
 	var chats []*Chat
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet"
@@ -175,15 +176,15 @@ func (api *PublicAPI) UnblockContact(parent context.Context, contactID string) (
 	return api.service.messenger.UnblockContact(contactID)
 }
 
-func (api *PublicAPI) Contacts(parent context.Context) []*protocol.Contact {
+func (api *PublicAPI) Contacts(parent context.Context) []*contacts.Contact {
 	return api.service.messenger.Contacts()
 }
 
-func (api *PublicAPI) GetContactByID(parent context.Context, id string) *protocol.Contact {
+func (api *PublicAPI) GetContactByID(parent context.Context, id string) *contacts.Contact {
 	return api.service.messenger.GetContactByID(id)
 }
 
-func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*protocol.Contact, error) {
+func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*contacts.Contact, error) {
 	return api.service.messenger.FetchContact(pubkey, true)
 }
 
@@ -311,7 +312,7 @@ func (api *PublicAPI) GetCommunityPublicKeyFromPrivateKey(ctx context.Context, h
 }
 
 // Get community members contact list for provided wallet addresses
-func (api *PublicAPI) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*protocol.Contact, error) {
+func (api *PublicAPI) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*contacts.Contact, error) {
 	return api.service.messenger.GetCommunityMembersForWalletAddresses(communityID, chainID)
 }
 
@@ -1310,7 +1311,7 @@ func (api *PublicAPI) RequestCancelDiscordChannelImport(discordChannelID string)
 	api.service.messenger.MarkDiscordChannelImportAsCancelled(discordChannelID)
 }
 
-func (api *PublicAPI) BuildContact(request *requests.BuildContact) (*protocol.Contact, error) {
+func (api *PublicAPI) BuildContact(request *requests.BuildContact) (*contacts.Contact, error) {
 	return api.service.messenger.BuildContact(request)
 }
 

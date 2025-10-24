@@ -10,12 +10,13 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
+	"go.uber.org/zap"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-
-	"go.uber.org/zap"
+	"github.com/status-im/status-go/pkg/contacts"
 
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/communities"
@@ -158,7 +159,7 @@ func (m *StoreNodeRequestManager) fetchCustomShard(ctx context.Context, communit
 
 // FetchContact - similar to FetchCommunity
 // If a `nil` contact and a `nil` error are returned, it means that the contact wasn't found at the store node.
-func (m *StoreNodeRequestManager) FetchContact(ctx context.Context, contactID string, opts []StoreNodeRequestOption) (*Contact, StoreNodeRequestStats, error) {
+func (m *StoreNodeRequestManager) FetchContact(ctx context.Context, contactID string, opts []StoreNodeRequestOption) (*contacts.Contact, StoreNodeRequestStats, error) {
 
 	cfg := buildStoreNodeRequestConfig(opts)
 
@@ -341,7 +342,7 @@ type storeNodeRequestResult struct {
 	stats StoreNodeRequestStats
 	// One of data fields (community or contact) will be present depending on request type
 	community *communities.Community
-	contact   *Contact
+	contact   *contacts.Contact
 	shard     *messagingtypes.Shard
 }
 

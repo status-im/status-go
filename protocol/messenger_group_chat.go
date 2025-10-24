@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -51,13 +52,13 @@ var ErrGroupChatAddedContacts = errors.New("group-chat: can't add members who ar
 
 func (m *Messenger) validateAddedGroupMembers(members []string) error {
 	for _, memberPubkey := range members {
-		contactID, err := contactIDFromPublicKeyString(memberPubkey)
+		contactID, err := contacts.ContactIDFromPublicKeyString(memberPubkey)
 		if err != nil {
 			return err
 		}
 
 		contact, _ := m.allContacts.Load(contactID)
-		if contact == nil || !contact.mutual() {
+		if contact == nil || !contact.Mutual() {
 			return ErrGroupChatAddedContacts
 		}
 	}
@@ -736,7 +737,7 @@ func (m *Messenger) leaveGroupChat(ctx context.Context, response *MessengerRespo
 		}
 		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 		event := v1protocol.NewMemberRemovedEvent(
-			contactIDFromPublicKey(&m.identity.PublicKey),
+			contacts.ContactIDFromPublicKey(&m.identity.PublicKey),
 			clock,
 		)
 		event.ChatID = chat.ID

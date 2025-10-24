@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/contacts"
 )
 
 func TestRePosRegex(t *testing.T) {
@@ -84,13 +85,13 @@ func TestRePos(t *testing.T) {
 func TestReplaceMentions(t *testing.T) {
 	users := map[string]*MentionableUser{
 		"0xpk1": {
-			Contact: &Contact{
+			Contact: &contacts.Contact{
 				ID:            "0xpk1",
 				LocalNickname: "User Number One",
 			},
 		},
 		"0xpk2": {
-			Contact: &Contact{
+			Contact: &contacts.Contact{
 				ID:            "0xpk2",
 				LocalNickname: "user2",
 				ENSVerified:   true,
@@ -98,7 +99,7 @@ func TestReplaceMentions(t *testing.T) {
 			},
 		},
 		"0xpk3": {
-			Contact: &Contact{
+			Contact: &contacts.Contact{
 				ID:            "0xpk3",
 				LocalNickname: "user3",
 				ENSVerified:   true,
@@ -106,7 +107,7 @@ func TestReplaceMentions(t *testing.T) {
 			},
 		},
 		"0xpk4": {
-			Contact: &Contact{
+			Contact: &contacts.Contact{
 				ID:            "0xpk4",
 				EnsName:       "ens-user-4.eth",
 				ENSVerified:   true,
@@ -115,13 +116,13 @@ func TestReplaceMentions(t *testing.T) {
 			},
 		},
 		"0xpk5": {
-			Contact: &Contact{
+			Contact: &contacts.Contact{
 				ID:            "0xpk5",
 				LocalNickname: "User Number",
 			},
 		},
 		"0xpk6": {
-			Contact: &Contact{
+			Contact: &contacts.Contact{
 				ID:            "0xpk6",
 				LocalNickname: "特别字符",
 				DisplayName:   "特别 字符",
@@ -860,7 +861,7 @@ func TestMentionSuggestionSpecialChars(t *testing.T) {
 func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
 	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(t, map[string]*MentionableUser{
 		"0xpk1": {
-			Contact: &Contact{
+			Contact: &contacts.Contact{
 				ID:            "0xpk1",
 				LocalNickname: "User Number One",
 			},
@@ -1061,13 +1062,13 @@ func setupMentionSuggestionTest(t *testing.T, mentionableUserMapInput map[string
 func getDefaultMentionableUserMap() map[string]*MentionableUser {
 	return map[string]*MentionableUser{
 		"0xpk1": {
-			Contact: &Contact{
+			Contact: &contacts.Contact{
 				ID:            "0xpk1",
 				LocalNickname: "User Number One",
 			},
 		},
 		"0xpk2": {
-			Contact: &Contact{
+			Contact: &contacts.Contact{
 				ID:            "0xpk2",
 				LocalNickname: "u2",
 				ENSVerified:   true,
@@ -1075,7 +1076,7 @@ func getDefaultMentionableUserMap() map[string]*MentionableUser {
 			},
 		},
 		"0xpk3": {
-			Contact: &Contact{
+			Contact: &contacts.Contact{
 				ID:            "0xpk3",
 				LocalNickname: "u3",
 				ENSVerified:   true,
@@ -1083,7 +1084,7 @@ func getDefaultMentionableUserMap() map[string]*MentionableUser {
 			},
 		},
 		"0xpk4": {
-			Contact: &Contact{
+			Contact: &contacts.Contact{
 				ID:            "0xpk4",
 				LocalNickname: "自由人",
 				ENSVerified:   true,

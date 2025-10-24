@@ -6,6 +6,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/pkg/contacts"
 	ensservice "github.com/status-im/status-go/services/ens"
 
 	"github.com/status-im/status-go/services/browsers"
@@ -42,7 +43,7 @@ type SeenUnseenMessages struct {
 }
 
 type MessengerResponse struct {
-	Contacts                      []*Contact
+	Contacts                      []*contacts.Contact
 	Invitations                   []*GroupChatInvitation
 	CommunityChanges              []*communities.CommunityChanges
 	StoreNodes                    []messagingtypes.StoreNode
@@ -97,7 +98,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		RemovedMessages         []*RemovedMessage                   `json:"removedMessages,omitempty"`
 		DeletedMessages         map[string][]string                 `json:"deletedMessages,omitempty"`
 		Messages                []*common.Message                   `json:"messages,omitempty"`
-		Contacts                []*Contact                          `json:"contacts,omitempty"`
+		Contacts                []*contacts.Contact                 `json:"contacts,omitempty"`
 		Installations           []*messagingtypes.Installation      `json:"installations,omitempty"`
 		PinMessages             []*common.PinMessage                `json:"pinMessages,omitempty"`
 		EmojiReactions          []*EmojiReaction                    `json:"emojiReactions,omitempty"`
@@ -776,7 +777,7 @@ func (r *MessengerResponse) AddMessage(message *common.Message) {
 	r.messages[message.ID] = message
 }
 
-func (r *MessengerResponse) AddContact(c *Contact) {
+func (r *MessengerResponse) AddContact(c *contacts.Contact) {
 
 	for idx, c1 := range r.Contacts {
 		if c1.ID == c.ID {
@@ -788,7 +789,7 @@ func (r *MessengerResponse) AddContact(c *Contact) {
 	r.Contacts = append(r.Contacts, c)
 }
 
-func (r *MessengerResponse) AddContacts(contacts []*Contact) {
+func (r *MessengerResponse) AddContacts(contacts []*contacts.Contact) {
 	for idx := range contacts {
 		r.AddContact(contacts[idx])
 	}

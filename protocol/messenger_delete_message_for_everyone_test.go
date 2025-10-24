@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -68,7 +69,7 @@ func (s *MessengerDeleteMessageForEveryoneSuite) testSendAndDeleteMessage(messag
 	response, err = WaitOnMessengerResponse(s.bob, func(response *MessengerResponse) bool {
 		return len(response.RemovedMessages()) > 0
 	}, "removed messages not received")
-	s.Require().Equal(deleteMessageResponse.RemovedMessages()[0].DeletedBy, contactIDFromPublicKey(s.moderator.IdentityPublicKey()))
+	s.Require().Equal(deleteMessageResponse.RemovedMessages()[0].DeletedBy, contacts.ContactIDFromPublicKey(s.moderator.IdentityPublicKey()))
 
 	s.Require().NoError(err)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)

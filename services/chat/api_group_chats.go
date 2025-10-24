@@ -5,6 +5,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
@@ -23,12 +24,12 @@ type GroupChatResponseWithInvitations struct {
 
 type CreateOneToOneChatResponse struct {
 	Chat    *protocol.Chat    `json:"chat,omitempty"`
-	Contact *protocol.Contact `json:"contact,omitempty"`
+	Contact *contacts.Contact `json:"contact,omitempty"`
 }
 
 type StartGroupChatResponse struct {
 	Chat     *protocol.Chat      `json:"chat,omitempty"`
-	Contacts []*protocol.Contact `json:"contacts"`
+	Contacts []*contacts.Contact `json:"contacts"`
 	Messages []*common.Message   `json:"messages,omitempty"`
 }
 
@@ -44,7 +45,7 @@ func (api *API) CreateOneToOneChat(ctx context.Context, communityID types.HexByt
 
 	chat := response.Chats()[0]
 
-	var contact *protocol.Contact
+	var contact *contacts.Contact
 	if ensName != "" {
 		contact = response.Contacts[0]
 	}

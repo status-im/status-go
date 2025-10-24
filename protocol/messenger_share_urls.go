@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -434,7 +435,7 @@ func parseUserURLWithENS(ensName string) (*URLDataResponse, error) {
 	return nil, fmt.Errorf("not implemented yet")
 }
 
-func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, error) {
+func (m *Messenger) prepareEncodedUserData(contact *contacts.Contact) (string, string, error) {
 	pk, err := contact.PublicKey()
 	if err != nil {
 		return "", "", err

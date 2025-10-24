@@ -8,6 +8,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -27,11 +28,11 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			var contact *Contact
+			var contact *contacts.Contact
 			if c, ok := state.AllContacts.Load(message.PublicKey); ok {
 				contact = c
 			} else {
-				c, err := buildContact(message.PublicKey, publicKey)
+				c, err := contacts.BuildContact(message.PublicKey, publicKey)
 				if err != nil {
 					m.logger.Info("failed to build contact", zap.Error(err))
 					continue

@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -451,7 +452,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	c, err := BuildContactFromPublicKey(&identity.PublicKey)
+	c, err := contacts.BuildContactFromPublicKey(&identity.PublicKey)
 	s.Require().NoError(err)
 	s.Require().NotNil(c)
 

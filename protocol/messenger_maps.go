@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -56,11 +57,11 @@ func (cm *chatMap) Delete(chatID string) {
 
 type contactMap struct {
 	sm     sync.Map
-	me     *Contact
+	me     *contacts.Contact
 	logger *zap.Logger
 }
 
-func (cm *contactMap) Load(contactID string) (*Contact, bool) {
+func (cm *contactMap) Load(contactID string) (*contacts.Contact, bool) {
 	if contactID == cm.me.ID {
 		cm.logger.Warn("contacts map: loading own identity", zap.String("contactID", contactID))
 		return cm.me, true
@@ -69,10 +70,10 @@ func (cm *contactMap) Load(contactID string) (*Contact, bool) {
 	if contact == nil {
 		return nil, ok
 	}
-	return contact.(*Contact), ok
+	return contact.(*contacts.Contact), ok
 }
 
-func (cm *contactMap) Store(contactID string, contact *Contact) {
+func (cm *contactMap) Store(contactID string, contact *contacts.Contact) {
 	if contactID == cm.me.ID {
 		cm.logger.Warn("contacts map: storing own identity", zap.String("contactID", contactID))
 		return
@@ -80,9 +81,9 @@ func (cm *contactMap) Store(contactID string, contact *Contact) {
 	cm.sm.Store(contactID, contact)
 }
 
-func (cm *contactMap) Range(f func(contactID string, contact *Contact) (shouldContinue bool)) {
+func (cm *contactMap) Range(f func(contactID string, contact *contacts.Contact) (shouldContinue bool)) {
 	nf := func(key, value interface{}) (shouldContinue bool) {
-		return f(key.(string), value.(*Contact))
+		return f(key.(string), value.(*contacts.Contact))
 	}
 	cm.sm.Range(nf)
 }
@@ -97,7 +98,7 @@ func (cm *contactMap) Delete(contactID string) {
 
 func (cm *contactMap) Len() int {
 	count := 0
-	cm.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
+	cm.Range(func(contactID string, contact *contacts.Contact) (shouldContinue bool) {
 		count++
 		return true
 	})

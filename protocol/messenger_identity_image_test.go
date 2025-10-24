@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -112,10 +113,10 @@ func (s *MessengerProfilePictureHandlerSuite) TestEncryptDecryptIdentityImagesWi
 		s.Require().NoError(err)
 		contactKeys[i] = contactKey
 
-		contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
+		contact, err := contacts.BuildContactFromPublicKey(&contactKey.PublicKey)
 		s.Require().NoError(err)
 
-		contact.ContactRequestLocalState = ContactRequestStateSent
+		contact.ContactRequestLocalState = contacts.ContactRequestStateSent
 
 		s.alice.allContacts.Store(contact.ID, contact)
 	}
@@ -357,7 +358,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 
 	// Poll bob to see if he got the chatIdentity
 	// Retrieve ChatIdentity
-	var contacts []*Contact
+	var contactsList []*contacts.Contact
 
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 2 * time.Second
@@ -369,25 +370,25 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 			return err
 		}
 
-		contacts = response.Contacts
-		if len(contacts) > 0 && len(contacts[0].Images) > 0 {
+		contactsList = response.Contacts
+		if len(contactsList) > 0 && len(contactsList[0].Images) > 0 {
 			return nil
 		}
 
-		return errors.New("no new contacts with images received")
+		return errors.New("no new contactsList with images received")
 	}, options)
 
 	if !expectPicture {
-		s.Require().EqualError(err, "no new contacts with images received")
+		s.Require().EqualError(err, "no new contactsList with images received")
 		return
 	}
 
 	s.Require().NoError(err)
-	s.Require().NotNil(contacts)
+	s.Require().NotNil(contactsList)
 
 	// Check if alice's contact data with profile picture is there
-	var contact *Contact
-	for _, c := range contacts {
+	var contact *contacts.Contact
+	for _, c := range contactsList {
 		if c.ID == alice.IdentityPublicKeyString() {
 			contact = c
 		}

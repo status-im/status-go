@@ -8,6 +8,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -15,7 +16,7 @@ import (
 
 type NotificationBody struct {
 	Message   *common.Message        `json:"message"`
-	Contact   *Contact               `json:"contact"`
+	Contact   *contacts.Contact      `json:"contact"`
 	Chat      *Chat                  `json:"chat"`
 	Community *communities.Community `json:"community"`
 }
@@ -47,7 +48,7 @@ func (n NotificationBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(item)
 }
 
-func NewMessageNotification(id string, message *common.Message, chat *Chat, contact *Contact, resolvePrimaryName func(string) (string, error), profilePicturesVisibility int) (*localnotifications.Notification, error) {
+func NewMessageNotification(id string, message *common.Message, chat *Chat, contact *contacts.Contact, resolvePrimaryName func(string) (string, error), profilePicturesVisibility int) (*localnotifications.Notification, error) {
 	body := &NotificationBody{
 		Message: message,
 		Chat:    chat,
@@ -68,7 +69,7 @@ func DeletedMessageNotification(id string, chat *Chat) *localnotifications.Notif
 	}
 }
 
-func NewCommunityRequestToJoinNotification(id string, community *communities.Community, contact *Contact) *localnotifications.Notification {
+func NewCommunityRequestToJoinNotification(id string, community *communities.Community, contact *contacts.Contact) *localnotifications.Notification {
 	body := &NotificationBody{
 		Community: community,
 		Contact:   contact,
@@ -77,7 +78,7 @@ func NewCommunityRequestToJoinNotification(id string, community *communities.Com
 	return body.toCommunityRequestToJoinNotification(id)
 }
 
-func NewPrivateGroupInviteNotification(id string, chat *Chat, contact *Contact, profilePicturesVisibility int) *localnotifications.Notification {
+func NewPrivateGroupInviteNotification(id string, chat *Chat, contact *contacts.Contact, profilePicturesVisibility int) *localnotifications.Notification {
 	body := &NotificationBody{
 		Chat:    chat,
 		Contact: contact,

@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -245,21 +246,21 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	// Validate contacts on bob1
 	contact1 := bob1.GetContactByID(contactID1)
 	s.Require().NotNil(contact1)
-	s.Require().Equal(ContactRequestStateSent, contact1.ContactRequestLocalState)
-	s.Require().Equal(ContactRequestStateNone, contact1.ContactRequestRemoteState)
-	s.Require().True(contact1.added())
+	s.Require().Equal(contacts.ContactRequestStateSent, contact1.ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateNone, contact1.ContactRequestRemoteState)
+	s.Require().True(contact1.Added())
 
 	contact2 := bob1.GetContactByID(contactID2)
 	s.Require().NotNil(contact2)
-	s.Require().Equal(ContactRequestStateSent, contact2.ContactRequestLocalState)
-	s.Require().Equal(ContactRequestStateNone, contact2.ContactRequestRemoteState)
-	s.Require().True(contact2.added())
+	s.Require().Equal(contacts.ContactRequestStateSent, contact2.ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateNone, contact2.ContactRequestRemoteState)
+	s.Require().True(contact2.Added())
 
 	aliceContact = bob1.GetContactByID(alice.selfContact.ID)
 	s.Require().NotNil(aliceContact)
-	s.Require().Equal(ContactRequestStateSent, aliceContact.ContactRequestLocalState)
-	s.Require().Equal(ContactRequestStateReceived, aliceContact.ContactRequestRemoteState)
-	s.Require().True(aliceContact.added())
+	s.Require().Equal(contacts.ContactRequestStateSent, aliceContact.ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateReceived, aliceContact.ContactRequestRemoteState)
+	s.Require().True(aliceContact.Added())
 
 	// Check that bob2 has no contacts
 	s.Require().Len(bob2.Contacts(), 0)
@@ -277,21 +278,21 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	// Validate contacts on bob2
 	contact1 = bob2.GetContactByID(contactID1)
 	s.Require().NotNil(contact1)
-	s.Require().Equal(ContactRequestStateSent, contact1.ContactRequestLocalState)
-	s.Require().Equal(ContactRequestStateNone, contact1.ContactRequestRemoteState)
-	s.Require().True(contact1.added())
+	s.Require().Equal(contacts.ContactRequestStateSent, contact1.ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateNone, contact1.ContactRequestRemoteState)
+	s.Require().True(contact1.Added())
 
 	contact2 = bob2.GetContactByID(contactID2)
 	s.Require().NotNil(contact2)
-	s.Require().Equal(ContactRequestStateSent, contact2.ContactRequestLocalState)
-	s.Require().Equal(ContactRequestStateNone, contact2.ContactRequestRemoteState)
-	s.Require().True(contact2.added())
+	s.Require().Equal(contacts.ContactRequestStateSent, contact2.ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateNone, contact2.ContactRequestRemoteState)
+	s.Require().True(contact2.Added())
 
 	aliceContact = bob2.GetContactByID(alice.selfContact.ID)
 	s.Require().NotNil(aliceContact)
-	s.Require().Equal(ContactRequestStateSent, aliceContact.ContactRequestLocalState)
-	s.Require().Equal(ContactRequestStateReceived, aliceContact.ContactRequestRemoteState)
-	s.Require().True(aliceContact.added())
+	s.Require().Equal(contacts.ContactRequestStateSent, aliceContact.ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateReceived, aliceContact.ContactRequestRemoteState)
+	s.Require().True(aliceContact.Added())
 
 	// Validate communities on bob2
 	communities, err = bob2.JoinedCommunities()

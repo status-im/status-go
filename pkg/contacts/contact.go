@@ -50,7 +50,7 @@ type ContactDeviceInfo struct {
 }
 
 func (c *Contact) CanonicalImage(profilePicturesVisibility settings.ProfilePicturesVisibilityType) string {
-	if profilePicturesVisibility == settings.ProfilePicturesVisibilityNone || (profilePicturesVisibility == settings.ProfilePicturesVisibilityContactsOnly && !c.added()) {
+	if profilePicturesVisibility == settings.ProfilePicturesVisibilityNone || (profilePicturesVisibility == settings.ProfilePicturesVisibilityContactsOnly && !c.Added()) {
 		return c.Identicon
 	}
 
@@ -178,27 +178,27 @@ func (c *Contact) Unblock(clock uint64) {
 	c.RetractContactRequest(clock)
 }
 
-func (c *Contact) added() bool {
+func (c *Contact) Added() bool {
 	return c.ContactRequestLocalState == ContactRequestStateSent
 }
 
-func (c *Contact) hasAddedUs() bool {
+func (c *Contact) HasAddedUs() bool {
 	return c.ContactRequestRemoteState == ContactRequestStateReceived
 }
 
-func (c *Contact) mutual() bool {
-	return c.added() && c.hasAddedUs()
+func (c *Contact) Mutual() bool {
+	return c.Added() && c.HasAddedUs()
 }
 
 func (c *Contact) active() bool {
-	return c.mutual() && !c.Blocked
+	return c.Mutual() && !c.Blocked
 }
 
-func (c *Contact) dismissed() bool {
+func (c *Contact) Dismissed() bool {
 	return c.ContactRequestLocalState == ContactRequestStateDismissed
 }
 
-func (c *Contact) names() []string {
+func (c *Contact) Names() []string {
 	var names []string
 
 	if c.LocalNickname != "" {
@@ -218,7 +218,7 @@ func (c *Contact) names() []string {
 }
 
 func (c *Contact) PrimaryName() string {
-	return c.names()[0]
+	return c.Names()[0]
 }
 
 func (c *Contact) SecondaryName() string {
@@ -226,7 +226,7 @@ func (c *Contact) SecondaryName() string {
 	if c.LocalNickname == "" {
 		return ""
 	}
-	names := c.names()
+	names := c.Names()
 	if len(names) > 1 {
 		return names[1]
 	}
@@ -237,6 +237,18 @@ type ContactRequestProcessingResponse struct {
 	processed                 bool
 	newContactRequestReceived bool
 	sendBackState             bool
+}
+
+func (r *ContactRequestProcessingResponse) Processed() bool {
+	return r.processed
+}
+
+func (r *ContactRequestProcessingResponse) NewContactRequestReceived() bool {
+	return r.newContactRequestReceived
+}
+
+func (r *ContactRequestProcessingResponse) SendBackState() bool {
+	return r.sendBackState
 }
 
 func (c *Contact) ContactRequestSent(clock uint64) ContactRequestProcessingResponse {
@@ -298,7 +310,7 @@ func (c *Contact) contactRequestRetracted(clock uint64, fromSyncing bool, r Cont
 	// This is a symmetric action, we set both local & remote clock
 	// since we want everything before this point discarded, regardless
 	// the side it was sent from. The only exception is when the contact
-	// request has been explicitly dismissed, in which case we don't
+	// request has been explicitly Dismissed, in which case we don't
 	// change state
 	if c.ContactRequestLocalState != ContactRequestStateDismissed && !fromSyncing {
 		c.ContactRequestLocalClock = clock
@@ -343,7 +355,7 @@ func (c *Contact) ContactRequestAccepted(clock uint64) ContactRequestProcessingR
 	return c.ContactRequestReceived(clock)
 }
 
-func buildContactFromPkString(pkString string) (*Contact, error) {
+func BuildContactFromPkString(pkString string) (*Contact, error) {
 	publicKeyBytes, err := types.DecodeHex(pkString)
 	if err != nil {
 		return nil, err
@@ -354,12 +366,12 @@ func buildContactFromPkString(pkString string) (*Contact, error) {
 		return nil, err
 	}
 
-	return buildContact(pkString, publicKey)
+	return BuildContact(pkString, publicKey)
 }
 
 func BuildContactFromPublicKey(publicKey *ecdsa.PublicKey) (*Contact, error) {
 	id := crypto.PubkeyToHex(publicKey)
-	return buildContact(id, publicKey)
+	return BuildContact(id, publicKey)
 }
 
 func getShortenedCompressedKey(publicKey string) string {
@@ -374,7 +386,7 @@ func getShortenedCompressedKey(publicKey string) string {
 	return ""
 }
 
-func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact, error) {
+func BuildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact, error) {
 	compressedKey, err := multiformat.SerializeLegacyKey(crypto.PubkeyToHex(publicKey))
 	if err != nil {
 		return nil, err
@@ -392,10 +404,10 @@ func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact,
 	return contact, nil
 }
 
-func buildSelfContact(identity *ecdsa.PrivateKey, settings *accounts.Database, multiAccounts *multiaccounts.Database, account *multiaccounts.Account) (*Contact, error) {
+func BuildSelfContact(identity *ecdsa.PrivateKey, settings *accounts.Database, multiAccounts *multiaccounts.Database, account *multiaccounts.Account) (*Contact, error) {
 	myPublicKeyString := types.EncodeHex(crypto.FromECDSAPub(&identity.PublicKey))
 
-	c, err := buildContact(myPublicKeyString, &identity.PublicKey)
+	c, err := BuildContact(myPublicKeyString, &identity.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build contact: %w", err)
 	}
@@ -427,17 +439,17 @@ func buildSelfContact(identity *ecdsa.PrivateKey, settings *accounts.Database, m
 	return c, nil
 }
 
-func contactIDFromPublicKey(key *ecdsa.PublicKey) string {
+func ContactIDFromPublicKey(key *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(key))
 }
 
-func contactIDFromPublicKeyString(key string) (string, error) {
+func ContactIDFromPublicKeyString(key string) (string, error) {
 	pubKey, err := crypto.HexToPubkey(key)
 	if err != nil {
 		return "", err
 	}
 
-	return contactIDFromPublicKey(pubKey), nil
+	return ContactIDFromPublicKey(pubKey), nil
 }
 
 func (c *Contact) ProcessSyncContactRequestState(remoteState ContactRequestState, remoteClock uint64, localState ContactRequestState, localClock uint64) {
@@ -477,20 +489,20 @@ func (c *Contact) MarshalJSON() ([]byte, error) {
 		Alias: (*Alias)(c),
 	}
 
-	item.Added = c.added()
-	item.HasAddedUs = c.hasAddedUs()
-	item.Mutual = c.mutual()
+	item.Added = c.Added()
+	item.HasAddedUs = c.HasAddedUs()
+	item.Mutual = c.Mutual()
 	item.Active = c.active()
 	item.PrimaryName = c.PrimaryName()
 	item.SecondaryName = c.SecondaryName()
 
-	if c.mutual() {
+	if c.Mutual() {
 		item.ContactRequestState = ContactRequestStateMutual
-	} else if c.dismissed() {
+	} else if c.Dismissed() {
 		item.ContactRequestState = ContactRequestStateDismissed
-	} else if c.added() {
+	} else if c.Added() {
 		item.ContactRequestState = ContactRequestStateSent
-	} else if c.hasAddedUs() {
+	} else if c.HasAddedUs() {
 		item.ContactRequestState = ContactRequestStateReceived
 	}
 	ext, err := accscommon.ExtendStructWithPubKeyData(item.ID, item)

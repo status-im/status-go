@@ -10,6 +10,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -194,7 +195,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		}
 
 		// only add DeletedBy when not deleted by message.From
-		deletedBy = contactIDFromPublicKey(m.IdentityPublicKey())
+		deletedBy = contacts.ContactIDFromPublicKey(m.IdentityPublicKey())
 
 		if !canDeleteMessageForEveryone {
 			return nil, ErrInvalidEditOrDeleteAuthor

@@ -13,8 +13,8 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -34,7 +34,7 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 	}
 
 	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.mutual() {
+	if !ok || !contact.Mutual() {
 		return nil, ErrContactNotMutual
 	}
 
@@ -81,7 +81,7 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 		return nil, err
 	}
 
-	contact.VerificationStatus = VerificationStatusVERIFYING
+	contact.VerificationStatus = contacts.VerificationStatusVERIFYING
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
 	err = m.persistence.SaveContact(contact, nil)
@@ -170,7 +170,7 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 
 	contactID := verifRequest.To
 	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.mutual() {
+	if !ok || !contact.Mutual() {
 		return nil, errors.New("Can't find contact for canceling verification request")
 	}
 
@@ -183,7 +183,7 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 	if err != nil {
 		return nil, err
 	}
-	contact.VerificationStatus = VerificationStatusUNVERIFIED
+	contact.VerificationStatus = contacts.VerificationStatusUNVERIFIED
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
 	err = m.persistence.SaveContact(contact, nil)
@@ -282,7 +282,7 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 	contactID := verifRequest.From
 
 	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.mutual() {
+	if !ok || !contact.Mutual() {
 		return nil, ErrContactNotMutual
 	}
 
@@ -397,7 +397,7 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 	contactID := notification.ReplyMessage.From
 
 	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.mutual() {
+	if !ok || !contact.Mutual() {
 		return nil, ErrContactNotMutual
 	}
 
@@ -407,7 +407,7 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 		return nil, err
 	}
 
-	contact.VerificationStatus = VerificationStatusVERIFIED
+	contact.VerificationStatus = contacts.VerificationStatusVERIFIED
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
@@ -512,7 +512,7 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests
 		return nil, err
 	}
 
-	contact, err := m.setContactVerificationStatus(contactID, VerificationStatusVERIFIED)
+	contact, err := m.setContactVerificationStatus(contactID, contacts.VerificationStatusVERIFIED)
 	if err != nil {
 		return nil, err
 	}
@@ -592,11 +592,11 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 	}
 
 	contact, ok := m.allContacts.Load(verifRequest.From)
-	if !ok || !contact.mutual() {
+	if !ok || !contact.Mutual() {
 		return nil, ErrContactNotMutual
 	}
 	contactID := verifRequest.From
-	contact, err = m.setContactVerificationStatus(contactID, VerificationStatusVERIFIED)
+	contact, err = m.setContactVerificationStatus(contactID, contacts.VerificationStatusVERIFIED)
 
 	if err != nil {
 		return nil, err
@@ -687,9 +687,9 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 	return response, nil
 }
 
-func (m *Messenger) setContactVerificationStatus(contactID string, verificationStatus VerificationStatus) (*Contact, error) {
+func (m *Messenger) setContactVerificationStatus(contactID string, verificationStatus contacts.VerificationStatus) (*contacts.Contact, error) {
 	contact, ok := m.allContacts.Load(contactID)
-	if !ok || !contact.mutual() {
+	if !ok || !contact.Mutual() {
 		return nil, ErrContactNotMutual
 	}
 
@@ -754,7 +754,7 @@ func (m *Messenger) RemoveTrustVerificationStatus(ctx context.Context, contactID
 		return nil, err
 	}
 
-	contact, err := m.setContactVerificationStatus(contactID, VerificationStatusUNVERIFIED)
+	contact, err := m.setContactVerificationStatus(contactID, contacts.VerificationStatusUNVERIFIED)
 	if err != nil {
 		return nil, err
 	}
@@ -794,7 +794,7 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
 
 	contact := state.CurrentMessageState.Contact
-	if !contact.mutual() {
+	if !contact.Mutual() {
 		m.logger.Debug("Received a verification request for a non added mutual contact", zap.String("contactID", contactID))
 		return ErrContactNotMutual
 	}
@@ -885,7 +885,7 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
 
 	contact := state.CurrentMessageState.Contact
-	if !contact.mutual() {
+	if !contact.Mutual() {
 		m.logger.Debug("Received a verification response for a non mutual contact", zap.String("contactID", contactID))
 		return ErrContactNotMutual
 	}
@@ -974,7 +974,7 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
 
 	contact := state.CurrentMessageState.Contact
-	if !contact.mutual() {
+	if !contact.Mutual() {
 		m.logger.Debug("Received a verification decline for a non mutual contact", zap.String("contactID", contactID))
 		return ErrContactNotMutual
 	}
@@ -993,7 +993,7 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 		return nil // Do nothing, We have already cancelled the verification request
 	}
 
-	contact.VerificationStatus = VerificationStatusUNVERIFIED
+	contact.VerificationStatus = contacts.VerificationStatusUNVERIFIED
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
 	err = m.persistence.SaveContact(contact, nil)
@@ -1104,7 +1104,7 @@ func (m *Messenger) GetLatestVerificationRequestFrom(contactID string) (*verific
 	return m.verificationDatabase.GetLatestVerificationRequestFrom(contactID)
 }
 
-func (m *Messenger) createOrUpdateOutgoingContactVerificationNotification(contact *Contact, response *MessengerResponse, vr *verification.Request, chatMessage *common.Message, replyMessage *common.Message) error {
+func (m *Messenger) createOrUpdateOutgoingContactVerificationNotification(contact *contacts.Contact, response *MessengerResponse, vr *verification.Request, chatMessage *common.Message, replyMessage *common.Message) error {
 	notification := &ActivityCenterNotification{
 		ID:                        types.FromHex(vr.ID),
 		Name:                      contact.PrimaryName(),
@@ -1124,7 +1124,7 @@ func (m *Messenger) createOrUpdateOutgoingContactVerificationNotification(contac
 	return m.addActivityCenterNotification(response, notification, nil)
 }
 
-func (m *Messenger) createOrUpdateIncomingContactVerificationNotification(contact *Contact, messageState *ReceivedMessageState, vr *verification.Request, chatMessage *common.Message, replyMessage *common.Message) error {
+func (m *Messenger) createOrUpdateIncomingContactVerificationNotification(contact *contacts.Contact, messageState *ReceivedMessageState, vr *verification.Request, chatMessage *common.Message, replyMessage *common.Message) error {
 	notification := &ActivityCenterNotification{
 		ID:                        types.FromHex(vr.ID),
 		Name:                      contact.PrimaryName(),

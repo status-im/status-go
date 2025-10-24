@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -237,7 +238,7 @@ func (s *MessengerEmojiSuite) TestMaxEmojiReactionsPerMessage() {
 
 	messageState := bob.buildMessageState()
 	messageState.CurrentMessageState = &CurrentMessageState{
-		Contact: &Contact{
+		Contact: &contacts.Contact{
 			ID: crypto.PubkeyToHex(&alice.identity.PublicKey),
 		},
 	}

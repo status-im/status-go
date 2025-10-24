@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/server"
@@ -153,7 +154,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageFirstThenMessage() {
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
+	contact, err := contacts.BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
@@ -280,7 +281,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
+	contact, err := contacts.BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
