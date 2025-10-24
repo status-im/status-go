@@ -61,23 +61,17 @@
       }
     );
   in {
-    devShells = forAllSystems (system: let pkgs = pkgsFor.${system}; in {
-      default = pkgs.callPackage ./nix/shell.nix {
-        sdsHeaderPath = "${pkgs.lib-sds-pkg}/include";
-        sdsLibPath    = "${pkgs.lib-sds-pkg}/lib";
-      };
+    devShells = forAllSystems (system: {
+      default = pkgsFor.${system}.callPackage ./nix/shell.nix { };
     });
 
-    packages = forAllSystems (system:
-      let
-        pkgs = pkgsFor.${system};
-
-        # Import your Status Go packaging logic
-        statusGo = import ./nix/pkgs/status-go { inherit self pkgs; };
-      in {
-        status-go-library = statusGo.library;
-        status-go-mobile-android = statusGo.mobile.android { };
-        status-go-mobile-ios = statusGo.mobile.ios { };
-      });
+    packages = forAllSystems (system: let
+      pkgs = pkgsFor.${system};
+      statusGo = import ./nix/pkgs/status-go { inherit self pkgs; };
+    in {
+      status-go-library = statusGo.library;
+      status-go-mobile-android = statusGo.mobile.android {};
+      status-go-mobile-ios = statusGo.mobile.ios {};
+    });
   };
 }

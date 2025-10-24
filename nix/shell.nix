@@ -1,7 +1,5 @@
 {
-  pkgs,
-  sdsHeaderPath,
-  sdsLibPath
+  pkgs
 }:
 
 let
