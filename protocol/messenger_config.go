@@ -86,6 +86,7 @@ type config struct {
 	collectiblesManager    communities.CollectiblesManager
 	accountsManager        AccountsManager
 	signer                 communities.MessageSigner
+	sharedurls             SharedURLProvider
 
 	ensVerifier *ens.Verifier
 
@@ -337,6 +338,13 @@ func WithAccountsPublisher(publisher *pubsub.Publisher) Option {
 func WithENSVerifier(ensVerifier *ens.Verifier) func(c *config) error {
 	return func(c *config) error {
 		c.ensVerifier = ensVerifier
+		return nil
+	}
+}
+
+func WithSharedURLProvider(sharedURLProvider SharedURLProvider) Option {
+	return func(c *config) error {
+		c.sharedurls = sharedURLProvider
 		return nil
 	}
 }

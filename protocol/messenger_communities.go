@@ -2920,7 +2920,7 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 	}
 
 	response := &MessengerResponse{}
-	communityURL, err := m.ShareCommunityURLWithData(request.CommunityID)
+	communityURL, err := m.config.sharedurls.ShareCommunityURLWithData(request.CommunityID)
 	if err != nil {
 		return nil, err
 	}
