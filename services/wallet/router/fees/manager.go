@@ -173,17 +173,16 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address 
 		return nil, false, false, err
 	}
 
-	suggestion, err := gas.GetTxSuggestions(ctx, ethClient, params, config, nil)
+	feeSuggestions, err := gas.GetChainSuggestions(ctx, ethClient, params, config, address)
 	if err != nil {
+		f.logger.Error("Failed to get chain suggestions", zap.Error(err))
 		return nil, false, false, err
 	}
 
 	f.logger.Debug("Got Tx Suggestions",
 		zap.String("chainID", fmt.Sprintf("%d", chainID)),
-		zap.Any("suggestion", suggestion),
+		zap.Any("feeSuggestions", feeSuggestions),
 	)
-
-	feeSuggestions := suggestion.FeeSuggestions
 
 	suggestedFees = &SuggestedFees{
 		GasPrice:             big.NewInt(0),
@@ -212,13 +211,13 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address 
 	}
 
 	noBaseFee = false
-	estimatedBaseFee := suggestion.FeeSuggestions.EstimatedBaseFee
+	estimatedBaseFee := feeSuggestions.EstimatedBaseFee
 	if estimatedBaseFee != nil && estimatedBaseFee.Sign() == 0 {
 		noBaseFee = true
 	}
 
 	noPriorityFee = false
-	estimatedPriorityFeeLowerBound := suggestion.FeeSuggestions.PriorityFeeLowerBound
+	estimatedPriorityFeeLowerBound := feeSuggestions.PriorityFeeLowerBound
 	if estimatedPriorityFeeLowerBound != nil && estimatedPriorityFeeLowerBound.Sign() == 0 {
 		noPriorityFee = true
 	}

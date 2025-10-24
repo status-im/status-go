@@ -1197,7 +1197,7 @@ github.com/status-im/doubleratchet
 # github.com/status-im/extkeys v1.4.0
 ## explicit; go 1.23.0
 github.com/status-im/extkeys
-# github.com/status-im/go-wallet-sdk v0.0.0-20251017215230-2ff9d97b6bb3
+# github.com/status-im/go-wallet-sdk v0.0.0-20251027141302-43edbd6abc92
 ## explicit; go 1.23.0
 github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher
 github.com/status-im/go-wallet-sdk/pkg/contracts/erc1155

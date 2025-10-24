@@ -8,7 +8,16 @@ import (
 	"github.com/ethereum/go-ethereum"
 )
 
-func getL2Suggestions(ctx context.Context, ethClient EthClient, params ChainParameters, config SuggestionsConfig, callMsg *ethereum.CallMsg) (*TxSuggestions, error) {
+func getL2ChainSuggestions(ctx context.Context, ethClient EthClient, params ChainParameters, config SuggestionsConfig) (*FeeSuggestions, error) {
+	txSuggestions, err := getL2TxSuggestions(ctx, ethClient, params, config, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get l2 tx suggestions: %w", err)
+	}
+
+	return txSuggestions.FeeSuggestions, nil
+}
+
+func getL2TxSuggestions(ctx context.Context, ethClient EthClient, params ChainParameters, config SuggestionsConfig, callMsg *ethereum.CallMsg) (*TxSuggestions, error) {
 	ret := &TxSuggestions{
 		GasLimit: big.NewInt(0),
 	}
@@ -24,7 +33,7 @@ func getL2Suggestions(ctx context.Context, ethClient EthClient, params ChainPara
 	blockCount := uint64(max(config.GasPriceEstimationBlocks, config.NetworkCongestionBlocks))
 	rewardPercentiles := []float64{config.LowRewardPercentile, config.MediumRewardPercentile, config.HighRewardPercentile}
 
-	feeHistory, err := ethClient.FeeHistory(ctx, blockCount, nil, rewardPercentiles)
+	feeHistory, err := getFeeHistory(ctx, ethClient, blockCount, nil, rewardPercentiles)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fee history: %w", err)
 	}

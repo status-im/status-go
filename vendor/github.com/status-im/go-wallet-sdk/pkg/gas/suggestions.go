@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // DefaultConfig returns default configuration
@@ -41,21 +42,35 @@ func DefaultConfig(chainClass ChainClass) SuggestionsConfig {
 	}
 }
 
-func GetTxSuggestions(ctx context.Context, ethClient EthClient, params ChainParameters, config SuggestionsConfig, callMsg *ethereum.CallMsg) (*TxSuggestions, error) {
+func GetChainSuggestions(ctx context.Context, ethClient EthClient, params ChainParameters, config SuggestionsConfig, account common.Address) (*FeeSuggestions, error) {
 	switch params.ChainClass {
 	case ChainClassL1:
-		return getL1Suggestions(ctx, ethClient, params, config, callMsg)
+		return getL1ChainSuggestions(ctx, ethClient, params, config)
+	case ChainClassLineaStack:
+		return getLineaChainSuggestions(ctx, ethClient, params, config, account)
+	}
+	return getL2ChainSuggestions(ctx, ethClient, params, config)
+}
+
+func GetTxSuggestions(ctx context.Context, ethClient EthClient, params ChainParameters, config SuggestionsConfig, callMsg *ethereum.CallMsg) (*TxSuggestions, error) {
+	if callMsg == nil {
+		return nil, fmt.Errorf("call msg is required for tx suggestions")
+	}
+
+	switch params.ChainClass {
+	case ChainClassL1:
+		return getL1TxSuggestions(ctx, ethClient, params, config, callMsg)
 	case ChainClassLineaStack:
 		return getLineaTxSuggestions(ctx, ethClient, params, config, callMsg)
 	}
-	return getL2Suggestions(ctx, ethClient, params, config, callMsg)
+	return getL2TxSuggestions(ctx, ethClient, params, config, callMsg)
 }
 
 func EstimateInclusion(ctx context.Context, ethClient EthClient, params ChainParameters, config SuggestionsConfig, fee Fee) (*Inclusion, error) {
 	blockCount := uint64(max(config.GasPriceEstimationBlocks, config.NetworkCongestionBlocks))
 	rewardPercentiles := []float64{config.MediumRewardPercentile}
 
-	feeHistory, err := ethClient.FeeHistory(ctx, blockCount, nil, rewardPercentiles)
+	feeHistory, err := getFeeHistory(ctx, ethClient, blockCount, nil, rewardPercentiles)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fee history: %w", err)
 	}

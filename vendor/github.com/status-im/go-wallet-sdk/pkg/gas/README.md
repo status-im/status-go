@@ -77,6 +77,49 @@ config := gas.SuggestionsConfig{
 
 ## API Methods
 
+### GetChainSuggestions
+
+Get fee suggestions for a specific account without requiring a transaction call message. This method provides general fee recommendations based on network conditions and account-specific factors.
+
+```go
+func GetChainSuggestions(
+    ctx context.Context,
+    ethClient EthClient,
+    params ChainParameters,
+    config SuggestionsConfig,
+    account common.Address,
+) (*FeeSuggestions, error)
+```
+
+**Parameters:**
+- `ctx`: Context for cancellation and timeout
+- `ethClient`: Ethereum client implementing `EthClient` interface
+- `params`: Chain parameters (class and block time)
+- `config`: Configuration for estimation (use `DefaultConfig()` or customize)
+- `account`: Account address for account-specific fee suggestions (required for LineaStack)
+
+**Returns:**
+- `FeeSuggestions`: Contains fee suggestions for three priority levels with inclusion time estimates
+- `error`: Error if fee history retrieval or estimation fails
+
+**Example:**
+```go
+// Get general fee suggestions for an account
+account := common.HexToAddress("0x...")
+suggestions, err := gas.GetChainSuggestions(ctx, ethClient, params, config, account)
+if err != nil {
+    return err
+}
+
+// Use medium priority fees
+maxPriorityFee := suggestions.Medium.MaxPriorityFeePerGas
+maxFee := suggestions.Medium.MaxFeePerGas
+
+// Check estimated wait time
+minWait := suggestions.MediumInclusion.MinTimeUntilInclusion
+maxWait := suggestions.MediumInclusion.MaxTimeUntilInclusion
+```
+
 ### GetTxSuggestions
 
 Get comprehensive fee suggestions and gas limit estimation for a transaction.
