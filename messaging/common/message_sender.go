@@ -16,8 +16,8 @@ import (
 
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging/adapters"
 	messagingevents "github.com/status-im/status-go/messaging/events"
 	"github.com/status-im/status-go/messaging/layers/encryption"
@@ -55,9 +55,6 @@ type MessageSender struct {
 	// to decrypt messages
 	ephemeralKeys      map[string]*ecdsa.PrivateKey
 	ephemeralKeysMutex sync.Mutex
-
-	// handleSharedSecrets is a callback that is called every time a new shared secret is negotiated
-	handleSharedSecrets func([]*sharedsecret.Secret) error
 }
 
 func NewMessageSender(
@@ -91,10 +88,6 @@ func (s *MessageSender) Stop() {
 	s.StopReliability()
 }
 
-func (s *MessageSender) SetHandleSharedSecrets(handler func([]*sharedsecret.Secret) error) {
-	s.handleSharedSecrets = handler
-}
-
 // SendPrivate takes encoded data, encrypts it and sends through the wire.
 func (s *MessageSender) SendPrivate(
 	ctx context.Context,
@@ -103,7 +96,7 @@ func (s *MessageSender) SendPrivate(
 ) ([]byte, error) {
 	s.logger.Debug(
 		"sending a private message",
-		zap.String("public-key", types.EncodeHex(crypto.FromECDSAPub(recipient))),
+		zap.String("public-key", cryptotypes.EncodeHex(crypto.FromECDSAPub(recipient))),
 		zap.String("site", "SendPrivate"),
 	)
 	// Currently we don't support sending through datasync and setting custom waku fields,
@@ -129,7 +122,7 @@ func (s *MessageSender) SendCommunityMessage(
 ) ([]byte, error) {
 	s.logger.Debug(
 		"sending a community message",
-		zap.String("communityId", types.EncodeHex(rawMessage.CommunityID)),
+		zap.String("communityId", cryptotypes.EncodeHex(rawMessage.CommunityID)),
 		zap.String("site", "SendCommunityMessage"),
 	)
 	rawMessage.Sender = s.identity
@@ -144,7 +137,7 @@ func (s *MessageSender) SendPubsubTopicKey(
 ) ([]byte, error) {
 	s.logger.Debug(
 		"sending the protected topic key for a community",
-		zap.String("communityId", types.EncodeHex(rawMessage.CommunityID)),
+		zap.String("communityId", cryptotypes.EncodeHex(rawMessage.CommunityID)),
 		zap.String("site", "SendPubsubTopicKey"),
 	)
 	rawMessage.Sender = s.identity
@@ -215,7 +208,7 @@ func (s *MessageSender) SendGroup(
 	return messageID, nil
 }
 
-func (s *MessageSender) getMessageID(rawMessage *messagingtypes.RawMessage) (types.HexBytes, error) {
+func (s *MessageSender) getMessageID(rawMessage *messagingtypes.RawMessage) (cryptotypes.HexBytes, error) {
 	wrappedMessage, err := s.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
@@ -230,7 +223,7 @@ func (s *MessageSender) ValidateRawMessage(rawMessage *messagingtypes.RawMessage
 	if err != nil {
 		return err
 	}
-	messageID := types.EncodeHex(id)
+	messageID := cryptotypes.EncodeHex(id)
 
 	return s.validateMessageID(messageID, rawMessage)
 
@@ -247,8 +240,8 @@ func (s *MessageSender) validateMessageID(messageID string, rawMessage *messagin
 	return nil
 }
 
-func (s *MessageSender) setMessageID(messageID types.HexBytes, rawMessage *messagingtypes.RawMessage) error {
-	msgID := types.EncodeHex(messageID)
+func (s *MessageSender) setMessageID(messageID cryptotypes.HexBytes, rawMessage *messagingtypes.RawMessage) error {
+	msgID := cryptotypes.EncodeHex(messageID)
 
 	if err := s.validateMessageID(msgID, rawMessage); err != nil {
 		return err
@@ -273,7 +266,7 @@ func (s *MessageSender) sendCommunity(
 	ctx context.Context,
 	rawMessage *messagingtypes.RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug("sending community message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(&rawMessage.Sender.PublicKey))))
+	s.logger.Debug("sending community message", zap.String("recipient", cryptotypes.EncodeHex(crypto.FromECDSAPub(&rawMessage.Sender.PublicKey))))
 
 	// Set sender
 	if rawMessage.Sender == nil {
@@ -371,7 +364,7 @@ func (s *MessageSender) sendCommunity(
 		zap.String("messageID", messageID.String()),
 		zap.String("messageType", "community"),
 		zap.Any("contentType", rawMessage.MessageType),
-		zap.Strings("hashes", types.EncodeHexes(hashes)))
+		zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)))
 	s.transport.Track(messageID, hashes, newMessages)
 	s.notifyOnSentRawMessage(rawMessage)
 
@@ -384,7 +377,7 @@ func (s *MessageSender) sendPrivate(
 	recipient *ecdsa.PublicKey,
 	rawMessage *messagingtypes.RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
+	s.logger.Debug("sending private message", zap.String("recipient", cryptotypes.EncodeHex(crypto.FromECDSAPub(recipient))))
 
 	var wrappedMessage []byte
 	var err error
@@ -452,7 +445,7 @@ func (s *MessageSender) sendPrivate(
 			zap.String("messageID", messageID.String()),
 			zap.String("messageType", "private"),
 			zap.Any("contentType", rawMessage.MessageType),
-			zap.Strings("hashes", types.EncodeHexes(hashes)))
+			zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)))
 		s.transport.Track(messageID, hashes, newMessages)
 
 	} else {
@@ -472,7 +465,7 @@ func (s *MessageSender) sendPrivate(
 			zap.String("messageID", messageID.String()),
 			zap.Any("contentType", rawMessage.MessageType),
 			zap.String("messageType", "private"),
-			zap.Strings("hashes", types.EncodeHexes(hashes)))
+			zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)))
 		s.transport.Track(messageID, hashes, newMessages)
 	}
 
@@ -487,7 +480,7 @@ func (s *MessageSender) SendPairInstallation(
 	recipient *ecdsa.PublicKey,
 	rawMessage messagingtypes.RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
+	s.logger.Debug("sending private message", zap.String("recipient", cryptotypes.EncodeHex(crypto.FromECDSAPub(recipient))))
 
 	wrappedMessage, err := s.wrapMessageV1(&rawMessage)
 	if err != nil {
@@ -663,7 +656,7 @@ func (s *MessageSender) SendPublic(
 		if err != nil {
 			return nil, err
 		}
-		s.logger.Debug("adding key id to message", zap.String("keyid", types.Bytes2Hex(keyID)))
+		s.logger.Debug("adding key id to message", zap.String("keyid", cryptotypes.Bytes2Hex(keyID)))
 		// We send the message over the community topic
 		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, ratchet)
 		if err != nil {
@@ -730,7 +723,7 @@ func (s *MessageSender) SendPublic(
 		zap.String("messageID", messageID.String()),
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.String("messageType", "public"),
-		zap.Strings("hashes", types.EncodeHexes(hashes)))
+		zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)))
 	s.transport.Track(messageID, hashes, newMessages)
 	s.notifyOnSentRawMessage(&rawMessage)
 
@@ -744,7 +737,7 @@ func (s *MessageSender) SendPublic(
 // It returns an error only if the processing of required steps failed.
 func (s *MessageSender) HandleMessages(msg *messagingtypes.ReceivedMessage) (*messagingtypes.HandleMessageResponse, error) {
 	logger := s.logger.With(zap.String("site", "HandleMessages"))
-	hlogger := logger.With(zap.String("hash", types.HexBytes(msg.Hash).String()))
+	hlogger := logger.With(zap.String("hash", cryptotypes.HexBytes(msg.Hash).String()))
 
 	response, err := s.handleMessage(msg)
 	if err != nil {
@@ -770,7 +763,7 @@ func (s *MessageSender) HandleMessages(msg *messagingtypes.ReceivedMessage) (*me
 
 		var processedIds [][]byte
 		for _, message := range messages {
-			hlogger.Info("handling out of order encrypted messages", zap.String("hash", types.Bytes2Hex(message.Hash)))
+			hlogger.Info("handling out of order encrypted messages", zap.String("hash", cryptotypes.Bytes2Hex(message.Hash)))
 			r, err := s.handleMessage(message)
 			if err != nil {
 				hlogger.Debug("failed to handle hash ratchet message", zap.Error(err))
@@ -813,7 +806,7 @@ func (h *handleMessageResponse) Messages() []*messagingtypes.Message {
 }
 
 func (s *MessageSender) handleMessage(receivedMsg *messagingtypes.ReceivedMessage) (*handleMessageResponse, error) {
-	hlogger := s.logger.Named("handleMessage").With(zap.String("hash", types.EncodeHex(receivedMsg.Hash)))
+	hlogger := s.logger.Named("handleMessage").With(zap.String("hash", cryptotypes.EncodeHex(receivedMsg.Hash)))
 
 	message := &messagingtypes.Message{}
 
@@ -873,7 +866,7 @@ func (s *MessageSender) handleMessage(receivedMsg *messagingtypes.ReceivedMessag
 
 // fetchDecryptionKey returns the private key associated with this public key, and returns true if it's an ephemeral key
 func (s *MessageSender) fetchDecryptionKey(destination *ecdsa.PublicKey) (*ecdsa.PrivateKey, bool) {
-	destinationID := types.EncodeHex(crypto.FromECDSAPub(destination))
+	destinationID := cryptotypes.EncodeHex(crypto.FromECDSAPub(destination))
 
 	s.ephemeralKeysMutex.Lock()
 	decryptionKey, ok := s.ephemeralKeys[destinationID]
@@ -893,19 +886,50 @@ func (s *MessageSender) handleEncryptionLayer(ctx context.Context, message *mess
 	// if it's an ephemeral key, we don't negotiate a topic
 	decryptionKey, skipNegotiation := s.fetchDecryptionKey(message.TransportLayer.Dst)
 
-	err := populateMessageEncryptionLayer(message, decryptionKey, publicKey, s.protocol, skipNegotiation)
+	// As we handle non-encrypted messages, we make sure that DecryptPayload
+	// is set regardless of whether this step is successful
+	message.EncryptionLayer.Payload = message.TransportLayer.Payload
 
-	// if it's an ephemeral key, we don't have to handle a device not found error
-	if err == encryption.ErrDeviceNotFound && !skipNegotiation {
-		if err := s.handleErrDeviceNotFound(ctx, publicKey); err != nil {
+	// Nothing to do
+	if skipNegotiation {
+		return nil
+	}
+
+	var protocolMessage encryption.ProtocolMessage
+	err := proto.Unmarshal(message.TransportLayer.Payload, &protocolMessage)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal ProtocolMessage")
+	}
+
+	response, err := s.protocol.HandleMessage(
+		decryptionKey,
+		publicKey,
+		&protocolMessage,
+		message.TransportLayer.Hash,
+	)
+
+	switch err {
+	case nil:
+		message.EncryptionLayer.Payload = response.DecryptedMessage
+		message.EncryptionLayer.Installations = adapters.FromEncryptionInstallations(response.Installations)
+		message.EncryptionLayer.HashRatchetInfo = adapters.FromEncryptionHashRatchets(response.HashRatchetInfo)
+
+		err := s.HandleSharedSecrets(response.SharedSecrets)
+		if err != nil {
+			logger.Error("failed to handle shared secrets", zap.Error(err))
+		}
+	case encryption.ErrHashRatchetGroupIDNotFound:
+		if response != nil {
+			message.EncryptionLayer.HashRatchetInfo = adapters.FromEncryptionHashRatchets(response.HashRatchetInfo)
+		}
+	case encryption.ErrDeviceNotFound:
+		err := s.handleErrDeviceNotFound(ctx, publicKey)
+		if err != nil {
 			logger.Error("failed to handle ErrDeviceNotFound", zap.Error(err))
 		}
 	}
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (s *MessageSender) handleErrDeviceNotFound(ctx context.Context, publicKey *ecdsa.PublicKey) error {
@@ -994,7 +1018,7 @@ func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey 
 		if err != nil {
 			return nil, nil, err
 		}
-		s.logger.Debug("adding key id to message", zap.String("keyid", types.Bytes2Hex(keyID)))
+		s.logger.Debug("adding key id to message", zap.String("keyid", cryptotypes.Bytes2Hex(keyID)))
 		// We send the message over the community topic
 		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, ratchet)
 		if err != nil {
@@ -1051,8 +1075,8 @@ func (s *MessageSender) sendMessageSpec(ctx context.Context, publicKey *ecdsa.Pu
 	for _, newMessage := range newMessages {
 		// The shared secret needs to be handle before we send a message
 		// otherwise the topic might not be set up before we receive a message
-		if messageSpec.SharedSecret != nil && s.handleSharedSecrets != nil {
-			err := s.handleSharedSecrets([]*sharedsecret.Secret{messageSpec.SharedSecret})
+		if messageSpec.SharedSecret != nil {
+			err := s.HandleSharedSecrets([]*sharedsecret.Secret{messageSpec.SharedSecret})
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1136,7 +1160,7 @@ func (s *MessageSender) GetEphemeralKey() (*ecdsa.PrivateKey, error) {
 		return nil, err
 	}
 
-	s.ephemeralKeys[types.EncodeHex(crypto.FromECDSAPub(&privateKey.PublicKey))] = privateKey
+	s.ephemeralKeys[cryptotypes.EncodeHex(crypto.FromECDSAPub(&privateKey.PublicKey))] = privateKey
 	s.ephemeralKeysMutex.Unlock()
 	_, err = s.transport.LoadKeyFilters(privateKey)
 	if err != nil {
@@ -1193,6 +1217,20 @@ func (s *MessageSender) Publisher() *pubsub.Publisher {
 	return s.publisher
 }
 
+func (s *MessageSender) HandleSharedSecrets(secrets []*sharedsecret.Secret) error {
+	for _, secret := range secrets {
+		fSecret := ethtypes.NegotiatedSecret{
+			PublicKey: secret.Identity,
+			Key:       secret.Key,
+		}
+		_, err := s.transport.ProcessNegotiatedSecret(fSecret)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func populateMessageTransportLayer(m *messagingtypes.Message, msg *messagingtypes.ReceivedMessage) error {
 	publicKey, err := crypto.UnmarshalPubkey(msg.Sig)
 	if err != nil {
@@ -1212,47 +1250,6 @@ func populateMessageTransportLayer(m *messagingtypes.Message, msg *messagingtype
 		m.TransportLayer.Dst = publicKey
 	}
 
-	return nil
-}
-
-func populateMessageEncryptionLayer(m *messagingtypes.Message, myKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, enc *encryption.Protocol, skipNegotiation bool) error {
-	// As we handle non-encrypted messages, we make sure that DecryptPayload
-	// is set regardless of whether this step is successful
-	m.EncryptionLayer.Payload = m.TransportLayer.Payload
-	// Nothing to do
-	if skipNegotiation {
-		return nil
-	}
-
-	var protocolMessage encryption.ProtocolMessage
-	err := proto.Unmarshal(m.TransportLayer.Payload, &protocolMessage)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal ProtocolMessage")
-	}
-
-	response, err := enc.HandleMessage(
-		myKey,
-		senderKey,
-		&protocolMessage,
-		m.TransportLayer.Hash,
-	)
-
-	if err == encryption.ErrHashRatchetGroupIDNotFound {
-
-		if response != nil {
-			m.EncryptionLayer.HashRatchetInfo = adapters.FromEncryptionHashRatchets(response.HashRatchetInfo)
-		}
-		return err
-	}
-
-	if err != nil {
-		return errors.Wrap(err, "failed to handle Encryption message")
-	}
-
-	m.EncryptionLayer.Payload = response.DecryptedMessage
-	m.EncryptionLayer.Installations = adapters.FromEncryptionInstallations(response.Installations)
-	m.EncryptionLayer.SharedSecrets = adapters.FromEncryptionSharedSecrets(response.SharedSecrets)
-	m.EncryptionLayer.HashRatchetInfo = adapters.FromEncryptionHashRatchets(response.HashRatchetInfo)
 	return nil
 }
 

@@ -3139,11 +3139,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 				publicKey := msg.SigPubKey()
 
 				m.handleInstallations(msg.EncryptionLayer.Installations)
-				err := m.messaging.HandleSharedSecrets(msg.EncryptionLayer.SharedSecrets)
-				if err != nil {
-					// log and continue, non-critical error
-					logger.Warn("failed to handle shared secrets")
-				}
 
 				senderID := contactIDFromPublicKey(publicKey)
 				ownID := contactIDFromPublicKey(m.IdentityPublicKey())

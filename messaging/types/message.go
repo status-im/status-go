@@ -28,7 +28,6 @@ type EncryptionLayer struct {
 	// Payload after having been processed by the encryption layer
 	Payload         []byte `json:"-"`
 	Installations   []*Installation
-	SharedSecrets   []*SharedSecret
 	HashRatchetInfo []*HashRatchetInfo
 }
 
