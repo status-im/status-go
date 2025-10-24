@@ -10,7 +10,6 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
 ARG build_target='cmd'
