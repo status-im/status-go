@@ -296,6 +296,8 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
+USE_SYSTEM_NIM ?= 0
+
 generate-sds:  ##@ Build libsds third_party
 	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
 
