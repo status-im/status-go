@@ -167,7 +167,7 @@ pipeline {
                 variable: 'CODECOV_TOKEN'
               ),
             ]) {
-              nix.develop('make test-unit V=3', pure: false)
+              nix.develop('make test-unit V=1', pure: false)
             }
             archiveArtifacts('report_*.xml, test_*.log, test-coverage.html')
           }
