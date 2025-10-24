@@ -86,6 +86,7 @@ type ArchiveManager struct {
 func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 	return &ArchiveManager{
 		torrentConfig:               amc.TorrentConfig,
+		codexConfig:                 amc.CodexConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
 		indexCidTasks:               make(map[string]string),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
