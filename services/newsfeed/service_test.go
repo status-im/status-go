@@ -20,7 +20,6 @@ import (
 type MessengerNewsFeedSuite struct {
 	suite.Suite
 	service *Service
-	//storage *mock_newsfeed.MockPersistence
 	storage Persistence
 	ac      *mock_newsfeed.MockActivityCenter
 }
