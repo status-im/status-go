@@ -47,72 +47,9 @@ func TestEstimatedTimeV2(t *testing.T) {
 			big.NewInt(0x134180d5a),
 			big.NewInt(0x134e32c33),
 			big.NewInt(0x137da8d22),
-		},
-		GasUsedRatio: []float64{
-			0.7113286209349903,
-			0.19531163333333335,
-			0.7189235666666667,
-			0.4639678021079083,
-			0.5103012666666666,
-			0.538413,
-			0.16543626666666666,
-		},
-		OldestBlock: big.NewInt(0x1497d4b),
-		Reward: [][]*big.Int{
-			{
-				big.NewInt(0x2faf080),
-				big.NewInt(0x39d10680),
-				big.NewInt(0x722d7ef5),
-			},
-			{
-				big.NewInt(0x342e4a2),
-				big.NewInt(0x39d10680),
-				big.NewInt(0x77359400),
-			},
-			{
-				big.NewInt(0x14a22237),
-				big.NewInt(0x40170350),
-				big.NewInt(0x77359400),
-			},
-			{
-				big.NewInt(0x9134860),
-				big.NewInt(0x39d10680),
-				big.NewInt(0x618400ad),
-			},
-			{
-				big.NewInt(0x2faf080),
-				big.NewInt(0x39d10680),
-				big.NewInt(0x77359400),
-			},
-			{
-				big.NewInt(0x1ed69035),
-				big.NewInt(0x39d10680),
-				big.NewInt(0x41d0a8d6),
-			},
-		},
-	}
-	state.ethClient.EXPECT().FeeHistory(context.Background(), gomock.Any(), nil, gomock.Any()).Times(1).Return(feeHistory, nil)
-
-	maxFeesPerGas := big.NewInt(100e9)
-	priorityFeesPerGas := big.NewInt(10e9)
-	estimation, err := state.feeManager.EstimatedTime(context.Background(), uint64(1), maxFeesPerGas, priorityFeesPerGas)
-	assert.NoError(t, err)
-
-	assert.Less(t, estimation, uint(20))
-	assert.Greater(t, estimation, uint(10))
-}
-
-func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
-	state := setupTest(t)
-
-	feeHistoryResponse := &geth.FeeHistory{
-		BaseFee: []*big.Int{
-			big.NewInt(0x12f0e070b),
-			big.NewInt(0x13f10da8b),
-			big.NewInt(0x126c30d5e),
-			big.NewInt(0x136e4fe51),
-			big.NewInt(0x134180d5a),
-			big.NewInt(0x134e32c33),
+			big.NewInt(0x137da8d22),
+			big.NewInt(0x137da8d22),
+			big.NewInt(0x137da8d22),
 			big.NewInt(0x137da8d22),
 		},
 		GasUsedRatio: []float64{
@@ -122,6 +59,9 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 			0.4639678021079083,
 			0.5103012666666666,
 			0.538413,
+			0.16543626666666666,
+			0.16543626666666666,
+			0.16543626666666666,
 			0.16543626666666666,
 		},
 		OldestBlock: big.NewInt(0x1497d4b),
@@ -155,6 +95,115 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 				big.NewInt(0x2faf080),
 				big.NewInt(0x39d10680),
 				big.NewInt(0x77359400),
+			},
+			{
+				big.NewInt(0x1ed69035),
+				big.NewInt(0x39d10680),
+				big.NewInt(0x41d0a8d6),
+			},
+			{
+				big.NewInt(0x1ed69035),
+				big.NewInt(0x39d10680),
+				big.NewInt(0x41d0a8d6),
+			},
+			{
+				big.NewInt(0x1ed69035),
+				big.NewInt(0x39d10680),
+				big.NewInt(0x41d0a8d6),
+			},
+			{
+				big.NewInt(0x1ed69035),
+				big.NewInt(0x39d10680),
+				big.NewInt(0x41d0a8d6),
+			},
+		},
+	}
+	state.ethClient.EXPECT().FeeHistory(context.Background(), gomock.Any(), nil, gomock.Any()).Times(1).Return(feeHistory, nil)
+
+	maxFeesPerGas := big.NewInt(100e9)
+	priorityFeesPerGas := big.NewInt(10e9)
+	estimation, err := state.feeManager.EstimatedTime(context.Background(), uint64(1), maxFeesPerGas, priorityFeesPerGas)
+	assert.NoError(t, err)
+
+	assert.Less(t, estimation, uint(20))
+	assert.Greater(t, estimation, uint(10))
+}
+
+func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
+	state := setupTest(t)
+
+	feeHistoryResponse := &geth.FeeHistory{
+		BaseFee: []*big.Int{
+			big.NewInt(0x12f0e070b),
+			big.NewInt(0x13f10da8b),
+			big.NewInt(0x126c30d5e),
+			big.NewInt(0x136e4fe51),
+			big.NewInt(0x134180d5a),
+			big.NewInt(0x134e32c33),
+			big.NewInt(0x137da8d22),
+			big.NewInt(0x137da8d22),
+			big.NewInt(0x137da8d22),
+			big.NewInt(0x137da8d22),
+			big.NewInt(0x137da8d22),
+		},
+		GasUsedRatio: []float64{
+			0.7113286209349903,
+			0.19531163333333335,
+			0.7189235666666667,
+			0.4639678021079083,
+			0.5103012666666666,
+			0.538413,
+			0.16543626666666666,
+			0.16543626666666666,
+			0.16543626666666666,
+			0.16543626666666666,
+		},
+		OldestBlock: big.NewInt(0x1497d4b),
+		Reward: [][]*big.Int{
+			{
+				big.NewInt(0x2faf080),
+				big.NewInt(0x39d10680),
+				big.NewInt(0x722d7ef5),
+			},
+			{
+				big.NewInt(0x5f5e100),
+				big.NewInt(0x3b9aca00),
+				big.NewInt(0x59682f00),
+			},
+			{
+				big.NewInt(0x342e4a2),
+				big.NewInt(0x39d10680),
+				big.NewInt(0x77359400),
+			},
+			{
+				big.NewInt(0x14a22237),
+				big.NewInt(0x40170350),
+				big.NewInt(0x77359400),
+			},
+			{
+				big.NewInt(0x9134860),
+				big.NewInt(0x39d10680),
+				big.NewInt(0x618400ad),
+			},
+			{
+				big.NewInt(0x2faf080),
+				big.NewInt(0x39d10680),
+				big.NewInt(0x77359400),
+			},
+			{
+				big.NewInt(0x1ed69035),
+				big.NewInt(0x39d10680),
+				big.NewInt(0x41d0a8d6),
+			},
+			{
+				big.NewInt(0x1ed69035),
+				big.NewInt(0x39d10680),
+				big.NewInt(0x41d0a8d6),
+			},
+			{
+				big.NewInt(0x1ed69035),
+				big.NewInt(0x39d10680),
+				big.NewInt(0x41d0a8d6),
 			},
 			{
 				big.NewInt(0x1ed69035),
