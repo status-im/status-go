@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log"
 
 	"github.com/codex-storage/codex-go-bindings/codex"
 )
@@ -29,7 +28,6 @@ func NewCodexClient(config codex.Config) (CodexClient, error) {
 }
 
 func (c CodexClient) Start() error {
-	log.Println("Starting Codex node...")
 	return c.node.Start()
 }
 
