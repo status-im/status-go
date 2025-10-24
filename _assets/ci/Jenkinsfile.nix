@@ -27,11 +27,7 @@ pipeline {
     stage('Build library') {
       steps {
         script {
-          sh '''
-            export PATH=$PATH:/nix/var/nix/profiles/default/bin
-            export NIX_DEBUG=1
-            nix build --show-trace --print-build-logs --print-out-paths '.#status-go-library'
-          '''
+          nix.flake("status-go-library")
         }
       }
     }
