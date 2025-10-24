@@ -26,6 +26,7 @@ prepare:
 	@cd ../third_party/nim-sds && \
 		git fetch origin && \
 		git checkout master && \
+		git pull origin master && \
 		echo "Running 'make update'..." && \
 		make update
 
