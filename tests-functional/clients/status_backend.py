@@ -1,4 +1,5 @@
 import json
+import itertools
 import logging
 import os
 import tempfile
@@ -39,6 +40,8 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 
 class StatusBackend(RpcClient, SignalClient, ApiClient):
     container = None
+    _media_server_port_gen = itertools.count(constants.STATUS_MEDIA_SERVER_PORT, 1)
+    _connector_ws_port_gen = itertools.count(constants.STATUS_CONNECTOR_WS_PORT, 1)
 
     def __init__(self, privileged=False, ipv6=USE_IPV6, **kwargs):
         self.temp_dir = None
@@ -55,8 +58,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             self.temp_dir = tempfile.TemporaryDirectory()
             self.data_dir = self.temp_dir.name
             if kwargs.get("connector_enabled", False):
-                self.connector_ws_url = f"ws://localhost:{constants.STATUS_CONNECTOR_WS_PORT}"
-            self.media_server_port = constants.STATUS_MEDIA_SERVER_PORT
+                self.connector_ws_url = f"ws://localhost:{next(StatusBackend._connector_ws_port_gen)}"
+            self.media_server_port = next(StatusBackend._media_server_port_gen)
         else:
             self.container = StatusBackendContainer(privileged, self.ipv6, **kwargs)
             self.temp_dir = None
@@ -147,8 +150,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "apiLoggingEnabled": True,
             "wakuFleetsConfigFilePath": Config.waku_fleets_config,
             "pushFleetsConfigFilePath": Config.push_fleets_config,
-            "mediaServerAddress": f"""{"0.0.0.0" if self.container else "localhost"}:{constants.STATUS_MEDIA_SERVER_PORT}""",
-            "mediaServerAdvertizeHost": "localhost" if self.container else "",
+            "mediaServerAddress": f"""{"0.0.0.0" if self.container else "127.0.0.1"}:{self.media_server_port}""",
+            "mediaServerAdvertizeHost": "127.0.0.1" if self.container else "",
             "mediaServerAdvertizePort": self.container.media_server_port if self.container else 0,
         }
 
