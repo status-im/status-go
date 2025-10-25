@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS newsfeed_settings (
     id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
     enabled BOOLEAN DEFAULT TRUE,
     rss_enabled BOOLEAN DEFAULT TRUE,
+    notifications_enabled BOOLEAN DEFAULT FALSE,
     last_fetched_timestamp TIMESTAMP
 );
 
