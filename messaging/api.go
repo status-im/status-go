@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/connection"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
 	"github.com/status-im/status-go/messaging/layers/encryption"
@@ -288,10 +287,6 @@ func (a *API) RemovePubsubTopicKey(topic string) error {
 	return a.core.transport.RemovePubsubTopicKey(topic)
 }
 
-func (a *API) ConfirmMessageDelivered(messageID string) {
-	a.core.transport.ConfirmMessageDelivered(messageID)
-}
-
 func (a *API) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters types.ChatFilters) {
 	a.core.transport.SetCriteriaForMissingMessageVerification(peerInfo, adapters.ToTransportFilters(filters))
 }
@@ -339,8 +334,8 @@ func (a *API) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 	a.core.transport.SetStorenodeConfigProvider(c)
 }
 
-func (a *API) ResetDatasyncForPeer(publicKey *ecdsa.PublicKey, eventTime uint64) {
-	a.core.resetDatasyncForPeer(publicKey, eventTime)
+func (a *API) ReportUserOnline(publicKey *ecdsa.PublicKey, eventTime uint64) {
+	a.core.sender.ReportUserOnline(publicKey, eventTime)
 }
 
 func (a *API) MetricsPushReceivedMessages(receivedMessages types.ReceivedMessages) {
@@ -456,10 +451,6 @@ func (a *API) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID
 
 func (a *API) Metrics() string {
 	return a.core.metrics()
-}
-
-func (a *API) MarkAsConfirmed(dataSyncID []byte, atLeastOne bool) (messageID cryptotypes.HexBytes, err error) {
-	return a.core.sender.MarkAsConfirmed(dataSyncID, atLeastOne)
 }
 
 func ToContentTopic(s string) []byte {

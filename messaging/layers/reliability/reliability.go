@@ -3,7 +3,8 @@ package reliability
 import (
 	"crypto/ecdsa"
 
-	"github.com/cockroachdb/errors"
+	"github.com/golang/protobuf/proto"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	mvdsnode "github.com/status-im/mvds/node"
@@ -14,32 +15,39 @@ import (
 	datasyncpeer "github.com/status-im/status-go/messaging/layers/reliability/datasync/peer"
 )
 
-type MVDSDispatcher func(peer mvdsstate.PeerID, payload *mvdsproto.Payload) error
+// MessageDispatcher is a function that dispatches messages to a given public key.
+//
+//	publicKey: the recipient public key
+//	wrappedPayload: the datasync wrapped payload
+//	messages: the original messages that were wrapped
+type MessageDispatcher func(publicKey *ecdsa.PublicKey, wrappedPayload []byte, messages [][]byte) error
 
 type Reliability struct {
-	identity            *ecdsa.PrivateKey
-	datasync            *datasync.DataSync
-	datasyncPersistence mvdsnode.Persistence
-	logger              *zap.Logger
+	identity              *ecdsa.PrivateKey
+	datasync              *datasync.DataSync
+	mvdsPersistence       mvdsnode.Persistence
+	mvdsStatusChangeEvent chan mvdsnode.PeerStatusChangeEvent
+	logger                *zap.Logger
 }
 
 func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, logger *zap.Logger) *Reliability {
 	return &Reliability{
-		identity:            identity,
-		datasyncPersistence: datasyncPersistence,
-		logger:              logger.Named("reliability"),
+		identity:              identity,
+		mvdsPersistence:       datasyncPersistence,
+		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
+		logger:                logger.Named("reliability"),
 	}
 }
 
-func (r *Reliability) Start(statusChangeEvent chan mvdsnode.PeerStatusChangeEvent, dispatch MVDSDispatcher) error {
+func (r *Reliability) Start(dispatch MessageDispatcher) error {
 	dataSyncTransport := datasync.NewNodeTransport()
 	dataSyncNode, err := mvdsnode.NewPersistentNode(
-		r.datasyncPersistence,
+		r.mvdsPersistence,
 		dataSyncTransport,
 		datasyncpeer.PublicKeyToPeerID(r.identity.PublicKey),
 		mvdsnode.BATCH,
 		datasync.CalculateSendTime,
-		statusChangeEvent,
+		r.mvdsStatusChangeEvent,
 		r.logger,
 	)
 	if err != nil {
@@ -48,7 +56,30 @@ func (r *Reliability) Start(statusChangeEvent chan mvdsnode.PeerStatusChangeEven
 
 	r.datasync = datasync.New(dataSyncNode, dataSyncTransport, true, r.logger)
 
-	r.datasync.Init(dispatch, r.logger)
+	mvdsDispatch := func(receiver mvdsstate.PeerID, payload *mvdsproto.Payload) error {
+		if !payload.IsValid() {
+			return errors.New("payload is invalid")
+		}
+
+		marshalledPayload, err := proto.Marshal(payload)
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal payload")
+		}
+
+		publicKey, err := datasyncpeer.IDToPublicKey(receiver)
+		if err != nil {
+			return errors.Wrap(err, "failed to convert id to public key")
+		}
+
+		messages := make([][]byte, 0, len(payload.Messages))
+		for _, msg := range payload.Messages {
+			messages = append(messages, msg.Body)
+		}
+
+		return dispatch(publicKey, marshalledPayload, messages)
+	}
+
+	r.datasync.Init(mvdsDispatch, r.logger)
 	r.datasync.Start(datasync.DatasyncTicker)
 
 	return nil
@@ -86,4 +117,17 @@ func (r *Reliability) WrapAndQueueMessageForDispatch(publicKey *ecdsa.PublicKey,
 // and potentially acknowledges it.
 func (r *Reliability) UnwrapAndAcknowledgeMessage(publicKey *ecdsa.PublicKey, message []byte) (*mvdsproto.Payload, error) {
 	return r.datasync.Unwrap(publicKey, message)
+}
+
+// ReportPeerOnline reports to MVDS that a peer is online at a given event time.
+func (r *Reliability) ReportPeerOnline(publicKey *ecdsa.PublicKey, eventTime uint64) {
+	select {
+	case r.mvdsStatusChangeEvent <- mvdsnode.PeerStatusChangeEvent{
+		PeerID:    datasyncpeer.PublicKeyToPeerID(*publicKey),
+		Status:    mvdsnode.OnlineStatus,
+		EventTime: eventTime,
+	}:
+	default:
+		r.logger.Debug("mvdsStatusChangeEvent channel is full")
+	}
 }

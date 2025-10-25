@@ -11,10 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	mvdsnode "github.com/status-im/mvds/node"
-	mvdsproto "github.com/status-im/mvds/protobuf"
-	mvdsstate "github.com/status-im/mvds/state"
-
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
@@ -23,8 +19,6 @@ import (
 	"github.com/status-im/status-go/messaging/common"
 	"github.com/status-im/status-go/messaging/events"
 	"github.com/status-im/status-go/messaging/layers/encryption"
-	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
-	datasyncpeer "github.com/status-im/status-go/messaging/layers/reliability/datasync/peer"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
@@ -51,8 +45,7 @@ type Core struct {
 	wg   sync.WaitGroup
 	quit chan struct{}
 
-	connectionState       connection.State
-	mvdsStatusChangeEvent chan mvdsnode.PeerStatusChangeEvent
+	connectionState connection.State
 
 	publisher *pubsub.Publisher
 
@@ -103,15 +96,14 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	}
 
 	return &Core{
-		config:                *config,
-		identity:              params.Identity,
-		waku:                  waku,
-		transport:             transport,
-		sender:                sender,
-		encryptor:             encryptor,
-		quit:                  make(chan struct{}),
-		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
-		publisher:             pubsub.NewPublisher(),
+		config:    *config,
+		identity:  params.Identity,
+		waku:      waku,
+		transport: transport,
+		sender:    sender,
+		encryptor: encryptor,
+		quit:      make(chan struct{}),
+		publisher: pubsub.NewPublisher(),
 	}, nil
 }
 
@@ -163,7 +155,7 @@ func (c *Core) start() error {
 		}
 	}
 
-	err = c.sender.StartReliability(c.mvdsStatusChangeEvent, c.sendDataSync)
+	err = c.sender.StartReliability()
 	if err != nil {
 		return err
 	}
@@ -250,62 +242,6 @@ func (c *Core) stop() error {
 	return nil
 }
 
-func (c *Core) sendDataSync(receiver mvdsstate.PeerID, payload *mvdsproto.Payload) error {
-	ctx := context.Background()
-	if !payload.IsValid() {
-		c.logger.Error("payload is invalid")
-		return errors.New("payload is invalid")
-	}
-
-	marshalledPayload, err := proto.Marshal(payload)
-	if err != nil {
-		c.logger.Error("failed to marshal payload")
-		return err
-	}
-
-	publicKey, err := datasyncpeer.IDToPublicKey(receiver)
-	if err != nil {
-		c.logger.Error("failed to convert id to public key", zap.Error(err))
-		return err
-	}
-
-	// Calculate the messageIDs
-	messageIDs := make([][]byte, 0, len(payload.Messages))
-	hexMessageIDs := make([]string, 0, len(payload.Messages))
-	for _, payload := range payload.Messages {
-		mid := types.MessageID(&c.identity.PublicKey, payload.Body)
-		messageIDs = append(messageIDs, mid)
-		hexMessageIDs = append(hexMessageIDs, mid.String())
-	}
-
-	messageSpec, err := c.encryptor.BuildEncryptedMessage(c.identity, publicKey, marshalledPayload)
-	if err != nil {
-		return errors.Wrap(err, "failed to encrypt message")
-	}
-
-	// The shared secret needs to be handle before we send a message
-	// otherwise the topic might not be set up before we receive a message
-	err = c.sender.HandleSharedSecrets([]*sharedsecret.Secret{messageSpec.SharedSecret})
-	if err != nil {
-		return err
-	}
-
-	hashes, newMessages, err := c.sender.SendMessageSpec(ctx, publicKey, messageSpec, messageIDs)
-	if err != nil {
-		c.logger.Error("failed to send a datasync message", zap.Error(err))
-		return err
-	}
-
-	c.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)))
-	c.transport.TrackMany(messageIDs, hashes, newMessages)
-
-	pubsub.Publish(c.publisher, events.DatasyncMessagesSentEvent{
-		Messages: newMessages,
-	})
-
-	return nil
-}
-
 func (c *Core) connectionChanged(state connection.State) {
 	c.transport.ConnectionChanged(state)
 
@@ -314,22 +250,10 @@ func (c *Core) connectionChanged(state connection.State) {
 	}
 
 	if c.connectionState.Offline && !state.Offline {
-		err := c.sender.StartReliability(c.mvdsStatusChangeEvent, c.sendDataSync)
+		err := c.sender.StartReliability()
 		if err != nil {
 			c.logger.Error("failed to start datasync", zap.Error(err))
 		}
-	}
-}
-
-func (c *Core) resetDatasyncForPeer(publicKey *ecdsa.PublicKey, eventTime uint64) {
-	select {
-	case c.mvdsStatusChangeEvent <- mvdsnode.PeerStatusChangeEvent{
-		PeerID:    datasyncpeer.PublicKeyToPeerID(*publicKey),
-		Status:    mvdsnode.OnlineStatus,
-		EventTime: eventTime,
-	}:
-	default:
-		c.logger.Debug("mvdsStatusChangeEvent channel is full")
 	}
 }
 
@@ -472,9 +396,6 @@ func (c *Core) startWakuMetrics() error {
 		sentMessagesSub, unsubSentMessages := pubsub.Subscribe[events.MessageEvent](c.publisher, 100)
 		defer unsubSentMessages()
 
-		sentDatasyncSub, unsubSentDatasync := pubsub.Subscribe[events.DatasyncMessagesSentEvent](c.publisher, 100)
-		defer unsubSentDatasync()
-
 		for {
 			select {
 			case sub := <-sentMessagesSub:
@@ -488,16 +409,6 @@ func (c *Core) startWakuMetrics() error {
 					msg.MessageType.String(),
 					uint32(len(msg.Payload)),
 				)
-
-			case sub := <-sentDatasyncSub:
-				for _, msg := range sub.Messages {
-					c.wakumetrics.PushRawMessageByType(
-						msg.PubsubTopic,
-						msg.Topic.String(),
-						"DATASYNC",
-						uint32(len(msg.Payload)),
-					)
-				}
 
 			case <-c.quit:
 				return

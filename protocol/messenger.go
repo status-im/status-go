@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/newsfeed"
 	"github.com/status-im/status-go/messaging"
@@ -3129,7 +3130,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 				Messages:   statusMessages,
 			})
 
-			m.markDeliveredMessages(handleMessagesResponse.DatasyncAcks)
+			m.markDeliveredMessages(handleMessagesResponse.AckedMessageIDs)
 
 			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
 
@@ -3230,22 +3231,12 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 	return m.saveDataAndPrepareResponse(messageState)
 }
 
-func (m *Messenger) markDeliveredMessages(acks [][]byte) {
+func (m *Messenger) markDeliveredMessages(acks []cryptotypes.HexBytes) {
 	for _, ack := range acks {
-		//get message ID from database by datasync ID, with at-least-one
-		// semantic
-		messageIDBytes, err := m.messaging.MarkAsConfirmed(ack, true)
-		if err != nil {
-			m.logger.Info("got datasync acknowledge for message we don't have in db", zap.String("ack", hex.EncodeToString(ack)))
-			continue
-		}
-
-		messageID := messageIDBytes.String()
-		//mark messages as delivered
-
+		messageID := ack.String()
 		m.logger.Debug("got datasync acknowledge for message", zap.String("ack", hex.EncodeToString(ack)), zap.String("messageID", messageID))
 
-		err = m.UpdateMessageOutgoingStatus(messageID, common.OutgoingStatusDelivered)
+		err := m.UpdateMessageOutgoingStatus(messageID, common.OutgoingStatusDelivered)
 		if err != nil {
 			m.logger.Debug("Can't set message status as delivered", zap.Error(err))
 		}
@@ -3254,8 +3245,6 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 		if err != nil {
 			m.logger.Debug("can't set raw message as sent", zap.Error(err))
 		}
-
-		m.messaging.ConfirmMessageDelivered(messageID)
 
 		//send signal to client that message status updated
 		if m.config.messengerSignalsHandler != nil {

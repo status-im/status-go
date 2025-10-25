@@ -5,7 +5,6 @@ import (
 
 	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
 // SentMessage reprent a message that has been passed to the transport layer
@@ -28,8 +27,4 @@ type MessageEvent struct {
 	Type        MessageEventType
 	SentMessage *SentMessage
 	RawMessage  *types.RawMessage
-}
-
-type DatasyncMessagesSentEvent struct {
-	Messages []*wakutypes.NewMessage
 }
