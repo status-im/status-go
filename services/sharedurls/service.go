@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/utils"
 )
 
@@ -34,7 +33,10 @@ const sharedURLChannelPrefixWithData = baseShareURL + "/" + channelPath
 
 const channelUUIDRegExp = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$"
 
-var channelRegExp = regexp.MustCompile(channelUUIDRegExp)
+var (
+	channelRegExp         = regexp.MustCompile(channelUUIDRegExp)
+	errInvalidCommunityID = errors.New("invalid community id")
+)
 
 var (
 	ErrContactNotFound = errors.New("contact not found")
@@ -197,26 +199,26 @@ func parseCommunityURLWithData(data string, chatKey string) (*URLDataResponse, e
 	}, nil
 }
 
-func (m *Service) ShareCommunityChannelURLWithChatKey(request *requests.CommunityChannelShareURL) (string, error) {
-	if err := request.Validate(); err != nil {
-		return "", err
+func (m *Service) ShareCommunityChannelURLWithChatKey(communityID types.HexBytes, channelID string) (string, error) {
+	if len(communityID) == 0 {
+		return "", errInvalidCommunityID
 	}
 
-	shortKey, err := serializePublicKey(request.CommunityID)
+	shortKey, err := serializePublicKey(communityID)
 	if err != nil {
 		return "", err
 	}
 
-	valid, err := regexp.MatchString(channelUUIDRegExp, request.ChannelID)
+	valid, err := regexp.MatchString(channelUUIDRegExp, channelID)
 	if err != nil {
 		return "", err
 	}
 
 	if !valid {
-		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(request.ChannelID))
+		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(channelID))
 	}
 
-	return fmt.Sprintf("%s/cc/%s#%s", baseShareURL, request.ChannelID, shortKey), nil
+	return fmt.Sprintf("%s/cc/%s#%s", baseShareURL, channelID, shortKey), nil
 }
 
 func parseCommunityChannelURLWithChatKey(channelID string, publicKey string) (*URLDataResponse, error) {
@@ -291,31 +293,31 @@ func (m *Service) prepareEncodedCommunityChannelData(community *communities.Comm
 	return encodedData, shortKey, nil
 }
 
-func (m *Service) ShareCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
-	if err := request.Validate(); err != nil {
-		return "", err
+func (m *Service) ShareCommunityChannelURLWithData(communityID types.HexBytes, channelID string) (string, error) {
+	if len(communityID) == 0 {
+		return "", errInvalidCommunityID
 	}
 
-	valid, err := regexp.MatchString(channelUUIDRegExp, request.ChannelID)
+	valid, err := regexp.MatchString(channelUUIDRegExp, channelID)
 	if err != nil {
 		return "", err
 	}
 
 	if !valid {
-		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(request.ChannelID))
+		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(channelID))
 	}
 
-	community, err := m.provider.GetCommunityByID(request.CommunityID)
+	community, err := m.provider.GetCommunityByID(communityID)
 	if err != nil {
 		return "", err
 	}
 
-	channel := community.Chats()[request.ChannelID]
+	channel := community.Chats()[channelID]
 	if channel == nil {
-		return "", fmt.Errorf("channel with channelID %s not found", gocommon.TruncateWithDot(request.ChannelID))
+		return "", fmt.Errorf("channel with channelID %s not found", gocommon.TruncateWithDot(channelID))
 	}
 
-	data, shortKey, err := m.prepareEncodedCommunityChannelData(community, channel, request.ChannelID)
+	data, shortKey, err := m.prepareEncodedCommunityChannelData(community, channel, channelID)
 	if err != nil {
 		return "", err
 	}
@@ -423,7 +425,7 @@ func parseUserURLWithENS(ensName string) (*URLDataResponse, error) {
 	return nil, fmt.Errorf("not implemented yet")
 }
 
-func (m *Messenger) prepareEncodedUserData(contact *contacts.Contact) (string, string, error) {
+func (m *Service) prepareEncodedUserData(contact *contacts.Contact) (string, string, error) {
 	pk, err := contact.PublicKey()
 	if err != nil {
 		return "", "", err

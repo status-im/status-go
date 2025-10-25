@@ -2,7 +2,6 @@ package sharedurls
 
 import (
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/protocol/requests"
 )
 
 type PublicAPI struct {
@@ -17,12 +16,12 @@ func (api *PublicAPI) ShareCommunityURLWithData(communityID types.HexBytes) (str
 	return api.service.ShareCommunityURLWithData(communityID)
 }
 
-func (api *PublicAPI) ShareCommunityChannelURLWithChatKey(request *requests.CommunityChannelShareURL) (string, error) {
-	return api.service.ShareCommunityChannelURLWithChatKey(request)
+func (api *PublicAPI) ShareCommunityChannelURLWithChatKey(communityID types.HexBytes, channelID string) (string, error) {
+	return api.service.ShareCommunityChannelURLWithChatKey(communityID, channelID)
 }
 
-func (api *PublicAPI) ShareCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
-	return api.service.ShareCommunityChannelURLWithData(request)
+func (api *PublicAPI) ShareCommunityChannelURLWithData(communityID types.HexBytes, channelID string) (string, error) {
+	return api.service.ShareCommunityChannelURLWithData(communityID, channelID)
 }
 
 func (api *PublicAPI) ShareUserURLWithENS(pubKey string) (string, error) {

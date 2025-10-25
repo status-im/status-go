@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/protocol/contacts"
+	requests2 "github.com/status-im/status-go/services/sharedurls/requests"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
@@ -319,7 +320,7 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithChatKey() {
 	community := s.createCommunity()
 	channelID := "003cdcd5-e065-48f9-b166-b1a94ac75a11"
 
-	request := &requests.CommunityChannelShareURL{
+	request := &requests2.CommunityChannelShareURL{
 		CommunityID: community.ID(),
 		ChannelID:   channelID,
 	}
@@ -359,7 +360,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
 func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithData() {
 	community, channel, channelID := s.createCommunityWithChannel()
 
-	request := &requests.CommunityChannelShareURL{
+	request := &requests2.CommunityChannelShareURL{
 		CommunityID: community.ID(),
 		ChannelID:   channelID,
 	}
@@ -390,7 +391,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithData() {
 func (s *MessengerShareUrlsSuite) TestShareAndParseCommunityChannelURLWithData() {
 	community, channel, channelID := s.createCommunityWithChannel()
 
-	request := &requests.CommunityChannelShareURL{
+	request := &requests2.CommunityChannelShareURL{
 		CommunityID: community.ID(),
 		ChannelID:   channelID,
 	}
