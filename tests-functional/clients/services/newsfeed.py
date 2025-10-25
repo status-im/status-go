@@ -32,4 +32,3 @@ class NewsFeedService(Service):
         """Enable or disable RSS."""
         params = [value]
         self.rpc_request("setRSSEnabled", params)
-
