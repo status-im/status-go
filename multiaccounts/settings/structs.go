@@ -156,9 +156,9 @@ type Settings struct {
 	Name                 string           `json:"name,omitempty"`
 	Networks             *json.RawMessage `json:"networks/networks"`
 	// NotificationsEnabled indicates whether local notifications should be enabled (android only)
-	NotificationsEnabled         bool             `json:"notifications-enabled?,omitempty"`
-	PhotoPath                    string           `json:"photo-path"`
-	PinnedMailserver             *json.RawMessage `json:"pinned-mailservers,omitempty"`
+	NotificationsEnabled bool             `json:"notifications-enabled?,omitempty"`
+	PhotoPath            string           `json:"photo-path"`
+	PinnedMailserver     *json.RawMessage `json:"pinned-mailservers,omitempty"`
 	// PreferredName represents the user's preferred Ethereum Name Service (ENS) name.
 	// If a user has multiple ENS names, they can select one as the PreferredName.
 	// When PreferredName is set, it takes precedence over the DisplayName for displaying the user's name.

@@ -19,6 +19,7 @@ import (
 
 var (
 	errServiceNotRunning = errors.New("service is not running")
+	errNoActivityCenter  = errors.New("no activity center set up")
 )
 
 type Service struct {
@@ -87,6 +88,10 @@ func (s *Service) APIs() []rpc.API {
 }
 
 func (s *Service) HandleFeedItem(feedItem *gofeed.Item) (*protocol.MessengerResponse, error) {
+	if s.ac == nil {
+		return nil, errNoActivityCenter
+	}
+
 	response := &protocol.MessengerResponse{}
 
 	imageURL := ""

@@ -80,7 +80,7 @@ func (s *MessengerNewsFeedSuite) TestHandleNewsFeedItem() {
 	s.Require().NoError(err)
 
 	// Check that the lastFetched timestamp is updated
-	lastFetched, err := s.service.storage.NewsFeedLastFetchedTimestamp()
+	lastFetched, err := s.service.storage.GetLastFetchedTimestamp()
 	s.Require().NoError(err)
 	s.Require().GreaterOrEqual(time.Now().UTC().Second(), lastFetched.UTC().Second())
 }

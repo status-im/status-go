@@ -408,12 +408,6 @@ type NewsFeedActivityCenter struct {
 	m *protocol.Messenger
 }
 
-func NewNewsFeedActivityCenter(m *protocol.Messenger) *NewsFeedActivityCenter {
-	return &NewsFeedActivityCenter{
-		m: m,
-	}
-}
-
 func (ac *NewsFeedActivityCenter) AddNotification(response *protocol.MessengerResponse, notification *protocol.ActivityCenterNotification) error {
 	return ac.m.AddActivityCenterNotification(response, notification, nil)
 }
@@ -425,7 +419,10 @@ func (b *StatusNode) NewsFeedService() *newsfeed.Service {
 
 	if b.newsfeedSrvc == nil {
 		persistence := newsfeed.NewSQLitePersistence(b.appDB)
-		ac := NewNewsFeedActivityCenter(b.WakuV2ExtService().Messenger())
+		ac := &NewsFeedActivityCenter{}
+		if wakuext := b.WakuV2ExtService(); wakuext != nil {
+			ac.m = wakuext.Messenger()
+		}
 
 		b.newsfeedSrvc = newsfeed.NewService(
 			b.logger.Named("newsfeed"),
