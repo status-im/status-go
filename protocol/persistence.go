@@ -20,6 +20,7 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/contacts"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/browsers"
@@ -71,7 +72,7 @@ func (db sqlitePersistence) SaveChats(chats []*Chat) error {
 	return nil
 }
 
-func (db sqlitePersistence) SaveContacts(contacts []*Contact) error {
+func (db sqlitePersistence) SaveContacts(contacts []*contacts.Contact) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -555,8 +556,8 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 
 }
 
-func (db sqlitePersistence) Contacts() ([]*Contact, error) {
-	allContacts := make(map[string]*Contact)
+func (db sqlitePersistence) Contacts() ([]*contacts.Contact, error) {
+	allContacts := make(map[string]*contacts.Contact)
 
 	rows, err := db.db.Query(`
 		SELECT
@@ -596,7 +597,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	for rows.Next() {
 
 		var (
-			contact                   Contact
+			contact                   contacts.Contact
 			nickname                  sql.NullString
 			contactRequestLocalState  sql.NullInt64
 			contactRequestLocalClock  sql.NullInt64
@@ -655,7 +656,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 		}
 
 		if contactRequestLocalState.Valid {
-			contact.ContactRequestLocalState = ContactRequestState(contactRequestLocalState.Int64)
+			contact.ContactRequestLocalState = contacts.ContactRequestState(contactRequestLocalState.Int64)
 		}
 
 		if contactRequestLocalClock.Valid {
@@ -663,7 +664,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 		}
 
 		if contactRequestRemoteState.Valid {
-			contact.ContactRequestRemoteState = ContactRequestState(contactRequestRemoteState.Int64)
+			contact.ContactRequestRemoteState = contacts.ContactRequestState(contactRequestRemoteState.Int64)
 		}
 
 		if contactRequestRemoteClock.Valid {
@@ -713,7 +714,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 		}
 	}
 
-	var response []*Contact
+	var response []*contacts.Contact
 	for key := range allContacts {
 		response = append(response, allContacts[key])
 
@@ -894,7 +895,7 @@ func (db sqlitePersistence) ExpiredMessagesIDs(maxSendCount int) ([]string, erro
 	return ids, nil
 }
 
-func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error) {
+func (db sqlitePersistence) SaveContact(contact *contacts.Contact, tx *sql.Tx) (err error) {
 	if tx == nil {
 		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
 		if err != nil {

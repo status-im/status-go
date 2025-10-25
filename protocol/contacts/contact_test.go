@@ -1,4 +1,4 @@
-package protocol
+package contacts
 
 import (
 	"encoding/json"
@@ -34,18 +34,18 @@ func validateContactTest(t *testing.T, contact Contact, tc contactTest, testNum 
 	require.Equal(t, tc.expectedLocalState, contact.ContactRequestLocalState, failedMessage+", contact request local state not matching")
 	require.Equal(t, tc.expectedRemoteState, contact.ContactRequestRemoteState, failedMessage+", contact request remote state not matching")
 
-	require.Equal(t, tc.expectedAdded, contact.added(), failedMessage+", added() not matching")
-	require.Equal(t, tc.expectedHasAddedUs, contact.hasAddedUs(), failedMessage+", hasAddedUs() not matching")
-	require.Equal(t, tc.expectedMutual, contact.mutual(), failedMessage+", mutual() not matching")
+	require.Equal(t, tc.expectedAdded, contact.Added(), failedMessage+", Added() not matching")
+	require.Equal(t, tc.expectedHasAddedUs, contact.HasAddedUs(), failedMessage+", HasAddedUs() not matching")
+	require.Equal(t, tc.expectedMutual, contact.Mutual(), failedMessage+", Mutual() not matching")
 }
 
 /*
 none/none
 sent/none
-dismissed/none
+Dismissed/none
 none/received
 sent/received
-dismissed/received
+Dismissed/received
 */
 
 func TestContactContactRequestSent(t *testing.T) {
@@ -57,8 +57,8 @@ func TestContactContactRequestSent(t *testing.T) {
 	   Local = none Remote = received
 	   Local = sent Remote = none
 	   Local = sent Remote = received
-	   Local = dismissed Remote = none
-	   Local = dismissed Remote = received
+	   Local = Dismissed Remote = none
+	   Local = Dismissed Remote = received
 	*/
 
 	tests := []contactTest{
@@ -629,7 +629,7 @@ func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnTheirS
 func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnOurSide(t *testing.T) {
 	// We receive a message with expected contact request state == none
 	// and clock > our clock. We consider this a retraction, unless we are
-	// in the dismissed state, since that should be only changed by a
+	// in the Dismissed state, since that should be only changed by a
 	// trusted device
 
 	c := &Contact{}
@@ -645,9 +645,9 @@ func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnOurSid
 		},
 	)
 
-	require.False(t, c.added())
+	require.False(t, c.Added())
 
-	// But if it's dismissed, we don't change it
+	// But if it's Dismissed, we don't change it
 	c = &Contact{}
 	c.ContactRequestLocalState = ContactRequestStateDismissed
 	c.ContactRequestLocalClock = 1
@@ -661,8 +661,8 @@ func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnOurSid
 		},
 	)
 
-	require.False(t, c.added())
-	require.True(t, c.dismissed())
+	require.False(t, c.Added())
+	require.True(t, c.Dismissed())
 
 	// or if it's lower clock
 
@@ -679,7 +679,7 @@ func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnOurSid
 		},
 	)
 
-	require.True(t, c.added())
+	require.True(t, c.Added())
 }
 
 func TestContactContactRequestPropagatedStateReceivedOutOfDateRemoteState(t *testing.T) {
@@ -699,8 +699,8 @@ func TestContactContactRequestPropagatedStateReceivedOutOfDateRemoteState(t *tes
 		},
 	)
 
-	require.True(t, c.added())
-	require.True(t, c.mutual())
+	require.True(t, c.Added())
+	require.True(t, c.Mutual())
 
 	// and retraction
 	c = &Contact{}
@@ -718,9 +718,9 @@ func TestContactContactRequestPropagatedStateReceivedOutOfDateRemoteState(t *tes
 		},
 	)
 
-	require.False(t, c.added())
-	require.False(t, c.hasAddedUs())
-	require.False(t, c.mutual())
+	require.False(t, c.Added())
+	require.False(t, c.HasAddedUs())
+	require.False(t, c.Mutual())
 }
 
 func TestPrimaryName(t *testing.T) {

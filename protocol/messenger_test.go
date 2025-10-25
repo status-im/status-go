@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -592,7 +593,7 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	s.Require().NoError(err)
 
 	publicKeyHex := "0x" + hex.EncodeToString(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
-	blockedContact := Contact{
+	blockedContact := contacts.Contact{
 		ID:          publicKeyHex,
 		EnsName:     "contact-name",
 		LastUpdated: 20,
@@ -1209,21 +1210,21 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 }
 
 func (s *MessengerSuite) TestBlockContact() {
-	contact := Contact{
+	contact := contacts.Contact{
 		ID:                       testPK,
 		EnsName:                  "contact-name",
 		LastUpdated:              20,
-		ContactRequestLocalState: ContactRequestStateSent,
+		ContactRequestLocalState: contacts.ContactRequestStateSent,
 	}
 
 	key2, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	contact2 := Contact{
+	contact2 := contacts.Contact{
 		ID:                       crypto.PubkeyToHex(&key2.PublicKey),
 		EnsName:                  "contact-name",
 		LastUpdated:              20,
-		ContactRequestLocalState: ContactRequestStateSent,
+		ContactRequestLocalState: contacts.ContactRequestStateSent,
 	}
 
 	chat1 := &Chat{
@@ -1407,7 +1408,7 @@ func (s *MessengerSuite) TestContactPersistence() {
 
 	s.Require().Equal(1, len(savedContacts))
 
-	s.Require().True(savedContacts[0].added())
+	s.Require().True(savedContacts[0].Added())
 }
 
 func (s *MessengerSuite) TestCreateGroupChatWithMembers() {

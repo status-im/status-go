@@ -8,6 +8,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -131,10 +132,10 @@ func (s *EventToSystemMessageSuite) TestHandleMembershipUpdate() {
 	rawMembershipUpdateMessage2, err := testMembershipUpdateMessageStruct2.ToProtobuf()
 	s.Require().NoError(err)
 
-	contact, err := BuildContactFromPublicKey(&adminPrivateKey.PublicKey)
+	contact, err := contacts.BuildContactFromPublicKey(&adminPrivateKey.PublicKey)
 	s.Require().NoError(err)
 
-	contact.ContactRequestLocalState = ContactRequestStateSent
+	contact.ContactRequestLocalState = contacts.ContactRequestStateSent
 
 	currentMessageState := &CurrentMessageState{
 		Contact: contact,

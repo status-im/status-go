@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	userimage "github.com/status-im/status-go/images"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/protocol/contacts"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -55,13 +56,13 @@ func (s *MessengerGroupChatSuite) verifyGroupChatCreated(member *Messenger, expe
 }
 
 func makeMutualContact(origin *Messenger, contactPubkey *ecdsa.PublicKey) error {
-	contact, err := BuildContactFromPublicKey(contactPubkey)
+	contact, err := contacts.BuildContactFromPublicKey(contactPubkey)
 	if err != nil {
 		return err
 	}
-	contact.ContactRequestLocalState = ContactRequestStateSent
+	contact.ContactRequestLocalState = contacts.ContactRequestStateSent
 	contact.ContactRequestLocalClock = 1
-	contact.ContactRequestRemoteState = ContactRequestStateReceived
+	contact.ContactRequestRemoteState = contacts.ContactRequestStateReceived
 	contact.ContactRequestRemoteClock = 1
 	origin.allContacts.Store(contact.ID, contact)
 
@@ -355,7 +356,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatDeleteMemberMessage() {
 	_, err = WaitOnMessengerResponse(member, func(response *MessengerResponse) bool {
 		return len(response.RemovedMessages()) > 0
 	}, "removed messages not received")
-	s.Require().Equal(deleteMessageResponse.RemovedMessages()[0].DeletedBy, contactIDFromPublicKey(admin.IdentityPublicKey()))
+	s.Require().Equal(deleteMessageResponse.RemovedMessages()[0].DeletedBy, contacts.ContactIDFromPublicKey(admin.IdentityPublicKey()))
 	s.Require().NoError(err)
 	message, err = member.MessageByID(message.ID)
 	s.Require().NoError(err)
@@ -437,7 +438,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
 		Timesource:          memberA.getTimesource(),
 	}
 
-	c, err := buildContact(admin.myHexIdentity(), &admin.identity.PublicKey)
+	c, err := contacts.BuildContact(admin.myHexIdentity(), &admin.identity.PublicKey)
 	s.Require().NoError(err)
 
 	messageState.CurrentMessageState = &CurrentMessageState{

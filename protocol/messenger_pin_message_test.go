@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -125,7 +126,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 
 	handlePinMessageResponse := &MessengerResponse{}
 	err = theirMessenger.handlePinMessage(
-		&Contact{ID: s.m.myHexIdentity()},
+		&contacts.Contact{ID: s.m.myHexIdentity()},
 		1000,
 		handlePinMessageResponse,
 		&unpinMessage,
@@ -149,7 +150,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 	}
 
 	err = theirMessenger.handlePinMessage(
-		&Contact{ID: s.m.myHexIdentity()},
+		&contacts.Contact{ID: s.m.myHexIdentity()},
 		1000,
 		handlePinMessageResponse,
 		&pinMessage,
@@ -174,7 +175,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 	}
 
 	err = theirMessenger.handlePinMessage(
-		&Contact{ID: s.m.myHexIdentity()},
+		&contacts.Contact{ID: s.m.myHexIdentity()},
 		1000,
 		handlePinMessageResponse,
 		&pinMessage,

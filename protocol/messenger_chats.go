@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/deprecation"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -19,7 +20,7 @@ const (
 	ChatPreviewFilterTypeNonCommunity
 )
 
-func (m *Messenger) getOneToOneAndNextClock(contact *Contact) (*Chat, uint64, error) {
+func (m *Messenger) getOneToOneAndNextClock(contact *contacts.Contact) (*Chat, uint64, error) {
 	chat, ok := m.allChats.Load(contact.ID)
 	if !ok {
 		publicKey, err := contact.PublicKey()
@@ -332,7 +333,7 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 		if err != nil {
 			return nil, err
 		}
-		response.Contacts = []*Contact{contact}
+		response.Contacts = []*contacts.Contact{contact}
 	}
 
 	chat, ok := m.allChats.Load(chatID)
