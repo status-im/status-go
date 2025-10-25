@@ -22,7 +22,7 @@ import (
 
 func encodeMembershipUpdate(
 	group *v1protocol.Group,
-	chatEntity messagingtypes.ChatEntity,
+	chatEntity ChatEntity,
 ) ([]byte, error) {
 	message := v1protocol.MembershipUpdateMessage{
 		ChatID: group.ChatID(),

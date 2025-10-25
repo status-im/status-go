@@ -2434,7 +2434,7 @@ func (m *Messenger) HandleSyncAccountCustomizationColor(state *ReceivedMessageSt
 	return nil
 }
 
-func (m *Messenger) matchChatEntity(chatEntity messagingtypes.ChatEntity, messageType protobuf.ApplicationMetadataMessage_Type) (*Chat, error) {
+func (m *Messenger) matchChatEntity(chatEntity ChatEntity, messageType protobuf.ApplicationMetadataMessage_Type) (*Chat, error) {
 	if chatEntity.GetSigPubKey() == nil {
 		m.logger.Error("public key can't be empty")
 		return nil, errors.New("received a chatEntity with empty public key")
