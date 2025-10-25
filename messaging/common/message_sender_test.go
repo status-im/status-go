@@ -9,7 +9,7 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
-	datasyncproto "github.com/status-im/mvds/protobuf"
+	mvdsproto "github.com/status-im/mvds/protobuf"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -168,8 +168,8 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	dataSyncMessage := datasyncproto.Payload{
-		Messages: []*datasyncproto.Message{
+	dataSyncMessage := mvdsproto.Payload{
+		Messages: []*mvdsproto.Message{
 			{Body: wrappedPayload},
 		},
 	}
@@ -179,7 +179,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = marshalledDataSyncMessage
 
-	err = s.sender.StartReliability(nil, nil)
+	err = s.sender.StartReliability()
 	s.Require().NoError(err)
 
 	response, err := s.sender.HandleMessages(message)
@@ -207,8 +207,8 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	dataSyncMessage := datasyncproto.Payload{
-		Messages: []*datasyncproto.Message{
+	dataSyncMessage := mvdsproto.Payload{
+		Messages: []*mvdsproto.Message{
 			{Body: wrappedPayload},
 		},
 	}
@@ -244,7 +244,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = encryptedPayload
 
-	err = s.sender.StartReliability(nil, nil)
+	err = s.sender.StartReliability()
 	s.Require().NoError(err)
 
 	response, err := s.sender.HandleMessages(message)

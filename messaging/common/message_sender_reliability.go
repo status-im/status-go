@@ -1,13 +1,12 @@
 package common
 
 import (
+	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 
 	"github.com/pkg/errors"
-
-	mvdsnode "github.com/status-im/mvds/node"
-	datasyncproto "github.com/status-im/mvds/protobuf"
-	"github.com/status-im/mvds/state"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
@@ -16,12 +15,30 @@ import (
 
 var errReliabilityNotStarted = errors.New("reliability not started")
 
-func (s *MessageSender) StartReliability(statusChangeEvent chan mvdsnode.PeerStatusChangeEvent, dispatcher func(peer state.PeerID, payload *datasyncproto.Payload) error) error {
-	return s.reliability.Start(statusChangeEvent, dispatcher)
+func (s *MessageSender) StartReliability() error {
+	dispatcher := func(publicKey *ecdsa.PublicKey, wrappedPayload []byte, messages [][]byte) error {
+		messageIDs := make([]cryptotypes.HexBytes, 0, len(messages))
+		for _, msgPayload := range messages {
+			messageIDs = append(messageIDs, messagingtypes.MessageID(&s.identity.PublicKey, msgPayload))
+		}
+
+		err := s.sendPrivateEncryptedMessage(context.Background(), s.identity, publicKey, wrappedPayload, messageIDs)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return s.reliability.Start(dispatcher)
 }
 
 func (s *MessageSender) StopReliability() {
 	s.reliability.Stop()
+}
+
+func (s *MessageSender) ReportUserOnline(publicKey *ecdsa.PublicKey, eventTime uint64) {
+	s.reliability.ReportPeerOnline(publicKey, eventTime)
 }
 
 func (s *MessageSender) sendWithReliability(recipient *ecdsa.PublicKey, messageID cryptotypes.HexBytes, message []byte) error {
@@ -54,7 +71,7 @@ func (s *MessageSender) sendWithReliability(recipient *ecdsa.PublicKey, messageI
 
 // handleReliabilityLayer tries to unwrap message as datasync one and in case of success
 // returns cloned messages with replaced payloads
-func (s *MessageSender) handleReliabilityLayer(m *messagingtypes.Message) ([]*messagingtypes.Message, [][]byte, error) {
+func (s *MessageSender) handleReliabilityLayer(m *messagingtypes.Message) ([]*messagingtypes.Message, []cryptotypes.HexBytes, error) {
 	if !s.reliability.Started() {
 		return nil, nil, errReliabilityNotStarted
 	}
@@ -77,5 +94,18 @@ func (s *MessageSender) handleReliabilityLayer(m *messagingtypes.Message) ([]*me
 		statusMessages = append(statusMessages, message)
 	}
 
-	return statusMessages, datasyncMessage.Acks, nil
+	ackedMessageIDs := make([]cryptotypes.HexBytes, 0, len(datasyncMessage.Acks))
+	for _, ack := range datasyncMessage.Acks {
+		messageIDBytes, err := s.markAsConfirmed(ack, true)
+		if err != nil {
+			s.logger.Info("got datasync acknowledge for message we don't have in db", zap.String("ack", hex.EncodeToString(ack)))
+			continue
+		}
+
+		s.transport.ConfirmMessageDelivered(messageIDBytes.String())
+
+		ackedMessageIDs = append(ackedMessageIDs, messageIDBytes)
+	}
+
+	return statusMessages, ackedMessageIDs, nil
 }
