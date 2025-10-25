@@ -89,28 +89,28 @@ func (s *MessengerNewsFeedSuite) TestToggleSettings() {
 	err := s.service.Start()
 	s.Require().NoError(err)
 
-	err = s.service.ToggleNewsFeedEnabled(true)
+	err = s.service.ToggleEnabled(true)
 	s.Require().NoError(err)
 	s.Require().True(s.service.newsFeedManager.IsPolling())
 
 	oldFetchFrom := s.service.newsFeedManager.GetFetchFrom()
 
 	// Polling is off as soon as one setting is off
-	err = s.service.ToggleNewsFeedEnabled(false)
+	err = s.service.ToggleEnabled(false)
 	s.Require().NoError(err)
 	s.Require().False(s.service.newsFeedManager.IsPolling())
 
-	err = s.service.ToggleNewsRSSEnabled(false)
+	err = s.service.ToggleRSSEnabled(false)
 	s.Require().NoError(err)
 	s.Require().False(s.service.newsFeedManager.IsPolling())
 
 	//Poolling is still off
-	err = s.service.ToggleNewsRSSEnabled(true)
+	err = s.service.ToggleRSSEnabled(true)
 	s.Require().NoError(err)
 	s.Require().False(s.service.newsFeedManager.IsPolling())
 
 	// Polling restart if both settings are on
-	err = s.service.ToggleNewsFeedEnabled(true)
+	err = s.service.ToggleEnabled(true)
 	s.Require().NoError(err)
 	s.Require().True(s.service.newsFeedManager.IsPolling())
 

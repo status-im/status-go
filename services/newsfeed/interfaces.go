@@ -13,10 +13,12 @@ type ActivityCenter interface {
 }
 
 type Persistence interface {
-	NewsFeedEnabled() (bool, error)
-	SaveNewsFeedEnabled(bool) error
-	NewsRSSEnabled() (bool, error)
-	SaveNewsRSSEnabled(bool) error
-	NewsFeedLastFetchedTimestamp() (time.Time, error)
-	SaveNewsFeedLastFetchedTimestamp(time.Time) error
+	GetEnabled() (bool, error)
+	SaveEnabled(bool) error
+	GetRSSEnabled() (bool, error)
+	SaveRSSEnabled(bool) error
+	GetNotificationsEnabled() (bool, error)
+	SaveNotificationsEnabled(bool) error
+	GetLastFetchedTimestamp() (time.Time, error)
+	SaveLastFetchedTimestamp(time.Time) error
 }

@@ -49,8 +49,6 @@ var (
 		DisplayAssetsBelowBalanceThreshold:  int64(100000000),
 		DisplayAssetsBelowBalance:           false,
 		ShowCommunityAssetWhenSendingTokens: true,
-		NewsFeedEnabled:                     true,
-		NewsRSSEnabled:                      true,
 		ThirdpartyServicesEnabled:           true,
 	}
 )
@@ -134,9 +132,6 @@ func TestCreateSettings(t *testing.T) {
 
 	s, err := db.GetSettings()
 	require.NoError(t, err)
-	require.NotEqual(t, 0, s.NewsFeedLastFetchedTimestamp.UTC().Second())
-	// Reset the timestamp to 0 as it is set during CreateSettings as time.now and it's impossible to test reliably
-	s.NewsFeedLastFetchedTimestamp = time.Time{}
 	require.Equal(t, settings, s)
 }
 

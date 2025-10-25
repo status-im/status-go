@@ -36,7 +36,7 @@ func NewService(logger *zap.Logger, storage Persistence, ac ActivityCenter) *Ser
 }
 
 func (s *Service) Start() error {
-	lastFetched, err := s.storage.NewsFeedLastFetchedTimestamp()
+	lastFetched, err := s.storage.GetLastFetchedTimestamp()
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (s *Service) HandleFeedItem(feedItem *gofeed.Item) (*protocol.MessengerResp
 	}
 
 	// Update the lastFetch time to the current time
-	err = s.storage.SaveNewsFeedLastFetchedTimestamp(time.Now().UTC())
+	err = s.storage.SaveLastFetchedTimestamp(time.Now().UTC())
 	if err != nil {
 		s.logger.Error("HandleFeedItem: failed to save last fetch time", zap.Error(err))
 		return nil, err
@@ -163,14 +163,14 @@ func (s *Service) FetchNewsMessages() (*protocol.MessengerResponse, error) {
 // 1. The News Feed is enabled in the settings.
 // 2. The RSS feed is enabled in the settings.
 func (s *Service) IsNewsFeedEnabled() (bool, error) {
-	newsFeedEnabled, err := s.storage.NewsFeedEnabled()
+	newsFeedEnabled, err := s.storage.GetEnabled()
 	if err != nil {
 		return false, err
 	}
 	if !newsFeedEnabled {
 		return false, nil
 	}
-	newsRSSEnabled, err := s.storage.NewsRSSEnabled()
+	newsRSSEnabled, err := s.storage.GetRSSEnabled()
 	if err != nil {
 		return false, err
 	}
@@ -190,7 +190,7 @@ func (s *Service) changeNewsFeedManagerAfterUpdate() error {
 		// Reset the fetchFrom time to now since we don't want to fetch items that were posted while the feed was disabled
 		now := time.Now().UTC()
 		s.newsFeedManager.SetFetchFrom(now)
-		err = s.storage.SaveNewsFeedLastFetchedTimestamp(now)
+		err = s.storage.SaveLastFetchedTimestamp(now)
 		if err != nil {
 			s.logger.Error("changeNewsFeedManagerAfterUpdate: failed to save last fetch time", zap.Error(err))
 			return err
@@ -202,18 +202,20 @@ func (s *Service) changeNewsFeedManagerAfterUpdate() error {
 	return nil
 }
 
-func (s *Service) ToggleNewsFeedEnabled(value bool) error {
-	err := s.storage.SaveNewsFeedEnabled(value)
+func (s *Service) ToggleEnabled(value bool) error {
+	err := s.storage.SaveEnabled(value)
 	if err != nil {
 		return err
 	}
 	return s.changeNewsFeedManagerAfterUpdate()
 }
 
-func (s *Service) ToggleNewsRSSEnabled(value bool) error {
-	err := s.storage.SaveNewsRSSEnabled(value)
+func (s *Service) ToggleRSSEnabled(value bool) error {
+	err := s.storage.SaveRSSEnabled(value)
 	if err != nil {
 		return err
 	}
 	return s.changeNewsFeedManagerAfterUpdate()
 }
+
+

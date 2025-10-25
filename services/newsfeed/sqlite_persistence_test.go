@@ -41,49 +41,49 @@ func (s *SQLitePersistenceTestSuite) TearDownTest() {
 
 func (s *SQLitePersistenceTestSuite) TestNewsFeedEnabled_ToggleMultipleTimes() {
 	for i := 0; i < 3; i++ {
-		err := s.persistence.SaveNewsFeedEnabled(true)
+		err := s.persistence.SaveEnabled(true)
 		s.Require().NoError(err)
 
-		enabled, err := s.persistence.NewsFeedEnabled()
+		enabled, err := s.persistence.GetEnabled()
 		s.Require().NoError(err)
 		s.Require().True(enabled)
 
-		err = s.persistence.SaveNewsFeedEnabled(false)
+		err = s.persistence.SaveEnabled(false)
 		s.Require().NoError(err)
 
-		enabled, err = s.persistence.NewsFeedEnabled()
+		enabled, err = s.persistence.GetEnabled()
 		s.Require().NoError(err)
 		s.Require().False(enabled)
 	}
 }
 
 func (s *SQLitePersistenceTestSuite) TestDefaultValues() {
-	newsFeedEnabled, err := s.persistence.NewsFeedEnabled()
+	newsFeedEnabled, err := s.persistence.GetEnabled()
 	s.Require().NoError(err)
 	s.Require().True(newsFeedEnabled)
 
-	newsRSSEnabled, err := s.persistence.NewsRSSEnabled()
+	newsRSSEnabled, err := s.persistence.GetRSSEnabled()
 	s.Require().NoError(err)
 	s.Require().True(newsRSSEnabled)
 
-	timestamp, err := s.persistence.NewsFeedLastFetchedTimestamp()
+	timestamp, err := s.persistence.GetLastFetchedTimestamp()
 	s.Require().NoError(err)
 	s.Require().False(timestamp.IsZero())
 }
 
 func (s *SQLitePersistenceTestSuite) TestNewsRSSEnabled_ToggleMultipleTimes() {
 	for i := 0; i < 3; i++ {
-		err := s.persistence.SaveNewsRSSEnabled(true)
+		err := s.persistence.SaveRSSEnabled(true)
 		s.Require().NoError(err)
 
-		enabled, err := s.persistence.NewsRSSEnabled()
+		enabled, err := s.persistence.GetRSSEnabled()
 		s.Require().NoError(err)
 		s.Require().True(enabled)
 
-		err = s.persistence.SaveNewsRSSEnabled(false)
+		err = s.persistence.SaveRSSEnabled(false)
 		s.Require().NoError(err)
 
-		enabled, err = s.persistence.NewsRSSEnabled()
+		enabled, err = s.persistence.GetRSSEnabled()
 		s.Require().NoError(err)
 		s.Require().False(enabled)
 	}
@@ -97,10 +97,10 @@ func (s *SQLitePersistenceTestSuite) TestNewsFeedLastFetchedTimestamp_UpdateMult
 	}
 
 	for _, expected := range timestamps {
-		err := s.persistence.SaveNewsFeedLastFetchedTimestamp(expected)
+		err := s.persistence.SaveLastFetchedTimestamp(expected)
 		s.Require().NoError(err)
 
-		timestamp, err := s.persistence.NewsFeedLastFetchedTimestamp()
+		timestamp, err := s.persistence.GetLastFetchedTimestamp()
 		s.Require().NoError(err)
 		s.Require().Equal(expected.Unix(), timestamp.Unix())
 	}
