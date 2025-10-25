@@ -65,7 +65,6 @@ Session.vim
 .undodir/*
 .idea/*
 !.idea/codeStyles/
-/.vscode/
 /cmd/*/.ethereum/
 *.iml
 
