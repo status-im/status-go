@@ -18,6 +18,7 @@ from clients.services.appgeneral import AppgeneralService
 from clients.services.connector import ConnectorService
 from clients.services.eth import EthService
 from clients.services.multiaccounts import MultiAccountsService
+from clients.services.newsfeed import NewsFeedService
 from clients.services.settings import SettingsService
 from clients.services.wakuext import (
     WakuextService,
@@ -90,6 +91,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.wallet_service = WalletService(self)
         self.wakuext_service = WakuextService(self)
         self.accounts_service = AccountService(self)
+        self.newsfeed_service = NewsFeedService(self)
         self.multiaccounts_service = MultiAccountsService(self)
         self.settings_service = SettingsService(self)
         self.connector_service = ConnectorService(self)
