@@ -1,4 +1,4 @@
-package types
+package protocol
 
 import (
 	"crypto/ecdsa"

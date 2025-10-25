@@ -522,57 +522,6 @@ func (s *MessageSender) SendPairInstallation(
 	return messageID, nil
 }
 
-func (s *MessageSender) encodeMembershipUpdate(
-	message v1protocol.MembershipUpdateMessage,
-	chatEntity messagingtypes.ChatEntity,
-) ([]byte, error) {
-
-	if chatEntity != nil {
-		chatEntityProtobuf := chatEntity.GetProtobuf()
-		switch chatEntityProtobuf := chatEntityProtobuf.(type) {
-		case *protobuf.ChatMessage:
-			message.Message = chatEntityProtobuf
-		case *protobuf.EmojiReaction:
-			message.EmojiReaction = chatEntityProtobuf
-
-		}
-	}
-
-	encodedMessage, err := v1protocol.EncodeMembershipUpdateMessage(message)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to encode membership update message")
-	}
-
-	return encodedMessage, nil
-}
-
-// EncodeMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
-// All the events in a group are encoded and added to the payload
-func (s *MessageSender) EncodeMembershipUpdate(
-	group *v1protocol.Group,
-	chatEntity messagingtypes.ChatEntity,
-) ([]byte, error) {
-	message := v1protocol.MembershipUpdateMessage{
-		ChatID: group.ChatID(),
-		Events: group.Events(),
-	}
-
-	return s.encodeMembershipUpdate(message, chatEntity)
-}
-
-// EncodeAbridgedMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
-// Only the events relevant to the current group are encoded
-func (s *MessageSender) EncodeAbridgedMembershipUpdate(
-	group *v1protocol.Group,
-	chatEntity messagingtypes.ChatEntity,
-) ([]byte, error) {
-	message := v1protocol.MembershipUpdateMessage{
-		ChatID: group.ChatID(),
-		Events: group.AbridgedEvents(),
-	}
-	return s.encodeMembershipUpdate(message, chatEntity)
-}
-
 func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMessage *messagingtypes.RawMessage, wrappedMessage []byte, rekey bool) ([][]byte, []*wakutypes.NewMessage, error) {
 	payload := wrappedMessage
 	var err error

@@ -4362,7 +4362,7 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 
 }
 
-func (m *Messenger) encodeChatEntity(chat *Chat, message messagingtypes.ChatEntity) ([]byte, error) {
+func (m *Messenger) encodeChatEntity(chat *Chat, message ChatEntity) ([]byte, error) {
 	var encodedMessage []byte
 	var err error
 	l := m.logger.With(zap.String("site", "Send"), zap.String("chatID", chat.ID))
