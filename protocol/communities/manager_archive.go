@@ -708,7 +708,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 
 	// Create index downloader with path to index file using helper function
 	indexFilePath := m.ArchiveFileManager.codexArchiveIndexFile(id)
-	indexDownloader := NewCodexIndexDownloader(codexClient, indexCid, indexFilePath, indexDownloaderCancel)
+	indexDownloader := NewCodexIndexDownloader(codexClient, indexCid, indexFilePath, indexDownloaderCancel, m.logger)
 
 	m.logger.Debug("fetching history index from Codex", zap.String("indexCid", indexCid))
 	select {
@@ -721,17 +721,18 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 		return downloadTaskInfo, nil
 	case <-indexDownloader.GotManifest():
 		// Check if manifest fetch was actually successful
-		if indexDownloader.GetDatasetSize() == 0 {
-			m.logger.Error("failed to fetch Codex manifest - dataset size is 0")
-			return nil, fmt.Errorf("failed to fetch Codex manifest for CID %s", indexCid)
+		err := indexDownloader.GetError()
+		if indexDownloader.GetDatasetSize() == 0 || err != nil {
+			if err != nil {
+				m.logger.Error("failed to fetch Codex manifest", zap.Error(err))
+			} else {
+				m.logger.Error("failed to fetch Codex manifest - dataset size is 0")
+			}
+			return nil, fmt.Errorf("failed to fetch Codex manifest for CID %s: %w", indexCid, err)
 		}
 
 		// Start downloading the index file
-		err := indexDownloader.DownloadIndexFile()
-		if err != nil {
-			m.logger.Error("failed to start index file download", zap.Error(err))
-			return nil, fmt.Errorf("failed to start index file download: %w", err)
-		}
+		indexDownloader.DownloadIndexFile()
 
 		m.logger.Debug("downloading history archive index with CID:", zap.String("indexCid", indexCid))
 
@@ -746,7 +747,13 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 				downloadTaskInfo.Cancelled = true
 				return downloadTaskInfo, nil
 			case <-ticker.C:
-				if indexDownloader.BytesCompleted() == indexDownloader.Length() {
+				err := indexDownloader.GetError()
+				if err != nil {
+					m.logger.Error("error during index download", zap.Error(err))
+					return nil, err
+				}
+
+				if indexDownloader.IsDownloadComplete() {
 
 					index, err := m.ArchiveFileManager.CodexLoadHistoryArchiveIndexFromFile(m.identity, communityID)
 					if err != nil {
