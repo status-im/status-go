@@ -12,8 +12,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/signal"

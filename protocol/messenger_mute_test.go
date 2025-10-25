@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/deprecation"
-	"github.com/status-im/status-go/pkg/contacts"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/requests"
 )
 

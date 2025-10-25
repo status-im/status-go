@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/pkg/contacts"
+	"github.com/status-im/status-go/protocol/contacts"
 )
 
 func TestRePosRegex(t *testing.T) {

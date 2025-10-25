@@ -7,8 +7,8 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
-	contacts2 "github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/communities"
+	contacts2 "github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/signal"
 )

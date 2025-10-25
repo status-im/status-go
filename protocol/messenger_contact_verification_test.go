@@ -6,8 +6,8 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	contacts2 "github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
+	contacts2 "github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/verification"
 

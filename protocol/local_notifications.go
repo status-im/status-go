@@ -8,9 +8,9 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/contacts"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 )
 

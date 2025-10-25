@@ -5,8 +5,8 @@ import (
 	crand "crypto/rand"
 	"errors"
 
-	"github.com/status-im/status-go/pkg/contacts"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 

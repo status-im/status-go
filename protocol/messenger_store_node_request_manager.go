@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/pkg/contacts"
+	"github.com/status-im/status-go/protocol/contacts"
 
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/communities"
