@@ -6,13 +6,9 @@ import (
 	"time"
 )
 
-// Mock generation instruction above will create a mock in package `mock_communities`
-// (folder `mock/`) so tests can import it as e.g. `go-codex-client/communities/mock` or
-// with an alias like `mocks` to avoid import-cycle issues.
-//
+//go:generate mockgen -package=mock_communities -source=codex_client_interface.go -destination=mock/communities/codex_client_interface.go
+
 // CodexClientInterface defines the interface for CodexClient operations needed by the downloader
-//
-//go:generate mockgen -package=mock_communities -source=codex_client_interface.go -destination=mock/codex_client_interface.go
 type CodexClientInterface interface {
 	// Upload methods
 	Upload(data io.Reader, filename string) (string, error)
