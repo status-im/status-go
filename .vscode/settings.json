@@ -1,14 +1,16 @@
 {
-  "go.testTags": "gowaku_skip_migrations,gowaku_no_rln",
-  "cSpell.words": [
-    "unmarshalling"
-  ],
+  "go.testTags": "gowaku_skip_migrations,gowaku_no_rln,codex_integration",
+  "cSpell.words": ["unmarshalling"],
   "gopls": {
-    "formatting.local": "github.com/status-im/status-go"
+    "formatting.local": "github.com/status-im/status-go",
+    "build.buildFlags": [
+      "-tags=gowaku_skip_migrations,gowaku_no_rln,codex_integration"
+    ]
   },
   // format all files on save if a formatter is available
   "editor.formatOnSave": true,
   // I use "goimports" instead of "gofmt"
   // because it does the same thing but also formats imports
   "go.formatTool": "goimports",
+  "idf.pythonInstallPath": "/usr/bin/python"
 }
