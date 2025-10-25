@@ -107,6 +107,8 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	}
 	services = append(services, lns)
 
+	services = append(services, b.NewsFeedService())
+
 	b.services = services
 
 	return nil

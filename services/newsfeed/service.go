@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/google/uuid"
 	"github.com/mmcdole/gofeed"
 	"go.uber.org/zap"
@@ -71,6 +72,18 @@ func (s *Service) Stop() error {
 		s.newsFeedManager.StopPolling()
 	}
 	return nil
+}
+
+func (s *Service) APIs() []rpc.API {
+	return []rpc.API{
+		{
+			Namespace: "newsfeed",
+			Version:   "0.1.0",
+			Service: &API{
+				service: s,
+			},
+		},
+	}
 }
 
 func (s *Service) HandleFeedItem(feedItem *gofeed.Item) (*protocol.MessengerResponse, error) {
@@ -217,5 +230,3 @@ func (s *Service) ToggleRSSEnabled(value bool) error {
 	}
 	return s.changeNewsFeedManagerAfterUpdate()
 }
-
-
