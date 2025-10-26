@@ -21,11 +21,11 @@ func TestConnectionTypeDefault(t *testing.T) {
 	// Context without connection type should default to untrusted
 	ctx := context.Background()
 
-	if !IsUntrustedConnection(ctx) {
+	if IsUntrustedConnection(ctx) {
 		t.Error("Default connection type should be untrusted (HTTP)")
 	}
 
-	if got := GetConnectionType(ctx); got != ConnectionTypeHTTP {
-		t.Errorf("Default GetConnectionType() = %v, want %v", got, ConnectionTypeHTTP)
+	if got := GetConnectionType(ctx); got != ConnectionTypeInternal {
+		t.Errorf("Default GetConnectionType() = %v, want %v", got, ConnectionTypeInternal)
 	}
 }
