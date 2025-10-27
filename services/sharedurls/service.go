@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 
@@ -36,6 +37,7 @@ const channelUUIDRegExp = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9
 var (
 	channelRegExp         = regexp.MustCompile(channelUUIDRegExp)
 	errInvalidCommunityID = errors.New("invalid community id")
+	errNoDataProvider     = errors.New("no data provider")
 )
 
 var (
@@ -58,6 +60,18 @@ func (s *Service) Start() error {
 
 func (s *Service) Stop() error {
 	return nil
+}
+
+func (s *Service) APIs() []rpc.API {
+	return []rpc.API{
+		{
+			Namespace: "sharedurls",
+			Version:   "0.1.0",
+			Service: PublicAPI{
+				service: s,
+			},
+		},
+	}
 }
 
 func decodeCommunityID(serialisedPublicKey string) (string, error) {
@@ -143,6 +157,10 @@ func (m *Service) prepareEncodedCommunityData(community *communities.Community) 
 }
 
 func (m *Service) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
+	if m.provider == nil {
+		return "", errNoDataProvider
+	}
+
 	community, err := m.provider.GetCommunityByID(communityID)
 	if err != nil {
 		return "", err
@@ -294,6 +312,10 @@ func (m *Service) prepareEncodedCommunityChannelData(community *communities.Comm
 }
 
 func (m *Service) ShareCommunityChannelURLWithData(communityID types.HexBytes, channelID string) (string, error) {
+	if m.provider == nil {
+		return "", errNoDataProvider
+	}
+
 	if len(communityID) == 0 {
 		return "", errInvalidCommunityID
 	}
@@ -413,6 +435,10 @@ func parseUserURLWithChatKey(urlData string) (*URLDataResponse, error) {
 }
 
 func (m *Service) ShareUserURLWithENS(contactID string) (string, error) {
+	if m.provider == nil {
+		return "", errNoDataProvider
+	}
+
 	contact := m.provider.GetContactByID(contactID)
 	if contact == nil {
 		return "", ErrContactNotFound
@@ -468,6 +494,10 @@ func (m *Service) prepareEncodedUserData(contact *contacts.Contact) (string, str
 }
 
 func (m *Service) ShareUserURLWithData(contactID string) (string, error) {
+	if m.provider == nil {
+		return "", errNoDataProvider
+	}
+
 	contact := m.provider.GetContactByID(contactID)
 	if contact == nil {
 		return "", ErrContactNotFound

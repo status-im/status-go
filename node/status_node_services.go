@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/newsfeed"
+	"github.com/status-im/status-go/services/sharedurls"
 
 	"github.com/ethereum/go-ethereum/event"
 
@@ -108,6 +109,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, lns)
 
 	services = append(services, b.NewsFeedService())
+	services = append(services, b.sharedUrlsService())
 
 	b.services = services
 
@@ -321,6 +323,17 @@ func (b *StatusNode) ethService() *eth.Service {
 		b.ethSrvc = eth.NewService(b.rpcClient, b.gethAccountsManager)
 	}
 	return b.ethSrvc
+}
+
+func (b *StatusNode) sharedUrlsService() *sharedurls.Service {
+	if b.sharedUrlsSrvc == nil {
+		var m *protocol.Messenger
+		if extService := b.WakuV2ExtService(); extService != nil {
+			m = extService.Messenger()
+		}
+		b.sharedUrlsSrvc = sharedurls.NewService(m)
+	}
+	return b.sharedUrlsSrvc
 }
 
 func (b *StatusNode) localNotificationsService(network uint64) (*localnotifications.Service, error) {
