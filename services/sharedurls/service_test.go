@@ -1,21 +1,22 @@
 package sharedurls
 
 import (
-	"context"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api/multiformat"
-	"github.com/status-im/status-go/protocol/contacts"
-	requests2 "github.com/status-im/status-go/services/sharedurls/requests"
-
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
+	mock_provider "github.com/status-im/status-go/services/sharedurls/mock"
+
+	"github.com/status-im/status-go/protocol/communities"
 )
 
 const (
@@ -34,49 +35,55 @@ func TestMessengerShareUrlsSuite(t *testing.T) {
 }
 
 type MessengerShareUrlsSuite struct {
-	MessengerBaseTestSuite
+	suite.Suite
+	service  *Service
+	provider *mock_provider.MockDataProvider
 }
 
-func (s *MessengerShareUrlsSuite) createCommunity() *communities.Community {
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-		Tags:        RandomCommunityTags(3),
-	}
+func (s *MessengerShareUrlsSuite) SetupTest() {
+	ctrl := gomock.NewController(s.T())
+	s.provider = mock_provider.NewMockDataProvider(ctrl)
+	s.service = NewService(s.provider)
+}
 
-	// Create a community chat
-	response, err := s.m.CreateCommunity(description, false)
+type TimeSourceStub struct {
+}
+
+func (t *TimeSourceStub) GetCurrentTime() uint64 {
+	return uint64(time.Now().Unix())
+}
+
+func (s *MessengerShareUrlsSuite) fakeCommunity() *communities.Community {
+	timeSource := TimeSourceStub{}
+
+	var config communities.Config
+	err := gofakeit.Struct(&config)
 	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	return response.Communities()[0]
-}
 
-func (s *MessengerShareUrlsSuite) createContact() (*Messenger, *contacts.Contact) {
-	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
-
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
-	ensName := "blah.stateofus.eth"
-
-	s.Require().NoError(s.m.ENSVerified(contactID, ensName))
-
-	response, err := s.m.AddContact(context.Background(), &requests.AddContact{ID: contactID})
+	memberKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Contacts, 1)
 
-	contact := response.Contacts[0]
-	s.Require().Equal(ensName, contact.EnsName)
-	s.Require().True(contact.ENSVerified)
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
 
-	return theirMessenger, contact
+	config.ID = &key.PublicKey
+	config.PrivateKey = key
+	config.ControlNode = &key.PublicKey
+	config.Logger = zap.NewNop()
+	config.MemberIdentity = memberKey
+	config.ControlDevice = true
+	config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat) // Create community with no chats
+
+	//description.ID = types.EncodeHex(crypto.CompressPubkey(&key.PublicKey))
+
+	var community *communities.Community
+	community, err = communities.New(config, &timeSource, nil, nil)
+	s.Require().NoError(err)
+
+	return community
 }
 
-func (s *MessengerShareUrlsSuite) createCommunityWithChannel() (*communities.Community, *protobuf.CommunityChat, string) {
-	community := s.createCommunity()
-
+func (s *MessengerShareUrlsSuite) addFakeChannel(community *communities.Community) (*communities.Community, *protobuf.CommunityChat, string) {
 	chat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
 			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
@@ -87,25 +94,52 @@ func (s *MessengerShareUrlsSuite) createCommunityWithChannel() (*communities.Com
 			Description: "status-core community chat",
 		},
 	}
-	response, err := s.m.CreateCommunityChat(community.ID(), chat)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Chats(), 1)
 
-	community = response.Communities()[0]
+	chatID := gofakeit.UUID()
+	changes, err := community.CreateChat(chatID, chat)
+	s.Require().NoError(err)
+	s.Require().NotNil(changes)
+
+	community = changes.Community
 	s.Require().Len(community.Chats(), 1)
 
-	var channelID string
-	var channel *protobuf.CommunityChat
-
-	for key, value := range community.Chats() {
-		channelID = key
-		channel = value
-		break
-	}
+	channel, ok := community.Chats()[chatID]
+	s.Require().True(ok)
 	s.Require().NotNil(channel)
-	return community, channel, channelID
+
+	return community, channel, chatID
+}
+
+func (s *MessengerShareUrlsSuite) fakeContact() *contacts.Contact {
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	var contact *contacts.Contact
+	err = gofakeit.Struct(&contact)
+	s.Require().NoError(err)
+
+	contact.ID = contacts.ContactIDFromPublicKey(&key.PublicKey)
+	contact.ENSVerified = true
+
+	return contact
+}
+
+func (s *MessengerShareUrlsSuite) verifyCommunityURL(url string, community *communities.Community, channel *protobuf.CommunityChat) {
+	urlData, err := ParseSharedURL(url)
+	s.Require().NoError(err)
+
+	s.Require().Equal(community.Identity().DisplayName, urlData.Community.DisplayName)
+	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
+	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
+	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
+	s.Require().Equal(community.TagsIndices(), urlData.Community.TagIndices)
+
+	if channel != nil {
+		s.Require().NotNil(urlData.Channel)
+		s.Require().Equal(channel.Identity.Emoji, urlData.Channel.Emoji)
+		s.Require().Equal(channel.Identity.DisplayName, urlData.Channel.DisplayName)
+		s.Require().Equal(channel.Identity.Color, urlData.Channel.Color)
+	}
 }
 
 func (s *MessengerShareUrlsSuite) TestDecodeEncodeDataURL() {
@@ -205,9 +239,12 @@ func (s *MessengerShareUrlsSuite) TestIsStatusSharedUrl() {
 }
 
 func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithChatKey() {
-	community := s.createCommunity()
+	community := s.fakeCommunity()
 
-	url, err := s.m.ShareCommunityURLWithChatKey(community.ID())
+	s.provider.EXPECT().GetContactByID(gomock.Any()).Times(0)
+	s.provider.EXPECT().GetCommunityByID(gomock.Any()).Times(0)
+
+	url, err := s.service.ShareCommunityURLWithChatKey(community.ID())
 	s.Require().NoError(err)
 
 	shortID, err := community.SerializedID()
@@ -218,7 +255,7 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithChatKey() {
 }
 
 func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
-	community := s.createCommunity()
+	community := s.fakeCommunity()
 
 	shortID, err := community.SerializedID()
 	s.Require().NoError(err)
@@ -239,12 +276,17 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
 }
 
 func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithData() {
-	community := s.createCommunity()
+	community := s.fakeCommunity()
 
-	url, err := s.m.ShareCommunityURLWithData(community.ID())
+	s.provider.EXPECT().
+		GetCommunityByID(gomock.Eq(community.ID())).
+		Return(community, nil).
+		Times(1)
+
+	url, err := s.service.ShareCommunityURLWithData(community.ID())
 	s.Require().NoError(err)
 
-	communityData, chatKey, err := s.m.prepareEncodedCommunityData(community)
+	communityData, chatKey, err := s.service.prepareEncodedCommunityData(community)
 	s.Require().NoError(err)
 
 	expectedURL := fmt.Sprintf("%s/c/%s#%s", baseShareURL, communityData, chatKey)
@@ -301,30 +343,22 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithDataWithTags() {
 }
 
 func (s *MessengerShareUrlsSuite) TestShareAndParseCommunityURLWithData() {
-	community := s.createCommunity()
+	community := s.fakeCommunity()
 
-	url, err := s.m.ShareCommunityURLWithData(community.ID())
+	s.provider.EXPECT().GetContactByID(gomock.Any()).Times(0)
+	s.provider.EXPECT().GetCommunityByID(gomock.Eq(community.ID())).Return(community, nil).Times(1)
+
+	url, err := s.service.ShareCommunityURLWithData(community.ID())
 	s.Require().NoError(err)
 
-	urlData, err := ParseSharedURL(url)
-	s.Require().NoError(err)
-
-	s.Require().Equal(community.Identity().DisplayName, urlData.Community.DisplayName)
-	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
-	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
-	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
-	s.Require().Equal(community.TagsIndices(), urlData.Community.TagIndices)
+	s.verifyCommunityURL(url, community, nil)
 }
 
 func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithChatKey() {
-	community := s.createCommunity()
-	channelID := "003cdcd5-e065-48f9-b166-b1a94ac75a11"
+	community := s.fakeCommunity()
+	channelID := gofakeit.UUID()
 
-	request := &requests2.CommunityChannelShareURL{
-		CommunityID: community.ID(),
-		ChannelID:   channelID,
-	}
-	url, err := s.m.ShareCommunityChannelURLWithChatKey(request)
+	url, err := s.service.ShareCommunityChannelURLWithChatKey(community.ID(), channelID)
 	s.Require().NoError(err)
 
 	shortID, err := community.SerializedID()
@@ -358,16 +392,16 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
 }
 
 func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithData() {
-	community, channel, channelID := s.createCommunityWithChannel()
+	community := s.fakeCommunity()
+	community, channel, channelID := s.addFakeChannel(community)
 
-	request := &requests2.CommunityChannelShareURL{
-		CommunityID: community.ID(),
-		ChannelID:   channelID,
-	}
-	url, err := s.m.ShareCommunityChannelURLWithData(request)
+	s.provider.EXPECT().GetContactByID(gomock.Any()).Times(0)
+	s.provider.EXPECT().GetCommunityByID(gomock.Eq(community.ID())).Return(community, nil).Times(1)
+
+	url, err := s.service.ShareCommunityChannelURLWithData(community.ID(), channelID)
 	s.Require().NoError(err)
 
-	communityChannelData, chatKey, err := s.m.prepareEncodedCommunityChannelData(community, channel, channelID)
+	communityChannelData, chatKey, err := s.service.prepareEncodedCommunityChannelData(community, channel, channelID)
 	s.Require().NoError(err)
 
 	expectedURL := fmt.Sprintf("%s/cc/%s#%s", baseShareURL, communityChannelData, chatKey)
@@ -389,34 +423,25 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithData() {
 }
 
 func (s *MessengerShareUrlsSuite) TestShareAndParseCommunityChannelURLWithData() {
-	community, channel, channelID := s.createCommunityWithChannel()
+	community := s.fakeCommunity()
+	community, channel, channelID := s.addFakeChannel(community)
 
-	request := &requests2.CommunityChannelShareURL{
-		CommunityID: community.ID(),
-		ChannelID:   channelID,
-	}
-	url, err := s.m.ShareCommunityChannelURLWithData(request)
+	s.provider.EXPECT().GetContactByID(gomock.Any()).Times(0)
+	s.provider.EXPECT().GetCommunityByID(gomock.Eq(community.ID())).Return(community, nil).Times(1)
+
+	url, err := s.service.ShareCommunityChannelURLWithData(community.ID(), channelID)
 	s.Require().NoError(err)
 
-	urlData, err := ParseSharedURL(url)
-	s.Require().NoError(err)
-
-	s.Require().Equal(community.Identity().DisplayName, urlData.Community.DisplayName)
-	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
-	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
-	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
-	s.Require().Equal(community.TagsIndices(), urlData.Community.TagIndices)
-
-	s.Require().NotNil(urlData.Channel)
-	s.Require().Equal(channel.Identity.Emoji, urlData.Channel.Emoji)
-	s.Require().Equal(channel.Identity.DisplayName, urlData.Channel.DisplayName)
-	s.Require().Equal(channel.Identity.Color, urlData.Channel.Color)
+	s.verifyCommunityURL(url, community, channel)
 }
 
 func (s *MessengerShareUrlsSuite) TestShareUserURLWithChatKey() {
-	_, contact := s.createContact()
+	contact := s.fakeContact()
 
-	url, err := s.m.ShareUserURLWithChatKey(contact.ID)
+	s.provider.EXPECT().GetContactByID(gomock.Any()).Times(0)
+	s.provider.EXPECT().GetCommunityByID(gomock.Any()).Times(0)
+
+	url, err := s.service.ShareUserURLWithChatKey(contact.ID)
 	s.Require().NoError(err)
 
 	shortKey, err := multiformat.SerializeLegacyKey(contact.ID)
@@ -437,9 +462,12 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithChatKey() {
 }
 
 func (s *MessengerShareUrlsSuite) TestShareUserURLWithENS() {
-	_, contact := s.createContact()
+	contact := s.fakeContact()
 
-	url, err := s.m.ShareUserURLWithENS(contact.ID)
+	s.provider.EXPECT().GetContactByID(contact.ID).Return(contact).Times(1)
+	s.provider.EXPECT().GetCommunityByID(gomock.Any()).Times(0)
+
+	url, err := s.service.ShareUserURLWithENS(contact.ID)
 	s.Require().NoError(err)
 
 	expectedURL := fmt.Sprintf("%s/u#%s", baseShareURL, contact.EnsName)
@@ -447,19 +475,21 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithENS() {
 }
 
 // TODO: ens in the next ticket
-// func (s *MessengerShareUrlsSuite) TestParseUserURLWithENS() {
-// 	_, contact := s.createContact()
+func (s *MessengerShareUrlsSuite) TestParseUserURLWithENS() {
+	s.T().Skip("ens in the next ticket")
 
-// 	url := fmt.Sprintf("%s/u#%s", baseShareURL, contact.EnsName)
+	contact := s.fakeContact()
 
-// 	urlData, err := ParseSharedURL(url)
-// 	s.Require().NoError(err)
-// 	s.Require().NotNil(urlData)
+	url := fmt.Sprintf("%s/u#%s", baseShareURL, contact.EnsName)
 
-// 	s.Require().NotNil(urlData.Contact)
-// 	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
-//  s.Require().Equal(contact.Bio, urlData.Contact.DisplayName)
-// }
+	urlData, err := ParseSharedURL(url)
+	s.Require().NoError(err)
+	s.Require().NotNil(urlData)
+
+	s.Require().NotNil(urlData.Contact)
+	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
+	s.Require().Equal(contact.Bio, urlData.Contact.DisplayName)
+}
 
 func (s *MessengerShareUrlsSuite) TestParseUserURLWithData() {
 	urlData, err := ParseSharedURL(userURLWithData)
@@ -473,12 +503,15 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithData() {
 }
 
 func (s *MessengerShareUrlsSuite) TestShareUserURLWithData() {
-	_, contact := s.createContact()
+	contact := s.fakeContact()
 
-	url, err := s.m.ShareUserURLWithData(contact.ID)
+	s.provider.EXPECT().GetContactByID(contact.ID).Return(contact).Times(1)
+	s.provider.EXPECT().GetCommunityByID(gomock.Any()).Times(0)
+
+	url, err := s.service.ShareUserURLWithData(contact.ID)
 	s.Require().NoError(err)
 
-	userData, chatKey, err := s.m.prepareEncodedUserData(contact)
+	userData, chatKey, err := s.service.prepareEncodedUserData(contact)
 	s.Require().NoError(err)
 
 	expectedURL := fmt.Sprintf("%s/u/%s#%s", baseShareURL, userData, chatKey)
@@ -486,12 +519,14 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithData() {
 }
 
 func (s *MessengerShareUrlsSuite) TestPrepareEncodedUserDataWithEmptyAccount() {
-	_, contact := s.createContact()
-
+	contact := s.fakeContact()
 	contact.DisplayName = ""
 	contact.Bio = ""
 
-	userData, chatKey, err := s.m.prepareEncodedUserData(contact)
+	s.provider.EXPECT().GetContactByID(gomock.Any()).Return(contact).Times(0)
+	s.provider.EXPECT().GetCommunityByID(gomock.Any()).Times(0)
+
+	userData, chatKey, err := s.service.prepareEncodedUserData(contact)
 	s.Require().NoError(err)
 	// The data should be empty if no display name or bio is set
 	s.Require().Empty(userData)
@@ -499,12 +534,15 @@ func (s *MessengerShareUrlsSuite) TestPrepareEncodedUserDataWithEmptyAccount() {
 }
 
 func (s *MessengerShareUrlsSuite) TestShareAndParseUserURLWithData() {
-	_, contact := s.createContact()
+	contact := s.fakeContact()
+
+	s.provider.EXPECT().GetContactByID(contact.ID).Return(contact).Times(1)
+	s.provider.EXPECT().GetCommunityByID(gomock.Any()).Times(0)
 
 	shortKey, err := multiformat.SerializeLegacyKey(contact.ID)
 	s.Require().NoError(err)
 
-	url, err := s.m.ShareUserURLWithData(contact.ID)
+	url, err := s.service.ShareUserURLWithData(contact.ID)
 	s.Require().NoError(err)
 
 	urlData, err := ParseSharedURL(url)
