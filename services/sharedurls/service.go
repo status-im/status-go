@@ -2,6 +2,7 @@ package sharedurls
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -44,14 +45,19 @@ var (
 	ErrContactNotFound = errors.New("contact not found")
 )
 
+func isNil(data interface{}) bool {
+	v := reflect.ValueOf(data).Kind()
+	return data == nil || v == reflect.Ptr && reflect.ValueOf(data).IsNil()
+}
+
 type Service struct {
 	provider DataProvider
 }
 
 func NewService(provider DataProvider) *Service {
-	return &Service{
-		provider,
-	}
+	s := &Service{}
+	s.SetDataProvider(provider)
+	return s
 }
 
 func (s *Service) Start() error {
@@ -72,6 +78,13 @@ func (s *Service) APIs() []rpc.API {
 			},
 		},
 	}
+}
+
+func (s *Service) SetDataProvider(provider DataProvider) {
+	if isNil(provider) {
+		provider = &NopDataProvider{}
+	}
+	s.provider = provider
 }
 
 func decodeCommunityID(serialisedPublicKey string) (string, error) {
@@ -96,7 +109,7 @@ func deserializePublicKey(compressedKey string) (types.HexBytes, error) {
 	return utils.DeserializePublicKey(compressedKey)
 }
 
-func (m *Service) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
+func (s *Service) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
 	shortKey, err := serializePublicKey(communityID)
 	if err != nil {
 		return "", err
@@ -119,7 +132,7 @@ func parseCommunityURLWithChatKey(urlData string) (*URLDataResponse, error) {
 	}, nil
 }
 
-func (m *Service) prepareEncodedCommunityData(community *communities.Community) (string, string, error) {
+func (s *Service) prepareEncodedCommunityData(community *communities.Community) (string, string, error) {
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
@@ -156,17 +169,13 @@ func (m *Service) prepareEncodedCommunityData(community *communities.Community) 
 	return encodedData, shortKey, nil
 }
 
-func (m *Service) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
-	if m.provider == nil {
-		return "", errNoDataProvider
-	}
-
-	community, err := m.provider.GetCommunityByID(communityID)
+func (s *Service) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
+	community, err := s.provider.GetCommunityByID(communityID)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to get community")
 	}
 
-	data, shortKey, err := m.prepareEncodedCommunityData(community)
+	data, shortKey, err := s.prepareEncodedCommunityData(community)
 	if err != nil {
 		return "", err
 	}
@@ -217,7 +226,7 @@ func parseCommunityURLWithData(data string, chatKey string) (*URLDataResponse, e
 	}, nil
 }
 
-func (m *Service) ShareCommunityChannelURLWithChatKey(communityID types.HexBytes, channelID string) (string, error) {
+func (s *Service) ShareCommunityChannelURLWithChatKey(communityID types.HexBytes, channelID string) (string, error) {
 	if len(communityID) == 0 {
 		return "", errInvalidCommunityID
 	}
@@ -266,7 +275,7 @@ func parseCommunityChannelURLWithChatKey(channelID string, publicKey string) (*U
 	}, nil
 }
 
-func (m *Service) prepareEncodedCommunityChannelData(community *communities.Community, channel *protobuf.CommunityChat, channelID string) (string, string, error) {
+func (s *Service) prepareEncodedCommunityChannelData(community *communities.Community, channel *protobuf.CommunityChat, channelID string) (string, string, error) {
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
@@ -311,11 +320,7 @@ func (m *Service) prepareEncodedCommunityChannelData(community *communities.Comm
 	return encodedData, shortKey, nil
 }
 
-func (m *Service) ShareCommunityChannelURLWithData(communityID types.HexBytes, channelID string) (string, error) {
-	if m.provider == nil {
-		return "", errNoDataProvider
-	}
-
+func (s *Service) ShareCommunityChannelURLWithData(communityID types.HexBytes, channelID string) (string, error) {
 	if len(communityID) == 0 {
 		return "", errInvalidCommunityID
 	}
@@ -329,9 +334,9 @@ func (m *Service) ShareCommunityChannelURLWithData(communityID types.HexBytes, c
 		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(channelID))
 	}
 
-	community, err := m.provider.GetCommunityByID(communityID)
+	community, err := s.provider.GetCommunityByID(communityID)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to get community")
 	}
 
 	channel := community.Chats()[channelID]
@@ -339,7 +344,7 @@ func (m *Service) ShareCommunityChannelURLWithData(communityID types.HexBytes, c
 		return "", fmt.Errorf("channel with channelID %s not found", gocommon.TruncateWithDot(channelID))
 	}
 
-	data, shortKey, err := m.prepareEncodedCommunityChannelData(community, channel, channelID)
+	data, shortKey, err := s.prepareEncodedCommunityChannelData(community, channel, channelID)
 	if err != nil {
 		return "", err
 	}
@@ -397,7 +402,7 @@ func parseCommunityChannelURLWithData(data string, chatKey string) (*URLDataResp
 	}, nil
 }
 
-func (m *Service) ShareUserURLWithChatKey(contactID string) (string, error) {
+func (s *Service) ShareUserURLWithChatKey(contactID string) (string, error) {
 	publicKey, err := crypto.HexToPubkey(contactID)
 	if err != nil {
 		return "", err
@@ -434,12 +439,11 @@ func parseUserURLWithChatKey(urlData string) (*URLDataResponse, error) {
 	}, nil
 }
 
-func (m *Service) ShareUserURLWithENS(contactID string) (string, error) {
-	if m.provider == nil {
-		return "", errNoDataProvider
+func (s *Service) ShareUserURLWithENS(contactID string) (string, error) {
+	contact, err := s.provider.GetContactByID(contactID)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get contact")
 	}
-
-	contact := m.provider.GetContactByID(contactID)
 	if contact == nil {
 		return "", ErrContactNotFound
 	}
@@ -451,7 +455,7 @@ func parseUserURLWithENS(ensName string) (*URLDataResponse, error) {
 	return nil, fmt.Errorf("not implemented yet")
 }
 
-func (m *Service) prepareEncodedUserData(contact *contacts.Contact) (string, string, error) {
+func (s *Service) prepareEncodedUserData(contact *contacts.Contact) (string, string, error) {
 	pk, err := contact.PublicKey()
 	if err != nil {
 		return "", "", err
@@ -493,17 +497,16 @@ func (m *Service) prepareEncodedUserData(contact *contacts.Contact) (string, str
 	return encodedData, shortKey, nil
 }
 
-func (m *Service) ShareUserURLWithData(contactID string) (string, error) {
-	if m.provider == nil {
-		return "", errNoDataProvider
+func (s *Service) ShareUserURLWithData(contactID string) (string, error) {
+	contact, err := s.provider.GetContactByID(contactID)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get contact")
 	}
-
-	contact := m.provider.GetContactByID(contactID)
 	if contact == nil {
 		return "", ErrContactNotFound
 	}
 
-	data, shortKey, err := m.prepareEncodedUserData(contact)
+	data, shortKey, err := s.prepareEncodedUserData(contact)
 	if err != nil {
 		return "", err
 	}

@@ -8,8 +8,17 @@ import (
 
 //go:generate go tool mockgen -package=mock_provider -source=providers.go -destination=./mock/providers.go
 
-
 type DataProvider interface {
 	GetCommunityByID(communityID types.HexBytes) (*communities.Community, error)
-	GetContactByID(pubKey string) *contacts.Contact
+	GetContactByID(pubKey string) (*contacts.Contact, error)
+}
+
+type NopDataProvider struct{}
+
+func (*NopDataProvider) GetCommunityByID(types.HexBytes) (*communities.Community, error) {
+	return nil, errNoDataProvider
+}
+
+func (*NopDataProvider) GetContactByID(string) (*contacts.Contact, error) {
+	return nil, errNoDataProvider
 }

@@ -2358,6 +2358,7 @@ func (b *GethStatusBackend) initProtocol() error {
 	b.statusNode.ChatService(accDB).Init(messenger)
 	b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
 	b.statusNode.CommunityTokensService().Init(messenger)
+	b.statusNode.SharedUrlsService().SetDataProvider(node.NewSharedUrlsMessengerAdapter(messenger))
 
 	return nil
 }

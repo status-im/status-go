@@ -10,7 +10,6 @@ import (
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/featureflags"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/newsfeed"
@@ -327,12 +326,16 @@ func (b *StatusNode) ethService() *eth.Service {
 
 func (b *StatusNode) sharedUrlsService() *sharedurls.Service {
 	if b.sharedUrlsSrvc == nil {
-		var m *protocol.Messenger
+		b.sharedUrlsSrvc = sharedurls.NewService(nil)
 		if extService := b.WakuV2ExtService(); extService != nil {
-			m = extService.Messenger()
+			provider := NewSharedUrlsMessengerAdapter(extService.Messenger())
+			b.sharedUrlsSrvc.SetDataProvider(provider)
 		}
-		b.sharedUrlsSrvc = sharedurls.NewService(m)
 	}
+	return b.sharedUrlsSrvc
+}
+
+func (b *StatusNode) SharedUrlsService() *sharedurls.Service {
 	return b.sharedUrlsSrvc
 }
 
