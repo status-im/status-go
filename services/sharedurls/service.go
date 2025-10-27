@@ -67,7 +67,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "sharedurls",
 			Version:   "0.1.0",
-			Service: PublicAPI{
+			Service: &PublicAPI{
 				service: s,
 			},
 		},
