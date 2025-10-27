@@ -483,3 +483,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         method = "ImageServerTLSCert"
         response = self.api_request(method, {})
         return response.content.decode("utf-8")
+
+    def serialize_legacy_key(self, key):
+        method = "SerializeLegacyKey"
+        # Use client.post directly, because this method is old and has json-incompatible arguments
+        response = self.client.post(self.method_url(method), data=key)
+        return response.content.decode()
