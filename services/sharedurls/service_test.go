@@ -30,17 +30,17 @@ const (
 	channelURLWithData           = "https://status.app/cc/G54AAKwObLdpiGjXnckYzRcOSq0QQAS_CURGfqVU42ceGHCObstUIknTTZDOKF3E8y2MSicncpO7fTskXnoACiPKeejvjtLTGWNxUhlT7fyQS7Jrr33UVHluxv_PLjV2ePGw5GQ33innzeK34pInIgUGs5RjdQifMVmURalxxQKwiuoY5zwIjixWWRHqjHM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
 )
 
-func TestMessengerShareUrlsSuite(t *testing.T) {
-	suite.Run(t, new(MessengerShareUrlsSuite))
+func TestShareUrlsSuite(t *testing.T) {
+	suite.Run(t, new(ShareUrlsSuite))
 }
 
-type MessengerShareUrlsSuite struct {
+type ShareUrlsSuite struct {
 	suite.Suite
 	service  *Service
 	provider *mock_provider.MockDataProvider
 }
 
-func (s *MessengerShareUrlsSuite) SetupTest() {
+func (s *ShareUrlsSuite) SetupTest() {
 	ctrl := gomock.NewController(s.T())
 	s.provider = mock_provider.NewMockDataProvider(ctrl)
 	s.service = NewService(s.provider)
@@ -53,7 +53,7 @@ func (t *TimeSourceStub) GetCurrentTime() uint64 {
 	return uint64(time.Now().Unix())
 }
 
-func (s *MessengerShareUrlsSuite) fakeCommunity() *communities.Community {
+func (s *ShareUrlsSuite) fakeCommunity() *communities.Community {
 	timeSource := TimeSourceStub{}
 
 	var config communities.Config
@@ -83,7 +83,7 @@ func (s *MessengerShareUrlsSuite) fakeCommunity() *communities.Community {
 	return community
 }
 
-func (s *MessengerShareUrlsSuite) addFakeChannel(community *communities.Community) (*communities.Community, *protobuf.CommunityChat, string) {
+func (s *ShareUrlsSuite) addFakeChannel(community *communities.Community) (*communities.Community, *protobuf.CommunityChat, string) {
 	chat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
 			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
@@ -110,7 +110,7 @@ func (s *MessengerShareUrlsSuite) addFakeChannel(community *communities.Communit
 	return community, channel, chatID
 }
 
-func (s *MessengerShareUrlsSuite) fakeContact() *contacts.Contact {
+func (s *ShareUrlsSuite) fakeContact() *contacts.Contact {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -124,7 +124,7 @@ func (s *MessengerShareUrlsSuite) fakeContact() *contacts.Contact {
 	return contact
 }
 
-func (s *MessengerShareUrlsSuite) verifyCommunityURL(url string, community *communities.Community, channel *protobuf.CommunityChat) {
+func (s *ShareUrlsSuite) verifyCommunityURL(url string, community *communities.Community, channel *protobuf.CommunityChat) {
 	urlData, err := ParseSharedURL(url)
 	s.Require().NoError(err)
 
@@ -142,7 +142,7 @@ func (s *MessengerShareUrlsSuite) verifyCommunityURL(url string, community *comm
 	}
 }
 
-func (s *MessengerShareUrlsSuite) TestDecodeEncodeDataURL() {
+func (s *ShareUrlsSuite) TestDecodeEncodeDataURL() {
 	ts := [][]byte{
 		[]byte("test data 123"),
 		[]byte("test data 123test data 123test data 123test data 123test data 123"),
@@ -158,7 +158,7 @@ func (s *MessengerShareUrlsSuite) TestDecodeEncodeDataURL() {
 	}
 }
 
-func (s *MessengerShareUrlsSuite) TestParseWrongUrls() {
+func (s *ShareUrlsSuite) TestParseWrongUrls() {
 	const notStatusSharedURLError = "not a status shared url"
 	badURLs := map[string]string{
 		"https://status.appc/#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11":  notStatusSharedURLError,
@@ -176,7 +176,7 @@ func (s *MessengerShareUrlsSuite) TestParseWrongUrls() {
 	}
 }
 
-func (s *MessengerShareUrlsSuite) TestIsStatusSharedUrl() {
+func (s *ShareUrlsSuite) TestIsStatusSharedUrl() {
 	testCases := []struct {
 		Name   string
 		URL    string
@@ -238,7 +238,7 @@ func (s *MessengerShareUrlsSuite) TestIsStatusSharedUrl() {
 	}
 }
 
-func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithChatKey() {
+func (s *ShareUrlsSuite) TestShareCommunityURLWithChatKey() {
 	community := s.fakeCommunity()
 
 	s.provider.EXPECT().GetContactByID(gomock.Any()).Times(0)
@@ -254,7 +254,7 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithChatKey() {
 	s.Require().Equal(expectedURL, url)
 }
 
-func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
+func (s *ShareUrlsSuite) TestParseCommunityURLWithChatKey() {
 	community := s.fakeCommunity()
 
 	shortID, err := community.SerializedID()
@@ -275,7 +275,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
 	s.Require().Equal([]uint32{}, urlData.Community.TagIndices)
 }
 
-func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithData() {
+func (s *ShareUrlsSuite) TestShareCommunityURLWithData() {
 	community := s.fakeCommunity()
 
 	s.provider.EXPECT().
@@ -300,7 +300,7 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithData() {
 	s.Require().Equal(community.TagsIndices(), response.Community.TagIndices)
 }
 
-func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
+func (s *ShareUrlsSuite) TestParseCommunityURLWithData() {
 	urlData, err := ParseSharedURL(communityURLWithData)
 	s.Require().NoError(err)
 	s.Require().NotNil(urlData)
@@ -314,7 +314,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
 	s.Require().Equal([]uint32{1, 33, 51}, urlData.Community.TagIndices)
 }
 
-func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithDataNoTags() {
+func (s *ShareUrlsSuite) TestParseCommunityURLWithDataNoTags() {
 	urlData, err := ParseSharedURL(communityURLWithDataNoTags)
 	s.Require().NoError(err)
 	s.Require().NotNil(urlData)
@@ -328,7 +328,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithDataNoTags() {
 	s.Require().Equal([]uint32{}, urlData.Community.TagIndices)
 }
 
-func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithDataWithTags() {
+func (s *ShareUrlsSuite) TestParseCommunityURLWithDataWithTags() {
 	urlData, err := ParseSharedURL(communityURLWithDataWithTags)
 	s.Require().NoError(err)
 	s.Require().NotNil(urlData)
@@ -342,7 +342,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithDataWithTags() {
 	s.Require().Equal([]uint32{0x23, 0x1e}, urlData.Community.TagIndices)
 }
 
-func (s *MessengerShareUrlsSuite) TestShareAndParseCommunityURLWithData() {
+func (s *ShareUrlsSuite) TestShareAndParseCommunityURLWithData() {
 	community := s.fakeCommunity()
 
 	s.provider.EXPECT().GetContactByID(gomock.Any()).Times(0)
@@ -354,7 +354,7 @@ func (s *MessengerShareUrlsSuite) TestShareAndParseCommunityURLWithData() {
 	s.verifyCommunityURL(url, community, nil)
 }
 
-func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithChatKey() {
+func (s *ShareUrlsSuite) TestShareCommunityChannelURLWithChatKey() {
 	community := s.fakeCommunity()
 	channelID := gofakeit.UUID()
 
@@ -368,7 +368,7 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithChatKey() {
 	s.Require().Equal(expectedURL, url)
 }
 
-func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
+func (s *ShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
 	const channelUUID = "003cdcd5-e065-48f9-b166-b1a94ac75a11"
 	const communityID = "0x02a3d2fdb9ac335917bf9d46b38d7496c00bbfadbaf832e8aa61d13ac2b4452084"
 
@@ -391,7 +391,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
 	s.Require().Equal("", urlData.Channel.Color)
 }
 
-func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithData() {
+func (s *ShareUrlsSuite) TestShareCommunityChannelURLWithData() {
 	community := s.fakeCommunity()
 	community, channel, channelID := s.addFakeChannel(community)
 
@@ -408,7 +408,7 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithData() {
 	s.Require().Equal(expectedURL, url)
 }
 
-func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithData() {
+func (s *ShareUrlsSuite) TestParseCommunityChannelURLWithData() {
 	urlData, err := ParseSharedURL(channelURLWithData)
 	s.Require().NoError(err)
 	s.Require().NotNil(urlData)
@@ -422,7 +422,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithData() {
 	s.Require().Equal("#131D2F", urlData.Channel.Color)
 }
 
-func (s *MessengerShareUrlsSuite) TestShareAndParseCommunityChannelURLWithData() {
+func (s *ShareUrlsSuite) TestShareAndParseCommunityChannelURLWithData() {
 	community := s.fakeCommunity()
 	community, channel, channelID := s.addFakeChannel(community)
 
@@ -435,7 +435,7 @@ func (s *MessengerShareUrlsSuite) TestShareAndParseCommunityChannelURLWithData()
 	s.verifyCommunityURL(url, community, channel)
 }
 
-func (s *MessengerShareUrlsSuite) TestShareUserURLWithChatKey() {
+func (s *ShareUrlsSuite) TestShareUserURLWithChatKey() {
 	contact := s.fakeContact()
 
 	s.provider.EXPECT().GetContactByID(gomock.Any()).Times(0)
@@ -451,7 +451,7 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithChatKey() {
 	s.Require().Equal(expectedURL, url)
 }
 
-func (s *MessengerShareUrlsSuite) TestParseUserURLWithChatKey() {
+func (s *ShareUrlsSuite) TestParseUserURLWithChatKey() {
 	urlData, err := ParseSharedURL(userURL)
 	s.Require().NoError(err)
 	s.Require().NotNil(urlData)
@@ -461,10 +461,10 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithChatKey() {
 	s.Require().Equal("", urlData.Contact.Description)
 }
 
-func (s *MessengerShareUrlsSuite) TestShareUserURLWithENS() {
+func (s *ShareUrlsSuite) TestShareUserURLWithENS() {
 	contact := s.fakeContact()
 
-	s.provider.EXPECT().GetContactByID(contact.ID).Return(contact).Times(1)
+	s.provider.EXPECT().GetContactByID(contact.ID).Return(contact, nil).Times(1)
 	s.provider.EXPECT().GetCommunityByID(gomock.Any()).Times(0)
 
 	url, err := s.service.ShareUserURLWithENS(contact.ID)
@@ -475,7 +475,7 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithENS() {
 }
 
 // TODO: ens in the next ticket
-func (s *MessengerShareUrlsSuite) TestParseUserURLWithENS() {
+func (s *ShareUrlsSuite) TestParseUserURLWithENS() {
 	s.T().Skip("ens in the next ticket")
 
 	contact := s.fakeContact()
@@ -491,7 +491,7 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithENS() {
 	s.Require().Equal(contact.Bio, urlData.Contact.DisplayName)
 }
 
-func (s *MessengerShareUrlsSuite) TestParseUserURLWithData() {
+func (s *ShareUrlsSuite) TestParseUserURLWithData() {
 	urlData, err := ParseSharedURL(userURLWithData)
 	s.Require().NoError(err)
 	s.Require().NotNil(urlData)
@@ -502,10 +502,10 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithData() {
 	s.Require().Equal("zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj", urlData.Contact.PublicKey)
 }
 
-func (s *MessengerShareUrlsSuite) TestShareUserURLWithData() {
+func (s *ShareUrlsSuite) TestShareUserURLWithData() {
 	contact := s.fakeContact()
 
-	s.provider.EXPECT().GetContactByID(contact.ID).Return(contact).Times(1)
+	s.provider.EXPECT().GetContactByID(contact.ID).Return(contact, nil).Times(1)
 	s.provider.EXPECT().GetCommunityByID(gomock.Any()).Times(0)
 
 	url, err := s.service.ShareUserURLWithData(contact.ID)
@@ -518,7 +518,7 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithData() {
 	s.Require().Equal(expectedURL, url)
 }
 
-func (s *MessengerShareUrlsSuite) TestPrepareEncodedUserDataWithEmptyAccount() {
+func (s *ShareUrlsSuite) TestPrepareEncodedUserDataWithEmptyAccount() {
 	contact := s.fakeContact()
 	contact.DisplayName = ""
 	contact.Bio = ""
@@ -533,7 +533,7 @@ func (s *MessengerShareUrlsSuite) TestPrepareEncodedUserDataWithEmptyAccount() {
 	s.Require().NotEmpty(chatKey)
 }
 
-func (s *MessengerShareUrlsSuite) TestShareAndParseUserURLWithData() {
+func (s *ShareUrlsSuite) TestShareAndParseUserURLWithData() {
 	contact := s.fakeContact()
 
 	s.provider.EXPECT().GetContactByID(contact.ID).Return(contact).Times(1)

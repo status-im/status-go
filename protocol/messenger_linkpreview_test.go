@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/services/sharedurls"
 )
 
 const (
@@ -472,7 +473,8 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	s.m.allContacts.Store(c.ID, c)
 
 	// Generate a shared URL
-	u, err := s.m.ShareUserURLWithData(c.ID)
+	sharedUrlsService := sharedurls.NewService(s.m)
+	u, err := sharedUrlsService.ShareUserURLWithData(c.ID)
 	s.Require().NoError(err)
 
 	// Update contact info locally after creating the shared URL
@@ -554,7 +556,8 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
 	s.setProfileParameters(s.m, "TestDisplayName_3", "TestBio_3", identityImages)
 
 	// Generate a shared URL
-	u, err := s.m.ShareUserURLWithData(s.m.IdentityPublicKeyString())
+	sharedUrlsService := sharedurls.NewService(s.m)
+	u, err := sharedUrlsService.ShareUserURLWithData(s.m.IdentityPublicKeyString())
 	s.Require().NoError(err)
 
 	// Update contact info locally after creating the shared URL
@@ -641,7 +644,8 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined()
 	s.Require().NoError(err)
 
 	// Create shared URL
-	u, err := s.m.ShareCommunityURLWithData(community.ID())
+	sharedUrlsService := sharedurls.NewService(s.m)
+	u, err := sharedUrlsService.ShareCommunityURLWithData(community.ID())
 	s.Require().NoError(err)
 
 	// Unfurl community shared URL
