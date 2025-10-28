@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	contacts2 "github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -1078,8 +1077,8 @@ func insertMinimalDiscordMessage(p *sqlitePersistence, id string, discordMessage
 	}})
 }
 
-func minimalRawMessage(id string, messageType protobuf.ApplicationMetadataMessage_Type) *messagingtypes.RawMessage {
-	return &messagingtypes.RawMessage{
+func minimalRawMessage(id string, messageType protobuf.ApplicationMetadataMessage_Type) *common.RawMessage {
+	return &common.RawMessage{
 		ID:          id,
 		LocalChatID: "test-chat",
 		MessageType: messageType,

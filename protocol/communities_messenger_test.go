@@ -3578,7 +3578,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 
 	messageState.CurrentMessageState.PublicKey = &s.alice.identity.PublicKey
 
-	statusMessage := messagingtypes.Message{}
+	statusMessage := common.StatusMessage{}
 	statusMessage.TransportLayer.Dst = community.PublicKey()
 	err = s.owner.HandleCommunityRequestToJoin(messageState, requestToJoinProto, &statusMessage)
 
@@ -3684,7 +3684,7 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	}
 	encodedPayload, err := proto.Marshal(&testMessage)
 	s.Require().NoError(err)
-	wrappedPayload, err := v1protocol.WrapMessageV1(
+	wrappedPayload, err := v1protocol.WrapIntoAppLayerMessage(
 		encodedPayload,
 		protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		s.owner.identity,
@@ -3950,7 +3950,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 
 	messageState.CurrentMessageState.PublicKey = &s.alice.identity.PublicKey
 
-	statusMessage := messagingtypes.Message{}
+	statusMessage := common.StatusMessage{}
 	statusMessage.TransportLayer.Dst = community.PublicKey()
 
 	requestToJoinProto := &protobuf.CommunityRequestToJoin{

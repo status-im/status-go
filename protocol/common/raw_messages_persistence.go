@@ -5,10 +5,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/gob"
-	"errors"
 
 	"github.com/status-im/status-go/crypto"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -20,7 +18,7 @@ func NewRawMessagesPersistence(db *sql.DB) *RawMessagesPersistence {
 	return &RawMessagesPersistence{db: db}
 }
 
-func (db RawMessagesPersistence) SaveRawMessage(message *messagingtypes.RawMessage) error {
+func (db RawMessagesPersistence) SaveRawMessage(message *RawMessage) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -109,7 +107,7 @@ func (db RawMessagesPersistence) SaveRawMessage(message *messagingtypes.RawMessa
 	return err
 }
 
-func (db RawMessagesPersistence) RawMessageByID(id string) (*messagingtypes.RawMessage, error) {
+func (db RawMessagesPersistence) RawMessageByID(id string) (*RawMessage, error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return nil, err
@@ -126,12 +124,12 @@ func (db RawMessagesPersistence) RawMessageByID(id string) (*messagingtypes.RawM
 	return db.rawMessageByID(tx, id)
 }
 
-func (db RawMessagesPersistence) rawMessageByID(tx *sql.Tx, id string) (*messagingtypes.RawMessage, error) {
+func (db RawMessagesPersistence) rawMessageByID(tx *sql.Tx, id string) (*RawMessage, error) {
 	var rawPubKeys [][]byte
 	var encodedRecipients []byte
 	var skipGroupMessageWrap, sendOnPersonalTopic sql.NullBool
 	var sender []byte
-	message := &messagingtypes.RawMessage{}
+	message := &RawMessage{}
 
 	err := tx.QueryRow(`
 			SELECT
@@ -242,18 +240,6 @@ func (db RawMessagesPersistence) RawMessagesIDsByType(t protobuf.ApplicationMeta
 	}
 
 	return ids, nil
-}
-
-func (db RawMessagesPersistence) GetHashRatchetMessagesCountForGroup(groupID []byte) (int, error) {
-	var count int
-	err := db.db.QueryRow(`SELECT count(*) FROM hash_ratchet_encrypted_messages WHERE group_id = ?`, groupID).Scan(&count)
-	if err == nil {
-		return count, nil
-	}
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, nil
-	}
-	return 0, err
 }
 
 func (db RawMessagesPersistence) UpdateRawMessageSent(id string, sent bool) error {

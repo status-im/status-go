@@ -10,11 +10,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
 
-func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoBytes []byte, msg *messagingtypes.Message, filter messagingtypes.ChatFilter, fromArchive bool) error {
+func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoBytes []byte, msg *common.StatusMessage, filter messagingtypes.ChatFilter, fromArchive bool) error {
 	switch msg.ApplicationLayer.Type {
 	{{ range .}}
            case protobuf.ApplicationMetadataMessage_{{.EnumValue}}:
@@ -26,7 +27,7 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
 }
 
 {{ range . }}
-func (m *Messenger) {{.MethodName}}(messageState *ReceivedMessageState, protoBytes []byte, msg *messagingtypes.Message, filter messagingtypes.ChatFilter{{ if .FromArchiveArg }}, fromArchive bool{{ end }}) error {
+func (m *Messenger) {{.MethodName}}(messageState *ReceivedMessageState, protoBytes []byte, msg *common.StatusMessage, filter messagingtypes.ChatFilter{{ if .FromArchiveArg }}, fromArchive bool{{ end }}) error {
 	m.logger.Info("handling {{ .ProtobufName}}")
 	{{ if .SyncMessage }}
 	if !crypto.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {

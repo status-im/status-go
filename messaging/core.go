@@ -1,24 +1,23 @@
 package messaging
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"sync"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
-	"github.com/status-im/status-go/messaging/events"
+	"github.com/status-im/status-go/messaging/controller"
 	"github.com/status-im/status-go/messaging/layers/encryption"
+	"github.com/status-im/status-go/messaging/layers/reliability"
+	"github.com/status-im/status-go/messaging/layers/segmentation"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
@@ -36,18 +35,17 @@ var (
 type Core struct {
 	config
 
-	identity  *ecdsa.PrivateKey
-	waku      wakutypes.Waku
-	transport *transport.Transport
-	sender    *common.MessageSender
-	encryptor *encryption.Protocol
+	identity   *ecdsa.PrivateKey
+	waku       wakutypes.Waku
+	stack      *common.MessagingStack
+	controller *controller.Controller
+
+	publisher *pubsub.Publisher
 
 	wg   sync.WaitGroup
 	quit chan struct{}
 
 	connectionState connection.State
-
-	publisher *pubsub.Publisher
 
 	wakumetrics *wakumetrics.Client
 }
@@ -64,7 +62,10 @@ type CoreParams struct {
 }
 
 func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, error) {
-	transport, err := transport.NewTransport(
+	var err error
+	stack := &common.MessagingStack{}
+
+	stack.Transport, err = transport.NewTransport(
 		waku,
 		params.Identity,
 		config.persistence.TransportStorage().KeysStorage(),
@@ -76,34 +77,42 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		return nil, errors.Wrap(err, "failed to create transport instance")
 	}
 
-	encryptor := encryption.New(
+	stack.Segmentation = segmentation.NewSegmenter(
+		config.persistence.SegmentationStorage(),
+		config.logger,
+	)
+
+	stack.Encryption = encryption.New(
 		config.persistence.EncryptionStorage(),
 		params.InstallationID,
 		config.logger,
 	)
 
-	sender, err := common.NewMessageSender(
-		params.Identity,
-		config.persistence.MessageSenderStorage(),
+	stack.Reliability = reliability.NewReliability(
 		config.persistence.MVDSStorage(),
-		config.persistence.SegmentationStorage(),
-		transport,
-		encryptor,
+		params.Identity,
 		config.logger,
 	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create messageSender")
-	}
+
+	publisher := pubsub.NewPublisher()
+
+	controller := controller.NewController(
+		params.Identity,
+		stack,
+		config.persistence.MessageConfirmationStorage(),
+		config.persistence.HashRatchetStorage(),
+		publisher,
+		config.logger,
+	)
 
 	return &Core{
-		config:    *config,
-		identity:  params.Identity,
-		waku:      waku,
-		transport: transport,
-		sender:    sender,
-		encryptor: encryptor,
-		quit:      make(chan struct{}),
-		publisher: pubsub.NewPublisher(),
+		config:     *config,
+		identity:   params.Identity,
+		waku:       waku,
+		stack:      stack,
+		controller: controller,
+		publisher:  publisher,
+		quit:       make(chan struct{}),
 	}, nil
 }
 
@@ -155,44 +164,10 @@ func (c *Core) start() error {
 		}
 	}
 
-	err = c.sender.StartReliability()
+	err = c.controller.Start()
 	if err != nil {
 		return err
 	}
-
-	subscriptions, err := c.encryptor.Start(c.identity)
-	if err != nil {
-		return err
-	}
-
-	// handle stored shared secrets
-	err = c.sender.HandleSharedSecrets(subscriptions.SharedSecrets)
-	if err != nil {
-		return err
-	}
-
-	c.startCleanupLoop("messageSegmentsCleanupLoop", c.sender.CleanupSegments)
-	c.startCleanupLoop("hashRatchetEncryptedMessagesCleanupLoop", c.sender.CleanupHashRatchetEncryptedMessages)
-
-	// Forward MessageEvent
-	go func() {
-		defer gocommon.LogOnPanic()
-
-		c.wg.Add(1)
-		defer c.wg.Done()
-
-		s, unsub := pubsub.Subscribe[events.MessageEvent](c.sender.Publisher(), 0)
-		defer unsub()
-
-		for {
-			select {
-			case <-c.quit:
-				return
-			case event := <-s:
-				pubsub.Publish(c.publisher, event)
-			}
-		}
-	}()
 
 	return nil
 }
@@ -200,33 +175,13 @@ func (c *Core) start() error {
 func (c *Core) stop() error {
 	close(c.quit)
 
-	c.sender.Stop()
-
-	err := c.transport.Stop()
-	if err != nil {
-		return err
-	}
-
-	func() {
-		c.wg.Add(1)
-		defer c.wg.Done()
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
-		err := c.transport.ResetFilters(ctx)
-		if err != nil {
-			c.logger.Warn("could not reset filters", zap.Error(err))
-		}
-	}()
-
-	err = c.encryptor.Stop()
+	err := c.controller.Stop()
 	if err != nil {
 		return err
 	}
 
 	if c.metricsEnabled {
-		err = wakumetrics.UnregisterMetrics()
+		err := wakumetrics.UnregisterMetrics()
 		if err != nil {
 			return err
 		}
@@ -243,47 +198,18 @@ func (c *Core) stop() error {
 }
 
 func (c *Core) connectionChanged(state connection.State) {
-	c.transport.ConnectionChanged(state)
+	c.stack.Transport.ConnectionChanged(state)
 
 	if !c.connectionState.Offline && state.Offline {
-		c.sender.StopReliability()
+		c.controller.StopReliability()
 	}
 
 	if c.connectionState.Offline && !state.Offline {
-		err := c.sender.StartReliability()
+		err := c.controller.StartReliability()
 		if err != nil {
 			c.logger.Error("failed to start datasync", zap.Error(err))
 		}
 	}
-}
-
-func (c *Core) startCleanupLoop(name string, cleanupFunc func() error) {
-	logger := c.logger.Named(name)
-
-	go func() {
-		defer gocommon.LogOnPanic()
-
-		c.wg.Add(1)
-		defer c.wg.Done()
-
-		// Delay by a few minutes to minimize messenger's startup time
-		var interval time.Duration = 5 * time.Minute
-		for {
-			select {
-			case <-time.After(interval):
-				// Set the regular interval after the first execution
-				interval = 1 * time.Hour
-
-				err := cleanupFunc()
-				if err != nil {
-					logger.Error("failed to cleanup", zap.Error(err))
-				}
-
-			case <-c.quit:
-				return
-			}
-		}
-	}()
 }
 
 type wakuParams struct {
@@ -387,35 +313,6 @@ func (c *Core) startWakuMetrics() error {
 		c.wakumetrics = wakuMetricsHandler
 	}
 
-	go func() {
-		defer gocommon.LogOnPanic()
-
-		c.wg.Add(1)
-		defer c.wg.Done()
-
-		sentMessagesSub, unsubSentMessages := pubsub.Subscribe[events.MessageEvent](c.publisher, 100)
-		defer unsubSentMessages()
-
-		for {
-			select {
-			case sub := <-sentMessagesSub:
-				if sub.Type != events.RawMessageSent {
-					continue
-				}
-				msg := sub.RawMessage
-				c.wakumetrics.PushRawMessageByType(
-					msg.PubsubTopic,
-					msg.ContentTopic,
-					msg.MessageType.String(),
-					uint32(len(msg.Payload)),
-				)
-
-			case <-c.quit:
-				return
-			}
-		}
-	}()
-
 	return nil
 }
 
@@ -425,7 +322,7 @@ func (c *Core) metrics() string {
 }
 
 func (c *Core) generateHashRatchetKey(groupID []byte) error {
-	key, err := c.encryptor.GenerateHashRatchetKey(groupID)
+	key, err := c.stack.Encryption.GenerateHashRatchetKey(groupID)
 	if err != nil {
 		return err
 	}
@@ -444,13 +341,13 @@ func (c *Core) generateHashRatchetKey(groupID []byte) error {
 }
 
 func (c *Core) encryptWithHashRatchet(groupID []byte, payload []byte) ([]byte, []byte, uint32, error) {
-	encryptedPayload, ratchet, newSeqNo, err := c.encryptor.EncryptWithHashRatchet(groupID, payload)
+	encryptedPayload, ratchet, newSeqNo, err := c.stack.Encryption.EncryptWithHashRatchet(groupID, payload)
 	if err == encryption.ErrNoEncryptionKey {
-		_, err := c.encryptor.GenerateHashRatchetKey(groupID)
+		_, err := c.stack.Encryption.GenerateHashRatchetKey(groupID)
 		if err != nil {
 			return nil, nil, 0, err
 		}
-		encryptedPayload, ratchet, newSeqNo, err = c.encryptor.EncryptWithHashRatchet(groupID, payload)
+		encryptedPayload, ratchet, newSeqNo, err = c.stack.Encryption.EncryptWithHashRatchet(groupID, payload)
 		if err != nil {
 			return nil, nil, 0, err
 		}
@@ -468,7 +365,7 @@ func (c *Core) encryptWithHashRatchet(groupID []byte, payload []byte) ([]byte, [
 }
 
 func (c *Core) buildHashRatchetMessage(groupID []byte, payload []byte) ([]byte, error) {
-	messageSpec, err := c.encryptor.BuildHashRatchetMessage(groupID, payload)
+	messageSpec, err := c.stack.Encryption.BuildHashRatchetMessage(groupID, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +379,7 @@ func (c *Core) decryptMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *e
 		return nil, err
 	}
 
-	decrypted, err := c.encryptor.HandleMessage(myIdentityKey, theirPublicKey, &encryptionMessage, make([]byte, 0))
+	decrypted, err := c.stack.Encryption.HandleMessage(myIdentityKey, theirPublicKey, &encryptionMessage, make([]byte, 0))
 	if err != nil {
 		return nil, err
 	}

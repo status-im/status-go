@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -187,14 +188,14 @@ func (s *MessengerCommunitiesShardingSuite) TestIgnoreOutdatedShardKey() {
 		encodedMessage, err := proto.Marshal(communityShardKey)
 		s.Require().NoError(err)
 
-		rawMessage := messagingtypes.RawMessage{
+		rawMessage := common.RawMessage{
 			Recipients:  []*ecdsa.PublicKey{&s.alice.identity.PublicKey},
-			ResendType:  messagingtypes.ResendTypeDataSync,
+			ResendType:  common.ResendTypeDataSync,
 			MessageType: protobuf.ApplicationMetadataMessage_COMMUNITY_SHARD_KEY,
 			Payload:     encodedMessage,
 		}
 
-		_, err = s.owner.messaging.SendPubsubTopicKey(context.Background(), &rawMessage)
+		_, err = s.owner.sender.SendGroup(context.Background(), rawMessage.Recipients, &rawMessage)
 		s.Require().NoError(err)
 
 		_, err = WaitOnMessengerResponse(s.alice, func(mr *MessengerResponse) bool {

@@ -405,9 +405,19 @@ func (t *Transport) MaxMessageSize() uint32 {
 
 func (t *Transport) Stop() error {
 	close(t.quit)
+
 	if t.envelopesMonitor != nil {
 		t.envelopesMonitor.Stop()
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err := t.ResetFilters(ctx)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

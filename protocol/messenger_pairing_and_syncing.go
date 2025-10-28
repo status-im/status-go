@@ -138,11 +138,11 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, targetInstallation
 	if rawMessageHandler == nil {
 		rawMessageHandler = m.dispatchPairInstallationMessage
 	}
-	_, err = rawMessageHandler(ctx, messagingtypes.RawMessage{
+	_, err = rawMessageHandler(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_PAIR_INSTALLATION,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	})
 	if err != nil {
 		return nil, err
@@ -362,11 +362,11 @@ func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler, ide
 		return err
 	}
 
-	rawMessage := messagingtypes.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURES,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -424,11 +424,11 @@ func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID, c
 		return err
 	}
 
-	rawMessage := messagingtypes.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_CONTACT_REQUEST_DECISION,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -480,11 +480,11 @@ func (m *Messenger) syncMessages(ctx context.Context, rawMessageHandler RawMessa
 		}
 
 		_, chat := m.getLastClockWithRelatedChat()
-		rawMessage := messagingtypes.RawMessage{
+		rawMessage := common.RawMessage{
 			LocalChatID: chat.ID,
 			Payload:     encodedMessage,
 			MessageType: protobuf.ApplicationMetadataMessage_BACKED_UP_MESSAGE_BATCH,
-			ResendType:  messagingtypes.ResendTypeDataSync,
+			ResendType:  common.ResendTypeDataSync,
 		}
 
 		_, err = rawMessageHandler(ctx, rawMessage)

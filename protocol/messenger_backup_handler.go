@@ -9,10 +9,10 @@ import (
 
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/images"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/backupsync"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	ensservice "github.com/status-im/status-go/services/ens"
@@ -236,7 +236,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(syncCommunity *protob
 		return err
 	}
 
-	rawMessage := &messagingtypes.RawMessage{
+	rawMessage := &common.RawMessage{
 		Payload:             payload,
 		Sender:              m.identity,
 		CommunityID:         community.ID(),
@@ -276,7 +276,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(syncCommunity *protob
 	return nil
 }
 
-func (m *Messenger) HandleBackedUpMessageBatch(state *ReceivedMessageState, messageBatch *protobuf.BackedUpMessageBatch, msg *messagingtypes.Message) error {
+func (m *Messenger) HandleBackedUpMessageBatch(state *ReceivedMessageState, messageBatch *protobuf.BackedUpMessageBatch, msg *common.StatusMessage) error {
 	// BackedUpMessages can only be sent in the context of a local backup
 	return nil
 }

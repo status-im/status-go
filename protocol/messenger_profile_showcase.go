@@ -19,7 +19,6 @@ import (
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
@@ -759,11 +758,11 @@ func (m *Messenger) syncProfileShowcasePreferences(ctx context.Context, rawMessa
 	}
 
 	_, chat := m.getLastClockWithRelatedChat()
-	rawMessage := messagingtypes.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_PROFILE_SHOWCASE_PREFERENCES,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
