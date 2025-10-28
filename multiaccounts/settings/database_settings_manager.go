@@ -77,9 +77,5 @@ type DatabaseSettingsManager interface {
 	MnemonicWasShown() error
 	AutoRefreshTokensEnabled() (result bool, err error)
 	LastTokensUpdate() (result time.Time, err error)
-	NewsFeedLastFetchedTimestamp() (result time.Time, err error)
-	NewsFeedEnabled() (result bool, err error)
-	NewsNotificationsEnabled() (result bool, err error)
-	NewsRSSEnabled() (result bool, err error)
 	ThirdpartyServicesEnabled() (result bool, err error)
 }
