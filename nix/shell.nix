@@ -27,7 +27,7 @@ in mkShell {
   ];
 
   shellHook = ''
-    export LD_LIBRARY_PATH="${pkgs.lib-sds-pkg}/lib/"
+    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.lib-sds-pkg ]}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     export USE_SYSTEM_NIM=1
     export CGO_CFLAGS="$CGO_CFLAGS $NIX_CFLAGS_COMPILE"
     export CGO_LDFLAGS="$CGO_LDFLAGS $NIX_LDFLAGS"
