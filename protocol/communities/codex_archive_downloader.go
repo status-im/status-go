@@ -323,8 +323,8 @@ func (d *CodexArchiveDownloader) triggerSingleArchiveDownload(hash, cid string, 
 		return fmt.Errorf("failed to trigger archive download with CID %s: %w", cid, err)
 	}
 
-	if manifest.CID != cid {
-		return fmt.Errorf("unexpected manifest CID %s, expected %s", manifest.CID, cid)
+	if manifest.Cid != cid {
+		return fmt.Errorf("unexpected manifest CID %s, expected %s", manifest.Cid, cid)
 	}
 
 	return nil

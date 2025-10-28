@@ -97,6 +97,12 @@ func (d *CodexIndexDownloader) GotManifest() <-chan struct{} {
 
 		// Verify that the CID matches our configured indexCid
 		if manifest.Cid != d.indexCid {
+			d.mu.Lock()
+			d.downloadError = fmt.Errorf("manifest CID mismatch: expected %s, got %s", d.indexCid, manifest.Cid)
+			d.mu.Unlock()
+			d.logger.Debug("manifest CID mismatch",
+				zap.String("expected", d.indexCid),
+				zap.String("got", manifest.Cid))
 			// Don't close channel on error - let timeout handle it
 			return
 		}

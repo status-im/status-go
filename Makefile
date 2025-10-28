@@ -362,6 +362,12 @@ test-libcodex: |
 	CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" \
 	go test -tags '$(BUILD_TAGS) use_codex' -run TestCodexStart ./codex/... -v -json | jq -r '.Output'
 
+test-codex-integration : |
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="-I$(LIBS_DIR)" \
+	CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" \
+	go test -tags '$(BUILD_TAGS) use_codex' -run Codex ./protocol/communities/... -v -json | jq -r '.Output'
+
 clean-libcodex:
 	@echo "Removing libcodex"
 	rm -Rf $(LIBS_DIR)/*

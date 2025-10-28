@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -79,12 +80,12 @@ func (suite *CodexIndexDownloaderTestSuite) TestGotManifest_SuccessClosesChannel
 	filePath := filepath.Join(suite.testDir, "index.bin")
 
 	// Setup mock to return a successful manifest
-	expectedManifest := &communities.CodexManifest{
-		CID: testCid,
+	expectedManifest := codex.Manifest{
+		Cid: testCid,
 	}
-	expectedManifest.Manifest.DatasetSize = 1024
-	expectedManifest.Manifest.TreeCid = "zDvZRwzmTreeCID"
-	expectedManifest.Manifest.BlockSize = 65536
+	expectedManifest.DatasetSize = 1024
+	expectedManifest.TreeCid = "zDvZRwzmTreeCID"
+	expectedManifest.BlockSize = 65536
 
 	suite.mockClient.EXPECT().
 		FetchManifestWithContext(gomock.Any(), testCid).
@@ -119,7 +120,7 @@ func (suite *CodexIndexDownloaderTestSuite) TestGotManifest_ErrorDoesNotCloseCha
 	// Setup mock to return an error
 	suite.mockClient.EXPECT().
 		FetchManifestWithContext(gomock.Any(), testCid).
-		Return(nil, errors.New("fetch error"))
+		Return(codex.Manifest{}, errors.New("fetch error"))
 
 	// Create downloader
 	downloader := communities.NewCodexIndexDownloader(suite.mockClient, testCid, filePath, suite.cancelChan, suite.logger)
@@ -154,10 +155,10 @@ func (suite *CodexIndexDownloaderTestSuite) TestGotManifest_CidMismatchDoesNotCl
 	filePath := filepath.Join(suite.testDir, "index.bin")
 
 	// Setup mock to return a manifest with different CID
-	mismatchedManifest := &communities.CodexManifest{
-		CID: differentCid, // Different CID!
+	mismatchedManifest := codex.Manifest{
+		Cid: differentCid, // Different CID!
 	}
-	mismatchedManifest.Manifest.DatasetSize = 1024
+	mismatchedManifest.DatasetSize = 1024
 
 	suite.mockClient.EXPECT().
 		FetchManifestWithContext(gomock.Any(), testCid).
@@ -198,12 +199,12 @@ func (suite *CodexIndexDownloaderTestSuite) TestGotManifest_Cancellation() {
 	fetchCalled := make(chan struct{})
 	suite.mockClient.EXPECT().
 		FetchManifestWithContext(gomock.Any(), testCid).
-		DoAndReturn(func(ctx context.Context, cid string) (*communities.CodexManifest, error) {
+		DoAndReturn(func(ctx context.Context, cid string) (codex.Manifest, error) {
 			close(fetchCalled) // Signal that fetch was called
 
 			// Wait for context cancellation
 			<-ctx.Done()
-			return nil, ctx.Err()
+			return codex.Manifest{}, ctx.Err()
 		})
 
 	// Create downloader
@@ -247,14 +248,14 @@ func (suite *CodexIndexDownloaderTestSuite) TestGotManifest_Cancellation() {
 func (suite *CodexIndexDownloaderTestSuite) TestGotManifest_RecordsDatasetSize() {
 	testCid := "zDvZRwzmTestCID123"
 	filePath := filepath.Join(suite.testDir, "index.bin")
-	expectedSize := int64(2048)
+	expectedSize := 2048
 
 	// Setup mock to return a manifest with specific dataset size
-	expectedManifest := &communities.CodexManifest{
-		CID: testCid,
+	expectedManifest := codex.Manifest{
+		Cid: testCid,
 	}
-	expectedManifest.Manifest.DatasetSize = expectedSize
-	expectedManifest.Manifest.TreeCid = "zDvZRwzmTreeCID"
+	expectedManifest.DatasetSize = expectedSize
+	expectedManifest.TreeCid = "zDvZRwzmTreeCID"
 
 	suite.mockClient.EXPECT().
 		FetchManifestWithContext(gomock.Any(), testCid).
@@ -278,7 +279,7 @@ func (suite *CodexIndexDownloaderTestSuite) TestGotManifest_RecordsDatasetSize()
 	}
 
 	// Verify dataset size was recorded correctly
-	assert.Equal(suite.T(), expectedSize, downloader.GetDatasetSize(), "Dataset size should match manifest")
+	assert.Equal(suite.T(), int64(expectedSize), downloader.GetDatasetSize(), "Dataset size should match manifest")
 	suite.T().Logf("✅ Dataset size correctly recorded: %d", downloader.GetDatasetSize())
 
 	// Verify no error was recorded
@@ -500,13 +501,13 @@ func (suite *CodexIndexDownloaderTestSuite) TestDownloadIndexFile_ErrorHandling(
 func (suite *CodexIndexDownloaderTestSuite) TestLength_ReturnsDatasetSize() {
 	testCid := "zDvZRwzmTestCID123"
 	filePath := filepath.Join(suite.testDir, "index.bin")
-	expectedSize := int64(4096)
+	expectedSize := 4096
 
 	// Setup mock to return a manifest
-	expectedManifest := &communities.CodexManifest{
-		CID: testCid,
+	expectedManifest := codex.Manifest{
+		Cid: testCid,
 	}
-	expectedManifest.Manifest.DatasetSize = expectedSize
+	expectedManifest.DatasetSize = expectedSize
 
 	suite.mockClient.EXPECT().
 		FetchManifestWithContext(gomock.Any(), testCid).
@@ -523,6 +524,6 @@ func (suite *CodexIndexDownloaderTestSuite) TestLength_ReturnsDatasetSize() {
 	<-manifestChan
 
 	// Now Length should return the dataset size
-	assert.Equal(suite.T(), expectedSize, downloader.Length(), "Length should return dataset size")
+	assert.Equal(suite.T(), int64(expectedSize), downloader.Length(), "Length should return dataset size")
 	suite.T().Logf("✅ Length() correctly returns dataset size: %d", downloader.Length())
 }
