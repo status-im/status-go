@@ -1,5 +1,5 @@
 pytest~=7.4.0
-requests~=2.31.0
+requests~=2.32.4
 websocket-client~=1.4.2
 tenacity~=9.0.0
 docker~=7.1.0
