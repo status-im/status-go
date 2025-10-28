@@ -1,17 +1,15 @@
-//go:build !disable_torrent
-// +build !disable_torrent
-
 package communities
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/protobuf"
+
+	"go.uber.org/zap"
 )
 
 // CodexArchiveProcessor handles processing of downloaded archive data
@@ -19,52 +17,78 @@ type CodexArchiveProcessor interface {
 	// ProcessArchiveData processes the raw archive data and returns any error
 	// The processor is responsible for extracting messages, handling them,
 	// and saving the archive ID to persistence
-	ProcessArchiveData(communityID types.HexBytes, archiveHash string, archiveData []byte, from, to uint64) error
+	ProcessArchiveData(communityID string, archiveHash string, archiveData []byte, from, to uint64) error
 }
 
 // CodexArchiveDownloader handles downloading individual archive files from Codex storage
 type CodexArchiveDownloader struct {
-	codexClient        *CodexClient
+	codexClient        CodexClientInterface
 	index              *protobuf.CodexWakuMessageArchiveIndex
 	communityID        string
 	existingArchiveIDs []string
 	cancelChan         chan struct{} // for cancellation support
+	logger             *zap.Logger
 
 	// Progress tracking
 	totalArchivesCount           int
 	totalDownloadedArchivesCount int
-	currentArchiveHash           string
 	archiveDownloadProgress      map[string]int64 // hash -> bytes downloaded
 	archiveDownloadCancel        map[string]chan struct{}
 	mu                           sync.RWMutex
 
 	// Download control
 	downloadComplete bool
-	downloadError    error
 	cancelled        bool
+	pollingInterval  time.Duration // configurable polling interval for HasCid checks
+	pollingTimeout   time.Duration // configurable timeout for HasCid polling
 
-	// Callback for signaling archive completion with raw data
-	onArchiveDownloaded func(hash string, from, to uint64, archiveData []byte)
+	// Callbacks
+	onArchiveDownloaded       func(hash string, from, to uint64)
+	onStartingArchiveDownload func(hash string, from, to uint64)
 }
 
 // NewCodexArchiveDownloader creates a new archive downloader
-func NewCodexArchiveDownloader(codexClient *CodexClient, index *protobuf.CodexWakuMessageArchiveIndex, communityID string, existingArchiveIDs []string, cancelChan chan struct{}) *CodexArchiveDownloader {
+func NewCodexArchiveDownloader(codexClient CodexClientInterface, index *protobuf.CodexWakuMessageArchiveIndex, communityID string, existingArchiveIDs []string, cancelChan chan struct{}, logger *zap.Logger) *CodexArchiveDownloader {
 	return &CodexArchiveDownloader{
 		codexClient:                  codexClient,
 		index:                        index,
 		communityID:                  communityID,
 		existingArchiveIDs:           existingArchiveIDs,
 		cancelChan:                   cancelChan,
+		logger:                       logger,
 		totalArchivesCount:           len(index.Archives),
 		totalDownloadedArchivesCount: len(existingArchiveIDs),
 		archiveDownloadProgress:      make(map[string]int64),
 		archiveDownloadCancel:        make(map[string]chan struct{}),
+		pollingInterval:              1 * time.Second,  // Default production polling interval
+		pollingTimeout:               30 * time.Second, // Default production polling timeout
 	}
 }
 
+// SetPollingInterval sets the polling interval for HasCid checks (useful for testing)
+func (d *CodexArchiveDownloader) SetPollingInterval(interval time.Duration) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.pollingInterval = interval
+}
+
+// SetPollingTimeout sets the timeout for HasCid polling (useful for testing)
+func (d *CodexArchiveDownloader) SetPollingTimeout(timeout time.Duration) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.pollingTimeout = timeout
+}
+
 // SetOnArchiveDownloaded sets a callback function to be called when an archive is successfully downloaded
-func (d *CodexArchiveDownloader) SetOnArchiveDownloaded(callback func(hash string, from, to uint64, archiveData []byte)) {
+func (d *CodexArchiveDownloader) SetOnArchiveDownloaded(callback func(hash string, from, to uint64)) {
 	d.onArchiveDownloaded = callback
+}
+
+// SetOnStartingArchiveDownload sets a callback function to be called before starting an archive download
+// This callback is called on the main thread before launching goroutines, making it useful for testing
+// the deterministic order in which archives are processed (sorted newest first)
+func (d *CodexArchiveDownloader) SetOnStartingArchiveDownload(callback func(hash string, from, to uint64)) {
+	d.onStartingArchiveDownload = callback
 }
 
 // GetTotalArchivesCount returns the total number of archives to download
@@ -85,13 +109,6 @@ func (d *CodexArchiveDownloader) GetPendingArchivesCount() int {
 	return len(d.archiveDownloadCancel)
 }
 
-// GetCurrentArchiveHash returns the hash of the currently downloading archive
-func (d *CodexArchiveDownloader) GetCurrentArchiveHash() string {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	return d.currentArchiveHash
-}
-
 // GetArchiveDownloadProgress returns the download progress for a specific archive
 func (d *CodexArchiveDownloader) GetArchiveDownloadProgress(hash string) int64 {
 	d.mu.RLock()
@@ -106,13 +123,6 @@ func (d *CodexArchiveDownloader) IsDownloadComplete() bool {
 	return d.downloadComplete
 }
 
-// GetDownloadError returns any error that occurred during download
-func (d *CodexArchiveDownloader) GetDownloadError() error {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	return d.downloadError
-}
-
 // IsCancelled returns whether the download was cancelled
 func (d *CodexArchiveDownloader) IsCancelled() bool {
 	d.mu.RLock()
@@ -121,46 +131,55 @@ func (d *CodexArchiveDownloader) IsCancelled() bool {
 }
 
 // StartDownload begins downloading all missing archives
-func (d *CodexArchiveDownloader) StartDownload() error {
-	if d.totalArchivesCount == 0 {
-		return fmt.Errorf("no archives to download")
-	}
-	go func() {
-		err := d.downloadAllArchives()
-		d.mu.Lock()
-		d.downloadError = err
-		d.downloadComplete = true
-		d.mu.Unlock()
-	}()
-	return nil
+func (d *CodexArchiveDownloader) StartDownload() {
+	d.downloadAllArchives()
 }
 
 // downloadAllArchives handles the main download loop for all archives
-func (d *CodexArchiveDownloader) downloadAllArchives() error {
+func (d *CodexArchiveDownloader) downloadAllArchives() {
 	// Create sorted list of archives (newest first, like torrent version)
 	type archiveInfo struct {
 		hash string
 		from uint64
+		to   uint64
 		cid  string
 	}
 
 	var archivesList []archiveInfo
 	for hash, metadata := range d.index.Archives {
+		// Skip archives we already have
+		if slices.Contains(d.existingArchiveIDs, hash) {
+			continue
+		}
 		archivesList = append(archivesList, archiveInfo{
 			hash: hash,
 			from: metadata.Metadata.From,
+			to:   metadata.Metadata.To,
 			cid:  metadata.Cid,
 		})
 	}
 
-	// Sort by timestamp (newest first) - same as torrent version
-	for i := 0; i < len(archivesList)-1; i++ {
-		for j := i + 1; j < len(archivesList); j++ {
-			if archivesList[i].from < archivesList[j].from {
-				archivesList[i], archivesList[j] = archivesList[j], archivesList[i]
-			}
+	// Sort by timestamp (newest first)
+	slices.SortFunc(archivesList, func(a, b archiveInfo) int {
+		if a.from > b.from {
+			return -1 // a is newer, should come first
 		}
+		if a.from < b.from {
+			return 1 // b is newer, should come first
+		}
+		return 0 // equal timestamps
+	})
+
+	// Pre-populate archiveDownloadCancel with all archives that need downloading
+	// This ensures len(archiveDownloadCancel) correctly represents total pending work
+	// and prevents race condition where fast-completing goroutines set downloadComplete=true
+	// before all archives are added to the map
+	d.mu.Lock()
+	for _, archive := range archivesList {
+		d.archiveDownloadCancel[archive.hash] = make(chan struct{})
+		d.archiveDownloadProgress[archive.hash] = 0
 	}
+	d.mu.Unlock()
 
 	// Monitor for cancellation in a separate goroutine
 	go func() {
@@ -181,6 +200,7 @@ func (d *CodexArchiveDownloader) downloadAllArchives() error {
 					delete(d.archiveDownloadCancel, hash)
 				}
 				d.cancelled = true
+				d.downloadComplete = true // Mark as complete even on cancellation
 				d.mu.Unlock()
 				return // Exit goroutine after cancellation
 			case <-ticker.C:
@@ -198,57 +218,87 @@ func (d *CodexArchiveDownloader) downloadAllArchives() error {
 
 	// Download each missing archive
 	for _, archive := range archivesList {
-		// Check if we already have this archive
-		hasArchive := false
-		for _, existingHash := range d.existingArchiveIDs {
-			if existingHash == archive.hash {
-				hasArchive = true
-				break
-			}
-		}
-		if hasArchive {
-			continue
+		// Get the pre-created cancel channel for this archive
+		d.mu.RLock()
+		archiveCancelChan := d.archiveDownloadCancel[archive.hash]
+		d.mu.RUnlock()
+
+		// Call callback before starting
+		if d.onStartingArchiveDownload != nil {
+			d.onStartingArchiveDownload(archive.hash, archive.from, archive.to)
 		}
 
-		archiveCancelChan := make(chan struct{})
+		// Trigger archive download and track progress in a goroutine
+		go func(archiveHash, archiveCid string, archiveFrom, archiveTo uint64, archiveCancel chan struct{}) {
+			defer func() {
+				// Always clean up: remove from active downloads and check completion
+				d.mu.Lock()
+				delete(d.archiveDownloadCancel, archiveHash)
+				d.downloadComplete = len(d.archiveDownloadCancel) == 0
+				d.mu.Unlock()
+			}()
 
-		d.mu.Lock()
-		d.currentArchiveHash = archive.hash
-		d.archiveDownloadProgress[archive.hash] = 0
-		d.archiveDownloadCancel[archive.hash] = archiveCancelChan
-		d.mu.Unlock()
-
-		// Download this archive in parallel
-		go func(archiveHash, archiveCid string, archiveCancel chan struct{}) {
-			err := d.downloadSingleArchive(archiveHash, archiveCid, archiveCancel)
-			d.mu.Lock()
-			defer d.mu.Unlock()
-			
+			err := d.triggerSingleArchiveDownload(archiveHash, archiveCid, archiveCancel)
 			if err != nil {
-				// Store the last error encountered
-				d.downloadError = err
-			} else {
-				// Only increment on successful download
-				d.totalDownloadedArchivesCount++
+				// Don't proceed to polling if trigger failed (could be cancellation or other error)
+				d.logger.Debug("failed to trigger download",
+					zap.String("cid", archiveCid),
+					zap.String("hash", archiveHash),
+					zap.Error(err))
+				return
 			}
-			
-			// Remove from active downloads
-			delete(d.archiveDownloadCancel, archiveHash)
-			
-			// Check if all downloads are complete
-			if len(d.archiveDownloadCancel) == 0 {
-				d.downloadComplete = true
-			}
-		}(archive.hash, archive.cid, archiveCancelChan)
-	}
 
-	return nil
+			// Poll at configured interval until we confirm it's downloaded
+			// or timeout, or get cancelled
+			timeout := time.After(d.pollingTimeout)
+			ticker := time.NewTicker(d.pollingInterval)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-timeout:
+					d.logger.Debug("timeout waiting for CID to be available locally",
+						zap.String("cid", archiveCid),
+						zap.String("hash", archiveHash),
+						zap.Duration("timeout", d.pollingTimeout))
+					return // Exit without success callback or count increment
+				case <-archiveCancel:
+					d.logger.Debug("download cancelled",
+						zap.String("cid", archiveCid),
+						zap.String("hash", archiveHash))
+					return // Exit without success callback or count increment
+				case <-ticker.C:
+					hasCid, err := d.codexClient.HasCid(archiveCid)
+					if err != nil {
+						// Log error but continue polling
+						d.logger.Debug("error checking CID availability",
+							zap.String("cid", archiveCid),
+							zap.String("hash", archiveHash),
+							zap.Error(err))
+						continue
+					}
+					if hasCid {
+						// CID is now available locally - handle success immediately
+						d.mu.Lock()
+						d.totalDownloadedArchivesCount++
+						d.mu.Unlock()
+
+						// Call success callback
+						if d.onArchiveDownloaded != nil {
+							d.onArchiveDownloaded(archiveHash, archiveFrom, archiveTo)
+						}
+						return // Exit after successful completion
+					}
+				}
+			}
+		}(archive.hash, archive.cid, archive.from, archive.to, archiveCancelChan)
+	}
 }
 
-// downloadSingleArchive downloads a single archive by its CID
-func (d *CodexArchiveDownloader) downloadSingleArchive(hash, cid string, cancelChan <-chan struct{}) error {
+// triggerSingleArchiveDownload downloads a single archive by its CID
+func (d *CodexArchiveDownloader) triggerSingleArchiveDownload(hash, cid string, cancelChan <-chan struct{}) error {
 	// Create a context that can be cancelled via our cancel channel
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Monitor for cancellation in a separate goroutine
@@ -261,51 +311,14 @@ func (d *CodexArchiveDownloader) downloadSingleArchive(hash, cid string, cancelC
 		}
 	}()
 
-	// Download the archive data into a buffer
-	var archiveBuffer bytes.Buffer
-	progressWriter := &archiveProgressWriter{
-		buffer:   &archiveBuffer,
-		hash:     hash,
-		progress: &d.archiveDownloadProgress,
-		mu:       &d.mu,
-	}
-
-	// Use context-aware download for immediate cancellation
-	err := d.codexClient.DownloadWithContext(ctx, cid, progressWriter)
+	manifest, err := d.codexClient.TriggerDownloadWithContext(ctx, cid)
 	if err != nil {
-		return fmt.Errorf("failed to download archive data for CID %s: %w", cid, err)
+		return fmt.Errorf("failed to trigger archive download with CID %s: %w", cid, err)
 	}
 
-	// Get metadata for this archive
-	metadata := d.index.Archives[hash]
-	if metadata == nil {
-		return fmt.Errorf("metadata not found for archive hash %s", hash)
-	}
-
-	// Call the callback with the downloaded archive data
-	if d.onArchiveDownloaded != nil {
-		d.onArchiveDownloaded(hash, metadata.Metadata.From, metadata.Metadata.To, archiveBuffer.Bytes())
+	if manifest.CID != cid {
+		return fmt.Errorf("unexpected manifest CID %s, expected %s", manifest.CID, cid)
 	}
 
 	return nil
-}
-
-// archiveProgressWriter tracks download progress and collects data for individual archives
-type archiveProgressWriter struct {
-	buffer   *bytes.Buffer
-	hash     string
-	progress *map[string]int64
-	mu       *sync.RWMutex
-}
-
-func (apw *archiveProgressWriter) Write(p []byte) (n int, err error) {
-	n = len(p)
-
-	// Update progress tracking
-	apw.mu.Lock()
-	(*apw.progress)[apw.hash] += int64(n)
-	apw.mu.Unlock()
-
-	// Write data to buffer for processing
-	return apw.buffer.Write(p)
 }

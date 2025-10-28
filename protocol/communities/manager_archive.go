@@ -777,10 +777,10 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 					archiveDownloaderCancel := make(chan struct{})
 
 					// Create the archive downloader using the protobuf index directly
-					archiveDownloader := NewCodexArchiveDownloader(codexClient, index, id, existingArchiveIDs, archiveDownloaderCancel)
+					archiveDownloader := NewCodexArchiveDownloader(codexClient, index, id, existingArchiveIDs, archiveDownloaderCancel, m.logger)
 
 					// Set up callback for when individual archives are downloaded
-					archiveDownloader.SetOnArchiveDownloaded(func(hash string, from, to uint64, archiveData []byte) {
+					archiveDownloader.SetOnArchiveDownloaded(func(hash string, from, to uint64) {
 						m.publisher.publish(&Subscription{
 							HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
 								CommunityID: communityID.String(),
@@ -795,11 +795,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 							zap.Uint64("to", to))
 					})
 
-					err = archiveDownloader.StartDownload()
-					if err != nil {
-						m.logger.Error("failed to start archive downloads", zap.Error(err))
-						return nil, fmt.Errorf("failed to start archive downloads: %w", err)
-					}
+					archiveDownloader.StartDownload()
 
 					m.publisher.publish(&Subscription{
 						DownloadingHistoryArchivesStartedSignal: &signal.DownloadingHistoryArchivesStartedSignal{
@@ -819,20 +815,20 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 							downloadTaskInfo.Cancelled = true
 							return downloadTaskInfo, nil
 						case <-archiveTicker.C:
-							if archiveDownloader.IsDownloadComplete() || archiveDownloader.IsCancelled() {
-								if archiveDownloader.IsCancelled() {
-									m.logger.Debug("archive download was cancelled")
-									downloadTaskInfo.Cancelled = true
-									return downloadTaskInfo, nil
-								}
-								if downloadError := archiveDownloader.GetDownloadError(); downloadError != nil {
-									m.logger.Warn("at least one archive download failed", zap.Error(downloadError))
-								}
-
-								// Update final progress
+							// IsDownloadComplete == true also even when no single archive
+							// has been downloaded (e.g. because of error or because of
+							// cancellation).
+							// To further check for cancellation, call IsCancelled().
+							// To see if any archive was actually downloaded, check
+							// GetTotalDownloadedArchivesCount().
+							// Notice that GetTotalDownloadedArchivesCount represents
+							// all successfully downloaded archives so far, not only
+							// archives downloaded in this session.
+							if archiveDownloader.IsDownloadComplete() {
+								// Always update final progress
 								downloadTaskInfo.TotalDownloadedArchivesCount = archiveDownloader.GetTotalDownloadedArchivesCount()
 
-								m.logger.Info("All archives downloaded successfully from Codex",
+								m.logger.Info("Downloading archives from Codex finished",
 									zap.Int("totalArchives", downloadTaskInfo.TotalArchivesCount),
 									zap.Int("downloadedArchives", downloadTaskInfo.TotalDownloadedArchivesCount))
 
@@ -843,7 +839,15 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 										IndexCid:    true,  // Downloaded via Codex CID
 									},
 								})
-								m.logger.Debug("finished downloading archives from Codex")
+
+								if archiveDownloader.IsCancelled() {
+									// archive was cancelled, but it does not mean that
+									// no single archive was downloaded before cancellation
+									m.logger.Debug("archive download was cancelled")
+									downloadTaskInfo.Cancelled = true
+									return downloadTaskInfo, nil
+								}
+
 								return downloadTaskInfo, nil
 							} else {
 								// Update progress
@@ -851,7 +855,8 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 								m.logger.Debug("downloading archives",
 									zap.Int("completed", downloadTaskInfo.TotalDownloadedArchivesCount),
 									zap.Int("total", downloadTaskInfo.TotalArchivesCount),
-									zap.Int("inProgress", archiveDownloader.GetPendingArchivesCount()),
+									zap.Int("inProgress in this session", archiveDownloader.GetPendingArchivesCount()),
+									zap.Int("total remaining archives to download", downloadTaskInfo.TotalArchivesCount-downloadTaskInfo.TotalDownloadedArchivesCount),
 								)
 							}
 						}
