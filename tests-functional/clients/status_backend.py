@@ -383,7 +383,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         response = self.api_request(method, data)
         return response.content.decode()
 
-    def input_connection_string_for_bootstrapping(self, connection_string):
+    def input_connection_string_for_bootstrapping(self, connection_string, **kwargs):
         method = "InputConnectionStringForBootstrappingV2"
         # Empty user
         user = Account(
@@ -395,7 +395,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = {
             "connectionString": connection_string,
             "receiverClientConfig": {
-                "receiverConfig": {"createAccount": self._create_account_request(user)},
+                "receiverConfig": {"createAccount": self._create_account_request(user, **kwargs)},
                 "clientConfig": {},
             },
         }
