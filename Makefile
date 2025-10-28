@@ -95,9 +95,8 @@ BUILD_TAGS ?= gowaku_no_rln
 
 ifeq ($(USE_NWAKU), true)
     BUILD_TAGS += use_nwaku
-    ifndef NWAKU_SOURCE_DIR
-        $(error NWAKU_SOURCE_DIR must be set when USE_NWAKU is true)
-    endif
+    NWAKU_VERSION ?= v0.37.0-rc.3
+    NWAKU_SOURCE_DIR ?= $(GIT_ROOT)/../nwaku
     LIBWAKU := $(NWAKU_SOURCE_DIR)/build/libwaku.$(LIBWAKU_EXT)
     CGO_CFLAGS+=-I$(NWAKU_SOURCE_DIR)/library
 	CGO_LDFLAGS+=-L$(NWAKU_SOURCE_DIR)/build -lwaku -Wl,-rpath,$(NWAKU_SOURCE_DIR)/build
@@ -183,7 +182,16 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	@echo "Compilation done."
 	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
-$(LIBWAKU):
+
+$(NWAKU_SOURCE_DIR): ##@build Clone nwaku
+ifeq ($(USE_NWAKU),true)
+	@echo "Cloning nwaku $(NWAKU_VERSION)..."
+	git clone --branch $(NWAKU_VERSION) https://github.com/waku-org/nwaku.git $(NWAKU_SOURCE_DIR)
+endif
+
+clone-nwaku: $(NWAKU_SOURCE_DIR)
+
+$(LIBWAKU): clone-nwaku
 ifeq ($(USE_NWAKU),true)
 	@echo "Building libwaku" $(LIBWAKU)
 	$(MAKE) -C $(NWAKU_SOURCE_DIR) SHELL=/bin/bash
@@ -199,12 +207,6 @@ clean-libwaku:
 	rm $(LIBWAKU)
 
 rebuild-libwaku: | clean-libwaku $(LIBWAKU)
-
-clone-nwaku: NWAKU_SOURCE_DIR ?= $(GIT_ROOT)/../nwaku
-clone-nwaku: NWAKU_VERSION ?= v0.37.0-rc.3
-clone-nwaku: ##@build Clone or checkout nwaku v0.37.0-rc.3 into ../nwaku
-	@echo "Cloning nwaku $(NWAKU_VERSION)..."
-	git clone --branch $(NWAKU_VERSION) https://github.com/waku-org/nwaku.git $(NWAKU_SOURCE_DIR)
 
 statusgo: ##@build Build status-go as status-backend server
 statusgo: build/bin/status-backend
