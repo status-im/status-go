@@ -1355,7 +1355,6 @@ func (api *PublicAPI) CollectCommunityMetrics(request *requests.CommunityMetrics
 	return api.service.messenger.CollectCommunityMetrics(request)
 }
 
-
 func (api *PublicAPI) Messenger() *protocol.Messenger {
 	return api.service.messenger
 }

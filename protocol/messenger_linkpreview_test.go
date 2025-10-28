@@ -15,10 +15,12 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -30,6 +32,18 @@ const (
 		"AAAiklEQVR4nOzWwQmFQAwG4ffEXmzLIizDImzLarQBhSwSGH7mO+9hh0DI9AthCI0hNIbQGEJjCI0hNIbQxITM1YfHfl69X3m2bsu/8i5mI" +
 		"obQGEJjCI0hNIbQlG+tUW83UtfNFjMRQ2gMofm8tUa3U9c2i5mIITSGqEnMRAyhMYTGEBpDaO4AAAD//5POEGncqtj1AAAAAElFTkSuQmCC"
 )
+
+type SharedUrlsMessengerAdapter struct {
+	messenger *Messenger
+}
+
+func (p *SharedUrlsMessengerAdapter) GetCommunityByID(communityID types.HexBytes) (*communities.Community, error) {
+	return p.messenger.GetCommunityByID(communityID)
+}
+
+func (p *SharedUrlsMessengerAdapter) GetContactByID(pubKey string) (*contacts.Contact, error) {
+	return p.messenger.GetContactByID(pubKey), nil
+}
 
 func TestMessengerLinkPreviews(t *testing.T) {
 	suite.Run(t, new(MessengerLinkPreviewsTestSuite))
@@ -473,7 +487,8 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	s.m.allContacts.Store(c.ID, c)
 
 	// Generate a shared URL
-	sharedUrlsService := sharedurls.NewService(s.m)
+	provider := &SharedUrlsMessengerAdapter{messenger: s.m}
+	sharedUrlsService := sharedurls.NewService(provider)
 	u, err := sharedUrlsService.ShareUserURLWithData(c.ID)
 	s.Require().NoError(err)
 
@@ -556,7 +571,8 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
 	s.setProfileParameters(s.m, "TestDisplayName_3", "TestBio_3", identityImages)
 
 	// Generate a shared URL
-	sharedUrlsService := sharedurls.NewService(s.m)
+	provider := &SharedUrlsMessengerAdapter{messenger: s.m}
+	sharedUrlsService := sharedurls.NewService(provider)
 	u, err := sharedUrlsService.ShareUserURLWithData(s.m.IdentityPublicKeyString())
 	s.Require().NoError(err)
 
@@ -644,7 +660,8 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined()
 	s.Require().NoError(err)
 
 	// Create shared URL
-	sharedUrlsService := sharedurls.NewService(s.m)
+	provider := &SharedUrlsMessengerAdapter{messenger: s.m}
+	sharedUrlsService := sharedurls.NewService(provider)
 	u, err := sharedUrlsService.ShareCommunityURLWithData(community.ID())
 	s.Require().NoError(err)
 

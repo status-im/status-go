@@ -26,7 +26,6 @@ func NewSharedUrlsMessengerAdapter(messenger *protocol.Messenger) *SharedUrlsMes
 	}
 }
 
-
 func (p *SharedUrlsMessengerAdapter) GetCommunityByID(communityID types.HexBytes) (*communities.Community, error) {
 	if p.messenger == nil {
 		return nil, ErrMessengerNotReady
