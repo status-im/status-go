@@ -3,7 +3,6 @@ module github.com/status-im/status-go
 go 1.24.0
 
 tool (
-	github.com/goware/modvendor
 	github.com/kevinburke/go-bindata/v4/go-bindata
 	github.com/status-im/goroutine-defer-guard/cmd/goroutine-defer-guard
 	github.com/wadey/gocovmerge
@@ -187,7 +186,6 @@ require (
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20250202011525-fc3143867406 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
-	github.com/goware/modvendor v0.5.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-bexpr v0.1.10 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -222,7 +220,6 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
-	github.com/mattn/go-zglob v0.0.2-0.20191112051448-a8912a37f9e7 // indirect
 	github.com/miekg/dns v1.1.63 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect

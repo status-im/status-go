@@ -178,7 +178,7 @@ all: $(GO_CMD_NAMES)
 $(GO_CMD_BUILDS): generate $(LIBWAKU)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -mod=vendor -v \
+	go build -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
 	@echo "Compilation done."
@@ -219,7 +219,7 @@ status-backend: build/bin/status-backend
 run-status-backend: PORT ?= 0
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
-	go run ./cmd/status-backend --address localhost:${PORT}
+	go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
@@ -238,7 +238,7 @@ status-go-deps:
 statusgo-c-bindings:
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
-	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
+	go run -mod=mod cmd/library/*.go > build/bin/statusgo-lib/main.go
 
 statusgo-library: generate
 statusgo-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
@@ -327,9 +327,9 @@ generate:  ##@ Run generate for all given packages using go-generate-fast, fallb
 generate-contracts:
 	go generate ./contracts
 download-tokens:
-	go run ./services/wallet/token/token-lists/default-lists/downloader/main.go
+	go run -mod=mod ./services/wallet/token/token-lists/default-lists/downloader/main.go
 analyze-token-stores:
-	go run ./services/wallet/token/token-lists/analyzer/main.go
+	go run -mod=mod ./services/wallet/token/token-lists/analyzer/main.go
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
@@ -358,7 +358,6 @@ test-unit-prep: export UNIT_TEST_REPORT_CODECOV ?= false
 test-unit: test-unit-prep
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true
 test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
-	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake | \
@@ -403,12 +402,6 @@ deep-clean: clean git-clean
 
 tidy:
 	go mod tidy
-
-vendor: generate
-	go mod tidy
-	go mod vendor
-	go tool modvendor -copy="**/*.c **/*.h" -v
-.PHONY: vendor
 
 migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
 migration:

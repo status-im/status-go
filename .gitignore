@@ -21,7 +21,6 @@
 */**/.DS_Store
 .ethtest
 */**/*tx_database*
-vendor/github.com/ethereum/go-ethereum/vendor
 node_modules/
 tags
 build/
@@ -46,7 +45,6 @@ profile.cov
 
 # tests
 .ethereumtest/
-/vendor/**/*_test.go
 *.test
 
 #
@@ -69,9 +67,6 @@ Session.vim
 /cmd/*/.ethereum/
 *.iml
 
-# do not vendor nested vendor/ dirs
-vendor/**/vendor
-
 # nodejs package
 
 package.json
@@ -84,14 +79,6 @@ report.xml
 test.log
 test_*.log
 **/exit_code_*.txt
-
-# Waku libs
-vendor/github.com/waku-org/go-zerokit-rln-x86_64/
-vendor/github.com/waku-org/go-zerokit-rln-apple/
-vendor/github.com/waku-org/go-zerokit-rln-arm/
-
-# waku-go-bindings third_party directory
-vendor/**/waku-go-bindings/third_party/
 
 # status-cli logs
 alice.log
@@ -115,7 +102,6 @@ report/results.xml
 
 # generated files
 mock/
-!vendor/**/mock/
 mock.go
 *_mock_test.go
 *.pb.go
@@ -128,10 +114,6 @@ pkg/version/GIT_COMMIT
 pkg/sentry/SENTRY_CONTEXT_NAME
 pkg/sentry/SENTRY_CONTEXT_VERSION
 pkg/sentry/SENTRY_PRODUCTION
-
-# Don't ignore generated files in the vendor/ directory
-!vendor/**/*.pb.go
-!vendor/**/migrations.go
 
 go.work
 go.work.sum
