@@ -39,6 +39,7 @@ var (
 	channelRegExp         = regexp.MustCompile(channelUUIDRegExp)
 	errInvalidCommunityID = errors.New("invalid community id")
 	errNoDataProvider     = errors.New("no data provider")
+	errCommunityNil       = errors.New("community is nil")
 )
 
 var (
@@ -132,7 +133,7 @@ func parseCommunityURLWithChatKey(urlData string) (*URLDataResponse, error) {
 	}, nil
 }
 
-func (s *Service) prepareEncodedCommunityData(community *communities.Community) (string, string, error) {
+func prepareEncodedCommunityData(community *communities.Community) (string, string, error) {
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
@@ -175,7 +176,15 @@ func (s *Service) ShareCommunityURLWithData(communityID types.HexBytes) (string,
 		return "", errors.Wrap(err, "failed to get community")
 	}
 
-	data, shortKey, err := s.prepareEncodedCommunityData(community)
+	return ShareCommunityURLWithData(community)
+}
+
+func ShareCommunityURLWithData(community *communities.Community) (string, error) {
+	if community == nil {
+		return "", errCommunityNil
+	}
+
+	data, shortKey, err := prepareEncodedCommunityData(community)
 	if err != nil {
 		return "", err
 	}

@@ -65,10 +65,6 @@ type PushNotificationServer interface {
 	HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) error
 }
 
-type SharedURLProvider interface {
-	ShareCommunityURLWithData(communityID types.HexBytes) (string, error)
-}
-
 const (
 	PubKeyStringLength = 132
 

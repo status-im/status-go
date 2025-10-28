@@ -286,7 +286,7 @@ func (s *ShareUrlsSuite) TestShareCommunityURLWithData() {
 	url, err := s.service.ShareCommunityURLWithData(community.ID())
 	s.Require().NoError(err)
 
-	communityData, chatKey, err := s.service.prepareEncodedCommunityData(community)
+	communityData, chatKey, err := prepareEncodedCommunityData(community)
 	s.Require().NoError(err)
 
 	expectedURL := fmt.Sprintf("%s/c/%s#%s", baseShareURL, communityData, chatKey)

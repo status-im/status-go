@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/featureflags"
 	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/newsfeed"
