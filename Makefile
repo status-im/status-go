@@ -35,12 +35,6 @@ RELEASE_TAG ?= $(shell ./_assets/scripts/version.sh)
 RELEASE_DIR ?= /tmp/release-$(RELEASE_TAG)
 GOLANGCI_BINARY = golangci-lint
 
-ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
- detected_OS := Windows
-else
- detected_OS := $(strip $(shell uname))
-endif
-
 ifeq ($(MAKECMDGOALS),statusgo-android-library)
     ARCH ?= arm64
     ANDROID_NDK_ROOT ?= $(shell find /nix/store -path "*android-sdk-ndk-27.2.12479018/libexec/android-sdk/ndk/27.2.12479018" -type d 2>/dev/null | head -1)
@@ -68,23 +62,6 @@ ifeq ($(MAKECMDGOALS),statusgo-ios-library)
     IOS_BUILD_FLAGS := CGO_LDFLAGS="-Os -flto" CGO_ENABLED=1 GOOS=ios GOARCH=$(MOBILE_GOARCH)
 endif
 
-ifeq ($(detected_OS),Darwin)
- GOBIN_SHARED_LIB_EXT := dylib
- LIBWAKU_EXT := so
- LIBSDS_EXT := so
- GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
-else ifeq ($(detected_OS),Windows)
- GOBIN_SHARED_LIB_EXT := dll
- LIBWAKU_EXT := dll
- LIBSDS_EXT := dll
- GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
-else
- GOBIN_SHARED_LIB_EXT := so
- LIBWAKU_EXT := so
- LIBSDS_EXT := so
- GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
-endif
-
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 export GOPATH ?= $(HOME)/go
 
@@ -96,6 +73,29 @@ export NIM_SDS_HEADER_PATH=$(GIT_ROOT)/vendor/github.com/waku-org/sds-go-binding
 export NIM_SDS_LIB_PATH=$(GIT_ROOT)/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build
 export CGO_CFLAGS=-I${NIM_SDS_HEADER_PATH}/
 export CGO_LDFLAGS=-L${NIM_SDS_LIB_PATH}/ -lsds -Wl,-rpath,${NIM_SDS_LIB_PATH}/
+
+ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
+ detected_OS := Windows
+else
+ detected_OS := $(strip $(shell uname))
+endif
+
+ifeq ($(detected_OS),Darwin)
+ GOBIN_SHARED_LIB_EXT := dylib
+ LIBWAKU_EXT := so
+ LIBSDS_EXT := so
+ GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
+else ifeq ($(detected_OS),Windows)
+ GOBIN_SHARED_LIB_EXT := dll
+ LIBWAKU_EXT := dll
+ LIBSDS_EXT := dll
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-L${NIM_SDS_LIB_PATH}/ -lsds"
+else
+ GOBIN_SHARED_LIB_EXT := so
+ LIBWAKU_EXT := so
+ LIBSDS_EXT := so
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
+endif
 
 BUILD_TAGS ?= gowaku_no_rln
 
@@ -238,6 +238,8 @@ statusgo-shared-library: generate-sds generate
 statusgo-shared-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
+	mkdir -p build/bin/statusgo-lib
+	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
 	$(GOBIN_SHARED_LIB_CFLAGS) $(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \

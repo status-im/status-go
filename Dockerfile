@@ -57,6 +57,8 @@ COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
 COPY --from=builder /go/src/github.com/status-im/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/libsds.so /usr/local/lib/
 
+ENV LD_LIBRARY_PATH=/usr/local/lib/
+
 COPY _assets/scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 

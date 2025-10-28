@@ -21,13 +21,11 @@ in mkShell {
     go golangci-lint go-junit-report gopls codecov-cli go-generate-fast
     protobuf3_24 protoc-gen-go gotestsum openjdk openssl
     rustc cargo
-    gnused   # make sure sed is available
     nim
     lib-sds-pkg
   ];
 
   shellHook = ''
-    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.lib-sds-pkg ]}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     export USE_SYSTEM_NIM=1
     export CGO_CFLAGS="$CGO_CFLAGS $NIX_CFLAGS_COMPILE"
     export CGO_LDFLAGS="$CGO_LDFLAGS $NIX_LDFLAGS"

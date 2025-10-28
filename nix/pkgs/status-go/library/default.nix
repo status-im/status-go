@@ -8,24 +8,26 @@
 
 let
   optionalString = pkgs.lib.optionalString;
-in pkgs.buildGoModule {
+
+in
+pkgs.buildGoModule {
   pname = "status-go";
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
   vendorHash = null;
 
   inherit meta version;
 
-  nativeBuildInputs = let
-    # Fixes fatal: not a git repository (or any of the parent directories): .git
-    fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
-  in
+  nativeBuildInputs =
+    let
+      fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
+    in
     with pkgs; [
-      which
       mockgen
       protoc-gen-go
       protobuf3_24
       fakeGit
-  ];
+      llvmPackages.clang
+    ];
 
   phases = ["unpackPhase" "configurePhase" "patchPhase" "buildPhase"];
 
@@ -39,7 +41,6 @@ in pkgs.buildGoModule {
   # FIXME: Remove this when go 1.23 or later versions fix this madness.
   allowGoReference = true;
 
-  NIX_DEBUG = 1;
   patchPhase = ''
     mkdir -p vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build
     mkdir -p vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library
@@ -52,22 +53,15 @@ in pkgs.buildGoModule {
   preBuild = ''
     go run cmd/library/*.go > $NIX_BUILD_TOP/main.go
     make generate SHELL=$SHELL GO111MODULE=on GO_GENERATE_CMD='go generate'
+
+    export CGO_CFLAGS="-I${pkgs.lib-sds-pkg}/include"
+    export CGO_LDFLAGS="-L${pkgs.lib-sds-pkg}/lib -Wl,-rpath,${pkgs.lib-sds-pkg}/lib"
   '';
 
-  # Build the Go library
-  # ld flags and netgo tag are necessary for integration tests to work on MacOS
-  # https://github.com/status-im/status-mobile/issues/20135
   buildPhase = ''
-    # Set Go cache inside writable directory
-    export GOCACHE=$NIX_BUILD_TOP/.gocache
-    mkdir -p $GOCACHE
-
     # make sure Go modules build correctly
     export GOPATH=$NIX_BUILD_TOP/go
     export GO111MODULE=on
-
-    export CGO_CFLAGS="-I${pkgs.lib-sds-pkg}/include/"
-    export CGO_LDFLAGS="-L${pkgs.lib-sds-pkg}/lib/ -lsds -Wl,-rpath,${pkgs.lib-sds-pkg}/lib/"
 
     # Patch env.sh now that nim-sds exists
     echo "Patching env.sh to use Nix Nim..."
