@@ -523,7 +523,7 @@ func (s *ShareUrlsSuite) TestPrepareEncodedUserDataWithEmptyAccount() {
 	contact.DisplayName = ""
 	contact.Bio = ""
 
-	s.provider.EXPECT().GetContactByID(gomock.Any()).Return(contact).Times(0)
+	s.provider.EXPECT().GetContactByID(gomock.Any()).Return(contact, nil).Times(0)
 	s.provider.EXPECT().GetCommunityByID(gomock.Any()).Times(0)
 
 	userData, chatKey, err := s.service.prepareEncodedUserData(contact)
@@ -536,7 +536,7 @@ func (s *ShareUrlsSuite) TestPrepareEncodedUserDataWithEmptyAccount() {
 func (s *ShareUrlsSuite) TestShareAndParseUserURLWithData() {
 	contact := s.fakeContact()
 
-	s.provider.EXPECT().GetContactByID(contact.ID).Return(contact).Times(1)
+	s.provider.EXPECT().GetContactByID(contact.ID).Return(contact, nil).Times(1)
 	s.provider.EXPECT().GetCommunityByID(gomock.Any()).Times(0)
 
 	shortKey, err := multiformat.SerializeLegacyKey(contact.ID)
