@@ -2,10 +2,11 @@ package protocol
 
 import (
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func (m *Messenger) buildSyncContactMessage(contact *Contact) *protobuf.SyncInstallationContactV2 {
+func (m *Messenger) buildSyncContactMessage(contact *contacts.Contact) *protobuf.SyncInstallationContactV2 {
 	var ensName string
 	if contact.ENSVerified {
 		ensName = contact.EnsName
@@ -30,10 +31,10 @@ func (m *Messenger) buildSyncContactMessage(contact *Contact) *protobuf.SyncInst
 		EnsName:                   ensName,
 		CustomizationColor:        customizationColor,
 		LocalNickname:             contact.LocalNickname,
-		Added:                     contact.added(),
+		Added:                     contact.Added(),
 		Blocked:                   contact.Blocked,
 		Muted:                     muted,
-		HasAddedUs:                contact.hasAddedUs(),
+		HasAddedUs:                contact.HasAddedUs(),
 		Removed:                   contact.Removed,
 		ContactRequestLocalState:  int64(contact.ContactRequestLocalState),
 		ContactRequestRemoteState: int64(contact.ContactRequestRemoteState),

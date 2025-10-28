@@ -87,7 +87,7 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 	var err error
 	// only used in testing to simulate going offline
 	if w.cfg.SkipPublishToTopic {
-		logger.Info("skipping publish to topic")
+		logger.Debug("skipping publish to topic")
 		err = errors.New("test send failure")
 	} else {
 		err = w.messageSender.Send(publish.NewRequest(w.ctx, envelope))

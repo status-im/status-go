@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS wallet_connect_v1_sessions;

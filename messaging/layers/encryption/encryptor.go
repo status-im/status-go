@@ -2,7 +2,6 @@ package encryption
 
 import (
 	"crypto/ecdsa"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"sync"
@@ -43,7 +42,7 @@ type confirmationData struct {
 
 // encryptor defines a service that is responsible for the encryption aspect of the protocol.
 type encryptor struct {
-	persistence *sqlitePersistence
+	persistence Persistence
 	config      encryptorConfig
 	messageIDs  map[string]*confirmationData
 	mutex       sync.Mutex
@@ -84,9 +83,9 @@ func defaultEncryptorConfig(installationID string, logger *zap.Logger) encryptor
 }
 
 // newEncryptor creates a new EncryptionService instance.
-func newEncryptor(db *sql.DB, config encryptorConfig) *encryptor {
+func newEncryptor(persistence Persistence, config encryptorConfig) *encryptor {
 	return &encryptor{
-		persistence: newSQLitePersistence(db),
+		persistence: persistence,
 		config:      config,
 		messageIDs:  make(map[string]*confirmationData),
 		logger:      config.Logger.With(zap.Namespace("encryptor")),

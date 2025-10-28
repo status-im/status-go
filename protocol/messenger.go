@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -29,11 +30,13 @@ import (
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/newsfeed"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/protocol/contacts"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -43,11 +46,9 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
-	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -95,7 +96,6 @@ type Messenger struct {
 	identity                  *ecdsa.PrivateKey
 	signer                    communities.MessageSigner
 	messaging                 *messaging.API
-	messagingPersistence      *messagingPersistence
 	persistence               *sqlitePersistence
 	ensVerifier               *ens.Verifier
 	pushNotificationClient    *pushnotificationclient.Client
@@ -116,7 +116,7 @@ type Messenger struct {
 	shouldPublishContactCode   bool
 	systemMessagesTranslations *systemMessageTranslationsMap
 	allChats                   *chatMap
-	selfContact                *Contact
+	selfContact                *contacts.Contact
 	selfContactSubscriptions   []chan *SelfContactChangeEvent
 	allContacts                *contactMap
 	allInstallations           *installationMap
@@ -169,10 +169,6 @@ type Messenger struct {
 	// enables control over chat messages iteration
 	retrievedMessagesIteratorFactory func(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) MessagesIterator
 
-	peersyncing         *peersyncing.PeerSyncing
-	peersyncingOffers   map[string]uint64
-	peersyncingRequests map[string]uint64
-
 	newsFeedManager *newsfeed.NewsFeedManager
 }
 
@@ -202,7 +198,7 @@ func (m *Messenger) ResolvePrimaryName(mentionID string) (string, error) {
 	contact, ok := m.allContacts.Load(mentionID)
 	if !ok {
 		var err error
-		contact, err = buildContactFromPkString(mentionID)
+		contact, err = contacts.BuildContactFromPkString(mentionID)
 		if err != nil {
 			return mentionID, err
 		}
@@ -387,7 +383,7 @@ func NewMessenger(
 
 	savedAddressesManager := wallet.NewSavedAddressesManager(c.walletDb)
 
-	selfContact, err := buildSelfContact(identity, settings, c.multiAccount, c.account)
+	selfContact, err := contacts.BuildSelfContact(identity, settings, c.multiAccount, c.account)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build contact of ourself: %w", err)
 	}
@@ -397,7 +393,6 @@ func NewMessenger(
 		config:                     &c,
 		identity:                   identity,
 		messaging:                  messaging,
-		messagingPersistence:       NewMessagingPersistence(database),
 		persistence:                sqlitePersistence,
 		communityTokensService:     c.communityTokensService,
 		pushNotificationClient:     pushNotificationClient,
@@ -422,9 +417,6 @@ func NewMessenger(
 		database:              database,
 		multiAccounts:         c.multiAccount,
 		settings:              settings,
-		peersyncing:           peersyncing.New(peersyncing.Config{Database: database, Timesource: messaging}),
-		peersyncingOffers:     make(map[string]uint64),
-		peersyncingRequests:   make(map[string]uint64),
 		verificationDatabase:  verification.NewPersistence(database),
 		mailserversDatabase:   c.mailserversDatabase,
 		account:               c.account,
@@ -601,7 +593,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 			return nil, err
 		}
 	}
-	m.startPeerSyncingLoop()
 	m.startSyncSettingsLoop()
 	m.startSettingsChangesLoop()
 	m.startCommunityRekeyLoop()
@@ -1205,7 +1196,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 // handleInstallations adds the installations in the installations map
 func (m *Messenger) handleInstallations(installations []*messagingtypes.Installation) {
 	for _, installation := range installations {
-		if installation.Identity == contactIDFromPublicKey(&m.identity.PublicKey) {
+		if installation.Identity == contacts.ContactIDFromPublicKey(&m.identity.PublicKey) {
 			if _, ok := m.allInstallations.Load(installation.ID); !ok {
 				m.allInstallations.Store(installation.ID, installation)
 				m.modifiedInstallations.Store(installation.ID, true)
@@ -1245,7 +1236,7 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *messagingt
 }
 
 func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
-	var contacts []*Contact
+	var contacts []*contacts.Contact
 	for _, record := range records {
 		m.logger.Info("handling record", zap.Any("record", record))
 		contact, ok := m.allContacts.Load(record.PublicKey)
@@ -2057,37 +2048,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			return err
 		}
 
-		var syncMessageType peersyncing.SyncMessageType
-		if chat.OneToOne() {
-			syncMessageType = peersyncing.SyncMessageOneToOneType
-		} else if chat.CommunityChat() {
-			syncMessageType = peersyncing.SyncMessageCommunityType
-		} else if chat.PrivateGroupChat() {
-			syncMessageType = peersyncing.SyncMessagePrivateGroup
-		}
-
-		wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender)
-		if err != nil {
-			return errors.Wrap(err, "failed to wrap message")
-		}
-
-		syncMessage := peersyncing.SyncMessage{
-			Type:      syncMessageType,
-			ID:        types.Hex2Bytes(rawMessage.ID),
-			ChatID:    []byte(chat.ID),
-			Payload:   wrappedMessage,
-			Timestamp: m.getTimesource().GetCurrentTime() / 1000,
-		}
-
-		// If the chat type is not supported, skip saving it
-		if syncMessageType == 0 {
-			return nil
-		}
-
 		// ensure that the message is saved only once
 		rawMessage.BeforeDispatch = nil
 
-		return m.peersyncing.Add(syncMessage)
+		return m.persistence.SaveMessages([]*common.Message{message})
 	}
 
 	rawMessage, err = m.dispatchMessage(ctx, rawMessage)
@@ -2336,7 +2300,7 @@ func (m *Messenger) syncChatRemoving(ctx context.Context, id string, rawMessageH
 }
 
 // syncContact sync as contact with paired devices
-func (m *Messenger) syncContact(ctx context.Context, contact *Contact, rawMessageHandler RawMessageHandler) error {
+func (m *Messenger) syncContact(ctx context.Context, contact *contacts.Contact, rawMessageHandler RawMessageHandler) error {
 	var err error
 	if contact.IsSyncing {
 		return nil
@@ -2728,7 +2692,7 @@ type CurrentMessageState struct {
 	// WhisperTimestamp is the whisper timestamp of the message
 	WhisperTimestamp uint64
 	// Contact is the contact associated with the author of the message
-	Contact *Contact
+	Contact *contacts.Contact
 	// PublicKey is the public key of the author of the message
 	PublicKey *ecdsa.PublicKey
 
@@ -2777,7 +2741,7 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 	if err != nil {
 		return err
 	}
-	contactID := contactIDFromPublicKey(pubKey)
+	contactID := contacts.ContactIDFromPublicKey(pubKey)
 
 	chat, ok := r.AllChats.Load(m.LocalChatID)
 	if !ok {
@@ -2986,7 +2950,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.C
 				logger.Debug("processing message")
 
 				publicKey := msg.SigPubKey()
-				senderID := contactIDFromPublicKey(publicKey)
+				senderID := contacts.ContactIDFromPublicKey(publicKey)
 
 				if len(msg.EncryptionLayer.HashRatchetInfo) != 0 {
 					err := m.communitiesManager.NewHashRatchetKeys(msg.EncryptionLayer.HashRatchetInfo)
@@ -3006,11 +2970,11 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.C
 					continue
 				}
 
-				var contact *Contact
+				var contact *contacts.Contact
 				if c, ok := messageState.AllContacts.Load(senderID); ok {
 					contact = c
 				} else {
-					c, err := buildContact(senderID, publicKey)
+					c, err := contacts.BuildContact(senderID, publicKey)
 					if err != nil {
 						logger.Info("failed to build contact", zap.Error(err))
 						continue
@@ -3166,10 +3130,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 				Messages:   statusMessages,
 			})
 
-			err = m.handleDatasyncMetadata(handleMessagesResponse)
-			if err != nil {
-				m.logger.Warn("failed to handle datasync metadata", zap.Error(err))
-			}
+			m.markDeliveredMessages(handleMessagesResponse.AckedMessageIDs)
 
 			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
 
@@ -3179,14 +3140,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 				publicKey := msg.SigPubKey()
 
 				m.handleInstallations(msg.EncryptionLayer.Installations)
-				err := m.messaging.HandleSharedSecrets(msg.EncryptionLayer.SharedSecrets)
-				if err != nil {
-					// log and continue, non-critical error
-					logger.Warn("failed to handle shared secrets")
-				}
 
-				senderID := contactIDFromPublicKey(publicKey)
-				ownID := contactIDFromPublicKey(m.IdentityPublicKey())
+				senderID := contacts.ContactIDFromPublicKey(publicKey)
+				ownID := contacts.ContactIDFromPublicKey(m.IdentityPublicKey())
 				logger.Info("processing message", zap.Any("type", msg.ApplicationLayer.Type), zap.String("senderID", senderID))
 
 				if senderID == ownID {
@@ -3215,7 +3171,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 				}
 
 				if !contactFound {
-					c, err := buildContact(senderID, publicKey)
+					c, err := contacts.BuildContact(senderID, publicKey)
 					if err != nil {
 						logger.Info("failed to build contact", zap.Error(err))
 						allMessagesProcessed = false
@@ -3275,6 +3231,33 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 	return m.saveDataAndPrepareResponse(messageState)
 }
 
+func (m *Messenger) markDeliveredMessages(acks []cryptotypes.HexBytes) {
+	for _, ack := range acks {
+		messageID := ack.String()
+		m.logger.Debug("got datasync acknowledge for message", zap.String("ack", hex.EncodeToString(ack)), zap.String("messageID", messageID))
+
+		err := m.UpdateMessageOutgoingStatus(messageID, common.OutgoingStatusDelivered)
+		if err != nil {
+			m.logger.Debug("Can't set message status as delivered", zap.Error(err))
+		}
+
+		err = m.UpdateRawMessageSent(messageID, true)
+		if err != nil {
+			m.logger.Debug("can't set raw message as sent", zap.Error(err))
+		}
+
+		//send signal to client that message status updated
+		if m.config.messengerSignalsHandler != nil {
+			message, err := m.persistence.MessageByID(messageID)
+			if err != nil {
+				m.logger.Debug("Can't get message from database", zap.Error(err))
+				continue
+			}
+			m.config.messengerSignalsHandler.MessageDelivered(message.LocalChatID, messageID)
+		}
+	}
+}
+
 func (m *Messenger) deleteNotification(response *MessengerResponse, installationID string) error {
 	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(installationID))
 	if err != nil {
@@ -3303,7 +3286,7 @@ func (m *Messenger) deleteNotification(response *MessengerResponse, installation
 
 func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageState) (*MessengerResponse, error) {
 	var err error
-	var contactsToSave []*Contact
+	var contactsToSave []*contacts.Contact
 	messageState.ModifiedContacts.Range(func(id string, value bool) (shouldContinue bool) {
 		contact, ok := messageState.AllContacts.Load(id)
 		if ok {
@@ -3544,9 +3527,9 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 	var nextCursor string
 
 	if chat.Timeline() {
-		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
-		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-			if contact.added() {
+		var chatIDs = []string{"@" + contacts.ContactIDFromPublicKey(&m.identity.PublicKey)}
+		m.allContacts.Range(func(contactID string, contact *contacts.Contact) (shouldContinue bool) {
+			if contact.Added() {
 				chatIDs = append(chatIDs, "@"+contact.ID)
 			}
 			return true
@@ -4074,7 +4057,7 @@ func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
 		}
 	}
 
-	var contact *Contact
+	var contact *contacts.Contact
 	if chat.OneToOne() {
 		contact, _ = m.allContacts.Load(request.ChatID)
 	}
@@ -4115,7 +4098,7 @@ func (m *Messenger) MuteChatV2(muteParams *requests.MuteChat) (time.Time, error)
 	return m.MuteChat(muteParams)
 }
 
-func (m *Messenger) muteChat(chat *Chat, contact *Contact, mutedTill time.Time) (time.Time, error) {
+func (m *Messenger) muteChat(chat *Chat, contact *contacts.Contact, mutedTill time.Time) (time.Time, error) {
 	err := m.persistence.MuteChat(chat.ID, mutedTill)
 	if err != nil {
 		return time.Time{}, err
@@ -4152,7 +4135,7 @@ func (m *Messenger) UnmuteChat(chatID string) error {
 		return ErrChatNotFoundError
 	}
 
-	var contact *Contact
+	var contact *contacts.Contact
 	if chat.OneToOne() {
 		contact, _ = m.allContacts.Load(chatID)
 	}
@@ -4160,7 +4143,7 @@ func (m *Messenger) UnmuteChat(chatID string) error {
 	return m.unmuteChat(chat, contact)
 }
 
-func (m *Messenger) unmuteChat(chat *Chat, contact *Contact) error {
+func (m *Messenger) unmuteChat(chat *Chat, contact *contacts.Contact) error {
 	err := m.persistence.UnmuteChat(chat.ID)
 	if err != nil {
 		return err
@@ -4288,8 +4271,8 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 	var publicChatIDs []string
 	var blockedChatIDs []string
 
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.added() && !contact.Blocked {
+	m.allContacts.Range(func(contactID string, contact *contacts.Contact) (shouldContinue bool) {
+		if contact.Added() && !contact.Blocked {
 			pk, err := contact.PublicKey()
 			if err != nil {
 				m.logger.Warn("could not parse contact public key")
@@ -4472,7 +4455,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message messagingtypes.ChatEnti
 	return encodedMessage, nil
 }
 
-func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*Contact, error) {
+func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*contacts.Contact, error) {
 	if c, ok := m.allContacts.Load(msg.From); ok {
 		return c, nil
 	}
@@ -4481,8 +4464,8 @@ func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*Contact,
 	if err != nil {
 		return nil, err
 	}
-	senderID := contactIDFromPublicKey(senderPubKey)
-	c, err := buildContact(senderID, senderPubKey)
+	senderID := contacts.ContactIDFromPublicKey(senderPubKey)
+	c, err := contacts.BuildContact(senderID, senderPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -4536,7 +4519,7 @@ func (m *Messenger) HandleSyncVerificationRequest(state *ReceivedMessageState, m
 			return nil
 		}
 
-		contact.VerificationStatus = VerificationStatus(message.VerificationStatus)
+		contact.VerificationStatus = contacts.VerificationStatus(message.VerificationStatus)
 		if err := m.persistence.SaveContact(contact, nil); err != nil {
 			return err
 		}

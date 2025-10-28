@@ -3,15 +3,14 @@ package encryption
 import (
 	"testing"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/helpers"
-
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
+	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestProtocolServiceTestSuite(t *testing.T) {
@@ -30,22 +29,30 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 
 	s.logger = tt.MustCreateTestLogger()
 
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     migrations.AssetNames(),
+			AssetFunc: migrations.Asset,
+		},
+	}))
 	s.Require().NoError(err)
-	err = sqlite.Migrate(db)
-	s.Require().NoError(err)
+
 	s.alice = New(
-		db,
+		NewSQLitePersistence(db),
 		"1",
 		s.logger.With(zap.String("user", "alice")),
 	)
 
-	db, err = helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err = helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     migrations.AssetNames(),
+			AssetFunc: migrations.Asset,
+		},
+	}))
 	s.Require().NoError(err)
-	err = sqlite.Migrate(db)
-	s.Require().NoError(err)
+
 	s.bob = New(
-		db,
+		NewSQLitePersistence(db),
 		"2",
 		s.logger.With(zap.String("user", "bob")),
 	)

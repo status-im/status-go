@@ -163,14 +163,13 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 	messaging, err := messaging.NewCore(
 		messaging.CoreParams{
 			Identity:       params.Identity,
-			DB:             params.AppDB,
-			Persistence:    protocol.NewMessagingPersistence(params.AppDB),
 			NodeKey:        nodeKey,
 			WakuConfig:     s.config.WakuV2Config,
 			ClusterConfig:  s.config.ClusterConfig,
 			InstallationID: s.config.ShhextConfig.InstallationID,
 			TimeSource:     params.TimeSource,
 		},
+		messaging.WithSQLitePersistence(params.AppDB),
 		messaging.WithLogger(s.logger),
 		messaging.WithEnvelopeEventsConfig(envelopeEventsConfig),
 		messaging.WithHistoricMessagesRequestFailedHandler(signal.SendHistoricMessagesRequestFailed),

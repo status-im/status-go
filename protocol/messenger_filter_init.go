@@ -297,7 +297,7 @@ func (m *Messenger) processContacts(wg *sync.WaitGroup, publicKeysCh chan<- []*e
 		}
 		m.allContacts.Store(contact.ID, contacts[idx])
 		// We only need filters for contacts added by us and not blocked.
-		if !contact.added() || contact.Blocked {
+		if !contact.Added() || contact.Blocked {
 			continue
 		}
 

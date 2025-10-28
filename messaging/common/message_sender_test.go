@@ -6,22 +6,25 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
+	mvdsnode "github.com/status-im/mvds/node"
+	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
+	mvdsproto "github.com/status-im/mvds/protobuf"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	datasyncproto "github.com/status-im/mvds/protobuf"
-
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/messaging/adapters"
-	"github.com/status-im/status-go/messaging/datasync"
+	messagesendermigrations "github.com/status-im/status-go/messaging/common/migrations"
 	"github.com/status-im/status-go/messaging/layers/encryption"
+	encryptionmigrations "github.com/status-im/status-go/messaging/layers/encryption/migrations"
+	"github.com/status-im/status-go/messaging/layers/segmentation"
+	segmentationmigrations "github.com/status-im/status-go/messaging/layers/segmentation/migrations"
 	"github.com/status-im/status-go/messaging/layers/transport"
+	transportmigrations "github.com/status-im/status-go/messaging/layers/transport/migrations"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/sqlite"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/t/helpers"
 )
@@ -56,13 +59,31 @@ func (s *MessageSenderSuite) SetupTest() {
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	database, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     transportmigrations.AssetNames(),
+			AssetFunc: transportmigrations.Asset,
+		},
+		{
+			Names:     segmentationmigrations.AssetNames(),
+			AssetFunc: segmentationmigrations.Asset,
+		},
+		{
+			Names:     encryptionmigrations.AssetNames(),
+			AssetFunc: encryptionmigrations.Asset,
+		},
+		{
+			Names:     messagesendermigrations.AssetNames(),
+			AssetFunc: messagesendermigrations.Asset,
+		},
+	}))
 	s.Require().NoError(err)
-	err = sqlite.Migrate(database)
+
+	err = mvdsmigrations.Migrate(db)
 	s.Require().NoError(err)
 
 	encryptionProtocol := encryption.New(
-		database,
+		encryption.NewSQLitePersistence(db),
 		"installation-1",
 		s.logger,
 	)
@@ -80,13 +101,11 @@ func (s *MessageSenderSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
 
-	stubPersistence := NewStubPersistence()
-
 	transport, err := transport.NewTransport(
 		shh,
 		identity,
-		&adapters.KeysPersistence{P: stubPersistence},
-		&adapters.ProcessedMessageIDsCache{P: stubPersistence},
+		transport.NewSQLiteKeysPersistence(db),
+		transport.NewSQLiteProcessedMessageIDsCachePersistence(db),
 		&transport.EnvelopesMonitorConfig{},
 		s.logger,
 	)
@@ -94,8 +113,9 @@ func (s *MessageSenderSuite) SetupTest() {
 
 	s.sender, err = NewMessageSender(
 		identity,
-		database,
-		stubPersistence,
+		NewSQLiteMessageSenderPersistence(db),
+		mvdsnode.NewSQLitePersistence(db),
+		segmentation.NewSQLitePersistence(db),
 		transport,
 		encryptionProtocol,
 		s.logger,
@@ -148,11 +168,8 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	ds := datasync.New(nil, nil, false, s.sender.logger)
-	s.sender.datasync = ds
-
-	dataSyncMessage := datasyncproto.Payload{
-		Messages: []*datasyncproto.Message{
+	dataSyncMessage := mvdsproto.Payload{
+		Messages: []*mvdsproto.Message{
 			{Body: wrappedPayload},
 		},
 	}
@@ -161,6 +178,9 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	message := &messagingtypes.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = marshalledDataSyncMessage
+
+	err = s.sender.StartReliability()
+	s.Require().NoError(err)
 
 	response, err := s.sender.HandleMessages(message)
 	s.Require().NoError(err)
@@ -187,8 +207,8 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	dataSyncMessage := datasyncproto.Payload{
-		Messages: []*datasyncproto.Message{
+	dataSyncMessage := mvdsproto.Payload{
+		Messages: []*mvdsproto.Message{
 			{Body: wrappedPayload},
 		},
 	}
@@ -196,13 +216,16 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	s.Require().NoError(err)
 
 	// Create sender encryption protocol.
-	senderDatabase, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-	err = sqlite.Migrate(senderDatabase)
+	senderDatabase, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     encryptionmigrations.AssetNames(),
+			AssetFunc: encryptionmigrations.Asset,
+		},
+	}))
 	s.Require().NoError(err)
 
 	senderEncryptionProtocol := encryption.New(
-		senderDatabase,
+		encryption.NewSQLitePersistence(senderDatabase),
 		"installation-2",
 		s.logger,
 	)
@@ -221,8 +244,8 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = encryptedPayload
 
-	ds := datasync.New(nil, nil, false, s.sender.logger)
-	s.sender.datasync = ds
+	err = s.sender.StartReliability()
+	s.Require().NoError(err)
 
 	response, err := s.sender.HandleMessages(message)
 	s.Require().NoError(err)
@@ -246,13 +269,16 @@ func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
 	s.Require().NoError(err)
 
 	// Create sender encryption protocol.
-	senderDatabase, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-	err = sqlite.Migrate(senderDatabase)
+	senderDatabase, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     encryptionmigrations.AssetNames(),
+			AssetFunc: encryptionmigrations.Asset,
+		},
+	}))
 	s.Require().NoError(err)
 
 	senderEncryptionProtocol := encryption.New(
-		senderDatabase,
+		encryption.NewSQLitePersistence(senderDatabase),
 		"installation-2",
 		s.logger,
 	)
@@ -329,7 +355,7 @@ func (s *MessageSenderSuite) TestHandleSegmentMessages() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	segmentedMessages, err := segmentMessage(&wakutypes.NewMessage{Payload: wrappedPayload}, int(math.Ceil(float64(len(wrappedPayload))/2)))
+	segmentedMessages, err := s.sender.segmentMessageWithSize(&wakutypes.NewMessage{Payload: wrappedPayload}, int(math.Ceil(float64(len(wrappedPayload))/2)))
 	s.Require().NoError(err)
 	s.Require().Len(segmentedMessages, 2)
 
@@ -356,7 +382,7 @@ func (s *MessageSenderSuite) TestHandleSegmentMessages() {
 
 	// Receiving another segment after the message has been reassembled is considered an error
 	_, err = s.sender.HandleMessages(message)
-	s.Require().ErrorIs(err, ErrMessageSegmentsAlreadyCompleted)
+	s.Require().ErrorIs(err, segmentation.ErrAlreadyCompleted)
 }
 
 func (s *MessageSenderSuite) TestGetEphemeralKey() {

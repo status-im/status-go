@@ -3,7 +3,6 @@ package messaging
 import (
 	"context"
 	"crypto/ecdsa"
-	"database/sql"
 	"sync"
 	"time"
 
@@ -12,20 +11,14 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	datasyncnode "github.com/status-im/mvds/node"
-	datasyncproto "github.com/status-im/mvds/protobuf"
-	"github.com/status-im/mvds/state"
-
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
-	datasyncpeer "github.com/status-im/status-go/messaging/datasync/peer"
 	"github.com/status-im/status-go/messaging/events"
 	"github.com/status-im/status-go/messaging/layers/encryption"
-	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
@@ -43,8 +36,6 @@ var (
 type Core struct {
 	config
 
-	persistence types.Persistence
-
 	identity  *ecdsa.PrivateKey
 	waku      wakutypes.Waku
 	transport *transport.Transport
@@ -54,8 +45,7 @@ type Core struct {
 	wg   sync.WaitGroup
 	quit chan struct{}
 
-	connectionState       connection.State
-	mvdsStatusChangeEvent chan datasyncnode.PeerStatusChangeEvent
+	connectionState connection.State
 
 	publisher *pubsub.Publisher
 
@@ -65,9 +55,6 @@ type Core struct {
 type CoreParams struct {
 	Identity       *ecdsa.PrivateKey
 	InstallationID string
-
-	DB          *sql.DB // FIXME: This should be removed once the database is not needed in the sender
-	Persistence types.Persistence
 
 	NodeKey       *ecdsa.PrivateKey
 	WakuConfig    params.WakuV2Config
@@ -80,8 +67,8 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	transport, err := transport.NewTransport(
 		waku,
 		params.Identity,
-		&adapters.KeysPersistence{P: params.Persistence},
-		&adapters.ProcessedMessageIDsCache{P: params.Persistence},
+		config.persistence.TransportStorage().KeysStorage(),
+		config.persistence.TransportStorage().ProcessedMessageIDsCacheStorage(),
 		config.envelopesMonitorConfig,
 		config.logger,
 	)
@@ -90,15 +77,16 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	}
 
 	encryptor := encryption.New(
-		params.DB,
+		config.persistence.EncryptionStorage(),
 		params.InstallationID,
 		config.logger,
 	)
 
 	sender, err := common.NewMessageSender(
 		params.Identity,
-		params.DB,
-		params.Persistence,
+		config.persistence.MessageSenderStorage(),
+		config.persistence.MVDSStorage(),
+		config.persistence.SegmentationStorage(),
 		transport,
 		encryptor,
 		config.logger,
@@ -108,24 +96,26 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	}
 
 	return &Core{
-		config:                *config,
-		persistence:           params.Persistence,
-		identity:              params.Identity,
-		waku:                  waku,
-		transport:             transport,
-		sender:                sender,
-		encryptor:             encryptor,
-		quit:                  make(chan struct{}),
-		mvdsStatusChangeEvent: make(chan datasyncnode.PeerStatusChangeEvent, 5),
-		publisher:             pubsub.NewPublisher(),
+		config:    *config,
+		identity:  params.Identity,
+		waku:      waku,
+		transport: transport,
+		sender:    sender,
+		encryptor: encryptor,
+		quit:      make(chan struct{}),
+		publisher: pubsub.NewPublisher(),
 	}, nil
 }
 
 func NewCore(params CoreParams, options ...Options) (*Core, error) {
 	config := newConfig(options...)
 
+	if config.persistence == nil {
+		return nil, errors.New("persistence is not configured")
+	}
+
 	waku, err := newWaku(wakuParams{
-		persistence:                     params.Persistence,
+		persistence:                     config.persistence.WakuStorage(),
 		identity:                        params.Identity,
 		nodeKey:                         params.NodeKey,
 		wakuConfig:                      params.WakuConfig,
@@ -165,11 +155,7 @@ func (c *Core) start() error {
 		}
 	}
 
-	// set shared secret handles
-	c.sender.SetHandleSharedSecrets(func(s []*sharedsecret.Secret) error {
-		return c.API().HandleSharedSecrets(adapters.FromEncryptionSharedSecrets(s))
-	})
-	err = c.sender.StartDatasync(c.mvdsStatusChangeEvent, c.sendDataSync)
+	err = c.sender.StartReliability()
 	if err != nil {
 		return err
 	}
@@ -180,7 +166,7 @@ func (c *Core) start() error {
 	}
 
 	// handle stored shared secrets
-	err = c.API().HandleSharedSecrets(adapters.FromEncryptionSharedSecrets(subscriptions.SharedSecrets))
+	err = c.sender.HandleSharedSecrets(subscriptions.SharedSecrets)
 	if err != nil {
 		return err
 	}
@@ -256,86 +242,18 @@ func (c *Core) stop() error {
 	return nil
 }
 
-func (c *Core) sendDataSync(receiver state.PeerID, payload *datasyncproto.Payload) error {
-	ctx := context.Background()
-	if !payload.IsValid() {
-		c.logger.Error("payload is invalid")
-		return errors.New("payload is invalid")
-	}
-
-	marshalledPayload, err := proto.Marshal(payload)
-	if err != nil {
-		c.logger.Error("failed to marshal payload")
-		return err
-	}
-
-	publicKey, err := datasyncpeer.IDToPublicKey(receiver)
-	if err != nil {
-		c.logger.Error("failed to convert id to public key", zap.Error(err))
-		return err
-	}
-
-	// Calculate the messageIDs
-	messageIDs := make([][]byte, 0, len(payload.Messages))
-	hexMessageIDs := make([]string, 0, len(payload.Messages))
-	for _, payload := range payload.Messages {
-		mid := types.MessageID(&c.identity.PublicKey, payload.Body)
-		messageIDs = append(messageIDs, mid)
-		hexMessageIDs = append(hexMessageIDs, mid.String())
-	}
-
-	messageSpec, err := c.encryptor.BuildEncryptedMessage(c.identity, publicKey, marshalledPayload)
-	if err != nil {
-		return errors.Wrap(err, "failed to encrypt message")
-	}
-
-	// The shared secret needs to be handle before we send a message
-	// otherwise the topic might not be set up before we receive a message
-	err = c.API().HandleSharedSecrets([]*types.SharedSecret{adapters.FromEncryptionSharedSecret(messageSpec.SharedSecret)})
-	if err != nil {
-		return err
-	}
-
-	hashes, newMessages, err := c.sender.SendMessageSpec(ctx, publicKey, messageSpec, messageIDs)
-	if err != nil {
-		c.logger.Error("failed to send a datasync message", zap.Error(err))
-		return err
-	}
-
-	c.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)))
-	c.transport.TrackMany(messageIDs, hashes, newMessages)
-
-	pubsub.Publish(c.publisher, events.DatasyncMessagesSentEvent{
-		Messages: newMessages,
-	})
-
-	return nil
-}
-
 func (c *Core) connectionChanged(state connection.State) {
 	c.transport.ConnectionChanged(state)
 
 	if !c.connectionState.Offline && state.Offline {
-		c.sender.StopDatasync()
+		c.sender.StopReliability()
 	}
 
 	if c.connectionState.Offline && !state.Offline {
-		err := c.sender.StartDatasync(c.mvdsStatusChangeEvent, c.sendDataSync)
+		err := c.sender.StartReliability()
 		if err != nil {
 			c.logger.Error("failed to start datasync", zap.Error(err))
 		}
-	}
-}
-
-func (c *Core) resetDatasyncForPeer(publicKey *ecdsa.PublicKey, eventTime uint64) {
-	select {
-	case c.mvdsStatusChangeEvent <- datasyncnode.PeerStatusChangeEvent{
-		PeerID:    datasyncpeer.PublicKeyToPeerID(*publicKey),
-		Status:    datasyncnode.OnlineStatus,
-		EventTime: eventTime,
-	}:
-	default:
-		c.logger.Debug("mvdsStatusChangeEvent channel is full")
 	}
 }
 
@@ -369,7 +287,7 @@ func (c *Core) startCleanupLoop(name string, cleanupFunc func() error) {
 }
 
 type wakuParams struct {
-	persistence types.Persistence
+	persistence wakuv2.ProtectedTopicsPersistence
 
 	identity *ecdsa.PrivateKey
 	nodeKey  *ecdsa.PrivateKey
@@ -425,7 +343,7 @@ func newWaku(params wakuParams) (*wakuv2.Waku, error) {
 		params.nodeKey,
 		cfg,
 		params.logger,
-		&adapters.WakuProtectedTopics{P: params.persistence},
+		params.persistence,
 		params.timeSource,
 		params.onHistoricMessagesRequestFailed,
 		params.onPeerStats,
@@ -478,9 +396,6 @@ func (c *Core) startWakuMetrics() error {
 		sentMessagesSub, unsubSentMessages := pubsub.Subscribe[events.MessageEvent](c.publisher, 100)
 		defer unsubSentMessages()
 
-		sentDatasyncSub, unsubSentDatasync := pubsub.Subscribe[events.DatasyncMessagesSentEvent](c.publisher, 100)
-		defer unsubSentDatasync()
-
 		for {
 			select {
 			case sub := <-sentMessagesSub:
@@ -494,16 +409,6 @@ func (c *Core) startWakuMetrics() error {
 					msg.MessageType.String(),
 					uint32(len(msg.Payload)),
 				)
-
-			case sub := <-sentDatasyncSub:
-				for _, msg := range sub.Messages {
-					c.wakumetrics.PushRawMessageByType(
-						msg.PubsubTopic,
-						msg.Topic.String(),
-						"DATASYNC",
-						uint32(len(msg.Payload)),
-					)
-				}
 
 			case <-c.quit:
 				return

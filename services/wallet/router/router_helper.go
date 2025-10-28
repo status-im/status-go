@@ -187,16 +187,15 @@ func (r *Router) applyCustomFields(ctx context.Context, path *routes.Path, fetch
 // setSuggestedFields sets suggested fee fields
 func (r *Router) setSuggestedFields(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees, usedNonces map[uint64]uint64, eipP1559EnabledChain bool) error {
 	if !eipP1559EnabledChain {
-		path.SuggestedNonEIP1559Fees = fetchedFees.NonEIP1559Fees
-	} else {
-		path.SuggestedLevelsForMaxFeesPerGas = fetchedFees.MaxFeesLevels
-		if fetchedFees.MaxPriorityFeeSuggestedBounds != nil {
-			if fetchedFees.MaxPriorityFeeSuggestedBounds.Lower != nil {
-				path.SuggestedMinPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeeSuggestedBounds.Lower)
-			}
-			if fetchedFees.MaxPriorityFeeSuggestedBounds.Upper != nil {
-				path.SuggestedMaxPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeeSuggestedBounds.Upper)
-			}
+		return fees.ErrEIP1559IncompaibleChain
+	}
+	path.SuggestedLevelsForMaxFeesPerGas = fetchedFees.MaxFeesLevels
+	if fetchedFees.MaxPriorityFeeSuggestedBounds != nil {
+		if fetchedFees.MaxPriorityFeeSuggestedBounds.Lower != nil {
+			path.SuggestedMinPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeeSuggestedBounds.Lower)
+		}
+		if fetchedFees.MaxPriorityFeeSuggestedBounds.Upper != nil {
+			path.SuggestedMaxPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeeSuggestedBounds.Upper)
 		}
 	}
 
@@ -220,23 +219,9 @@ func (r *Router) setPathFields(path *routes.Path, fetchedFees *fees.SuggestedFee
 // applyDefaultFeeModes applies default fee modes to the path
 func (r *Router) applyDefaultFeeModes(path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool) error {
 	if !eipP1559EnabledChain {
-		return r.applyDefaultNonEIP1559Fees(path, fetchedFees)
+		return fees.ErrEIP1559IncompaibleChain
 	}
 	return r.applyDefaultEIP1559Fees(path, fetchedFees)
-}
-
-// applyDefaultNonEIP1559Fees applies default non-EIP1559 fees
-func (r *Router) applyDefaultNonEIP1559Fees(path *routes.Path, fetchedFees *fees.SuggestedFees) error {
-	if path.ApprovalRequired {
-		path.ApprovalGasFeeMode = r.lastInputParams.GasFeeMode
-		path.ApprovalGasPrice = fetchedFees.NonEIP1559Fees.GasPrice
-		path.ApprovalEstimatedTime = fetchedFees.NonEIP1559Fees.EstimatedTime
-	}
-
-	path.TxGasFeeMode = r.lastInputParams.GasFeeMode
-	path.TxGasPrice = fetchedFees.NonEIP1559Fees.GasPrice
-	path.TxEstimatedTime = fetchedFees.NonEIP1559Fees.EstimatedTime
-	return nil
 }
 
 // applyDefaultEIP1559Fees applies default EIP1559 fees
@@ -291,9 +276,7 @@ func (r *Router) applyCustomApprovalFees(ctx context.Context, path *routes.Path,
 // applyNonCustomApprovalFees applies non-custom fees for approval transaction
 func (r *Router) applyNonCustomApprovalFees(path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool, params *requests.PathTxCustomParams) error {
 	if !eipP1559EnabledChain {
-		path.ApprovalGasPrice = fetchedFees.NonEIP1559Fees.GasPrice
-		path.ApprovalEstimatedTime = fetchedFees.NonEIP1559Fees.EstimatedTime
-		return nil
+		return fees.ErrEIP1559IncompaibleChain
 	}
 
 	maxFeesPerGas, priorityFee, estimatedTime, err := fetchedFees.FeeFor(params.GasFeeMode)
@@ -310,19 +293,21 @@ func (r *Router) applyNonCustomApprovalFees(path *routes.Path, fetchedFees *fees
 
 // applyCustomApprovalFeeMode applies custom fee mode for approval transaction
 func (r *Router) applyCustomApprovalFeeMode(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool, params *requests.PathTxCustomParams) error {
+	if !eipP1559EnabledChain {
+		return fees.ErrEIP1559IncompaibleChain
+	}
+
 	path.ApprovalTxNonce = (*hexutil.Uint64)(&params.Nonce)
 	path.ApprovalGasAmount = params.GasAmount
-
-	if !eipP1559EnabledChain {
-		path.ApprovalGasPrice = params.GasPrice
-		path.ApprovalEstimatedTime = r.feesManager.TransactionEstimatedTimeV2Legacy(ctx, path.FromChain.ChainID, path.ApprovalGasPrice.ToInt())
-		return nil
-	}
 
 	path.ApprovalMaxFeesPerGas = params.MaxFeesPerGas
 	path.ApprovalBaseFee = (*hexutil.Big)(new(big.Int).Sub(params.MaxFeesPerGas.ToInt(), params.PriorityFee.ToInt()))
 	path.ApprovalPriorityFee = params.PriorityFee
-	path.ApprovalEstimatedTime = r.feesManager.TransactionEstimatedTimeV2(ctx, path.FromChain.ChainID, path.ApprovalMaxFeesPerGas.ToInt(), path.ApprovalPriorityFee.ToInt())
+	estimatedTime, err := r.feesManager.EstimatedTime(ctx, path.FromChain.ChainID, path.ApprovalMaxFeesPerGas.ToInt(), path.ApprovalPriorityFee.ToInt())
+	if err != nil {
+		return err
+	}
+	path.ApprovalEstimatedTime = estimatedTime
 	return nil
 }
 
@@ -344,9 +329,7 @@ func (r *Router) applyCustomTxFees(ctx context.Context, path *routes.Path, fetch
 // applyNonCustomTxFees applies non-custom fees for main transaction
 func (r *Router) applyNonCustomTxFees(path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool, params *requests.PathTxCustomParams) error {
 	if !eipP1559EnabledChain {
-		path.TxGasPrice = fetchedFees.NonEIP1559Fees.GasPrice
-		path.TxEstimatedTime = fetchedFees.NonEIP1559Fees.EstimatedTime
-		return nil
+		return fees.ErrEIP1559IncompaibleChain
 	}
 
 	maxFeesPerGas, priorityFee, estimatedTime, err := fetchedFees.FeeFor(params.GasFeeMode)
@@ -363,19 +346,21 @@ func (r *Router) applyNonCustomTxFees(path *routes.Path, fetchedFees *fees.Sugge
 
 // applyCustomTxFeeMode applies custom fee mode for main transaction
 func (r *Router) applyCustomTxFeeMode(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees, eipP1559EnabledChain bool, params *requests.PathTxCustomParams) error {
+	if !eipP1559EnabledChain {
+		return fees.ErrEIP1559IncompaibleChain
+	}
+
 	path.TxNonce = (*hexutil.Uint64)(&params.Nonce)
 	path.TxGasAmount = params.GasAmount
-
-	if !eipP1559EnabledChain {
-		path.TxGasPrice = params.GasPrice
-		path.TxEstimatedTime = r.feesManager.TransactionEstimatedTimeV2Legacy(ctx, path.FromChain.ChainID, path.TxGasPrice.ToInt())
-		return nil
-	}
 
 	path.TxMaxFeesPerGas = params.MaxFeesPerGas
 	path.TxBaseFee = (*hexutil.Big)(new(big.Int).Sub(params.MaxFeesPerGas.ToInt(), params.PriorityFee.ToInt()))
 	path.TxPriorityFee = params.PriorityFee
-	path.TxEstimatedTime = r.feesManager.TransactionEstimatedTimeV2(ctx, path.FromChain.ChainID, path.TxMaxFeesPerGas.ToInt(), path.TxPriorityFee.ToInt())
+	estimatedTime, err := r.feesManager.EstimatedTime(ctx, path.FromChain.ChainID, path.TxMaxFeesPerGas.ToInt(), path.TxPriorityFee.ToInt())
+	if err != nil {
+		return err
+	}
+	path.TxEstimatedTime = estimatedTime
 	return nil
 }
 
@@ -387,6 +372,9 @@ func (r *Router) updatePathFields(path *routes.Path, fetchedFees *fees.Suggested
 
 func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees,
 	usedNonces map[uint64]uint64, noBaseFee bool, noPriorityFee bool, testsMode bool, testApprovalL1Fee uint64) (err error) {
+	if !fetchedFees.EIP1559Enabled {
+		return fees.ErrEIP1559IncompaibleChain
+	}
 
 	r.updatePathFields(path, fetchedFees, noBaseFee, noPriorityFee)
 
@@ -429,22 +417,13 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 
 	// calculate ETH fees
 	ethTotalFees := big.NewInt(0)
-	var txFeeInWei *big.Int
-	if !path.FromChain.EIP1559Enabled {
-		txFeeInWei = new(big.Int).Mul(path.TxGasPrice.ToInt(), big.NewInt(int64(path.TxGasAmount)))
-	} else {
-		txFeeInWei = new(big.Int).Mul(path.TxMaxFeesPerGas.ToInt(), big.NewInt(int64(path.TxGasAmount)))
-	}
+	txFeeInWei := new(big.Int).Mul(path.TxMaxFeesPerGas.ToInt(), big.NewInt(int64(path.TxGasAmount)))
 	ethTotalFees.Add(ethTotalFees, txFeeInWei)
 	ethTotalFees.Add(ethTotalFees, l1TxFeeWei)
 
 	approvalFeeInWei := big.NewInt(0)
 	if path.ApprovalRequired {
-		if !path.FromChain.EIP1559Enabled {
-			approvalFeeInWei.Mul(path.ApprovalGasPrice.ToInt(), big.NewInt(int64(path.ApprovalGasAmount)))
-		} else {
-			approvalFeeInWei.Mul(path.ApprovalMaxFeesPerGas.ToInt(), big.NewInt(int64(path.ApprovalGasAmount)))
-		}
+		approvalFeeInWei.Mul(path.ApprovalMaxFeesPerGas.ToInt(), big.NewInt(int64(path.ApprovalGasAmount)))
 		ethTotalFees.Add(ethTotalFees, approvalFeeInWei)
 		ethTotalFees.Add(ethTotalFees, l1ApprovalFeeWei)
 	}

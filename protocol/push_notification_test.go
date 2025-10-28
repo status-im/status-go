@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -306,10 +307,10 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	s.Require().NoError(err)
 
 	// Add alice has a contact
-	aliceContact := &Contact{
+	aliceContact := &contacts.Contact{
 		ID:                       types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey)),
 		EnsName:                  "Some Contact",
-		ContactRequestLocalState: ContactRequestStateSent,
+		ContactRequestLocalState: contacts.ContactRequestStateSent,
 	}
 
 	_, err = bob.AddContact(context.Background(), &requests.AddContact{ID: aliceContact.ID})
@@ -447,20 +448,20 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	s.Require().NoError(err)
 
 	// Add alice has a contact
-	aliceContact := &Contact{
+	aliceContact := &contacts.Contact{
 		ID:                       types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey)),
 		EnsName:                  "Some Contact",
-		ContactRequestLocalState: ContactRequestStateSent,
+		ContactRequestLocalState: contacts.ContactRequestStateSent,
 	}
 
 	_, err = bob.AddContact(context.Background(), &requests.AddContact{ID: aliceContact.ID})
 	s.Require().NoError(err)
 
 	// Add frank has a contact
-	frankContact := &Contact{
+	frankContact := &contacts.Contact{
 		ID:                       types.EncodeHex(crypto.FromECDSAPub(&frank.identity.PublicKey)),
 		EnsName:                  "Some Contact",
-		ContactRequestLocalState: ContactRequestStateSent,
+		ContactRequestLocalState: contacts.ContactRequestStateSent,
 	}
 
 	_, err = bob.AddContact(context.Background(), &requests.AddContact{ID: frankContact.ID})
@@ -545,7 +546,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	s.Require().Equal(&bob.identity.PublicKey, info[0].PublicKey)
 
 	// The message has been sent, but not received, now we remove a contact so that the token is invalidated
-	frankContact = &Contact{
+	frankContact = &contacts.Contact{
 		ID:      types.EncodeHex(crypto.FromECDSAPub(&frank.identity.PublicKey)),
 		EnsName: "Some Contact",
 	}

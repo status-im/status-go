@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -276,7 +277,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 
 	newContactKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	wrongContact, err := BuildContactFromPublicKey(&newContactKey.PublicKey)
+	wrongContact, err := contacts.BuildContactFromPublicKey(&newContactKey.PublicKey)
 	s.Require().NoError(err)
 
 	editMessage := EditMessage{
@@ -301,7 +302,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 
 	// Edit with a newer clock value
 
-	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
+	contact, err := contacts.BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
 	s.Require().NoError(err)
 
 	editMessage = EditMessage{
@@ -354,7 +355,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
+	contact, err := contacts.BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())

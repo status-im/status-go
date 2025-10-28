@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet"
@@ -175,15 +176,15 @@ func (api *PublicAPI) UnblockContact(parent context.Context, contactID string) (
 	return api.service.messenger.UnblockContact(contactID)
 }
 
-func (api *PublicAPI) Contacts(parent context.Context) []*protocol.Contact {
+func (api *PublicAPI) Contacts(parent context.Context) []*contacts.Contact {
 	return api.service.messenger.Contacts()
 }
 
-func (api *PublicAPI) GetContactByID(parent context.Context, id string) *protocol.Contact {
+func (api *PublicAPI) GetContactByID(parent context.Context, id string) *contacts.Contact {
 	return api.service.messenger.GetContactByID(id)
 }
 
-func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*protocol.Contact, error) {
+func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*contacts.Contact, error) {
 	return api.service.messenger.FetchContact(pubkey, true)
 }
 
@@ -311,7 +312,7 @@ func (api *PublicAPI) GetCommunityPublicKeyFromPrivateKey(ctx context.Context, h
 }
 
 // Get community members contact list for provided wallet addresses
-func (api *PublicAPI) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*protocol.Contact, error) {
+func (api *PublicAPI) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*contacts.Contact, error) {
 	return api.service.messenger.GetCommunityMembersForWalletAddresses(communityID, chainID)
 }
 
@@ -868,19 +869,6 @@ func (api *PublicAPI) CreateCommunityTokenDeploymentSignature(ctx context.Contex
 	return api.service.messenger.CreateCommunityTokenDeploymentSignature(ctx, chainID, addressFrom, communityID)
 }
 
-// wallet connect session apis
-func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, request *requests.AddWalletConnectSession) error {
-	return api.service.messenger.AddWalletConnectSession(request)
-}
-
-func (api *PublicAPI) GetWalletConnectSession(ctx context.Context) ([]protocol.WalletConnectSession, error) {
-	return api.service.messenger.GetWalletConnectSession()
-}
-
-func (api *PublicAPI) DestroyWalletConnectSession(ctx context.Context, PeerID string) error {
-	return api.service.messenger.DestroyWalletConnectSession(PeerID)
-}
-
 // Saved Addresses APIs
 func (api *PublicAPI) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAddress) error {
 	return api.service.messenger.UpsertSavedAddress(ctx, sa)
@@ -1287,10 +1275,6 @@ func (api *PublicAPI) ToggleUseMailservers(value bool) error {
 	return api.service.messenger.ToggleUseMailservers(value)
 }
 
-func (api *PublicAPI) TogglePeerSyncing(request *requests.TogglePeerSyncingRequest) error {
-	return api.service.messenger.TogglePeerSyncing(request)
-}
-
 func (api *PublicAPI) SetSyncingOnMobileNetwork(request *requests.SetSyncingOnMobileNetwork) error {
 	return api.service.messenger.SetSyncingOnMobileNetwork(request)
 }
@@ -1323,7 +1307,7 @@ func (api *PublicAPI) RequestCancelDiscordChannelImport(discordChannelID string)
 	api.service.messenger.MarkDiscordChannelImportAsCancelled(discordChannelID)
 }
 
-func (api *PublicAPI) BuildContact(request *requests.BuildContact) (*protocol.Contact, error) {
+func (api *PublicAPI) BuildContact(request *requests.BuildContact) (*contacts.Contact, error) {
 	return api.service.messenger.BuildContact(request)
 }
 

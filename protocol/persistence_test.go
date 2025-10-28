@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
+	contacts2 "github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"
@@ -1190,7 +1191,7 @@ func TestContactBioPersistence(t *testing.T) {
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
 	contactBio := "A contact bio description"
 
-	err = p.SaveContact(&Contact{ID: contactID, Bio: contactBio}, nil)
+	err = p.SaveContact(&contacts2.Contact{ID: contactID, Bio: contactBio}, nil)
 	require.NoError(t, err)
 
 	contacts, err := p.Contacts()
@@ -1209,7 +1210,7 @@ func TestContactBioPersistenceDefaults(t *testing.T) {
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
 
-	err = p.SaveContact(&Contact{ID: contactID}, nil)
+	err = p.SaveContact(&contacts2.Contact{ID: contactID}, nil)
 	require.NoError(t, err)
 
 	contacts, err := p.Contacts()
@@ -1228,7 +1229,7 @@ func TestUpdateContactChatIdentity(t *testing.T) {
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
 
-	err = p.SaveContact(&Contact{ID: contactID}, nil)
+	err = p.SaveContact(&contacts2.Contact{ID: contactID}, nil)
 	require.NoError(t, err)
 
 	jpegType := []byte{0xff, 0xd8, 0xff, 0x1}
@@ -1304,7 +1305,7 @@ func TestRemovedProfileImage(t *testing.T) {
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
 
-	err = p.SaveContact(&Contact{ID: contactID}, nil)
+	err = p.SaveContact(&contacts2.Contact{ID: contactID}, nil)
 	require.NoError(t, err)
 
 	jpegType := []byte{0xff, 0xd8, 0xff, 0x1}

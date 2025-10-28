@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -167,7 +168,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		rawMessageHandler = m.dispatchMessage
 	}
 
-	myID := contactIDFromPublicKey(&m.identity.PublicKey)
+	myID := contacts.ContactIDFromPublicKey(&m.identity.PublicKey)
 
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
@@ -190,11 +191,11 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	m.allContacts.Range(func(contactID string, contact *Contact) bool {
+	m.allContacts.Range(func(contactID string, contact *contacts.Contact) bool {
 		if contact.ID == myID {
 			return true
 		}
-		if contact.LocalNickname != "" || contact.added() || contact.hasAddedUs() || contact.Blocked {
+		if contact.LocalNickname != "" || contact.Added() || contact.HasAddedUs() || contact.Blocked {
 			if err = m.syncContact(ctx, contact, rawMessageHandler); err != nil {
 				return false
 			}
@@ -439,7 +440,7 @@ func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID, c
 }
 
 func (m *Messenger) getLastClockWithRelatedChat() (uint64, *Chat) {
-	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
+	chatID := contacts.ContactIDFromPublicKey(&m.identity.PublicKey)
 
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {

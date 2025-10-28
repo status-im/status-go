@@ -507,11 +507,6 @@ var (
 		dBColumnName:   "mnemonic_was_not_shown",
 		valueHandler:   BoolHandler,
 	}
-	PeerSyncingEnabled = SettingField{
-		reactFieldName: "peer-syncing-enabled?",
-		dBColumnName:   "peer_syncing_enabled",
-		valueHandler:   BoolHandler,
-	}
 	AutoRefreshTokensEnabled = SettingField{
 		reactFieldName: "auto-refresh-tokens-enabled",
 		dBColumnName:   "auto_refresh_tokens_enabled",
@@ -581,7 +576,6 @@ var (
 		NodeConfig,
 		NotificationsEnabled,
 		OpenseaEnabled,
-		PeerSyncingEnabled,
 		PhotoPath,
 		PinnedMailservers,
 		PreferredName,

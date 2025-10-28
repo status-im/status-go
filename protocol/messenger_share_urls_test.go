@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/api/multiformat"
+	"github.com/status-im/status-go/protocol/contacts"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
@@ -51,7 +52,7 @@ func (s *MessengerShareUrlsSuite) createCommunity() *communities.Community {
 	return response.Communities()[0]
 }
 
-func (s *MessengerShareUrlsSuite) createContact() (*Messenger, *Contact) {
+func (s *MessengerShareUrlsSuite) createContact() (*Messenger, *contacts.Contact) {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 

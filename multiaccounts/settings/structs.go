@@ -222,10 +222,9 @@ type Settings struct {
 	CollectibleGroupByCollection        bool                          `json:"collectible-group-by-collection?,omitempty"`
 	CollectibleGroupByCommunity         bool                          `json:"collectible-group-by-community?,omitempty"`
 	URLUnfurlingMode                    URLUnfurlingModeType          `json:"url-unfurling-mode,omitempty"`
-	PeerSyncingEnabled                  bool                          `json:"peer-syncing-enabled?,omitempty"`
 	AutoRefreshTokensEnabled            bool                          `json:"auto-refresh-tokens-enabled,omitempty"`
 	LastTokensUpdate                    time.Time                     `json:"last-tokens-update,omitempty"`
-	ThirdpartyServicesEnabled           bool                          `json:"thirdparty_services_enabled,omitempty"`
+	ThirdpartyServicesEnabled           bool                          `json:"thirdparty_services_enabled"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {
@@ -250,4 +249,33 @@ func (s Settings) GetFleet() string {
 		return params.FleetUndefined
 	}
 	return *s.Fleet
+}
+
+// UnmarshalJSON implements custom unmarshaling for Settings so that when the
+// thirdparty_services_enabled field is missing from incoming JSON it defaults
+// to true instead of the default value (false).
+func (s *Settings) UnmarshalJSON(data []byte) error {
+	// Use an alias to avoid infinite recursion
+	type Alias Settings
+
+	// Temporary struct to check if ThirdpartyServicesEnabled is present
+	aux := &struct {
+		*Alias
+		ThirdpartyServicesEnabled *bool `json:"thirdparty_services_enabled"`
+	}{
+		Alias: (*Alias)(s),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// If the field was omitted, ensure it defaults to true.
+	if aux.ThirdpartyServicesEnabled == nil {
+		s.ThirdpartyServicesEnabled = true
+	} else {
+		s.ThirdpartyServicesEnabled = *aux.ThirdpartyServicesEnabled
+	}
+
+	return nil
 }

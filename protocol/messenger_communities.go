@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -4616,13 +4617,13 @@ func (m *Messenger) rekeyCommunities(logger *zap.Logger) {
 	}
 }
 
-func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*Contact, error) {
+func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*contacts.Contact, error) {
 	community, err := m.communitiesManager.GetByID(communityID)
 	if err != nil {
 		return nil, err
 	}
 
-	membersForAddresses := map[string]*Contact{}
+	membersForAddresses := map[string]*contacts.Contact{}
 
 	for _, memberPubKey := range community.GetMemberPubkeys() {
 		memberPubKeyStr := crypto.PubkeyToHex(memberPubKey)

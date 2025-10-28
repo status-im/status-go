@@ -3,15 +3,15 @@ package sharedsecret
 import (
 	"testing"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/helpers"
-
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
+
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
+	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestServiceTestSuite(t *testing.T) {
@@ -27,12 +27,15 @@ type SharedSecretTestSuite struct {
 func (s *SharedSecretTestSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-	err = sqlite.Migrate(db)
+	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     migrations.AssetNames(),
+			AssetFunc: migrations.Asset,
+		},
+	}))
 	s.Require().NoError(err)
 
-	s.service = New(db, s.logger)
+	s.service = New(NewSQLitePersistence(db), s.logger)
 }
 
 func (s *SharedSecretTestSuite) TearDownTest() {

@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -130,9 +131,9 @@ func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit i
 	}
 
 	if chat.Timeline() {
-		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
-		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-			if contact.added() {
+		var chatIDs = []string{"@" + contacts.ContactIDFromPublicKey(&m.identity.PublicKey)}
+		m.allContacts.Range(func(contactID string, contact *contacts.Contact) (shouldContinue bool) {
+			if contact.Added() {
 				chatIDs = append(chatIDs, "@"+contact.ID)
 			}
 			return true

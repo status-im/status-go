@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/connection"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
 	"github.com/status-im/status-go/messaging/layers/encryption"
@@ -112,22 +111,12 @@ func (a *API) UpdateFilterEphemerality(chatID string, ephemeral bool) error {
 	return nil
 }
 
-func (a *API) HandleSharedSecrets(secrets []*types.SharedSecret) error {
-	for _, secret := range secrets {
-		fSecret := ethtypes.NegotiatedSecret{
-			PublicKey: secret.Identity,
-			Key:       secret.Key,
-		}
-		_, err := a.core.transport.ProcessNegotiatedSecret(fSecret)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (a *API) JoinPublicChat(chatID string) (*types.ChatFilter, error) {
-	return a.core.sender.JoinPublic(chatID)
+	f, err := a.core.sender.JoinPublic(chatID)
+	if err != nil {
+		return nil, err
+	}
+	return adapters.FromTransportFilter(f), nil
 }
 
 func (a *API) JoinPrivateChat(publicKey *ecdsa.PublicKey) (*types.ChatFilter, error) {
@@ -195,7 +184,7 @@ func (a *API) GetCurrentKeyForGroup(groupID []byte) (*encryption.HashRatchetKeyC
 }
 
 func (a *API) SaveHashRatchetMessage(groupID []byte, keyID []byte, m *types.ReceivedMessage) error {
-	return a.core.persistence.SaveHashRatchetMessage(groupID, keyID, m)
+	return a.core.sender.SaveHashRatchetMessage(groupID, keyID, m)
 }
 
 func (a *API) SendPubsubTopicKey(ctx context.Context, rawMessage *types.RawMessage) ([]byte, error) {
@@ -298,10 +287,6 @@ func (a *API) RemovePubsubTopicKey(topic string) error {
 	return a.core.transport.RemovePubsubTopicKey(topic)
 }
 
-func (a *API) ConfirmMessageDelivered(messageID string) {
-	a.core.transport.ConfirmMessageDelivered(messageID)
-}
-
 func (a *API) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters types.ChatFilters) {
 	a.core.transport.SetCriteriaForMissingMessageVerification(peerInfo, adapters.ToTransportFilters(filters))
 }
@@ -349,8 +334,8 @@ func (a *API) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 	a.core.transport.SetStorenodeConfigProvider(c)
 }
 
-func (a *API) ResetDatasyncForPeer(publicKey *ecdsa.PublicKey, eventTime uint64) {
-	a.core.resetDatasyncForPeer(publicKey, eventTime)
+func (a *API) ReportUserOnline(publicKey *ecdsa.PublicKey, eventTime uint64) {
+	a.core.sender.ReportUserOnline(publicKey, eventTime)
 }
 
 func (a *API) MetricsPushReceivedMessages(receivedMessages types.ReceivedMessages) {

@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/deprecation"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/requests"
 )
 
@@ -96,7 +97,7 @@ func (s *MessengerMuteSuite) TestSetMuteForDuration() {
 		}
 	}
 
-	var contact *Contact
+	var contact *contacts.Contact
 	if actualChat.OneToOne() {
 		contact, _ = s.m.allContacts.Load(chatID)
 	}

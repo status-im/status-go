@@ -1,17 +1,8 @@
 package types
 
-import "crypto/ecdsa"
+import cryptotypes "github.com/status-im/status-go/crypto/types"
 
 type HandleMessageResponse struct {
-	Hash             []byte
-	StatusMessages   []*Message
-	DatasyncSender   *ecdsa.PublicKey
-	DatasyncAcks     [][]byte
-	DatasyncOffers   []DatasyncOffer
-	DatasyncRequests [][]byte
-}
-
-type DatasyncOffer struct {
-	GroupID   []byte
-	MessageID []byte
+	StatusMessages  []*Message
+	AckedMessageIDs []cryptotypes.HexBytes
 }
