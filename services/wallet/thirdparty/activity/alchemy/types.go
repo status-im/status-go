@@ -1,7 +1,9 @@
 package alchemy
 
 import (
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -13,6 +15,35 @@ import (
 
 const getAssetTransfersMethod = "alchemy_getAssetTransfers"
 const MaxAssetTransfersCount = 1000
+
+// AlchemyBigInt wraps VarHexBigInt to handle Alchemy API inconsistency
+// it sometimes returns plain decimal numbers instead of hexadecimal
+type AlchemyBigInt struct {
+	*bigint.VarHexBigInt
+}
+
+func (a *AlchemyBigInt) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+
+	// alchemy sometimes returns plain numbers like "0" or "1" without "0x" prefix
+	// so we need to take this into account
+	if len(str) >= 2 && str[0:2] == "0x" {
+		// hex string case
+		a.VarHexBigInt = &bigint.VarHexBigInt{}
+		return a.VarHexBigInt.UnmarshalJSON(data)
+	} else {
+		// plain decimal number
+		val := new(big.Int)
+		if _, ok := val.SetString(str, 10); !ok {
+			return fmt.Errorf("invalid decimal number: %s", str)
+		}
+		a.VarHexBigInt = &bigint.VarHexBigInt{Int: val}
+		return nil
+	}
+}
 
 type TransferCategory string
 
@@ -58,7 +89,7 @@ type Transfer struct {
 	ToAddress       *common.Address      `json:"to,omitempty"`
 	Value           float64              `json:"value,omitempty"`
 	Erc1155Metadata []Erc1155Metadata    `json:"erc1155Metadata,omitempty"`
-	TokenID         *bigint.VarHexBigInt `json:"tokenId"`
+	TokenID         *AlchemyBigInt       `json:"tokenId"`
 	Asset           string               `json:"asset"`
 	UniqueID        string               `json:"uniqueId"`
 	Hash            common.Hash          `json:"hash"`
@@ -79,7 +110,7 @@ func (t Transfer) IsIncoming(accountAddress common.Address) bool {
 }
 
 type Erc1155Metadata struct {
-	TokenID *bigint.VarHexBigInt `json:"tokenId"`
+	TokenID *AlchemyBigInt       `json:"tokenId"`
 	Value   *bigint.VarHexBigInt `json:"value"`
 }
 
