@@ -3994,7 +3994,7 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 		return err
 	}
 
-	m.config.codexConfig = nodeConfig.CodexConfig
+	m.config.codexConfig = &nodeConfig.CodexConfig
 	m.archiveManager.SetCodexConfig(&nodeConfig.CodexConfig)
 	err = m.archiveManager.StartCodexClient()
 	if err != nil {

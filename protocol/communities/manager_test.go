@@ -66,7 +66,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 
 	amc := &ArchiveManagerConfig{
 		TorrentConfig: buildTorrentConfig(),
-		CodexConfig:   buildCodexConfig(),
+		CodexConfig:   buildCodexConfig(s.T()),
 		Logger:        logger,
 		Persistence:   m.GetPersistence(),
 		Messaging:     nil,
@@ -578,6 +578,7 @@ func (s *ManagerSuite) TestStartTorrentClient_DelayedUntilOnline() {
 
 	s.archiveManager.SetOnline(true)
 	s.Require().True(s.archiveManager.torrentClientStarted())
+	s.Require().True(s.archiveManager.isCodexClientStarted)
 }
 
 func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_WithoutMessages() {
@@ -1651,9 +1652,9 @@ func buildTorrentConfig() *params.TorrentConfig {
 	}
 }
 
-func buildCodexConfig() *codex.Config {
+func buildCodexConfig(t *testing.T) *codex.Config {
 	return &codex.Config{
-		DataDir:      os.TempDir() + "/codexdata",
+		DataDir:      t.TempDir() + "/codexdata",
 		BlockRetries: 5,
 		LogLevel:     "ERROR",
 	}
