@@ -356,9 +356,10 @@ func (s *Service) getDeps() FilterDependencies {
 				Address:   t.Address,
 			}
 		},
-		currentTimestamp: func() int64 {
+			currentTimestamp: func() int64 {
 			return time.Now().Unix()
 		},
+		tokenPublisher: s.tokenManager.GetTokenPublisher(),
 	}
 }
 

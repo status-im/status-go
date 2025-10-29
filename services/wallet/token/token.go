@@ -38,8 +38,10 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
 	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
+	"github.com/status-im/status-go/services/wallet/token/tokenevent"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/signal"
 )
 
 const (
@@ -76,6 +78,7 @@ type ManagerInterface interface {
 	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) *tokenTypes.Token
 	MarkAsPreviouslyOwnedToken(token *tokenTypes.Token, owner common.Address) (bool, error)
 	SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *tokenTypes.Token, isFirst bool)
+	GetTokenPublisher() *pubsub.Publisher
 }
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
@@ -90,6 +93,7 @@ type Manager struct {
 	walletFeed           *event.Feed
 	accountsDB           *accounts.Database
 	accountsPublisher    *pubsub.Publisher
+	tokenPublisher       *pubsub.Publisher
 	tokenBalancesStorage TokenBalancesStorage
 
 	tokenLists *tokenlists.TokenLists
@@ -106,6 +110,7 @@ func NewTokenManager(
 	mediaServer *server.MediaServer,
 	walletFeed *event.Feed,
 	accountsPublisher *pubsub.Publisher,
+	tokenPublisher *pubsub.Publisher,
 	accountsDB *accounts.Database,
 	tokenBalancesStorage TokenBalancesStorage,
 ) *Manager {
@@ -127,6 +132,7 @@ func NewTokenManager(
 		mediaServer:          mediaServer,
 		walletFeed:           walletFeed,
 		accountsPublisher:    accountsPublisher,
+		tokenPublisher:       tokenPublisher,
 		accountsDB:           accountsDB,
 		tokenBalancesStorage: tokenBalancesStorage,
 		tokenLists:           tokensLists,
@@ -136,6 +142,7 @@ func NewTokenManager(
 func (tm *Manager) Start(ctx context.Context, autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) {
 	tm.stopCh = make(chan struct{})
 	tm.startAccountsWatcher()
+	tm.startTokenDiscoveryWatcher()
 
 	// For now we don't have the list of tokens lists remotely set so we're uisng the harcoded default lists. Once we have it
 	//we will just need to update the empty string with the correct URL.
@@ -165,12 +172,45 @@ func (tm *Manager) startAccountsWatcher() {
 	}()
 }
 
+func (tm *Manager) startTokenDiscoveryWatcher() {
+	if tm.tokenPublisher == nil {
+		return
+	}
+
+	ch, unsubFn := pubsub.Subscribe[tokenevent.TokenDiscoveryRequestEvent](tm.tokenPublisher, 100)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubFn()
+		for {
+			select {
+			case <-tm.stopCh:
+				return
+			case event, ok := <-ch:
+				if !ok {
+					return
+				}
+				tm.handleTokenDiscoveryRequest(context.Background(), event)
+			}
+		}
+	}()
+}
+
+func (tm *Manager) handleTokenDiscoveryRequest(ctx context.Context, event tokenevent.TokenDiscoveryRequestEvent) {
+	// Use existing FindOrCreateTokenByAddress logic
+	// This will fetch token metadata and send TokenListsUpdated signal to frontend
+	tm.FindOrCreateTokenByAddress(ctx, event.ChainID, event.Address)
+}
+
 func (tm *Manager) Stop() {
 	if tm.stopCh != nil {
 		close(tm.stopCh)
 		tm.stopCh = nil
 	}
 	tm.tokenLists.Stop()
+}
+
+func (tm *Manager) GetTokenPublisher() *pubsub.Publisher {
+	return tm.tokenPublisher
 }
 
 // overrideTokensInPlace overrides tokens in the store with the ones from the networks
@@ -298,6 +338,8 @@ func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint6
 	}
 
 	tm.discoverTokenCommunityID(ctx, token, address)
+	signal.SendWalletEvent(signal.TokenListsUpdated, nil)
+
 	return token
 }
 
@@ -437,7 +479,7 @@ func (tm *Manager) getNativeTokens() ([]*tokenTypes.Token, error) {
 }
 
 func (tm *Manager) GetAllTokens() ([]*tokenTypes.Token, error) {
-	allTokens, err := tm.GetCustoms(true)
+	allTokens, err := tm.GetCustoms(false)
 	if err != nil {
 		logutils.ZapLogger().Error("can't fetch custom tokens", zap.Error(err))
 	}

@@ -172,22 +172,30 @@ func extractTransferTokenAndValue(t Transfer, chainID uint64) []transferTokenAnd
 			Value: (*hexutil.Big)(t.RawContract.Value.Int),
 		})
 	case TransferCategoryErc721:
+		var tokenID *hexutil.Big
+		if t.TokenID != nil && t.TokenID.Int != nil {
+			tokenID = (*hexutil.Big)(t.TokenID.Int)
+		}
 		transfersData = append(transfersData, transferTokenAndValue{
 			Token: ac.Token{
 				TokenType: ac.Erc721,
 				ChainID:   wCommon.ChainID(chainID),
 				Address:   *t.RawContract.Address,
-				TokenID:   (*hexutil.Big)(t.TokenID.Int),
+				TokenID:   tokenID,
 			},
 		})
 	case TransferCategoryErc1155:
 		for _, m := range t.Erc1155Metadata {
+			var tokenID *hexutil.Big
+			if m.TokenID != nil && m.TokenID.Int != nil {
+				tokenID = (*hexutil.Big)(m.TokenID.Int)
+			}
 			transfersData = append(transfersData, transferTokenAndValue{
 				Token: ac.Token{
 					TokenType: ac.Erc1155,
 					ChainID:   wCommon.ChainID(chainID),
 					Address:   *t.RawContract.Address,
-					TokenID:   (*hexutil.Big)(m.TokenID.Int),
+					TokenID:   tokenID,
 				},
 				Value: (*hexutil.Big)(m.Value.Int),
 			})

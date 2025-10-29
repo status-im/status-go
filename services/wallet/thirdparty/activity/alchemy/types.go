@@ -19,7 +19,7 @@ const MaxAssetTransfersCount = 1000
 // AlchemyBigInt wraps VarHexBigInt to handle Alchemy API inconsistency
 // it sometimes returns plain decimal numbers instead of hexadecimal
 type AlchemyBigInt struct {
-	*bigint.VarHexBigInt
+	bigint.VarHexBigInt
 }
 
 func (a *AlchemyBigInt) UnmarshalJSON(data []byte) error {
@@ -31,8 +31,7 @@ func (a *AlchemyBigInt) UnmarshalJSON(data []byte) error {
 	// alchemy sometimes returns plain numbers like "0" or "1" without "0x" prefix
 	// so we need to take this into account
 	if len(str) >= 2 && str[0:2] == "0x" {
-		// hex string case
-		a.VarHexBigInt = &bigint.VarHexBigInt{}
+		// hex string case - unmarshal directly into embedded struct
 		return a.VarHexBigInt.UnmarshalJSON(data)
 	} else {
 		// plain decimal number
@@ -40,7 +39,7 @@ func (a *AlchemyBigInt) UnmarshalJSON(data []byte) error {
 		if _, ok := val.SetString(str, 10); !ok {
 			return fmt.Errorf("invalid decimal number: %s", str)
 		}
-		a.VarHexBigInt = &bigint.VarHexBigInt{Int: val}
+		a.VarHexBigInt.Int = val
 		return nil
 	}
 }

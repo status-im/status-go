@@ -9,20 +9,24 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/pkg/pubsub"
 	wc "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	alchemy "github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
+	"github.com/status-im/status-go/services/wallet/token/tokenevent"
 )
 
 type Manager struct {
-	client      *alchemy.Client
-	persistence *alchemy.Persistence
+	client         *alchemy.Client
+	persistence    *alchemy.Persistence
+	tokenPublisher *pubsub.Publisher
 }
 
-func NewManager(client *alchemy.Client, persistence *alchemy.Persistence) *Manager {
+func NewManager(client *alchemy.Client, persistence *alchemy.Persistence, tokenPublisher *pubsub.Publisher) *Manager {
 	return &Manager{
-		client:      client,
-		persistence: persistence,
+		client:         client,
+		persistence:    persistence,
+		tokenPublisher: tokenPublisher,
 	}
 }
 
@@ -44,7 +48,6 @@ func (m *Manager) GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID u
 
 // FetchActivity orchestrates fetching, persistence, and type conversion.
 func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, parameters thirdparty.ActivityFetchParameters, cursor string, limit int) (thirdparty.ActivityEntryContainer, error) {
-
 	transfers, nextCursor, err := m.client.FetchTransfers(ctx, chainID, parameters, cursor, limit)
 	if err != nil {
 		return thirdparty.ActivityEntryContainer{}, err
@@ -53,6 +56,18 @@ func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, parameters 
 	err = m.persistence.SaveTransfers(transfers, chainID, parameters.Address)
 	if err != nil {
 		return thirdparty.ActivityEntryContainer{}, err
+	}
+
+	// Request async token discovery for ERC20 transfers to make sure we have their metadata
+	if m.tokenPublisher != nil {
+		for _, transfer := range transfers {
+			if transfer.Category == alchemy.TransferCategoryErc20 && transfer.RawContract.Address != nil {
+				pubsub.Publish(m.tokenPublisher, tokenevent.TokenDiscoveryRequestEvent{
+					ChainID: chainID,
+					Address: *transfer.RawContract.Address,
+				})
+			}
+		}
 	}
 
 	items := alchemy.TransfersToThirdpartyActivityEntries(transfers, chainID, parameters.Address)

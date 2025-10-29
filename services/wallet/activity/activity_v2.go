@@ -8,6 +8,7 @@ import (
 
 	eth "github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/pkg/pubsub"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	wCommon "github.com/status-im/status-go/services/wallet/common"
 )
@@ -20,6 +21,8 @@ type FilterDependencies struct {
 	tokenFromSymbol func(chainID *wCommon.ChainID, symbol string) *ac.Token
 	// use to get current timestamp
 	currentTimestamp func() int64
+	// tokenPublisher for async token discovery requests
+	tokenPublisher *pubsub.Publisher
 }
 
 type TransactionOrigin int

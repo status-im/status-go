@@ -12,17 +12,18 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/pubsub"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	wCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
+	"github.com/status-im/status-go/services/wallet/token/tokenevent"
 	"github.com/status-im/status-go/sqlite"
 )
 
 // getFetchedEntriesByIDs fetches Alchemy transaction details by IDs
 // Returns a map keyed by "chainID-hash-address" string
 func getFetchedEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs []OrderedTransactionID) (map[string]Entry, error) {
-
 	if len(txIDs) == 0 {
 		return make(map[string]Entry), nil
 	}
@@ -73,6 +74,22 @@ func getFetchedEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs 
 	transfersMap, err := rowsToTransfersGrouped(rows)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert rows to transfers: %w", err)
+	}
+
+	// Request async token discovery for ERC20 transfers to make sure we have their metadata
+	if deps.tokenPublisher != nil {
+		for chainID, addressMap := range transfersMap {
+			for _, transfers := range addressMap {
+				for _, transfer := range transfers {
+					if transfer.Category == alchemy.TransferCategoryErc20 && transfer.RawContract.Address != nil {
+						pubsub.Publish(deps.tokenPublisher, tokenevent.TokenDiscoveryRequestEvent{
+							ChainID: uint64(chainID),
+							Address: *transfer.RawContract.Address,
+						})
+					}
+				}
+			}
+		}
 	}
 
 	result := make(map[string]Entry)
@@ -176,6 +193,7 @@ func thirdpartyActivityEntriesToEntries(deps FilterDependencies, activityEntries
 		}
 
 		entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
+
 		entries = append(entries, entry)
 	}
 

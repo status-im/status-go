@@ -50,7 +50,7 @@ func setupAlchemyActivityManager(t *testing.T) *alchemymanager.Manager {
 
 	alchemyClient := alchemy.NewClient(alchemyEthClientGetter)
 	alchemyPersistence := alchemy.NewPersistence(walletDB)
-	alchemyManager := alchemymanager.NewManager(alchemyClient, alchemyPersistence)
+	alchemyManager := alchemymanager.NewManager(alchemyClient, alchemyPersistence, nil)
 
 	return alchemyManager
 }

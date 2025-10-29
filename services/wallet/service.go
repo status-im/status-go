@@ -261,7 +261,7 @@ func NewService(
 	alchemyEthClientGetter := rpc.NewProviderChainClientGetter(common.SmartProxyAlchemy, rpcClient)
 	alchemyFetcherDb := activityfetcher_alchemy.NewPersistence(db)
 	alchemyFetcherClient := activityfetcher_alchemy.NewClient(alchemyEthClientGetter)
-	alchemyFetcherManager := alchemymanager.NewManager(alchemyFetcherClient, alchemyFetcherDb)
+	alchemyFetcherManager := alchemymanager.NewManager(alchemyFetcherClient, alchemyFetcherDb, tokenManager.GetTokenPublisher())
 	activityFetcherManager := activityfetcher.NewManager(alchemyFetcherManager)
 	activityFetcherService := activityfetcher.NewService(activityFetcherManager, rpcClient.GetNetworkManager(), accountsDB, accountsPublisher, rpcClient, feed)
 
