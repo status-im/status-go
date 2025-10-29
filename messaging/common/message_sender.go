@@ -37,10 +37,6 @@ const (
 	maxMessageSenderEphemeralKeys = 3
 )
 
-// RekeyCompatibility indicates whether we should be sending
-// keys in 1-to-1 messages as well as in the newer format
-var RekeyCompatibility = true
-
 type MessageSender struct {
 	identity    *ecdsa.PrivateKey
 	transport   *transport.Transport
@@ -299,10 +295,8 @@ func (s *MessageSender) sendCommunity(
 	// Check if it's a key exchange message. In this case we send it
 	// to all the recipients
 	if rawMessage.CommunityKeyExMsgType != messagingtypes.KeyExMsgNone {
-		// If rekeycompatibility is on, we always
-		// want to execute below, otherwise we execute
-		// only when we want to fill up old keys to a given user
-		if RekeyCompatibility || !forceRekey {
+		// we want to fill up old keys to a given user
+		if !forceRekey {
 			keyExMessageSpecs, err := s.protocol.GetKeyExMessageSpecs(rawMessage.HashRatchetGroupID, s.identity, rawMessage.Recipients, forceRekey)
 			if err != nil {
 				return nil, err
@@ -577,18 +571,8 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 	payload := wrappedMessage
 	var err error
 	if rekey && len(rawMessage.HashRatchetGroupID) != 0 {
-
-		var ratchet *encryption.HashRatchetKeyCompatibility
-		// We have just rekeyed, pull the latest
-		if RekeyCompatibility {
-			ratchet, err = s.protocol.GetCurrentKeyForGroup(rawMessage.HashRatchetGroupID)
-			if err != nil {
-				return nil, nil, err
-			}
-
-		}
 		// We send the message over the community topic
-		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, ratchet)
+		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, nil)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1020,24 +1004,8 @@ func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *m
 func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, wrappedMessage []byte, pubsubTopic string, rekey bool, rawMessage *messagingtypes.RawMessage) ([][]byte, []*wakutypes.NewMessage, error) {
 	payload := wrappedMessage
 	if rekey && len(rawMessage.HashRatchetGroupID) != 0 {
-
-		var ratchet *encryption.HashRatchetKeyCompatibility
-		var err error
-		// We have just rekeyed, pull the latest
-		if RekeyCompatibility {
-			ratchet, err = s.protocol.GetCurrentKeyForGroup(rawMessage.HashRatchetGroupID)
-			if err != nil {
-				return nil, nil, err
-			}
-
-		}
-		keyID, err := ratchet.GetKeyID()
-		if err != nil {
-			return nil, nil, err
-		}
-		s.logger.Debug("adding key id to message", zap.String("keyid", cryptotypes.Bytes2Hex(keyID)))
 		// We send the message over the community topic
-		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, ratchet)
+		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, nil)
 		if err != nil {
 			return nil, nil, err
 		}
