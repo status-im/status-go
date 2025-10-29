@@ -1,14 +1,16 @@
 import logging
 from uuid import uuid4
+
 import pytest
 from requests import ReadTimeout
 
+from clients.anvil import Anvil
+from clients.contract_deployers.multicall3 import Multicall3Deployer
+from clients.foundry import Foundry
 from clients.status_backend import StatusBackend
 from clients.statusgo_container import StatusGoContainer
-from clients.anvil import Anvil
-from clients.foundry import Foundry
-from clients.contract_deployers.multicall3 import Multicall3Deployer
 from resources.constants import USE_IPV6
+from utils import fake
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -92,7 +94,7 @@ def backend_new_profile(request, backend_factory):
         backends.append(backend)
 
         backend.init_status_backend()
-        backend.create_account_and_login(waku_light_client=waku_light_client, **kwargs)
+        backend.create_account_and_login(password=fake.profile_password(), waku_light_client=waku_light_client, **kwargs)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()
         return backend
