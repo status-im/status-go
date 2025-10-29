@@ -83,7 +83,7 @@ func (c *Client) IsConnected() bool {
 
 // FetchFollowingAddresses fetches the list of addresses that the given user is following
 func (c *Client) FetchFollowingAddresses(ctx context.Context, userAddress common.Address) ([]FollowingAddress, error) {
-	url := fmt.Sprintf("%s/users/%s/following?include=ens", c.baseURL, userAddress.Hex())
+	url := fmt.Sprintf("%s/users/%s/following?include=ens&limit=20", c.baseURL, userAddress.Hex())
 
 	response, err := c.httpClient.DoGetRequest(ctx, url, nil)
 	if err != nil {
@@ -129,4 +129,3 @@ func handleFollowingResponse(response []byte) ([]FollowingAddress, error) {
 
 	return result, nil
 }
-
