@@ -1,7 +1,10 @@
-import re
-from clients.status_backend import StatusBackend
-import pytest
 import os
+import re
+
+import pytest
+
+from clients.status_backend import StatusBackend
+from utils import fake
 
 
 @pytest.mark.rpc
@@ -26,7 +29,7 @@ class TestLogging:
 
         # Init and login
         backend_client.init_status_backend()
-        backend_client.create_account_and_login()
+        backend_client.create_account_and_login(password=fake.profile_password())
         backend_client.wait_for_login()
 
         # Configure logging
@@ -67,7 +70,7 @@ class TestLogging:
 
         # Ensure changes are persisted after re-login
         backend_client.logout()
-        backend_client.login(key_uid)
+        backend_client.login(key_uid, password=backend_client.password)
         backend_client.wait_for_login()
         backend_client.wakuext_service.log_test()
         profile_log = backend_client.extract_data(log_path)
