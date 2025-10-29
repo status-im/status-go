@@ -28,14 +28,10 @@ import (
 type CodexClientIntegrationTestSuite struct {
 	suite.Suite
 	client *communities.CodexClient
-	host   string
-	port   string
 }
 
 // SetupSuite runs once before all tests in the suite
 func (suite *CodexClientIntegrationTestSuite) SetupSuite() {
-	suite.host = communities.GetEnvOrDefault("CODEX_HOST", "localhost")
-	suite.port = communities.GetEnvOrDefault("CODEX_API_PORT", "8080")
 	client, err := communities.NewCodexClient(codex.Config{
 		DataDir:        suite.T().TempDir(),
 		LogFormat:      codex.LogFormatNoColors,
