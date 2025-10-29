@@ -8,13 +8,6 @@ from clients.status_backend import StatusBackend
 
 @pytest.mark.rpc
 class TestMediaServer:
-    await_signals = [
-        SignalType.MEDIASERVER_STARTED.value,
-        SignalType.NODE_STARTED.value,
-        SignalType.NODE_READY.value,
-        SignalType.NODE_LOGIN.value,
-    ]
-
     @pytest.fixture()
     def backend(self, backend_new_profile) -> StatusBackend:
         return backend_new_profile("sender")

@@ -17,14 +17,7 @@ class TestLocalBackup:
 
     @pytest.mark.init
     def test_local_backup(self, tmp_path):
-        await_signals = [
-            "mediaserver.started",
-            "node.started",
-            "node.ready",
-            "node.login",
-        ]
-
-        backend_client = StatusBackend(await_signals)
+        backend_client = StatusBackend()
         assert backend_client is not None
 
         # Init and login
@@ -213,7 +206,7 @@ class TestLocalBackup:
         assert backup_file is not None
 
         # Create a new installation
-        backend_client2 = StatusBackend(await_signals)
+        backend_client2 = StatusBackend()
         assert backend_client2 is not None
 
         # Init and login
@@ -296,13 +289,7 @@ class TestLocalBackup:
         assert one_on_one_chat_recovered, "One-to-one chat was not restored correctly"
 
     def test_local_backup_backwards_compatibility(self, tmp_path):
-        await_signals = [
-            "mediaserver.started",
-            "node.started",
-            "node.ready",
-            "node.login",
-        ]
-        backend_client = StatusBackend(await_signals)
+        backend_client = StatusBackend()
         assert backend_client is not None
         # Restore the account with a hardcoded mnemonic to get the same private key
         backend_client.init_status_backend()

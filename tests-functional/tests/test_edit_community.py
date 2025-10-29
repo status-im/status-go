@@ -48,12 +48,6 @@ def validate_community_images(community, name, cert_file_path):
 @pytest.mark.rpc
 @pytest.mark.create_account
 class TestEditCommunity:
-    await_signals = [
-        SignalType.MEDIASERVER_STARTED.value,
-        SignalType.NODE_STARTED.value,
-        SignalType.NODE_READY.value,
-        SignalType.NODE_LOGIN.value,
-    ]
 
     @pytest.fixture()
     def backend(self, backend_new_profile) -> StatusBackend:

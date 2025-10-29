@@ -1,29 +1,19 @@
 import re
 import uuid as uuid_lib
-import pytest
 
-import resources.constants as constants
+import pytest
 from web3.types import Wei  # type: ignore
 
-from clients.signals import SignalType
-from utils import wallet_utils
-from resources.constants import user_1
+import resources.constants as constants
 from clients.api import ApiResponseError
+from resources.constants import user_1
+from utils import wallet_utils
 
 
 @pytest.mark.rpc
 @pytest.mark.transaction
 @pytest.mark.wallet
 class TestRouter:
-
-    await_signals = [
-        SignalType.NODE_LOGIN.value,
-        SignalType.WALLET.value,
-        SignalType.WALLET_SUGGESTED_ROUTES.value,
-        SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value,
-        SignalType.WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED.value,
-        SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
-    ]
 
     @pytest.fixture(autouse=True)
     def setup_backend(self, backend_recovered_profile, anvil_client, multicall3_deployer):

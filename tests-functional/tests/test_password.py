@@ -11,15 +11,6 @@ from utils import fake
 @pytest.mark.rpc
 class TestPassword:
 
-    await_signals = [
-        SignalType.NODE_LOGIN.value,
-        SignalType.DB_REENCRYPTION_STARTED.value,
-        SignalType.DB_REENCRYPTION_FINISHED.value,
-        SignalType.NODE_STARTED.value,
-        SignalType.NODE_READY.value,
-        SignalType.NODE_STOPPED.value,
-    ]
-
     def test_verify_correct_password(self, backend_new_profile):
         backend = backend_new_profile("sender")
         response = backend.accounts_service.verify_password(backend.password)
