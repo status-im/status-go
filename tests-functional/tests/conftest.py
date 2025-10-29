@@ -88,7 +88,7 @@ def waku_light_client(request) -> bool:
 def backend_new_profile(request, backend_factory):
     backends: list[StatusBackend] = []
 
-    def _backend_new_profile(name: str, waku_light_client: bool = False, **kwargs) -> StatusBackend:
+    def factory(name: str = "", waku_light_client: bool = False, **kwargs) -> StatusBackend:
         logging.debug(f"📋 [SETUP] backend_new_profile parameters: wakuV2LightClient={waku_light_client}")
         backend = backend_factory(name, **kwargs)
         backends.append(backend)
@@ -99,7 +99,7 @@ def backend_new_profile(request, backend_factory):
         backend.wakuext_service.start_messenger()
         return backend
 
-    yield _backend_new_profile
+    yield factory
 
     for backend in backends:
         try:
