@@ -12,14 +12,6 @@ from clients.services.wallet import WalletService
 @pytest.mark.assets
 @pytest.mark.wallet
 class TestWalletAssets:
-    await_signals = [
-        SignalType.NODE_LOGIN.value,
-        SignalType.WALLET.value,
-        SignalType.WALLET_SUGGESTED_ROUTES.value,
-        SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value,
-        SignalType.WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED.value,
-        SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
-    ]
 
     @pytest.fixture(autouse=True)
     def setup_backend(self, backend_recovered_profile, multicall3_deployer):

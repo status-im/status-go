@@ -1,9 +1,9 @@
 import logging
+import os
+
+import pytest
 
 from clients.status_backend import StatusBackend
-import pytest
-from clients.signals import SignalType
-import os
 
 
 @pytest.mark.create_account
@@ -18,14 +18,7 @@ class TestInitialiseApp:
     @pytest.mark.init
     def test_init_app(self):
 
-        await_signals = [
-            SignalType.MEDIASERVER_STARTED.value,
-            SignalType.NODE_STARTED.value,
-            SignalType.NODE_READY.value,
-            SignalType.NODE_LOGIN.value,
-        ]
-
-        backend_client = StatusBackend(await_signals)
+        backend_client = StatusBackend()
         backend_client.init_status_backend()
         backend_client.restore_account_and_login()
 

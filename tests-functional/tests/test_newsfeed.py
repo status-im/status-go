@@ -1,16 +1,8 @@
 import pytest
 
-from clients.signals import SignalType
-
 
 @pytest.mark.rpc
 class TestNewsFeed:
-
-    await_signals = [
-        SignalType.NODE_LOGIN.value,
-        SignalType.NODE_STARTED.value,
-        SignalType.NODE_READY.value,
-    ]
 
     def test_newsfeed_settings(self, backend_new_profile):
         backend = backend_new_profile("backend")

@@ -39,7 +39,7 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 class StatusBackend(RpcClient, SignalClient, ApiClient):
     container = None
 
-    def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6, **kwargs):
+    def __init__(self, privileged=False, ipv6=USE_IPV6, **kwargs):
         self.temp_dir = None
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
@@ -83,7 +83,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         RpcClient.__init__(self)
         ApiClient.__init__(self, self.api_url)
-        SignalClient.__init__(self, self.ws_url, await_signals)
+        SignalClient.__init__(self, self.ws_url)
 
         self.wait_for_healthy()
 

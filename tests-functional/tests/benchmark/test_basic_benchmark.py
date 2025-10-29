@@ -2,7 +2,6 @@ import time
 
 import pytest
 
-from clients.signals import SignalType
 from clients.status_backend import StatusBackend
 from steps.messenger import MessengerSteps
 from utils import fake
@@ -16,13 +15,6 @@ class TestBasicBenchmark(MessengerSteps):
 
     This test suite contains a few test cases that track CPU, RAM and network usage via Docker API.
     """
-
-    await_signals = [
-        SignalType.MESSAGES_NEW.value,
-        SignalType.MESSAGE_DELIVERED.value,
-        SignalType.NODE_LOGIN.value,
-        SignalType.NODE_STOPPED.value,
-    ]
 
     @pytest.fixture(scope="function", autouse=False)
     def aut(self, request, backend_factory, waku_light_client):

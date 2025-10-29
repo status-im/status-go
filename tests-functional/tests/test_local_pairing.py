@@ -148,20 +148,12 @@ def login_paired_device(backend: StatusBackend, key_uid, password):
 @pytest.mark.rpc
 class TestLocalPairing(MessengerSteps):
 
-    await_signals = [
-        SignalType.MESSAGES_NEW.value,
-        SignalType.MESSAGE_DELIVERED.value,
-        SignalType.NODE_LOGIN.value,
-        SignalType.NODE_STOPPED.value,
-        SignalType.LOCAL_PAIRING.value,
-    ]
-
     def test_pairing_server_as_sender(self, backend_new_profile):
         # Create users
         alice = backend_new_profile()
         bob = backend_new_profile()
 
-        bob_second_device = StatusBackend(self.await_signals)
+        bob_second_device = StatusBackend()
         bob_second_device.init_status_backend()
 
         # Make contacts before local pairing
@@ -241,7 +233,7 @@ class TestLocalPairing(MessengerSteps):
         # Create users
         alice = backend_new_profile()
         bob = backend_new_profile()
-        bob_second_device = StatusBackend(self.await_signals)
+        bob_second_device = StatusBackend()
         bob_second_device.init_status_backend()
 
         # Make contacts before local pairing
@@ -284,9 +276,9 @@ class TestLocalPairing(MessengerSteps):
     def test_pairing_three_devices(self, backend_new_profile):
         # Create users
         bob1 = backend_new_profile()
-        bob2 = StatusBackend(self.await_signals)
+        bob2 = StatusBackend()
         bob2.init_status_backend()
-        bob3 = StatusBackend(self.await_signals)
+        bob3 = StatusBackend()
         bob3.init_status_backend()
         user_accepted = backend_new_profile()
         user_pending = backend_new_profile()
