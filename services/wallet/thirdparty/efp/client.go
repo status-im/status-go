@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -94,14 +95,17 @@ func (c *Client) FetchFollowingAddresses(ctx context.Context, userAddress common
 		offset = 0
 	}
 
-	url := fmt.Sprintf("%s/users/%s/following?include=ens&limit=%d&offset=%d", c.baseURL, userAddress.Hex(), limit, offset)
-
-	// Add search parameter if provided
+	// Use different endpoint for search vs regular listing
+	var urlStr string
 	if search != "" {
-		url = fmt.Sprintf("%s&search=%s", url, search)
+		urlStr = fmt.Sprintf("%s/users/%s/searchFollowing?include=ens&limit=%d&offset=%d&sort=followers&term=%s",
+			c.baseURL, userAddress.Hex(), limit, offset, url.QueryEscape(search))
+	} else {
+		urlStr = fmt.Sprintf("%s/users/%s/following?include=ens&limit=%d&offset=%d&sort=followers",
+			c.baseURL, userAddress.Hex(), limit, offset)
 	}
 
-	response, err := c.httpClient.DoGetRequest(ctx, url, nil)
+	response, err := c.httpClient.DoGetRequest(ctx, urlStr, nil)
 	if err != nil {
 		return nil, err
 	}
