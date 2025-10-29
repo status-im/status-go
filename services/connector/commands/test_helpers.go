@@ -24,9 +24,10 @@ import (
 )
 
 var testDAppData = signal.ConnectorDApp{
-	URL:     "http://testDAppURL",
-	Name:    "testDAppName",
-	IconURL: "http://testDAppIconUrl",
+	URL:      "http://testDAppURL",
+	Name:     "testDAppName",
+	IconURL:  "http://testDAppIconUrl",
+	ClientID: "",
 }
 
 type EventType struct {
@@ -145,6 +146,7 @@ func PersistDAppData(db *sql.DB, dApp signal.ConnectorDApp, sharedAccount types.
 		URL:           dApp.URL,
 		Name:          dApp.Name,
 		IconURL:       dApp.IconURL,
+		ClientID:      dApp.ClientID,
 		SharedAccount: sharedAccount,
 		ChainID:       chainID,
 	}
@@ -164,6 +166,7 @@ func ConstructRPCRequest(method string, params []interface{}, dApp *signal.Conne
 		request.URL = dApp.URL
 		request.Name = dApp.Name
 		request.IconURL = dApp.IconURL
+		request.ClientID = dApp.ClientID
 	}
 
 	return request, nil

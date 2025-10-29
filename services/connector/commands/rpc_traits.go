@@ -32,14 +32,15 @@ var (
 )
 
 type RPCRequest struct {
-	JSONRPC string        `json:"jsonrpc"`
-	ID      int           `json:"id"`
-	Method  string        `json:"method"`
-	Params  []interface{} `json:"params"`
-	URL     string        `json:"url"`
-	Name    string        `json:"name"`
-	IconURL string        `json:"iconUrl"`
-	ChainID uint64        `json:"chainId"`
+	JSONRPC  string        `json:"jsonrpc"`
+	ID       int           `json:"id"`
+	Method   string        `json:"method"`
+	Params   []interface{} `json:"params"`
+	URL      string        `json:"url"`
+	Name     string        `json:"name"`
+	IconURL  string        `json:"iconUrl"`
+	ClientID string        `json:"clientId"`
+	ChainID  uint64        `json:"chainId"`
 }
 
 type RPCCommand interface {
@@ -67,7 +68,8 @@ type RejectedArgs struct {
 }
 
 type RecallDAppPermissionsArgs struct {
-	URL string `json:"url"`
+	URL      string `json:"url"`
+	ClientID string `json:"clientId"`
 }
 
 type ClientSideHandlerInterface interface {
@@ -107,5 +109,6 @@ func (r *RPCRequest) Validate() error {
 	if r.URL == "" || r.Name == "" {
 		return ErrRequestMissingDAppData
 	}
+
 	return nil
 }
