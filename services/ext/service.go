@@ -341,7 +341,7 @@ func buildMessengerOptions(
 		protocol.WithENSVerifier(ensVerifier),
 		protocol.WithClusterConfig(config.ClusterConfig),
 		protocol.WithTorrentConfig(&config.TorrentConfig),
-		protocol.WithCodexConfig(config.CodexConfig),
+		protocol.WithCodexConfig(&config.CodexConfig),
 		protocol.WithHTTPServer(httpServer),
 		protocol.WithRPCClient(rpcClient),
 		protocol.WithMessageCSV(config.OutputMessageCSVEnabled),
