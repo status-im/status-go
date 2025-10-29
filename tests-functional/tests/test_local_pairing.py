@@ -1,12 +1,13 @@
 import re
+
 import pytest
+
 from clients.api import ApiResponseError
 from clients.services.wakuext import ActivityCenterNotificationType, ContactRequestState
 from clients.signals import SignalType, LocalPairingEventType, LocalPairingEventAction
 from clients.status_backend import StatusBackend
-from resources.constants import Account
-from steps.messenger import MessengerSteps
 from resources.enums import MessageContentType
+from steps.messenger import MessengerSteps
 
 
 def check_server_sender_events(events):
@@ -138,14 +139,8 @@ def pair_server_as_receiver(sender, receiver):
 
 
 def login_paired_device(backend: StatusBackend, key_uid, password):
-    user = Account(
-        password=password,
-        address="",
-        private_key="",
-        passphrase="",
-    )
     backend.init_status_backend()
-    backend.login(key_uid, user)
+    backend.login(key_uid, password)
     backend.wait_for_login()
     backend.wakuext_service.start_messenger()
 
@@ -161,23 +156,10 @@ class TestLocalPairing(MessengerSteps):
         SignalType.LOCAL_PAIRING.value,
     ]
 
-    @pytest.fixture(autouse=True)
-    def setup_cleanup(self, close_status_backend_containers):
-        """Automatically cleanup containers after each test"""
-        yield
-
-    def initialize_backend(self, await_signals, privileged=True, **kwargs):
-        backend = StatusBackend(await_signals, privileged=privileged)
-        backend.init_status_backend()
-        backend.create_account_and_login(**kwargs)
-        backend.wait_for_login()
-        backend.wakuext_service.start_messenger()
-        return backend
-
-    def test_pairing_server_as_sender(self):
+    def test_pairing_server_as_sender(self, backend_new_profile):
         # Create users
-        alice = self.initialize_backend(self.await_signals, False)
-        bob = self.initialize_backend(self.await_signals, False)
+        alice = backend_new_profile()
+        bob = backend_new_profile()
 
         bob_second_device = StatusBackend(self.await_signals)
         bob_second_device.init_status_backend()
@@ -255,10 +237,10 @@ class TestLocalPairing(MessengerSteps):
         assert messages_map[message_id2]["text"] == "hello bob"
         assert messages_map[message_id2]["clock"] == clock_2, "Message 2 clock is not right on paired device"
 
-    def test_pairing_server_as_receiver(self):
+    def test_pairing_server_as_receiver(self, backend_new_profile):
         # Create users
-        alice = self.initialize_backend(self.await_signals, False)
-        bob = self.initialize_backend(self.await_signals, False)
+        alice = backend_new_profile()
+        bob = backend_new_profile()
         bob_second_device = StatusBackend(self.await_signals)
         bob_second_device.init_status_backend()
 
@@ -299,16 +281,16 @@ class TestLocalPairing(MessengerSteps):
         messages = bob_second_device.wakuext_service.chat_messages(sender_chat_id, limit=10)["messages"]
         assert messages is None, "Messages found on paired device wrongly"
 
-    def test_pairing_three_devices(self):
+    def test_pairing_three_devices(self, backend_new_profile):
         # Create users
-        bob1 = self.initialize_backend(self.await_signals, False)
+        bob1 = backend_new_profile()
         bob2 = StatusBackend(self.await_signals)
         bob2.init_status_backend()
         bob3 = StatusBackend(self.await_signals)
         bob3.init_status_backend()
-        user_accepted = self.initialize_backend(self.await_signals, False)
-        user_pending = self.initialize_backend(self.await_signals, False)
-        user_declined = self.initialize_backend(self.await_signals, False)
+        user_accepted = backend_new_profile()
+        user_pending = backend_new_profile()
+        user_declined = backend_new_profile()
 
         # Setup contacts before local pairing
         self.make_contacts(user_accepted, bob1)
@@ -355,9 +337,9 @@ class TestLocalPairing(MessengerSteps):
             assert user_declined_notification["accepted"] is False
             assert user_declined_notification["dismissed"] is True
 
-    def test_pairing_receiver_must_be_logged_out(self):
-        sender = self.initialize_backend(self.await_signals, False)
-        receiver = self.initialize_backend(self.await_signals, False)
+    def test_pairing_receiver_must_be_logged_out(self, backend_new_profile):
+        sender = backend_new_profile()
+        receiver = backend_new_profile()
 
         # Client receiver must be logged out
         connection_string = sender.get_connection_string_for_bootstrapping_another_device()
