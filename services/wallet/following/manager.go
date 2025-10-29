@@ -26,9 +26,12 @@ func NewManager(providers []efp.FollowingDataProvider) *Manager {
 
 // FetchFollowingAddresses fetches the list of addresses that the given user is following
 // Uses the first available provider (can be enhanced later with fallback logic)
-func (m *Manager) FetchFollowingAddresses(ctx context.Context, userAddress common.Address) ([]efp.FollowingAddress, error) {
+func (m *Manager) FetchFollowingAddresses(ctx context.Context, userAddress common.Address, search string, limit, offset int) ([]efp.FollowingAddress, error) {
 	logutils.ZapLogger().Debug("following.Manager.FetchFollowingAddresses",
 		zap.String("userAddress", userAddress.Hex()),
+		zap.String("search", search),
+		zap.Int("limit", limit),
+		zap.Int("offset", offset),
 		zap.Int("providers.len", len(m.providers)),
 	)
 
@@ -44,7 +47,7 @@ func (m *Manager) FetchFollowingAddresses(ctx context.Context, userAddress commo
 	}
 
 	startTime := time.Now()
-	addresses, err := provider.FetchFollowingAddresses(ctx, userAddress)
+	addresses, err := provider.FetchFollowingAddresses(ctx, userAddress, search, limit, offset)
 	duration := time.Since(startTime)
 
 	logutils.ZapLogger().Debug("following.Manager.FetchFollowingAddresses completed",
@@ -61,4 +64,3 @@ func (m *Manager) FetchFollowingAddresses(ctx context.Context, userAddress commo
 
 	return addresses, nil
 }
-

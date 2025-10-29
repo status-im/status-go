@@ -82,8 +82,24 @@ func (c *Client) IsConnected() bool {
 }
 
 // FetchFollowingAddresses fetches the list of addresses that the given user is following
-func (c *Client) FetchFollowingAddresses(ctx context.Context, userAddress common.Address) ([]FollowingAddress, error) {
-	url := fmt.Sprintf("%s/users/%s/following?include=ens&limit=20", c.baseURL, userAddress.Hex())
+func (c *Client) FetchFollowingAddresses(ctx context.Context, userAddress common.Address, search string, limit, offset int) ([]FollowingAddress, error) {
+	// Apply sensible defaults and limits
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	url := fmt.Sprintf("%s/users/%s/following?include=ens&limit=%d&offset=%d", c.baseURL, userAddress.Hex(), limit, offset)
+
+	// Add search parameter if provided
+	if search != "" {
+		url = fmt.Sprintf("%s&search=%s", url, search)
+	}
 
 	response, err := c.httpClient.DoGetRequest(ctx, url, nil)
 	if err != nil {

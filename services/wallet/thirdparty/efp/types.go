@@ -10,5 +10,5 @@ import (
 type FollowingDataProvider interface {
 	ID() string
 	IsConnected() bool
-	FetchFollowingAddresses(ctx context.Context, userAddress common.Address) ([]FollowingAddress, error)
+	FetchFollowingAddresses(ctx context.Context, userAddress common.Address, search string, limit, offset int) ([]FollowingAddress, error)
 }

@@ -940,13 +940,16 @@ func (api *API) UnsubscribeFromLeaderboard() error {
 }
 
 // GetFollowingAddresses fetches the list of addresses that the given user is following via EFP
-func (api *API) GetFollowingAddresses(ctx context.Context, userAddress common.Address) ([]efp.FollowingAddress, error) {
+func (api *API) GetFollowingAddresses(ctx context.Context, userAddress common.Address, search string, limit, offset int) ([]efp.FollowingAddress, error) {
 	logutils.ZapLogger().Debug("call to GetFollowingAddresses",
-		zap.String("userAddress", userAddress.Hex()))
+		zap.String("userAddress", userAddress.Hex()),
+		zap.String("search", search),
+		zap.Int("limit", limit),
+		zap.Int("offset", offset))
 
 	if api.s.followingManager == nil {
 		return nil, errors.New("following manager not initialized")
 	}
 
-	return api.s.followingManager.FetchFollowingAddresses(ctx, userAddress)
+	return api.s.followingManager.FetchFollowingAddresses(ctx, userAddress, search, limit, offset)
 }
