@@ -84,23 +84,23 @@ func (c *Client) IsConnected() bool {
 
 // FetchFollowingAddresses fetches the list of addresses that the given user is following
 func (c *Client) FetchFollowingAddresses(ctx context.Context, userAddress common.Address, search string, limit, offset int) ([]FollowingAddress, error) {
-	// Apply sensible defaults and limits
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
-	if offset < 0 {
-		offset = 0
-	}
-
-	// Use different endpoint for search vs regular listing
 	var urlStr string
+
 	if search != "" {
-		urlStr = fmt.Sprintf("%s/users/%s/searchFollowing?include=ens&limit=%d&offset=%d&sort=followers&term=%s",
-			c.baseURL, userAddress.Hex(), limit, offset, url.QueryEscape(search))
+		// Search returns all results (no pagination)
+		urlStr = fmt.Sprintf("%s/users/%s/searchFollowing?include=ens&sort=followers&term=%s",
+			c.baseURL, userAddress.Hex(), url.QueryEscape(search))
 	} else {
+		// Regular listing uses pagination
+		if limit <= 0 {
+			limit = 10
+		}
+		if limit > 100 {
+			limit = 100
+		}
+		if offset < 0 {
+			offset = 0
+		}
 		urlStr = fmt.Sprintf("%s/users/%s/following?include=ens&limit=%d&offset=%d&sort=followers",
 			c.baseURL, userAddress.Hex(), limit, offset)
 	}
