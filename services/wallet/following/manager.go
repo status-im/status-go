@@ -64,3 +64,33 @@ func (m *Manager) FetchFollowingAddresses(ctx context.Context, userAddress commo
 
 	return addresses, nil
 }
+
+// FetchFollowingStats fetches the stats (following count) for a user
+func (m *Manager) FetchFollowingStats(ctx context.Context, userAddress common.Address) (int, error) {
+	logutils.ZapLogger().Debug("following.Manager.FetchFollowingStats",
+		zap.String("userAddress", userAddress.Hex()),
+	)
+
+	if len(m.providers) == 0 {
+		return 0, nil
+	}
+
+	provider := m.providers[0]
+	if !provider.IsConnected() {
+		logutils.ZapLogger().Warn("EFP provider not connected", zap.String("providerID", provider.ID()))
+		return 0, nil
+	}
+
+	count, err := provider.FetchFollowingStats(ctx, userAddress)
+	if err != nil {
+		logutils.ZapLogger().Error("following.Manager.FetchFollowingStats error", zap.Error(err))
+		return 0, err
+	}
+
+	logutils.ZapLogger().Debug("following.Manager.FetchFollowingStats completed",
+		zap.String("userAddress", userAddress.Hex()),
+		zap.Int("count", count),
+	)
+
+	return count, nil
+}

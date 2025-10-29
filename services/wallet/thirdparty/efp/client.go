@@ -41,6 +41,12 @@ type EFPFollowingResponse struct {
 	Following []EFPFollowingRecord `json:"following"`
 }
 
+// EFPStatsResponse represents the stats from the EFP API
+type EFPStatsResponse struct {
+	FollowingCount int `json:"following_count"`
+	FollowersCount int `json:"followers_count"`
+}
+
 // FollowingAddress represents a processed following address for internal use
 type FollowingAddress struct {
 	Address common.Address    `json:"address"`
@@ -111,6 +117,24 @@ func (c *Client) FetchFollowingAddresses(ctx context.Context, userAddress common
 	}
 
 	return handleFollowingResponse(response)
+}
+
+// FetchFollowingStats fetches the stats (following/followers count) for a user
+func (c *Client) FetchFollowingStats(ctx context.Context, userAddress common.Address) (int, error) {
+	urlStr := fmt.Sprintf("%s/users/%s/stats", c.baseURL, userAddress.Hex())
+
+	response, err := c.httpClient.DoGetRequest(ctx, urlStr, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	var statsResponse EFPStatsResponse
+	err = json.Unmarshal(response, &statsResponse)
+	if err != nil {
+		return 0, fmt.Errorf("failed to unmarshal EFP stats response: %w", err)
+	}
+
+	return statsResponse.FollowingCount, nil
 }
 
 func handleFollowingResponse(response []byte) ([]FollowingAddress, error) {

@@ -953,3 +953,15 @@ func (api *API) GetFollowingAddresses(ctx context.Context, userAddress common.Ad
 
 	return api.s.followingManager.FetchFollowingAddresses(ctx, userAddress, search, limit, offset)
 }
+
+// GetFollowingStats fetches the stats (following count) for a user
+func (api *API) GetFollowingStats(ctx context.Context, userAddress common.Address) (int, error) {
+	logutils.ZapLogger().Debug("call to GetFollowingStats",
+		zap.String("userAddress", userAddress.Hex()))
+
+	if api.s.followingManager == nil {
+		return 0, errors.New("following manager not initialized")
+	}
+
+	return api.s.followingManager.FetchFollowingStats(ctx, userAddress)
+}
