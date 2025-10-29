@@ -1,10 +1,12 @@
-import pytest
 import time
+
+import pytest
 
 from clients.signals import SignalType
 from clients.status_backend import StatusBackend
-from utils.config import Config
 from steps.messenger import MessengerSteps
+from utils import fake
+from utils.config import Config
 
 
 @pytest.mark.benchmark
@@ -33,7 +35,7 @@ class TestBasicBenchmark(MessengerSteps):
 
         status_backend.init_status_backend()
         status_backend.events.append("CreateAccountAndLogin")
-        status_backend.create_account_and_login(waku_light_client=waku_light_client)
+        status_backend.create_account_and_login(password=fake.profile_password(), waku_light_client=waku_light_client)
         status_backend.wait_for_login()
         status_backend.events.append("Logged in")
         status_backend.wakuext_service.start_messenger()
