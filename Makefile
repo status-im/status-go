@@ -194,7 +194,7 @@ clone-nwaku: $(NWAKU_SOURCE_DIR)
 $(LIBWAKU): clone-nwaku
 ifeq ($(USE_NWAKU),true)
 	@echo "Building libwaku" $(LIBWAKU)
-	$(MAKE) -C $(NWAKU_SOURCE_DIR) SHELL=/bin/bash
+	$(MAKE) -C $(NWAKU_SOURCE_DIR) libwaku SHELL=/bin/bash
 endif
 
 build-libwaku: $(LIBWAKU)
