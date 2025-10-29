@@ -89,12 +89,14 @@ def backend_new_profile(request, backend_factory):
     backends: list[StatusBackend] = []
 
     def factory(name: str = "", waku_light_client: bool = False, **kwargs) -> StatusBackend:
+        password = kwargs.pop("password", fake.profile_password())
+
         logging.debug(f"📋 [SETUP] backend_new_profile parameters: wakuV2LightClient={waku_light_client}")
         backend = backend_factory(name, **kwargs)
         backends.append(backend)
 
         backend.init_status_backend()
-        backend.create_account_and_login(password=fake.profile_password(), waku_light_client=waku_light_client, **kwargs)
+        backend.create_account_and_login(password=password, waku_light_client=waku_light_client, **kwargs)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()
         return backend
