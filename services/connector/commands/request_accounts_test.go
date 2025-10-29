@@ -126,3 +126,30 @@ func TestRequestAccountsRejected(t *testing.T) {
 	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrRequestAccountsRejectedByUser, err)
 }
+
+func TestRequestAccountsWithExistingDApp(t *testing.T) {
+	state, close := setupCommand(t, Method_EthRequestAccounts)
+	t.Cleanup(close)
+
+	// Pre-create a dApp
+	accountAddress := types.Address{0x05}
+	dApp := &persistence.DApp{
+		URL:           testDAppData.URL,
+		Name:          testDAppData.Name,
+		IconURL:       testDAppData.IconURL,
+		ClientID:      testDAppData.ClientID,
+		SharedAccount: accountAddress,
+		ChainID:       walletCommon.EthereumMainnet,
+	}
+	err := persistence.UpsertDApp(state.walletDb, dApp)
+	assert.NoError(t, err)
+
+	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
+	assert.NoError(t, err)
+
+	// Should not trigger signal since dApp already exists
+	expectedResponse := FormatAccountAddressToResponse(accountAddress)
+	response, err := state.cmd.Execute(state.ctx, request)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedResponse, response)
+}

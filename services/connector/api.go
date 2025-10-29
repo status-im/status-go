@@ -55,13 +55,22 @@ func NewAPI(s *Service) *API {
 		Db:             s.db,
 		NetworkManager: s.nm,
 	})
+	r.Register("net_version", &commands.NetVersionCommand{
+		Db:             s.db,
+		NetworkManager: s.nm,
+	})
 	r.Register("wallet_switchEthereumChain", &commands.SwitchEthereumChainCommand{
 		Db:             s.db,
 		NetworkManager: s.nm,
 	})
 
 	// Permissions
-	r.Register("wallet_requestPermissions", &commands.RequestPermissionsCommand{})
+	r.Register("wallet_requestPermissions", &commands.RequestPermissionsCommand{
+		Db: s.db,
+	})
+	r.Register("wallet_getPermissions", &commands.GetPermissionsCommand{
+		Db: s.db,
+	})
 	r.Register("wallet_revokePermissions", &commands.RevokePermissionsCommand{
 		Db: s.db,
 	})
