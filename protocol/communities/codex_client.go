@@ -48,7 +48,7 @@ func (c *CodexClient) Upload(data io.Reader, filename string) (string, error) {
 	options := codex.UploadOptions{
 		Filepath: filename,
 	}
-	return c.node.UploadReader(options, data)
+	return c.node.UploadReader(context.Background(), options, data)
 }
 
 // Download downloads data from Codex by CID and writes it to the provided writer
@@ -77,15 +77,15 @@ func (c *CodexClient) DownloadWithContext(ctx context.Context, cid string, outpu
 	options := codex.DownloadStreamOptions{
 		Writer: output,
 	}
-	return c.node.DownloadStream(cid, options)
+	return c.node.DownloadStream(ctx, cid, options)
 }
 
 func (c *CodexClient) LocalDownload(cid string, output io.Writer) error {
-	return c.node.DownloadStream(cid, codex.DownloadStreamOptions{Writer: output})
+	return c.LocalDownloadWithContext(context.Background(), cid, output)
 }
 
 func (c *CodexClient) LocalDownloadWithContext(ctx context.Context, cid string, output io.Writer) error {
-	return c.LocalDownload(cid, output)
+	return c.node.DownloadStream(ctx, cid, codex.DownloadStreamOptions{Writer: output})
 }
 
 func (c *CodexClient) FetchManifestWithContext(ctx context.Context, cid string) (codex.Manifest, error) {
