@@ -44,15 +44,25 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
 
-        if Config.status_backend_urls:
+        url = None
+        if kwargs.__contains__("url"):
+            url = kwargs.get("url", "")
+        elif Config.status_backend_urls:
             try:
                 url = next(Config.status_backend_urls)
             except StopIteration:
                 raise Exception("--status-backend-url is found, but not enough backends provided")
 
+        data_dir = kwargs.get("data_dir", None)  # TODO: Should be argument of `init_status_backend` or fetched from the app
+        self.logLevel = kwargs.get("logLevel", "DEBUG")
+
+        if url:
             assert url != "", "not enough status-backend urls provided"
-            self.temp_dir = tempfile.TemporaryDirectory()
-            self.data_dir = self.temp_dir.name
+            if data_dir is None:
+                self.temp_dir = tempfile.TemporaryDirectory()
+                self.data_dir = self.temp_dir.name
+            else:
+                self.data_dir = data_dir
             if kwargs.get("connector_enabled", False):
                 self.connector_ws_url = f"ws://localhost:{constants.STATUS_CONNECTOR_WS_PORT}"
             self.media_server_port = constants.STATUS_MEDIA_SERVER_PORT
@@ -142,7 +152,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = {
             "dataDir": self.data_dir,
             "logEnabled": True,
-            "logLevel": "DEBUG",
+            "logLevel": self.logLevel,
             "apiLoggingEnabled": True,
             "wakuFleetsConfigFilePath": Config.waku_fleets_config,
             "pushFleetsConfigFilePath": Config.push_fleets_config,
@@ -266,7 +276,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             # Logs config
             "logEnabled": True,
             "logToStderr": True,
-            "logLevel": "DEBUG",
+            "logLevel": self.logLevel,
             # Waku config
             "wakuV2LightClient": kwargs.get("waku_light_client", False),
             "wakuV2Fleet": Config.waku_fleet,

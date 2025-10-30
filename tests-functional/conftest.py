@@ -1,6 +1,7 @@
-import os
 import logging
+import os
 from typing import Iterator
+
 from utils.config import Config
 
 
@@ -84,23 +85,6 @@ def _status_backend_url_generator(urls) -> Iterator[str]:
         yield url
 
 
-def _calculate_port_range():
-    executor_number = int(os.getenv("EXECUTOR_NUMBER", 5))
-    base_port = 7000
-    range_size = 100
-    max_port = 65535
-    min_port = 1024
-
-    start_port = base_port + (executor_number * range_size)
-    end_port = start_port + 20000
-
-    # Ensure generated ports are within the valid range
-    if start_port < min_port or end_port > max_port:
-        raise ValueError(f"Generated port range ({start_port}-{end_port}) is outside the allowed range ({min_port}-{max_port}).")
-
-    return list(range(start_port, end_port))
-
-
 def pytest_configure(config):
     status_backend_urls = config.getoption("--status_backend_url")
     Config.status_backend_urls = _status_backend_url_generator(status_backend_urls) if status_backend_urls else None
@@ -115,7 +99,6 @@ def pytest_configure(config):
     Config.waku_fleet = config.getoption("--waku-fleet")
     Config.push_fleets_config = config.getoption("--push-fleets-config")
     Config.disable_override_networks = config.getoption("--disable-override-networks")
-    Config.status_backend_port_range = _calculate_port_range()
     Config.base_dir = os.path.dirname(os.path.abspath(__file__))  # schemas directory
 
 
