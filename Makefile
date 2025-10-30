@@ -219,7 +219,7 @@ status-backend: build/bin/status-backend
 run-status-backend: PORT ?= 0
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
-	go run ./cmd/status-backend --address localhost:${PORT}
+	go run -tags '$(BUILD_TAGS)' ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
