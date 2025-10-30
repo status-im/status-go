@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 
 	"go.uber.org/zap"
@@ -132,11 +133,13 @@ func (d *CodexArchiveDownloader) IsCancelled() bool {
 
 // StartDownload begins downloading all missing archives
 func (d *CodexArchiveDownloader) StartDownload() {
+	defer common.LogOnPanic()
 	d.downloadAllArchives()
 }
 
 // downloadAllArchives handles the main download loop for all archives
 func (d *CodexArchiveDownloader) downloadAllArchives() {
+	defer common.LogOnPanic()
 	// Create sorted list of archives (newest first, like torrent version)
 	type archiveInfo struct {
 		hash string
@@ -183,6 +186,7 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 
 	// Monitor for cancellation in a separate goroutine
 	go func() {
+		defer common.LogOnPanic()
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
 
@@ -230,6 +234,7 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 
 		// Trigger archive download and track progress in a goroutine
 		go func(archiveHash, archiveCid string, archiveFrom, archiveTo uint64, archiveCancel chan struct{}) {
+			defer common.LogOnPanic()
 			defer func() {
 				// Always clean up: remove from active downloads and check completion
 				d.mu.Lock()
@@ -297,12 +302,14 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 
 // triggerSingleArchiveDownload downloads a single archive by its CID
 func (d *CodexArchiveDownloader) triggerSingleArchiveDownload(hash, cid string, cancelChan <-chan struct{}) error {
+	defer common.LogOnPanic()
 	// Create a context that can be cancelled via our cancel channel
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Monitor for cancellation in a separate goroutine
 	go func() {
+		defer common.LogOnPanic()
 		select {
 		case <-cancelChan:
 			cancel() // Cancel the download immediately
