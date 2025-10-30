@@ -175,7 +175,10 @@ endif
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
 $(GO_CMD_BUILDS): generate
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
-	$(CGO_ENV) go build -mod=vendor -v \
+	CGO_ENABLED=1 \
+	CGO_CFLAGS=-I$(LIBS_DIR) \
+	CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" \
+	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
 	@echo "Compilation done."
@@ -259,8 +262,6 @@ status-go-deps:
 	go clean -cache || true
 	go clean -modcache || true
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
-
-
 
 statusgo-c-bindings:
 	## cmd/library/README.md explains the magic incantation behind this
@@ -418,7 +419,7 @@ test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
-	@./_assets/scripts/run_functional_tests.sh
+	CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" @./_assets/scripts/run_functional_tests.sh
 
 benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 benchmark:
