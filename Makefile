@@ -365,7 +365,6 @@ fetch-libcodex:
 		rm -f $(LIBS_DIR)/codex*.zip; \
 	fi
 
-# Add rpath to libstdc++ to avoid runtime errors with NIX
 test-libcodex: generate |
 	$(CGO_ENV) go test -tags '$(BUILD_TAGS) use_codex' -run TestCodexStart ./codex/... -v -json -count=1 | jq -r '.Output'
 
@@ -550,7 +549,7 @@ test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
-	@$(CGO_ENV) LD_LIBRARY_PATH= DYLD_LIBRARY_PATH= ./_assets/scripts/run_functional_tests.sh
+	@./_assets/scripts/run_functional_tests.sh
 
 benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 benchmark:
