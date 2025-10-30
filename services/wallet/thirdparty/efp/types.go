@@ -6,6 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+//go:generate mockgen -package=mock_efp -source=types.go -destination=mock/mock_efp.go
+
 // FollowingDataProvider defines the interface for providers that can fetch following addresses
 type FollowingDataProvider interface {
 	ID() string
