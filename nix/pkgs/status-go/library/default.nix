@@ -14,11 +14,17 @@ let
     else if stdenv.hostPlatform.isAarch64 then "arm64"
     else stdenv.hostPlatform.arch;
   os = if stdenv.isDarwin then "macos" else "Linux";
+  hash = 
+    if stdenv.hostPlatform.isDarwin 
+    # nix store prefetch-file --json --unpack https://github.com/codex-storage/codex-go-bindings/releases/download/v0.0.24/codex-macos-arm64.zip | jq -r .hash
+    then "sha256-0AwwTom5i8v+hG81ikKjXWVeq7/v/FNVyb+3clH/V1Y="
+    # nix store prefetch-file --json --unpack https://github.com/codex-storage/codex-go-bindings/releases/download/v0.0.24/codex-Linux-amd64.zip | jq -r .hash
+    else "sha256-P1w1XvWsg/ZPg8VZfd52hffI2u4SIIWekIWVP79YnCc=";
 
   # Pre-fetch libcodex to avoid network during build
   codexLib = pkgs.fetchzip {
     url = "https://github.com/codex-storage/codex-go-bindings/releases/download/${codexVersion}/codex-${os}-${arch}.zip";
-    hash = "sha256-P1w1XvWsg/ZPg8VZfd52hffI2u4SIIWekIWVP79YnCc=";
+    hash = hash;
     stripRoot = false;
   };
 
