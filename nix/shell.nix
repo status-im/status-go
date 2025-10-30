@@ -17,7 +17,7 @@ in mkShell {
 
   buildInputs = with pkgs;
     lib.optionals (stdenv.isDarwin) [ xcodeWrapper llvmPackages.openmp ] ++ [
-    git jq which
+    git jq which unzip
     go golangci-lint go-junit-report gopls codecov-cli
     protobuf3_24 protoc-gen-go gotestsum openjdk openssl
     rustc cargo
