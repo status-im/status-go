@@ -40,7 +40,7 @@ in pkgs.buildGoModule {
 
   preBuild = ''
     go run cmd/library/*.go > $NIX_BUILD_TOP/main.go
-    make generate SHELL=$SHELL GO111MODULE=on GO_GENERATE_CMD='go generate'
+    make generate NO_NETWORK=1 SHELL=$SHELL GO111MODULE=on GO_GENERATE_CMD='go generate'
   '';
 
   # Build the Go library

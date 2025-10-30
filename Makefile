@@ -348,7 +348,7 @@ generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
 generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
-ifeq ($(NIX_BUILD_TOP),)
+ifeq ($(NO_NETWORK),)
 generate: fetch-libcodex
 endif
 generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
