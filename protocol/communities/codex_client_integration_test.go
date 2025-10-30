@@ -11,12 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-
-	"github.com/status-im/status-go/protocol/communities"
 )
 
 // CodexClientIntegrationTestSuite demonstrates testify's suite functionality for CodexClient integration tests
@@ -27,36 +24,11 @@ import (
 //   - CODEX_TIMEOUT_MS (optional; default: 60000)
 type CodexClientIntegrationTestSuite struct {
 	suite.Suite
-	client *communities.CodexClient
 }
 
 // SetupSuite runs once before all tests in the suite
 func (suite *CodexClientIntegrationTestSuite) SetupSuite() {
-	client, err := communities.NewCodexClient(codex.Config{
-		DataDir:        suite.T().TempDir(),
-		LogFormat:      codex.LogFormatNoColors,
-		MetricsEnabled: false,
-		BlockRetries:   5,
-	})
-	if err != nil {
-		suite.T().Fatalf("Failed to create Codex client: %v", err)
-	}
 
-	suite.T().Cleanup(func() {
-		if err := client.Stop(); err != nil {
-			suite.T().Logf("Failed to stop codex: %v", err)
-		}
-
-		if err := client.Destroy(); err != nil {
-			suite.T().Logf("Failed to destroy codex: %v", err)
-		}
-	})
-
-	suite.client = &client
-
-	if err = suite.client.Start(); err != nil {
-		suite.T().Fatalf("Failed to start Codex node: %v", err)
-	}
 }
 
 // TestCodexClientIntegrationTestSuite runs the integration test suite
@@ -65,25 +37,27 @@ func TestCodexClientIntegrationTestSuite(t *testing.T) {
 }
 
 func (suite *CodexClientIntegrationTestSuite) TestIntegration_UploadAndDownload() {
+	client := NewCodexClientTest(suite.T())
+
 	// Generate random payload to ensure proper round-trip verification
 	payload := make([]byte, 1024)
 	_, err := rand.Read(payload)
 	require.NoError(suite.T(), err, "failed to generate random payload")
 	suite.T().Logf("Generated payload (first 32 bytes hex): %s", hex.EncodeToString(payload[:32]))
 
-	cid, err := suite.client.Upload(bytes.NewReader(payload), "it.bin")
+	cid, err := client.Upload(bytes.NewReader(payload), "it.bin")
 	require.NoError(suite.T(), err, "upload failed")
 	suite.T().Logf("Upload successful, CID: %s", cid)
 
 	// Clean up after test
 	defer func() {
-		if err := suite.client.RemoveCid(cid); err != nil {
+		if err := client.RemoveCid(cid); err != nil {
 			suite.T().Logf("Warning: Failed to remove CID %s: %v", cid, err)
 		}
 	}()
 
 	// Verify existence via HasCid
-	exists, err := suite.client.HasCid(cid)
+	exists, err := client.HasCid(cid)
 	require.NoError(suite.T(), err, "HasCid failed")
 	assert.True(suite.T(), exists, "HasCid returned false for uploaded CID %s", cid)
 	suite.T().Logf("HasCid confirmed existence of CID: %s", cid)
@@ -93,40 +67,44 @@ func (suite *CodexClientIntegrationTestSuite) TestIntegration_UploadAndDownload(
 	defer cancel()
 
 	var buf bytes.Buffer
-	err = suite.client.DownloadWithContext(ctx, cid, &buf)
+	err = client.DownloadWithContext(ctx, cid, &buf)
 	require.NoError(suite.T(), err, "download failed")
 	assert.Equal(suite.T(), payload, buf.Bytes(), "payload mismatch")
 }
 
 func (suite *CodexClientIntegrationTestSuite) TestIntegration_CheckNonExistingCID() {
+	client := NewCodexClientTest(suite.T())
+
 	// Generate random payload to ensure proper round-trip verification
 	payload := make([]byte, 1024)
 	_, err := rand.Read(payload)
 	require.NoError(suite.T(), err, "failed to generate random payload")
 	suite.T().Logf("Generated payload (first 32 bytes hex): %s", hex.EncodeToString(payload[:32]))
 
-	cid, err := suite.client.Upload(bytes.NewReader(payload), "it.bin")
+	cid, err := client.Upload(bytes.NewReader(payload), "it.bin")
 	require.NoError(suite.T(), err, "upload failed")
 	suite.T().Logf("Upload successful, CID: %s", cid)
 
 	// Verify existence via HasCid
-	exists, err := suite.client.HasCid(cid)
+	exists, err := client.HasCid(cid)
 	require.NoError(suite.T(), err, "HasCid failed")
 	assert.True(suite.T(), exists, "HasCid returned false for uploaded CID %s", cid)
 	suite.T().Logf("HasCid confirmed existence of CID: %s", cid)
 
 	// Remove CID from Codex
-	err = suite.client.RemoveCid(cid)
+	err = client.RemoveCid(cid)
 	require.NoError(suite.T(), err, "RemoveCid failed")
 	suite.T().Logf("RemoveCid confirmed deletion of CID: %s", cid)
 
-	exists, err = suite.client.HasCid(cid)
+	exists, err = client.HasCid(cid)
 	require.NoError(suite.T(), err, "HasCid failed after removal")
 	assert.False(suite.T(), exists, "HasCid returned true for removed CID %s", cid)
 	suite.T().Logf("HasCid confirmed CID is no longer present: %s", cid)
 }
 
 func (suite *CodexClientIntegrationTestSuite) TestIntegration_TriggerDownload() {
+	client := NewCodexClientTest(suite.T())
+
 	// Generate random payload to ensure proper round-trip verification
 	payload := make([]byte, 1024)
 	_, err := rand.Read(payload)
@@ -134,19 +112,19 @@ func (suite *CodexClientIntegrationTestSuite) TestIntegration_TriggerDownload() 
 	suite.T().Logf("Generated payload (first 32 bytes hex): %s", hex.EncodeToString(payload[:32]))
 
 	// Upload the data
-	cid, err := suite.client.Upload(bytes.NewReader(payload), "local-download-test.bin")
+	cid, err := client.Upload(bytes.NewReader(payload), "local-download-test.bin")
 	require.NoError(suite.T(), err, "upload failed")
 	suite.T().Logf("Upload successful, CID: %s", cid)
 
 	// Clean up after test
 	defer func() {
-		if err := suite.client.RemoveCid(cid); err != nil {
+		if err := client.RemoveCid(cid); err != nil {
 			suite.T().Logf("Warning: Failed to remove CID %s: %v", cid, err)
 		}
 	}()
 
 	// Trigger async download
-	manifest, err := suite.client.TriggerDownload(cid)
+	manifest, err := client.TriggerDownload(cid)
 	require.NoError(suite.T(), err, "TriggerDownload failed")
 	suite.T().Logf("Async download triggered, manifest CID: %s", manifest.Cid)
 
@@ -156,7 +134,7 @@ func (suite *CodexClientIntegrationTestSuite) TestIntegration_TriggerDownload() 
 		ticker := time.NewTicker(500 * time.Millisecond)
 		defer ticker.Stop()
 		for range ticker.C {
-			hasCid, err := suite.client.HasCid(cid)
+			hasCid, err := client.HasCid(cid)
 			if err != nil {
 				suite.T().Logf("HasCid check failed: %v", err)
 				continue
@@ -184,7 +162,7 @@ func (suite *CodexClientIntegrationTestSuite) TestIntegration_TriggerDownload() 
 	defer cancel()
 
 	var downloadBuf bytes.Buffer
-	err = suite.client.LocalDownloadWithContext(ctx, cid, &downloadBuf)
+	err = client.LocalDownloadWithContext(ctx, cid, &downloadBuf)
 	require.NoError(suite.T(), err, "LocalDownload after trigger download failed")
 
 	downloadedData := downloadBuf.Bytes()
@@ -195,25 +173,27 @@ func (suite *CodexClientIntegrationTestSuite) TestIntegration_TriggerDownload() 
 }
 
 func (suite *CodexClientIntegrationTestSuite) TestIntegration_FetchManifest() {
+	client := NewCodexClientTest(suite.T())
+
 	// Generate random payload to ensure proper round-trip verification
 	payload := make([]byte, 1024)
 	_, err := rand.Read(payload)
 	require.NoError(suite.T(), err, "failed to generate random payload")
 	suite.T().Logf("Generated payload (first 32 bytes hex): %s", hex.EncodeToString(payload[:32]))
 
-	cid, err := suite.client.Upload(bytes.NewReader(payload), "fetch-manifest-test.bin")
+	cid, err := client.Upload(bytes.NewReader(payload), "fetch-manifest-test.bin")
 	require.NoError(suite.T(), err, "upload failed")
 	suite.T().Logf("Upload successful, CID: %s", cid)
 
 	// Clean up after test
 	defer func() {
-		if err := suite.client.RemoveCid(cid); err != nil {
+		if err := client.RemoveCid(cid); err != nil {
 			suite.T().Logf("Warning: Failed to remove CID %s: %v", cid, err)
 		}
 	}()
 
 	// Verify existence via HasCid first
-	exists, err := suite.client.HasCid(cid)
+	exists, err := client.HasCid(cid)
 	require.NoError(suite.T(), err, "HasCid failed")
 	assert.True(suite.T(), exists, "HasCid returned false for uploaded CID %s", cid)
 	suite.T().Logf("HasCid confirmed existence of CID: %s", cid)
@@ -222,7 +202,7 @@ func (suite *CodexClientIntegrationTestSuite) TestIntegration_FetchManifest() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	manifest, err := suite.client.FetchManifestWithContext(ctx, cid)
+	manifest, err := client.FetchManifestWithContext(ctx, cid)
 	require.NoError(suite.T(), err, "FetchManifestWithContext failed")
 	suite.T().Logf("FetchManifest successful, manifest CID: %s", manifest.Cid)
 
@@ -248,7 +228,7 @@ func (suite *CodexClientIntegrationTestSuite) TestIntegration_FetchManifest() {
 
 	// Test fetching manifest for non-existent CID (should fail gracefully)
 	nonExistentCID := "zDvZRwzmNonExistentCID123456789"
-	_, err = suite.client.FetchManifestWithContext(ctx, nonExistentCID)
+	_, err = client.FetchManifestWithContext(ctx, nonExistentCID)
 	assert.Error(suite.T(), err, "Expected error when fetching manifest for non-existent CID")
 	suite.T().Logf("Expected error for non-existent CID: %v", err)
 }
