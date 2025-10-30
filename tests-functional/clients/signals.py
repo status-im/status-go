@@ -134,13 +134,13 @@ class SignalClient:
         self.received_signals[signal_type]["expected_count"] = len(self.received_signals[signal_type]["received"]) + delta_count
         self.received_signals[signal_type]["accept_fn"] = accept_fn
 
-    def wait_for_signal(self, signal_type: SignalType | str, timeout: int = 20):
+    def wait_for_signal(self, signal_type: SignalType | str, timeout: int | None = 20):
         signal_type = self._convert_signal_type(signal_type)
 
         start_time = time.time()
         received_signals = self.received_signals.get(signal_type)
         while (not received_signals) or len(received_signals["received"]) < received_signals["expected_count"]:
-            if time.time() - start_time >= timeout:
+            if timeout is not None and time.time() - start_time >= timeout:
                 raise TimeoutError(f"Signal {signal_type} is not received in {timeout} seconds")
             time.sleep(0.2)
         logging.debug(f"Signal {signal_type} is received in {round(time.time() - start_time)} seconds")
