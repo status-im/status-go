@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/status-im/status-go/common"
+
 	"go.uber.org/zap"
 )
 
@@ -40,6 +42,7 @@ func NewCodexIndexDownloader(codexClient CodexClientInterface, indexCid string, 
 // for the configured CID is successfully fetched. On error, the channel is not closed
 // (allowing timeout to handle failures). Check GetDatasetSize() > 0 to verify success.
 func (d *CodexIndexDownloader) GotManifest() <-chan struct{} {
+	defer common.LogOnPanic()
 	ch := make(chan struct{})
 
 	// Create cancellable context
@@ -47,6 +50,7 @@ func (d *CodexIndexDownloader) GotManifest() <-chan struct{} {
 
 	// Monitor for cancellation in separate goroutine
 	go func() {
+		defer common.LogOnPanic()
 		select {
 		case <-d.cancelChan:
 			cancel() // Cancel fetch immediately
@@ -56,6 +60,7 @@ func (d *CodexIndexDownloader) GotManifest() <-chan struct{} {
 	}()
 
 	go func() {
+		defer common.LogOnPanic()
 		defer cancel() // Ensure context is cancelled when fetch completes or fails
 
 		// Reset datasetSize to 0 to indicate no successful fetch yet
@@ -110,6 +115,7 @@ func (d *CodexIndexDownloader) GetDatasetSize() int64 {
 
 // DownloadIndexFile starts downloading the index file from Codex and writes it to the configured file path
 func (d *CodexIndexDownloader) DownloadIndexFile() {
+	defer common.LogOnPanic()
 	// Reset progress counter and completion flag
 	d.mu.Lock()
 	d.bytesCompleted = 0
@@ -122,6 +128,7 @@ func (d *CodexIndexDownloader) DownloadIndexFile() {
 
 	// Monitor for cancellation in separate goroutine
 	go func() {
+		defer common.LogOnPanic()
 		select {
 		case <-d.cancelChan:
 			cancel() // Cancel download immediately
@@ -132,6 +139,7 @@ func (d *CodexIndexDownloader) DownloadIndexFile() {
 
 	// Start download in separate goroutine
 	go func() {
+		defer common.LogOnPanic()
 		defer cancel() // Ensure context is cancelled when download completes or fails
 
 		// Create a temporary file in the same directory as the target file
