@@ -20,6 +20,8 @@ in pkgs.buildGoModule {
     fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
   in
     with pkgs; [
+      curl 
+      unzip
       mockgen
       protoc-gen-go
       protobuf3_24
@@ -40,7 +42,7 @@ in pkgs.buildGoModule {
 
   preBuild = ''
     go run cmd/library/*.go > $NIX_BUILD_TOP/main.go
-    make generate NO_NETWORK=1 SHELL=$SHELL GO111MODULE=on GO_GENERATE_CMD='go generate'
+    make generate SHELL=$SHELL GO111MODULE=on GO_GENERATE_CMD='go generate'
   '';
 
   # Build the Go library
@@ -48,6 +50,10 @@ in pkgs.buildGoModule {
   # https://github.com/status-im/status-mobile/issues/20135
   buildPhase = ''
     runHook preBuild
+    export LIBS_DIR="$PWD/libs"
+    CGO_ENABLED=1 \
+    CGO_CFLAGS=-I$(LIBS_DIR) \
+    CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" \
     go build \
       -buildmode='c-archive' \
       ${optionalString stdenv.isDarwin "-ldflags=-extldflags=-lresolv"} \
