@@ -212,7 +212,7 @@ else
 CODEX_OS := $(detected_OS)
 endif
 
-CODEX_VERSION ?= "v0.0.22"
+CODEX_VERSION ?= "v0.0.24"
 CODEX_DOWNLOAD_URL := "https://github.com/codex-storage/codex-go-bindings/releases/download/$(CODEX_VERSION)/codex-${CODEX_OS}-${CODEX_ARCH}.zip"
 
 fetch-libcodex:

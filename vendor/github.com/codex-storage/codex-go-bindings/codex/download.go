@@ -30,6 +30,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -216,10 +217,12 @@ func (node CodexNode) DownloadStream(ctx context.Context, cid string, options Do
 	defer close(done)
 
 	channelError := make(chan error, 1)
+	var cancelled atomic.Bool
 	go func() {
 		select {
 		case <-ctx.Done():
 			channelError <- node.DownloadCancel(cid)
+			cancelled.Store(true)
 		case <-done:
 			// Nothing to do, download finished
 		}
@@ -236,7 +239,11 @@ func (node CodexNode) DownloadStream(ctx context.Context, cid string, options Do
 
 	if err != nil {
 		if cancelError != nil {
-			return fmt.Errorf("download canceled: %v, but failed to cancel download session: %v", ctx.Err(), cancelError)
+			return fmt.Errorf("context canceled: %v, but failed to cancel download session: %v", ctx.Err(), cancelError)
+		}
+
+		if cancelled.Load() {
+			return context.Canceled
 		}
 
 		return err

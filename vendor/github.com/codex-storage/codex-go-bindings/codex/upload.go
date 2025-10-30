@@ -28,10 +28,10 @@ import "C"
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -187,7 +187,7 @@ func (node CodexNode) UploadReader(ctx context.Context, options UploadOptions, r
 			if cancelErr := node.UploadCancel(sessionId); cancelErr != nil {
 				return "", fmt.Errorf("upload canceled: %v, but failed to cancel upload session: %v", ctx.Err(), cancelErr)
 			}
-			return "", errors.New("upload canceled")
+			return "", context.Canceled
 		default:
 			// continue
 		}
@@ -313,10 +313,12 @@ func (node CodexNode) UploadFile(ctx context.Context, options UploadOptions) (st
 	defer close(done)
 
 	channelError := make(chan error, 1)
+	var cancelled atomic.Bool
 	go func() {
 		select {
 		case <-ctx.Done():
 			channelError <- node.UploadCancel(sessionId)
+			cancelled.Store(true)
 		case <-done:
 			// Nothing to do, upload finished
 		}
@@ -333,8 +335,13 @@ func (node CodexNode) UploadFile(ctx context.Context, options UploadOptions) (st
 
 	if err != nil {
 		if cancelErr != nil {
-			return "", fmt.Errorf("upload canceled: %v, but failed to cancel upload session: %v", ctx.Err(), cancelErr)
+			return "", fmt.Errorf("context canceled: %v, but failed to cancel upload session: %v", ctx.Err(), cancelErr)
 		}
+
+		if cancelled.Load() {
+			return "", context.Canceled
+		}
+
 		return "", err
 	}
 
