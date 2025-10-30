@@ -112,7 +112,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             self.temp_dir.cleanup()
 
     @retry(
-        stop=stop_after_delay(10),
+        stop=stop_after_delay(30),
         wait=wait_exponential(multiplier=1, min=0.1, max=5),
         retry=retry_if_exception_type((ConnectionError, requests.RequestException)),
         reraise=True,
