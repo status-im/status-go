@@ -97,7 +97,7 @@ pipeline {
     stage('Build Static Lib') {
         steps {
             script {
-                nix.develop('make statusgo-library', pure: false)
+                nix.develop('make statusgo-library', pure: false, sandbox: false)
                 }
             }
         }
@@ -105,7 +105,7 @@ pipeline {
     stage('Build Shared Lib') {
         steps {
             script {
-                nix.develop('make statusgo-shared-library', pure: false)
+                nix.develop('make statusgo-shared-library', pure: false, sandbox: false)
                 }
             }
         }
