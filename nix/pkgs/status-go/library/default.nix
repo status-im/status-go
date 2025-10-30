@@ -19,6 +19,7 @@ let
   codexLib = pkgs.fetchzip {
     url = "https://github.com/codex-storage/codex-go-bindings/releases/download/${codexVersion}/codex-${os}-${arch}.zip";
     hash = "sha256-P1w1XvWsg/ZPg8VZfd52hffI2u4SIIWekIWVP79YnCc=";
+    stripRoot = false;
   };
 
 in pkgs.buildGoModule {
