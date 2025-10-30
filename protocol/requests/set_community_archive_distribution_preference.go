@@ -15,11 +15,11 @@ func (s *SetCommunityArchiveDistributionPreference) Validate() error {
 	if s == nil {
 		return errors.New("invalid request")
 	}
-	
+
 	if len(s.CommunityID) == 0 {
 		return errors.New("community ID is required")
 	}
-	
+
 	// Validate preference value
 	switch s.Preference {
 	case "auto", "torrent", "codex":
