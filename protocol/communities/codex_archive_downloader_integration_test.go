@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
-
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 
@@ -26,46 +24,21 @@ import (
 // against a real Codex instance
 type CodexArchiveDownloaderIntegrationSuite struct {
 	suite.Suite
-	client       *communities.CodexClient
 	uploadedCIDs []string // Track uploaded CIDs for cleanup
 }
 
 // SetupSuite runs once before all tests in the suite
 func (suite *CodexArchiveDownloaderIntegrationSuite) SetupSuite() {
-	client, err := communities.NewCodexClient(codex.Config{
-		LogFormat:      codex.LogFormatNoColors,
-		MetricsEnabled: false,
-		BlockRetries:   5,
-		LogLevel:       "ERROR",
-	})
-	if err != nil {
-		suite.T().Fatalf("Failed to create Codex client: %v", err)
-	}
-
-	suite.T().Cleanup(func() {
-		if err := client.Stop(); err != nil {
-			suite.T().Logf("Failed to stop codex: %v", err)
-		}
-
-		if err := client.Destroy(); err != nil {
-			suite.T().Logf("Failed to destroy codex: %v", err)
-		}
-	})
-
-	suite.client = &client
-
-	if err = suite.client.Start(); err != nil {
-		suite.T().Fatalf("Failed to start Codex node: %v", err)
-	}
-
-	suite.T().Logf("CodexClient configured")
+	// Nothing to do
 }
 
 // TearDownSuite runs once after all tests in the suite
 func (suite *CodexArchiveDownloaderIntegrationSuite) TearDownSuite() {
+	client := NewCodexClientTest(suite.T())
+
 	// Clean up all uploaded CIDs
 	for _, cid := range suite.uploadedCIDs {
-		if err := suite.client.RemoveCid(cid); err != nil {
+		if err := client.RemoveCid(cid); err != nil {
 			suite.T().Logf("Warning: Failed to remove CID %s: %v", cid, err)
 		} else {
 			suite.T().Logf("Successfully removed CID: %s", cid)
@@ -74,6 +47,8 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TearDownSuite() {
 }
 
 func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWorkflow() {
+	client := NewCodexClientTest(suite.T())
+
 	// Step 1: Create test archive data and upload multiple archives to Codex
 	archives := []struct {
 		hash string
@@ -98,7 +73,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 
 	// Upload all archives to Codex
 	for _, archive := range archives {
-		cid, err := suite.client.Upload(bytes.NewReader(archive.data), archive.hash+".bin")
+		cid, err := client.Upload(bytes.NewReader(archive.data), archive.hash+".bin")
 		require.NoError(suite.T(), err, "Failed to upload %s", archive.hash)
 
 		archiveCIDs[archive.hash] = cid
@@ -106,7 +81,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 		suite.T().Logf("Uploaded %s to CID: %s", archive.hash, cid)
 
 		// Verify upload succeeded
-		exists, err := suite.client.HasCid(cid)
+		exists, err := client.HasCid(cid)
 		require.NoError(suite.T(), err, "Failed to check CID existence for %s", archive.hash)
 		require.True(suite.T(), exists, "CID %s should exist after upload", cid)
 	}
@@ -134,7 +109,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 	logger, _ := zap.NewDevelopment() // Use development logger for integration tests
 
 	downloader := communities.NewCodexArchiveDownloader(
-		suite.client,
+		&client,
 		index,
 		communityID,
 		existingArchiveIDs,
@@ -214,7 +189,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 
 		var downloadBuf bytes.Buffer
-		err := suite.client.LocalDownloadWithContext(ctx, cid, &downloadBuf)
+		err := client.LocalDownloadWithContext(ctx, cid, &downloadBuf)
 		cancel()
 
 		require.NoError(suite.T(), err, "LocalDownload should succeed for %s", completedHash)

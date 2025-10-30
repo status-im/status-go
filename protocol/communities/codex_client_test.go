@@ -13,8 +13,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/protocol/communities"
-
-	"github.com/codex-storage/codex-go-bindings/codex"
 )
 
 func upload(client communities.CodexClient, t *testing.T, buf *bytes.Buffer) string {
@@ -34,43 +32,11 @@ func upload(client communities.CodexClient, t *testing.T, buf *bytes.Buffer) str
 // CodexClientTestSuite demonstrates testify's suite functionality for CodexClient tests
 type CodexClientTestSuite struct {
 	suite.Suite
-	client *communities.CodexClient
 }
 
 // SetupTest runs before each test method
 func (suite *CodexClientTestSuite) SetupTest() {
-	client, err := communities.NewCodexClient(codex.Config{
-		DataDir:        suite.T().TempDir(),
-		LogFormat:      codex.LogFormatNoColors,
-		MetricsEnabled: false,
-		BlockRetries:   5,
-		LogLevel:       "ERROR",
-	})
 
-	if err != nil {
-		suite.T().Fatalf("Failed to create Codex node: %v", err)
-	}
-
-	suite.T().Cleanup(func() {
-		if err := client.Stop(); err != nil {
-			suite.T().Logf("Failed to stop codex: %v", err)
-		}
-
-		if err := client.Destroy(); err != nil {
-			suite.T().Logf("Failed to destroy codex: %v", err)
-		}
-	})
-
-	suite.client = &client
-
-	if err = suite.client.Start(); err != nil {
-		suite.T().Fatalf("Failed to start Codex node: %v", err)
-	}
-
-	// TODO Remove this when the Codex binding is updated
-	if err = client.UpdateLogLevel("ERROR"); err != nil {
-		suite.T().Fatalf("Failed to set Codex log level: %v", err)
-	}
 }
 
 // TearDownTest runs after each test method
@@ -84,8 +50,10 @@ func TestCodexClientTestSuite(t *testing.T) {
 }
 
 func (suite *CodexClientTestSuite) TestUpload_Success() {
+	client := NewCodexClientTest(suite.T())
+
 	// Act
-	cid, err := suite.client.Upload(bytes.NewReader([]byte("payload")), "hello.txt")
+	cid, err := client.Upload(bytes.NewReader([]byte("payload")), "hello.txt")
 
 	// Assert
 	require.NoError(suite.T(), err)
@@ -94,11 +62,13 @@ func (suite *CodexClientTestSuite) TestUpload_Success() {
 }
 
 func (suite *CodexClientTestSuite) TestDownload_Success() {
+	client := NewCodexClientTest(suite.T())
+
 	const payload = "hello from codex"
-	cid := upload(*suite.client, suite.T(), bytes.NewBuffer([]byte(payload)))
+	cid := upload(client, suite.T(), bytes.NewBuffer([]byte(payload)))
 
 	var buf bytes.Buffer
-	err := suite.client.Download(cid, &buf)
+	err := client.Download(cid, &buf)
 	require.NoError(suite.T(), err)
 	assert.Equal(suite.T(), payload, buf.String())
 }
@@ -107,14 +77,16 @@ func (suite *CodexClientTestSuite) TestDownloadWithContext_Cancel() {
 	// skip test
 	suite.T().Skip("Wait for cancellation support PR to be merged in codex-go-bindings")
 
+	client := NewCodexClientTest(suite.T())
+
 	len := 1024 * 1024 * 50
 	buf := bytes.NewBuffer(make([]byte, len))
-	cid := upload(*suite.client, suite.T(), buf)
+	cid := upload(client, suite.T(), buf)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
 
 	channelError := make(chan error, 1)
 	go func() {
-		err := suite.client.DownloadWithContext(ctx, cid, io.Discard)
+		err := client.DownloadWithContext(ctx, cid, io.Discard)
 		channelError <- err
 	}()
 
@@ -133,8 +105,10 @@ func (suite *CodexClientTestSuite) TestDownloadWithContext_Cancel() {
 }
 
 func (suite *CodexClientTestSuite) TestHasCid_Success() {
+	client := NewCodexClientTest(suite.T())
+
 	const payload = "hello from codex"
-	cid := upload(*suite.client, suite.T(), bytes.NewBuffer([]byte(payload)))
+	cid := upload(client, suite.T(), bytes.NewBuffer([]byte(payload)))
 
 	tests := []struct {
 		name     string
@@ -147,7 +121,7 @@ func (suite *CodexClientTestSuite) TestHasCid_Success() {
 
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			got, err := suite.client.HasCid(tt.cid)
+			got, err := client.HasCid(tt.cid)
 			require.NoError(suite.T(), err)
 			assert.Equal(suite.T(), tt.wantBool, got, "HasCid(%q) = %v, want %v", tt.cid, got, tt.wantBool)
 		})
@@ -155,19 +129,23 @@ func (suite *CodexClientTestSuite) TestHasCid_Success() {
 }
 
 func (suite *CodexClientTestSuite) TestRemoveCid_Success() {
-	const payload = "hello from codex"
-	cid := upload(*suite.client, suite.T(), bytes.NewBuffer([]byte(payload)))
+	client := NewCodexClientTest(suite.T())
 
-	err := suite.client.RemoveCid(cid)
+	const payload = "hello from codex"
+	cid := upload(client, suite.T(), bytes.NewBuffer([]byte(payload)))
+
+	err := client.RemoveCid(cid)
 	require.NoError(suite.T(), err)
 }
 
 func (suite *CodexClientTestSuite) TestTriggerDownload() {
+	client := NewCodexClientTest(suite.T())
+
 	const payload = "hello from codex"
-	cid := upload(*suite.client, suite.T(), bytes.NewBuffer([]byte(payload)))
+	cid := upload(client, suite.T(), bytes.NewBuffer([]byte(payload)))
 
 	ctx := context.Background()
-	manifest, err := suite.client.TriggerDownloadWithContext(ctx, cid)
+	manifest, err := client.TriggerDownloadWithContext(ctx, cid)
 	require.NoError(suite.T(), err)
 	assert.Equal(suite.T(), cid, manifest.Cid)
 	assert.Equal(suite.T(), "zDzSvJTf7mGkC3yuiVGco7Qc6s4LA8edye9inT4w2QqHnfbuRvMr", manifest.TreeCid)
@@ -178,13 +156,15 @@ func (suite *CodexClientTestSuite) TestTriggerDownload() {
 func (suite *CodexClientTestSuite) TestTriggerDownloadWithContext_Cancellation() {
 	suite.T().Skip("Not sure if we are going to have cancellation in trigger download")
 
+	client := NewCodexClientTest(suite.T())
+
 	const testCid = "zDvZRwzmTestCID"
 
 	// Cancel after 50ms (before server responds)
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	manifest, err := suite.client.TriggerDownloadWithContext(ctx, testCid)
+	manifest, err := client.TriggerDownloadWithContext(ctx, testCid)
 	require.Error(suite.T(), err, "expected cancellation error")
 	assert.Nil(suite.T(), manifest, "expected nil manifest on cancellation")
 	// Accept either canceled or deadline exceeded depending on timing
@@ -198,22 +178,26 @@ func (suite *CodexClientTestSuite) TestTriggerDownloadWithContext_Cancellation()
 }
 
 func (suite *CodexClientTestSuite) TestLocalDownload() {
+	client := NewCodexClientTest(suite.T())
+
 	const payload = "test data for local download"
-	cid := upload(*suite.client, suite.T(), bytes.NewBuffer([]byte(payload)))
+	cid := upload(client, suite.T(), bytes.NewBuffer([]byte(payload)))
 
 	var buf bytes.Buffer
-	err := suite.client.LocalDownload(cid, &buf)
+	err := client.LocalDownload(cid, &buf)
 	require.NoError(suite.T(), err, "LocalDownload failed")
 	assert.Equal(suite.T(), payload, buf.String(), "Downloaded data mismatch")
 }
 
 func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Success() {
+	client := NewCodexClientTest(suite.T())
+
 	const payload = "test data for local download with context"
-	cid := upload(*suite.client, suite.T(), bytes.NewBuffer([]byte(payload)))
+	cid := upload(client, suite.T(), bytes.NewBuffer([]byte(payload)))
 
 	ctx := context.Background()
 	var buf bytes.Buffer
-	err := suite.client.LocalDownloadWithContext(ctx, cid, &buf)
+	err := client.LocalDownloadWithContext(ctx, cid, &buf)
 	require.NoError(suite.T(), err, "LocalDownloadWithContext failed")
 	assert.Equal(suite.T(), payload, buf.String(), "Downloaded data mismatch")
 }
@@ -221,15 +205,17 @@ func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Success() {
 func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Cancellation() {
 	suite.T().Skip("Wait for cancellation support PR to be merged in codex-go-bindings")
 
+	client := NewCodexClientTest(suite.T())
+
 	// Create a context with a very short timeout
 	len := 1024 * 1024 * 50
 	buf := bytes.NewBuffer(make([]byte, len))
-	cid := upload(*suite.client, suite.T(), buf)
+	cid := upload(client, suite.T(), buf)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 
 	channelError := make(chan error, 1)
 	go func() {
-		err := suite.client.LocalDownloadWithContext(ctx, cid, io.Discard)
+		err := client.LocalDownloadWithContext(ctx, cid, io.Discard)
 		channelError <- err
 	}()
 
@@ -248,11 +234,13 @@ func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Cancellation() {
 }
 
 func (suite *CodexClientTestSuite) TestFetchManifestWithContext_Success() {
+	client := NewCodexClientTest(suite.T())
+
 	const payload = "hello from codex"
-	cid := upload(*suite.client, suite.T(), bytes.NewBuffer([]byte(payload)))
+	cid := upload(client, suite.T(), bytes.NewBuffer([]byte(payload)))
 
 	ctx := context.Background()
-	manifest, err := suite.client.FetchManifestWithContext(ctx, cid)
+	manifest, err := client.FetchManifestWithContext(ctx, cid)
 	require.NoError(suite.T(), err, "Expected no error")
 	require.NotNil(suite.T(), manifest, "Expected manifest, got nil")
 
@@ -268,13 +256,15 @@ func (suite *CodexClientTestSuite) TestFetchManifestWithContext_Success() {
 func (suite *CodexClientTestSuite) TestFetchManifestWithContext_Cancellation() {
 	suite.T().Skip("Not sure if we are going to have cancellation in fetch manifest")
 
+	client := NewCodexClientTest(suite.T())
+
 	testCid := "zDvZRwzmTestCID"
 
 	// Create a context with a very short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
-	manifest, err := suite.client.FetchManifestWithContext(ctx, testCid)
+	manifest, err := client.FetchManifestWithContext(ctx, testCid)
 	require.Error(suite.T(), err, "Expected context cancellation error")
 	assert.Nil(suite.T(), manifest, "Expected nil manifest on cancellation")
 

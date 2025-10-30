@@ -576,6 +576,10 @@ func (s *ManagerSuite) TestStopTorrentClient_ShouldStopHistoryArchiveTasks() {
 func (s *ManagerSuite) TestStartTorrentClient_DelayedUntilOnline() {
 	s.Require().False(s.archiveManager.torrentClientStarted())
 
+	s.T().Cleanup(func() {
+		s.archiveManager.Stop()
+	})
+
 	s.archiveManager.SetOnline(true)
 	s.Require().True(s.archiveManager.torrentClientStarted())
 	s.Require().True(s.archiveManager.isCodexClientStarted)
