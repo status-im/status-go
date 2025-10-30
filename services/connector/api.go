@@ -12,13 +12,15 @@ import (
 var (
 	ErrInvalidResponseFromForwardedRpc         = errors.New("invalid response from forwarded RPC")
 	ErrCannotOverrideClientIDForHttpConnection = errors.New("cannot override clientId for HTTP connection")
+	ErrNotAllowedForUntrustedConnection        = errors.New("cannot call from untrusted connection")
 	ErrEmptyClientIDFromTrustedConnection      = errors.New("trusted connection must provide a clientId")
 )
 
 type API struct {
-	s *Service
-	r *CommandRegistry
-	c *commands.ClientSideHandler
+	s                    *Service
+	r                    *CommandRegistry
+	c                    *commands.ClientSideHandler
+	changeAccountCommand *commands.ChangeAccountCommand
 }
 
 func NewAPI(s *Service) *API {
@@ -75,10 +77,15 @@ func NewAPI(s *Service) *API {
 		Db: s.db,
 	})
 
+	changeAccountCommand := &commands.ChangeAccountCommand{
+		Db: s.db,
+	}
+
 	return &API{
-		s: s,
-		r: r,
-		c: c,
+		s:                    s,
+		r:                    r,
+		c:                    c,
+		changeAccountCommand: changeAccountCommand,
 	}
 }
 
@@ -167,4 +174,11 @@ func (api *API) SignAccepted(args commands.SignAcceptedArgs) error {
 
 func (api *API) SignRejected(args commands.RejectedArgs) error {
 	return api.c.SignRejected(args)
+}
+
+func (api *API) ChangeAccount(ctx context.Context, args commands.ChangeAccountArgs) error {
+	if IsUntrustedConnection(ctx) {
+		return ErrNotAllowedForUntrustedConnection
+	}
+	return api.changeAccountCommand.Execute(args)
 }

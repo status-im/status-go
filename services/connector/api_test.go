@@ -96,3 +96,67 @@ func TestCallRPC_TrustedConnectionWithClientID(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 }
+
+func TestChangeAccount_UntrustedConnection(t *testing.T) {
+	state := setupTests(t)
+
+	// Test untrusted connection (HTTP)
+	ctx := WithConnectionType(context.Background(), ConnectionTypeHTTP)
+
+	args := commands.ChangeAccountArgs{
+		URL:      "https://example.com",
+		ClientID: "test-client",
+	}
+
+	err := state.api.ChangeAccount(ctx, args)
+	require.Error(t, err)
+	require.Equal(t, ErrNotAllowedForUntrustedConnection, err)
+}
+
+func TestCallRPC_MethodNotAllowed(t *testing.T) {
+	state := setupTests(t)
+
+	ctx := WithConnectionType(context.Background(), ConnectionTypeHTTP)
+
+	// Test a method that's not in the allowed list
+	request := `{
+		"method": "eth_subscribe",
+		"params": [],
+		"url": "https://example.com",
+		"name": "Example DApp",
+		"iconUrl": "https://example.com/icon.png"
+	}`
+
+	result, err := state.api.CallRPC(ctx, request)
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.Contains(t, err.Error(), "not allowed")
+}
+
+func TestCallRPC_InvalidJSON(t *testing.T) {
+	state := setupTests(t)
+
+	ctx := WithConnectionType(context.Background(), ConnectionTypeHTTP)
+
+	request := `invalid json`
+
+	result, err := state.api.CallRPC(ctx, request)
+	require.Error(t, err)
+	require.Equal(t, "", result)
+}
+
+func TestRecallDAppPermission_Deprecated(t *testing.T) {
+	state := setupTests(t)
+
+	err := state.api.RecallDAppPermission("https://example.com")
+	// Error is expected when dApp doesn't exist
+	require.Error(t, err)
+}
+
+func TestGetPermittedDAppsList(t *testing.T) {
+	state := setupTests(t)
+
+	dapps, err := state.api.GetPermittedDAppsList()
+	require.NoError(t, err)
+	require.Empty(t, dapps)
+}

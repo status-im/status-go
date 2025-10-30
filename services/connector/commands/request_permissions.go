@@ -62,7 +62,7 @@ func (c *RequestPermissionsCommand) parseCaveats(caveatsMap map[string]interface
 
 func (c *RequestPermissionsCommand) getPermissionResponse(url string, methodName string, caveats []persistence.Caveat) persistence.Permission {
 	return persistence.Permission{
-		Invoker:          url,
+		Invoker:          persistence.NormalizeURL(url),
 		ParentCapability: methodName,
 		Caveats:          caveats,
 	}

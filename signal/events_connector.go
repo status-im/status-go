@@ -11,6 +11,7 @@ const (
 	EventConnectorDAppPermissionGranted = "connector.dAppPermissionGranted"
 	EventConnectorDAppPermissionRevoked = "connector.dAppPermissionRevoked"
 	EventConnectorDAppChainIdSwitched   = "connector.dAppChainIdSwitched"
+	EventConnectorAccountChanged        = "connector.dAppAccountChanged"
 )
 
 type ConnectorDApp struct {
@@ -53,6 +54,12 @@ type ConnectorDAppChainIdSwitchedSignal struct {
 	ChainId string `json:"chainId"`
 }
 
+type ConnectorAccountChangedSignal struct {
+	URL           string        `json:"url"`
+	ClientID      string        `json:"clientId"`
+	SharedAccount types.Address `json:"sharedAccount"`
+}
+
 func SendConnectorSendRequestAccounts(dApp ConnectorDApp, requestID string) {
 	send(EventConnectorSendRequestAccounts, ConnectorSendRequestAccountsSignal{
 		ConnectorDApp: dApp,
@@ -93,4 +100,12 @@ func SendConnectorDAppPermissionRevoked(dApp ConnectorDApp) {
 
 func SendConnectorDAppChainIdSwitched(payload ConnectorDAppChainIdSwitchedSignal) {
 	send(EventConnectorDAppChainIdSwitched, payload)
+}
+
+func SendConnectorAccountChanged(url string, clientID string, account types.Address) {
+	send(EventConnectorAccountChanged, ConnectorAccountChangedSignal{
+		URL:           url,
+		ClientID:      clientID,
+		SharedAccount: account,
+	})
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 )
 
-func normalizeURL(url string) string {
+func NormalizeURL(url string) string {
 	return strings.TrimRight(url, "/")
 }
 
@@ -47,14 +47,14 @@ type Permission struct {
 }
 
 func UpsertDApp(db *sql.DB, dApp *DApp) error {
-	normalizedURL := normalizeURL(dApp.URL)
+	normalizedURL := NormalizeURL(dApp.URL)
 	_, err := db.Exec(upsertDAppQuery, normalizedURL, dApp.Name, dApp.IconURL, dApp.ClientID, dApp.SharedAccount, dApp.ChainID)
 	return err
 }
 
 func SelectDApp(db *sql.DB, url string, clientID string) (*DApp, error) {
 	// clientID can be empty for backward compatibility with browser extension
-	normalizedURL := normalizeURL(url)
+	normalizedURL := NormalizeURL(url)
 	dApp := &DApp{
 		URL:      normalizedURL,
 		ClientID: clientID,
@@ -86,13 +86,13 @@ func SelectAllDApps(db *sql.DB) ([]DApp, error) {
 }
 
 func DeleteDApp(db *sql.DB, url string, clientID string) error {
-	normalizedURL := normalizeURL(url)
+	normalizedURL := NormalizeURL(url)
 	_, err := db.Exec(deleteDAppQuery, normalizedURL, clientID)
 	return err
 }
 
 func InsertPermission(db *sql.DB, url string, clientID string, parentCapability string, caveats []Caveat, createdAt int64) error {
-	normalizedURL := normalizeURL(url)
+	normalizedURL := NormalizeURL(url)
 
 	var count int
 	err := db.QueryRow(selectPermissionExistsQuery, normalizedURL, clientID, parentCapability).Scan(&count)
@@ -114,7 +114,7 @@ func InsertPermission(db *sql.DB, url string, clientID string, parentCapability 
 }
 
 func SelectPermissions(db *sql.DB, url string, clientID string) ([]Permission, error) {
-	normalizedURL := normalizeURL(url)
+	normalizedURL := NormalizeURL(url)
 
 	rows, err := db.Query(selectPermissionsQuery, normalizedURL, clientID)
 	if err != nil {
@@ -149,7 +149,7 @@ func SelectPermissions(db *sql.DB, url string, clientID string) ([]Permission, e
 }
 
 func DeletePermissions(db *sql.DB, url string, clientID string) error {
-	normalizedURL := normalizeURL(url)
+	normalizedURL := NormalizeURL(url)
 	_, err := db.Exec(deletePermissionsQuery, normalizedURL, clientID)
 	return err
 }
