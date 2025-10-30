@@ -8,6 +8,19 @@
 
 let
   optionalString = pkgs.lib.optionalString;
+  codexVersion = "v0.0.24";
+  arch =
+    if stdenv.hostPlatform.isx86_64 then "amd64"
+    else if stdenv.hostPlatform.isAarch64 then "arm64"
+    else stdenv.hostPlatform.arch;
+  os = if stdenv.isDarwin then "macos" else "Linux";
+
+  # Pre-fetch libcodex to avoid network during build
+  codexLib = pkgs.fetchzip {
+    url = "https://github.com/codex-storage/codex-go-bindings/releases/download/${codexVersion}/codex-${os}-${arch}.zip";
+    hash = "sha256-P1w1XvWsg/ZPg8VZfd52hffI2u4SIIWekIWVP79YnCc=";
+  };
+
 in pkgs.buildGoModule {
   pname = "status-go";
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
@@ -20,8 +33,6 @@ in pkgs.buildGoModule {
     fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
   in
     with pkgs; [
-      curl 
-      unzip
       mockgen
       protoc-gen-go
       protobuf3_24
@@ -41,8 +52,9 @@ in pkgs.buildGoModule {
   allowGoReference = true;
 
   preBuild = ''
+    export LIBS_DIR="${codexLib}"
     go run cmd/library/*.go > $NIX_BUILD_TOP/main.go
-    make generate SHELL=$SHELL GO111MODULE=on GO_GENERATE_CMD='go generate'
+    NO_NETWORK=1 LIBS_DIR="$LIBS_DIR" make generate SHELL=$SHELL GO111MODULE=on GO_GENERATE_CMD='go generate'
   '';
 
   # Build the Go library
@@ -50,10 +62,9 @@ in pkgs.buildGoModule {
   # https://github.com/status-im/status-mobile/issues/20135
   buildPhase = ''
     runHook preBuild
-    export LIBS_DIR="$PWD/libs"
     CGO_ENABLED=1 \
-    CGO_CFLAGS=-I$(LIBS_DIR) \
-    CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" \
+    CGO_CFLAGS="-I$LIBS_DIR" \
+    CGO_LDFLAGS="-L$LIBS_DIR -lcodex -Wl,-rpath,$LIBS_DIR" \
     go build \
       -buildmode='c-archive' \
       ${optionalString stdenv.isDarwin "-ldflags=-extldflags=-lresolv"} \
