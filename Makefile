@@ -33,6 +33,7 @@ help: ##@other Show this help
 RELEASE_TAG ?= $(shell ./_assets/scripts/version.sh)
 RELEASE_DIR ?= /tmp/release-$(RELEASE_TAG)
 GOLANGCI_BINARY = golangci-lint
+LIBS_DIR := $(abspath ./libs)
 
 ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
  detected_OS := Windows
@@ -70,15 +71,15 @@ endif
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
  LIBWAKU_EXT := so
- GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
+ GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)"
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
  LIBWAKU_EXT := dll
- GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)"
 else
  GOBIN_SHARED_LIB_EXT := so
  LIBWAKU_EXT := so
- GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
+ GOBIN_SHARED_LIB_CGO_LDFLAGS :=  CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-Wl,-soname,libstatus.so.0 -L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)"
 endif
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
@@ -164,7 +165,6 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 #----------------
 all: $(GO_CMD_NAMES)
 
-LIBS_DIR := $(abspath ./libs)
 CGO_ENV := CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)"
 ifeq ($(detected_OS),Darwin)
 CGO_ENV += DYLD_LIBRARY_PATH=$(LIBS_DIR):$$DYLD_LIBRARY_PATH
