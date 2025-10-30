@@ -238,6 +238,7 @@ clean-libcodex:
 statusgo: ##@build Build status-go as status-backend server
 statusgo: build/bin/status-backend
 
+status-backend: fetch-libcodex
 status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend
 
@@ -427,10 +428,26 @@ benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 benchmark:
 	@./_assets/scripts/run_benchmark.sh
 
+lint-panics: export CGO_ENABLED=1
+lint-panics: export CGO_CFLAGS=-I$(LIBS_DIR)
+lint-panics: export CGO_LDFLAGS=-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)
+ifeq ($(detected_OS),Darwin)
+lint-panics: export DYLD_LIBRARY_PATH := $(LIBS_DIR):$(DYLD_LIBRARY_PATH)
+else
+lint-panics: export LD_LIBRARY_PATH := $(LIBS_DIR):$(LD_LIBRARY_PATH)
+endif
 lint-panics: export GOFLAGS ?= -tags='$(BUILD_TAGS)'
 lint-panics: generate
 	go run ./cmd/lint-panics -root="$(PWD)" -skip=./cmd -test=false ./...
 
+lint: export CGO_ENABLED=1
+lint: export CGO_CFLAGS=-I$(LIBS_DIR)
+lint: export CGO_LDFLAGS=-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)
+ifeq ($(detected_OS),Darwin)
+lint: export DYLD_LIBRARY_PATH := $(LIBS_DIR):$(DYLD_LIBRARY_PATH)
+else
+lint: export LD_LIBRARY_PATH := $(LIBS_DIR):$(LD_LIBRARY_PATH)
+endif
 lint: generate lint-panics
 	golangci-lint --build-tags '$(BUILD_TAGS)' run ./...
 
