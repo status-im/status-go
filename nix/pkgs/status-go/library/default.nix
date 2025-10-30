@@ -20,6 +20,8 @@ in pkgs.buildGoModule {
     fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
   in
     with pkgs; [
+      curl
+      unzip
       mockgen
       protoc-gen-go
       protobuf3_24
