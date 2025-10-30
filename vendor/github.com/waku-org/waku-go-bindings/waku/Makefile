@@ -1,37 +1,25 @@
 # Makefile for Waku Go Bindings
 
 # Directories
-THIRD_PARTY_DIR := ../third_party
+THIRD_PARTY_DIR := $(shell pwd)/../third_party
 NWAKU_REPO := https://github.com/waku-org/nwaku
 NWAKU_DIR := $(THIRD_PARTY_DIR)/nwaku
 
-.PHONY: all clean prepare build-libwaku build
+.PHONY: all clean build-libwaku build
 
 # Default target
 all: build
 
-# Prepare third_party directory and clone nwaku
-prepare:
-	@echo "Creating third_party directory..."
-	@mkdir -p $(THIRD_PARTY_DIR)
-
-	@echo "Cloning nwaku repository..."
-	@if [ ! -d "$(NWAKU_DIR)" ]; then \
-		cd $(THIRD_PARTY_DIR) && \
-		git clone $(NWAKU_REPO) && \
-		cd $(NWAKU_DIR) && \
-		make update; \
-	else \
-		echo "nwaku repository already exists."; \
-	fi
-
 # Build libwaku
-build-libwaku: prepare
+build-libwaku:
 	@echo "Building libwaku..."
 	@cd $(NWAKU_DIR) && make libwaku
 
 # Build Waku Go Bindings
-build: build-libwaku
+
+build: export CGO_CFLAGS = "-I${NWAKU_DIR}/library/"
+build: export CGO_LDFLAGS = "-L${NWAKU_DIR}/build/ -lwaku -L${NWAKU_DIR} -Wl,-rpath,${NWAKU_DIR}/build/"
+build:
 	@echo "Building Waku Go Bindings..."
 	go build ./...
 

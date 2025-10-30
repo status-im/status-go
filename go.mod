@@ -100,7 +100,7 @@ require (
 	github.com/status-im/extkeys v1.4.0
 	github.com/status-im/go-wallet-sdk v0.0.0-20251027141302-43edbd6abc92
 	github.com/waku-org/go-waku v0.10.1-0.20251003225121-06c9af60f35b
-	github.com/waku-org/waku-go-bindings v0.0.0-20250714110306-6feba5b0df4d
+	github.com/waku-org/waku-go-bindings v0.0.0-20251030105913-aa64c47d2bf3
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	go.lsp.dev/jsonrpc2 v0.10.0
 	go.lsp.dev/protocol v0.12.0
