@@ -1,7 +1,7 @@
 package waku
 
 /*
-	#include "libwaku.h"
+	#include <libwaku.h>
 	#include <stdio.h>
 	#include <stdlib.h>
 
