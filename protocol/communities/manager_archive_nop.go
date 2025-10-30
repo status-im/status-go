@@ -6,6 +6,8 @@ package communities
 import (
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
+
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
@@ -29,7 +31,13 @@ func (tmm *ArchiveManagerNop) SetOnline(online bool) {}
 
 func (tmm *ArchiveManagerNop) SetTorrentConfig(*params.TorrentConfig) {}
 
+func (tmm *ArchiveManagerNop) SetCodexConfig(*codex.Config) {}
+
 func (tmm *ArchiveManagerNop) StartTorrentClient() error {
+	return nil
+}
+
+func (tmm *ArchiveManagerNop) StartCodexClient() error {
 	return nil
 }
 
@@ -68,6 +76,8 @@ func (tmm *ArchiveManagerNop) SeedHistoryArchiveTorrent(communityID types.HexByt
 
 func (tmm *ArchiveManagerNop) UnseedHistoryArchiveTorrent(communityID types.HexBytes) {}
 
+func (tmm *ArchiveManagerNop) UnseedHistoryArchiveIndexCid(communityID types.HexBytes) {}
+
 func (tmm *ArchiveManagerNop) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool {
 	return false
 }
@@ -80,6 +90,10 @@ func (tmm *ArchiveManagerNop) AddHistoryArchiveDownloadTask(communityID string, 
 }
 
 func (tmm *ArchiveManagerNop) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
+	return nil, nil
+}
+
+func (tmm *ArchiveManagerNop) DownloadHistoryArchivesByIndexCid(communityID types.HexBytes, indexCid string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
 	return nil, nil
 }
 

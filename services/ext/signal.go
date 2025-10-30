@@ -97,8 +97,8 @@ func (m *MessengerSignalsHandler) HistoryArchivesCreated(communityID string, fro
 	signal.SendHistoryArchivesCreated(communityID, from, to)
 }
 
-func (m *MessengerSignalsHandler) HistoryArchivesSeeding(communityID string) {
-	signal.SendHistoryArchivesSeeding(communityID)
+func (m *MessengerSignalsHandler) HistoryArchivesSeeding(communityID string, magnetLink bool, indexCid bool) {
+	signal.SendHistoryArchivesSeeding(communityID, magnetLink, indexCid)
 }
 
 func (m *MessengerSignalsHandler) HistoryArchivesUnseeded(communityID string) {

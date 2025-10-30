@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
+
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
@@ -59,7 +61,11 @@ type EncodedArchiveData struct {
 type ArchiveManager struct {
 	torrentConfig                *params.TorrentConfig
 	torrentClient                *torrent.Client
+	codexConfig                  *codex.Config
+	codexClient                  *CodexClient
+	isCodexClientStarted         bool
 	torrentTasks                 map[string]metainfo.Hash
+	indexCidTasks                map[string]string
 	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
 	historyArchiveTasksWaitGroup sync.WaitGroup
 	historyArchiveTasks          sync.Map // stores `chan struct{}`
@@ -80,7 +86,9 @@ type ArchiveManager struct {
 func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 	return &ArchiveManager{
 		torrentConfig:               amc.TorrentConfig,
+		codexConfig:                 amc.CodexConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
+		indexCidTasks:               make(map[string]string),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
 
 		logger:      amc.Logger,
@@ -101,12 +109,23 @@ func (m *ArchiveManager) SetOnline(online bool) {
 				m.logger.Error("couldn't start torrent client", zap.Error(err))
 			}
 		}
+
+		if m.codexConfig != nil && !m.isCodexClientStarted {
+			err := m.StartCodexClient()
+			if err != nil {
+				m.logger.Error("couldn't start codex client", zap.Error(err))
+			}
+		}
 	}
 }
 
 func (m *ArchiveManager) SetTorrentConfig(config *params.TorrentConfig) {
 	m.torrentConfig = config
 	m.ArchiveFileManager.torrentConfig = config
+}
+
+func (m *ArchiveManager) SetCodexConfig(config *codex.Config) {
+	m.codexConfig = config
 }
 
 // getTCPandUDPport will return the same port number given if != 0,
@@ -197,16 +216,60 @@ func (m *ArchiveManager) StartTorrentClient() error {
 	return nil
 }
 
+func (m *ArchiveManager) StartCodexClient() error {
+	if m.codexConfig == nil {
+		return fmt.Errorf("can't start codex client: missing codexConfig")
+	}
+
+	if m.isCodexClientStarted {
+		return nil
+	}
+
+	var err error
+	client, err := NewCodexClient(*m.codexConfig)
+	if err != nil {
+		return err
+	}
+	m.codexClient = &client
+	m.ArchiveFileManager.codexClient = &client
+	m.isCodexClientStarted = true
+
+	return m.codexClient.Start()
+}
+
 func (m *ArchiveManager) Stop() error {
-	if m.torrentClientStarted() {
+	if m.torrentClientStarted() || m.isCodexClientStarted {
 		m.stopHistoryArchiveTasksIntervals()
+	}
+
+	errs := []error{}
+	if m.torrentClientStarted() {
 		m.logger.Info("Stopping torrent client")
-		errs := m.torrentClient.Close()
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
+		errs = m.torrentClient.Close()
 		m.torrentClient = nil
 	}
+
+	if m.isCodexClientStarted {
+		m.logger.Info("Stopping codex client")
+
+		e := m.codexClient.Stop()
+		if e != nil {
+			errs = append(errs, e)
+		}
+
+		e = m.codexClient.Destroy()
+		if e != nil {
+			errs = append(errs, e)
+		}
+
+		m.isCodexClientStarted = false
+		m.codexClient = nil
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
 	return nil
 }
 
@@ -220,7 +283,8 @@ func (m *ArchiveManager) IsReady() bool {
 	// be instantiated (for example in case of port conflicts)
 	return m.torrentConfig != nil &&
 		m.torrentConfig.Enabled &&
-		m.torrentClientStarted()
+		m.torrentClientStarted() &&
+		m.isCodexClientStarted
 }
 
 func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error) {
@@ -309,12 +373,37 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 }
 
 func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
+	archiveTorrentCreatedSuccessfully := true
+	archiveCodexCreatedSuccessfully := true
 	m.UnseedHistoryArchiveTorrent(communityID)
-	_, err := m.ArchiveFileManager.CreateHistoryArchiveTorrentFromDB(communityID, topics, startDate, endDate, partition, encrypt)
-	if err != nil {
-		return err
+	_, errTorrent := m.ArchiveFileManager.CreateHistoryArchiveTorrentFromDB(communityID, topics, startDate, endDate, partition, encrypt)
+	if errTorrent != nil {
+		archiveTorrentCreatedSuccessfully = false
+		m.logger.Error("failed to create history archive torrent", zap.Error(errTorrent))
+	} else {
+		errTorrent = m.SeedHistoryArchiveTorrent(communityID)
+		if errTorrent != nil {
+			archiveTorrentCreatedSuccessfully = false
+			m.logger.Error("failed to seed history archive torrent", zap.Error(errTorrent))
+		}
 	}
-	return m.SeedHistoryArchiveTorrent(communityID)
+	_, errCodex := m.ArchiveFileManager.CreateHistoryArchiveCodexFromDB(communityID, topics, startDate, endDate, partition, encrypt)
+	if errCodex != nil {
+		archiveCodexCreatedSuccessfully = false
+		m.logger.Error("failed to create history archive codex", zap.Error(errCodex))
+	}
+	if !archiveTorrentCreatedSuccessfully && !archiveCodexCreatedSuccessfully {
+		return errors.Join(errTorrent, errCodex)
+	}
+	// one way of publishing index succeeded - we can publish the seeding signal
+	m.publisher.publish(&Subscription{
+		HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
+			CommunityID: communityID.String(),
+			MagnetLink:  archiveTorrentCreatedSuccessfully, // true if torrent created successfully
+			IndexCid:    archiveCodexCreatedSuccessfully,   // true if codex created successfully
+		},
+	})
+	return nil
 }
 
 func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, interval time.Duration) {
@@ -421,22 +510,12 @@ func (m *ArchiveManager) SeedHistoryArchiveTorrent(communityID types.HexBytes) e
 	hash := metaInfo.HashInfoBytes()
 	m.torrentTasks[id] = hash
 
-	if err != nil {
-		return err
-	}
-
 	torrent, err := m.torrentClient.AddTorrent(metaInfo)
 	if err != nil {
 		return err
 	}
 
 	torrent.DownloadAll()
-
-	m.publisher.publish(&Subscription{
-		HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
-			CommunityID: communityID.String(),
-		},
-	})
 
 	magnetLink := metaInfo.Magnet(nil, &info).String()
 
@@ -462,6 +541,21 @@ func (m *ArchiveManager) UnseedHistoryArchiveTorrent(communityID types.HexBytes)
 				},
 			})
 		}
+	}
+}
+
+func (m *ArchiveManager) UnseedHistoryArchiveIndexCid(communityID types.HexBytes) {
+	id := communityID.String()
+
+	if cid, exists := m.indexCidTasks[id]; exists {
+		m.logger.Debug("Unseeding index CID for community", zap.String("id", id), zap.String("cid", cid))
+		// ToDo: consider "unpinning" the index Cid, so that it is no longer advertised on DHT
+		// For now, we remove it from tracking and could delete the local index file
+		delete(m.indexCidTasks, id)
+
+		// Optional: Remove local index file if we want to clean up storage
+		// indexFilePath := m.ArchiveFileManager.codexArchiveIndexFile(id)
+		// os.Remove(indexFilePath)
 	}
 }
 
@@ -641,10 +735,189 @@ func (m *ArchiveManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 					m.publisher.publish(&Subscription{
 						HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
 							CommunityID: communityID.String(),
+							MagnetLink:  true,  // Downloaded via magnet link
+							IndexCid:    false, // No Codex CID in magnet link downloads
 						},
 					})
 					m.logger.Debug("finished downloading archives")
 					return downloadTaskInfo, nil
+				}
+			}
+		}
+	}
+}
+
+func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.HexBytes, indexCid string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
+
+	id := communityID.String()
+
+	downloadTaskInfo := &HistoryArchiveDownloadTaskInfo{
+		TotalDownloadedArchivesCount: 0,
+		TotalArchivesCount:           0,
+		Cancelled:                    false,
+	}
+
+	m.indexCidTasks[id] = indexCid
+	timeout := time.After(20 * time.Second)
+
+	// Create separate cancel channel for the index downloader to avoid channel competition
+	indexDownloaderCancel := make(chan struct{})
+
+	// Create index downloader with path to index file using helper function
+	indexFilePath := m.ArchiveFileManager.codexArchiveIndexFile(id)
+	indexDownloader := NewCodexIndexDownloader(m.codexClient, indexCid, indexFilePath, indexDownloaderCancel, m.logger)
+
+	m.logger.Debug("fetching history index from Codex", zap.String("indexCid", indexCid))
+	select {
+	case <-timeout:
+		return nil, ErrIndexCidTimedout
+	case <-cancelTask:
+		m.logger.Debug("cancelled fetching history index from Codex")
+		close(indexDownloaderCancel) // Forward cancellation to index downloader
+		downloadTaskInfo.Cancelled = true
+		return downloadTaskInfo, nil
+	case <-indexDownloader.GotManifest():
+		// Check if manifest fetch was actually successful
+		err := indexDownloader.GetError()
+		if indexDownloader.GetDatasetSize() == 0 || err != nil {
+			if err != nil {
+				m.logger.Error("failed to fetch Codex manifest", zap.Error(err))
+			} else {
+				m.logger.Error("failed to fetch Codex manifest - dataset size is 0")
+			}
+			return nil, fmt.Errorf("failed to fetch Codex manifest for CID %s: %w", indexCid, err)
+		}
+
+		// Start downloading the index file
+		indexDownloader.DownloadIndexFile()
+
+		m.logger.Debug("downloading history archive index with CID:", zap.String("indexCid", indexCid))
+
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-cancelTask:
+				m.logger.Debug("cancelled downloading archive index")
+				close(indexDownloaderCancel) // Forward cancellation to index downloader
+				downloadTaskInfo.Cancelled = true
+				return downloadTaskInfo, nil
+			case <-ticker.C:
+				err := indexDownloader.GetError()
+				if err != nil {
+					m.logger.Error("error during index download", zap.Error(err))
+					return nil, err
+				}
+
+				if indexDownloader.IsDownloadComplete() {
+
+					index, err := m.ArchiveFileManager.CodexLoadHistoryArchiveIndexFromFile(m.identity, communityID)
+					if err != nil {
+						return nil, err
+					}
+
+					existingArchiveIDs, err := m.persistence.GetDownloadedMessageArchiveIDs(communityID)
+					if err != nil {
+						return nil, err
+					}
+
+					if len(existingArchiveIDs) == len(index.Archives) {
+						m.logger.Debug("download cancelled, no new archives")
+						return downloadTaskInfo, nil
+					}
+
+					downloadTaskInfo.TotalDownloadedArchivesCount = len(existingArchiveIDs)
+					downloadTaskInfo.TotalArchivesCount = len(index.Archives)
+
+					// Create separate cancel channel for the archive downloader to avoid channel competition
+					archiveDownloaderCancel := make(chan struct{})
+
+					// Create the archive downloader using the protobuf index directly
+					archiveDownloader := NewCodexArchiveDownloader(m.codexClient, index, id, existingArchiveIDs, archiveDownloaderCancel, m.logger)
+
+					// Set up callback for when individual archives are downloaded
+					archiveDownloader.SetOnArchiveDownloaded(func(hash string, from, to uint64) {
+						m.publisher.publish(&Subscription{
+							HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
+								CommunityID: communityID.String(),
+								From:        int(from),
+								To:          int(to),
+							},
+						})
+
+						m.logger.Debug("archive downloaded successfully",
+							zap.String("hash", hash),
+							zap.Uint64("from", from),
+							zap.Uint64("to", to))
+					})
+
+					archiveDownloader.StartDownload()
+
+					m.publisher.publish(&Subscription{
+						DownloadingHistoryArchivesStartedSignal: &signal.DownloadingHistoryArchivesStartedSignal{
+							CommunityID: communityID.String(),
+						},
+					})
+
+					// Monitor archive download progress
+					archiveTicker := time.NewTicker(1 * time.Second)
+					defer archiveTicker.Stop()
+
+					for {
+						select {
+						case <-cancelTask:
+							m.logger.Debug("cancelled downloading individual archives")
+							close(archiveDownloaderCancel)
+							downloadTaskInfo.Cancelled = true
+							return downloadTaskInfo, nil
+						case <-archiveTicker.C:
+							// IsDownloadComplete == true also even when no single archive
+							// has been downloaded (e.g. because of error or because of
+							// cancellation).
+							// To further check for cancellation, call IsCancelled().
+							// To see if any archive was actually downloaded, check
+							// GetTotalDownloadedArchivesCount().
+							// Notice that GetTotalDownloadedArchivesCount represents
+							// all successfully downloaded archives so far, not only
+							// archives downloaded in this session.
+							if archiveDownloader.IsDownloadComplete() {
+								// Always update final progress
+								downloadTaskInfo.TotalDownloadedArchivesCount = archiveDownloader.GetTotalDownloadedArchivesCount()
+
+								m.logger.Info("Downloading archives from Codex finished",
+									zap.Int("totalArchives", downloadTaskInfo.TotalArchivesCount),
+									zap.Int("downloadedArchives", downloadTaskInfo.TotalDownloadedArchivesCount))
+
+								m.publisher.publish(&Subscription{
+									HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
+										CommunityID: communityID.String(),
+										MagnetLink:  false, // Not downloaded via magnet link
+										IndexCid:    true,  // Downloaded via Codex CID
+									},
+								})
+
+								if archiveDownloader.IsCancelled() {
+									// archive was cancelled, but it does not mean that
+									// no single archive was downloaded before cancellation
+									m.logger.Debug("archive download was cancelled")
+									downloadTaskInfo.Cancelled = true
+									return downloadTaskInfo, nil
+								}
+
+								return downloadTaskInfo, nil
+							} else {
+								// Update progress
+								downloadTaskInfo.TotalDownloadedArchivesCount = archiveDownloader.GetTotalDownloadedArchivesCount()
+								m.logger.Debug("downloading archives",
+									zap.Int("completed", downloadTaskInfo.TotalDownloadedArchivesCount),
+									zap.Int("total", downloadTaskInfo.TotalArchivesCount),
+									zap.Int("inProgress in this session", archiveDownloader.GetPendingArchivesCount()),
+									zap.Int("total remaining archives to download", downloadTaskInfo.TotalArchivesCount-downloadTaskInfo.TotalDownloadedArchivesCount),
+								)
+							}
+						}
+					}
 				}
 			}
 		}

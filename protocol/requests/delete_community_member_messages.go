@@ -31,7 +31,7 @@ func (d *DeleteCommunityMemberMessages) Validate() error {
 		return ErrDeleteCommunityMemberMessagesInvalidMemberID
 	}
 
-	if d.Messages != nil && len(d.Messages) > 0 && d.DeleteAll {
+	if len(d.Messages) > 0 && d.DeleteAll {
 		return ErrDeleteCommunityMemberMessagesInvalidDeleteAll
 	}
 

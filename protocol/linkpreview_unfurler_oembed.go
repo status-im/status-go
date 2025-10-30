@@ -76,9 +76,7 @@ func (u OEmbedUnfurler) Unfurl() (*common.LinkPreview, error) {
 	}
 
 	var oembedResponse OEmbedResponse
-	if err != nil {
-		return preview, err
-	}
+
 	err = json.Unmarshal(oembedBytes, &oembedResponse)
 	if err != nil {
 		return preview, err

@@ -22,6 +22,14 @@ func (amm *ArchiveFileManagerNop) CreateHistoryArchiveTorrentFromDB(communityID 
 	return nil, nil
 }
 
+func (amm *ArchiveFileManagerNop) CreateHistoryArchiveCodexFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+	return nil, nil
+}
+
+func (amm *ArchiveFileManagerNop) CreateHistoryArchiveCodexFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+	return nil, nil
+}
+
 func (amm *ArchiveFileManagerNop) SaveMessageArchiveID(communityID types.HexBytes, hash string) error {
 	return nil
 }
@@ -38,10 +46,18 @@ func (amm *ArchiveFileManagerNop) ExtractMessagesFromHistoryArchive(communityID 
 	return nil, nil
 }
 
+func (amm *ArchiveFileManagerNop) ExtractMessagesFromCodexHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error) {
+	return nil, nil
+}
+
 func (amm *ArchiveFileManagerNop) GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error) {
 	return "", nil
 }
 
 func (amm *ArchiveFileManagerNop) LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error) {
+	return nil, nil
+}
+
+func (amm *ArchiveFileManagerNop) CodexLoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.CodexWakuMessageArchiveIndex, error) {
 	return nil, nil
 }

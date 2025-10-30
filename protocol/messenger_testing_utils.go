@@ -39,7 +39,7 @@ func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bo
 			panic(err)
 		}
 
-		if err == nil && !condition(response) {
+		if !condition(response) {
 			err = errors.New(errorMessage)
 		}
 		return err
@@ -62,7 +62,7 @@ func (m *MessengerSignalsHandlerMock) HistoryArchivesProtocolDisabled()         
 func (m *MessengerSignalsHandlerMock) CreatingHistoryArchives(string)            {}
 func (m *MessengerSignalsHandlerMock) NoHistoryArchivesCreated(string, int, int) {}
 func (m *MessengerSignalsHandlerMock) HistoryArchivesCreated(string, int, int)   {}
-func (m *MessengerSignalsHandlerMock) HistoryArchivesSeeding(string)             {}
+func (m *MessengerSignalsHandlerMock) HistoryArchivesSeeding(string, bool, bool) {}
 func (m *MessengerSignalsHandlerMock) HistoryArchivesUnseeded(string)            {}
 func (m *MessengerSignalsHandlerMock) HistoryArchiveDownloaded(string, int, int) {}
 func (m *MessengerSignalsHandlerMock) DownloadingHistoryArchivesStarted(string)  {}

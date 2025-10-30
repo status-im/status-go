@@ -246,7 +246,11 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 
 				if sub.HistoryArchivesSeedingSignal != nil {
 
-					m.config.messengerSignalsHandler.HistoryArchivesSeeding(sub.HistoryArchivesSeedingSignal.CommunityID)
+					m.config.messengerSignalsHandler.HistoryArchivesSeeding(
+						sub.HistoryArchivesSeedingSignal.CommunityID,
+						sub.HistoryArchivesSeedingSignal.MagnetLink,
+						sub.HistoryArchivesSeedingSignal.IndexCid,
+					)
 
 					c, err := m.communitiesManager.GetByIDString(sub.HistoryArchivesSeedingSignal.CommunityID)
 					if err != nil {
@@ -254,9 +258,17 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 					}
 
 					if c.IsControlNode() {
-						err := m.dispatchMagnetlinkMessage(sub.HistoryArchivesSeedingSignal.CommunityID)
-						if err != nil {
-							m.logger.Debug("failed to dispatch magnetlink message", zap.Error(err))
+						if sub.HistoryArchivesSeedingSignal.MagnetLink {
+							err := m.dispatchMagnetlinkMessage(sub.HistoryArchivesSeedingSignal.CommunityID)
+							if err != nil {
+								m.logger.Debug("failed to dispatch magnetlink message", zap.Error(err))
+							}
+						}
+						if sub.HistoryArchivesSeedingSignal.IndexCid {
+							err := m.dispatchIndexCidMessage(sub.HistoryArchivesSeedingSignal.CommunityID)
+							if err != nil {
+								m.logger.Debug("failed to dispatch index cid message", zap.Error(err))
+							}
 						}
 					}
 				}
@@ -4030,7 +4042,17 @@ importMessageArchivesLoop:
 			// wait for all archives to be processed first
 			downloadedArchiveID := archiveIDsToImport[0]
 
-			archiveMessages, err := m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
+			var archiveMessages []*protobuf.WakuMessage
+			preference, err := m.communitiesManager.GetArchiveDistributionPreference(communityID)
+			if err != nil {
+				m.logger.Warn("failed to get archive distribution preference, using torrent", zap.Error(err))
+				preference = "torrent"
+			}
+			if preference == "codex" {
+				archiveMessages, err = m.archiveManager.ExtractMessagesFromCodexHistoryArchive(communityID, downloadedArchiveID)
+			} else {
+				archiveMessages, err = m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
+			}
 			if err != nil {
 				if errors.Is(err, messagingtypes.ErrHashRatchetGroupIDNotFound) {
 					// In case we're missing hash ratchet keys, best we can do is
@@ -4121,6 +4143,51 @@ func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
 	return m.communitiesManager.UpdateMagnetlinkMessageClock(community.ID(), magnetLinkMessage.Clock)
 }
 
+func (m *Messenger) dispatchIndexCidMessage(communityID string) error {
+
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		return err
+	}
+
+	indexCid, err := m.archiveManager.GetHistoryArchiveIndexCid(community.ID())
+	if err != nil {
+		return err
+	}
+
+	indexCidMessage := &protobuf.CommunityMessageArchiveIndexCid{
+		Clock: m.getTimesource().GetCurrentTime(),
+		Cid:   indexCid,
+	}
+
+	encodedMessage, err := proto.Marshal(indexCidMessage)
+	if err != nil {
+		return err
+	}
+
+	chatID := community.MagnetlinkMessageChannelID()
+	rawMessage := messagingtypes.RawMessage{
+		LocalChatID:          chatID,
+		Sender:               community.PrivateKey(),
+		Payload:              encodedMessage,
+		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_MESSAGE_ARCHIVE_INDEX_CID,
+		SkipGroupMessageWrap: true,
+		PubsubTopic:          community.PubsubTopic(),
+		Priority:             &messagingtypes.LowPriority,
+	}
+
+	_, err = m.messaging.SendPublic(context.Background(), chatID, rawMessage)
+	if err != nil {
+		return err
+	}
+
+	err = m.communitiesManager.UpdateCommunityDescriptionIndexCidMessageClock(community.ID(), indexCidMessage.Clock)
+	if err != nil {
+		return err
+	}
+	return m.communitiesManager.UpdateIndexCidMessageClock(community.ID(), indexCidMessage.Clock)
+}
+
 func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 	nodeConfig, err := m.settings.GetNodeConfig()
 	if err != nil {
@@ -4140,6 +4207,13 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 	m.config.torrentConfig = &nodeConfig.TorrentConfig
 	m.archiveManager.SetTorrentConfig(&nodeConfig.TorrentConfig)
 	err = m.archiveManager.StartTorrentClient()
+	if err != nil {
+		return err
+	}
+
+	m.config.codexConfig = &nodeConfig.CodexConfig
+	m.archiveManager.SetCodexConfig(&nodeConfig.CodexConfig)
+	err = m.archiveManager.StartCodexClient()
 	if err != nil {
 		return err
 	}
@@ -5029,4 +5103,35 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 			}
 		}
 	}()
+}
+
+// SetCommunityArchiveDistributionPreference sets the archive distribution preference for a community
+func (m *Messenger) SetCommunityArchiveDistributionPreference(request *requests.SetCommunityArchiveDistributionPreference) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	community, err := m.communitiesManager.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	if community == nil {
+		return nil, errors.New("community not found")
+	}
+
+	err = m.communitiesManager.SetArchiveDistributionPreference(request.CommunityID, request.Preference)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+
+	return response, nil
+}
+
+// GetCommunityArchiveDistributionPreference gets the archive distribution preference for a community
+func (m *Messenger) GetCommunityArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
+	return m.communitiesManager.GetArchiveDistributionPreference(communityID)
 }
