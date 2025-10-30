@@ -252,7 +252,7 @@ func (suite *CodexClientTestSuite) TestRemoveCid_Error() {
 	suite.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Return error status
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("server error"))
+		_, _ = w.Write([]byte("server error"))
 	}))
 
 	suite.client.BaseURL = suite.server.URL
@@ -287,7 +287,7 @@ func (suite *CodexClientTestSuite) TestTriggerDownload() {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(expectedManifest))
+		_, _ = w.Write([]byte(expectedManifest))
 	}))
 
 	suite.client.BaseURL = suite.server.URL
@@ -321,7 +321,7 @@ func (suite *CodexClientTestSuite) TestTriggerDownloadWithContext_JSONParseError
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Return invalid JSON
-		w.Write([]byte(`{"invalid": json}`))
+		_, _ = w.Write([]byte(`{"invalid": json}`))
 	}))
 
 	suite.client.BaseURL = suite.server.URL
@@ -338,7 +338,7 @@ func (suite *CodexClientTestSuite) TestTriggerDownloadWithContext_HTTPError() {
 
 	suite.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("CID not found"))
+		_, _ = w.Write([]byte("CID not found"))
 	}))
 
 	suite.client.BaseURL = suite.server.URL
@@ -361,7 +361,7 @@ func (suite *CodexClientTestSuite) TestTriggerDownloadWithContext_Cancellation()
 		case <-time.After(200 * time.Millisecond):
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"cid": "test"}`))
+			_, _ = w.Write([]byte(`{"cid": "test"}`))
 		}
 	}))
 
@@ -395,7 +395,7 @@ func (suite *CodexClientTestSuite) TestLocalDownload() {
 		assert.Equal(suite.T(), expectedPath, r.URL.Path, "Expected correct path")
 
 		w.WriteHeader(http.StatusOK)
-		w.Write(testData)
+		_, _ = w.Write(testData)
 	}))
 
 	suite.client.BaseURL = suite.server.URL
@@ -417,7 +417,7 @@ func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Success() {
 		assert.Equal(suite.T(), expectedPath, r.URL.Path, "Expected correct path")
 
 		w.WriteHeader(http.StatusOK)
-		w.Write(testData)
+		_, _ = w.Write(testData)
 	}))
 
 	suite.client.BaseURL = suite.server.URL
@@ -448,7 +448,7 @@ func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_HTTPError() {
 
 	suite.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("CID not found in local storage"))
+		_, _ = w.Write([]byte("CID not found in local storage"))
 	}))
 
 	suite.client.BaseURL = suite.server.URL
@@ -467,7 +467,7 @@ func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Cancellation() {
 		// Simulate a slow response
 		time.Sleep(100 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("slow response"))
+		_, _ = w.Write([]byte("slow response"))
 	}))
 
 	suite.client.BaseURL = suite.server.URL
@@ -510,7 +510,7 @@ func (suite *CodexClientTestSuite) TestFetchManifestWithContext_Success() {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(expectedManifest))
+		_, _ = w.Write([]byte(expectedManifest))
 	}))
 
 	suite.client.BaseURL = suite.server.URL
@@ -548,7 +548,7 @@ func (suite *CodexClientTestSuite) TestFetchManifestWithContext_HTTPError() {
 
 	suite.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Manifest not found"))
+		_, _ = w.Write([]byte("Manifest not found"))
 	}))
 
 	suite.client.BaseURL = suite.server.URL
@@ -566,7 +566,7 @@ func (suite *CodexClientTestSuite) TestFetchManifestWithContext_JSONParseError()
 	suite.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("invalid json {"))
+		_, _ = w.Write([]byte("invalid json {"))
 	}))
 
 	suite.client.BaseURL = suite.server.URL
@@ -586,7 +586,7 @@ func (suite *CodexClientTestSuite) TestFetchManifestWithContext_Cancellation() {
 		time.Sleep(100 * time.Millisecond)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"cid": "test"}`))
+		_, _ = w.Write([]byte(`{"cid": "test"}`))
 	}))
 
 	suite.client.BaseURL = suite.server.URL
