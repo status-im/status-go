@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 type ErrorCode int
@@ -77,11 +78,11 @@ func (e *AccountsError) Error() string {
 		return fmt.Sprintf("[%s] %s: %v", e.Category, e.Message, e.Err)
 	}
 	if e.Context != nil {
-		message := ""
+		var message strings.Builder
 		for k, v := range e.Context {
-			message += fmt.Sprintf(" %s: %v", k, v)
+			message.WriteString(fmt.Sprintf(" %s: %v", k, v))
 		}
-		return fmt.Sprintf("[%s] %s - %s", e.Category, e.Message, message)
+		return fmt.Sprintf("[%s] %s - %s", e.Category, e.Message, message.String())
 	}
 	return fmt.Sprintf("[%s] %s", e.Category, e.Message)
 }

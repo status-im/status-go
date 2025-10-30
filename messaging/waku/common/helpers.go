@@ -124,15 +124,16 @@ func ParseDialErrors(errMsg string) []DialError {
 			continue
 		}
 		protocols := ma.Protocols()
-		protocolsStr := "/"
+		var protocolsStr strings.Builder
+		protocolsStr.WriteString("/")
 		for i, protocol := range protocols {
-			protocolsStr += protocol.Name
+			protocolsStr.WriteString(protocol.Name)
 			if i < len(protocols)-1 {
-				protocolsStr += "/"
+				protocolsStr.WriteString("/")
 			}
 		}
 		dialErrors = append(dialErrors, DialError{
-			Protocols: protocolsStr,
+			Protocols: protocolsStr.String(),
 			MultiAddr: matches[1],
 			ErrMsg:    errMsg,
 			ErrType:   CategorizeDialError(errMsg),

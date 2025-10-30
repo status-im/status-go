@@ -74,11 +74,12 @@ func (s SensitiveString) Contains(substr any) bool {
 }
 
 func (s SensitiveString) Append(others ...any) SensitiveString {
-	result := s.value
+	var result strings.Builder
+	result.WriteString(s.value)
 	for _, other := range others {
-		result += getValue(other)
+		result.WriteString(getValue(other))
 	}
-	return NewSensitiveString(result)
+	return NewSensitiveString(result.String())
 }
 
 // getValue extracts the string value from various types

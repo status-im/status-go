@@ -15,7 +15,8 @@ func isCodeFile(info os.FileInfo) bool {
 }
 
 func main() {
-	var output = prelude
+	var output strings.Builder
+	output.WriteString(prelude)
 
 	fset := token.NewFileSet()
 
@@ -29,17 +30,17 @@ func main() {
 	for _, a := range parsedAST {
 		for _, file := range a.Files {
 			// handle each file and append the output
-			output += handleFile(file)
+			output.WriteString(handleFile(file))
 		}
 	}
 
 	// To free memory allocated to strings
-	output += "//export Free\n"
-	output += "func Free (param unsafe.Pointer){\n"
-	output += "C.free(param);\n"
-	output += "}\n"
+	output.WriteString("//export Free\n")
+	output.WriteString("func Free (param unsafe.Pointer){\n")
+	output.WriteString("C.free(param);\n")
+	output.WriteString("}\n")
 
-	fmt.Println(output)
+	fmt.Println(output.String())
 }
 
 func handleFunction(name string, funcDecl *ast.FuncDecl) string {
@@ -47,30 +48,31 @@ func handleFunction(name string, funcDecl *ast.FuncDecl) string {
 	results := funcDecl.Type.Results
 
 	// add export tag
-	output := fmt.Sprintf("//export %s\n", name)
+	var output strings.Builder
+	output.WriteString(fmt.Sprintf("//export %s\n", name))
 	// add initial func declaration
-	output += fmt.Sprintf("func %s (", name)
+	output.WriteString(fmt.Sprintf("func %s (", name))
 
 	// iterate over parameters and correctly add the C type
 	paramCount := 0
 	for _, p := range params {
 		for _, paramIdentity := range p.Names {
 			if paramCount != 0 {
-				output += ", "
+				output.WriteString(", ")
 			}
 			paramCount++
-			output += paramIdentity.Name
+			output.WriteString(paramIdentity.Name)
 
 			typeString := fmt.Sprint(paramIdentity.Obj.Decl.(*ast.Field).Type)
 			// We match against the stringified type,
 			// could not find a better way to match this
 			switch typeString {
 			case stringType:
-				output += " *C.char"
+				output.WriteString(" *C.char")
 			case intType, boolType:
-				output += " C.int"
+				output.WriteString(" C.int")
 			case unsafePointerType:
-				output += " unsafe.Pointer"
+				output.WriteString(" unsafe.Pointer")
 			default:
 				// ignore if the type is any different
 				return ""
@@ -78,18 +80,18 @@ func handleFunction(name string, funcDecl *ast.FuncDecl) string {
 		}
 	}
 
-	output += ")"
+	output.WriteString(")")
 
 	// check if it has a return value, convert to CString if so and return
 	if results != nil {
-		output += " *C.char {\nreturn C.CString("
+		output.WriteString(" *C.char {\nreturn C.CString(")
 	} else {
-		output += " {\n"
+		output.WriteString(" {\n")
 
 	}
 
 	// call the mobile equivalent function
-	output += fmt.Sprintf("mobile.%s(", name)
+	output.WriteString(fmt.Sprintf("mobile.%s(", name))
 
 	// iterate through the parameters, convert to go types and close
 	// the function call
@@ -97,21 +99,21 @@ func handleFunction(name string, funcDecl *ast.FuncDecl) string {
 	for _, p := range params {
 		for _, paramIdentity := range p.Names {
 			if paramCount != 0 {
-				output += ", "
+				output.WriteString(", ")
 			}
 			paramCount++
 			typeString := fmt.Sprint(paramIdentity.Obj.Decl.(*ast.Field).Type)
 			switch typeString {
 			case stringType:
-				output += fmt.Sprintf("C.GoString(%s)", paramIdentity.Name)
+				output.WriteString(fmt.Sprintf("C.GoString(%s)", paramIdentity.Name))
 			case intType:
-				output += fmt.Sprintf("int(%s)", paramIdentity.Name)
+				output.WriteString(fmt.Sprintf("int(%s)", paramIdentity.Name))
 			case unsafePointerType:
-				output += paramIdentity.Name
+				output.WriteString(paramIdentity.Name)
 			case boolType:
-				output += paramIdentity.Name
+				output.WriteString(paramIdentity.Name)
 				// convert int to bool
-				output += " == 1"
+				output.WriteString(" == 1")
 			default:
 				// ignore otherwise
 				return ""
@@ -120,27 +122,27 @@ func handleFunction(name string, funcDecl *ast.FuncDecl) string {
 	}
 
 	// close function call
-	output += ")"
+	output.WriteString(")")
 
 	// close conversion to CString
 	if results != nil {
-		output += ")\n"
+		output.WriteString(")\n")
 	}
 
 	// close function declaration
-	output += "}\n"
-	return output
+	output.WriteString("}\n")
+	return output.String()
 }
 
 func handleFile(parsedAST *ast.File) string {
-	output := ""
+	var output strings.Builder
 	for name, obj := range parsedAST.Scope.Objects {
 		// Ignore non-functions or non exported fields
 		if obj.Kind != ast.Fun || !unicode.IsUpper(rune(name[0])) {
 			continue
 		}
-		output += handleFunction(name, obj.Decl.(*ast.FuncDecl))
+		output.WriteString(handleFunction(name, obj.Decl.(*ast.FuncDecl)))
 	}
 
-	return output
+	return output.String()
 }
