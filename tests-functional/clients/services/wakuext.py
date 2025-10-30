@@ -346,8 +346,15 @@ class WakuextService(Service):
         response = self.rpc_request("generateEditCommunityRequestsForSigning", params)
         return response
 
-    def send_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value):
-        params = [{"chatId": chat_id, "text": message, "contentType": content_type}]
+    def send_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value, responseTo: str = ""):
+        params = [
+            {
+                "chatId": chat_id,
+                "text": message,
+                "contentType": content_type,
+                "responseTo": responseTo,
+            }
+        ]
         response = self.rpc_request("sendChatMessage", params)
         return response
 
