@@ -552,7 +552,7 @@ test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
-	CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" @./_assets/scripts/run_functional_tests.sh
+	CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" ./_assets/scripts/run_functional_tests.sh
 
 benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 benchmark:
