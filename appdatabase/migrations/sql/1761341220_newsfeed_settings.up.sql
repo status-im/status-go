@@ -22,7 +22,9 @@ SELECT 1,
        news_feed_enabled,
        news_rss_enabled,
        news_notifications_enabled,
-       news_feed_last_fetched_timestamp
+       -- We cannot guarantee that last_fetched_timestamp will be initialized correctly
+       -- if this migration is run on an older version of the database. So we default to CURRENT_TIMESTAMP.
+       CURRENT_TIMESTAMP
 FROM settings;
 
 -- Drop columns from settings table
