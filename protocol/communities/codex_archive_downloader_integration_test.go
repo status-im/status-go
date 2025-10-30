@@ -42,7 +42,21 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) SetupSuite() {
 		suite.T().Fatalf("Failed to create Codex client: %v", err)
 	}
 
+	suite.T().Cleanup(func() {
+		if err := client.Stop(); err != nil {
+			suite.T().Logf("Failed to stop codex: %v", err)
+		}
+
+		if err := client.Destroy(); err != nil {
+			suite.T().Logf("Failed to destroy codex: %v", err)
+		}
+	})
+
 	suite.client = &client
+
+	if err = suite.client.Start(); err != nil {
+		suite.T().Fatalf("Failed to start Codex node: %v", err)
+	}
 
 	suite.T().Logf("CodexClient configured")
 }

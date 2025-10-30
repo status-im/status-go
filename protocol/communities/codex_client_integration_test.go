@@ -41,7 +41,22 @@ func (suite *CodexClientIntegrationTestSuite) SetupSuite() {
 	if err != nil {
 		suite.T().Fatalf("Failed to create Codex client: %v", err)
 	}
+
+	suite.T().Cleanup(func() {
+		if err := client.Stop(); err != nil {
+			suite.T().Logf("Failed to stop codex: %v", err)
+		}
+
+		if err := client.Destroy(); err != nil {
+			suite.T().Logf("Failed to destroy codex: %v", err)
+		}
+	})
+
 	suite.client = &client
+
+	if err = suite.client.Start(); err != nil {
+		suite.T().Fatalf("Failed to start Codex node: %v", err)
+	}
 }
 
 // TestCodexClientIntegrationTestSuite runs the integration test suite
@@ -112,37 +127,26 @@ func (suite *CodexClientIntegrationTestSuite) TestIntegration_CheckNonExistingCI
 }
 
 func (suite *CodexClientIntegrationTestSuite) TestIntegration_TriggerDownload() {
-	// Use port 8001 for this test as specified
-	client, err := communities.NewCodexClient(codex.Config{
-		DataDir:        suite.T().TempDir(),
-		LogFormat:      codex.LogFormatNoColors,
-		MetricsEnabled: false,
-		BlockRetries:   5,
-	})
-	if err != nil {
-		suite.T().Fatalf("Failed to create Codex client: %v", err)
-	}
-
 	// Generate random payload to ensure proper round-trip verification
 	payload := make([]byte, 1024)
-	_, err = rand.Read(payload)
+	_, err := rand.Read(payload)
 	require.NoError(suite.T(), err, "failed to generate random payload")
 	suite.T().Logf("Generated payload (first 32 bytes hex): %s", hex.EncodeToString(payload[:32]))
 
 	// Upload the data
-	cid, err := client.Upload(bytes.NewReader(payload), "local-download-test.bin")
+	cid, err := suite.client.Upload(bytes.NewReader(payload), "local-download-test.bin")
 	require.NoError(suite.T(), err, "upload failed")
 	suite.T().Logf("Upload successful, CID: %s", cid)
 
 	// Clean up after test
 	defer func() {
-		if err := client.RemoveCid(cid); err != nil {
+		if err := suite.client.RemoveCid(cid); err != nil {
 			suite.T().Logf("Warning: Failed to remove CID %s: %v", cid, err)
 		}
 	}()
 
 	// Trigger async download
-	manifest, err := client.TriggerDownload(cid)
+	manifest, err := suite.client.TriggerDownload(cid)
 	require.NoError(suite.T(), err, "TriggerDownload failed")
 	suite.T().Logf("Async download triggered, manifest CID: %s", manifest.Cid)
 
@@ -152,7 +156,7 @@ func (suite *CodexClientIntegrationTestSuite) TestIntegration_TriggerDownload() 
 		ticker := time.NewTicker(500 * time.Millisecond)
 		defer ticker.Stop()
 		for range ticker.C {
-			hasCid, err := client.HasCid(cid)
+			hasCid, err := suite.client.HasCid(cid)
 			if err != nil {
 				suite.T().Logf("HasCid check failed: %v", err)
 				continue
@@ -180,7 +184,7 @@ func (suite *CodexClientIntegrationTestSuite) TestIntegration_TriggerDownload() 
 	defer cancel()
 
 	var downloadBuf bytes.Buffer
-	err = client.LocalDownloadWithContext(ctx, cid, &downloadBuf)
+	err = suite.client.LocalDownloadWithContext(ctx, cid, &downloadBuf)
 	require.NoError(suite.T(), err, "LocalDownload after trigger download failed")
 
 	downloadedData := downloadBuf.Bytes()
