@@ -20,6 +20,8 @@ in pkgs.buildGoModule {
     fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
   in
     with pkgs; [
+      curl 
+      unzip
       mockgen
       protoc-gen-go
       protobuf3_24
@@ -41,7 +43,6 @@ in pkgs.buildGoModule {
   preBuild = ''
     export NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include"
     export NIM_SDS_LIB_DIR="${pkgs.lib-sds-pkg}/lib"
-    export NO_NETWORK=1
     export GO111MODULE=on
     export GO_GENERATE_CMD='go generate'
     make generate
@@ -52,6 +53,10 @@ in pkgs.buildGoModule {
   # https://github.com/status-im/status-mobile/issues/20135
   buildPhase = ''
     runHook preBuild
+    export LIBS_DIR="$PWD/libs"
+    CGO_ENABLED=1 \
+    CGO_CFLAGS=-I$(LIBS_DIR) \
+    CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" \
     make statusgo-library \
         STATUS_GO_BINDINGS_PATH="$NIX_BUILD_TOP" \
         STATUS_GO_LIBRARY_OUT="$out"
