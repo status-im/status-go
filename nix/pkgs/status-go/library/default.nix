@@ -41,6 +41,8 @@ in pkgs.buildGoModule {
   preBuild = ''
     export NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include"
     export NIM_SDS_LIB_DIR="${pkgs.lib-sds-pkg}/lib"
+    export NO_NETWORK=1
+    export GO111MODULE=on
     export GO_GENERATE_CMD='go generate'
     make generate
   '';
