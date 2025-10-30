@@ -148,7 +148,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             shutil.copy2(src_path, dst_path)
 
     @retry(
-        stop=stop_after_delay(30),
+        stop=stop_after_delay(10),
         wait=wait_exponential(multiplier=1, min=0.1, max=5),
         retry=retry_if_exception_type((ConnectionError, requests.RequestException)),
         reraise=True,
