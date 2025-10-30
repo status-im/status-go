@@ -34,14 +34,15 @@ RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_i
       GO_GENERATE_FAST_DIR="/root/.cache/go-generate-fast"
 
 # Copy binaries to the second image
-FROM debian:bookworm-slim
+# glibc≥2.39
+FROM debian:trixie-slim
 
 LABEL maintainer="support@status.im"
 LABEL source="https://github.com/status-im/status-go"
 LABEL description="status-go is an underlying part of Status - a browser, messenger, and gateway to a decentralized world."
 
 RUN apt-get update \
- && apt-get install -y ca-certificates bash curl python3 \
+ && apt-get install -y ca-certificates bash curl python3 libstdc++6 libgomp1 \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
@@ -56,6 +57,10 @@ COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
 
 COPY _assets/scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+
+RUN mkdir -p /go/src/github.com/status-im/status-go/libs
+COPY --from=builder /go/src/github.com/status-im/status-go/libs/* /go/src/github.com/status-im/status-go/libs/
+
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # 30304 is used for Discovery v5
