@@ -579,8 +579,8 @@ github.com/cockroachdb/redact v1.1.5/go.mod h1:BVNblN9mBWFyMyqK1k3AAiSxhvhfK2oOZ
 github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 h1:zuQyyAKVxetITBuuhv3BI9cMrmStnpT18zmgmTxunpo=
 github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06/go.mod h1:7nc4anLGjupUW/PeY5qiNYsdNXj7zopG+eqsS7To5IQ=
 github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
-github.com/codex-storage/codex-go-bindings v0.0.22 h1:53nOqLzgfvR3KdghFAKDoREoW+n12ewvNf8Zf3Pdobc=
-github.com/codex-storage/codex-go-bindings v0.0.22/go.mod h1:hP/n9iDZqQP4MytkgUepl3yMMsZy5Jbk9lQbbbVJ51Q=
+github.com/codex-storage/codex-go-bindings v0.0.23 h1:aMHttUQZELiG0ebSjC58HFHlkyIiCNMElvdTnt4+Y5s=
+github.com/codex-storage/codex-go-bindings v0.0.23/go.mod h1:hP/n9iDZqQP4MytkgUepl3yMMsZy5Jbk9lQbbbVJ51Q=
 github.com/consensys/gnark-crypto v0.18.1 h1:RyLV6UhPRoYYzaFnPQA4qK3DyuDgkTgskDdoGqFt3fI=
 github.com/consensys/gnark-crypto v0.18.1/go.mod h1:L3mXGFTe1ZN+RSJ+CLjUt9x7PNdx8ubaYfDROyp2Z8c=
 github.com/containerd/aufs v0.0.0-20200908144142-dab0cbea06f4/go.mod h1:nukgQABAEopAHvB6j7cnP5zJ+/3aVcE7hCYqvIwAHyE=

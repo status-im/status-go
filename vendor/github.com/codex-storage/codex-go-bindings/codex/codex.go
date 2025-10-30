@@ -92,7 +92,7 @@ const (
 
 type Config struct {
 	// Default: INFO
-	LogLevel LogLevel `json:"log-level,omitempty"`
+	LogLevel string `json:"log-level,omitempty"`
 
 	// Specifies what kind of logs should be written to stdout
 	// Default: auto
@@ -280,8 +280,12 @@ func (node CodexNode) Destroy() error {
 		return bridge.callError("cGoCodexDestroy")
 	}
 
-	_, err = bridge.wait()
-	return err
+	// We don't wait for the bridge here.
+	// The destroy function does not call the worker thread,
+	// it destroys the context directly and return the return
+	// value synchronously.
+
+	return nil
 }
 
 // Version returns the version of the Codex node.
