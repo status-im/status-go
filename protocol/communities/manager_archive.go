@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
-
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
@@ -61,7 +59,7 @@ type EncodedArchiveData struct {
 type ArchiveManager struct {
 	torrentConfig                *params.TorrentConfig
 	torrentClient                *torrent.Client
-	codexConfig                  *codex.Config
+	codexConfig                  *params.CodexConfig
 	codexClient                  *CodexClient
 	isCodexClientStarted         bool
 	torrentTasks                 map[string]metainfo.Hash
@@ -124,7 +122,7 @@ func (m *ArchiveManager) SetTorrentConfig(config *params.TorrentConfig) {
 	m.ArchiveFileManager.torrentConfig = config
 }
 
-func (m *ArchiveManager) SetCodexConfig(config *codex.Config) {
+func (m *ArchiveManager) SetCodexConfig(config *params.CodexConfig) {
 	m.codexConfig = config
 }
 

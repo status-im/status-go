@@ -212,7 +212,7 @@ type NodeConfig struct {
 	// OTELConfig provides configuration for OpenTelemetry tracing
 	OTELConfig OTELConfig
 
-	CodexConfig codex.Config
+	CodexConfig CodexConfig
 
 	OutputMessageCSVEnabled bool
 }
@@ -337,6 +337,11 @@ type TorrentConfig struct {
 	TorrentDir string
 }
 
+type CodexConfig struct {
+	Enabled bool
+	codex.Config
+}
+
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
 func (c *ShhextConfig) Validate(validate *validator.Validate) error {
 	if err := validate.Struct(c); err != nil {
@@ -410,10 +415,13 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			DataDir:    dataDir + "/archivedata",
 			TorrentDir: dataDir + "/torrents",
 		},
-		CodexConfig: codex.Config{
-			BlockRetries:   50,
-			DataDir:        dataDir + "/codexdata",
-			MetricsEnabled: false,
+		CodexConfig: CodexConfig{
+			Enabled: false,
+			Config: codex.Config{
+				BlockRetries:   50,
+				DataDir:        dataDir + "/codexdata",
+				MetricsEnabled: false,
+			},
 		},
 	}
 
@@ -527,7 +535,7 @@ func (c *TorrentConfig) Validate(validate *validator.Validate) error {
 	return nil
 }
 
-func Validate(c codex.Config, validate *validator.Validate) error {
+func Validate(c CodexConfig, validate *validator.Validate) error {
 	if err := validate.Struct(c); err != nil {
 		return err
 	}
