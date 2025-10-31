@@ -47,6 +47,7 @@ import (
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcstats"
+	"github.com/status-im/status-go/services/sharedurls"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/updates"
@@ -125,6 +126,7 @@ type StatusNode struct {
 	appGeneralSrvc         *appgeneral.Service
 	ethSrvc                *eth.Service
 	newsfeedSrvc           *newsfeed.Service
+	sharedUrlsSrvc         *sharedurls.Service
 
 	walletFeed        event.Feed
 	accountsPublisher *pubsub.Publisher

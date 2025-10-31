@@ -1,15 +1,13 @@
-package protocol
+package sharedurls
 
 import (
-	"bytes"
-	"encoding/base64"
 	"fmt"
+	"reflect"
 	"regexp"
-	"strings"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/golang/protobuf/proto"
-
-	"github.com/andybalholm/brotli"
+	"github.com/pkg/errors"
 
 	"github.com/status-im/status-go/api/multiformat"
 	gocommon "github.com/status-im/status-go/common"
@@ -19,39 +17,8 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/utils"
 )
-
-type CommunityURLData struct {
-	DisplayName  string   `json:"displayName"`
-	Description  string   `json:"description"`
-	MembersCount uint32   `json:"membersCount"`
-	Color        string   `json:"color"`
-	TagIndices   []uint32 `json:"tagIndices"`
-	CommunityID  string   `json:"communityId"`
-}
-
-type CommunityChannelURLData struct {
-	Emoji       string `json:"emoji"`
-	DisplayName string `json:"displayName"`
-	Description string `json:"description"`
-	Color       string `json:"color"`
-	ChannelUUID string `json:"channelUuid"`
-}
-
-type ContactURLData struct {
-	DisplayName string `json:"displayName"`
-	Description string `json:"description"`
-	PublicKey   string `json:"publicKey"`
-}
-
-type URLDataResponse struct {
-	Community *CommunityURLData        `json:"community"`
-	Channel   *CommunityChannelURLData `json:"channel"`
-	Contact   *ContactURLData          `json:"contact"`
-	Shard     *messagingtypes.Shard    `json:"shard,omitempty"`
-}
 
 const baseShareURL = "https://status.app"
 const userPath = "u#"
@@ -68,7 +35,58 @@ const sharedURLChannelPrefixWithData = baseShareURL + "/" + channelPath
 
 const channelUUIDRegExp = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$"
 
-var channelRegExp = regexp.MustCompile(channelUUIDRegExp)
+var (
+	channelRegExp         = regexp.MustCompile(channelUUIDRegExp)
+	errInvalidCommunityID = errors.New("invalid community id")
+	errNoDataProvider     = errors.New("no data provider")
+	errCommunityNil       = errors.New("community is nil")
+)
+
+var (
+	ErrContactNotFound = errors.New("contact not found")
+)
+
+func isNil(data interface{}) bool {
+	v := reflect.ValueOf(data).Kind()
+	return data == nil || v == reflect.Ptr && reflect.ValueOf(data).IsNil()
+}
+
+type Service struct {
+	provider DataProvider
+}
+
+func NewService(provider DataProvider) *Service {
+	s := &Service{}
+	s.SetDataProvider(provider)
+	return s
+}
+
+func (s *Service) Start() error {
+	return nil
+}
+
+func (s *Service) Stop() error {
+	return nil
+}
+
+func (s *Service) APIs() []rpc.API {
+	return []rpc.API{
+		{
+			Namespace: "sharedurls",
+			Version:   "0.1.0",
+			Service: &PublicAPI{
+				service: s,
+			},
+		},
+	}
+}
+
+func (s *Service) SetDataProvider(provider DataProvider) {
+	if isNil(provider) {
+		provider = &NopDataProvider{}
+	}
+	s.provider = provider
+}
 
 func decodeCommunityID(serialisedPublicKey string) (string, error) {
 	deserializedCommunityID, err := multiformat.DeserializeCompressedKey(serialisedPublicKey)
@@ -92,7 +110,7 @@ func deserializePublicKey(compressedKey string) (types.HexBytes, error) {
 	return utils.DeserializePublicKey(compressedKey)
 }
 
-func (m *Messenger) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
+func (s *Service) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
 	shortKey, err := serializePublicKey(communityID)
 	if err != nil {
 		return "", err
@@ -115,7 +133,7 @@ func parseCommunityURLWithChatKey(urlData string) (*URLDataResponse, error) {
 	}, nil
 }
 
-func (m *Messenger) prepareEncodedCommunityData(community *communities.Community) (string, string, error) {
+func prepareEncodedCommunityData(community *communities.Community) (string, string, error) {
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
@@ -152,13 +170,21 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 	return encodedData, shortKey, nil
 }
 
-func (m *Messenger) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
-	community, err := m.GetCommunityByID(communityID)
+func (s *Service) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
+	community, err := s.provider.GetCommunityByID(communityID)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to get community")
 	}
 
-	data, shortKey, err := m.prepareEncodedCommunityData(community)
+	return ShareCommunityURLWithData(community)
+}
+
+func ShareCommunityURLWithData(community *communities.Community) (string, error) {
+	if community == nil {
+		return "", errCommunityNil
+	}
+
+	data, shortKey, err := prepareEncodedCommunityData(community)
 	if err != nil {
 		return "", err
 	}
@@ -209,26 +235,26 @@ func parseCommunityURLWithData(data string, chatKey string) (*URLDataResponse, e
 	}, nil
 }
 
-func (m *Messenger) ShareCommunityChannelURLWithChatKey(request *requests.CommunityChannelShareURL) (string, error) {
-	if err := request.Validate(); err != nil {
-		return "", err
+func (s *Service) ShareCommunityChannelURLWithChatKey(communityID types.HexBytes, channelID string) (string, error) {
+	if len(communityID) == 0 {
+		return "", errInvalidCommunityID
 	}
 
-	shortKey, err := serializePublicKey(request.CommunityID)
+	shortKey, err := serializePublicKey(communityID)
 	if err != nil {
 		return "", err
 	}
 
-	valid, err := regexp.MatchString(channelUUIDRegExp, request.ChannelID)
+	valid, err := regexp.MatchString(channelUUIDRegExp, channelID)
 	if err != nil {
 		return "", err
 	}
 
 	if !valid {
-		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(request.ChannelID))
+		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(channelID))
 	}
 
-	return fmt.Sprintf("%s/cc/%s#%s", baseShareURL, request.ChannelID, shortKey), nil
+	return fmt.Sprintf("%s/cc/%s#%s", baseShareURL, channelID, shortKey), nil
 }
 
 func parseCommunityChannelURLWithChatKey(channelID string, publicKey string) (*URLDataResponse, error) {
@@ -258,7 +284,7 @@ func parseCommunityChannelURLWithChatKey(channelID string, publicKey string) (*U
 	}, nil
 }
 
-func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Community, channel *protobuf.CommunityChat, channelID string) (string, string, error) {
+func (s *Service) prepareEncodedCommunityChannelData(community *communities.Community, channel *protobuf.CommunityChat, channelID string) (string, string, error) {
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
@@ -303,31 +329,31 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 	return encodedData, shortKey, nil
 }
 
-func (m *Messenger) ShareCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
-	if err := request.Validate(); err != nil {
-		return "", err
+func (s *Service) ShareCommunityChannelURLWithData(communityID types.HexBytes, channelID string) (string, error) {
+	if len(communityID) == 0 {
+		return "", errInvalidCommunityID
 	}
 
-	valid, err := regexp.MatchString(channelUUIDRegExp, request.ChannelID)
+	valid, err := regexp.MatchString(channelUUIDRegExp, channelID)
 	if err != nil {
 		return "", err
 	}
 
 	if !valid {
-		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(request.ChannelID))
+		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(channelID))
 	}
 
-	community, err := m.GetCommunityByID(request.CommunityID)
+	community, err := s.provider.GetCommunityByID(communityID)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to get community")
 	}
 
-	channel := community.Chats()[request.ChannelID]
+	channel := community.Chats()[channelID]
 	if channel == nil {
-		return "", fmt.Errorf("channel with channelID %s not found", gocommon.TruncateWithDot(request.ChannelID))
+		return "", fmt.Errorf("channel with channelID %s not found", gocommon.TruncateWithDot(channelID))
 	}
 
-	data, shortKey, err := m.prepareEncodedCommunityChannelData(community, channel, request.ChannelID)
+	data, shortKey, err := s.prepareEncodedCommunityChannelData(community, channel, channelID)
 	if err != nil {
 		return "", err
 	}
@@ -385,7 +411,7 @@ func parseCommunityChannelURLWithData(data string, chatKey string) (*URLDataResp
 	}, nil
 }
 
-func (m *Messenger) ShareUserURLWithChatKey(contactID string) (string, error) {
+func (s *Service) ShareUserURLWithChatKey(contactID string) (string, error) {
 	publicKey, err := crypto.HexToPubkey(contactID)
 	if err != nil {
 		return "", err
@@ -422,8 +448,11 @@ func parseUserURLWithChatKey(urlData string) (*URLDataResponse, error) {
 	}, nil
 }
 
-func (m *Messenger) ShareUserURLWithENS(contactID string) (string, error) {
-	contact := m.GetContactByID(contactID)
+func (s *Service) ShareUserURLWithENS(contactID string) (string, error) {
+	contact, err := s.provider.GetContactByID(contactID)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get contact")
+	}
 	if contact == nil {
 		return "", ErrContactNotFound
 	}
@@ -435,7 +464,7 @@ func parseUserURLWithENS(ensName string) (*URLDataResponse, error) {
 	return nil, fmt.Errorf("not implemented yet")
 }
 
-func (m *Messenger) prepareEncodedUserData(contact *contacts.Contact) (string, string, error) {
+func (s *Service) prepareEncodedUserData(contact *contacts.Contact) (string, string, error) {
 	pk, err := contact.PublicKey()
 	if err != nil {
 		return "", "", err
@@ -477,151 +506,19 @@ func (m *Messenger) prepareEncodedUserData(contact *contacts.Contact) (string, s
 	return encodedData, shortKey, nil
 }
 
-func (m *Messenger) ShareUserURLWithData(contactID string) (string, error) {
-	contact := m.GetContactByID(contactID)
+func (s *Service) ShareUserURLWithData(contactID string) (string, error) {
+	contact, err := s.provider.GetContactByID(contactID)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get contact")
+	}
 	if contact == nil {
 		return "", ErrContactNotFound
 	}
 
-	data, shortKey, err := m.prepareEncodedUserData(contact)
+	data, shortKey, err := s.prepareEncodedUserData(contact)
 	if err != nil {
 		return "", err
 	}
 
 	return fmt.Sprintf("%s/u/%s#%s", baseShareURL, data, shortKey), nil
-}
-
-func parseUserURLWithData(data string, chatKey string) (*URLDataResponse, error) {
-	if data == "" {
-		return &URLDataResponse{
-			Contact: &ContactURLData{
-				DisplayName: "",
-				Description: "",
-				PublicKey:   chatKey,
-			},
-		}, nil
-	}
-	urlData, err := decodeDataURL(data)
-	if err != nil {
-		return nil, err
-	}
-
-	var urlDataProto protobuf.URLData
-	err = proto.Unmarshal(urlData, &urlDataProto)
-	if err != nil {
-		return nil, err
-	}
-
-	var userProto protobuf.User
-	err = proto.Unmarshal(urlDataProto.Content, &userProto)
-	if err != nil {
-		return nil, err
-	}
-
-	return &URLDataResponse{
-		Contact: &ContactURLData{
-			DisplayName: userProto.DisplayName,
-			Description: userProto.Description,
-			PublicKey:   chatKey,
-		},
-	}, nil
-}
-
-func IsStatusSharedURL(url string) bool {
-	return strings.HasPrefix(url, sharedURLUserPrefix) ||
-		strings.HasPrefix(url, sharedURLUserPrefixWithData) ||
-		strings.HasPrefix(url, sharedURLCommunityPrefix) ||
-		strings.HasPrefix(url, sharedURLCommunityPrefixWithData) ||
-		strings.HasPrefix(url, sharedURLChannelPrefixWithData)
-}
-
-func splitSharedURLData(data string) (string, string, error) {
-	const count = 2
-	contents := strings.SplitN(data, "#", count)
-	if len(contents) != count {
-		return "", "", fmt.Errorf("url should contain at least one `#` separator")
-	}
-	return contents[0], contents[1], nil
-}
-
-func ParseSharedURL(url string) (*URLDataResponse, error) {
-
-	if strings.HasPrefix(url, sharedURLUserPrefix) {
-		chatKey := strings.TrimPrefix(url, sharedURLUserPrefix)
-		if strings.HasPrefix(chatKey, "zQ3sh") {
-			return parseUserURLWithChatKey(chatKey)
-		}
-		return parseUserURLWithENS(chatKey)
-	}
-
-	if strings.HasPrefix(url, sharedURLUserPrefixWithData) {
-		trimmedURL := strings.TrimPrefix(url, sharedURLUserPrefixWithData)
-		encodedData, chatKey, err := splitSharedURLData(trimmedURL)
-		if err != nil {
-			return nil, err
-		}
-		return parseUserURLWithData(encodedData, chatKey)
-	}
-
-	if strings.HasPrefix(url, sharedURLCommunityPrefix) {
-		chatKey := strings.TrimPrefix(url, sharedURLCommunityPrefix)
-		return parseCommunityURLWithChatKey(chatKey)
-	}
-
-	if strings.HasPrefix(url, sharedURLCommunityPrefixWithData) {
-		trimmedURL := strings.TrimPrefix(url, sharedURLCommunityPrefixWithData)
-		encodedData, chatKey, err := splitSharedURLData(trimmedURL)
-		if err != nil {
-			return nil, err
-		}
-		return parseCommunityURLWithData(encodedData, chatKey)
-	}
-
-	if strings.HasPrefix(url, sharedURLChannelPrefixWithData) {
-		trimmedURL := strings.TrimPrefix(url, sharedURLChannelPrefixWithData)
-		encodedData, chatKey, err := splitSharedURLData(trimmedURL)
-		if err != nil {
-			return nil, err
-		}
-
-		if channelRegExp.MatchString(encodedData) {
-			return parseCommunityChannelURLWithChatKey(encodedData, chatKey)
-		}
-		return parseCommunityChannelURLWithData(encodedData, chatKey)
-	}
-
-	return nil, fmt.Errorf("not a status shared url")
-}
-
-func encodeDataURL(data []byte) (string, error) {
-	bb := bytes.NewBuffer([]byte{})
-	writer := brotli.NewWriter(bb)
-	_, err := writer.Write(data)
-	if err != nil {
-		return "", err
-	}
-
-	err = writer.Close()
-	if err != nil {
-		return "", err
-	}
-
-	return base64.URLEncoding.EncodeToString(bb.Bytes()), nil
-}
-
-func decodeDataURL(data string) ([]byte, error) {
-	decoded, err := base64.URLEncoding.DecodeString(data)
-	if err != nil {
-		return nil, err
-	}
-
-	output := make([]byte, 4096)
-	bb := bytes.NewBuffer(decoded)
-	reader := brotli.NewReader(bb)
-	n, err := reader.Read(output)
-	if err != nil {
-		return nil, err
-	}
-
-	return output[:n], nil
 }

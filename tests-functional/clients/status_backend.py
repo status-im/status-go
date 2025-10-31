@@ -20,6 +20,7 @@ from clients.services.eth import EthService
 from clients.services.multiaccounts import MultiAccountsService
 from clients.services.newsfeed import NewsFeedService
 from clients.services.settings import SettingsService
+from clients.services.sharedurls import SharedURLsService
 from clients.services.wakuext import (
     WakuextService,
     PushNotificationRegistrationTokenType,
@@ -94,6 +95,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.newsfeed_service = NewsFeedService(self)
         self.multiaccounts_service = MultiAccountsService(self)
         self.settings_service = SettingsService(self)
+        self.sharedurls_service = SharedURLsService(self)
         self.connector_service = ConnectorService(self)
         self.appgeneral_service = AppgeneralService(self)
         self.eth_service = EthService(self)
@@ -481,3 +483,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         method = "ImageServerTLSCert"
         response = self.api_request(method, {})
         return response.content.decode("utf-8")
+
+    def serialize_legacy_key(self, key):
+        method = "SerializeLegacyKey"
+        # Use client.post directly, because this method is old and has json-incompatible arguments
+        response = self.client.post(self.method_url(method), data=key)
+        return response.content.decode()

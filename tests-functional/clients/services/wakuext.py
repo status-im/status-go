@@ -710,21 +710,6 @@ class WakuextService(Service):
         response = self.rpc_request("reorderCommunityChat", params)
         return response
 
-    def share_community_channel_url_with_chat_key(self, community_id: str, channel_id: str):
-        params = [{"communityId": community_id, "channelId": channel_id}]
-        response = self.rpc_request("shareCommunityChannelURLWithChatKey", params)
-        return response
-
-    def share_community_url_with_chat_key(self, community_id: str):
-        params = [community_id]
-        response = self.rpc_request("shareCommunityURLWithChatKey", params)
-        return response
-
-    def parse_shared_url(self, url: str):
-        params = [url]
-        response = self.rpc_request("parseSharedURL", params)
-        return response
-
     def mute_community_chats(self, community_id: str, muted_type):
         params = [{"communityId": community_id, "mutedType": muted_type}]
         response = self.rpc_request("muteCommunityChats", params)

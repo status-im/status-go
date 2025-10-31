@@ -16,6 +16,7 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/services/sharedurls"
 )
 
 const UnfurledLinksPerMessageLimit = 5
@@ -153,7 +154,7 @@ func (m *Messenger) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {
 
 		metadata := URLUnfurlingMetadata{
 			URL:               url,
-			IsStatusSharedURL: IsStatusSharedURL(url),
+			IsStatusSharedURL: sharedurls.IsStatusSharedURL(url),
 		}
 
 		if !URLUnfurlingSupported(rawURL) {
@@ -217,7 +218,7 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlUR
 	for _, url := range urls {
 		m.logger.Debug("unfurling", zap.String("url", url))
 
-		if IsStatusSharedURL(url) {
+		if sharedurls.IsStatusSharedURL(url) {
 			unfurler := NewStatusUnfurler(url, m, m.logger)
 			preview, err := unfurler.Unfurl()
 			if err != nil {

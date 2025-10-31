@@ -287,7 +287,9 @@ func (s *Service) handleSetSignerPubKey(status string, toAddress common.Address,
 
 // Stop is run when a service is stopped.
 func (s *Service) Stop() error {
-	s.walletWatcher.Stop()
+	if s.walletWatcher != nil {
+		s.walletWatcher.Stop()
+	}
 	return nil
 }
 
