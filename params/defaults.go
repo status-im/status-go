@@ -21,5 +21,5 @@ const (
 	IpfsGatewayURL = "https://ipfs.status.im/"
 
 	// Number of times to retry fetching a block on Codex before giving up
-	BlockRetries = 5
+	BlockRetries = 50
 )
