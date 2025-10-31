@@ -94,7 +94,7 @@ func (c *Client) FetchFollowingAddresses(ctx context.Context, userAddress common
 
 	if search != "" {
 		// Search returns all results (no pagination)
-		urlStr = fmt.Sprintf("%s/users/%s/searchFollowing?include=ens&sort=followers&term=%s",
+		urlStr = fmt.Sprintf("%s/users/%s/searchFollowing?include=ens&sort=latest&term=%s",
 			c.baseURL, userAddress.Hex(), url.QueryEscape(search))
 	} else {
 		// Regular listing uses pagination
@@ -107,7 +107,7 @@ func (c *Client) FetchFollowingAddresses(ctx context.Context, userAddress common
 		if offset < 0 {
 			offset = 0
 		}
-		urlStr = fmt.Sprintf("%s/users/%s/following?include=ens&limit=%d&offset=%d&sort=followers",
+		urlStr = fmt.Sprintf("%s/users/%s/following?include=ens&limit=%d&offset=%d&sort=latest",
 			c.baseURL, userAddress.Hex(), limit, offset)
 	}
 
