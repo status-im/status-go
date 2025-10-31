@@ -63,7 +63,6 @@ type ArchiveManager struct {
 	codexClient                  *CodexClient
 	isCodexClientStarted         bool
 	torrentTasks                 map[string]metainfo.Hash
-	indexCidTasks                map[string]string
 	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
 	historyArchiveTasksWaitGroup sync.WaitGroup
 	historyArchiveTasks          sync.Map // stores `chan struct{}`
@@ -86,7 +85,6 @@ func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 		torrentConfig:               amc.TorrentConfig,
 		codexConfig:                 amc.CodexConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
-		indexCidTasks:               make(map[string]string),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
 
 		logger:      amc.Logger,
@@ -463,6 +461,7 @@ func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, 
 			}
 		case <-cancel:
 			m.UnseedHistoryArchiveTorrent(community.ID())
+			m.UnseedHistoryArchiveIndexCid(community.ID())
 			m.historyArchiveTasks.Delete(id)
 			m.historyArchiveTasksWaitGroup.Done()
 			return
@@ -543,17 +542,25 @@ func (m *ArchiveManager) UnseedHistoryArchiveTorrent(communityID types.HexBytes)
 }
 
 func (m *ArchiveManager) UnseedHistoryArchiveIndexCid(communityID types.HexBytes) {
-	id := communityID.String()
+	// Remove local index file
+	err := m.removeCodexIndexFile(communityID)
+	if err != nil {
+		m.logger.Error("failed to remove local index file", zap.Error(err))
+	}
 
-	if cid, exists := m.indexCidTasks[id]; exists {
-		m.logger.Debug("Unseeding index CID for community", zap.String("id", id), zap.String("cid", cid))
-		// ToDo: consider "unpinning" the index Cid, so that it is no longer advertised on DHT
-		// For now, we remove it from tracking and could delete the local index file
-		delete(m.indexCidTasks, id)
+	// get currently advertised index Cid
+	cid, err := m.GetHistoryArchiveIndexCid(communityID)
 
-		// Optional: Remove local index file if we want to clean up storage
-		// indexFilePath := m.ArchiveFileManager.codexArchiveIndexFile(id)
-		// os.Remove(indexFilePath)
+	if err != nil {
+		m.logger.Debug("failed to get history archive index CID", zap.Error(err))
+		return
+	}
+
+	m.logger.Debug("Unseeding index CID for community", zap.String("id", communityID.String()), zap.String("cid", cid))
+
+	err = m.codexClient.RemoveCid(cid)
+	if err != nil {
+		m.logger.Error("failed to remove CID from Codex", zap.Error(err))
 	}
 }
 
@@ -755,14 +762,13 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 		Cancelled:                    false,
 	}
 
-	m.indexCidTasks[id] = indexCid
 	timeout := time.After(20 * time.Second)
 
 	// Create separate cancel channel for the index downloader to avoid channel competition
 	indexDownloaderCancel := make(chan struct{})
 
 	// Create index downloader with path to index file using helper function
-	indexFilePath := m.ArchiveFileManager.codexArchiveIndexFile(id)
+	indexFilePath := m.codexArchiveIndexFilePath(communityID)
 	indexDownloader := NewCodexIndexDownloader(m.codexClient, indexCid, indexFilePath, indexDownloaderCancel, m.logger)
 
 	m.logger.Debug("fetching history index from Codex", zap.String("indexCid", indexCid))
@@ -810,7 +816,13 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 
 				if indexDownloader.IsDownloadComplete() {
 
-					index, err := m.ArchiveFileManager.CodexLoadHistoryArchiveIndexFromFile(m.identity, communityID)
+					err := m.writeCodexIndexCidToFile(communityID, indexCid)
+					if err != nil {
+						m.logger.Error("failed to write Codex index CID to file", zap.Error(err))
+						return nil, err
+					}
+
+					index, err := m.CodexLoadHistoryArchiveIndexFromFile(m.identity, communityID)
 					if err != nil {
 						return nil, err
 					}
