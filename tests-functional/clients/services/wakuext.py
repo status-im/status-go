@@ -149,6 +149,11 @@ class WakuextService(Service):
         response = self.rpc_request("contacts")
         return response
 
+    def get_contact_by_id(self, id: str):
+        params = [id]
+        response = self.rpc_request("getContactByID", params)
+        return response
+
     def add_contact(self, contact_id: str, displayName: str):
         params = [{"id": contact_id, "nickname": "fake_nickname", "displayName": displayName, "ensName": ""}]
         response = self.rpc_request("addContact", params)
