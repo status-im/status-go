@@ -237,6 +237,7 @@ run-status-backend: ##@run Start status-backend server listening to localhost:PO
 	go run ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
+push-notification-server: generate-sds
 push-notification-server: build/bin/push-notification-server
 
 cmd: generate-sds
