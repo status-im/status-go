@@ -16,15 +16,18 @@ import (
 	"github.com/status-im/status-go/walletdatabase"
 )
 
-const (
-	password            = ""
-	kdfIterationsNumber = 0
+var (
+	outDir              = flag.String("out-dir", "build", "Output directory for generated DB files")
+	migrateOnly         = flag.Bool("migrate-only", false, "Only migrate the DBs, don't generate or recreate them")
+	password            = flag.String("password", "", "Password to encrypt the DBs")
+	kdfIterationsNumber = flag.Int("kdf-iterations", 0, "Number of KDF iterations")
 )
 
-func main() {
-	outDir := flag.String("out-dir", "build", "Output directory for generated DB files")
+func init() {
 	flag.Parse()
+}
 
+func main() {
 	if err := os.MkdirAll(*outDir, 0o755); err != nil {
 		log.Fatalf("failed to create output directory %s: %v", *outDir, err)
 	}
@@ -48,6 +51,9 @@ func main() {
 }
 
 func recreate(path string) error {
+	if *migrateOnly {
+		return nil
+	}
 	_ = os.Remove(path)
 	_ = os.Remove(path + "-wal")
 	_ = os.Remove(path + "-shm")
@@ -62,7 +68,7 @@ func generateAppDB(outDir string) error {
 
 	// Use the same initializer the app uses
 	var init appdatabase.DbInitializer
-	db, err := init.Initialize(path, password, kdfIterationsNumber)
+	db, err := init.Initialize(path, *password, *kdfIterationsNumber)
 	if err != nil {
 		return err
 	}
@@ -88,7 +94,7 @@ func generateWalletDB(outDir string) error {
 
 	// Use the same initializer the app uses
 	var init walletdatabase.DbInitializer
-	_, err := init.Initialize(path, password, kdfIterationsNumber)
+	_, err := init.Initialize(path, *password, *kdfIterationsNumber)
 	if err != nil {
 		return err
 	}
