@@ -72,9 +72,9 @@ var validateInterval = 2 * time.Minute
 
 // Archive distribution preferences
 const (
-	ArchiveDistributionMethodAuto    = "auto"    // Default: try both methods, prefer fastest
-	ArchiveDistributionMethodTorrent = "torrent" // Prefer BitTorrent/magnetlink only
-	ArchiveDistributionMethodCodex   = "codex"   // Prefer Codex/IndexCid only
+	ArchiveDistributionMethodUnknown = "unknown"
+	ArchiveDistributionMethodTorrent = "torrent"
+	ArchiveDistributionMethodCodex   = "codex"
 )
 
 // Used for testing only
@@ -3757,7 +3757,7 @@ func (m *Manager) GetArchiveDistributionPreference(communityID types.HexBytes) (
 func (m *Manager) SetArchiveDistributionPreference(communityID types.HexBytes, preference string) error {
 	// Validate preference value
 	switch preference {
-	case ArchiveDistributionMethodAuto, ArchiveDistributionMethodTorrent, ArchiveDistributionMethodCodex:
+	case ArchiveDistributionMethodTorrent, ArchiveDistributionMethodCodex:
 		// Valid preference
 	default:
 		return errors.New("invalid archive distribution preference")

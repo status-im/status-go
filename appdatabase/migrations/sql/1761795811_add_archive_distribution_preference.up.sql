@@ -1,1 +1,1 @@
-ALTER TABLE communities_archive_info ADD COLUMN preferred_distribution_method TEXT DEFAULT 'torrent';
+ALTER TABLE communities_archive_info ADD COLUMN preferred_distribution_method TEXT DEFAULT 'codex';

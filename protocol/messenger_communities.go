@@ -1478,6 +1478,23 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		Priority:            &messagingtypes.HighPriority,
 	}
 
+	// we want to use codex for archive distribution
+	// but if it is already set to something else (handy in testing), respect that
+	archiveDistributionPreference, err := m.communitiesManager.GetArchiveDistributionPreference(community.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	m.logger.Debug("Archive distribution preference (RequestToJoin):", zap.String("preference", archiveDistributionPreference))
+
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodUnknown {
+		// If the preference is unknown, we can set it to codex
+		err = m.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodCodex)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	_, err = m.SendMessageToControlNode(community, rawMessage)
 	if err != nil {
 		return nil, err
@@ -2474,6 +2491,12 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.CreateCommunity(request, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// we want to use codex for archive distribution
+	err = m.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodCodex)
 	if err != nil {
 		return nil, err
 	}
@@ -4048,8 +4071,8 @@ importMessageArchivesLoop:
 			var archiveMessages []*protobuf.WakuMessage
 			preference, err := m.communitiesManager.GetArchiveDistributionPreference(communityID)
 			if err != nil {
-				m.logger.Warn("failed to get archive distribution preference, using torrent", zap.Error(err))
-				preference = "torrent"
+				m.logger.Warn("failed to get archive distribution preference, using codex", zap.Error(err))
+				preference = "codex"
 			}
 			if preference == "codex" {
 				archiveMessages, err = m.archiveManager.ExtractMessagesFromCodexHistoryArchive(communityID, downloadedArchiveID)

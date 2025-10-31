@@ -1021,11 +1021,13 @@ func (p *Persistence) GetMagnetlinkMessageClock(communityID types.HexBytes) (uin
 }
 
 func (p *Persistence) SaveCommunityArchiveInfo(communityID types.HexBytes, magnetLinkClock uint64, lastArchiveEndDate uint64, indexCidClock uint64) error {
-	_, err := p.db.Exec(`INSERT INTO communities_archive_info (magnetlink_clock, last_message_archive_end_date, community_id, index_cid_clock) VALUES (?, ?, ?, ?)`,
+	_, err := p.db.Exec(`INSERT INTO communities_archive_info (magnetlink_clock, last_message_archive_end_date, community_id, index_cid_clock, preferred_distribution_method) VALUES (?, ?, ?, ?, ?)`,
 		magnetLinkClock,
 		lastArchiveEndDate,
 		communityID.String(),
-		indexCidClock)
+		indexCidClock,
+		ArchiveDistributionMethodUnknown,
+	)
 	return err
 }
 
@@ -2230,15 +2232,15 @@ func (p *Persistence) UpdateAndPruneEncryptionKeyRequests(communityID types.HexB
 }
 
 func (p *Persistence) GetArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
-	return "codex", nil
-	// var preference string
-	// err := p.db.QueryRow(`SELECT preferred_distribution_method FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&preference)
-	// if err == sql.ErrNoRows {
-	// 	return "auto", nil // Default preference
-	// } else if err != nil {
-	// 	return "", err
-	// }
-	// return preference, nil
+	// return "codex", nil
+	var preference string
+	err := p.db.QueryRow(`SELECT preferred_distribution_method FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&preference)
+	if err == sql.ErrNoRows {
+		return ArchiveDistributionMethodUnknown, nil
+	} else if err != nil {
+		return "", err
+	}
+	return preference, nil
 }
 
 func (p *Persistence) SetArchiveDistributionPreference(communityID types.HexBytes, preference string) error {
