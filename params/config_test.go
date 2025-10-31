@@ -30,6 +30,7 @@ func TestNewConfigFromJSON(t *testing.T) {
 			"TorrentDir": "` + tmpDir + `/torrents"
 		},
 		"CodexConfig": {
+			"Enabled": false,
 			"data-dir": "` + tmpDir + `/codexdata",
 			"block-retries": 5
 		},

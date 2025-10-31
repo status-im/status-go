@@ -6,8 +6,6 @@ package communities
 import (
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
-
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
@@ -31,7 +29,7 @@ func (tmm *ArchiveManagerNop) SetOnline(online bool) {}
 
 func (tmm *ArchiveManagerNop) SetTorrentConfig(*params.TorrentConfig) {}
 
-func (tmm *ArchiveManagerNop) SetCodexConfig(*codex.Config) {}
+func (tmm *ArchiveManagerNop) SetCodexConfig(*params.CodexConfig) {}
 
 func (tmm *ArchiveManagerNop) StartTorrentClient() error {
 	return nil

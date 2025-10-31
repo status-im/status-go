@@ -6,24 +6,28 @@ import (
 	"io"
 
 	"github.com/codex-storage/codex-go-bindings/codex"
+
+	"github.com/status-im/status-go/params"
 )
 
 // CodexClient handles basic upload/download operations with Codex storage
 type CodexClient struct {
-	config codex.Config
-	node   *codex.CodexNode
+	config  codex.Config
+	node    *codex.CodexNode
+	enabled bool
 }
 
 // NewCodexClient creates a new Codex client
-func NewCodexClient(config codex.Config) (CodexClient, error) {
-	node, err := codex.New(config)
+func NewCodexClient(config params.CodexConfig) (CodexClient, error) {
+	node, err := codex.New(config.Config)
 	if err != nil {
 		return CodexClient{}, err
 	}
 
 	return CodexClient{
-		config: config,
-		node:   node,
+		config:  config.Config,
+		node:    node,
+		enabled: config.Enabled,
 	}, nil
 }
 

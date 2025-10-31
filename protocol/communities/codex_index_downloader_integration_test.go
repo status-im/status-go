@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -29,7 +28,6 @@ import (
 //   - CODEX_TIMEOUT_MS (optional; default: 60000)
 type CodexIndexDownloaderIntegrationTestSuite struct {
 	suite.Suite
-	client  *communities.CodexClient
 	testDir string
 	host    string
 	port    string
@@ -38,34 +36,6 @@ type CodexIndexDownloaderIntegrationTestSuite struct {
 
 // SetupSuite runs once before all tests in the suite
 func (suite *CodexIndexDownloaderIntegrationTestSuite) SetupSuite() {
-	suite.host = communities.GetEnvOrDefault("CODEX_HOST", "localhost")
-	suite.port = communities.GetEnvOrDefault("CODEX_API_PORT", "8001")
-	client, err := communities.NewCodexClient(codex.Config{
-		DataDir:        suite.T().TempDir(),
-		LogFormat:      codex.LogFormatNoColors,
-		MetricsEnabled: false,
-		BlockRetries:   5,
-	})
-	if err != nil {
-		suite.T().Fatalf("Failed to create Codex client: %v", err)
-	}
-
-	suite.T().Cleanup(func() {
-		if err := client.Stop(); err != nil {
-			suite.T().Logf("Failed to stop codex: %v", err)
-		}
-
-		if err := client.Destroy(); err != nil {
-			suite.T().Logf("Failed to destroy codex: %v", err)
-		}
-	})
-
-	suite.client = &client
-
-	if err = suite.client.Start(); err != nil {
-		suite.T().Fatalf("Failed to start Codex node: %v", err)
-	}
-
 	// Create logger
 	suite.logger, _ = zap.NewDevelopment()
 }
@@ -92,6 +62,8 @@ func TestCodexIndexDownloaderIntegrationTestSuite(t *testing.T) {
 }
 
 func (suite *CodexIndexDownloaderIntegrationTestSuite) TestIntegration_GotManifest() {
+	client := NewCodexClientTest(suite.T())
+
 	// Generate random payload to create a test file
 	payload := make([]byte, 2048)
 	_, err := rand.Read(payload)
@@ -99,13 +71,13 @@ func (suite *CodexIndexDownloaderIntegrationTestSuite) TestIntegration_GotManife
 	suite.T().Logf("Generated payload (first 32 bytes hex): %s", hex.EncodeToString(payload[:32]))
 
 	// Upload the data to Codex
-	cid, err := suite.client.Upload(bytes.NewReader(payload), "index-manifest-test.bin")
+	cid, err := client.Upload(bytes.NewReader(payload), "index-manifest-test.bin")
 	require.NoError(suite.T(), err, "upload failed")
 	suite.T().Logf("Upload successful, CID: %s", cid)
 
 	// Clean up after test
 	defer func() {
-		if err := suite.client.RemoveCid(cid); err != nil {
+		if err := client.RemoveCid(cid); err != nil {
 			suite.T().Logf("Warning: Failed to remove CID %s: %v", cid, err)
 		}
 	}()
@@ -115,7 +87,7 @@ func (suite *CodexIndexDownloaderIntegrationTestSuite) TestIntegration_GotManife
 	defer close(cancelChan)
 
 	filePath := filepath.Join(suite.testDir, "test-index.bin")
-	downloader := communities.NewCodexIndexDownloader(suite.client, cid, filePath, cancelChan, suite.logger)
+	downloader := communities.NewCodexIndexDownloader(&client, cid, filePath, cancelChan, suite.logger)
 
 	// Test GotManifest
 	manifestChan := downloader.GotManifest()
@@ -142,6 +114,8 @@ func (suite *CodexIndexDownloaderIntegrationTestSuite) TestIntegration_GotManife
 }
 
 func (suite *CodexIndexDownloaderIntegrationTestSuite) TestIntegration_DownloadIndexFile() {
+	client := NewCodexClientTest(suite.T())
+
 	// Generate random payload
 	payload := make([]byte, 1024)
 	_, err := rand.Read(payload)
@@ -149,13 +123,13 @@ func (suite *CodexIndexDownloaderIntegrationTestSuite) TestIntegration_DownloadI
 	suite.T().Logf("Generated payload (first 32 bytes hex): %s", hex.EncodeToString(payload[:32]))
 
 	// Upload the data to Codex
-	cid, err := suite.client.Upload(bytes.NewReader(payload), "index-download-test.bin")
+	cid, err := client.Upload(bytes.NewReader(payload), "index-download-test.bin")
 	require.NoError(suite.T(), err, "upload failed")
 	suite.T().Logf("Upload successful, CID: %s", cid)
 
 	// Clean up after test
 	defer func() {
-		if err := suite.client.RemoveCid(cid); err != nil {
+		if err := client.RemoveCid(cid); err != nil {
 			suite.T().Logf("Warning: Failed to remove CID %s: %v", cid, err)
 		}
 	}()
@@ -165,7 +139,7 @@ func (suite *CodexIndexDownloaderIntegrationTestSuite) TestIntegration_DownloadI
 	defer close(cancelChan)
 
 	filePath := filepath.Join(suite.testDir, "downloaded-index.bin")
-	downloader := communities.NewCodexIndexDownloader(suite.client, cid, filePath, cancelChan, suite.logger)
+	downloader := communities.NewCodexIndexDownloader(&client, cid, filePath, cancelChan, suite.logger)
 
 	// First, get the manifest to know the expected size
 	manifestChan := downloader.GotManifest()

@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/golang/protobuf/proto"
 	"github.com/jellydator/ttlcache/v3"
 
@@ -212,7 +211,7 @@ type ArchiveService interface {
 
 	SetOnline(bool)
 	SetTorrentConfig(*params.TorrentConfig)
-	SetCodexConfig(*codex.Config)
+	SetCodexConfig(*params.CodexConfig)
 	StartTorrentClient() error
 	StartCodexClient() error
 	Stop() error
@@ -236,7 +235,7 @@ type ArchiveService interface {
 
 type ArchiveManagerConfig struct {
 	TorrentConfig *params.TorrentConfig
-	CodexConfig   *codex.Config
+	CodexConfig   *params.CodexConfig
 	Logger        *zap.Logger
 	Persistence   *Persistence
 	Messaging     *messaging.API

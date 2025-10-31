@@ -1656,11 +1656,14 @@ func buildTorrentConfig() *params.TorrentConfig {
 	}
 }
 
-func buildCodexConfig(t *testing.T) *codex.Config {
-	return &codex.Config{
-		DataDir:      t.TempDir() + "/codexdata",
-		BlockRetries: 5,
-		LogLevel:     "ERROR",
+func buildCodexConfig(t *testing.T) *params.CodexConfig {
+	return &params.CodexConfig{
+		Enabled: true,
+		Config: codex.Config{
+			DataDir:      t.TempDir() + "/codexdata",
+			BlockRetries: 5,
+			LogLevel:     "ERROR",
+		},
 	}
 }
 

@@ -4194,11 +4194,17 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 		return err
 	}
 
-	if nodeConfig.TorrentConfig.Enabled {
+	if nodeConfig.TorrentConfig.Enabled && nodeConfig.CodexConfig.Enabled {
 		return nil
 	}
 
 	nodeConfig.TorrentConfig.Enabled = true
+	err = m.settings.SaveSetting("node-config", nodeConfig)
+	if err != nil {
+		return err
+	}
+
+	nodeConfig.CodexConfig.Enabled = true
 	err = m.settings.SaveSetting("node-config", nodeConfig)
 	if err != nil {
 		return err

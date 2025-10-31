@@ -349,10 +349,13 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
 	}
 
-	nodeConfig.CodexConfig = codex.Config{
-		DataDir:        filepath.Join(nodeConfig.RootDataDir, params.ArchivesRelativePath),
-		BlockRetries:   params.BlockRetries,
-		MetricsEnabled: false,
+	nodeConfig.CodexConfig = params.CodexConfig{
+		Enabled: false,
+		Config: codex.Config{
+			DataDir:        filepath.Join(nodeConfig.RootDataDir, params.ArchivesRelativePath),
+			BlockRetries:   params.BlockRetries,
+			MetricsEnabled: false,
+		},
 	}
 
 	if request.APIConfig != nil {

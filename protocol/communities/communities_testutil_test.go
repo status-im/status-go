@@ -5,16 +5,19 @@ import (
 
 	"github.com/codex-storage/codex-go-bindings/codex"
 
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/communities"
 )
 
 func NewCodexClientTest(t *testing.T) communities.CodexClient {
-	client, err := communities.NewCodexClient(codex.Config{
-		DataDir:        t.TempDir(),
-		LogFormat:      codex.LogFormatNoColors,
-		MetricsEnabled: false,
-		BlockRetries:   5,
-		LogLevel:       "ERROR",
+	client, err := communities.NewCodexClient(params.CodexConfig{
+		Enabled: true,
+		Config: codex.Config{
+			DataDir:        t.TempDir(),
+			LogFormat:      codex.LogFormatNoColors,
+			MetricsEnabled: false,
+			LogLevel:       "ERROR",
+		},
 	})
 	if err != nil {
 		t.Fatalf("Failed to create Codex client: %v", err)
