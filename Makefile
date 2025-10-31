@@ -35,8 +35,14 @@ RELEASE_TAG ?= $(shell ./_assets/scripts/version.sh)
 RELEASE_DIR ?= /tmp/release-$(RELEASE_TAG)
 GOLANGCI_BINARY = golangci-lint
 
+ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
+ detected_OS := Windows
 else ifdef OS
  detected_OS := $(OS)
+else
+ detected_OS := $(strip $(shell uname))
+endif
+
 ifeq ($(MAKECMDGOALS),statusgo-android-library)
     ARCH ?= arm64
     ANDROID_NDK_ROOT ?= $(shell find /nix/store -path "*android-sdk-ndk-27.2.12479018/libexec/android-sdk/ndk/27.2.12479018" -type d 2>/dev/null | head -1)
@@ -80,22 +86,17 @@ export NIM_SDS_LIB_PATH=$(GIT_ROOT)/vendor/github.com/waku-org/sds-go-bindings/t
 export CGO_CFLAGS=-I${NIM_SDS_HEADER_PATH}/
 export CGO_LDFLAGS=-L${NIM_SDS_LIB_PATH}/ -lsds -Wl,-rpath,${NIM_SDS_LIB_PATH}/
 
-ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
- detected_OS := Windows
-else
- detected_OS := $(strip $(shell uname))
-endif
-
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
- LIBWAKU_EXT := so
- LIBSDS_EXT := so
+ LIBWAKU_EXT := dylib
+ LIBSDS_EXT := dylib
  GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
  LIBWAKU_EXT := dll
  LIBSDS_EXT := dll
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-L${NIM_SDS_LIB_PATH}/ -lsds"
+else ifeq ($(detected_OS),Linux)
  GOBIN_SHARED_LIB_EXT := so
  LIBWAKU_EXT := so
  LIBSDS_EXT := so
