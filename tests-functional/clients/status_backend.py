@@ -5,6 +5,7 @@ import tempfile
 import time
 import uuid
 
+import qrcode
 import requests
 from tenacity import retry, stop_after_delay, wait_fixed, wait_exponential, retry_if_exception_type
 
@@ -488,3 +489,36 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         # Use client.post directly, because this method is old and has json-incompatible arguments
         response = self.client.post(self.method_url(method), data=key)
         return response.content.decode()
+
+    def start_with_account(self, display_name: str, password: str, identity_image_path: str = "", **kwargs):
+        response = self.initialize()
+        if response is None:
+            response = {}
+        account_created = False
+        for account in response.get("accounts", []) or []:
+            if account["name"] == display_name:
+                self.login(account["key-uid"], password=password)
+                break
+        else:
+            print(f"Account '{display_name}' not found, creating...")
+            self.create_account_and_login(password=password, display_name=display_name)
+            account_created = True
+
+        try:
+            self.wait_for_login()
+            self.wakuext_service.start_messenger()
+            self.wallet_service.start_wallet()
+        except Exception as e:
+            if "node is already running" not in str(e):
+                raise e
+
+        if account_created:
+            self.multiaccounts_service.store_identity_image(self.key_uid, identity_image_path, 0, 0, 1024, 1024)
+
+    def generate_profile_qr_code(self):
+        bot_url = self.wakuext_service.share_user_url_with_data(self.public_key)
+        print(f"--- URL: {bot_url}")
+        print(f"--- Public Key: {self.public_key}")
+
+        img = qrcode.make(bot_url)
+        img.save("qr_code.png")  # type: ignore
