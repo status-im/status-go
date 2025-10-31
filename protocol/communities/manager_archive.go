@@ -122,6 +122,7 @@ func (m *ArchiveManager) SetTorrentConfig(config *params.TorrentConfig) {
 
 func (m *ArchiveManager) SetCodexConfig(config *params.CodexConfig) {
 	m.codexConfig = config
+	m.ArchiveFileManager.codexConfig = config
 }
 
 // getTCPandUDPport will return the same port number given if != 0,
@@ -213,6 +214,9 @@ func (m *ArchiveManager) StartTorrentClient() error {
 }
 
 func (m *ArchiveManager) StartCodexClient() error {
+
+	m.logger.Info("======================Starting codex client=============================")
+
 	if m.codexConfig == nil {
 		return fmt.Errorf("can't start codex client: missing codexConfig")
 	}
@@ -267,6 +271,16 @@ func (m *ArchiveManager) Stop() error {
 	}
 
 	return nil
+}
+
+func (m *ArchiveManager) GetCodexClient() *CodexClient {
+	return m.codexClient
+}
+
+func (m *ArchiveManager) SetCodexClient(client *CodexClient) {
+	m.codexClient = client
+	m.ArchiveFileManager.codexClient = client
+	m.isCodexClientStarted = true
 }
 
 func (m *ArchiveManager) torrentClientStarted() bool {

@@ -2230,14 +2230,15 @@ func (p *Persistence) UpdateAndPruneEncryptionKeyRequests(communityID types.HexB
 }
 
 func (p *Persistence) GetArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
-	var preference string
-	err := p.db.QueryRow(`SELECT preferred_distribution_method FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&preference)
-	if err == sql.ErrNoRows {
-		return "auto", nil // Default preference
-	} else if err != nil {
-		return "", err
-	}
-	return preference, nil
+	return "codex", nil
+	// var preference string
+	// err := p.db.QueryRow(`SELECT preferred_distribution_method FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&preference)
+	// if err == sql.ErrNoRows {
+	// 	return "auto", nil // Default preference
+	// } else if err != nil {
+	// 	return "", err
+	// }
+	// return preference, nil
 }
 
 func (p *Persistence) SetArchiveDistributionPreference(communityID types.HexBytes, preference string) error {

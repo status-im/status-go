@@ -39,6 +39,12 @@ func (tmm *ArchiveManagerNop) StartCodexClient() error {
 	return nil
 }
 
+func (tmm *ArchiveManagerNop) GetCodexClient() *CodexClient {
+	return nil
+}
+
+func (tmm *ArchiveManagerNop) SetCodexClient(client *CodexClient) {}
+
 func (tmm *ArchiveManagerNop) Stop() error {
 	return nil
 }
