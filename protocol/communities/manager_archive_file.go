@@ -16,6 +16,8 @@ import (
 	"path"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
+
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
@@ -32,6 +34,7 @@ import (
 
 type ArchiveFileManager struct {
 	torrentConfig *params.TorrentConfig
+	codexConfig   *codex.Config
 	codexClient   *CodexClient
 	logger        *zap.Logger
 	persistence   *Persistence
@@ -44,6 +47,7 @@ type ArchiveFileManager struct {
 func NewArchiveFileManager(amc *ArchiveManagerConfig) *ArchiveFileManager {
 	return &ArchiveFileManager{
 		torrentConfig: amc.TorrentConfig,
+		codexConfig:   amc.CodexConfig,
 		logger:        amc.Logger,
 		persistence:   amc.Persistence,
 		identity:      amc.Identity,
@@ -341,10 +345,8 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 		to = endDate
 	}
 
-	codexArchiveDir := m.torrentConfig.DataDir + "/codex/" + communityID.String()
-	codexIndexPath := codexArchiveDir + "/index"
-	codexIndexCidPath := codexArchiveDir + "/index-cid"
-	// codexDataPath := codexArchiveDir + "/data"
+	codexArchiveDir := m.codexArchiveDirPath(communityID)
+	codexIndexPath := m.codexArchiveIndexFilePath(communityID)
 
 	m.logger.Debug("codexArchiveDir", zap.String("codexArchiveDir", codexArchiveDir))
 
@@ -508,12 +510,12 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 			return codexArchiveIDs, err
 		}
 
-		err = os.WriteFile(codexIndexPath, codexIndexBytes, 0644) // nolint: gosec
+		err = m.writeCodexIndexToFile(communityID, codexIndexBytes)
 		if err != nil {
 			return codexArchiveIDs, err
 		}
 
-		err = os.WriteFile(codexIndexCidPath, []byte(cid), 0644) // nolint: gosec
+		err = m.writeCodexIndexCidToFile(communityID, cid)
 		if err != nil {
 			return codexArchiveIDs, err
 		}
@@ -558,8 +560,41 @@ func (m *ArchiveFileManager) archiveIndexFile(communityID string) string {
 	return path.Join(m.torrentConfig.DataDir, communityID, "index")
 }
 
-func (m *ArchiveFileManager) codexArchiveIndexFile(communityID string) string {
-	return path.Join(m.torrentConfig.DataDir, "codex", communityID, "index")
+func (m *ArchiveFileManager) codexArchiveDirPath(communityID types.HexBytes) string {
+	return path.Join(m.codexConfig.DataDir, communityID.String())
+}
+
+func (m *ArchiveFileManager) codexArchiveIndexFilePath(communityID types.HexBytes) string {
+	return path.Join(m.codexConfig.DataDir, communityID.String(), "index")
+}
+
+func (m *ArchiveFileManager) codexArchiveIndexCidFilePath(communityID types.HexBytes) string {
+	return path.Join(m.codexConfig.DataDir, communityID.String(), "index-cid")
+}
+
+func (m *ArchiveFileManager) writeCodexIndexToFile(communityID types.HexBytes, bytes []byte) error {
+	indexFilePath := m.codexArchiveIndexFilePath(communityID)
+	return os.WriteFile(indexFilePath, bytes, 0644) // nolint: gosec
+}
+
+func (m *ArchiveFileManager) readCodexIndexFromFile(communityID types.HexBytes) ([]byte, error) {
+	indexFilePath := m.codexArchiveIndexFilePath(communityID)
+	return os.ReadFile(indexFilePath)
+}
+
+func (m *ArchiveFileManager) removeCodexIndexFile(communityID types.HexBytes) error {
+	indexFilePath := m.codexArchiveIndexFilePath(communityID)
+	return os.Remove(indexFilePath)
+}
+
+func (m *ArchiveFileManager) writeCodexIndexCidToFile(communityID types.HexBytes, cid string) error {
+	cidFilePath := m.codexArchiveIndexCidFilePath(communityID)
+	return os.WriteFile(cidFilePath, []byte(cid), 0644) // nolint: gosec
+}
+
+func (m *ArchiveFileManager) readCodexIndexCidFromFile(communityID types.HexBytes) ([]byte, error) {
+	cidFilePath := m.codexArchiveIndexCidFilePath(communityID)
+	return os.ReadFile(cidFilePath)
 }
 
 func (m *ArchiveFileManager) createWakuMessageArchive(from time.Time, to time.Time, messages []messagingtypes.ReceivedMessage, topics [][]byte) *protobuf.WakuMessageArchive {
@@ -637,8 +672,7 @@ func (m *ArchiveFileManager) GetHistoryArchiveMagnetlink(communityID types.HexBy
 }
 
 func (m *ArchiveFileManager) GetHistoryArchiveIndexCid(communityID types.HexBytes) (string, error) {
-	codexArchiveDir := m.torrentConfig.DataDir + "/codex/" + communityID.String()
-	codexIndexCidPath := codexArchiveDir + "/index-cid"
+	codexIndexCidPath := m.codexArchiveIndexCidFilePath(communityID)
 
 	cidData, err := os.ReadFile(codexIndexCidPath)
 	if err != nil {
@@ -797,8 +831,7 @@ func (m *ArchiveFileManager) LoadHistoryArchiveIndexFromFile(myKey *ecdsa.Privat
 func (m *ArchiveFileManager) CodexLoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.CodexWakuMessageArchiveIndex, error) {
 	codexWakuMessageArchiveIndexProto := &protobuf.CodexWakuMessageArchiveIndex{}
 
-	indexPath := m.codexArchiveIndexFile(communityID.String())
-	indexData, err := os.ReadFile(indexPath)
+	indexData, err := m.readCodexIndexFromFile(communityID)
 	if err != nil {
 		return nil, err
 	}
