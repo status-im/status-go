@@ -108,7 +108,7 @@ func (m *ArchiveManager) SetOnline(online bool) {
 			}
 		}
 
-		if m.codexConfig != nil && !m.isCodexClientStarted {
+		if m.codexConfig != nil && m.codexConfig.Enabled && !m.isCodexClientStarted {
 			err := m.StartCodexClient()
 			if err != nil {
 				m.logger.Error("couldn't start codex client", zap.Error(err))
