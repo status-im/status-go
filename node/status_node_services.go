@@ -10,7 +10,6 @@ import (
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/featureflags"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/newsfeed"
@@ -421,14 +420,6 @@ func (b *StatusNode) timeSourceNow() func() time.Time {
 	return b.TimeSource().Now
 }
 
-type NewsFeedActivityCenter struct {
-	m *protocol.Messenger
-}
-
-func (ac *NewsFeedActivityCenter) AddNotification(response *protocol.MessengerResponse, notification *protocol.ActivityCenterNotification) error {
-	return ac.m.AddActivityCenterNotification(response, notification, nil)
-}
-
 func (b *StatusNode) NewsFeedService() *newsfeed.Service {
 	if !featureflags.EnableNewsFeed {
 		return nil
@@ -436,16 +427,17 @@ func (b *StatusNode) NewsFeedService() *newsfeed.Service {
 
 	if b.newsfeedSrvc == nil {
 		persistence := newsfeed.NewSQLitePersistence(b.appDB)
-		ac := &NewsFeedActivityCenter{}
-		if wakuext := b.WakuV2ExtService(); wakuext != nil {
-			ac.m = wakuext.Messenger()
-		}
 
 		b.newsfeedSrvc = newsfeed.NewService(
 			b.logger.Named("newsfeed"),
 			persistence,
-			ac,
+			nil,
 		)
+
+		if wakuext := b.WakuV2ExtService(); wakuext != nil {
+			ac := NewNewsFeedActivityCenterAdapter(wakuext.Messenger())
+			b.newsfeedSrvc.SetActivityCenter(ac)
+		}
 	}
 	return b.newsfeedSrvc
 }

@@ -3,6 +3,7 @@ package newsfeed
 import (
 	"context"
 	"errors"
+	"reflect"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -22,6 +23,11 @@ var (
 	errNoActivityCenter  = errors.New("no activity center set up")
 )
 
+func isNil(data interface{}) bool {
+	v := reflect.ValueOf(data).Kind()
+	return data == nil || v == reflect.Ptr && reflect.ValueOf(data).IsNil()
+}
+
 type Service struct {
 	logger          *zap.Logger
 	storage         Persistence
@@ -30,11 +36,12 @@ type Service struct {
 }
 
 func NewService(logger *zap.Logger, storage Persistence, ac ActivityCenter) *Service {
-	return &Service{
+	service := &Service{
 		logger:  logger,
 		storage: storage,
-		ac:      ac,
 	}
+	service.SetActivityCenter(ac)
+	return service
 }
 
 func (s *Service) Start() error {
@@ -84,6 +91,14 @@ func (s *Service) APIs() []rpc.API {
 				service: s,
 			},
 		},
+	}
+}
+
+func (s *Service) SetActivityCenter(ac ActivityCenter) {
+	if isNil(ac) {
+		s.ac = nil
+	} else {
+		s.ac = ac
 	}
 }
 
