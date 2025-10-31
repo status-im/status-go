@@ -2135,6 +2135,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	// 1.1. Create community
 	community, chat := s.createCommunity()
 
+	// createCommunity sets history archive distribution method to "codex" - we need torrent for this test
+	err := s.owner.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodTorrent)
+	s.Require().NoError(err)
+
+	err = s.bob.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodTorrent)
+	s.Require().NoError(err)
+
 	// 1.2. Setup permissions
 	communityPermission := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
@@ -2374,6 +2381,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedCodexArch
 	// 1.1. Create community
 	community, chat := s.createCommunity()
 
+	// for community owner, the history archive distribution preference is set to Codex when the community is created
+	archiveDistributionPreferenceOwner, err := s.owner.communitiesManager.GetArchiveDistributionPreference(community.ID())
+	s.Require().NoError(err)
+	log.Println("Archive distribution preference for owner:", archiveDistributionPreferenceOwner)
+	s.Require().Equal(communities.ArchiveDistributionMethodCodex, archiveDistributionPreferenceOwner)
+
 	// 1.2. Setup permissions
 	communityPermission := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
@@ -2507,6 +2520,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedCodexArch
 	})
 
 	s.joinCommunity(community, s.bob)
+
+	// when Bob requested to join, the history archive distribution preference should be set to Codex
+	archiveDistributionPreferenceBob, err := s.bob.communitiesManager.GetArchiveDistributionPreference(community.ID())
+	s.Require().NoError(err)
+
+	log.Println("Archive distribution preference for bob:", archiveDistributionPreferenceBob)
+
+	s.Require().Equal(communities.ArchiveDistributionMethodCodex, archiveDistributionPreferenceBob)
 
 	err = <-waitForKeysDistributedToBob
 	s.Require().NoError(err)
