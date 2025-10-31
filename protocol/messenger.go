@@ -16,7 +16,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
-	"github.com/mmcdole/gofeed"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
@@ -32,7 +31,6 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/internal/newsfeed"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
@@ -168,8 +166,6 @@ type Messenger struct {
 
 	// enables control over chat messages iteration
 	retrievedMessagesIteratorFactory func(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) MessagesIterator
-
-	newsFeedManager *newsfeed.NewsFeedManager
 }
 
 type EnvelopeEventsInterceptor struct {
@@ -676,35 +672,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		if err := m.SetDisplayName(replacementDisplayName); err != nil {
 			// We do not return the error as we do not want to block the login for it
 			m.logger.Warn("error setting display name", zap.Error(err))
-		}
-	}
-
-	if m.config.featureFlags.EnableNewsFeed {
-		lastFetched, err := m.settings.NewsFeedLastFetchedTimestamp()
-		if err != nil {
-			return nil, err
-		}
-		var feedUrl string
-		if gocommon.IsMobilePlatform() {
-			feedUrl = newsfeed.STATUS_MOBILE_FEED_URL
-		} else {
-			feedUrl = newsfeed.STATUS_DESKTOP_FEED_URL
-		}
-		m.newsFeedManager = newsfeed.NewNewsFeedManager(
-			newsfeed.WithURL(feedUrl),
-			newsfeed.WithParser(gofeed.NewParser()),
-			newsfeed.WithHandler(m),
-			newsfeed.WithLogger(m.logger),
-			newsfeed.WithPollingInterval(30*time.Minute),
-			newsfeed.WithFetchFrom(lastFetched),
-		)
-
-		newsFeedEnabled, err := m.IsNewsFeedEnabled()
-		if err != nil {
-			return nil, err
-		}
-		if newsFeedEnabled {
-			m.newsFeedManager.StartPolling(m.ctx)
 		}
 	}
 
@@ -4394,7 +4361,7 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 
 }
 
-func (m *Messenger) encodeChatEntity(chat *Chat, message messagingtypes.ChatEntity) ([]byte, error) {
+func (m *Messenger) encodeChatEntity(chat *Chat, message ChatEntity) ([]byte, error) {
 	var encodedMessage []byte
 	var err error
 	l := m.logger.With(zap.String("site", "Send"), zap.String("chatID", chat.ID))

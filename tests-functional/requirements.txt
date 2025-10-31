@@ -1,9 +1,7 @@
-deepdiff~=5.5.0
 pytest~=7.4.0
-requests~=2.31.0
+requests~=2.32.4
 websocket-client~=1.4.2
 tenacity~=9.0.0
-pytest-dependency~=0.6.0
 docker~=7.1.0
 pyright~=1.1.388
 black~=24.10.0

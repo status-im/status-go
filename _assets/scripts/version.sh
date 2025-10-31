@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-git describe --tags --dirty="-dirty"
+git describe --tags

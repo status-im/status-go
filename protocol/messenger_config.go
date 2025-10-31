@@ -334,13 +334,6 @@ func WithAccountsPublisher(publisher *pubsub.Publisher) Option {
 	}
 }
 
-func WithNewsFeed() func(c *config) error {
-	return func(c *config) error {
-		c.featureFlags.EnableNewsFeed = true
-		return nil
-	}
-}
-
 func WithENSVerifier(ensVerifier *ens.Verifier) func(c *config) error {
 	return func(c *config) error {
 		c.ensVerifier = ensVerifier

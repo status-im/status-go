@@ -40,10 +40,6 @@ const (
 	maxMessageSenderEphemeralKeys = 3
 )
 
-// RekeyCompatibility indicates whether we should be sending
-// keys in 1-to-1 messages as well as in the newer format
-var RekeyCompatibility = true
-
 type MessageSender struct {
 	identity    *ecdsa.PrivateKey
 	transport   *transport.Transport
@@ -336,10 +332,8 @@ func (s *MessageSender) sendCommunity(
 	// Check if it's a key exchange message. In this case we send it
 	// to all the recipients
 	if rawMessage.CommunityKeyExMsgType != messagingtypes.KeyExMsgNone {
-		// If rekeycompatibility is on, we always
-		// want to execute below, otherwise we execute
-		// only when we want to fill up old keys to a given user
-		if RekeyCompatibility || !forceRekey {
+		// we want to fill up old keys to a given user
+		if !forceRekey {
 			keyExMessageSpecs, err := s.protocol.GetKeyExMessageSpecs(rawMessage.HashRatchetGroupID, s.identity, rawMessage.Recipients, forceRekey)
 			if err != nil {
 				return nil, err
@@ -559,73 +553,12 @@ func (s *MessageSender) SendPairInstallation(
 	return messageID, nil
 }
 
-func (s *MessageSender) encodeMembershipUpdate(
-	message v1protocol.MembershipUpdateMessage,
-	chatEntity messagingtypes.ChatEntity,
-) ([]byte, error) {
-
-	if chatEntity != nil {
-		chatEntityProtobuf := chatEntity.GetProtobuf()
-		switch chatEntityProtobuf := chatEntityProtobuf.(type) {
-		case *protobuf.ChatMessage:
-			message.Message = chatEntityProtobuf
-		case *protobuf.EmojiReaction:
-			message.EmojiReaction = chatEntityProtobuf
-
-		}
-	}
-
-	encodedMessage, err := v1protocol.EncodeMembershipUpdateMessage(message)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to encode membership update message")
-	}
-
-	return encodedMessage, nil
-}
-
-// EncodeMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
-// All the events in a group are encoded and added to the payload
-func (s *MessageSender) EncodeMembershipUpdate(
-	group *v1protocol.Group,
-	chatEntity messagingtypes.ChatEntity,
-) ([]byte, error) {
-	message := v1protocol.MembershipUpdateMessage{
-		ChatID: group.ChatID(),
-		Events: group.Events(),
-	}
-
-	return s.encodeMembershipUpdate(message, chatEntity)
-}
-
-// EncodeAbridgedMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
-// Only the events relevant to the current group are encoded
-func (s *MessageSender) EncodeAbridgedMembershipUpdate(
-	group *v1protocol.Group,
-	chatEntity messagingtypes.ChatEntity,
-) ([]byte, error) {
-	message := v1protocol.MembershipUpdateMessage{
-		ChatID: group.ChatID(),
-		Events: group.AbridgedEvents(),
-	}
-	return s.encodeMembershipUpdate(message, chatEntity)
-}
-
 func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMessage *messagingtypes.RawMessage, wrappedMessage []byte, rekey bool) ([][]byte, []*wakutypes.NewMessage, error) {
 	payload := wrappedMessage
 	var err error
 	if rekey && len(rawMessage.HashRatchetGroupID) != 0 {
-
-		var ratchet *encryption.HashRatchetKeyCompatibility
-		// We have just rekeyed, pull the latest
-		if RekeyCompatibility {
-			ratchet, err = s.protocol.GetCurrentKeyForGroup(rawMessage.HashRatchetGroupID)
-			if err != nil {
-				return nil, nil, err
-			}
-
-		}
 		// We send the message over the community topic
-		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, ratchet)
+		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, nil)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1071,24 +1004,8 @@ func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *m
 func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, wrappedMessage []byte, pubsubTopic string, rekey bool, rawMessage *messagingtypes.RawMessage) ([][]byte, []*wakutypes.NewMessage, error) {
 	payload := wrappedMessage
 	if rekey && len(rawMessage.HashRatchetGroupID) != 0 {
-
-		var ratchet *encryption.HashRatchetKeyCompatibility
-		var err error
-		// We have just rekeyed, pull the latest
-		if RekeyCompatibility {
-			ratchet, err = s.protocol.GetCurrentKeyForGroup(rawMessage.HashRatchetGroupID)
-			if err != nil {
-				return nil, nil, err
-			}
-
-		}
-		keyID, err := ratchet.GetKeyID()
-		if err != nil {
-			return nil, nil, err
-		}
-		s.logger.Debug("adding key id to message", zap.String("keyid", cryptotypes.Bytes2Hex(keyID)))
 		// We send the message over the community topic
-		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, ratchet)
+		spec, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, wrappedMessage, nil)
 		if err != nil {
 			return nil, nil, err
 		}

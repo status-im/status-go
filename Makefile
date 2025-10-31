@@ -35,6 +35,8 @@ RELEASE_TAG ?= $(shell ./_assets/scripts/version.sh)
 RELEASE_DIR ?= /tmp/release-$(RELEASE_TAG)
 GOLANGCI_BINARY = golangci-lint
 
+else ifdef OS
+ detected_OS := $(OS)
 ifeq ($(MAKECMDGOALS),statusgo-android-library)
     ARCH ?= arm64
     ANDROID_NDK_ROOT ?= $(shell find /nix/store -path "*android-sdk-ndk-27.2.12479018/libexec/android-sdk/ndk/27.2.12479018" -type d 2>/dev/null | head -1)
@@ -47,7 +49,9 @@ ifeq ($(MAKECMDGOALS),statusgo-android-library)
         MOBILE_GOARCH := $(ARCH)
         ANDROID_CLANG_TARGET := aarch64-linux-android$(ANDROID_API)
     endif
-    ANDROID_BUILD_FLAGS := CC="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/clang --target=$(ANDROID_CLANG_TARGET) --sysroot=$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/sysroot" CGO_CFLAGS="-Os -flto -fembed-bitcode" CGO_LDFLAGS="-Os -flto" CGO_ENABLED=1 GOOS=android GOARCH=$(MOBILE_GOARCH)
+    ANDROID_BUILD_FLAGS := CC="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/clang --target=$(ANDROID_CLANG_TARGET) --sysroot=$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/sysroot" CGO_ENABLED=1 GOOS=android GOARCH=$(MOBILE_GOARCH)
+    CGO_CFLAGS+=-Os -flto -fembed-bitcode
+    CGO_LDFLAGS+=-Os -flto
 endif
 
 ifeq ($(MAKECMDGOALS),statusgo-ios-library)
@@ -59,7 +63,9 @@ ifeq ($(MAKECMDGOALS),statusgo-ios-library)
     else
         MOBILE_GOARCH := $(ARCH)
     endif
-    IOS_BUILD_FLAGS := CGO_LDFLAGS="-Os -flto" CGO_ENABLED=1 GOOS=ios GOARCH=$(MOBILE_GOARCH)
+    IOS_BUILD_FLAGS := CGO_ENABLED=1 GOOS=ios GOARCH=$(MOBILE_GOARCH)
+    CGO_CFLAGS+=-Os -flto -arch $(ARCH) -isysroot $$(xcrun --sdk $(IPHONE_SDK) --show-sdk-path) -miphoneos-version-min=$(IOS_TARGET) -fembed-bitcode
+    CGO_LDFLAGS+=-Os -flto
 endif
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
@@ -90,17 +96,21 @@ else ifeq ($(detected_OS),Windows)
  LIBWAKU_EXT := dll
  LIBSDS_EXT := dll
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-L${NIM_SDS_LIB_PATH}/ -lsds"
-else
  GOBIN_SHARED_LIB_EXT := so
  LIBWAKU_EXT := so
  LIBSDS_EXT := so
- GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
+ CGO_LDFLAGS += "-Wl,-soname,libstatus.so.0"
 endif
 
 BUILD_TAGS ?= gowaku_no_rln
 
 ifeq ($(USE_NWAKU), true)
-BUILD_TAGS += use_nwaku
+    BUILD_TAGS += use_nwaku
+    NWAKU_VERSION ?= v0.37.0-rc.3
+    NWAKU_SOURCE_DIR ?= $(GIT_ROOT)/../nwaku
+    LIBWAKU := $(NWAKU_SOURCE_DIR)/build/libwaku.$(LIBWAKU_EXT)
+    CGO_CFLAGS+=-I$(NWAKU_SOURCE_DIR)/library
+	CGO_LDFLAGS+=-L$(NWAKU_SOURCE_DIR)/build -lwaku -Wl,-rpath,$(NWAKU_SOURCE_DIR)/build
 endif
 
 BUILD_FLAGS ?= -ldflags=""
@@ -175,23 +185,43 @@ all: $(GO_CMD_NAMES)
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
 $(GO_CMD_BUILDS): generate-sds generate
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
 	@echo "Compilation done."
 	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
-LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(LIBWAKU_EXT)
-$(LIBWAKU):
+
+$(NWAKU_SOURCE_DIR): ##@build Clone nwaku
 ifeq ($(USE_NWAKU),true)
-	@echo "Building libwaku"
-	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
+	@echo "Cloning nwaku $(NWAKU_VERSION)..."
+	git clone --branch $(NWAKU_VERSION) https://github.com/waku-org/nwaku.git $(NWAKU_SOURCE_DIR)
 endif
+
+clone-nwaku: $(NWAKU_SOURCE_DIR)
+
+$(LIBWAKU): clone-nwaku
+ifeq ($(USE_NWAKU),true)
+	@echo "Building libwaku" $(LIBWAKU)
+	$(MAKE) -C $(NWAKU_SOURCE_DIR) libwaku SHELL=/bin/bash
+endif
+
+build-libwaku: $(LIBWAKU)
+
+test-libwaku: | $(LIBWAKU)
+	go test -tags '$(BUILD_TAGS) use_nwaku' -run TestDial ./wakuv2/... -count 1 -v -json | jq -r '.Output'
 
 LIBSDS := $(CURDIR)/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/libsds.$(LIBSDS_EXT)
 $(LIBSDS):
 	@echo "Building libsds"
 	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/sds-go-bindings/sds SHELL=/bin/bash V=2
+
+clean-libwaku:
+	@echo "Removing libwaku"
+	rm $(LIBWAKU)
+
+rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
 statusgo: ##@build Build status-go as status-backend server
 statusgo: $(LIBSDS)
@@ -222,6 +252,7 @@ statusgo-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as stati
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
@@ -231,16 +262,15 @@ statusgo-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as stati
 	@echo "Static library built:"
 	@ls -la build/bin/libstatus.*
 
-build-libwaku: $(LIBWAKU)
 build-libsds: $(LIBSDS)
-
 statusgo-shared-library: generate-sds generate
 statusgo-shared-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
-	$(GOBIN_SHARED_LIB_CFLAGS) $(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+ 	go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-shared \
@@ -257,7 +287,8 @@ endif
 
 statusgo-android-library: generate $(LIBWAKU) ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
-	$(ANDROID_BUILD_FLAGS) go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
 	@echo "Android library built"
@@ -267,8 +298,8 @@ statusgo-ios-library: generate $(LIBWAKU) ##@cross-compile Build status-go as iO
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
-	CGO_CFLAGS="-Os -flto -arch $(ARCH) -isysroot $$(xcrun --sdk $(IPHONE_SDK) --show-sdk-path) -miphoneos-version-min=$(IOS_TARGET) -fembed-bitcode" \
-	$(IOS_BUILD_FLAGS) go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
 	@echo "iOS library built"
@@ -334,15 +365,6 @@ lint-fix:
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
-
-test-libwaku: | $(LIBWAKU)
-	go test -tags '$(BUILD_TAGS) use_nwaku' -run TestDial ./wakuv2/... -count 1 -v -json | jq -r '.Output'
-
-clean-libwaku:
-	@echo "Removing libwaku"
-	rm $(LIBWAKU)
-
-rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
 clean-libsds:
 	@echo "Removing libsds"

@@ -8,9 +8,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/pkg/featureflags"
 	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
+	"github.com/status-im/status-go/services/newsfeed"
 
 	"github.com/ethereum/go-ethereum/event"
 
@@ -104,7 +107,18 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	}
 	services = append(services, lns)
 
+	services = append(services, b.NewsFeedService())
+
 	b.services = services
+
+	return nil
+}
+
+func (b *StatusNode) runServicesMigrations() error {
+	err := newsfeed.SQLiteMigrate(b.appDB)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -388,6 +402,35 @@ func (b *StatusNode) TimeSource() timesource.Provider {
 
 func (b *StatusNode) timeSourceNow() func() time.Time {
 	return b.TimeSource().Now
+}
+
+type NewsFeedActivityCenter struct {
+	m *protocol.Messenger
+}
+
+func (ac *NewsFeedActivityCenter) AddNotification(response *protocol.MessengerResponse, notification *protocol.ActivityCenterNotification) error {
+	return ac.m.AddActivityCenterNotification(response, notification, nil)
+}
+
+func (b *StatusNode) NewsFeedService() *newsfeed.Service {
+	if !featureflags.EnableNewsFeed {
+		return nil
+	}
+
+	if b.newsfeedSrvc == nil {
+		persistence := newsfeed.NewSQLitePersistence(b.appDB)
+		ac := &NewsFeedActivityCenter{}
+		if wakuext := b.WakuV2ExtService(); wakuext != nil {
+			ac.m = wakuext.Messenger()
+		}
+
+		b.newsfeedSrvc = newsfeed.NewService(
+			b.logger.Named("newsfeed"),
+			persistence,
+			ac,
+		)
+	}
+	return b.newsfeedSrvc
 }
 
 func (b *StatusNode) Cleanup() error {
