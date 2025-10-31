@@ -354,8 +354,9 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	}
 
 	nodeConfig.CodexConfig = codex.Config{
-		DataDir:      filepath.Join(nodeConfig.RootDataDir, params.ArchivesRelativePath),
-		BlockRetries: params.BlockRetries,
+		DataDir:        filepath.Join(nodeConfig.RootDataDir, params.ArchivesRelativePath),
+		BlockRetries:   params.BlockRetries,
+		MetricsEnabled: false,
 	}
 
 	if request.APIConfig != nil {

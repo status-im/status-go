@@ -411,8 +411,9 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			TorrentDir: dataDir + "/torrents",
 		},
 		CodexConfig: codex.Config{
-			BlockRetries: 5,
-			DataDir:      dataDir + "/codexdata",
+			BlockRetries:   50,
+			DataDir:        dataDir + "/codexdata",
+			MetricsEnabled: false,
 		},
 	}
 
