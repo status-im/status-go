@@ -16,8 +16,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
-
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
@@ -34,7 +32,7 @@ import (
 
 type ArchiveFileManager struct {
 	torrentConfig *params.TorrentConfig
-	codexConfig   *codex.Config
+	codexConfig   *params.CodexConfig
 	codexClient   *CodexClient
 	logger        *zap.Logger
 	persistence   *Persistence
