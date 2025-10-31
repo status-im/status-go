@@ -26,7 +26,6 @@ class TestSharedURLs(MessengerSteps):
         communities = response.get("communities")
         assert len(chats) == 1
         assert len(communities) == 1
-        # community_chats = communities[0].get("chats")
 
         logging.info(f"Created community chat: {chats}")
 
