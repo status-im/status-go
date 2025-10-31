@@ -1,5 +1,6 @@
 from clients.rpc import RpcClient
 from clients.services.service import Service
+from utils import fake
 
 
 class AccountService(Service):
@@ -16,6 +17,23 @@ class AccountService(Service):
 
     def add_account(self, password, account_data):
         params = [password, account_data]
+        response = self.rpc_request("addAccount", params)
+        return response
+
+    def add_watch_only_account(self, address: str, name: str, color: str = "blue"):
+        account_data = {
+            "address": address,
+            "key-uid": "",
+            "wallet": False,
+            "chat": False,
+            "type": "watch",
+            "path": "",
+            "public-key": "",
+            "name": name,
+            "emoji": fake.emoji(),
+            "colorId": color,
+        }
+        params = ["", account_data]
         response = self.rpc_request("addAccount", params)
         return response
 

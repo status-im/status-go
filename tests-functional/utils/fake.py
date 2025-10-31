@@ -32,6 +32,14 @@ def profile_name() -> str:
     return _faker.pystr(min_chars=length, max_chars=length)
 
 
+def emoji() -> str:
+    return _faker.emoji()
+
+
+def account_name() -> str:
+    return _faker.word()
+
+
 def profile_password(length: int = 8) -> str:
     # Letters + digits; no special characters to keep compatibility
     return _faker.password(length=length, special_chars=False)
