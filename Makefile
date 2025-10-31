@@ -36,6 +36,8 @@ GOLANGCI_BINARY = golangci-lint
 
 ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
  detected_OS := Windows
+else ifdef OS
+ detected_OS := $(OS)
 else
  detected_OS := $(strip $(shell uname))
 endif
@@ -78,7 +80,7 @@ ifeq ($(detected_OS),Darwin)
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
  LIBWAKU_EXT := dll
-else
+else ifeq ($(detected_OS),Linux)
  GOBIN_SHARED_LIB_EXT := so
  LIBWAKU_EXT := so
  CGO_LDFLAGS += "-Wl,-soname,libstatus.so.0"
