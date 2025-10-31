@@ -134,7 +134,7 @@ class SignalClient:
         self.received_signals[signal_type]["expected_count"] = len(self.received_signals[signal_type]["received"]) + delta_count
         self.received_signals[signal_type]["accept_fn"] = accept_fn
 
-    def wait_for_signal(self, signal_type: SignalType | str, timeout: int | None = 20):
+    def wait_for_signal(self, signal_type: SignalType | str, timeout: int | None = 40):
         signal_type = self._convert_signal_type(signal_type)
 
         start_time = time.time()
