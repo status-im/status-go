@@ -214,6 +214,8 @@ type ArchiveService interface {
 	SetCodexConfig(*params.CodexConfig)
 	StartTorrentClient() error
 	StartCodexClient() error
+	SetCodexClient(client *CodexClient)
+	GetCodexClient() *CodexClient
 	Stop() error
 	IsReady() bool
 	GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error)

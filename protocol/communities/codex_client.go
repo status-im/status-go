@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log"
 
 	"github.com/codex-storage/codex-go-bindings/codex"
 
@@ -12,9 +13,12 @@ import (
 
 // CodexClient handles basic upload/download operations with Codex storage
 type CodexClient struct {
-	config  codex.Config
-	node    *codex.CodexNode
-	enabled bool
+	config    codex.Config
+	node      *codex.CodexNode
+	enabled   bool
+	started   bool
+	stopped   bool
+	destroyed bool
 }
 
 // NewCodexClient creates a new Codex client
@@ -31,16 +35,44 @@ func NewCodexClient(config params.CodexConfig) (CodexClient, error) {
 	}, nil
 }
 
-func (c CodexClient) Start() error {
-	return c.node.Start()
+func (c *CodexClient) Start() error {
+	if c.started {
+		return nil
+	}
+	err := c.node.Start()
+	if err != nil {
+		return err
+	}
+	c.started = true
+	return nil
 }
 
-func (c CodexClient) Stop() error {
-	return c.node.Stop()
+func (c *CodexClient) Stop() error {
+	log.Println("AAAAAAAAAAAAAAA!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+	if c.stopped {
+		return nil
+	}
+	log.Println("Stopping Codex client...!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+	err := c.node.Stop()
+	if err != nil {
+		return err
+	}
+	c.stopped = true
+	return nil
 }
 
-func (c CodexClient) Destroy() error {
-	return c.node.Destroy()
+func (c *CodexClient) Destroy() error {
+	log.Println("BBBBBBBBBBBBBBBB????????????????????????????????")
+	if c.destroyed {
+		return nil
+	}
+	log.Println("Destroy Destroy Destroy ???????????????????????")
+	err := c.node.Destroy()
+	if err != nil {
+		return err
+	}
+	c.destroyed = true
+	return nil
 }
 
 func (c *CodexClient) UpdateLogLevel(logLevel string) error {
