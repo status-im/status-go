@@ -1847,6 +1847,35 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 				m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
 			}(currentTask)
 		}
+
+		cid := requestToJoinResponseProto.IndexCid
+		if m.archiveManager.IsReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && cid != "" {
+
+			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
+			go func(currentTask *communities.HistoryArchiveDownloadTask) {
+				defer gocommon.LogOnPanic()
+				// Cancel ongoing download/import task
+				if currentTask != nil && !currentTask.IsCancelled() {
+					currentTask.Cancel()
+					currentTask.Waiter.Wait()
+				}
+
+				task := &communities.HistoryArchiveDownloadTask{
+					CancelChan: make(chan struct{}),
+					Waiter:     *new(sync.WaitGroup),
+					Cancelled:  false,
+				}
+				m.archiveManager.AddHistoryArchiveDownloadTask(community.IDString(), task)
+
+				task.Waiter.Add(1)
+				defer task.Waiter.Done()
+
+				m.shutdownWaitGroup.Add(1)
+				defer m.shutdownWaitGroup.Done()
+
+				m.downloadAndImportCodexHistoryArchives(community.ID(), cid, task.CancelChan)
+			}(currentTask)
+		}
 	}
 
 	return nil

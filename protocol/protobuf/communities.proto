@@ -208,6 +208,7 @@ message CommunityRequestToJoinResponse {
   reserved 7, 8;
   // CommunityDescription protocol message with owner signature
   bytes community_description_protocol_message = 9;
+  string index_cid = 10;
 }
 
 message CommunityRequestToLeave {

@@ -104,3 +104,7 @@ func (tmm *ArchiveManagerNop) DownloadHistoryArchivesByIndexCid(communityID type
 func (tmm *ArchiveManagerNop) TorrentFileExists(communityID string) bool {
 	return false
 }
+
+func (tmm *ArchiveManagerNop) CodexIndexCidFileExists(communityID types.HexBytes) bool {
+	return false
+}
