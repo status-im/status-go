@@ -233,6 +233,7 @@ type ArchiveService interface {
 	DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
 	DownloadHistoryArchivesByIndexCid(communityID types.HexBytes, indexCid string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
 	TorrentFileExists(communityID string) bool
+	CodexIndexCidFileExists(communityID types.HexBytes) bool
 }
 
 type ArchiveManagerConfig struct {

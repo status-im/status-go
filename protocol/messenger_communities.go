@@ -2016,6 +2016,15 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			requestToJoinResponseProto.MagnetUri = magnetlink
 		}
 
+		if m.archiveManager.IsReady() && m.archiveManager.CodexIndexCidFileExists(community.ID()) {
+			cid, err := m.archiveManager.GetHistoryArchiveIndexCid(community.ID())
+			if err != nil {
+				m.logger.Warn("couldn't get codex index cid for community", zap.Error(err))
+				return nil, err
+			}
+			requestToJoinResponseProto.IndexCid = cid
+		}
+
 		payload, err := proto.Marshal(requestToJoinResponseProto)
 		if err != nil {
 			return nil, err

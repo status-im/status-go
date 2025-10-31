@@ -953,6 +953,11 @@ func (m *ArchiveManager) TorrentFileExists(communityID string) bool {
 	return err == nil
 }
 
+func (m *ArchiveManager) CodexIndexCidFileExists(communityID types.HexBytes) bool {
+	_, err := os.Stat(m.codexArchiveIndexCidFilePath(communityID))
+	return err == nil
+}
+
 func topicsAsByteArrays(topics []messagingtypes.ContentTopic) [][]byte {
 	var topicsAsByteArrays [][]byte
 	for _, t := range topics {
