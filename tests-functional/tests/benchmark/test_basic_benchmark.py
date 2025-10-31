@@ -25,7 +25,7 @@ class TestBasicBenchmark(MessengerSteps):
         status_backend.start_performance_monitoring()
         self.sleep(status_backend, 5)  # Keep idle for a short time
 
-        status_backend.init_status_backend()
+        status_backend.initialize()
         status_backend.events.append("CreateAccountAndLogin")
         status_backend.create_account_and_login(password=fake.profile_password(), waku_light_client=waku_light_client)
         status_backend.wait_for_login()

@@ -136,7 +136,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
     def health(self):
         return self.api_request("health", data=[], url=self.base_url, quiet=True)
 
-    def init_status_backend(self):
+    def initialize(self):
         if Config.logout:
             logging.warning("automatically logging out before InitializeApplication")
             try:

@@ -21,7 +21,7 @@ class TestLocalBackup:
         assert backend_client is not None
 
         # Init and login
-        backend_client.init_status_backend()
+        backend_client.initialize()
         backend_client.create_account_and_login(password=fake.profile_password())
         backend_client.wait_for_login()
         backend_client.wakuext_service.start_messenger()
@@ -210,7 +210,7 @@ class TestLocalBackup:
         assert backend_client2 is not None
 
         # Init and login
-        backend_client2.init_status_backend()
+        backend_client2.initialize()
         backend_client2.restore_account_and_login(
             user=Account(
                 passphrase=user_mnemonic,
@@ -292,7 +292,7 @@ class TestLocalBackup:
         backend_client = StatusBackend()
         assert backend_client is not None
         # Restore the account with a hardcoded mnemonic to get the same private key
-        backend_client.init_status_backend()
+        backend_client.initialize()
         backend_client.restore_account_and_login(
             user=Account(
                 # Hardcoded mnemonic for backwards compatibility test

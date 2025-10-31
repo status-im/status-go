@@ -139,7 +139,7 @@ def pair_server_as_receiver(sender, receiver):
 
 
 def login_paired_device(backend: StatusBackend, key_uid, password):
-    backend.init_status_backend()
+    backend.initialize()
     backend.login(key_uid, password)
     backend.wait_for_login()
     backend.wakuext_service.start_messenger()
@@ -154,7 +154,7 @@ class TestLocalPairing(MessengerSteps):
         bob = backend_new_profile()
 
         bob_second_device = StatusBackend()
-        bob_second_device.init_status_backend()
+        bob_second_device.initialize()
 
         # Make contacts before local pairing
         self.make_contacts(alice, bob)
@@ -234,7 +234,7 @@ class TestLocalPairing(MessengerSteps):
         alice = backend_new_profile()
         bob = backend_new_profile()
         bob_second_device = StatusBackend()
-        bob_second_device.init_status_backend()
+        bob_second_device.initialize()
 
         # Make contacts before local pairing
         self.make_contacts(alice, bob)
@@ -277,9 +277,9 @@ class TestLocalPairing(MessengerSteps):
         # Create users
         bob1 = backend_new_profile()
         bob2 = StatusBackend()
-        bob2.init_status_backend()
+        bob2.initialize()
         bob3 = StatusBackend()
-        bob3.init_status_backend()
+        bob3.initialize()
         user_accepted = backend_new_profile()
         user_pending = backend_new_profile()
         user_declined = backend_new_profile()

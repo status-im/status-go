@@ -24,7 +24,7 @@ class TestBackupMnemonicAndRestore:
     def test_profile_creation_and_mnemonics_backup(self):
         # Create a new account container and initialize
         account = StatusBackend()
-        account.init_status_backend()
+        account.initialize()
         account.create_account_and_login(password=fake.profile_password())
         account.wait_for_login()
 
@@ -38,7 +38,7 @@ class TestBackupMnemonicAndRestore:
     def test_backup_account_and_restore_it_via_mnemonics(self):
         # Create original account and backup mnemonic
         original_account = StatusBackend()
-        original_account.init_status_backend()
+        original_account.initialize()
         original_account.create_account_and_login(password=fake.profile_password())
         original_account.wait_for_login()
         original_get_settings_response = original_account.settings_service.get_settings()
@@ -51,7 +51,7 @@ class TestBackupMnemonicAndRestore:
 
         # Restore account in a new container
         restored_account = StatusBackend()
-        restored_account.init_status_backend()
+        restored_account.initialize()
         restored_account.restore_account_and_login(user=user)
         restored_account.wait_for_login()
 
@@ -85,7 +85,7 @@ class TestBackupMnemonicAndRestore:
     def test_restore_app_different_valid_size_mnemonics(self, user_mnemonic):
         # Initialize backend client and restore account using user_mnemonic.
         restored_account = StatusBackend()
-        restored_account.init_status_backend()
+        restored_account.initialize()
         restored_account.restore_account_and_login(user=user_mnemonic)
         restored_account.wait_for_login()
 
@@ -111,7 +111,7 @@ class TestBackupMnemonicAndRestore:
         user.passphrase = " ".join("".join(random.choice(string.ascii_lowercase) for _ in range(random.randint(2, 10))) for _ in range(mnemonic_size))
 
         restored_account = StatusBackend()
-        restored_account.init_status_backend()
+        restored_account.initialize()
         restored_account.restore_account_and_login(user=user)
         restored_account.wait_for_login()
 
@@ -126,7 +126,7 @@ class TestBackupMnemonicAndRestore:
         user.passphrase = "<>?`~!@#$%^&*()_+1 $fgdg ^&*()"
 
         restored_account = StatusBackend()
-        restored_account.init_status_backend()
+        restored_account.initialize()
         restored_account.restore_account_and_login(user=user)
         restored_account.wait_for_login()
         get_settings_response = restored_account.settings_service.get_settings()
@@ -139,7 +139,7 @@ class TestBackupMnemonicAndRestore:
         user = copy.deepcopy(user_mnemonic_12)
 
         restored_account = StatusBackend()
-        restored_account.init_status_backend()
+        restored_account.initialize()
         restored_account._set_display_name()
         data = restored_account._create_account_request(password=user.password)
         data["mnemonic"] = ""
@@ -150,7 +150,7 @@ class TestBackupMnemonicAndRestore:
         # Restore with both keycard and mnemonic isn't allowed
         user = copy.deepcopy(user_mnemonic_12)
         restored_account = StatusBackend()
-        restored_account.init_status_backend()
+        restored_account.initialize()
         restored_account._set_display_name()
         data = restored_account._create_account_request(password=user.password)
         data["mnemonic"] = user.passphrase
@@ -161,7 +161,7 @@ class TestBackupMnemonicAndRestore:
     def test_restored_on_existing_restored_account_fails(self):
         user = copy.deepcopy(user_mnemonic_12)
         restored_account = StatusBackend()
-        restored_account.init_status_backend()
+        restored_account.initialize()
         restored_account.restore_account_and_login(user=user)
         restored_account.wait_for_login()
         restored_account.restore_account_and_login(user=user)

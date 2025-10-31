@@ -92,7 +92,7 @@ def backend_new_profile(request, backend_factory):
         backend = backend_factory(name, **kwargs)
         backends.append(backend)
 
-        backend.init_status_backend()
+        backend.initialize()
         backend.create_account_and_login(password=password, waku_light_client=waku_light_client, **kwargs)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()
@@ -116,7 +116,7 @@ def backend_recovered_profile(request, backend_factory):
         backend = backend_factory(name, **kwargs)
         backends.append(backend)
 
-        backend.init_status_backend()
+        backend.initialize()
         backend.restore_account_and_login(user=user, waku_light_client=waku_light_client, **kwargs)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()

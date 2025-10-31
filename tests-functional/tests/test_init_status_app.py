@@ -19,7 +19,7 @@ class TestInitialiseApp:
     def test_init_app(self):
 
         backend_client = StatusBackend()
-        backend_client.init_status_backend()
+        backend_client.initialize()
         backend_client.restore_account_and_login()
 
         assert backend_client is not None
