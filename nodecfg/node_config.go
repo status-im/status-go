@@ -3,6 +3,7 @@ package nodecfg
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
 
 	"github.com/status-im/status-go/params"
@@ -115,6 +116,50 @@ func insertTorrentConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
+// Insert or update codex_config table
+func insertCodexConfig(tx *sql.Tx, c *params.NodeConfig) error {
+	listenAddrsJSON, err := json.Marshal(c.CodexConfig.ListenAddrs)
+	if err != nil {
+		return err
+	}
+	bootstrapNodesJSON, err := json.Marshal(c.CodexConfig.BootstrapNodes)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
+		INSERT OR REPLACE INTO codex_config (
+			enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
+			listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
+			repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
+			block_retries, cache_size, log_file, synthetic_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		c.CodexConfig.Enabled,
+		c.CodexConfig.LogLevel,
+		c.CodexConfig.LogFormat,
+		c.CodexConfig.MetricsEnabled,
+		c.CodexConfig.MetricsAddress,
+		c.CodexConfig.MetricsPort,
+		c.CodexConfig.DataDir,
+		string(listenAddrsJSON),
+		c.CodexConfig.Nat,
+		c.CodexConfig.DiscoveryPort,
+		c.CodexConfig.NetPrivKeyFile,
+		string(bootstrapNodesJSON),
+		c.CodexConfig.MaxPeers,
+		c.CodexConfig.NumThreads,
+		c.CodexConfig.AgentString,
+		c.CodexConfig.RepoKind,
+		c.CodexConfig.StorageQuota,
+		c.CodexConfig.BlockTtl,
+		c.CodexConfig.BlockMaintenanceInterval,
+		c.CodexConfig.BlockMaintenanceNumberOfBlocks,
+		c.CodexConfig.BlockRetries,
+		c.CodexConfig.CacheSize,
+		c.CodexConfig.LogFile,
+	)
+	return err
+}
+
 func insertWakuV2ConfigPreMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO wakuv2_config (
@@ -178,6 +223,7 @@ func nodeConfigNormalInserts() []insertFn {
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 		insertTorrentConfig,
+		insertCodexConfig,
 		insertWakuV2ConfigPostMigration,
 	}
 }
@@ -257,6 +303,54 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
+	}
+
+	// Load codex_config
+	var listenAddrsStr, bootstrapNodesStr string
+	err = tx.QueryRow(`
+	  SELECT enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
+			 listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
+			 repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
+			 block_retries, cache_size, log_file
+	  FROM codex_config WHERE synthetic_id = 'id'
+	`).Scan(
+		&nodecfg.CodexConfig.Enabled,
+		&nodecfg.CodexConfig.LogLevel,
+		&nodecfg.CodexConfig.LogFormat,
+		&nodecfg.CodexConfig.MetricsEnabled,
+		&nodecfg.CodexConfig.MetricsAddress,
+		&nodecfg.CodexConfig.MetricsPort,
+		&nodecfg.CodexConfig.DataDir,
+		&listenAddrsStr,
+		&nodecfg.CodexConfig.Nat,
+		&nodecfg.CodexConfig.DiscoveryPort,
+		&nodecfg.CodexConfig.NetPrivKeyFile,
+		&bootstrapNodesStr,
+		&nodecfg.CodexConfig.MaxPeers,
+		&nodecfg.CodexConfig.NumThreads,
+		&nodecfg.CodexConfig.AgentString,
+		&nodecfg.CodexConfig.RepoKind,
+		&nodecfg.CodexConfig.StorageQuota,
+		&nodecfg.CodexConfig.BlockTtl,
+		&nodecfg.CodexConfig.BlockMaintenanceInterval,
+		&nodecfg.CodexConfig.BlockMaintenanceNumberOfBlocks,
+		&nodecfg.CodexConfig.BlockRetries,
+		&nodecfg.CodexConfig.CacheSize,
+		&nodecfg.CodexConfig.LogFile,
+	)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+	// Unmarshal JSON fields
+	if listenAddrsStr != "" {
+		if err := json.Unmarshal([]byte(listenAddrsStr), &nodecfg.CodexConfig.ListenAddrs); err != nil {
+			return nil, err
+		}
+	}
+	if bootstrapNodesStr != "" {
+		if err := json.Unmarshal([]byte(bootstrapNodesStr), &nodecfg.CodexConfig.BootstrapNodes); err != nil {
+			return nil, err
+		}
 	}
 
 	err = tx.QueryRow("SELECT enabled, log_dir, log_level, log_namespaces, file, max_backups, max_size, compress_rotated, log_to_stderr FROM log_config WHERE synthetic_id = 'id'").Scan(
