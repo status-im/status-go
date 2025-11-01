@@ -103,7 +103,9 @@ func (c *CodexClient) HasCid(cid string) (bool, error) {
 	if err := c.node.DownloadInit(cid, codex.DownloadInitOptions{Local: true}); err != nil {
 		return false, nil
 	}
-	defer c.node.DownloadCancel(cid)
+	defer func() {
+		_ = c.node.DownloadCancel(cid)
+	}()
 
 	_, err := c.node.DownloadChunk(cid)
 	return err == nil, nil

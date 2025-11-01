@@ -577,7 +577,7 @@ func (s *ManagerSuite) TestStartTorrentClient_DelayedUntilOnline() {
 	s.Require().False(s.archiveManager.torrentClientStarted())
 
 	s.T().Cleanup(func() {
-		s.archiveManager.Stop()
+		_ = s.archiveManager.Stop()
 	})
 
 	s.archiveManager.SetOnline(true)
