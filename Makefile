@@ -403,6 +403,23 @@ deep-clean: clean git-clean
 tidy:
 	go mod tidy
 
+# Temporarily redirect the well-known `vendor` target to `vendor-hash`.
+# This target will be removed in the future.
+vendor: vendor-hash
+
+# https://gitlab.com/peerdb/peerdb/-/blob/d1dbd0c6533dca16bf57322b57cc8fb6ab897a66/nix-update.sh
+# After stopping vendoring https://github.com/status-im/status-go/pull/6951,
+# we have to manually update `vendorHash` in the nix derivation.
+# This target runs the nix build, extracts the expected vendorHash and updates with it the nix derivation.
+vendor-hash:
+	@echo "$(GREEN)Running nix build...$(RESET)"; \
+	NIX_OUTPUT="$$(nix build --extra-experimental-features 'nix-command flakes' '.?submodules=1#status-go-library' 2>&1)"; \
+	CURRENT_VENDOR_HASH="$$(echo $${NIX_OUTPUT} | sed -n 's/.*specified:[[:space:]]*\(sha256-[A-Za-z0-9+/=]*\).*/\1/p' | head -1)"; \
+	NEW_VENDOR_HASH="$$(echo $${NIX_OUTPUT} | sed -n 's/.*got:[[:space:]]*\(sha256-[A-Za-z0-9+/=]*\).*/\1/p' | head -1)"; \
+	sed -i '' "s|vendorHash = \"$${CURRENT_VENDOR_HASH}\";|vendorHash = \"$${NEW_VENDOR_HASH}\";|g" ./nix/pkgs/status-go/library/default.nix; \
+	echo "Replaced vendorHash $${CURRENT_VENDOR_HASH} with $${NEW_VENDOR_HASH}"
+
+
 migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
 migration:
 	touch $(DEFAULT_MIGRATION_PATH)/$$(date '+%s')_$(D).up.sql
