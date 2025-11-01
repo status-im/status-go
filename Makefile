@@ -9,10 +9,10 @@ export GOROOT=
 # It supports ANSI colors and categories.
 # To add new item into help output, simply add comments
 # starting with '##'. To add category, use @category.
-GREEN  := $(shell echo "\e[32m")
-WHITE  := $(shell echo "\e[37m")
-YELLOW := $(shell echo "\e[33m")
-RESET  := $(shell echo "\e[0m")
+GREEN  := $(shell printf "\e[32m")
+WHITE  := $(shell printf "\e[37m")
+YELLOW := $(shell printf "\e[33m")
+RESET  := $(shell printf "\e[0m")
 HELP_FUN = \
 		   %help; \
 		   while(<>) { push @{$$help{$$2 // 'options'}}, [$$1, $$3] if /^([a-zA-Z0-9\-]+)\s*:.*\#\#(?:@([a-zA-Z\-]+))?\s(.*)$$/ }; \
