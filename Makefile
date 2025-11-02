@@ -386,7 +386,7 @@ benchmark:
 	@./_assets/scripts/run_benchmark.sh
 
 lint-panics: export GOFLAGS ?= -tags='$(BUILD_TAGS)'
-lint-panics:
+lint-panics: generate
 	go tool goroutine-defer-guard -skip=./cmd -test=false ./...
 
 lint: generate lint-panics
