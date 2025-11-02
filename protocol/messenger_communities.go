@@ -4301,6 +4301,15 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 	return nil
 }
 
+func (m *Messenger) UpdateMessageArchiveInterval(duration time.Duration) error {
+	messageArchiveInterval = duration
+	return nil
+}
+
+func (m *Messenger) GetMessageArchiveInterval() (time.Duration, error) {
+	return messageArchiveInterval, nil
+}
+
 func (m *Messenger) GetCommunitiesSettings() ([]communities.CommunitySettings, error) {
 	settings, err := m.communitiesManager.GetCommunitiesSettings()
 	if err != nil {

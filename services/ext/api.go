@@ -1176,6 +1176,14 @@ func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
 }
 
+func (api *PublicAPI) GetMessageArchiveInterval() (time.Duration, error) {
+	return api.service.messenger.GetMessageArchiveInterval()
+}
+
+func (api *PublicAPI) UpdateMessageArchiveInterval(duration time.Duration) error {
+	return api.service.messenger.UpdateMessageArchiveInterval(duration)
+}
+
 func (api *PublicAPI) SubscribeToPubsubTopic(topic string, optPublicKey string) error {
 	var publicKey *ecdsa.PublicKey
 	if optPublicKey != "" {
