@@ -2,6 +2,7 @@ package ext
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -15,6 +16,7 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -1093,6 +1095,45 @@ func (api *PublicAPI) EnableCommunityHistoryArchiveProtocol() error {
 
 func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
+}
+
+func (api *PublicAPI) GetMessageArchiveInterval() (time.Duration, error) {
+	return api.service.messenger.GetMessageArchiveInterval()
+}
+
+func (api *PublicAPI) UpdateMessageArchiveInterval(duration time.Duration) error {
+	return api.service.messenger.UpdateMessageArchiveInterval(duration)
+}
+
+func (api *PublicAPI) SubscribeToPubsubTopic(topic string, optPublicKey string) error {
+	var publicKey *ecdsa.PublicKey
+	if optPublicKey != "" {
+		keyBytes, err := hexutil.Decode(optPublicKey)
+		if err != nil {
+			return err
+		}
+
+		publicKey, err = crypto.UnmarshalPubkey(keyBytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	return api.service.messenger.SubscribeToPubsubTopic(topic, publicKey)
+}
+
+func (api *PublicAPI) StorePubsubTopicKey(topic string, privKey string) error {
+	keyBytes, err := hexutil.Decode(privKey)
+	if err != nil {
+		return err
+	}
+
+	p, err := crypto.ToECDSA(keyBytes)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.StorePubsubTopicKey(topic, p)
 }
 
 func (api *PublicAPI) AddRelayPeer(address string) (peer.ID, error) {
