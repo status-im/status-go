@@ -5,6 +5,7 @@ go 1.24.0
 tool (
 	github.com/goware/modvendor
 	github.com/kevinburke/go-bindata/v4/go-bindata
+	github.com/status-im/goroutine-defer-guard/cmd/goroutine-defer-guard
 	github.com/wadey/gocovmerge
 	go.uber.org/mock/mockgen
 )
@@ -54,14 +55,14 @@ require (
 	github.com/status-im/migrate/v4 v4.6.2-status.3
 	github.com/status-im/mvds v0.0.27-0.20251022120125-7bdc695d49c4
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/wealdtech/go-ens/v3 v3.5.0
 	github.com/wealdtech/go-multicodec v1.4.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 	github.com/zenthangplus/goccm v0.0.0-20211005163543-2f2e522aca15
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.41.0
+	golang.org/x/crypto v0.43.0
 	golang.org/x/image v0.24.0
 	google.golang.org/protobuf v1.36.4
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
@@ -109,10 +110,10 @@ require (
 	go.uber.org/mock v0.6.0
 	go.uber.org/multierr v1.11.0
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
-	golang.org/x/net v0.43.0
-	golang.org/x/text v0.28.0
+	golang.org/x/net v0.46.0
+	golang.org/x/text v0.30.0
 	golang.org/x/time v0.9.0
-	golang.org/x/tools v0.36.0
+	golang.org/x/tools v0.38.0
 )
 
 require (
@@ -293,6 +294,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
+	github.com/status-im/goroutine-defer-guard v0.0.0-20251102112658-a4df8f17be98 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/supranational/blst v0.3.14 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
@@ -315,9 +317,10 @@ require (
 	go.lsp.dev/pkg v0.0.0-20210717090340-384b27a52fb2 // indirect
 	go.uber.org/dig v1.18.0 // indirect
 	go.uber.org/fx v1.23.0 // indirect
-	golang.org/x/mod v0.27.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/mod v0.29.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
+	golang.org/x/telemetry v0.0.0-20251008203120-078029d740a8 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.3.0 // indirect
