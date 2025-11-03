@@ -24,6 +24,10 @@ import (
    static int cGoCodexStorageDelete(void* codexCtx, char* cid, void* resp) {
        return codex_storage_delete(codexCtx, cid, (CodexCallback) callback, resp);
    }
+
+   static int cGoCodexStorageExists(void* codexCtx, char* cid, void* resp) {
+       return codex_storage_exists(codexCtx, cid, (CodexCallback) callback, resp);
+   }
 */
 import "C"
 
@@ -141,4 +145,20 @@ func (node CodexNode) Delete(cid string) error {
 
 	_, err := bridge.wait()
 	return err
+}
+
+// Exists checks if a given cid exists in the local storage.
+func (node CodexNode) Exists(cid string) (bool, error) {
+	bridge := newBridgeCtx()
+	defer bridge.free()
+
+	var cCid = C.CString(cid)
+	defer C.free(unsafe.Pointer(cCid))
+
+	if C.cGoCodexStorageExists(node.ctx, cCid, bridge.resp) != C.RET_OK {
+		return false, bridge.callError("cGoCodexStorageExists")
+	}
+
+	result, err := bridge.wait()
+	return result == "true", err
 }

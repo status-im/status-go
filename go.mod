@@ -86,7 +86,7 @@ require (
 	github.com/btcsuite/btcd/btcutil v1.1.6
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cockroachdb/errors v1.11.3
-	github.com/codex-storage/codex-go-bindings v0.0.24
+	github.com/codex-storage/codex-go-bindings v0.0.25
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/golang-migrate/migrate/v4 v4.15.2
 	github.com/gorilla/sessions v1.2.1
