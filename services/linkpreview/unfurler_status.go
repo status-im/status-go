@@ -1,4 +1,4 @@
-package protocol
+package linkpreview
 
 import (
 	"fmt"
@@ -14,16 +14,16 @@ import (
 )
 
 type StatusUnfurler struct {
-	m      *Messenger
-	logger *zap.Logger
-	url    string
+	provider StatusDataProvider
+	logger   *zap.Logger
+	url      string
 }
 
-func NewStatusUnfurler(URL string, messenger *Messenger, logger *zap.Logger) *StatusUnfurler {
+func NewStatusUnfurler(URL string, provider StatusDataProvider, logger *zap.Logger) *StatusUnfurler {
 	return &StatusUnfurler{
-		m:      messenger,
-		logger: logger.With(zap.String("url", URL)),
-		url:    URL,
+		provider: provider,
+		logger:   logger.With(zap.String("url", URL)),
+		url:      URL,
 	}
 }
 
@@ -56,11 +56,11 @@ func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusConta
 		return nil, err
 	}
 
-	contact := u.m.GetContactByID(contactID)
+	contact := u.provider.GetContactByID(contactID)
 
 	// If no contact found locally, fetch it from waku
 	if contact == nil {
-		contact, err = u.m.FetchContact(contactID, true)
+		contact, err = u.provider.FetchContact(contactID, true)
 		if err != nil {
 			return nil, fmt.Errorf("failed to request contact info from mailserver for public key '%s': %w", gocommon.TruncateWithDot(publicKey), err)
 		}
@@ -86,12 +86,7 @@ func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusConta
 
 func (u *StatusUnfurler) buildCommunityData(communityID string) (*communities.Community, *common.StatusCommunityLinkPreview, error) {
 	// This automatically checks the database
-	community, err := u.m.FetchCommunity(&FetchCommunityRequest{
-		CommunityKey:    communityID,
-		TryDatabase:     true,
-		WaitForResponse: true,
-	})
-
+	community, err := u.provider.FetchCommunity(communityID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get community info for communityID '%s': %w", gocommon.TruncateWithDot(communityID), err)
 	}

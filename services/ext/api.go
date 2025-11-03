@@ -987,29 +987,6 @@ func (api *PublicAPI) EmojiReactionsByChatIDMessageID(chatID string, messageID s
 	return api.service.messenger.EmojiReactionsByChatIDMessageID(chatID, messageID)
 }
 
-// GetTextURLsToUnfurl parses text and returns a deduplicated and (somewhat) normalized
-// slice of URLs. The returned URLs can be used as cache keys by clients.
-// For each URL there's a corresponding metadata which should be used as to plan the unfurling.
-func (api *PublicAPI) GetTextURLsToUnfurl(text string) *protocol.URLsUnfurlPlan {
-	return api.service.messenger.GetTextURLsToUnfurl(text)
-}
-
-// Deprecated: GetTextURLs is deprecated in favor of more generic GetTextURLsToUnfurl.
-//
-// GetTextURLs parses text and returns a deduplicated and (somewhat) normalized
-// slice of URLs. The returned URLs can be used as cache keys by clients.
-func (api *PublicAPI) GetTextURLs(text string) []string {
-	return api.service.messenger.GetURLs(text)
-}
-
-// UnfurlURLs uses a best-effort approach to unfurl each URL. Failed URLs will
-// be removed from the response.
-//
-// This endpoint expects the client to send URLs normalized by GetTextURLs.
-func (api *PublicAPI) UnfurlURLs(urls []string) (protocol.UnfurlURLsResponse, error) {
-	return api.service.messenger.UnfurlURLs(nil, urls)
-}
-
 func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 	return api.service.messenger.ENSVerified(pk, ensName)
 }

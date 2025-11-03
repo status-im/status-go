@@ -1,30 +1,26 @@
-package protocol
+package linkpreview
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"math"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/services/linkpreview/mock"
 	"github.com/status-im/status-go/services/sharedurls"
+	"github.com/status-im/status-go/t"
 )
 
 const (
@@ -33,108 +29,30 @@ const (
 		"obQGEJjCI0hNIbQlG+tUW83UtfNFjMRQ2gMofm8tUa3U9c2i5mIITSGqEnMRAyhMYTGEBpDaO4AAAD//5POEGncqtj1AAAAAElFTkSuQmCC"
 )
 
-type SharedUrlsMessengerAdapter struct {
-	messenger *Messenger
+func TestLinkPreviews(t *testing.T) {
+	suite.Run(t, new(LinkPreviewsTestSuite))
 }
 
-func (p *SharedUrlsMessengerAdapter) GetCommunityByID(communityID types.HexBytes) (*communities.Community, error) {
-	return p.messenger.GetCommunityByID(communityID)
+type LinkPreviewsTestSuite struct {
+	suite.Suite
+	logger *zap.Logger
+
+	ctrl *gomock.Controller
 }
 
-func (p *SharedUrlsMessengerAdapter) GetContactByID(pubKey string) (*contacts.Contact, error) {
-	return p.messenger.GetContactByID(pubKey), nil
-}
+func (s *LinkPreviewsTestSuite) SetupSuite() {
+	var err error
+	s.logger, err = zap.NewDevelopment()
+	s.Require().NoError(err)
 
-func TestMessengerLinkPreviews(t *testing.T) {
-	suite.Run(t, new(MessengerLinkPreviewsTestSuite))
-}
-
-type MessengerLinkPreviewsTestSuite struct {
-	MessengerBaseTestSuite
-}
-
-// StubMatcher should either return an http.Response or nil in case the request
-// doesn't match.
-type StubMatcher func(req *http.Request) *http.Response
-
-type StubTransport struct {
-	// fallbackToDefaultTransport when true will make the transport use
-	// http.DefaultTransport in case no matcher is found.
-	fallbackToDefaultTransport bool
-	// disabledStubs when true, will skip all matchers and use
-	// http.DefaultTransport.
-	//
-	// Useful while testing to toggle between the original and stubbed responses.
-	disabledStubs bool
-	// matchers are http.RoundTripper functions.
-	matchers []StubMatcher
-}
-
-// RoundTrip returns a stubbed response if any matcher returns a non-nil
-// http.Response. If no matcher is found and fallbackToDefaultTransport is true,
-// then it executes the HTTP request using the default http transport.
-//
-// If StubTransport#disabledStubs is true, the default http transport is used.
-func (t *StubTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if t.disabledStubs {
-		return http.DefaultTransport.RoundTrip(req)
-	}
-
-	for _, matcher := range t.matchers {
-		res := matcher(req)
-		if res != nil {
-			return res, nil
-		}
-	}
-
-	if t.fallbackToDefaultTransport {
-		return http.DefaultTransport.RoundTrip(req)
-	}
-
-	return nil, fmt.Errorf("no HTTP matcher found")
-}
-
-func (t *StubTransport) AddURLMatcherRoundTrip(urlRegexp string, roundTrip func(r *http.Request) *http.Response) {
-	matcher := func(req *http.Request) *http.Response {
-		rx, err := regexp.Compile(regexp.QuoteMeta(urlRegexp))
-		if err != nil {
-			return nil
-		}
-		if !rx.MatchString(req.URL.String()) {
-			return nil
-		}
-		return roundTrip(req)
-	}
-	t.matchers = append(t.matchers, matcher)
-}
-
-// Add a matcher based on a URL regexp. If a given request URL matches the
-// regexp, then responseBody will be returned with a hardcoded 200 status code.
-// If headers is non-nil, use it as the value of http.Response.Header.
-func (t *StubTransport) AddURLMatcher(urlRegexp string, responseBody []byte, headers map[string]string) {
-	matcher := func(req *http.Request) *http.Response {
-		res := &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(bytes.NewBuffer(responseBody)),
-		}
-
-		if headers != nil {
-			res.Header = http.Header{}
-			for k, v := range headers {
-				res.Header.Set(k, v)
-			}
-		}
-
-		return res
-	}
-	t.AddURLMatcherRoundTrip(urlRegexp, matcher)
+	s.ctrl = gomock.NewController(s.T())
 }
 
 // assertContainsLongString verifies if actual contains a slice of expected and
 // correctly prints the cause of the failure. The default behavior of
 // require.Contains with long strings is to not print the formatted message
 // (varargs to require.Contains).
-func (s *MessengerLinkPreviewsTestSuite) assertContainsLongString(expected string, actual string, maxLength int) {
+func (s *LinkPreviewsTestSuite) assertContainsLongString(expected string, actual string, maxLength int) {
 	var safeIdx float64
 	var actualShort string
 	var expectedShort string
@@ -157,64 +75,172 @@ func (s *MessengerLinkPreviewsTestSuite) assertContainsLongString(expected strin
 	)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_GetLinks() {
+func (s *LinkPreviewsTestSuite) Test_GetLinks() {
 	examples := []struct {
 		args     string
-		expected []string
+		expected *URLsUnfurlPlan
 	}{
 		// Invalid URLs are not taken in consideration.
-		{args: "", expected: []string{}},
-		{args: "  ", expected: []string{}},
-		{args: "https", expected: []string{}},
-		{args: "https://", expected: []string{}},
-		{args: "https://status", expected: []string{}},
-		{args: "https://status.", expected: []string{}},
+		{
+			args:     "",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{}},
+		},
+		{
+			args:     "  ",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{}},
+		},
+		{
+			args:     "https",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{}},
+		},
+		{
+			args:     "https://",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{}},
+		},
+		{
+			args:     "https://status",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{}},
+		},
+		{
+			args:     "https://status.",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{}},
+		},
 		// URLs must include the sheme.
-		{args: "status.com", expected: []string{}},
-
-		{args: "https://status.im", expected: []string{"https://status.im"}},
-
+		{
+			args:     "status.com",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{}},
+		},
+		{
+			args: "https://status.im",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
+				{
+					URL:               "https://status.im",
+					Permission:        URLUnfurlingAllowed,
+					IsStatusSharedURL: false,
+				},
+			}},
+		},
 		// Only the host should be lowercased.
-		{args: "HTTPS://STATUS.IM/path/to?Q=AbCdE", expected: []string{"https://status.im/path/to?Q=AbCdE"}},
-
+		{
+			args: "HTTPS://STATUS.IM/path/to?Q=AbCdE",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
+				{
+					URL:               "https://status.im/path/to?Q=AbCdE",
+					Permission:        URLUnfurlingAllowed,
+					IsStatusSharedURL: false,
+				},
+			}},
+		},
 		// Remove trailing forward slash.
-		{args: "https://github.com/", expected: []string{"https://github.com"}},
-		{args: "https://www.youtube.com/watch?v=mzOyYtfXkb0/", expected: []string{"https://www.youtube.com/watch?v=mzOyYtfXkb0"}},
-
+		{
+			args: "https://github.com/",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
+				{
+					URL:               "https://github.com",
+					Permission:        URLUnfurlingAllowed,
+					IsStatusSharedURL: false,
+				},
+			}},
+		},
+		{
+			args: "https://www.youtube.com/watch?v=mzOyYtfXkb0/",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
+				{
+					URL:               "https://www.youtube.com/watch?v=mzOyYtfXkb0",
+					Permission:        URLUnfurlingAllowed,
+					IsStatusSharedURL: false,
+				},
+			}},
+		},
 		// Valid URL.
-		{args: "https://status.c", expected: []string{"https://status.c"}},
-		{args: "https://status.im/test", expected: []string{"https://status.im/test"}},
-		{args: "https://192.168.0.100:9999/xyz", expected: []string{"https://192.168.0.100:9999/xyz"}},
+		{
+			args: "https://status.c",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
+				{
+					URL:               "https://status.c",
+					Permission:        URLUnfurlingAllowed,
+					IsStatusSharedURL: false,
+				},
+			}},
+		},
+		{
+			args: "https://status.im/test",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
+				{
+					URL:               "https://status.im/test",
+					Permission:        URLUnfurlingAllowed,
+					IsStatusSharedURL: false,
+				},
+			}},
+		},
+		{
+			args: "https://192.168.0.100:9999/xyz",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
+				{
+					URL:               "https://192.168.0.100:9999/xyz",
+					Permission:        URLUnfurlingAllowed,
+					IsStatusSharedURL: false,
+				},
+			}},
+		},
 
 		// There is a bug in the code that builds the AST from markdown text,
 		// because it removes the closing parenthesis, which means it won't be
 		// possible to unfurl this URL.
-		{args: "https://en.wikipedia.org/wiki/Status_message_(instant_messaging)", expected: []string{"https://en.wikipedia.org/wiki/Status_message_(instant_messaging"}},
+		{
+			args: "https://en.wikipedia.org/wiki/Status_message_(instant_messaging)",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
+				{
+					URL:               "https://en.wikipedia.org/wiki/Status_message_(instant_messaging",
+					Permission:        URLUnfurlingAllowed,
+					IsStatusSharedURL: false,
+				},
+			}},
+		},
 
 		// Multiple URLs.
 		{
-			args:     "https://status.im/test https://www.youtube.com/watch?v=mzOyYtfXkb0",
-			expected: []string{"https://status.im/test", "https://www.youtube.com/watch?v=mzOyYtfXkb0"},
+			args: "https://status.im/test https://www.youtube.com/watch?v=mzOyYtfXkb0",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
+				{
+					URL:               "https://status.im/test",
+					Permission:        URLUnfurlingAllowed,
+					IsStatusSharedURL: false,
+				},
+				{
+					URL:               "https://www.youtube.com/watch?v=mzOyYtfXkb0",
+					Permission:        URLUnfurlingAllowed,
+					IsStatusSharedURL: false,
+				},
+			}},
 		},
 		{
-			args:     "status.im https://www.youtube.com/watch?v=mzOyYtfXkb0",
-			expected: []string{"https://www.youtube.com/watch?v=mzOyYtfXkb0"},
+			args: "status.im https://www.youtube.com/watch?v=mzOyYtfXkb0",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
+				{
+					URL:               "https://www.youtube.com/watch?v=mzOyYtfXkb0",
+					Permission:        URLUnfurlingAllowed,
+					IsStatusSharedURL: false,
+				},
+			}},
 		},
 	}
 
 	for _, ex := range examples {
-		links := s.m.GetURLs(ex.args)
-		s.Require().Equal(ex.expected, links, "Failed for args: '%s'", ex.args)
+		s.Run(ex.args, func() {
+			links := GetTextURLsToUnfurl(ex.args, settings.URLUnfurlingEnableAll)
+			s.Require().Equal(ex.expected, links, "Failed for args: '%s'", ex.args)
+		})
 	}
 }
 
-func (s *MessengerLinkPreviewsTestSuite) readAsset(filename string) []byte {
-	b, err := ioutil.ReadFile("../_assets/tests/" + filename)
+func (s *LinkPreviewsTestSuite) readAsset(filename string) []byte {
+	b, err := ioutil.ReadFile("../../_assets/tests/" + filename)
 	s.Require().NoError(err)
 	return b
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_GetFavicon() {
+func (s *LinkPreviewsTestSuite) Test_GetFavicon() {
 	goodHTMLPNG := []byte(
 		`
 	<html>
@@ -271,7 +297,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_GetFavicon() {
 	s.Require().Equal("", faviconPath)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
+func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
 	u := "https://www.youtube.com/watch?v=lE4UXdJSJM4"
 	thumbnailURL := "https://i.ytimg.com/vi/lE4UXdJSJM4/maxresdefault.jpg"
 	expected := common.LinkPreview{
@@ -305,7 +331,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
 	transport.AddURLMatcher(thumbnailURL, s.readAsset("1.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
-	response, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	response, err := UnfurlURLs([]string{u}, &stubbedClient, nil, s.logger)
 	s.Require().NoError(err)
 	s.Require().Len(response.StatusLinkPreviews, 0)
 	s.Require().Len(response.LinkPreviews, 1)
@@ -323,7 +349,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
 	s.assertContainsLongString(expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Reddit() {
+func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_Reddit() {
 	u := "https://www.reddit.com/r/Bitcoin/comments/13j0tzr/the_best_bitcoin_explanation_of_all_times/?utm_source=share"
 	expected := common.LinkPreview{
 		Type:        protobuf.UnfurledLink_LINK,
@@ -351,7 +377,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Reddit() {
 	)
 	stubbedClient := http.Client{Transport: &transport}
 
-	response, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	response, err := UnfurlURLs([]string{u}, &stubbedClient, nil, s.logger)
 	s.Require().NoError(err)
 	s.Require().Len(response.StatusLinkPreviews, 0)
 	s.Require().Len(response.LinkPreviews, 1)
@@ -365,15 +391,15 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Reddit() {
 	s.Require().Equal(expected.Thumbnail, preview.Thumbnail)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Timeout() {
+func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_Timeout() {
 	httpClient := http.Client{Timeout: time.Nanosecond}
-	response, err := s.m.UnfurlURLs(&httpClient, []string{"https://status.im"})
+	response, err := UnfurlURLs([]string{"https://status.im"}, &httpClient, nil, s.logger)
 	s.Require().NoError(err)
 	s.Require().Len(response.StatusLinkPreviews, 0)
 	s.Require().Empty(response.LinkPreviews)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_CommonFailures() {
+func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_CommonFailures() {
 	httpClient := http.Client{}
 
 	// Test URL that doesn't return any OpenGraph title.
@@ -384,25 +410,25 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_CommonFailures() {
 		nil,
 	)
 	stubbedClient := http.Client{Transport: &transport}
-	response, err := s.m.UnfurlURLs(&stubbedClient, []string{"https://wikipedia.org"})
+	response, err := UnfurlURLs([]string{"https://wikipedia.org"}, &stubbedClient, nil, s.logger)
 	s.Require().NoError(err)
 	s.Require().Len(response.StatusLinkPreviews, 0)
 	s.Require().Empty(response.LinkPreviews)
 
 	// Test 404.
-	response, err = s.m.UnfurlURLs(&httpClient, []string{"https://github.com/status-im/i_do_not_exist"})
+	response, err = UnfurlURLs([]string{"https://github.com/status-im/i_do_not_exist"}, &httpClient, nil, s.logger) // FIXME: Internet access?
 	s.Require().NoError(err)
 	s.Require().Len(response.StatusLinkPreviews, 0)
 	s.Require().Empty(response.LinkPreviews)
 
 	// Test no response when trying to get OpenGraph metadata.
-	response, err = s.m.UnfurlURLs(&httpClient, []string{"https://wikipedia.o"})
+	response, err = UnfurlURLs([]string{"https://wikipedia.o"}, &httpClient, nil, s.logger) // FIXME: Internet access?// FIXME: Internet access?
 	s.Require().NoError(err)
 	s.Require().Len(response.StatusLinkPreviews, 0)
 	s.Require().Empty(response.LinkPreviews)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_isSupportedImageURL() {
+func (s *LinkPreviewsTestSuite) Test_isSupportedImageURL() {
 	examples := []struct {
 		url      string
 		expected bool
@@ -426,7 +452,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_isSupportedImageURL() {
 	}
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
+func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 	u := "https://placehold.co/600x400@3x.png"
 	expected := common.LinkPreview{
 		Type:        protobuf.UnfurledLink_IMAGE,
@@ -446,7 +472,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 	transport.AddURLMatcher(u, s.readAsset("IMG_1205.HEIC.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
-	response, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	response, err := UnfurlURLs([]string{u}, &stubbedClient, nil, s.logger)
 	s.Require().NoError(err)
 	s.Require().Len(response.StatusLinkPreviews, 0)
 	s.Require().Len(response.LinkPreviews, 1)
@@ -463,13 +489,9 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 	s.assertContainsLongString(expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
-	identity, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	c, err := contacts.BuildContactFromPublicKey(&identity.PublicKey)
-	s.Require().NoError(err)
-	s.Require().NotNil(c)
+func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
+	publicKey := t.FakePublicKey(s.T())
+	c := t.FakeContact(s.T(), publicKey)
 
 	payload, err := images.GetPayloadFromURI(exampleIdenticonURI)
 	s.Require().NoError(err)
@@ -479,26 +501,26 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 		Height:  50,
 		Payload: payload,
 	}
-
-	c.Bio = "TestBio_1"
-	c.DisplayName = "TestDisplayName_1"
-	c.Images = map[string]images.IdentityImage{}
-	c.Images[images.SmallDimName] = icon
-	s.m.allContacts.Store(c.ID, c)
+	c.Images = map[string]images.IdentityImage{
+		images.SmallDimName: icon,
+	}
 
 	// Generate a shared URL
-	provider := &SharedUrlsMessengerAdapter{messenger: s.m}
-	sharedUrlsService := sharedurls.NewService(provider)
-	u, err := sharedUrlsService.ShareUserURLWithData(c.ID)
+	u, err := sharedurls.ShareUserURLWithData(c)
 	s.Require().NoError(err)
 
-	// Update contact info locally after creating the shared URL
+	// Provider a different contact with the same ID
 	// This is required to test that URL-decoded data is not used in the preview.
-	c.Bio = "TestBio_2"
-	c.DisplayName = "TestDisplayName_2"
-	s.m.allContacts.Store(c.ID, c)
+	// TODO: Also replace image
+	c2 := t.FakeContact(s.T(), publicKey)
+	c2.Images = map[string]images.IdentityImage{
+		images.SmallDimName: icon,
+	}
 
-	r, err := s.m.UnfurlURLs(nil, []string{u})
+	dataProvider := mock_linkpreview.NewMockStatusDataProvider(s.ctrl)
+	dataProvider.EXPECT().GetContactByID(gomock.Eq(c2.ID)).Return(c2).Times(1)
+
+	r, err := UnfurlURLs([]string{u}, nil, dataProvider, s.logger)
 	s.Require().NoError(err)
 	s.Require().Len(r.StatusLinkPreviews, 1)
 	s.Require().Len(r.LinkPreviews, 0)
@@ -508,9 +530,9 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	s.Require().Nil(preview.Community)
 	s.Require().Nil(preview.Channel)
 	s.Require().NotNil(preview.Contact)
-	s.Require().Equal(c.ID, preview.Contact.PublicKey)
-	s.Require().Equal(c.DisplayName, preview.Contact.DisplayName)
-	s.Require().Equal(c.Bio, preview.Contact.Description)
+	s.Require().Equal(c2.ID, preview.Contact.PublicKey)
+	s.Require().Equal(c2.DisplayName, preview.Contact.DisplayName)
+	s.Require().Equal(c2.Bio, preview.Contact.Description)
 	s.Require().Equal(icon.Width, preview.Contact.Icon.Width)
 	s.Require().Equal(icon.Height, preview.Contact.Icon.Height)
 	s.Require().Equal("", preview.Contact.Icon.URL)
@@ -520,126 +542,13 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	s.Require().Equal(expectedDataURI, preview.Contact.Icon.DataURI)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) setProfileParameters(messenger *Messenger, displayName string, bio string, identityImages []images.IdentityImage) {
-	const timeout = 1 * time.Second
+func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
 
-	changes := SelfContactChangeEvent{}
+	community := t.FakeCommunity(s.T(),
+		t.WithCommunityImage("../../_assets/tests/status.png", 0, 0, 256, 256),        // 256*256 px
+		t.WithCommunityBanner("../../_assets/tests/IMG_1205.HEIC.jpg", 0, 0, 160, 90), // 2282*3352 px
+	)
 
-	SetSettingsAndWaitForChange(&s.Suite, messenger, timeout, func() {
-		err := messenger.SetDisplayName(displayName)
-		s.Require().NoError(err)
-		err = messenger.SetBio(bio)
-		s.Require().NoError(err)
-	}, func(event *SelfContactChangeEvent) bool {
-		if event.DisplayNameChanged {
-			changes.DisplayNameChanged = true
-		}
-		if event.BioChanged {
-			changes.BioChanged = true
-		}
-		return changes.DisplayNameChanged && changes.BioChanged
-	})
-
-	SetIdentityImagesAndWaitForChange(&s.Suite, messenger, timeout, func() {
-		err := messenger.multiAccounts.StoreIdentityImages(messenger.account.KeyUID, identityImages, false)
-		s.Require().NoError(err)
-	})
-
-	selfContact := messenger.GetSelfContact()
-	s.Require().Equal(selfContact.DisplayName, displayName)
-	s.Require().Equal(selfContact.Bio, bio)
-
-	for _, image := range identityImages {
-		saved, ok := selfContact.Images[image.Name]
-		s.Require().True(ok)
-		s.Require().Equal(saved, image)
-	}
-	s.Require().Equal(selfContact.DisplayName, displayName)
-}
-
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
-	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
-	s.Require().NoError(err)
-	profileKp.KeyUID = s.m.account.KeyUID
-	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
-
-	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
-	s.Require().NoError(err)
-
-	// Set initial profile parameters
-	identityImages := images.SampleIdentityImages()
-	s.setProfileParameters(s.m, "TestDisplayName_3", "TestBio_3", identityImages)
-
-	// Generate a shared URL
-	provider := &SharedUrlsMessengerAdapter{messenger: s.m}
-	sharedUrlsService := sharedurls.NewService(provider)
-	u, err := sharedUrlsService.ShareUserURLWithData(s.m.IdentityPublicKeyString())
-	s.Require().NoError(err)
-
-	// Update contact info locally after creating the shared URL
-	// This is required to test that URL-decoded data is not used in the preview.
-	iconPayload, err := images.GetPayloadFromURI(exampleIdenticonURI)
-	s.Require().NoError(err)
-	icon := images.IdentityImage{
-		Name:    images.SmallDimName,
-		Width:   50,
-		Height:  50,
-		Payload: iconPayload,
-	}
-	s.setProfileParameters(s.m, "TestDisplayName_4", "TestBio_4", []images.IdentityImage{icon})
-
-	r, err := s.m.UnfurlURLs(nil, []string{u})
-	s.Require().NoError(err)
-	s.Require().Len(r.StatusLinkPreviews, 1)
-	s.Require().Len(r.LinkPreviews, 0)
-
-	userSettings, err := s.m.getSettings()
-	s.Require().NoError(err)
-
-	preview := r.StatusLinkPreviews[0]
-	s.Require().Equal(u, preview.URL)
-	s.Require().Nil(preview.Community)
-	s.Require().Nil(preview.Channel)
-	s.Require().NotNil(preview.Contact)
-	s.Require().Equal(s.m.IdentityPublicKeyString(), preview.Contact.PublicKey)
-	s.Require().Equal(userSettings.DisplayName, preview.Contact.DisplayName)
-	s.Require().Equal(userSettings.Bio, preview.Contact.Description)
-
-	s.Require().Equal(icon.Width, preview.Contact.Icon.Width)
-	s.Require().Equal(icon.Height, preview.Contact.Icon.Height)
-	s.Require().Equal("", preview.Contact.Icon.URL)
-
-	expectedDataURI, err := images.GetPayloadDataURI(icon.Payload)
-	s.Require().NoError(err)
-	s.Require().Equal(expectedDataURI, preview.Contact.Icon.DataURI)
-}
-
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
-
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
-		Name:        "status",
-		Description: "status community description",
-		Color:       "#123456",
-		Image:       "../_assets/tests/status.png", // 256*256 px
-		ImageAx:     0,
-		ImageAy:     0,
-		ImageBx:     256,
-		ImageBy:     256,
-		Banner: images.CroppedImage{
-			ImagePath: "../_assets/tests/IMG_1205.HEIC.jpg", // 2282*3352 px
-			X:         0,
-			Y:         0,
-			Width:     160,
-			Height:    90,
-		},
-	}
-
-	response, err := s.m.CreateCommunity(description, false)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	community := response.Communities()[0]
 	communityImages := community.Images()
 	s.Require().Len(communityImages, 3)
 
@@ -660,13 +569,16 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined()
 	s.Require().NoError(err)
 
 	// Create shared URL
-	provider := &SharedUrlsMessengerAdapter{messenger: s.m}
-	sharedUrlsService := sharedurls.NewService(provider)
-	u, err := sharedUrlsService.ShareCommunityURLWithData(community.ID())
+	u, err := sharedurls.ShareCommunityURLWithData(community)
 	s.Require().NoError(err)
 
+	// Instantiate provider
+	dataProvider := mock_linkpreview.NewMockStatusDataProvider(s.ctrl)
+	dataProvider.EXPECT().FetchCommunity(gomock.Eq(community.IDString()), gomock.Eq(community.Shard())).
+		Return(community, nil).Times(1)
+
 	// Unfurl community shared URL
-	r, err := s.m.UnfurlURLs(nil, []string{u})
+	r, err := UnfurlURLs([]string{u}, nil, dataProvider, s.logger)
 	s.Require().NoError(err)
 	s.Require().Len(r.StatusLinkPreviews, 1)
 	s.Require().Len(r.LinkPreviews, 0)
@@ -688,7 +600,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined()
 	s.Require().Equal(bannerDataURI, preview.Community.Banner.DataURI)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
+func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	// Create website stub
 	const ogLink = "https://github.com"
 	const statusUserLink = "https://status.app/c#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
@@ -698,11 +610,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	text := strings.Join(linksToUnfurl, " ")
 
 	// Test `AlwaysAsk`
-
-	err := s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingAlwaysAsk)
-	s.Require().NoError(err)
-
-	plan := s.m.GetTextURLsToUnfurl(text)
+	plan := GetTextURLsToUnfurl(text, settings.URLUnfurlingAlwaysAsk)
 	s.Require().Len(plan.URLs, len(linksToUnfurl))
 
 	s.Require().Equal(plan.URLs[0].URL, ogLink)
@@ -718,10 +626,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	s.Require().Equal(plan.URLs[2].Permission, URLUnfurlingNotSupported)
 
 	// Test `EnableAll`
-	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingEnableAll)
-	s.Require().NoError(err)
-
-	plan = s.m.GetTextURLsToUnfurl(text)
+	plan = GetTextURLsToUnfurl(text, settings.URLUnfurlingEnableAll)
 	s.Require().Len(plan.URLs, len(linksToUnfurl))
 
 	s.Require().Equal(plan.URLs[0].URL, ogLink)
@@ -737,10 +642,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	s.Require().Equal(plan.URLs[2].Permission, URLUnfurlingNotSupported)
 
 	// Test `DisableAll`
-	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingDisableAll)
-	s.Require().NoError(err)
-
-	plan = s.m.GetTextURLsToUnfurl(text)
+	plan = GetTextURLsToUnfurl(text, settings.URLUnfurlingDisableAll)
 	s.Require().Len(plan.URLs, len(linksToUnfurl))
 
 	s.Require().Equal(plan.URLs[0].URL, ogLink)
@@ -754,17 +656,4 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	s.Require().Equal(plan.URLs[2].URL, gifLink)
 	s.Require().Equal(plan.URLs[2].IsStatusSharedURL, false)
 	s.Require().Equal(plan.URLs[2].Permission, URLUnfurlingNotSupported)
-}
-
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Limit() {
-	text := "https://www.youtube.com/watch?v=6dkDepLX0rk " +
-		"https://www.youtube.com/watch?v=ferZnZ0_rSM " +
-		"https://www.youtube.com/watch?v=bdneye4pzMw " +
-		"https://www.youtube.com/watch?v=pRERgcQe-fQ " +
-		"https://www.youtube.com/watch?v=j82L3pLjb_0 " +
-		"https://www.youtube.com/watch?v=hxsJvKYyVyg " +
-		"https://www.youtube.com/watch?v=jIIuzB11dsA "
-
-	urls := s.m.GetURLs(text)
-	s.Require().Equal(UnfurledLinksPerMessageLimit, len(urls))
 }

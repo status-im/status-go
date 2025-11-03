@@ -1,4 +1,4 @@
-package protocol
+package linkpreview
 
 import (
 	"encoding/json"
@@ -56,7 +56,7 @@ func (u *OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 	return oembedURL, nil
 }
 
-func (u OEmbedUnfurler) Unfurl() (*common.LinkPreview, error) {
+func (u *OEmbedUnfurler) Unfurl() (*common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
 	preview.Type = protobuf.UnfurledLink_LINK
 
@@ -76,9 +76,6 @@ func (u OEmbedUnfurler) Unfurl() (*common.LinkPreview, error) {
 	}
 
 	var oembedResponse OEmbedResponse
-	if err != nil {
-		return preview, err
-	}
 	err = json.Unmarshal(oembedBytes, &oembedResponse)
 	if err != nil {
 		return preview, err
