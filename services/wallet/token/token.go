@@ -110,7 +110,6 @@ func NewTokenManager(
 	mediaServer *server.MediaServer,
 	walletFeed *event.Feed,
 	accountsPublisher *pubsub.Publisher,
-	tokenPublisher *pubsub.Publisher,
 	accountsDB *accounts.Database,
 	tokenBalancesStorage TokenBalancesStorage,
 ) *Manager {
@@ -132,7 +131,7 @@ func NewTokenManager(
 		mediaServer:          mediaServer,
 		walletFeed:           walletFeed,
 		accountsPublisher:    accountsPublisher,
-		tokenPublisher:       tokenPublisher,
+		tokenPublisher:       pubsub.NewPublisher(),
 		accountsDB:           accountsDB,
 		tokenBalancesStorage: tokenBalancesStorage,
 		tokenLists:           tokensLists,

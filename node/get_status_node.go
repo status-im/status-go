@@ -130,7 +130,6 @@ type StatusNode struct {
 
 	walletFeed        event.Feed
 	accountsPublisher *pubsub.Publisher
-	tokenPublisher    *pubsub.Publisher
 
 	localBackup *backup.Controller
 }
@@ -144,7 +143,6 @@ func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagemen
 		logger:              logger,
 		publicMethods:       make(map[string]bool),
 		accountsPublisher:   pubsub.NewPublisher(),
-		tokenPublisher:      pubsub.NewPublisher(),
 		rpcServer:           gethrpc.NewServer(),
 	}
 }
@@ -382,7 +380,7 @@ func (n *StatusNode) createAndStartTokenManager() error {
 	}
 
 	n.tokenManager = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.mediaServer, nil),
-		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsPublisher, n.tokenPublisher, accDB,
+		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsPublisher, accDB,
 		token.NewPersistence(n.walletDB))
 
 	const (
@@ -442,7 +440,6 @@ func (n *StatusNode) Stop() error {
 	}
 
 	n.accountsPublisher.Close()
-	n.tokenPublisher.Close()
 
 	n.rpcClient.Stop()
 	n.rpcClient = nil
