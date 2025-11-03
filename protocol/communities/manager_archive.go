@@ -285,13 +285,11 @@ func (m *ArchiveManager) torrentClientStarted() bool {
 }
 
 func (m *ArchiveManager) IsReady() bool {
-	// Simply checking for `torrentConfig.Enabled` isn't enough
-	// as there's a possibility that the torrent client couldn't
-	// be instantiated (for example in case of port conflicts)
-	return m.torrentConfig != nil &&
-		m.torrentConfig.Enabled &&
-		m.torrentClientStarted() &&
-		m.isCodexClientStarted
+	// Simply checking for `torrentConfig.Enabled` or `codexConfig.Enabled`
+	// isn't enough as there's a possibility that the torrent client or the
+	// codex client couldn't be instantiated (for example in case of port conflicts)
+	return (m.torrentConfig != nil && m.torrentConfig.Enabled && m.torrentClientStarted() ||
+		(m.codexConfig != nil && m.codexConfig.Enabled && m.isCodexClientStarted))
 }
 
 func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error) {

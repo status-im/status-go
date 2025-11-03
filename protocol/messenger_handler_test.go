@@ -1,15 +1,23 @@
 package protocol
 
 import (
+	"bytes"
 	"context"
+	"path/filepath"
 	"testing"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 )
@@ -172,4 +180,69 @@ func (s *EventToSystemMessageSuite) TestHandleMembershipUpdate() {
 	s.Require().Len(state.Response.Notifications(), 0)
 	s.Require().Len(state.Response.Chats(), 1)
 	s.Require().False(state.Response.Chats()[0].Active)
+}
+
+func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithCodex() {
+	adminPrivateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	contact, err := contacts.BuildContactFromPublicKey(&adminPrivateKey.PublicKey)
+	s.Require().NoError(err)
+
+	contact.ContactRequestLocalState = contacts.ContactRequestStateSent
+	currentMessageState := &CurrentMessageState{
+		Contact: contact,
+	}
+
+	state := &ReceivedMessageState{
+		Response:            &MessengerResponse{},
+		Timesource:          s.m.getTimesource(),
+		CurrentMessageState: currentMessageState,
+		ExistingMessagesMap: map[string]bool{},
+		AllChats:            s.m.allChats,
+	}
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	response, err := s.m.CreateCommunity(description, false)
+	s.Require().NoError(err)
+
+	s.m.archiveManager.SetCodexConfig(&params.CodexConfig{
+		Enabled:               true,
+		HistoryArchiveDataDir: filepath.Join(s.T().TempDir(), "codex", "archivedata"),
+		CodexNodeConfig: codex.Config{
+			DataDir:        filepath.Join(s.T().TempDir(), "codex", "codexdata"),
+			LogFormat:      codex.LogFormatNoColors,
+			MetricsEnabled: false,
+			LogLevel:       "ERROR",
+			Nat:            "none",
+		},
+	})
+
+	err = s.m.archiveManager.StartCodexClient()
+	s.Require().NoError(err)
+	defer s.m.archiveManager.Stop()
+
+	s.Require().True(s.m.archiveManager.IsReady())
+
+	community := response.Communities()[0]
+	s.m.communitiesManager.SaveCommunitySettings(communities.CommunitySettings{
+		CommunityID:                  community.IDString(),
+		HistoryArchiveSupportEnabled: true,
+	})
+	s.m.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodCodex)
+
+	var buf bytes.Buffer
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()), zapcore.AddSync(&buf), zap.DebugLevel)
+	s.m.logger = zap.New(core)
+
+	err = s.m.HandleHistoryArchiveMagnetlinkMessage(state, &community.PrivateKey().PublicKey, "", 100)
+	s.Require().NoError(err)
+	s.Require().Contains(buf.String(), "skipping magnetlink processing due to codex-only preference")
 }
