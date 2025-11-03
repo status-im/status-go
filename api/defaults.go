@@ -354,9 +354,10 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	}
 
 	nodeConfig.CodexConfig = params.CodexConfig{
-		Enabled: false,
-		Config: codex.Config{
-			DataDir:        filepath.Join(nodeConfig.RootDataDir, params.ArchivesRelativePath),
+		Enabled:               false,
+		HistoryArchiveDataDir: filepath.Join(nodeConfig.RootDataDir, "codex", "archivedata"),
+		CodexNodeConfig: codex.Config{
+			DataDir:        filepath.Join(nodeConfig.RootDataDir, "codex", "codexdata"),
 			BlockRetries:   params.BlockRetries,
 			MetricsEnabled: false,
 		},

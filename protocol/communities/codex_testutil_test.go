@@ -1,6 +1,7 @@
 package communities_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/codex-storage/codex-go-bindings/codex"
@@ -11,12 +12,14 @@ import (
 
 func NewCodexClientTest(t *testing.T) communities.CodexClient {
 	client, err := communities.NewCodexClient(params.CodexConfig{
-		Enabled: true,
-		Config: codex.Config{
-			DataDir:        t.TempDir(),
+		Enabled:               true,
+		HistoryArchiveDataDir: filepath.Join(t.TempDir(), "codex", "archivedata"),
+		CodexNodeConfig: codex.Config{
+			DataDir:        filepath.Join(t.TempDir(), "codex", "codexdata"),
 			LogFormat:      codex.LogFormatNoColors,
 			MetricsEnabled: false,
 			LogLevel:       "ERROR",
+			Nat:            "none",
 		},
 	})
 	if err != nil {

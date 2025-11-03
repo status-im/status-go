@@ -338,8 +338,9 @@ type TorrentConfig struct {
 }
 
 type CodexConfig struct {
-	Enabled bool
-	codex.Config
+	Enabled               bool
+	HistoryArchiveDataDir string
+	CodexNodeConfig       codex.Config
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
@@ -416,10 +417,11 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			TorrentDir: dataDir + "/torrents",
 		},
 		CodexConfig: CodexConfig{
-			Enabled: false,
-			Config: codex.Config{
+			Enabled:               false,
+			HistoryArchiveDataDir: dataDir + "/codex/history-archive-data",
+			CodexNodeConfig: codex.Config{
 				BlockRetries:   50,
-				DataDir:        dataDir + "/codexdata",
+				DataDir:        dataDir + "/codex/codex-data",
 				MetricsEnabled: false,
 			},
 		},

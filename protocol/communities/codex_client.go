@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log"
 
 	"github.com/codex-storage/codex-go-bindings/codex"
 
@@ -23,13 +22,13 @@ type CodexClient struct {
 
 // NewCodexClient creates a new Codex client
 func NewCodexClient(config params.CodexConfig) (CodexClient, error) {
-	node, err := codex.New(config.Config)
+	node, err := codex.New(config.CodexNodeConfig)
 	if err != nil {
 		return CodexClient{}, err
 	}
 
 	return CodexClient{
-		config:  config.Config,
+		config:  config.CodexNodeConfig,
 		node:    node,
 		enabled: config.Enabled,
 	}, nil
@@ -48,11 +47,9 @@ func (c *CodexClient) Start() error {
 }
 
 func (c *CodexClient) Stop() error {
-	log.Println("AAAAAAAAAAAAAAA!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	if c.stopped {
 		return nil
 	}
-	log.Println("Stopping Codex client...!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	err := c.node.Stop()
 	if err != nil {
 		return err
@@ -62,11 +59,9 @@ func (c *CodexClient) Stop() error {
 }
 
 func (c *CodexClient) Destroy() error {
-	log.Println("BBBBBBBBBBBBBBBB????????????????????????????????")
 	if c.destroyed {
 		return nil
 	}
-	log.Println("Destroy Destroy Destroy ???????????????????????")
 	err := c.node.Destroy()
 	if err != nil {
 		return err
@@ -128,7 +123,10 @@ func (c *CodexClient) LocalDownload(cid string, output io.Writer) error {
 }
 
 func (c *CodexClient) LocalDownloadWithContext(ctx context.Context, cid string, output io.Writer) error {
-	return c.node.DownloadStream(ctx, cid, codex.DownloadStreamOptions{Writer: output, Local: true})
+	return c.node.DownloadStream(ctx, cid, codex.DownloadStreamOptions{
+		Writer: output,
+		Local:  true,
+	})
 }
 
 func (c *CodexClient) FetchManifestWithContext(ctx context.Context, cid string) (codex.Manifest, error) {

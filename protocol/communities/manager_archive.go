@@ -214,9 +214,6 @@ func (m *ArchiveManager) StartTorrentClient() error {
 }
 
 func (m *ArchiveManager) StartCodexClient() error {
-
-	m.logger.Info("======================Starting codex client=============================")
-
 	if m.codexConfig == nil {
 		return fmt.Errorf("can't start codex client: missing codexConfig")
 	}
@@ -782,7 +779,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 	indexDownloaderCancel := make(chan struct{})
 
 	// Create index downloader with path to index file using helper function
-	indexFilePath := m.codexArchiveIndexFilePath(communityID)
+	indexFilePath := m.codexHistoryArchiveIndexFilePath(communityID)
 	indexDownloader := NewCodexIndexDownloader(m.codexClient, indexCid, indexFilePath, indexDownloaderCancel, m.logger)
 
 	m.logger.Debug("fetching history index from Codex", zap.String("indexCid", indexCid))
@@ -954,7 +951,7 @@ func (m *ArchiveManager) TorrentFileExists(communityID string) bool {
 }
 
 func (m *ArchiveManager) CodexIndexCidFileExists(communityID types.HexBytes) bool {
-	_, err := os.Stat(m.codexArchiveIndexCidFilePath(communityID))
+	_, err := os.Stat(m.codexHistoryArchiveIndexCidFilePath(communityID))
 	return err == nil
 }
 

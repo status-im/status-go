@@ -75,7 +75,7 @@ func (suite *CodexClientTestSuite) TestDownload_Success() {
 
 func (suite *CodexClientTestSuite) TestDownloadWithContext_Cancel() {
 	// skip test
-	suite.T().Skip("Wait for cancellation support PR to be merged in codex-go-bindings")
+	// suite.T().Skip("Wait for cancellation support PR to be merged in codex-go-bindings")
 
 	client := NewCodexClientTest(suite.T())
 
@@ -203,8 +203,6 @@ func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Success() {
 }
 
 func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Cancellation() {
-	suite.T().Skip("Wait for cancellation support PR to be merged in codex-go-bindings")
-
 	client := NewCodexClientTest(suite.T())
 
 	// Create a context with a very short timeout

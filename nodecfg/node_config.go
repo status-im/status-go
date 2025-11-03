@@ -84,44 +84,45 @@ func insertTorrentConfig(tx *sql.Tx, c *params.NodeConfig) error {
 
 // Insert or update codex_config table
 func insertCodexConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	listenAddrsJSON, err := json.Marshal(c.CodexConfig.ListenAddrs)
+	listenAddrsJSON, err := json.Marshal(c.CodexConfig.CodexNodeConfig.ListenAddrs)
 	if err != nil {
 		return err
 	}
-	bootstrapNodesJSON, err := json.Marshal(c.CodexConfig.BootstrapNodes)
+	bootstrapNodesJSON, err := json.Marshal(c.CodexConfig.CodexNodeConfig.BootstrapNodes)
 	if err != nil {
 		return err
 	}
 	_, err = tx.Exec(`
 		INSERT OR REPLACE INTO codex_config (
-			enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
+			enabled, history_archive_data_dir, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
 			listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
 			repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
 			block_retries, cache_size, log_file, synthetic_id
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
 		c.CodexConfig.Enabled,
-		c.CodexConfig.LogLevel,
-		c.CodexConfig.LogFormat,
-		c.CodexConfig.MetricsEnabled,
-		c.CodexConfig.MetricsAddress,
-		c.CodexConfig.MetricsPort,
-		c.CodexConfig.DataDir,
+		c.CodexConfig.HistoryArchiveDataDir,
+		c.CodexConfig.CodexNodeConfig.LogLevel,
+		c.CodexConfig.CodexNodeConfig.LogFormat,
+		c.CodexConfig.CodexNodeConfig.MetricsEnabled,
+		c.CodexConfig.CodexNodeConfig.MetricsAddress,
+		c.CodexConfig.CodexNodeConfig.MetricsPort,
+		c.CodexConfig.CodexNodeConfig.DataDir,
 		string(listenAddrsJSON),
-		c.CodexConfig.Nat,
-		c.CodexConfig.DiscoveryPort,
-		c.CodexConfig.NetPrivKeyFile,
+		c.CodexConfig.CodexNodeConfig.Nat,
+		c.CodexConfig.CodexNodeConfig.DiscoveryPort,
+		c.CodexConfig.CodexNodeConfig.NetPrivKeyFile,
 		string(bootstrapNodesJSON),
-		c.CodexConfig.MaxPeers,
-		c.CodexConfig.NumThreads,
-		c.CodexConfig.AgentString,
-		c.CodexConfig.RepoKind,
-		c.CodexConfig.StorageQuota,
-		c.CodexConfig.BlockTtl,
-		c.CodexConfig.BlockMaintenanceInterval,
-		c.CodexConfig.BlockMaintenanceNumberOfBlocks,
-		c.CodexConfig.BlockRetries,
-		c.CodexConfig.CacheSize,
-		c.CodexConfig.LogFile,
+		c.CodexConfig.CodexNodeConfig.MaxPeers,
+		c.CodexConfig.CodexNodeConfig.NumThreads,
+		c.CodexConfig.CodexNodeConfig.AgentString,
+		c.CodexConfig.CodexNodeConfig.RepoKind,
+		c.CodexConfig.CodexNodeConfig.StorageQuota,
+		c.CodexConfig.CodexNodeConfig.BlockTtl,
+		c.CodexConfig.CodexNodeConfig.BlockMaintenanceInterval,
+		c.CodexConfig.CodexNodeConfig.BlockMaintenanceNumberOfBlocks,
+		c.CodexConfig.CodexNodeConfig.BlockRetries,
+		c.CodexConfig.CodexNodeConfig.CacheSize,
+		c.CodexConfig.CodexNodeConfig.LogFile,
 	)
 	return err
 }
@@ -274,47 +275,48 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	// Load codex_config
 	var listenAddrsStr, bootstrapNodesStr string
 	err = tx.QueryRow(`
-	  SELECT enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
+	  SELECT enabled, history_archive_data_dir, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
 			 listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
 			 repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
 			 block_retries, cache_size, log_file
 	  FROM codex_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.CodexConfig.Enabled,
-		&nodecfg.CodexConfig.LogLevel,
-		&nodecfg.CodexConfig.LogFormat,
-		&nodecfg.CodexConfig.MetricsEnabled,
-		&nodecfg.CodexConfig.MetricsAddress,
-		&nodecfg.CodexConfig.MetricsPort,
-		&nodecfg.CodexConfig.DataDir,
+		&nodecfg.CodexConfig.HistoryArchiveDataDir,
+		&nodecfg.CodexConfig.CodexNodeConfig.LogLevel,
+		&nodecfg.CodexConfig.CodexNodeConfig.LogFormat,
+		&nodecfg.CodexConfig.CodexNodeConfig.MetricsEnabled,
+		&nodecfg.CodexConfig.CodexNodeConfig.MetricsAddress,
+		&nodecfg.CodexConfig.CodexNodeConfig.MetricsPort,
+		&nodecfg.CodexConfig.CodexNodeConfig.DataDir,
 		&listenAddrsStr,
-		&nodecfg.CodexConfig.Nat,
-		&nodecfg.CodexConfig.DiscoveryPort,
-		&nodecfg.CodexConfig.NetPrivKeyFile,
+		&nodecfg.CodexConfig.CodexNodeConfig.Nat,
+		&nodecfg.CodexConfig.CodexNodeConfig.DiscoveryPort,
+		&nodecfg.CodexConfig.CodexNodeConfig.NetPrivKeyFile,
 		&bootstrapNodesStr,
-		&nodecfg.CodexConfig.MaxPeers,
-		&nodecfg.CodexConfig.NumThreads,
-		&nodecfg.CodexConfig.AgentString,
-		&nodecfg.CodexConfig.RepoKind,
-		&nodecfg.CodexConfig.StorageQuota,
-		&nodecfg.CodexConfig.BlockTtl,
-		&nodecfg.CodexConfig.BlockMaintenanceInterval,
-		&nodecfg.CodexConfig.BlockMaintenanceNumberOfBlocks,
-		&nodecfg.CodexConfig.BlockRetries,
-		&nodecfg.CodexConfig.CacheSize,
-		&nodecfg.CodexConfig.LogFile,
+		&nodecfg.CodexConfig.CodexNodeConfig.MaxPeers,
+		&nodecfg.CodexConfig.CodexNodeConfig.NumThreads,
+		&nodecfg.CodexConfig.CodexNodeConfig.AgentString,
+		&nodecfg.CodexConfig.CodexNodeConfig.RepoKind,
+		&nodecfg.CodexConfig.CodexNodeConfig.StorageQuota,
+		&nodecfg.CodexConfig.CodexNodeConfig.BlockTtl,
+		&nodecfg.CodexConfig.CodexNodeConfig.BlockMaintenanceInterval,
+		&nodecfg.CodexConfig.CodexNodeConfig.BlockMaintenanceNumberOfBlocks,
+		&nodecfg.CodexConfig.CodexNodeConfig.BlockRetries,
+		&nodecfg.CodexConfig.CodexNodeConfig.CacheSize,
+		&nodecfg.CodexConfig.CodexNodeConfig.LogFile,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 	// Unmarshal JSON fields
 	if listenAddrsStr != "" {
-		if err := json.Unmarshal([]byte(listenAddrsStr), &nodecfg.CodexConfig.ListenAddrs); err != nil {
+		if err := json.Unmarshal([]byte(listenAddrsStr), &nodecfg.CodexConfig.CodexNodeConfig.ListenAddrs); err != nil {
 			return nil, err
 		}
 	}
 	if bootstrapNodesStr != "" {
-		if err := json.Unmarshal([]byte(bootstrapNodesStr), &nodecfg.CodexConfig.BootstrapNodes); err != nil {
+		if err := json.Unmarshal([]byte(bootstrapNodesStr), &nodecfg.CodexConfig.CodexNodeConfig.BootstrapNodes); err != nil {
 			return nil, err
 		}
 	}
