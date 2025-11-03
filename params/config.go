@@ -405,10 +405,10 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		},
 		CodexConfig: CodexConfig{
 			Enabled:               false,
-			HistoryArchiveDataDir: dataDir + "/codex/history-archive-data",
+			HistoryArchiveDataDir: filepath.Join(dataDir, "codex", "archivedata"),
 			CodexNodeConfig: codex.Config{
 				BlockRetries:   50,
-				DataDir:        dataDir + "/codex/codex-data",
+				DataDir:        filepath.Join(dataDir, "codex", "codexdata"),
 				MetricsEnabled: false,
 			},
 		},
