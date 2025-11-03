@@ -128,7 +128,7 @@ func (c *CodexClient) LocalDownload(cid string, output io.Writer) error {
 }
 
 func (c *CodexClient) LocalDownloadWithContext(ctx context.Context, cid string, output io.Writer) error {
-	return c.node.DownloadStream(ctx, cid, codex.DownloadStreamOptions{Writer: output})
+	return c.node.DownloadStream(ctx, cid, codex.DownloadStreamOptions{Writer: output, Local: true})
 }
 
 func (c *CodexClient) FetchManifestWithContext(ctx context.Context, cid string) (codex.Manifest, error) {
