@@ -17,9 +17,9 @@ let
   hash = 
     if stdenv.hostPlatform.isDarwin 
     # nix store prefetch-file --json --unpack https://github.com/codex-storage/codex-go-bindings/releases/download/v0.0.25/codex-macos-arm64.zip | jq -r .hash
-    then "sha256-0AwwTom5i8v+hG81ikKjXWVeq7/v/FNVyb+3clH/V1Y="
+    then "sha256-vlQu7mCGuDL+dKBsD1yZ+PZenZYtmM2TxjU5b/Gi1pQ="
     # nix store prefetch-file --json --unpack https://github.com/codex-storage/codex-go-bindings/releases/download/v0.0.25/codex-Linux-amd64.zip | jq -r .hash
-    else "sha256-P1w1XvWsg/ZPg8VZfd52hffI2u4SIIWekIWVP79YnCc=";
+    else "sha256-SVJsnEZF5Bkh3zBWBCD1klpAb/Q3bePX8HB7NCeSY20=";
 
   # Pre-fetch libcodex to avoid network during build
   codexLib = pkgs.fetchzip {
