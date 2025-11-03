@@ -2,7 +2,6 @@ package tokenlists
 
 import (
 	"encoding/json"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -21,8 +20,13 @@ func (t *TokenLists) rebuildTokensMap(fetchedLists []fetcher.FetchedTokenList) e
 		// so we can just decode them all the same way, but once we add new list that doesn't follow the same schema
 		// we need to add a switch here, based on the `fetchedTokenList.ID` to map them to `TokensList` struct
 		var list TokensList
-		decoder := json.NewDecoder(strings.NewReader(fetchedTokenList.JsonData))
-		if err := decoder.Decode(&list); err != nil {
+		//Filter non-EVM tokens to avoid decode errors
+		filteredData, err := filterNonEVMTokens([]byte(fetchedTokenList.JsonData))
+		if err != nil {
+			return err
+		}
+
+		if err := json.Unmarshal(filteredData, &list); err != nil {
 			return err
 		}
 
@@ -115,18 +119,51 @@ func (t *TokenLists) rebuildTokensListsMap() error {
 	return t.rebuildTokensMap(tokensListsForProcessing)
 }
 
+// filterNonEVMTokens filters out tokens from non-EVM chains (e.g. Solana)
+func filterNonEVMTokens(body []byte) ([]byte, error) {
+	var rawList struct {
+		Name      string                   `json:"name"`
+		Timestamp string                   `json:"timestamp"`
+		Version   map[string]interface{}   `json:"version"`
+		Tags      map[string]interface{}   `json:"tags"`
+		LogoURI   string                   `json:"logoURI"`
+		Keywords  []string                 `json:"keywords"`
+		Tokens    []map[string]interface{} `json:"tokens"`
+	}
+
+	if err := json.Unmarshal(body, &rawList); err != nil {
+		return body, err
+	}
+
+	filteredTokens := make([]map[string]interface{}, 0, len(rawList.Tokens))
+
+	for _, token := range rawList.Tokens {
+		chainID, ok := token["chainId"].(float64)
+		if !ok {
+			continue
+		}
+
+		// Only include tokens from application's supported EVM chains
+		if common.IsSupportedChainID(uint64(chainID)) {
+			filteredTokens = append(filteredTokens, token)
+		}
+	}
+
+	rawList.Tokens = filteredTokens
+
+	filteredBody, err := json.Marshal(rawList)
+	if err != nil {
+		return nil, err
+	}
+
+	return filteredBody, nil
+}
+
 func filterTokens(tokens []*tokenTypes.Token) []*tokenTypes.Token {
 	var filteredTokens []*tokenTypes.Token
 	for _, token := range tokens {
-		found := false
-		for _, chainID := range common.AllChainIDs() {
-			if token.ChainID == uint64(chainID) {
-				found = true
-				break
-			}
-		}
 		// remove native token on respective chains as they are added via a different list
-		if !found || token.IsNative() {
+		if token.IsNative() {
 			continue
 		}
 		filteredTokens = append(filteredTokens, token)
