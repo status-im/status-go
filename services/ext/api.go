@@ -286,14 +286,14 @@ func (api *PublicAPI) SetCommunityShard(request *requests.SetCommunityShard) (*p
 	return api.service.messenger.SetCommunityShard(request)
 }
 
-// SetCommunityArchiveDistributionPreference sets the archive distribution preference for a community
-func (api *PublicAPI) SetCommunityArchiveDistributionPreference(request *requests.SetCommunityArchiveDistributionPreference) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SetCommunityArchiveDistributionPreference(request)
+// SetArchiveDistributionPreference sets the archive distribution preference for the node
+func (api *PublicAPI) SetArchiveDistributionPreference(request *requests.SetArchiveDistributionPreference) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SetArchiveDistributionPreference(request)
 }
 
-// GetCommunityArchiveDistributionPreference gets the archive distribution preference for a community
-func (api *PublicAPI) GetCommunityArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
-	return api.service.messenger.GetCommunityArchiveDistributionPreference(communityID)
+// GetArchiveDistributionPreference gets the archive distribution preference for the node
+func (api *PublicAPI) GetArchiveDistributionPreference() (string, error) {
+	return api.service.messenger.GetArchiveDistributionPreference()
 }
 
 // ExportCommunity exports the private key of the community with given ID

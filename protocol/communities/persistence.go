@@ -1004,12 +1004,11 @@ func (p *Persistence) GetMagnetlinkMessageClock(communityID types.HexBytes) (uin
 }
 
 func (p *Persistence) SaveCommunityArchiveInfo(communityID types.HexBytes, magnetLinkClock uint64, lastArchiveEndDate uint64, indexCidClock uint64) error {
-	_, err := p.db.Exec(`INSERT INTO communities_archive_info (magnetlink_clock, last_message_archive_end_date, community_id, index_cid_clock, preferred_distribution_method) VALUES (?, ?, ?, ?, ?)`,
+	_, err := p.db.Exec(`INSERT INTO communities_archive_info (magnetlink_clock, last_message_archive_end_date, community_id, index_cid_clock) VALUES (?, ?, ?, ?)`,
 		magnetLinkClock,
 		lastArchiveEndDate,
 		communityID.String(),
 		indexCidClock,
-		ArchiveDistributionMethodUnknown,
 	)
 	return err
 }
@@ -2154,33 +2153,58 @@ func (p *Persistence) UpdateAndPruneEncryptionKeyRequests(communityID types.HexB
 	return nil
 }
 
-func (p *Persistence) GetArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
-	// return "codex", nil
+// func (p *Persistence) GetArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
+// 	// return "codex", nil
+// 	var preference string
+// 	err := p.db.QueryRow(`SELECT preferred_distribution_method FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&preference)
+// 	if err == sql.ErrNoRows {
+// 		return ArchiveDistributionMethodUnknown, nil
+// 	} else if err != nil {
+// 		return "", err
+// 	}
+// 	return preference, nil
+// }
+
+func (p *Persistence) GetArchiveDistributionPreference() (string, error) {
 	var preference string
-	err := p.db.QueryRow(`SELECT preferred_distribution_method FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&preference)
-	if err == sql.ErrNoRows {
-		return ArchiveDistributionMethodUnknown, nil
-	} else if err != nil {
+	err := p.db.QueryRow(`SELECT history_archive_distribution_preference FROM node_config`).Scan(&preference)
+	if err != nil {
 		return "", err
 	}
 	return preference, nil
 }
 
-func (p *Persistence) SetArchiveDistributionPreference(communityID types.HexBytes, preference string) error {
-	// First check if record exists
-	exists, err := p.HasCommunityArchiveInfo(communityID)
+func (p *Persistence) SetArchiveDistributionPreference(preference string) error {
+	res, err := p.db.Exec(
+		`UPDATE node_config
+		 SET history_archive_distribution_preference = ?
+		 WHERE synthetic_id = 'id'`,
+		preference,
+	)
 	if err != nil {
 		return err
 	}
-
-	if exists {
-		// Update existing record
-		_, err = p.db.Exec(`UPDATE communities_archive_info SET preferred_distribution_method = ? WHERE community_id = ?`,
-			preference, communityID.String())
-	} else {
-		// Insert new record with preference
-		_, err = p.db.Exec(`INSERT INTO communities_archive_info (community_id, preferred_distribution_method, magnetlink_clock, last_message_archive_end_date, index_cid_clock) VALUES (?, ?, 0, 0, 0)`,
-			communityID.String(), preference)
+	if rows, _ := res.RowsAffected(); rows == 0 {
+		return errors.New("node_config row not found")
 	}
-	return err
+	return nil
 }
+
+// func (p *Persistence) SetArchiveDistributionPreference(communityID types.HexBytes, preference string) error {
+// 	// First check if record exists
+// 	exists, err := p.HasCommunityArchiveInfo(communityID)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	if exists {
+// 		// Update existing record
+// 		_, err = p.db.Exec(`UPDATE communities_archive_info SET preferred_distribution_method = ? WHERE community_id = ?`,
+// 			preference, communityID.String())
+// 	} else {
+// 		// Insert new record with preference
+// 		_, err = p.db.Exec(`INSERT INTO communities_archive_info (community_id, preferred_distribution_method, magnetlink_clock, last_message_archive_end_date, index_cid_clock) VALUES (?, ?, 0, 0, 0)`,
+// 			communityID.String(), preference)
+// 	}
+// 	return err
+// }

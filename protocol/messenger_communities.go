@@ -1461,23 +1461,6 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		Priority:            &messagingtypes.HighPriority,
 	}
 
-	// we want to use codex for archive distribution
-	// but if it is already set to something else (handy in testing), respect that
-	archiveDistributionPreference, err := m.communitiesManager.GetArchiveDistributionPreference(community.ID())
-	if err != nil {
-		return nil, err
-	}
-
-	m.logger.Debug("Archive distribution preference (RequestToJoin):", zap.String("preference", archiveDistributionPreference))
-
-	if archiveDistributionPreference == communities.ArchiveDistributionMethodUnknown {
-		// If the preference is unknown, we can set it to codex
-		err = m.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodCodex)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	_, err = m.SendMessageToControlNode(community, rawMessage)
 	if err != nil {
 		return nil, err
@@ -2488,12 +2471,6 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.CreateCommunity(request, true)
-	if err != nil {
-		return nil, err
-	}
-
-	// we want to use codex for archive distribution
-	err = m.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodCodex)
 	if err != nil {
 		return nil, err
 	}
@@ -3861,12 +3838,12 @@ importMessageArchivesLoop:
 			downloadedArchiveID := archiveIDsToImport[0]
 
 			var archiveMessages []*protobuf.WakuMessage
-			preference, err := m.communitiesManager.GetArchiveDistributionPreference(communityID)
+			preference, err := m.GetArchiveDistributionPreference()
 			if err != nil {
 				m.logger.Warn("failed to get archive distribution preference, using codex", zap.Error(err))
-				preference = "codex"
+				preference = communities.ArchiveDistributionMethodCodex
 			}
-			if preference == "codex" {
+			if preference == communities.ArchiveDistributionMethodCodex {
 				archiveMessages, err = m.archiveManager.ExtractMessagesFromCodexHistoryArchive(communityID, downloadedArchiveID)
 			} else {
 				archiveMessages, err = m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
@@ -4012,34 +3989,43 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 		return err
 	}
 
-	if nodeConfig.TorrentConfig.Enabled && nodeConfig.CodexConfig.Enabled {
+	if nodeConfig.TorrentConfig.Enabled || nodeConfig.CodexConfig.Enabled {
 		return nil
 	}
 
-	nodeConfig.TorrentConfig.Enabled = true
-	err = m.settings.SaveSetting("node-config", nodeConfig)
+	archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
 	if err != nil {
 		return err
 	}
 
-	nodeConfig.CodexConfig.Enabled = true
-	err = m.settings.SaveSetting("node-config", nodeConfig)
-	if err != nil {
-		return err
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodTorrent {
+		nodeConfig.TorrentConfig.Enabled = true
+		err = m.settings.SaveSetting("node-config", nodeConfig)
+		if err != nil {
+			return err
+		}
+
+		m.config.torrentConfig = &nodeConfig.TorrentConfig
+		m.archiveManager.SetTorrentConfig(&nodeConfig.TorrentConfig)
+		err = m.archiveManager.StartTorrentClient()
+		if err != nil {
+			return err
+		}
 	}
 
-	m.config.torrentConfig = &nodeConfig.TorrentConfig
-	m.archiveManager.SetTorrentConfig(&nodeConfig.TorrentConfig)
-	err = m.archiveManager.StartTorrentClient()
-	if err != nil {
-		return err
-	}
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodCodex {
+		nodeConfig.CodexConfig.Enabled = true
+		err = m.settings.SaveSetting("node-config", nodeConfig)
+		if err != nil {
+			return err
+		}
 
-	m.config.codexConfig = &nodeConfig.CodexConfig
-	m.archiveManager.SetCodexConfig(&nodeConfig.CodexConfig)
-	err = m.archiveManager.StartCodexClient()
-	if err != nil {
-		return err
+		m.config.codexConfig = &nodeConfig.CodexConfig
+		m.archiveManager.SetCodexConfig(&nodeConfig.CodexConfig)
+		err = m.archiveManager.StartCodexClient()
+		if err != nil {
+			return err
+		}
 	}
 
 	controlledCommunities, err := m.communitiesManager.Controlled()
@@ -4940,33 +4926,23 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 	}()
 }
 
-// SetCommunityArchiveDistributionPreference sets the archive distribution preference for a community
-func (m *Messenger) SetCommunityArchiveDistributionPreference(request *requests.SetCommunityArchiveDistributionPreference) (*MessengerResponse, error) {
+// SetArchiveDistributionPreference sets the archive distribution preference for the node
+func (m *Messenger) SetArchiveDistributionPreference(request *requests.SetArchiveDistributionPreference) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
 
-	community, err := m.communitiesManager.GetByID(request.CommunityID)
-	if err != nil {
-		return nil, err
-	}
-
-	if community == nil {
-		return nil, errors.New("community not found")
-	}
-
-	err = m.communitiesManager.SetArchiveDistributionPreference(request.CommunityID, request.Preference)
+	err := m.communitiesManager.SetArchiveDistributionPreference(request.Preference)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
-	response.AddCommunity(community)
 
 	return response, nil
 }
 
-// GetCommunityArchiveDistributionPreference gets the archive distribution preference for a community
-func (m *Messenger) GetCommunityArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
-	return m.communitiesManager.GetArchiveDistributionPreference(communityID)
+// GetArchiveDistributionPreference gets the archive distribution preference for the node
+func (m *Messenger) GetArchiveDistributionPreference() (string, error) {
+	return m.communitiesManager.GetArchiveDistributionPreference()
 }

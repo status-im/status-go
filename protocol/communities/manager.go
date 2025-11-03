@@ -72,7 +72,6 @@ var validateInterval = 2 * time.Minute
 
 // Archive distribution preferences
 const (
-	ArchiveDistributionMethodUnknown = "unknown"
 	ArchiveDistributionMethodTorrent = "torrent"
 	ArchiveDistributionMethodCodex   = "codex"
 )
@@ -3688,11 +3687,15 @@ func (m *Manager) GetLastSeenIndexCid(communityID types.HexBytes) (string, error
 	return m.persistence.GetLastSeenIndexCid(communityID)
 }
 
-func (m *Manager) GetArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
-	return m.persistence.GetArchiveDistributionPreference(communityID)
+func (m *Manager) GetArchiveDistributionPreference() (string, error) {
+	return m.persistence.GetArchiveDistributionPreference()
 }
 
-func (m *Manager) SetArchiveDistributionPreference(communityID types.HexBytes, preference string) error {
+// func (m *Manager) GetArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
+// 	return m.persistence.GetArchiveDistributionPreference(communityID)
+// }
+
+func (m *Manager) SetArchiveDistributionPreference(preference string) error {
 	// Validate preference value
 	switch preference {
 	case ArchiveDistributionMethodTorrent, ArchiveDistributionMethodCodex:
@@ -3701,8 +3704,20 @@ func (m *Manager) SetArchiveDistributionPreference(communityID types.HexBytes, p
 		return errors.New("invalid archive distribution preference")
 	}
 
-	return m.persistence.SetArchiveDistributionPreference(communityID, preference)
+	return m.persistence.SetArchiveDistributionPreference(preference)
 }
+
+// func (m *Manager) SetArchiveDistributionPreference(communityID types.HexBytes, preference string) error {
+// 	// Validate preference value
+// 	switch preference {
+// 	case ArchiveDistributionMethodTorrent, ArchiveDistributionMethodCodex:
+// 		// Valid preference
+// 	default:
+// 		return errors.New("invalid archive distribution preference")
+// 	}
+
+// 	return m.persistence.SetArchiveDistributionPreference(communityID, preference)
+// }
 
 func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	m.communityLock.Lock(id)

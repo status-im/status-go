@@ -277,6 +277,8 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.LogEnabled = false
 	}
 
+	nodeConfig.HistoryArchiveDistributionPreference = params.DefaultHistoryArchiveDistributionPreference
+
 	if request.TestOverrideNetworks != nil {
 		nodeConfig.Networks = request.TestOverrideNetworks
 	} else {
@@ -360,6 +362,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 			DataDir:        filepath.Join(nodeConfig.RootDataDir, "codex", "codexdata"),
 			BlockRetries:   params.BlockRetries,
 			MetricsEnabled: false,
+			LogFormat:      codex.LogFormatNoColors,
 		},
 	}
 

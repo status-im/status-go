@@ -11,15 +11,16 @@ import (
 
 func setupConfigs() (*params.NodeConfig, *requests.APIConfig) {
 	newNodeConfig := &params.NodeConfig{
-		APIModules:       "test, eth, wakuv2",
-		ConnectorConfig:  params.ConnectorConfig{Enabled: true},
-		HTTPEnabled:      true,
-		HTTPHost:         "0.0.0.0",
-		HTTPPort:         8545,
-		HTTPVirtualHosts: []string{"status-go"},
-		WSEnabled:        false,
-		WSHost:           "127.0.0.1",
-		WSPort:           8586,
+		APIModules:                           "test, eth, wakuv2",
+		ConnectorConfig:                      params.ConnectorConfig{Enabled: true},
+		HTTPEnabled:                          true,
+		HTTPHost:                             "0.0.0.0",
+		HTTPPort:                             8545,
+		HTTPVirtualHosts:                     []string{"status-go"},
+		WSEnabled:                            false,
+		WSHost:                               "127.0.0.1",
+		WSPort:                               8586,
+		HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference,
 	}
 
 	apiConfig := &requests.APIConfig{

@@ -149,6 +149,23 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 	collectiblesManagerMock *CollectiblesManagerMock
 	accountsTestData        map[string][]string
 	accountsPasswords       map[string]string
+	nodeConfigs             map[string]*params.NodeConfig
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) defaultNodeCfg(tempDir string) *params.NodeConfig {
+	s.Require().NoError(os.MkdirAll(tempDir, 0o755))
+
+	const defaultNetworkID = 1
+
+	nodeCfg, err := params.NewNodeConfig(tempDir, defaultNetworkID)
+	s.Require().NoError(err)
+
+	// false is default, but being explicit here for clarity
+	nodeCfg.CodexConfig.Enabled = false
+	nodeCfg.TorrentConfig.Enabled = false
+	nodeCfg.HistoryArchiveDistributionPreference = params.DefaultHistoryArchiveDistributionPreference
+
+	return nodeCfg
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
@@ -163,11 +180,19 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	}
 	s.resetMockedBalances()
 
-	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, "owner", []Option{})
+	s.nodeConfigs = make(map[string]*params.NodeConfig)
 
-	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, "bob", []Option{})
+	ownerNodeConfig := s.defaultNodeCfg(filepath.Join(os.TempDir(), "owner_"+uuid.NewString()))
+	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, "owner", []Option{}, ownerNodeConfig)
+	s.nodeConfigs[s.owner.IdentityPublicKeyString()] = ownerNodeConfig
 
-	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{})
+	bobNodeConfig := s.defaultNodeCfg(filepath.Join(os.TempDir(), "bob_"+uuid.NewString()))
+	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, "bob", []Option{}, bobNodeConfig)
+	s.nodeConfigs[s.bob.IdentityPublicKeyString()] = bobNodeConfig
+
+	aliceNodeConfig := s.defaultNodeCfg(filepath.Join(os.TempDir(), "alice_"+uuid.NewString()))
+	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{}, aliceNodeConfig)
+	s.nodeConfigs[s.alice.IdentityPublicKeyString()] = aliceNodeConfig
 
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
@@ -184,17 +209,23 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, name string, extraOptions []Option) *Messenger {
+func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, name string, extraOptions []Option, nodeConfig *params.NodeConfig) *Messenger {
 	communityManagerOptions := []communities.ManagerOption{
 		communities.WithAllowForcingCommunityMembersReevaluation(true),
 	}
 	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
 
+	testMessengerCfg := testMessengerConfig{
+		extraOptions: extraOptions,
+		name:         name,
+	}
+
+	if nodeConfig != nil {
+		testMessengerCfg.nodeConfig = nodeConfig
+	}
+
 	messenger := newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
-		testMessengerConfig: testMessengerConfig{
-			extraOptions: extraOptions,
-			name:         name,
-		},
+		testMessengerConfig: testMessengerCfg,
 		password:            password,
 		walletAddresses:     walletAddresses,
 		mockedBalances:      &s.mockedBalances,
@@ -2137,10 +2168,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	community, chat := s.createCommunity()
 
 	// createCommunity sets history archive distribution method to "codex" - we need torrent for this test
-	err := s.owner.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodTorrent)
+	err := s.owner.communitiesManager.SetArchiveDistributionPreference(communities.ArchiveDistributionMethodTorrent)
 	s.Require().NoError(err)
 
-	err = s.bob.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodTorrent)
+	err = s.bob.communitiesManager.SetArchiveDistributionPreference(communities.ArchiveDistributionMethodTorrent)
 	s.Require().NoError(err)
 
 	// 1.2. Setup permissions
@@ -2386,11 +2417,15 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedCodexArch
 	// 1.1. Create community
 	community, chat := s.createCommunity()
 
-	// for community owner, the history archive distribution preference is set to Codex when the community is created
-	archiveDistributionPreferenceOwner, err := s.owner.communitiesManager.GetArchiveDistributionPreference(community.ID())
+	archiveDistributionPreferenceOwner, err := s.owner.GetArchiveDistributionPreference()
 	s.Require().NoError(err)
 	log.Println("Archive distribution preference for owner:", archiveDistributionPreferenceOwner)
 	s.Require().Equal(communities.ArchiveDistributionMethodCodex, archiveDistributionPreferenceOwner)
+
+	archiveDistributionPreferenceBob, err := s.bob.GetArchiveDistributionPreference()
+	s.Require().NoError(err)
+	log.Println("Archive distribution preference for bob:", archiveDistributionPreferenceBob)
+	s.Require().Equal(communities.ArchiveDistributionMethodCodex, archiveDistributionPreferenceBob)
 
 	// 1.2. Setup permissions
 	communityPermission := &requests.CreateCommunityTokenPermission{
@@ -2500,14 +2535,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedCodexArch
 
 	s.joinCommunity(community, s.bob)
 
-	// when Bob requested to join, the history archive distribution preference should be set to Codex
-	archiveDistributionPreferenceBob, err := s.bob.communitiesManager.GetArchiveDistributionPreference(community.ID())
-	s.Require().NoError(err)
-
-	log.Println("Archive distribution preference for bob:", archiveDistributionPreferenceBob)
-
-	s.Require().Equal(communities.ArchiveDistributionMethodCodex, archiveDistributionPreferenceBob)
-
 	err = <-waitForKeysDistributedToBob
 	s.Require().NoError(err)
 
@@ -2597,9 +2624,27 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestLoadingConfigFromDatabas
 
 	// So TestImportDecryptedCodexArchiveMessages starts from that baseline: the in-memory DB contains the node config seeded with CodexConfig.Enabled false (unless you explicitly mutate it in the test).
 
-	// Following the above reaoning, we read the config from the database and verify that CodexConfig setting are what we expect them to be.
+	// Following the above reasoning, we read the codex config from the database and verify that CodexConfig setting are what we expect them to be.
 
-	// s.owner.
+	ownerNodeCfgFromDB, err := s.owner.settings.GetNodeConfig()
+	s.Require().NoError(err)
+	s.Assert().Equal(
+		s.nodeConfigs[s.owner.IdentityPublicKeyString()].CodexConfig,
+		ownerNodeCfgFromDB.CodexConfig,
+	)
+
+	bobNodeCfgFromDB, err := s.bob.settings.GetNodeConfig()
+	s.Require().NoError(err)
+	s.Assert().Equal(
+		s.nodeConfigs[s.bob.IdentityPublicKeyString()].CodexConfig,
+		bobNodeCfgFromDB.CodexConfig,
+	)
+
+	// now to be specific
+	s.Assert().False(ownerNodeCfgFromDB.CodexConfig.Enabled)
+	s.Assert().False(bobNodeCfgFromDB.CodexConfig.Enabled)
+
+	// s.owner.settings.SaveSetting("node-config", ownerNodeCfgFromDB)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestDeleteChannelWithTokenPermission() {
