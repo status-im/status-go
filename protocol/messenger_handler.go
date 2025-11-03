@@ -3739,6 +3739,7 @@ func (m *Messenger) HandleCommunityMessageArchiveIndexCid(state *ReceivedMessage
 	}
 	if archiveDistributionPreference == communities.ArchiveDistributionMethodTorrent {
 		// Ignore Cid messages when torrent distribution is selected
+		m.logger.Debug("skipping cid processing due to torrent-only preference")
 		return nil
 	}
 	return m.HandleHistoryArchiveIndexCidMessage(state, state.CurrentMessageState.PublicKey, message.Cid, message.Clock)
@@ -3750,7 +3751,8 @@ func (m *Messenger) HandleCommunityMessageArchiveMagnetlink(state *ReceivedMessa
 		return err
 	}
 	if archiveDistributionPreference == communities.ArchiveDistributionMethodCodex {
-		// Ignore Cid messages when codex distribution is selected
+		// Ignore magnetlink messages when codex distribution is selected
+		m.logger.Debug("skipping magnetlink processing due to codex-only preference")
 		return nil
 	}
 	return m.HandleHistoryArchiveMagnetlinkMessage(state, state.CurrentMessageState.PublicKey, message.MagnetUri, message.Clock)
