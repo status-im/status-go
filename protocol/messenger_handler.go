@@ -1259,35 +1259,9 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 	}
 
 	if m.archiveManager.IsReady() && settings.HistoryArchiveSupportEnabled {
-		// Determine preference before any processing
-		preference, err := m.communitiesManager.GetArchiveDistributionPreference(id)
-		if err != nil {
-			m.logger.Warn("failed to get archive distribution preference, using auto", zap.Error(err))
-			preference = "auto"
-		}
-
-		// Skip magnetlink processing entirely if preference is codex-only
-		if preference == "codex" {
-			m.logger.Debug("skipping magnetlink processing due to codex-only preference")
-			return nil
-		}
-
 		lastMagnetlinkClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
 		if err != nil {
 			return err
-		}
-		lastIndexCidClock, err := m.communitiesManager.GetIndexCidMessageClock(id)
-		if err != nil {
-			return err
-		}
-
-		var lastClock uint64
-		if preference == "torrent" {
-			// In torrent mode, only compare against magnetlink clock
-			lastClock = lastMagnetlinkClock
-		} else {
-			// In auto mode, use the maximum of both clocks
-			lastClock = max(lastIndexCidClock, lastMagnetlinkClock)
 		}
 
 		lastSeenMagnetlink, err := m.communitiesManager.GetLastSeenMagnetlink(id)
@@ -1297,7 +1271,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		// We are only interested in a community archive magnet link
 		// if it originates from a community that the current account is
 		// part of and doesn't own the private key at the same time
-		if !community.IsControlNode() && community.Joined() && clock >= lastClock {
+		if !community.IsControlNode() && community.Joined() && clock >= lastMagnetlinkClock {
 			if lastSeenMagnetlink == magnetlink {
 				m.logger.Debug("already processed this magnetlink")
 				return nil
@@ -1363,35 +1337,9 @@ func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageSt
 	}
 
 	if m.archiveManager.IsReady() && settings.HistoryArchiveSupportEnabled {
-		// Determine preference before any processing
-		preference, err := m.communitiesManager.GetArchiveDistributionPreference(id)
-		if err != nil {
-			m.logger.Warn("failed to get archive distribution preference, using auto", zap.Error(err))
-			preference = "auto"
-		}
-
-		// Skip indexCid processing entirely if preference is torrent-only
-		if preference == "torrent" {
-			m.logger.Debug("skipping index CID processing due to torrent-only preference")
-			return nil
-		}
-
 		lastIndexCidClock, err := m.communitiesManager.GetIndexCidMessageClock(id)
 		if err != nil {
 			return err
-		}
-		lastMagnetlinkClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
-		if err != nil {
-			return err
-		}
-
-		var lastClock uint64
-		if preference == "codex" {
-			// In codex mode, only compare against indexCid clock
-			lastClock = lastIndexCidClock
-		} else {
-			// In auto mode, use the maximum of both clocks
-			lastClock = max(lastMagnetlinkClock, lastIndexCidClock)
 		}
 
 		lastSeenCid, err := m.communitiesManager.GetLastSeenIndexCid(id)
@@ -1401,7 +1349,7 @@ func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageSt
 		// We are only interested in a community archive index CID
 		// if it originates from a community that the current account is
 		// part of and doesn't own the private key at the same time
-		if !community.IsControlNode() && community.Joined() && clock >= lastClock {
+		if !community.IsControlNode() && community.Joined() && clock >= lastIndexCidClock {
 			if lastSeenCid == cid {
 				m.logger.Debug("already processed this index cid")
 				return nil
@@ -3785,10 +3733,26 @@ func (m *Messenger) HandleSyncTrustedUser(state *ReceivedMessageState, message *
 }
 
 func (m *Messenger) HandleCommunityMessageArchiveIndexCid(state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveIndexCid, statusMessage *messagingtypes.Message) error {
+	archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
+	if err != nil {
+		return err
+	}
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodTorrent {
+		// Ignore Cid messages when torrent distribution is selected
+		return nil
+	}
 	return m.HandleHistoryArchiveIndexCidMessage(state, state.CurrentMessageState.PublicKey, message.Cid, message.Clock)
 }
 
 func (m *Messenger) HandleCommunityMessageArchiveMagnetlink(state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveMagnetlink, statusMessage *messagingtypes.Message) error {
+	archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
+	if err != nil {
+		return err
+	}
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodCodex {
+		// Ignore Cid messages when codex distribution is selected
+		return nil
+	}
 	return m.HandleHistoryArchiveMagnetlinkMessage(state, state.CurrentMessageState.PublicKey, message.MagnetUri, message.Clock)
 }
 

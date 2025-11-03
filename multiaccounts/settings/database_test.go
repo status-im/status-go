@@ -20,7 +20,8 @@ import (
 
 var (
 	config = params.NodeConfig{
-		NetworkID: 10,
+		NetworkID:                            10,
+		HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference,
 	}
 
 	networks = json.RawMessage("{}")

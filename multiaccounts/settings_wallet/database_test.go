@@ -14,8 +14,9 @@ import (
 
 var (
 	config = params.NodeConfig{
-		NetworkID:   10,
-		RootDataDir: "test",
+		NetworkID:                            10,
+		RootDataDir:                          "test",
+		HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference,
 	}
 	networks    = json.RawMessage("{}")
 	settingsObj = settings.Settings{

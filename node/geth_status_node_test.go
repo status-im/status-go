@@ -63,7 +63,8 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 	require.NoError(t, err)
 
 	config := params.NodeConfig{
-		RootDataDir: dir,
+		RootDataDir:                          dir,
+		HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference,
 	}
 
 	n, stop1, stop2, err := createStatusNode()

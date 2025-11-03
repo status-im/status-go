@@ -583,7 +583,7 @@ func (b *GethStatusBackend) workaroundToFixBadMigration(request *requests.Login)
 	if currentConf.NetworkID == 0 &&
 		currentConf.NodeKey == "" {
 		// check if exist old node config
-		oldNodeConf := &params.NodeConfig{}
+		oldNodeConf := &params.NodeConfig{HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference}
 		err = b.appDB.QueryRow("SELECT node_config FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: oldNodeConf})
 		if err != nil && err != sql.ErrNoRows {
 			return err
@@ -692,7 +692,8 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	defaultCfg := &params.NodeConfig{
 		// why we need this? relate PR: https://github.com/status-im/status-go/pull/4014
-		KeycardPairingDataFile: filepath.Join(b.rootDataDir, DefaultKeycardPairingDataFileRelativePath),
+		KeycardPairingDataFile:               filepath.Join(b.rootDataDir, DefaultKeycardPairingDataFileRelativePath),
+		HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference,
 	}
 
 	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)

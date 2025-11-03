@@ -207,8 +207,13 @@ type NodeConfig struct {
 	// ConnectorConfig extra configuration for connector.Service
 	ConnectorConfig ConnectorConfig
 
+	// node-wide selection for history archive distribution preference
+	HistoryArchiveDistributionPreference string
+
+	// TorrentConfig provides configuration for the BitTorrent client used for message history archives.
 	TorrentConfig TorrentConfig
 
+	// CodexConfig provides configuration for the Codex history archive.
 	CodexConfig CodexConfig
 
 	OutputMessageCSVEnabled bool
@@ -330,6 +335,12 @@ type CodexConfig struct {
 	CodexNodeConfig       codex.Config
 }
 
+const (
+	ArchiveDistributionMethodTorrent            = "torrent"
+	ArchiveDistributionMethodCodex              = "codex"
+	DefaultHistoryArchiveDistributionPreference = ArchiveDistributionMethodCodex
+)
+
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
 func (c *ShhextConfig) Validate(validate *validator.Validate) error {
 	if err := validate.Struct(c); err != nil {
@@ -360,13 +371,35 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 		c.APIModules = "net,web3,eth"
 	}
 
-	// Ensure TorrentConfig is valid
+	if c.HistoryArchiveDistributionPreference == "" {
+		c.HistoryArchiveDistributionPreference = DefaultHistoryArchiveDistributionPreference
+	}
+
 	if c.TorrentConfig.Enabled {
-		if c.TorrentConfig.DataDir == "" {
-			c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, ArchivesRelativePath)
+		c.HistoryArchiveDistributionPreference = ArchiveDistributionMethodTorrent
+	} else if c.CodexConfig.Enabled {
+		c.HistoryArchiveDistributionPreference = ArchiveDistributionMethodCodex
+	}
+
+	if c.HistoryArchiveDistributionPreference == ArchiveDistributionMethodTorrent {
+		if c.TorrentConfig.Enabled {
+			if c.TorrentConfig.DataDir == "" {
+				c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, ArchivesRelativePath)
+			}
+			if c.TorrentConfig.TorrentDir == "" {
+				c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, TorrentTorrentsRelativePath)
+			}
 		}
-		if c.TorrentConfig.TorrentDir == "" {
-			c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, TorrentTorrentsRelativePath)
+	}
+
+	if c.HistoryArchiveDistributionPreference == ArchiveDistributionMethodCodex {
+		if c.CodexConfig.Enabled {
+			if c.CodexConfig.HistoryArchiveDataDir == "" {
+				c.CodexConfig.HistoryArchiveDataDir = filepath.Join(c.RootDataDir, "codex", "archivedata")
+			}
+			if c.CodexConfig.CodexNodeConfig.DataDir == "" {
+				c.CodexConfig.CodexNodeConfig.DataDir = filepath.Join(c.RootDataDir, "codex", "codexdata")
+			}
 		}
 	}
 
@@ -383,15 +416,16 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 	}
 
 	config := &NodeConfig{
-		NetworkID:              networkID,
-		RootDataDir:            dataDir,
-		KeycardPairingDataFile: keycardPairingDataFile,
-		HTTPHost:               "localhost",
-		HTTPPort:               8545,
-		HTTPVirtualHosts:       []string{"localhost"},
-		APIModules:             "eth,net,web3,peer,wallet",
-		LogFile:                "",
-		LogLevel:               "ERROR",
+		NetworkID:                            networkID,
+		RootDataDir:                          dataDir,
+		KeycardPairingDataFile:               keycardPairingDataFile,
+		HTTPHost:                             "localhost",
+		HTTPPort:                             8545,
+		HTTPVirtualHosts:                     []string{"localhost"},
+		APIModules:                           "eth,net,web3,peer,wallet",
+		LogFile:                              "",
+		LogLevel:                             "ERROR",
+		HistoryArchiveDistributionPreference: DefaultHistoryArchiveDistributionPreference,
 		WakuV2Config: WakuV2Config{
 			Host: "0.0.0.0",
 			Port: 0,
@@ -407,9 +441,10 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			Enabled:               false,
 			HistoryArchiveDataDir: filepath.Join(dataDir, "codex", "archivedata"),
 			CodexNodeConfig: codex.Config{
-				BlockRetries:   50,
+				BlockRetries:   BlockRetries,
 				DataDir:        filepath.Join(dataDir, "codex", "codexdata"),
 				MetricsEnabled: false,
+				LogFormat:      codex.LogFormatNoColors,
 			},
 		},
 	}

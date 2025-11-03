@@ -46,7 +46,7 @@ func TestMoveWalletAccount(t *testing.T) {
 	setting := settings.Settings{
 		Networks: &networks,
 	}
-	config := params.NodeConfig{}
+	config := params.NodeConfig{HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference}
 	err := db.CreateSettings(setting, config)
 	require.NoError(t, err)
 

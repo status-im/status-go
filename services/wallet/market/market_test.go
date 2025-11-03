@@ -37,7 +37,8 @@ func setupTokenManager(t *testing.T) (*token.Manager, func()) {
 	accDb, err := accounts.NewDB(appDb)
 	require.NoError(t, err)
 	config := params.NodeConfig{
-		NetworkID: 10,
+		NetworkID:                            10,
+		HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference,
 	}
 	networks := json.RawMessage("{}")
 	settingsObj := settings.Settings{

@@ -24,7 +24,8 @@ func setupTestDB(t *testing.T, db *sql.DB) (*accounts.Database, func()) {
 	acc, err := accounts.NewDB(db)
 	require.NoError(t, err)
 	config := params.NodeConfig{
-		NetworkID: 10,
+		NetworkID:                            10,
+		HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference,
 	}
 	networks := json.RawMessage("{}")
 	settingsObj := settings.Settings{

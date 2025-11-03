@@ -31,7 +31,8 @@ func initSettings(appDb *sql.DB, autoRefreshEnabled bool) (*settings.Database, e
 
 	var (
 		config = params.NodeConfig{
-			NetworkID: 10,
+			NetworkID:                            10,
+			HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference,
 		}
 		networks    = json.RawMessage("{}")
 		settingsObj = settings.Settings{
