@@ -55,7 +55,7 @@ func getTokenSymbols(t *testing.T) []string {
 	networkManager.EXPECT().GetEmbeddedNetworks().Return(networksList).AnyTimes()
 
 	// Skeleton token store to get full list of tokens
-	tm := token.NewTokenManager(walletDB, nil, nil, networkManager, appDB, nil, nil, nil, nil)
+	tm := token.NewTokenManager(walletDB, nil, nil, networkManager, appDB, nil, nil, nil, nil, nil)
 
 	tokens, err := tm.GetAllTokens()
 	require.NoError(t, err)
