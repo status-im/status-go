@@ -579,7 +579,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchCommunitiesToUnmute()
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
-	m.watchWalletBalances()
 	m.watchPendingCommunityRequestToJoin()
 	m.broadcastLatestUserStatus()
 	m.timeoutAutomaticStatusUpdates()

@@ -7,12 +7,8 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"go.uber.org/zap"
-
-	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/constants"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
@@ -22,66 +18,8 @@ import (
 )
 
 var (
-	checkBalancesInterval = time.Minute * 10
-
 	ErrCannotChangeKeypairName = errors.New("cannot change profile keypair name")
 )
-
-func (m *Messenger) retrieveWalletBalances() error {
-	if m.walletAPI == nil {
-		m.logger.Warn("wallet api not enabled")
-	}
-	accounts, err := m.settings.GetActiveAccounts()
-	if err != nil {
-		return err
-	}
-
-	if len(accounts) == 0 {
-		m.logger.Info("no accounts to sync wallet balance")
-	}
-
-	var ethAccounts []ethcommon.Address
-
-	for _, acc := range accounts {
-		m.logger.Info("syncing wallet address", zap.String("account", acc.Address.Hex()))
-		ethAccounts = append(ethAccounts, ethcommon.BytesToAddress(acc.Address.Bytes()))
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-	defer cancel()
-
-	// TODO: publish tokens as a signal
-	_, err = m.walletAPI.FetchOrGetCachedWalletBalances(ctx, ethAccounts, false)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *Messenger) watchWalletBalances() {
-	m.logger.Info("watching wallet balances")
-
-	if m.walletAPI == nil {
-		m.logger.Warn("wallet service not enabled")
-		return
-	}
-	go func() {
-		defer gocommon.LogOnPanic()
-		for {
-			select {
-			case <-time.After(checkBalancesInterval):
-
-				err := m.retrieveWalletBalances()
-				if err != nil {
-					m.logger.Error("failed to retrieve wallet balances", zap.Error(err))
-				}
-			case <-m.quit:
-				return
-			}
-		}
-	}()
-}
 
 func (m *Messenger) UpdateKeypairName(keyUID string, name string) error {
 	if keyUID == m.account.KeyUID && name != m.account.Name {
