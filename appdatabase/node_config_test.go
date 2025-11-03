@@ -9,6 +9,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/nodecfg"
@@ -55,6 +56,15 @@ func randomNodeConfig() *params.NodeConfig {
 		WakuV2Config: params.WakuV2Config{
 			LightClient: randomBool(),
 		},
+		CodexConfig: params.CodexConfig{
+			Enabled: randomBool(),
+			Config: codex.Config{
+				DataDir:       randomString(),
+				DiscoveryPort: randomInt(65535),
+				BlockRetries:  randomInt(10),
+				LogLevel:      randomString(),
+			},
+		},
 	}
 }
 
@@ -66,6 +76,7 @@ func TestGetNodeConfig(t *testing.T) {
 
 	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
 	require.NoError(t, err)
+
 	require.Equal(t, nodeConfig, dbNodeConfig)
 }
 
