@@ -269,7 +269,7 @@ github.com/cockroachdb/redact/internal/rfmt/fmtsort
 # github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06
 ## explicit; go 1.19
 github.com/cockroachdb/tokenbucket
-# github.com/codex-storage/codex-go-bindings v0.0.25
+# github.com/codex-storage/codex-go-bindings v0.0.26
 ## explicit; go 1.24.0
 github.com/codex-storage/codex-go-bindings/codex
 # github.com/consensys/gnark-crypto v0.18.0
