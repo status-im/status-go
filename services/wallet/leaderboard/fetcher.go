@@ -3,6 +3,7 @@ package leaderboard
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -176,22 +177,25 @@ func (f *ProxyFetcher) FetchPrices(ctx context.Context) error {
 	}
 
 	type ProxyPriceData struct {
-		ID                       string  `json:"id"`
 		CurrentPrice             float64 `json:"price"`
+		MarketCap                float64 `json:"market_cap"`
+		Volume24h                float64 `json:"volume_24h"`
 		PriceChangePercentage24h float64 `json:"percent_change_24h"`
 	}
 
 	var tempPriceMap map[string]ProxyPriceData
-
 	if err := json.Unmarshal(body, &tempPriceMap); err != nil {
-		return err
+		return fmt.Errorf("failed to unmarshal price data: %w", err)
 	}
 
 	priceData := PriceMap{}
 	for key, tempPrice := range tempPriceMap {
+		// The key is the cryptocurrency ID (e.g., "bitcoin", "ethereum")
 		priceData[key] = PriceData{
-			ID:               tempPrice.ID,
+			ID:               key,
 			Price:            tempPrice.CurrentPrice,
+			MarketCap:        tempPrice.MarketCap,
+			Volume24h:        tempPrice.Volume24h,
 			PercentChange24h: tempPrice.PriceChangePercentage24h,
 		}
 	}
