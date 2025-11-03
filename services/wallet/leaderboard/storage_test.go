@@ -62,16 +62,22 @@ var mockCrypto = []Cryptocurrency{
 }
 
 var mockPriceData = map[string]PriceData{
-	"BTC": {
+	"bitcoin": {
 		Price:            79451,
+		MarketCap:        1577274527423,
+		Volume24h:        78498730801,
 		PercentChange24h: 6.49692,
 	},
-	"ETH": {
+	"ethereum": {
 		Price:            1576.35,
+		MarketCap:        190254450318,
+		Volume24h:        38689205530,
 		PercentChange24h: 9.82681,
 	},
-	"ADA": {
+	"cardano": {
 		Price:            0.3742,
+		MarketCap:        13200401234.55,
+		Volume24h:        238203495.91,
 		PercentChange24h: 0.0041,
 	},
 }
@@ -88,6 +94,8 @@ func insertCryptoDataToDatabase(t *testing.T, db *sql.DB, cryptoData []Cryptocur
 func verifyCryptoPriceData(t *testing.T, expected PriceData, actual Cryptocurrency) {
 	t.Helper()
 	require.Equal(t, expected.Price, actual.CurrentPrice)
+	require.Equal(t, expected.MarketCap, actual.MarketCap)
+	require.Equal(t, expected.Volume24h, actual.TotalVolume)
 	require.Equal(t, expected.PercentChange24h, actual.PriceChangePercentage24h)
 }
 
@@ -186,8 +194,8 @@ func TestGetLeaderboardPageWithUpdatedPrices(t *testing.T) {
 		require.Equal(t, "usd", rst.Currency)
 		require.Equal(t, 3, len(rst.Data))
 		require.Equal(t, mockCrypto[2], rst.Data[2])
-		verifyCryptoPriceData(t, mockPriceData["BTC"], rst.Data[0])
-		verifyCryptoPriceData(t, mockPriceData["ETH"], rst.Data[1])
+		verifyCryptoPriceData(t, mockPriceData["bitcoin"], rst.Data[0])
+		verifyCryptoPriceData(t, mockPriceData["ethereum"], rst.Data[1])
 	}
 }
 
