@@ -117,7 +117,3 @@ pkg/sentry/SENTRY_PRODUCTION
 
 go.work
 go.work.sum
-
-services/wallet/token/local-token-lists/default-lists/status.go
-services/wallet/token/local-token-lists/default-lists/coingecko_*.go
-services/wallet/token/local-token-lists/default-lists/uniswap.go
