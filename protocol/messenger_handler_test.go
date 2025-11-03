@@ -226,18 +226,22 @@ func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithC
 
 	err = s.m.archiveManager.StartCodexClient()
 	s.Require().NoError(err)
-	defer s.m.archiveManager.Stop()
+	defer func() {
+		_ = s.m.archiveManager.Stop()
+	}()
 
 	s.Require().True(s.m.archiveManager.IsReady())
 
 	community := response.Communities()[0]
-	s.m.communitiesManager.SaveCommunitySettings(communities.CommunitySettings{
+	err = s.m.communitiesManager.SaveCommunitySettings(communities.CommunitySettings{
 		CommunityID:                  community.IDString(),
 		HistoryArchiveSupportEnabled: true,
 	})
+	s.Require().NoError(err)
 	// not valid after new distribution preference implementation
 	// s.m.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodCodex)
-	s.m.communitiesManager.SetArchiveDistributionPreference(params.ArchiveDistributionMethodCodex)
+	err = s.m.communitiesManager.SetArchiveDistributionPreference(params.ArchiveDistributionMethodCodex)
+	s.Require().NoError(err)
 
 	var buf bytes.Buffer
 	core := zapcore.NewCore(
