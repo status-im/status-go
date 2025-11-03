@@ -235,14 +235,24 @@ func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithC
 		CommunityID:                  community.IDString(),
 		HistoryArchiveSupportEnabled: true,
 	})
-	s.m.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodCodex)
+	// not valid after new distribution preference implementation
+	// s.m.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodCodex)
+	s.m.communitiesManager.SetArchiveDistributionPreference(params.ArchiveDistributionMethodCodex)
 
 	var buf bytes.Buffer
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()), zapcore.AddSync(&buf), zap.DebugLevel)
 	s.m.logger = zap.New(core)
 
-	err = s.m.HandleHistoryArchiveMagnetlinkMessage(state, &community.PrivateKey().PublicKey, "", 100)
+	message := &protobuf.CommunityMessageArchiveMagnetlink{
+		MagnetUri: "magnet:?xt=urn:btih:d58f7e0c4e3b3f1e8e4f8e4e8e4f8e4e8e4f8e4e",
+	}
+
+	state.CurrentMessageState.PublicKey = &community.PrivateKey().PublicKey
+
+	// detecting archive distribution preference now happens earlier
+	// err = s.m.HandleHistoryArchiveMagnetlinkMessage(state, &community.PrivateKey().PublicKey, "", 100)
+	err = s.m.HandleCommunityMessageArchiveMagnetlink(state, message, nil)
 	s.Require().NoError(err)
 	s.Require().Contains(buf.String(), "skipping magnetlink processing due to codex-only preference")
 }
