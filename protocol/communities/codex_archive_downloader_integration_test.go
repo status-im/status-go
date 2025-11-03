@@ -84,34 +84,6 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 		exists, err := suite.client.HasCid(cid)
 		require.NoError(suite.T(), err, "Failed to check CID existence for %s", archive.hash)
 		require.True(suite.T(), exists, "CID %s should exist after upload", cid)
-
-		// try to download immediately to verify
-		require.Eventually(suite.T(), func() bool {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-
-			var downloadBuf bytes.Buffer
-			err := suite.client.LocalDownloadWithContext(ctx, cid, &downloadBuf)
-			if err != nil {
-				suite.T().Logf("LocalDownloadWithContext error for %s: %v", cid, err)
-				return false
-			}
-
-			downloadedData := downloadBuf.Bytes()
-			if len(downloadedData) != len(archive.data) {
-				suite.T().Logf("Downloaded %d bytes for %s (expected %d), retrying...",
-					len(downloadedData), cid, len(archive.data))
-				return false
-			}
-
-			if !bytes.Equal(archive.data, downloadedData) {
-				suite.T().Logf("Downloaded data mismatch for %s, retrying...", cid)
-				return false
-			}
-
-			suite.T().Logf("✅ Verified content for %s: %d bytes match", cid, len(downloadedData))
-			return true
-		}, 30*time.Second, time.Second, "Local download should eventually match original for %s", cid)
 	}
 
 	// Step 2: Create archive index for CodexArchiveDownloader
@@ -222,32 +194,22 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 			}
 		}
 
-		require.Eventually(suite.T(), func() bool {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
+		// Create context with timeout for download
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 
-			var downloadBuf bytes.Buffer
-			err := suite.client.LocalDownloadWithContext(ctx, cid, &downloadBuf)
-			if err != nil {
-				suite.T().Logf("LocalDownloadWithContext error for %s: %v", completedHash, err)
-				return false
-			}
+		var downloadBuf bytes.Buffer
+		err := suite.client.LocalDownloadWithContext(ctx, cid, &downloadBuf)
+		cancel()
 
-			downloadedData := downloadBuf.Bytes()
-			if len(downloadedData) != len(originalData) {
-				suite.T().Logf("Downloaded %d bytes for %s (expected %d), retrying...",
-					len(downloadedData), completedHash, len(originalData))
-				return false
-			}
+		require.NoError(suite.T(), err, "LocalDownload should succeed for %s", completedHash)
 
-			if !bytes.Equal(originalData, downloadedData) {
-				suite.T().Logf("Downloaded data mismatch for %s, retrying...", completedHash)
-				return false
-			}
+		downloadedData := downloadBuf.Bytes()
+		assert.Equal(suite.T(), len(originalData), len(downloadedData),
+			"Downloaded data length should match for %s", completedHash)
+		assert.True(suite.T(), bytes.Equal(originalData, downloadedData),
+			"Downloaded data should match original for %s", completedHash)
 
-			suite.T().Logf("✅ Verified content for %s: %d bytes match", completedHash, len(downloadedData))
-			return true
-		}, 30*time.Second, time.Second, "Local download should eventually match original for %s", completedHash)
+		suite.T().Logf("✅ Verified content for %s: %d bytes match", completedHash, len(downloadedData))
 	}
 
 	suite.T().Log("🎉 Full archive download workflow completed successfully!")
