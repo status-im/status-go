@@ -353,7 +353,7 @@ else
 CODEX_OS := $(detected_OS)
 endif
 
-CODEX_VERSION ?= "v0.0.24"
+CODEX_VERSION := $(shell go list -m -f '{{.Version}}' github.com/codex-storage/codex-go-bindings 2>/dev/null)
 CODEX_DOWNLOAD_URL := "https://github.com/codex-storage/codex-go-bindings/releases/download/$(CODEX_VERSION)/codex-${CODEX_OS}-${CODEX_ARCH}.zip"
 
 fetch-libcodex:
@@ -567,7 +567,7 @@ lint: generate lint-panics
 lint:
 	$(CGO_ENV) golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
 
-clean: ##@other Cleanup
+clean: clean-libcodex | ##@other Cleanup
 	rm -fr build/bin/*
 
 git-clean:
