@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -2349,21 +2350,25 @@ func PrintArchiveIndex(index *protobuf.CodexWakuMessageArchiveIndex) {
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedCodexArchiveMessages() {
 
-	dataDir := os.TempDir() + "/archivedata"
+	archiveDataDir := filepath.Join(os.TempDir(), "codex", "archivedata")
+	codexDataDir := filepath.Join(os.TempDir(), "codex", "codexdata")
 
-	log.Println("Data directory:", dataDir)
+	log.Println("Data directory:", archiveDataDir)
 
 	codexConfig := params.CodexConfig{
-		Enabled: false,
-		Config: codex.Config{
-			DataDir:      dataDir,
+		Enabled:               false,
+		HistoryArchiveDataDir: archiveDataDir,
+		CodexNodeConfig: codex.Config{
+			DataDir:      codexDataDir,
 			BlockRetries: 10,
 			LogLevel:     "ERROR",
 			LogFormat:    codex.LogFormatNoColors,
+			Nat:          "none",
 		},
 	}
 
 	// Share archive directory between all users
+	// so that bob can access owner's created archive
 	s.owner.archiveManager.SetCodexConfig(&codexConfig)
 	s.bob.archiveManager.SetCodexConfig(&codexConfig)
 
@@ -2371,7 +2376,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedCodexArch
 	s.Require().NoError(err)
 	codexClient := s.owner.archiveManager.GetCodexClient()
 	s.Require().NotNil(codexClient)
-	// defer codexClient.Stop() //nolint: errcheck
+	// no need to stop codex client, as it will be stopped during messenger Stop
 	// defer codexClient.Stop() //nolint: errcheck
 
 	s.bob.archiveManager.SetCodexClient(codexClient)
@@ -2467,32 +2472,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedCodexArch
 	topic := messagingtypes.BytesToContentTopic(messaging.ToContentTopic(chat.ID))
 	communityCommonTopic := messagingtypes.BytesToContentTopic(messaging.ToContentTopic(community.UniversalChatID()))
 	topics := []messagingtypes.ContentTopic{topic, communityCommonTopic}
-
-	// dataDir := os.TempDir() + "/archivedata"
-
-	// log.Println("Data directory:", dataDir)
-
-	// codexConfig := params.CodexConfig{
-	// 	Enabled: false,
-	// 	Config: codex.Config{
-	// 		DataDir:      dataDir,
-	// 		BlockRetries: 10,
-	// 		LogLevel:     "ERROR",
-	// 		LogFormat:    codex.LogFormatNoColors,
-	// 	},
-	// }
-
-	// // Share archive directory between all users
-	// s.owner.archiveManager.SetCodexConfig(&codexConfig)
-	// s.bob.archiveManager.SetCodexConfig(&codexConfig)
-
-	// err = s.owner.archiveManager.StartCodexClient()
-	// s.Require().NoError(err)
-	// codexClient := s.owner.archiveManager.GetCodexClient()
-	// s.Require().NotNil(codexClient)
-	// defer codexClient.Stop() //nolint: errcheck
-
-	// s.bob.archiveManager.SetCodexClient(codexClient)
 
 	s.owner.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 	s.bob.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
@@ -2607,6 +2586,18 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedCodexArch
 	log.Printf("Received message: %+v, ok: %v", receivedMessage1, ok)
 	s.Require().True(ok)
 	s.Require().Equal(messageText1, receivedMessage1.Text)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestLoadingConfigFromDatabase() {
+	// The messengers used in the tests in this suite use the helper newTestMessenger (protocol/messenger_builder_test.go). In the config setup (config.complete), tmc.nodeConfig defaults to an empty params.NodeConfig{} unless the test overrides it. The default params.NodeConfig zero-value has all nested configs (including CodexConfig.Enabled) set to false.
+
+	// During newTestMessenger, the in-memory appDb is migrated and then sDB.CreateSettings(*config.appSettings, *config.nodeConfig) is called (messenger_builder_test.go (line 120)). If you don’t override config.nodeConfig beforehand, this writes CodexConfig.Enabled = false into the node-config tables—mirroring what a brand-new install would do.
+
+	// So TestImportDecryptedCodexArchiveMessages starts from that baseline: the in-memory DB contains the node config seeded with CodexConfig.Enabled false (unless you explicitly mutate it in the test).
+
+	// Following the above reaoning, we read the config from the database and verify that CodexConfig setting are what we expect them to be.
+
+	// s.owner.
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestDeleteChannelWithTokenPermission() {

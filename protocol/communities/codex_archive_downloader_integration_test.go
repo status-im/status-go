@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,21 +25,20 @@ import (
 // against a real Codex instance
 type CodexArchiveDownloaderIntegrationSuite struct {
 	suite.Suite
+	client       communities.CodexClient
 	uploadedCIDs []string // Track uploaded CIDs for cleanup
 }
 
 // SetupSuite runs once before all tests in the suite
-func (suite *CodexArchiveDownloaderIntegrationSuite) SetupSuite() {
-	// Nothing to do
+func (suite *CodexArchiveDownloaderIntegrationSuite) SetupTest() {
+	suite.client = NewCodexClientTest(suite.T())
 }
 
-// TearDownSuite runs once after all tests in the suite
-func (suite *CodexArchiveDownloaderIntegrationSuite) TearDownSuite() {
-	client := NewCodexClientTest(suite.T())
-
+// TearDownSuite runs once after each test in the suite
+func (suite *CodexArchiveDownloaderIntegrationSuite) TearDownTest() {
 	// Clean up all uploaded CIDs
 	for _, cid := range suite.uploadedCIDs {
-		if err := client.RemoveCid(cid); err != nil {
+		if err := suite.client.RemoveCid(cid); err != nil {
 			suite.T().Logf("Warning: Failed to remove CID %s: %v", cid, err)
 		} else {
 			suite.T().Logf("Successfully removed CID: %s", cid)
@@ -47,7 +47,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TearDownSuite() {
 }
 
 func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWorkflow() {
-	client := NewCodexClientTest(suite.T())
+	// client := NewCodexClientTest(suite.T())
 
 	// Step 1: Create test archive data and upload multiple archives to Codex
 	archives := []struct {
@@ -73,7 +73,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 
 	// Upload all archives to Codex
 	for _, archive := range archives {
-		cid, err := client.Upload(bytes.NewReader(archive.data), archive.hash+".bin")
+		cid, err := suite.client.Upload(bytes.NewReader(archive.data), archive.hash+".bin")
 		require.NoError(suite.T(), err, "Failed to upload %s", archive.hash)
 
 		archiveCIDs[archive.hash] = cid
@@ -81,7 +81,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 		suite.T().Logf("Uploaded %s to CID: %s", archive.hash, cid)
 
 		// Verify upload succeeded
-		exists, err := client.HasCid(cid)
+		exists, err := suite.client.HasCid(cid)
 		require.NoError(suite.T(), err, "Failed to check CID existence for %s", archive.hash)
 		require.True(suite.T(), exists, "CID %s should exist after upload", cid)
 	}
@@ -109,7 +109,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 	logger, _ := zap.NewDevelopment() // Use development logger for integration tests
 
 	downloader := communities.NewCodexArchiveDownloader(
-		&client,
+		&suite.client,
 		index,
 		communityID,
 		existingArchiveIDs,
@@ -122,16 +122,21 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 	downloader.SetPollingTimeout(30 * time.Second) // Generous timeout for real network
 
 	// Step 4: Set up callbacks to track progress
+	var trackerMu sync.Mutex
 	startedArchives := make(map[string]bool)
 	completedArchives := make(map[string]bool)
 
 	downloader.SetOnStartingArchiveDownload(func(hash string, from, to uint64) {
+		trackerMu.Lock()
 		startedArchives[hash] = true
+		trackerMu.Unlock()
 		suite.T().Logf("🚀 Started downloading archive: %s (from %d to %d)", hash, from, to)
 	})
 
 	downloader.SetOnArchiveDownloaded(func(hash string, from, to uint64) {
+		trackerMu.Lock()
 		completedArchives[hash] = true
+		trackerMu.Unlock()
 		suite.T().Logf("✅ Completed downloading archive: %s (from %d to %d)", hash, from, to)
 	})
 
@@ -162,6 +167,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 	assert.Equal(suite.T(), 0, downloader.GetPendingArchivesCount(), "Should have no pending archives")
 
 	// Verify all archives were processed
+	trackerMu.Lock()
 	assert.Len(suite.T(), startedArchives, 3, "Should have started 3 archives")
 	assert.Len(suite.T(), completedArchives, 3, "Should have completed 3 archives")
 
@@ -169,12 +175,15 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 		assert.Contains(suite.T(), startedArchives, archive.hash, "Should have started %s", archive.hash)
 		assert.Contains(suite.T(), completedArchives, archive.hash, "Should have completed %s", archive.hash)
 	}
+	trackerMu.Unlock()
 
 	// Step 9: Verify we can download the actual archive content using LocalDownloadWithContext
 	suite.T().Log("🔍 Verifying archive content can be downloaded...")
 
 	for completedHash := range completedArchives {
 		cid := archiveCIDs[completedHash]
+
+		suite.T().Logf("Downloading and verifying content for archive: %s (CID: %s)", completedHash, cid)
 
 		// Find the original archive data for comparison
 		var originalData []byte
@@ -185,22 +194,32 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 			}
 		}
 
-		// Create context with timeout for download
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		require.Eventually(suite.T(), func() bool {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
 
-		var downloadBuf bytes.Buffer
-		err := client.LocalDownloadWithContext(ctx, cid, &downloadBuf)
-		cancel()
+			var downloadBuf bytes.Buffer
+			err := suite.client.LocalDownloadWithContext(ctx, cid, &downloadBuf)
+			if err != nil {
+				suite.T().Logf("LocalDownloadWithContext error for %s: %v", completedHash, err)
+				return false
+			}
 
-		require.NoError(suite.T(), err, "LocalDownload should succeed for %s", completedHash)
+			downloadedData := downloadBuf.Bytes()
+			if len(downloadedData) != len(originalData) {
+				suite.T().Logf("Downloaded %d bytes for %s (expected %d), retrying...",
+					len(downloadedData), completedHash, len(originalData))
+				return false
+			}
 
-		downloadedData := downloadBuf.Bytes()
-		assert.Equal(suite.T(), len(originalData), len(downloadedData),
-			"Downloaded data length should match for %s", completedHash)
-		assert.True(suite.T(), bytes.Equal(originalData, downloadedData),
-			"Downloaded data should match original for %s", completedHash)
+			if !bytes.Equal(originalData, downloadedData) {
+				suite.T().Logf("Downloaded data mismatch for %s, retrying...", completedHash)
+				return false
+			}
 
-		suite.T().Logf("✅ Verified content for %s: %d bytes match", completedHash, len(downloadedData))
+			suite.T().Logf("✅ Verified content for %s: %d bytes match", completedHash, len(downloadedData))
+			return true
+		}, 30*time.Second, time.Second, "Local download should eventually match original for %s", completedHash)
 	}
 
 	suite.T().Log("🎉 Full archive download workflow completed successfully!")

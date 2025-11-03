@@ -14,6 +14,7 @@ import (
 	"crypto/ecdsa"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/status-im/status-go/crypto"
@@ -343,8 +344,8 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 		to = endDate
 	}
 
-	codexArchiveDir := m.codexArchiveDirPath(communityID)
-	codexIndexPath := m.codexArchiveIndexFilePath(communityID)
+	codexArchiveDir := m.codexHistoryArchiveDataDirPath(communityID)
+	codexIndexPath := m.codexHistoryArchiveIndexFilePath(communityID)
 
 	m.logger.Debug("codexArchiveDir", zap.String("codexArchiveDir", codexArchiveDir))
 
@@ -558,40 +559,40 @@ func (m *ArchiveFileManager) archiveIndexFile(communityID string) string {
 	return path.Join(m.torrentConfig.DataDir, communityID, "index")
 }
 
-func (m *ArchiveFileManager) codexArchiveDirPath(communityID types.HexBytes) string {
-	return path.Join(m.codexConfig.DataDir, communityID.String())
+func (m *ArchiveFileManager) codexHistoryArchiveDataDirPath(communityID types.HexBytes) string {
+	return filepath.Join(m.codexConfig.HistoryArchiveDataDir, communityID.String())
 }
 
-func (m *ArchiveFileManager) codexArchiveIndexFilePath(communityID types.HexBytes) string {
-	return path.Join(m.codexConfig.DataDir, communityID.String(), "index")
+func (m *ArchiveFileManager) codexHistoryArchiveIndexFilePath(communityID types.HexBytes) string {
+	return filepath.Join(m.codexConfig.HistoryArchiveDataDir, communityID.String(), "index")
 }
 
-func (m *ArchiveFileManager) codexArchiveIndexCidFilePath(communityID types.HexBytes) string {
-	return path.Join(m.codexConfig.DataDir, communityID.String(), "index-cid")
+func (m *ArchiveFileManager) codexHistoryArchiveIndexCidFilePath(communityID types.HexBytes) string {
+	return filepath.Join(m.codexConfig.HistoryArchiveDataDir, communityID.String(), "index-cid")
 }
 
 func (m *ArchiveFileManager) writeCodexIndexToFile(communityID types.HexBytes, bytes []byte) error {
-	indexFilePath := m.codexArchiveIndexFilePath(communityID)
+	indexFilePath := m.codexHistoryArchiveIndexFilePath(communityID)
 	return os.WriteFile(indexFilePath, bytes, 0644) // nolint: gosec
 }
 
 func (m *ArchiveFileManager) readCodexIndexFromFile(communityID types.HexBytes) ([]byte, error) {
-	indexFilePath := m.codexArchiveIndexFilePath(communityID)
+	indexFilePath := m.codexHistoryArchiveIndexFilePath(communityID)
 	return os.ReadFile(indexFilePath)
 }
 
 func (m *ArchiveFileManager) removeCodexIndexFile(communityID types.HexBytes) error {
-	indexFilePath := m.codexArchiveIndexFilePath(communityID)
+	indexFilePath := m.codexHistoryArchiveIndexFilePath(communityID)
 	return os.Remove(indexFilePath)
 }
 
 func (m *ArchiveFileManager) writeCodexIndexCidToFile(communityID types.HexBytes, cid string) error {
-	cidFilePath := m.codexArchiveIndexCidFilePath(communityID)
+	cidFilePath := m.codexHistoryArchiveIndexCidFilePath(communityID)
 	return os.WriteFile(cidFilePath, []byte(cid), 0644) // nolint: gosec
 }
 
 func (m *ArchiveFileManager) readCodexIndexCidFromFile(communityID types.HexBytes) ([]byte, error) {
-	cidFilePath := m.codexArchiveIndexCidFilePath(communityID)
+	cidFilePath := m.codexHistoryArchiveIndexCidFilePath(communityID)
 	return os.ReadFile(cidFilePath)
 }
 
@@ -670,7 +671,7 @@ func (m *ArchiveFileManager) GetHistoryArchiveMagnetlink(communityID types.HexBy
 }
 
 func (m *ArchiveFileManager) GetHistoryArchiveIndexCid(communityID types.HexBytes) (string, error) {
-	codexIndexCidPath := m.codexArchiveIndexCidFilePath(communityID)
+	codexIndexCidPath := m.codexHistoryArchiveIndexCidFilePath(communityID)
 
 	cidData, err := os.ReadFile(codexIndexCidPath)
 	if err != nil {

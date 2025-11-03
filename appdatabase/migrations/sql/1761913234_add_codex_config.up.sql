@@ -1,5 +1,6 @@
 CREATE TABLE codex_config (
   enabled BOOLEAN DEFAULT false,
+  history_archive_data_dir VARCHAR NOT NULL,
   log_level TEXT DEFAULT 'info',
   log_format TEXT DEFAULT 'auto',
   metrics_enabled BOOLEAN DEFAULT false,

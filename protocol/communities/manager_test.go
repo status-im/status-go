@@ -9,6 +9,7 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -493,7 +494,7 @@ func (s *ManagerSuite) TestStartAndStopCodexClient() {
 	s.Require().NotNil(s.archiveManager.codexClient)
 	defer s.archiveManager.Stop() //nolint: errcheck
 
-	_, err = os.Stat(s.archiveManager.codexConfig.DataDir)
+	_, err = os.Stat(s.archiveManager.codexConfig.CodexNodeConfig.DataDir)
 	s.Require().NoError(err)
 	s.Require().Equal(s.archiveManager.isCodexClientStarted, true)
 }
@@ -1658,11 +1659,13 @@ func buildTorrentConfig() *params.TorrentConfig {
 
 func buildCodexConfig(t *testing.T) *params.CodexConfig {
 	return &params.CodexConfig{
-		Enabled: true,
-		Config: codex.Config{
-			DataDir:      t.TempDir() + "/codexdata",
+		Enabled:               true,
+		HistoryArchiveDataDir: filepath.Join(t.TempDir(), "codex", "archivedata"),
+		CodexNodeConfig: codex.Config{
+			DataDir:      filepath.Join(t.TempDir(), "codex", "codexdata"),
 			BlockRetries: 5,
 			LogLevel:     "ERROR",
+			Nat:          "none",
 		},
 	}
 }
