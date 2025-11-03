@@ -324,3 +324,111 @@ func TestGetLeaderboardPageDatabase(t *testing.T) {
 		}
 	}
 }
+
+func TestGetCombinedDataWithPriceUpdates(t *testing.T) {
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	s := NewDataStorage(db)
+
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+	combined := s.GetCombinedData()
+	require.Equal(t, len(mockCrypto), len(combined))
+	require.Equal(t, mockCrypto[0].CurrentPrice, combined[0].CurrentPrice)
+
+	priceDataWithUpdates := map[string]PriceData{
+		"bitcoin": {
+			Price:            80000.0,
+			MarketCap:        1600000000000,
+			Volume24h:        80000000000,
+			PercentChange24h: 7.5,
+		},
+		"ethereum": {
+			Price:            1600.0,
+			MarketCap:        195000000000,
+			Volume24h:        40000000000,
+			PercentChange24h: 10.0,
+		},
+	}
+	s.UpdatePriceDataWithEtag(priceDataWithUpdates, "price-etag")
+
+	combined = s.GetCombinedData()
+	require.Equal(t, len(mockCrypto), len(combined))
+
+	require.Equal(t, priceDataWithUpdates["bitcoin"].Price, combined[0].CurrentPrice)
+	require.Equal(t, priceDataWithUpdates["bitcoin"].MarketCap, combined[0].MarketCap)
+	require.Equal(t, priceDataWithUpdates["bitcoin"].Volume24h, combined[0].TotalVolume)
+	require.Equal(t, priceDataWithUpdates["bitcoin"].PercentChange24h, combined[0].PriceChangePercentage24h)
+
+	require.Equal(t, priceDataWithUpdates["ethereum"].Price, combined[1].CurrentPrice)
+	require.Equal(t, priceDataWithUpdates["ethereum"].MarketCap, combined[1].MarketCap)
+	require.Equal(t, priceDataWithUpdates["ethereum"].Volume24h, combined[1].TotalVolume)
+	require.Equal(t, priceDataWithUpdates["ethereum"].PercentChange24h, combined[1].PriceChangePercentage24h)
+
+	require.Equal(t, mockCrypto[2].CurrentPrice, combined[2].CurrentPrice)
+	require.Equal(t, mockCrypto[2].MarketCap, combined[2].MarketCap)
+
+	priceDataWithZeros := map[string]PriceData{
+		"ripple": {Price: 2.0},
+	}
+	s.UpdatePriceDataWithEtag(priceDataWithZeros, "price-etag-2")
+
+	combined = s.GetCombinedData()
+	require.Equal(t, priceDataWithZeros["ripple"].Price, combined[3].CurrentPrice)
+	require.Equal(t, mockCrypto[3].MarketCap, combined[3].MarketCap)
+	require.Equal(t, mockCrypto[3].TotalVolume, combined[3].TotalVolume)
+	require.Equal(t, mockCrypto[3].PriceChangePercentage24h, combined[3].PriceChangePercentage24h)
+}
+
+func TestGetLeaderboardPagePricesWithIDLookup(t *testing.T) {
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	s := NewDataStorage(db)
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+
+	priceDataWithIDs := map[string]PriceData{
+		"bitcoin": {
+			Price:            81000.0,
+			MarketCap:        1620000000000,
+			Volume24h:        82000000000,
+			PercentChange24h: 8.0,
+		},
+		"ripple": {
+			Price:            1.95,
+			MarketCap:        110000000000,
+			Volume24h:        9500000000,
+			PercentChange24h: 13.0,
+		},
+	}
+	s.UpdatePriceDataWithEtag(priceDataWithIDs, "price-etag")
+
+	rst := s.GetLeaderboardPagePrices(LeaderboardPage{
+		Page:      1,
+		PageSize:  3,
+		SortOrder: -1,
+		Currency:  "usd",
+	})
+
+	require.NotNil(t, rst)
+	require.Equal(t, 1, rst.Page)
+	require.Equal(t, 3, rst.PageSize)
+	require.Equal(t, "usd", rst.Currency)
+	require.Equal(t, -1, rst.SortOrder)
+	require.Equal(t, 1, len(rst.Data))
+
+	require.Equal(t, "bitcoin", rst.Data[0].ID)
+	require.Equal(t, priceDataWithIDs["bitcoin"].Price, rst.Data[0].Price)
+	require.Equal(t, priceDataWithIDs["bitcoin"].MarketCap, rst.Data[0].MarketCap)
+	require.Equal(t, priceDataWithIDs["bitcoin"].Volume24h, rst.Data[0].Volume24h)
+
+	rst2 := s.GetLeaderboardPagePrices(LeaderboardPage{
+		Page:      2,
+		PageSize:  3,
+		SortOrder: -1,
+		Currency:  "usd",
+	})
+
+	require.NotNil(t, rst2)
+	require.Equal(t, 1, len(rst2.Data))
+	require.Equal(t, "ripple", rst2.Data[0].ID)
+	require.Equal(t, priceDataWithIDs["ripple"].Price, rst2.Data[0].Price)
+}
