@@ -92,18 +92,8 @@ func (c *CodexClient) TriggerDownload(cid string) (codex.Manifest, error) {
 }
 
 // HasCid checks if the given CID exists in Codex storage
-// TODO: When the PR is merge https://github.com/codex-storage/nim-codex/pull/1331
-// add the HasCid method to the codex-go-bindings and improve this implementation.
 func (c *CodexClient) HasCid(cid string) (bool, error) {
-	if err := c.node.DownloadInit(cid, codex.DownloadInitOptions{Local: true}); err != nil {
-		return false, nil
-	}
-	defer func() {
-		_ = c.node.DownloadCancel(cid)
-	}()
-
-	_, err := c.node.DownloadChunk(cid)
-	return err == nil, nil
+	return c.node.Exists(cid)
 }
 
 func (c *CodexClient) RemoveCid(cid string) error {
