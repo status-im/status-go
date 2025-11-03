@@ -134,3 +134,7 @@ pkg/sentry/SENTRY_PRODUCTION
 
 # Libs directory (Codex)
 libs
+coverage_merged.out
+test_0.coverage.out
+test-coverage.html
+api/pre_login.log
