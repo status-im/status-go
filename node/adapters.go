@@ -39,3 +39,20 @@ func (p *SharedUrlsMessengerAdapter) GetContactByID(pubKey string) (*contacts.Co
 	}
 	return p.messenger.GetContactByID(pubKey), nil
 }
+
+type NewsFeedActivityCenterAdapter struct {
+	messenger *protocol.Messenger
+}
+
+func NewNewsFeedActivityCenterAdapter(messenger *protocol.Messenger) *NewsFeedActivityCenterAdapter {
+	return &NewsFeedActivityCenterAdapter{
+		messenger: messenger,
+	}
+}
+
+func (p *NewsFeedActivityCenterAdapter) AddNotification(response *protocol.MessengerResponse, notification *protocol.ActivityCenterNotification) error {
+	if p.messenger == nil {
+		return ErrMessengerNotReady
+	}
+	return p.messenger.AddActivityCenterNotification(response, notification, nil)
+}
