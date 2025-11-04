@@ -857,6 +857,10 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 
 					// Set up callback for when individual archives are downloaded
 					archiveDownloader.SetOnArchiveDownloaded(func(hash string, from, to uint64) {
+						err = m.persistence.SaveMessageArchiveID(communityID, hash)
+						if err != nil {
+							m.logger.Error("couldn't save message archive ID", zap.Error(err))
+						}
 						m.publisher.publish(&Subscription{
 							HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
 								CommunityID: communityID.String(),
