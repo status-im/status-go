@@ -1,13 +1,15 @@
+import copy
 import random
 import string
-import copy
-from clients.status_backend import StatusBackend
-from clients.signals import SignalType
-import pytest
-from clients.api import ApiResponseError
 
+import pytest
+
+from clients.api import ApiResponseError
+from clients.signals import SignalType
+from clients.status_backend import StatusBackend
 from resources.constants import user_mnemonic_12, user_mnemonic_15, user_mnemonic_24, user_keycard_1
 from resources.utils import assert_response_attributes
+from utils import fake
 
 
 @pytest.mark.create_account
@@ -31,7 +33,7 @@ class TestBackupMnemonicAndRestore:
         # Create a new account container and initialize
         account = StatusBackend(self.await_signals)
         account.init_status_backend()
-        account.create_account_and_login()
+        account.create_account_and_login(password=fake.profile_password())
         account.wait_for_login()
 
         # Retrieve and verify the mnemonic
@@ -45,7 +47,7 @@ class TestBackupMnemonicAndRestore:
         # Create original account and backup mnemonic
         original_account = StatusBackend(self.await_signals)
         original_account.init_status_backend()
-        original_account.create_account_and_login()
+        original_account.create_account_and_login(password=fake.profile_password())
         original_account.wait_for_login()
         original_get_settings_response = original_account.settings_service.get_settings()
         original_settings = original_get_settings_response
@@ -147,7 +149,7 @@ class TestBackupMnemonicAndRestore:
         restored_account = StatusBackend(self.await_signals)
         restored_account.init_status_backend()
         restored_account._set_display_name()
-        data = restored_account._create_account_request(user)
+        data = restored_account._create_account_request(password=user.password)
         data["mnemonic"] = ""
         with pytest.raises(ApiResponseError, match=r"restore-account: mnemonic is not set"):
             restored_account.api_request_json("RestoreAccountAndLogin", data)
@@ -158,7 +160,7 @@ class TestBackupMnemonicAndRestore:
         restored_account = StatusBackend(self.await_signals)
         restored_account.init_status_backend()
         restored_account._set_display_name()
-        data = restored_account._create_account_request(user)
+        data = restored_account._create_account_request(password=user.password)
         data["mnemonic"] = user.passphrase
         data["keycard"] = user_keycard_1
         with pytest.raises(ApiResponseError, match=r"restore-account: mnemonic is set for keycard account"):
