@@ -4070,9 +4070,9 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 	return nil
 }
 
-func (m *Messenger) UpdateMessageArchiveInterval(duration time.Duration) error {
+func (m *Messenger) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
 	messageArchiveInterval = duration
-	return nil
+	return messageArchiveInterval, nil
 }
 
 func (m *Messenger) GetMessageArchiveInterval() (time.Duration, error) {
@@ -4927,19 +4927,8 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 }
 
 // SetArchiveDistributionPreference sets the archive distribution preference for the node
-func (m *Messenger) SetArchiveDistributionPreference(request *requests.SetArchiveDistributionPreference) (*MessengerResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-
-	err := m.communitiesManager.SetArchiveDistributionPreference(request.Preference)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &MessengerResponse{}
-
-	return response, nil
+func (m *Messenger) SetArchiveDistributionPreference(preference string) error {
+	return m.communitiesManager.SetArchiveDistributionPreference(preference)
 }
 
 // GetArchiveDistributionPreference gets the archive distribution preference for the node

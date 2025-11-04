@@ -287,8 +287,21 @@ func (api *PublicAPI) SetCommunityShard(request *requests.SetCommunityShard) (*p
 }
 
 // SetArchiveDistributionPreference sets the archive distribution preference for the node
-func (api *PublicAPI) SetArchiveDistributionPreference(request *requests.SetArchiveDistributionPreference) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SetArchiveDistributionPreference(request)
+func (api *PublicAPI) SetArchiveDistributionPreference(request *requests.SetArchiveDistributionPreference) (string, error) {
+	if err := request.Validate(); err != nil {
+		return "", err
+	}
+
+	if err := api.service.messenger.SetArchiveDistributionPreference(request.Preference); err != nil {
+		return "", err
+	}
+
+	updatedPreference, err := api.service.messenger.GetArchiveDistributionPreference()
+	if err != nil {
+		return "", err
+	}
+
+	return updatedPreference, nil
 }
 
 // GetArchiveDistributionPreference gets the archive distribution preference for the node
@@ -1101,9 +1114,14 @@ func (api *PublicAPI) GetMessageArchiveInterval() (time.Duration, error) {
 	return api.service.messenger.GetMessageArchiveInterval()
 }
 
-func (api *PublicAPI) UpdateMessageArchiveInterval(duration time.Duration) error {
+func (api *PublicAPI) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
 	d := duration * time.Second
-	return api.service.messenger.UpdateMessageArchiveInterval(d)
+	updatedInterval, err := api.service.messenger.UpdateMessageArchiveInterval(d)
+	if err != nil {
+		return 0, err
+	}
+	// Do something with updatedInterval if needed
+	return updatedInterval, nil
 }
 
 func (api *PublicAPI) SubscribeToPubsubTopic(topic string, optPublicKey string) error {
