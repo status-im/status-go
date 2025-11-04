@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -260,7 +261,7 @@ func (n *StatusNode) StartLocalBackup() error {
 		}
 
 		var backupDir string
-		if backupPath != "" {
+		if backupPath != "" && !strings.HasPrefix(backupPath, "content://") {
 			backupDir = backupPath
 		} else {
 			backupDir = filepath.Join(n.config.RootDataDir, "backups")
