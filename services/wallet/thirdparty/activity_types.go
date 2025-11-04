@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/pkg/pubsub"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 )
 
@@ -72,6 +73,7 @@ type ActivityFetcher interface {
 	ActivityProvider
 	FetchActivity(ctx context.Context, chainID uint64, parameters ActivityFetchParameters, cursor string, limit int) (ActivityEntryContainer, error)
 	GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address common.Address) (*rpc.BlockNumber, *time.Time, error)
+	SetActivityPublisher(publisher *pubsub.Publisher)
 }
 
 func (e ActivityEntry) String() string {

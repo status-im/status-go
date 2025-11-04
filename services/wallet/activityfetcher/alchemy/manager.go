@@ -10,24 +10,27 @@ import (
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/services/wallet/activityfetcher"
 	wc "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	alchemy "github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
-	"github.com/status-im/status-go/services/wallet/token/tokenevent"
 )
 
 type Manager struct {
-	client         *alchemy.Client
-	persistence    *alchemy.Persistence
-	tokenPublisher *pubsub.Publisher
+	client            *alchemy.Client
+	persistence       *alchemy.Persistence
+	activityPublisher *pubsub.Publisher
 }
 
-func NewManager(client *alchemy.Client, persistence *alchemy.Persistence, tokenPublisher *pubsub.Publisher) *Manager {
+func NewManager(client *alchemy.Client, persistence *alchemy.Persistence) *Manager {
 	return &Manager{
-		client:         client,
-		persistence:    persistence,
-		tokenPublisher: tokenPublisher,
+		client:      client,
+		persistence: persistence,
 	}
+}
+
+func (m *Manager) SetActivityPublisher(publisher *pubsub.Publisher) {
+	m.activityPublisher = publisher
 }
 
 func (m *Manager) ID() string {
@@ -58,11 +61,11 @@ func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, parameters 
 		return thirdparty.ActivityEntryContainer{}, err
 	}
 
-	// Request async token discovery for ERC20 transfers to make sure we have their metadata
-	if m.tokenPublisher != nil {
+	// Emit event about ERC20 activity being fetched so interested components can react
+	if m.activityPublisher != nil {
 		for _, transfer := range transfers {
 			if transfer.Category == alchemy.TransferCategoryErc20 && transfer.RawContract.Address != nil {
-				pubsub.Publish(m.tokenPublisher, tokenevent.TokenDiscoveryRequestEvent{
+				pubsub.Publish(m.activityPublisher, activityfetcher.EventERC20ActivityFetched{
 					ChainID: chainID,
 					Address: *transfer.RawContract.Address,
 				})

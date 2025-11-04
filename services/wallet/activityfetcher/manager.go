@@ -11,6 +11,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
@@ -23,17 +24,24 @@ type ManagerIface interface {
 	IsChainSupported(chainID uint64) bool
 	FetchActivity(ctx context.Context, chainID uint64, account gethcommon.Address, currentBlock uint64) (thirdparty.ActivityEntryContainer, error)
 	GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address gethcommon.Address) (*gethrpc.BlockNumber, *time.Time, error)
+	GetPublisher() *pubsub.Publisher
 }
 
 type Manager struct {
-	fetcher thirdparty.ActivityFetcher
-	logger  *zap.Logger
+	fetcher   thirdparty.ActivityFetcher
+	logger    *zap.Logger
+	publisher *pubsub.Publisher
 }
 
 func NewManager(fetcher thirdparty.ActivityFetcher) *Manager {
+	publisher := pubsub.NewPublisher()
+
+	fetcher.SetActivityPublisher(publisher)
+
 	return &Manager{
-		fetcher: fetcher,
-		logger:  logutils.ZapLogger().Named("ActivityFetcher"),
+		fetcher:   fetcher,
+		logger:    logutils.ZapLogger().Named("ActivityFetcher"),
+		publisher: publisher,
 	}
 }
 
@@ -103,4 +111,9 @@ func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, account get
 		zap.Duration("duration", duration))
 
 	return activity, nil
+}
+
+// GetPublisher returns the publisher for activity fetcher events
+func (m *Manager) GetPublisher() *pubsub.Publisher {
+	return m.publisher
 }

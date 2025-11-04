@@ -359,7 +359,6 @@ func (s *Service) getDeps() FilterDependencies {
 		currentTimestamp: func() int64 {
 			return time.Now().Unix()
 		},
-		tokenPublisher: s.tokenManager.GetTokenPublisher(),
 	}
 }
 

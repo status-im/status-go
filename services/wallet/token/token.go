@@ -35,10 +35,10 @@ import (
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	"github.com/status-im/status-go/services/utils"
+	"github.com/status-im/status-go/services/wallet/activityfetcher"
 	"github.com/status-im/status-go/services/wallet/community"
 	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
 	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
-	"github.com/status-im/status-go/services/wallet/token/tokenevent"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
@@ -78,23 +78,22 @@ type ManagerInterface interface {
 	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) *tokenTypes.Token
 	MarkAsPreviouslyOwnedToken(token *tokenTypes.Token, owner common.Address) (bool, error)
 	SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *tokenTypes.Token, isFirst bool)
-	GetTokenPublisher() *pubsub.Publisher
 }
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
-	db                   *sql.DB
-	ethClientGetter      rpc.EthClientGetter
-	ContractMaker        *contracts.ContractMaker
-	networkManager       network.ManagerInterface
-	communityTokensDB    *communitytokensdatabase.Database
-	communityManager     *community.Manager
-	mediaServer          *server.MediaServer
-	walletFeed           *event.Feed
-	accountsDB           *accounts.Database
-	accountsPublisher    *pubsub.Publisher
-	tokenPublisher       *pubsub.Publisher
-	tokenBalancesStorage TokenBalancesStorage
+	db                       *sql.DB
+	ethClientGetter          rpc.EthClientGetter
+	ContractMaker            *contracts.ContractMaker
+	networkManager           network.ManagerInterface
+	communityTokensDB        *communitytokensdatabase.Database
+	communityManager         *community.Manager
+	mediaServer              *server.MediaServer
+	walletFeed               *event.Feed
+	accountsDB               *accounts.Database
+	accountsPublisher        *pubsub.Publisher
+	activityFetcherPublisher *pubsub.Publisher
+	tokenBalancesStorage     TokenBalancesStorage
 
 	tokenLists *tokenlists.TokenLists
 
@@ -131,7 +130,6 @@ func NewTokenManager(
 		mediaServer:          mediaServer,
 		walletFeed:           walletFeed,
 		accountsPublisher:    accountsPublisher,
-		tokenPublisher:       pubsub.NewPublisher(),
 		accountsDB:           accountsDB,
 		tokenBalancesStorage: tokenBalancesStorage,
 		tokenLists:           tokensLists,
@@ -172,11 +170,11 @@ func (tm *Manager) startAccountsWatcher() {
 }
 
 func (tm *Manager) startTokenDiscoveryWatcher() {
-	if tm.tokenPublisher == nil {
+	if tm.activityFetcherPublisher == nil {
 		return
 	}
 
-	ch, unsubFn := pubsub.Subscribe[tokenevent.TokenDiscoveryRequestEvent](tm.tokenPublisher, 100)
+	ch, unsubFn := pubsub.Subscribe[activityfetcher.EventERC20ActivityFetched](tm.activityFetcherPublisher, 100)
 	go func() {
 		defer gocommon.LogOnPanic()
 		defer unsubFn()
@@ -188,15 +186,15 @@ func (tm *Manager) startTokenDiscoveryWatcher() {
 				if !ok {
 					return
 				}
-				tm.handleTokenDiscoveryRequest(context.Background(), event)
+				tm.handleERC20ActivityFetched(context.Background(), event)
 			}
 		}
 	}()
 }
 
-func (tm *Manager) handleTokenDiscoveryRequest(ctx context.Context, event tokenevent.TokenDiscoveryRequestEvent) {
-	// Use existing FindOrCreateTokenByAddress logic
-	// This will fetch token metadata and send TokenListsUpdated signal to frontend
+func (tm *Manager) handleERC20ActivityFetched(ctx context.Context, event activityfetcher.EventERC20ActivityFetched) {
+	// when ERC20 activity is fetched, discover token metadata if needed
+	// this will fetch token metadata and send TokenListsUpdated signal to frontend
 	tm.FindOrCreateTokenByAddress(ctx, event.ChainID, event.Address)
 }
 
@@ -208,8 +206,12 @@ func (tm *Manager) Stop() {
 	tm.tokenLists.Stop()
 }
 
-func (tm *Manager) GetTokenPublisher() *pubsub.Publisher {
-	return tm.tokenPublisher
+func (tm *Manager) SetActivityFetcherPublisher(publisher *pubsub.Publisher) {
+	tm.activityFetcherPublisher = publisher
+	// Start watching for token discovery events if not already started
+	if tm.stopCh != nil {
+		tm.startTokenDiscoveryWatcher()
+	}
 }
 
 // overrideTokensInPlace overrides tokens in the store with the ones from the networks
