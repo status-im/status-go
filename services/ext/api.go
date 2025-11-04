@@ -1102,7 +1102,8 @@ func (api *PublicAPI) GetMessageArchiveInterval() (time.Duration, error) {
 }
 
 func (api *PublicAPI) UpdateMessageArchiveInterval(duration time.Duration) error {
-	return api.service.messenger.UpdateMessageArchiveInterval(duration)
+	d := duration * time.Second
+	return api.service.messenger.UpdateMessageArchiveInterval(d)
 }
 
 func (api *PublicAPI) SubscribeToPubsubTopic(topic string, optPublicKey string) error {
