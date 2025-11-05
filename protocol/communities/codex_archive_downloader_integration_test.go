@@ -1,6 +1,3 @@
-//go:build codex_integration
-// +build codex_integration
-
 package communities_test
 
 import (
@@ -25,7 +22,7 @@ import (
 // against a real Codex instance
 type CodexArchiveDownloaderIntegrationSuite struct {
 	suite.Suite
-	client       communities.CodexClient
+	client       communities.CodexClientInterface
 	uploadedCIDs []string // Track uploaded CIDs for cleanup
 }
 
@@ -107,7 +104,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 	logger, _ := zap.NewDevelopment() // Use development logger for integration tests
 
 	downloader := communities.NewCodexArchiveDownloader(
-		&suite.client,
+		suite.client,
 		index,
 		communityID,
 		existingArchiveIDs,

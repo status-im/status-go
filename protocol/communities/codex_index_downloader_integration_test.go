@@ -1,6 +1,3 @@
-//go:build codex_integration
-// +build codex_integration
-
 package communities_test
 
 import (
@@ -29,8 +26,6 @@ import (
 type CodexIndexDownloaderIntegrationTestSuite struct {
 	suite.Suite
 	testDir string
-	host    string
-	port    string
 	logger  *zap.Logger
 }
 
@@ -87,7 +82,7 @@ func (suite *CodexIndexDownloaderIntegrationTestSuite) TestIntegration_GotManife
 	defer close(cancelChan)
 
 	filePath := filepath.Join(suite.testDir, "test-index.bin")
-	downloader := communities.NewCodexIndexDownloader(&client, cid, filePath, cancelChan, suite.logger)
+	downloader := communities.NewCodexIndexDownloader(client, cid, filePath, cancelChan, suite.logger)
 
 	// Test GotManifest
 	manifestChan := downloader.GotManifest()
@@ -139,7 +134,7 @@ func (suite *CodexIndexDownloaderIntegrationTestSuite) TestIntegration_DownloadI
 	defer close(cancelChan)
 
 	filePath := filepath.Join(suite.testDir, "downloaded-index.bin")
-	downloader := communities.NewCodexIndexDownloader(&client, cid, filePath, cancelChan, suite.logger)
+	downloader := communities.NewCodexIndexDownloader(client, cid, filePath, cancelChan, suite.logger)
 
 	// First, get the manifest to know the expected size
 	manifestChan := downloader.GotManifest()

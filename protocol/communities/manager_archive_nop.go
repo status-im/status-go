@@ -39,11 +39,11 @@ func (tmm *ArchiveManagerNop) StartCodexClient() error {
 	return nil
 }
 
-func (tmm *ArchiveManagerNop) GetCodexClient() *CodexClient {
+func (tmm *ArchiveManagerNop) GetCodexClient() CodexClientInterface {
 	return nil
 }
 
-func (tmm *ArchiveManagerNop) SetCodexClient(client *CodexClient) {}
+func (tmm *ArchiveManagerNop) SetCodexClient(client CodexClientInterface) {}
 
 func (tmm *ArchiveManagerNop) Stop() error {
 	return nil
@@ -83,6 +83,10 @@ func (tmm *ArchiveManagerNop) UnseedHistoryArchiveTorrent(communityID types.HexB
 func (tmm *ArchiveManagerNop) UnseedHistoryArchiveIndexCid(communityID types.HexBytes) {}
 
 func (tmm *ArchiveManagerNop) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool {
+	return false
+}
+
+func (tmm *ArchiveManagerNop) IsSeedingHistoryArchiveCodex(communityID types.HexBytes) bool {
 	return false
 }
 

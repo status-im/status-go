@@ -60,8 +60,9 @@ type ArchiveManager struct {
 	torrentConfig                *params.TorrentConfig
 	torrentClient                *torrent.Client
 	codexConfig                  *params.CodexConfig
-	codexClient                  *CodexClient
+	codexClient                  CodexClientInterface
 	isCodexClientStarted         bool
+	downloadTimeout              time.Duration // timeout for archive downloads, defaults to 20s
 	torrentTasks                 map[string]metainfo.Hash
 	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
 	historyArchiveTasksWaitGroup sync.WaitGroup
@@ -84,6 +85,7 @@ func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 	return &ArchiveManager{
 		torrentConfig:               amc.TorrentConfig,
 		codexConfig:                 amc.CodexConfig,
+		downloadTimeout:             20 * time.Second,
 		torrentTasks:                make(map[string]metainfo.Hash),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
 
@@ -97,7 +99,7 @@ func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 	}
 }
 
-func (m *ArchiveManager) GetCodexClient() *CodexClient {
+func (m *ArchiveManager) GetCodexClient() CodexClientInterface {
 	return m.codexClient
 }
 
@@ -231,8 +233,8 @@ func (m *ArchiveManager) StartCodexClient() error {
 	if err != nil {
 		return err
 	}
-	m.codexClient = &client
-	m.ArchiveFileManager.codexClient = &client
+	m.codexClient = client
+	m.ArchiveFileManager.codexClient = client
 	m.isCodexClientStarted = true
 
 	return m.codexClient.Start()
@@ -288,10 +290,14 @@ func (m *ArchiveManager) Stop() error {
 	return nil
 }
 
-func (m *ArchiveManager) SetCodexClient(client *CodexClient) {
+func (m *ArchiveManager) SetCodexClient(client CodexClientInterface) {
 	m.codexClient = client
 	m.ArchiveFileManager.codexClient = client
 	m.isCodexClientStarted = true
+}
+
+func (m *ArchiveManager) SetDownloadTimeout(timeout time.Duration) {
+	m.downloadTimeout = timeout
 }
 
 func (m *ArchiveManager) torrentClientStarted() bool {
@@ -585,6 +591,11 @@ func (m *ArchiveManager) UnseedHistoryArchiveIndexCid(communityID types.HexBytes
 	if err != nil {
 		m.logger.Error("failed to remove CID from Codex", zap.Error(err))
 	}
+
+	err = m.removeCodexIndexCidFile(communityID)
+	if err != nil {
+		m.logger.Error("failed to remove local index file", zap.Error(err))
+	}
 }
 
 func (m *ArchiveManager) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool {
@@ -592,6 +603,23 @@ func (m *ArchiveManager) IsSeedingHistoryArchiveTorrent(communityID types.HexByt
 	hash := m.torrentTasks[id]
 	torrent, ok := m.torrentClient.Torrent(hash)
 	return ok && torrent.Seeding()
+}
+
+func (m *ArchiveManager) IsSeedingHistoryArchiveCodex(communityID types.HexBytes) bool {
+	if m.CodexIndexCidFileExists(communityID) {
+		cid, err := m.GetHistoryArchiveIndexCid(communityID)
+		if err != nil {
+			m.logger.Debug("failed to read Codex index CID", zap.String("communityID", communityID.String()), zap.Error(err))
+			return false
+		}
+		hasCid, err := m.codexClient.HasCid(cid)
+		if err != nil {
+			m.logger.Debug("failed to verify Codex CID availability", zap.String("communityID", communityID.String()), zap.String("cid", cid), zap.Error(err))
+			return false
+		}
+		return hasCid
+	}
+	return false
 }
 
 func (m *ArchiveManager) GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask {
@@ -785,7 +813,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 		Cancelled:                    false,
 	}
 
-	timeout := time.After(20 * time.Second)
+	timeout := time.After(m.downloadTimeout)
 
 	// Create separate cancel channel for the index downloader to avoid channel competition
 	indexDownloaderCancel := make(chan struct{})
@@ -820,6 +848,14 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 			return nil, fmt.Errorf("failed to fetch Codex manifest for CID %s: %w", indexCid, err)
 		}
 
+		// Publish manifest fetched signal
+		m.publisher.publish(&Subscription{
+			ManifestFetchedSignal: &signal.ManifestFetchedSignal{
+				CommunityID: communityID.String(),
+				IndexCid:    indexCid,
+			},
+		})
+
 		// Start downloading the index file
 		indexDownloader.DownloadIndexFile()
 
@@ -843,6 +879,14 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 				}
 
 				if indexDownloader.IsDownloadComplete() {
+
+					// Publish index download completed signal
+					m.publisher.publish(&Subscription{
+						IndexDownloadCompletedSignal: &signal.IndexDownloadCompletedSignal{
+							CommunityID: communityID.String(),
+							IndexCid:    indexCid,
+						},
+					})
 
 					err := m.writeCodexIndexCidToFile(communityID, indexCid)
 					if err != nil {
@@ -911,6 +955,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 						case <-cancelTask:
 							m.logger.Debug("cancelled downloading individual archives")
 							close(archiveDownloaderCancel)
+							downloadTaskInfo.TotalDownloadedArchivesCount = archiveDownloader.GetTotalDownloadedArchivesCount()
 							downloadTaskInfo.Cancelled = true
 							return downloadTaskInfo, nil
 						case <-archiveTicker.C:

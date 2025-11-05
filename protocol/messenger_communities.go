@@ -2844,7 +2844,7 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 	if m.archiveManager.IsReady() {
 		if !communitySettings.HistoryArchiveSupportEnabled {
 			m.archiveManager.StopHistoryArchiveTasksInterval(id)
-		} else if !m.archiveManager.IsSeedingHistoryArchiveTorrent(id) {
+		} else if !m.archiveManager.IsSeedingHistoryArchiveTorrent(id) && !m.archiveManager.IsSeedingHistoryArchiveCodex(id) {
 			var communities []*communities.Community
 			communities = append(communities, community)
 			go m.InitHistoryArchiveTasks(communities)

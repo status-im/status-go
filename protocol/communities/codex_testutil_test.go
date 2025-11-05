@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 )
 
-func NewCodexClientTest(t *testing.T) communities.CodexClient {
+func NewCodexClientTest(t *testing.T) communities.CodexClientInterface {
 	client, err := communities.NewCodexClient(params.CodexConfig{
 		Enabled:               true,
 		HistoryArchiveDataDir: filepath.Join(t.TempDir(), "codex", "archivedata"),

@@ -288,6 +288,11 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 						d.totalDownloadedArchivesCount++
 						d.mu.Unlock()
 
+						d.logger.Debug("archive download completed",
+							zap.String("cid", archiveCid),
+							zap.String("totalDownloadedArchivesCount", fmt.Sprintf("%d", d.totalDownloadedArchivesCount)),
+						)
+
 						// Call success callback
 						if d.onArchiveDownloaded != nil {
 							d.onArchiveDownloaded(archiveHash, archiveFrom, archiveTo)

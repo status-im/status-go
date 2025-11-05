@@ -28,7 +28,7 @@ import (
 
 type CodexArchiveManagerSuite struct {
 	suite.Suite
-	codexClient *communities.CodexClient
+	codexClient communities.CodexClientInterface
 	// codexConfig    *params.CodexConfig
 	archiveManager *communities.ArchiveManager
 	manager        *communities.Manager
@@ -100,7 +100,9 @@ func (s *CodexArchiveManagerSuite) SetupTest() {
 	s.manager = m
 	s.archiveManager = t
 	s.Require().NoError(s.archiveManager.StartCodexClient())
-	s.codexClient = s.archiveManager.GetCodexClient()
+	client := s.archiveManager.GetCodexClient()
+	s.Require().NotNil(client)
+	s.codexClient = client
 }
 
 // TearDownSuite runs once after each test in the suite
@@ -273,6 +275,315 @@ func (s *CodexArchiveManagerSuite) TestDownloadingArchivesFromCodex() {
 	}
 
 	s.T().Logf("All signals verified successfully!")
+}
+
+func (s *CodexArchiveManagerSuite) TestDownloadCancellationBeforeManifestFetch() {
+	// Subscribe to signals
+	subscription := s.manager.Subscribe()
+
+	// Create a single test archive
+	archiveData := make([]byte, 256)
+	_, err := rand.Read(archiveData)
+	s.Require().NoError(err, "Failed to generate random data")
+
+	// Upload archive to Codex
+	archiveCid, err := s.codexClient.Upload(bytes.NewReader(archiveData), "test-archive.bin")
+	s.Require().NoError(err, "Failed to upload archive")
+	s.uploadedCIDs = append(s.uploadedCIDs, archiveCid)
+
+	// Create and upload index
+	index := &protobuf.CodexWakuMessageArchiveIndex{
+		Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+			"test-hash": {
+				Cid: archiveCid,
+				Metadata: &protobuf.WakuMessageArchiveMetadata{
+					From: 1000,
+					To:   2000,
+				},
+			},
+		},
+	}
+
+	codexIndexBytes, err := proto.Marshal(index)
+	s.Require().NoError(err, "Failed to marshal index")
+
+	indexCid, err := s.codexClient.UploadArchive(codexIndexBytes)
+	s.Require().NoError(err, "Failed to upload index")
+	s.uploadedCIDs = append(s.uploadedCIDs, indexCid)
+
+	communityID := types.HexBytes("cancel-test-community-1")
+	cancelChan := make(chan struct{})
+
+	// Track signals
+	downloadStartedReceived := false
+	manifestFetchedReceived := false
+	signalDone := make(chan struct{})
+	go func() {
+		timeout := time.After(10 * time.Second)
+		for {
+			select {
+			case event := <-subscription:
+				if event.DownloadingHistoryArchivesStartedSignal != nil {
+					downloadStartedReceived = true
+				}
+				if event.ManifestFetchedSignal != nil {
+					manifestFetchedReceived = true
+				}
+			case <-timeout:
+				close(signalDone)
+				return
+			case <-signalDone:
+				return
+			}
+		}
+	}()
+
+	// Cancel immediately before the download starts
+	close(cancelChan)
+
+	taskInfo, err := s.archiveManager.DownloadHistoryArchivesByIndexCid(communityID, indexCid, cancelChan)
+	s.Require().NoError(err, "Download should return without error on cancellation")
+	s.Require().NotNil(taskInfo, "Task info should not be nil")
+	s.Require().True(taskInfo.Cancelled, "Download should be marked as cancelled")
+	s.Require().Equal(0, taskInfo.TotalDownloadedArchivesCount, "No archives should be downloaded")
+
+	close(signalDone)
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify that neither signal was received
+	s.Require().False(downloadStartedReceived, "DownloadingHistoryArchivesStartedSignal should not be received when cancelled early")
+	s.Require().False(manifestFetchedReceived, "ManifestFetchedSignal should not be received when cancelled early")
+
+	s.T().Logf("Early cancellation test passed successfully!")
+}
+
+func (s *CodexArchiveManagerSuite) TestDownloadCancellationDuringIndexDownload() {
+	// Subscribe to signals
+	subscription := s.manager.Subscribe()
+
+	// Create a test archive
+	archiveData := make([]byte, 1024*10) // 10KB
+	_, err := rand.Read(archiveData)
+	s.Require().NoError(err, "Failed to generate random data")
+
+	// Upload archive to Codex
+	archiveCid, err := s.codexClient.Upload(bytes.NewReader(archiveData), "test-archive-large.bin")
+	s.Require().NoError(err, "Failed to upload archive")
+	s.uploadedCIDs = append(s.uploadedCIDs, archiveCid)
+
+	// Create and upload index
+	index := &protobuf.CodexWakuMessageArchiveIndex{
+		Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+			"test-hash-large": {
+				Cid: archiveCid,
+				Metadata: &protobuf.WakuMessageArchiveMetadata{
+					From: 1000,
+					To:   2000,
+				},
+			},
+		},
+	}
+
+	codexIndexBytes, err := proto.Marshal(index)
+	s.Require().NoError(err, "Failed to marshal index")
+
+	indexCid, err := s.codexClient.UploadArchive(codexIndexBytes)
+	s.Require().NoError(err, "Failed to upload index")
+	s.uploadedCIDs = append(s.uploadedCIDs, indexCid)
+
+	communityID := types.HexBytes("cancel-test-community-2")
+	cancelChan := make(chan struct{})
+
+	// Track signals
+	manifestFetchedReceived := false
+	indexDownloadCompletedReceived := false
+	downloadStartedReceived := false
+	signalDone := make(chan struct{})
+
+	go func() {
+		timeout := time.After(10 * time.Second)
+		for {
+			select {
+			case event := <-subscription:
+				if event.ManifestFetchedSignal != nil {
+					manifestFetchedReceived = true
+					s.T().Logf("Received ManifestFetchedSignal - now cancelling during index download")
+					// Cancel as soon as we get the manifest (before index download completes)
+					close(cancelChan)
+				}
+				if event.IndexDownloadCompletedSignal != nil {
+					indexDownloadCompletedReceived = true
+				}
+				if event.DownloadingHistoryArchivesStartedSignal != nil {
+					downloadStartedReceived = true
+				}
+			case <-timeout:
+				close(signalDone)
+				return
+			case <-signalDone:
+				return
+			}
+		}
+	}()
+
+	// Start download in goroutine
+	resultChan := make(chan struct {
+		taskInfo *communities.HistoryArchiveDownloadTaskInfo
+		err      error
+	}, 1)
+
+	go func() {
+		taskInfo, err := s.archiveManager.DownloadHistoryArchivesByIndexCid(communityID, indexCid, cancelChan)
+		resultChan <- struct {
+			taskInfo *communities.HistoryArchiveDownloadTaskInfo
+			err      error
+		}{taskInfo, err}
+	}()
+
+	result := <-resultChan
+	s.Require().NoError(result.err, "Download should return without error on cancellation")
+	s.Require().NotNil(result.taskInfo, "Task info should not be nil")
+	s.Require().True(result.taskInfo.Cancelled, "Download should be marked as cancelled")
+
+	close(signalDone)
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify signals
+	s.Require().True(manifestFetchedReceived, "Should have received ManifestFetchedSignal")
+	s.Require().False(indexDownloadCompletedReceived, "Should NOT have received IndexDownloadCompletedSignal (cancelled before completion)")
+	s.Require().False(downloadStartedReceived, "Should NOT have received DownloadingHistoryArchivesStartedSignal (cancelled before archives start)")
+
+	s.T().Logf("Index download cancellation test passed! Cancelled deterministically after manifest fetch.")
+}
+
+func (s *CodexArchiveManagerSuite) TestDownloadCancellationDuringArchiveDownload() {
+	// Subscribe to signals
+	subscription := s.manager.Subscribe()
+
+	// Create multiple test archives
+	archives := []struct {
+		hash string
+		from uint64
+		to   uint64
+		data []byte
+	}{
+		{"cancel-archive-1", 1000, 2000, make([]byte, 1024*5)}, // 5KB
+		{"cancel-archive-2", 2000, 3000, make([]byte, 1024*5)},
+		{"cancel-archive-3", 3000, 4000, make([]byte, 1024*5)},
+	}
+
+	// Generate and upload archives
+	archiveCIDs := make(map[string]string)
+	for i := range archives {
+		_, err := rand.Read(archives[i].data)
+		s.Require().NoError(err, "Failed to generate random data")
+
+		cid, err := s.codexClient.Upload(bytes.NewReader(archives[i].data), archives[i].hash+".bin")
+		s.Require().NoError(err, "Failed to upload archive")
+		archiveCIDs[archives[i].hash] = cid
+		s.uploadedCIDs = append(s.uploadedCIDs, cid)
+	}
+
+	// Create and upload index
+	index := &protobuf.CodexWakuMessageArchiveIndex{
+		Archives: make(map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata),
+	}
+
+	for _, archive := range archives {
+		index.Archives[archive.hash] = &protobuf.CodexWakuMessageArchiveIndexMetadata{
+			Cid: archiveCIDs[archive.hash],
+			Metadata: &protobuf.WakuMessageArchiveMetadata{
+				From: archive.from,
+				To:   archive.to,
+			},
+		}
+	}
+
+	codexIndexBytes, err := proto.Marshal(index)
+	s.Require().NoError(err, "Failed to marshal index")
+
+	indexCid, err := s.codexClient.UploadArchive(codexIndexBytes)
+	s.Require().NoError(err, "Failed to upload index")
+	s.uploadedCIDs = append(s.uploadedCIDs, indexCid)
+
+	communityID := types.HexBytes("cancel-test-community-3")
+	cancelChan := make(chan struct{})
+
+	// Track signals
+	downloadStartedReceived := false
+	indexDownloadCompletedReceived := false
+	archivesDownloaded := 0
+	signalDone := make(chan struct{})
+
+	go func() {
+		timeout := time.After(15 * time.Second)
+		for {
+			select {
+			case event := <-subscription:
+				if event.DownloadingHistoryArchivesStartedSignal != nil {
+					downloadStartedReceived = true
+					s.T().Logf("Received DownloadingHistoryArchivesStartedSignal")
+				}
+				if event.IndexDownloadCompletedSignal != nil {
+					indexDownloadCompletedReceived = true
+					s.T().Logf("Received IndexDownloadCompletedSignal - waiting for first archive download before cancelling")
+				}
+				if event.HistoryArchiveDownloadedSignal != nil {
+					archivesDownloaded++
+					s.T().Logf("Received HistoryArchiveDownloadedSignal (%d archives downloaded so far)", archivesDownloaded)
+					// Cancel after the first archive is downloaded
+					if archivesDownloaded == 1 {
+						s.T().Logf("Cancelling after first archive download")
+						close(cancelChan)
+					}
+				}
+			case <-timeout:
+				close(signalDone)
+				return
+			case <-signalDone:
+				return
+			}
+		}
+	}()
+
+	// Start download in goroutine
+	resultChan := make(chan struct {
+		taskInfo *communities.HistoryArchiveDownloadTaskInfo
+		err      error
+	}, 1)
+
+	go func() {
+		taskInfo, err := s.archiveManager.DownloadHistoryArchivesByIndexCid(communityID, indexCid, cancelChan)
+		resultChan <- struct {
+			taskInfo *communities.HistoryArchiveDownloadTaskInfo
+			err      error
+		}{taskInfo, err}
+	}()
+
+	result := <-resultChan
+	s.Require().NoError(result.err, "Download should return without error on cancellation")
+	s.Require().NotNil(result.taskInfo, "Task info should not be nil")
+	s.Require().True(result.taskInfo.Cancelled, "Download should be marked as cancelled")
+
+	close(signalDone)
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify signals
+	s.Require().True(downloadStartedReceived, "Should have received DownloadingHistoryArchivesStartedSignal")
+	s.Require().True(indexDownloadCompletedReceived, "Should have received IndexDownloadCompletedSignal")
+	s.Require().GreaterOrEqual(archivesDownloaded, 1, "Should have downloaded at least 1 archive before cancellation (via signals)")
+
+	s.T().Logf("Archive download cancellation test passed! Cancelled deterministically after downloading %d archive(s)", archivesDownloaded)
+	s.T().Logf("Task info: TotalArchivesCount=%d, TotalDownloadedArchivesCount=%d, Cancelled=%v",
+		result.taskInfo.TotalArchivesCount,
+		result.taskInfo.TotalDownloadedArchivesCount,
+		result.taskInfo.Cancelled)
+
+	// Note: Due to parallel downloads, the TotalDownloadedArchivesCount in taskInfo might not match
+	// the number of signals received because cancellation can happen while downloads are in-flight.
+	// The important thing is that we successfully cancelled based on a signal and the Cancelled flag is set.
+	s.T().Logf("Signals received: %d archives downloaded, TaskInfo reports: %d archives",
+		archivesDownloaded, result.taskInfo.TotalDownloadedArchivesCount)
 }
 
 // Run the integration test suite

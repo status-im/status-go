@@ -31,4 +31,12 @@ type CodexClientInterface interface {
 	// CID management methods
 	HasCid(cid string) (bool, error)
 	RemoveCid(cid string) error
+
+	// lifecycle management methods
+	Start() error
+	Stop() error
+	Destroy() error
+
+	// logging methods
+	UpdateLogLevel(logLevel string) error
 }
