@@ -32,9 +32,6 @@ def backend_factory(request):
         self.receiver = backend_factory("receiver")
     """
 
-    # Get class-level configuration
-    await_signals = getattr(request.cls, "await_signals", ["messages.new", "message.delivered", "node.login", "node.logout"])
-
     # Get parameters from request.param if available
     params = getattr(request, "param", {})
 
@@ -63,7 +60,7 @@ def backend_factory(request):
         logging.debug(f"📋 [SETUP] Parameters: privileged={privileged}, ipv6={ipv6}")
 
         # Create backend
-        backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6, **kwargs)
+        backend = StatusBackend(privileged=privileged, ipv6=ipv6, **kwargs)
         created_backends.append(backend)
         logging.debug(f"✅ [SETUP] {name.capitalize()} backend created")
 

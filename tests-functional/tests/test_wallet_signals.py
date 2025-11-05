@@ -9,7 +9,6 @@ from resources.constants import user_1
 @pytest.mark.wallet
 @pytest.mark.rpc
 class TestWalletSignals:
-    await_signals = [SignalType.NODE_LOGIN.value, SignalType.WALLET.value]
 
     @pytest.fixture(autouse=True)
     def setup_backend(self, backend_recovered_profile):

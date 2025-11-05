@@ -1,16 +1,18 @@
 import json
 import logging
+import os
 import threading
 import time
-
-import websocket
-import os
-from pathlib import Path
-from resources.constants import SIGNALS_DIR, LOG_SIGNALS_TO_FILE
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
+
+import websocket
+
+from resources.constants import SIGNALS_DIR, LOG_SIGNALS_TO_FILE
 
 
+# Only signals defined in SignalType are processed by SignalClient
 class SignalType(Enum):
     MESSAGES_NEW = "messages.new"
     MESSAGE_DELIVERED = "message.delivered"
@@ -69,10 +71,9 @@ class LocalPairingEventAction(Enum):
 
 
 class SignalClient:
-    def __init__(self, ws_url, await_signals):
+    def __init__(self, ws_url):
         self.url = f"{ws_url}/signals"
 
-        self.await_signals = await_signals
         self.received_signals = {
             # For each signal type, store:
             # - list of received signals
@@ -85,7 +86,7 @@ class SignalClient:
                 "expected_count": 1,
                 "accept_fn": None,
             }
-            for signal in self.await_signals
+            for signal in SignalType
         }
         if LOG_SIGNALS_TO_FILE:
             self.signal_file_path = os.path.join(
@@ -100,19 +101,32 @@ class SignalClient:
             self.write_signal_to_file(signal_data)
 
         signal_type = signal_data.get("type")
-        if signal_type in self.await_signals:
-            accept_fn = self.received_signals[signal_type]["accept_fn"]
-            if not accept_fn or accept_fn(signal_data):
-                self.received_signals[signal_type]["received"].append(signal_data)
+        try:
+            signal_type = self._convert_signal_type(signal_type)
+        except ValueError:
+            # Ignore unregistered signal types
+            return
 
-    def check_signal_type(self, signal_type):
-        if signal_type not in self.await_signals:
-            raise ValueError(f"Signal type {signal_type} is not in the list of awaited signals")
+        if signal_type not in self.received_signals:
+            # This should never happen, as we register all signal types from SignalType enum
+            raise ValueError(f"Signal type {signal_type} is not registered")
+
+        accept_fn = self.received_signals[signal_type]["accept_fn"]
+        if not accept_fn or accept_fn(signal_data):
+            self.received_signals[signal_type]["received"].append(signal_data)
+
+    # TODO: This is a temporary workaround until all tests are migrated to use SignalType enum
+    @staticmethod
+    def _convert_signal_type(signal_type: SignalType | str) -> SignalType:
+        if isinstance(signal_type, SignalType):
+            return signal_type
+        if isinstance(signal_type, str):
+            return SignalType(signal_type)
 
     # Used to set up how many instances of a signal to wait for, before triggering the actions
     # that cause them to be emitted.
-    def prepare_wait_for_signal(self, signal_type, delta_count, accept_fn=None):
-        self.check_signal_type(signal_type)
+    def prepare_wait_for_signal(self, signal_type: SignalType, delta_count: int, accept_fn=None):
+        signal_type = self._convert_signal_type(signal_type)
 
         if delta_count < 1:
             raise ValueError("delta_count must be greater than 0")
@@ -120,8 +134,8 @@ class SignalClient:
         self.received_signals[signal_type]["expected_count"] = len(self.received_signals[signal_type]["received"]) + delta_count
         self.received_signals[signal_type]["accept_fn"] = accept_fn
 
-    def wait_for_signal(self, signal_type, timeout=20):
-        self.check_signal_type(signal_type)
+    def wait_for_signal(self, signal_type: SignalType | str, timeout: int = 20):
+        signal_type = self._convert_signal_type(signal_type)
 
         start_time = time.time()
         received_signals = self.received_signals.get(signal_type)
@@ -136,7 +150,8 @@ class SignalClient:
             return self.received_signals[signal_type]["received"][-1]
         return self.received_signals[signal_type]["received"][-delta_count:]
 
-    def wait_for_signal_predicate(self, signal_type, predicate=lambda signal: True, timeout=20):
+    def wait_for_signal_predicate(self, signal_type: SignalType | str, predicate=lambda signal: True, timeout=20):
+        signal_type = self._convert_signal_type(signal_type)
         start_time = time.time()
         while True:
             elapsed_time = time.time() - start_time
@@ -153,10 +168,12 @@ class SignalClient:
         raise TimeoutError(f"Signal {signal_type} satisfying the predicate is not received in {timeout} seconds")
 
     def wait_for_logout(self):
-        signal = self.wait_for_signal(SignalType.NODE_STOPPED.value)
+        signal = self.wait_for_signal(SignalType.NODE_STOPPED)
         return signal
 
-    def find_signal_containing_pattern(self, signal_type, event_pattern, timeout=20):
+    def find_signal_containing_pattern(self, signal_type: SignalType | str, event_pattern, timeout=20):
+        signal_type = self._convert_signal_type(signal_type)
+
         start_time = time.time()
         while True:
             if time.time() - start_time >= timeout:
@@ -170,7 +187,8 @@ class SignalClient:
                     return event
             time.sleep(0.2)
 
-    def get_all_events(self, signal_type):
+    def get_all_events(self, signal_type: SignalType | str):
+        signal_type = self._convert_signal_type(signal_type)
         signals = self.received_signals.get(signal_type, {}).get("received", [])
         return [signal.get("event") for signal in signals]
 

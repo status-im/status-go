@@ -17,14 +17,7 @@ class TestLogging:
 
     @pytest.mark.init
     def test_logging(self, tmp_path):
-        await_signals = [
-            "mediaserver.started",
-            "node.started",
-            "node.ready",
-            "node.login",
-        ]
-
-        backend_client = StatusBackend(await_signals)
+        backend_client = StatusBackend()
         assert backend_client is not None
 
         # Init and login

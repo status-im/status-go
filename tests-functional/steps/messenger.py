@@ -15,13 +15,6 @@ from utils.retry_utils import retry_call
 
 class MessengerSteps(NetworkConditionsSteps):
 
-    await_signals = [
-        SignalType.MESSAGES_NEW.value,
-        SignalType.MESSAGE_DELIVERED.value,
-        SignalType.NODE_LOGIN.value,
-        SignalType.NODE_STOPPED.value,
-    ]
-
     def send_contact_request_and_wait_for_signal_to_be_received(self, sender=None, receiver=None) -> str:
         """
         Send a contact request from sender to receiver and wait for confirmation.
