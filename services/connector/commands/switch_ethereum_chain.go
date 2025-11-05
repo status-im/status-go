@@ -97,8 +97,9 @@ func (c *SwitchEthereumChainCommand) Execute(ctx context.Context, request RPCReq
 	}
 
 	signal.SendConnectorDAppChainIdSwitched(signal.ConnectorDAppChainIdSwitchedSignal{
-		URL:     request.URL,
-		ChainId: chainId,
+		URL:      request.URL,
+		ChainId:  chainId,
+		ClientID: request.ClientID,
 	})
 
 	return chainId, nil

@@ -50,8 +50,9 @@ type ConnectorSignSignal struct {
 }
 
 type ConnectorDAppChainIdSwitchedSignal struct {
-	URL     string `json:"url"`
-	ChainId string `json:"chainId"`
+	URL      string `json:"url"`
+	ChainId  string `json:"chainId"`
+	ClientID string `json:"clientId"`
 }
 
 type ConnectorAccountChangedSignal struct {
