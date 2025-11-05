@@ -434,7 +434,7 @@ func (b *StatusNode) NewsFeedService() *newsfeed.Service {
 			nil,
 		)
 
-		if wakuext := b.WakuV2ExtService(); wakuext != nil {
+		if wakuext := b.WakuV2ExtService(); wakuext != nil && wakuext.Messenger() != nil {
 			ac := NewNewsFeedActivityCenterAdapter(wakuext.Messenger())
 			b.newsfeedSrvc.SetActivityCenter(ac)
 		}
