@@ -12,6 +12,7 @@ package communities
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -353,11 +354,8 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 	codexWakuMessageArchiveIndex := make(map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata)
 	codexArchiveIDs := make([]string, 0)
 
-	if _, err := os.Stat(codexArchiveDir); os.IsNotExist(err) {
-		err := os.MkdirAll(codexArchiveDir, 0700)
-		if err != nil {
-			return codexArchiveIDs, err
-		}
+	if err := m.ensureCodexCommunityDir(communityID); err != nil {
+		return codexArchiveIDs, err
 	}
 
 	_, err := os.Stat(codexIndexPath)
@@ -557,6 +555,18 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 
 func (m *ArchiveFileManager) archiveIndexFile(communityID string) string {
 	return path.Join(m.torrentConfig.DataDir, communityID, "index")
+}
+
+func (m *ArchiveFileManager) ensureCodexCommunityDir(communityID types.HexBytes) error {
+	if m.codexConfig == nil {
+		return fmt.Errorf("codex config not initialized")
+	}
+
+	codexArchiveDir := m.codexHistoryArchiveDataDirPath(communityID)
+	if err := os.MkdirAll(codexArchiveDir, 0700); err != nil {
+		return fmt.Errorf("failed to create Codex archive directory %s: %w", codexArchiveDir, err)
+	}
+	return nil
 }
 
 func (m *ArchiveFileManager) codexHistoryArchiveDataDirPath(communityID types.HexBytes) string {

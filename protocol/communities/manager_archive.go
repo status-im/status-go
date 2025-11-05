@@ -97,6 +97,10 @@ func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 	}
 }
 
+func (m *ArchiveManager) GetCodexClient() *CodexClient {
+	return m.codexClient
+}
+
 func (m *ArchiveManager) SetOnline(online bool) {
 	if online {
 		if m.torrentConfig != nil && m.torrentConfig.Enabled && !m.torrentClientStarted() {
@@ -234,18 +238,8 @@ func (m *ArchiveManager) StartCodexClient() error {
 	return m.codexClient.Start()
 }
 
-func (m *ArchiveManager) Stop() error {
-	if m.torrentClientStarted() || m.isCodexClientStarted {
-		m.stopHistoryArchiveTasksIntervals()
-	}
-
+func (m *ArchiveManager) StopCodexClient() error {
 	errs := []error{}
-	if m.torrentClientStarted() {
-		m.logger.Info("Stopping torrent client")
-		errs = m.torrentClient.Close()
-		m.torrentClient = nil
-	}
-
 	if m.isCodexClientStarted {
 		m.logger.Info("Stopping codex client")
 
@@ -270,8 +264,28 @@ func (m *ArchiveManager) Stop() error {
 	return nil
 }
 
-func (m *ArchiveManager) GetCodexClient() *CodexClient {
-	return m.codexClient
+func (m *ArchiveManager) Stop() error {
+	if m.torrentClientStarted() || m.isCodexClientStarted {
+		m.stopHistoryArchiveTasksIntervals()
+	}
+
+	errs := []error{}
+	if m.torrentClientStarted() {
+		m.logger.Info("Stopping torrent client")
+		errs = m.torrentClient.Close()
+		m.torrentClient = nil
+	}
+
+	err := m.StopCodexClient()
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	return nil
 }
 
 func (m *ArchiveManager) SetCodexClient(client *CodexClient) {
@@ -775,6 +789,11 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 
 	// Create separate cancel channel for the index downloader to avoid channel competition
 	indexDownloaderCancel := make(chan struct{})
+
+	if err := m.ensureCodexCommunityDir(communityID); err != nil {
+		m.logger.Error("failed to ensure Codex archive directory", zap.String("communityID", id), zap.Error(err))
+		return nil, err
+	}
 
 	// Create index downloader with path to index file using helper function
 	indexFilePath := m.codexHistoryArchiveIndexFilePath(communityID)

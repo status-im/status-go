@@ -47,8 +47,6 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TearDownTest() {
 }
 
 func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWorkflow() {
-	// client := NewCodexClientTest(suite.T())
-
 	// Step 1: Create test archive data and upload multiple archives to Codex
 	archives := []struct {
 		hash string
