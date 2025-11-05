@@ -266,8 +266,10 @@ func NewService(
 	activityFetcherService := activityfetcher.NewService(activityFetcherManager, rpcClient.GetNetworkManager(), accountsDB, accountsPublisher, rpcClient, feed)
 
 	// connect activity fetcher publisher to token manager
-	if activityPublisher := activityFetcherManager.GetPublisher(); activityPublisher != nil {
-		tokenManager.SetActivityFetcherPublisher(activityPublisher)
+	if tokenManager != nil {
+		if activityPublisher := activityFetcherManager.GetPublisher(); activityPublisher != nil {
+			tokenManager.SetActivityFetcherPublisher(activityPublisher)
+		}
 	}
 
 	return &Service{
