@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	notificationssettings "github.com/status-im/status-go/multiaccounts/settings_notifications"

@@ -10,12 +10,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/status-im/status-go/internal/accounts-management/common"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/protocol/requests"
 
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/api"
 )
 

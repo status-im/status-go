@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/internal/accounts-management/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/signal"
 )

@@ -14,11 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	accsmanagementcommon "github.com/status-im/status-go/accounts-management/common"
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto/types"
+	accsmanagementcommon "github.com/status-im/status-go/internal/accounts-management/common"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"

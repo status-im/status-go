@@ -10,8 +10,8 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/api"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/signal"

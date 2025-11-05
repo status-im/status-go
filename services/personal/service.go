@@ -5,9 +5,9 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
 )
 
 // Make sure that Service implements node.Service interface.

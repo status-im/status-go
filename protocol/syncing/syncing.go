@@ -8,8 +8,8 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	maErrors "github.com/status-im/status-go/multiaccounts/errors"

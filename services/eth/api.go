@@ -3,8 +3,7 @@ package eth
 import (
 	"context"
 
-	accounts "github.com/status-im/status-go/accounts-management"
-
+	accounts "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/rpc"
 )
 

@@ -1,10 +1,10 @@
 package accounts
 
 import (
-	accsmanagementcommon "github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/accounts-management/generator"
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
+	accsmanagementcommon "github.com/status-im/status-go/internal/accounts-management/common"
+	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/multiaccounts/common"
 )
 
@@ -41,8 +41,8 @@ func GetWatchOnlyAccountsForTest() []*accsmanagementtypes.Account {
 }
 
 func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccount bool, includeAdditionalAccounts bool) (
-	keypair *accsmanagementtypes.Keypair, acc *generator.Account, derivedAccs map[string]*generator.Account, err error) {
-	acc, derivedAccs, err = generator.CreateAndDeriveAccountsFromMnemonic(testProfileMnemonic, []string{
+	keypair *accsmanagementtypes.Keypair, acc *generator2.Account, derivedAccs map[string]*generator2.Account, err error) {
+	acc, derivedAccs, err = generator2.CreateAndDeriveAccountsFromMnemonic(testProfileMnemonic, []string{
 		accsmanagementcommon.PathEIP1581Chat,
 		accsmanagementcommon.PathDefaultWalletAccount,
 		accsmanagementcommon.CustomWalletPath1,
@@ -146,8 +146,8 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 	return
 }
 
-func GetSeedImportedKeypair1ForTest() (keypair *accsmanagementtypes.Keypair, acc *generator.Account, derivedAccs map[string]*generator.Account, err error) {
-	acc, derivedAccs, err = generator.CreateAndDeriveAccountsFromMnemonic(testSeedMnemonic, []string{
+func GetSeedImportedKeypair1ForTest() (keypair *accsmanagementtypes.Keypair, acc *generator2.Account, derivedAccs map[string]*generator2.Account, err error) {
+	acc, derivedAccs, err = generator2.CreateAndDeriveAccountsFromMnemonic(testSeedMnemonic, []string{
 		accsmanagementcommon.PathDefaultWalletAccount,
 		accsmanagementcommon.CustomWalletPath1,
 	}, "")
@@ -203,8 +203,8 @@ func GetSeedImportedKeypair1ForTest() (keypair *accsmanagementtypes.Keypair, acc
 	return
 }
 
-func GetSeedImportedKeypair2ForTest() (keypair *accsmanagementtypes.Keypair, acc *generator.Account, derivedAccs map[string]*generator.Account, err error) {
-	acc, derivedAccs, err = generator.CreateAndDeriveAccountsFromMnemonic(testSeed2Mnemonic, []string{
+func GetSeedImportedKeypair2ForTest() (keypair *accsmanagementtypes.Keypair, acc *generator2.Account, derivedAccs map[string]*generator2.Account, err error) {
+	acc, derivedAccs, err = generator2.CreateAndDeriveAccountsFromMnemonic(testSeed2Mnemonic, []string{
 		accsmanagementcommon.PathDefaultWalletAccount,
 		accsmanagementcommon.CustomWalletPath1,
 	}, "")

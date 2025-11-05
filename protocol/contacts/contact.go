@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
+	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"

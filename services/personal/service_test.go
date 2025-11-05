@@ -5,9 +5,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
 
 	"github.com/stretchr/testify/require"
 )
@@ -28,12 +28,12 @@ func generateMessageToSign(t *testing.T) string {
 	return types.EncodeHex(crypto.Keccak256(identityPublicKeyCompressedBytes, communityIDBytes, requestIDBytes))
 }
 
-func generateAccountForSigning(t *testing.T) *generator.Account {
+func generateAccountForSigning(t *testing.T) *generator2.Account {
 	seedPhrase := "inch describe nothing prepare salon foster market fabric bottom type trial glooom"
-	account, err := generator.CreateAccountFromMnemonic(seedPhrase, "")
+	account, err := generator2.CreateAccountFromMnemonic(seedPhrase, "")
 	require.NoError(t, err)
 
-	derivedAccount, err := generator.DeriveChildFromAccount(account, "m/44'/60'/0'/0/0")
+	derivedAccount, err := generator2.DeriveChildFromAccount(account, "m/44'/60'/0'/0/0")
 	require.NoError(t, err)
 
 	return derivedAccount

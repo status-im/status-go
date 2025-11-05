@@ -9,8 +9,8 @@ import (
 
 	"go.uber.org/zap"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/appdatabase"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"

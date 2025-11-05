@@ -21,16 +21,15 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	accscommon "github.com/status-im/status-go/accounts-management/common"
-	accsmanagementcommon "github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/accounts-management/keystore"
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	accsmanagementcommon "github.com/status-im/status-go/internal/accounts-management/common"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/accounts-management/keystore"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -573,10 +572,10 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 
 		// Store keystore file for the wallet root address
 		masterAcc, derivedAccs, err := testContext.backend.AccountsManager().StoreKeystoreFilesForMnemonic(testContext.mnemonic, testPassword,
-			[]string{accscommon.PathWalletRoot})
+			[]string{accsmanagementcommon.PathWalletRoot})
 		require.NoError(t, err)
 
-		walletRootGeneratedAccount := derivedAccs[accscommon.PathWalletRoot]
+		walletRootGeneratedAccount := derivedAccs[accsmanagementcommon.PathWalletRoot]
 		require.Equal(t, walletRootAddress, walletRootGeneratedAccount.Address())
 
 		// check the number of wallet addresses in the db
@@ -585,14 +584,14 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.Equal(t, 2, len(walletAddresses)) // should be 1, but because of the tests `Run` before this one it's 2
 
 		// Create a new wallet account and store it to db only, without storing the keystore file
-		derivedWalletAcc1, err := generator.DeriveChildFromAccount(masterAcc, accscommon.CustomWalletPath1)
+		derivedWalletAcc1, err := generator.DeriveChildFromAccount(masterAcc, accsmanagementcommon.CustomWalletPath1)
 		require.NoError(t, err)
 
 		err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{
 			{
 				Address: derivedWalletAcc1.Address(),
 				KeyUID:  masterAcc.KeyUID(),
-				Path:    accscommon.CustomWalletPath1,
+				Path:    accsmanagementcommon.CustomWalletPath1,
 			},
 		}, false)
 		require.NoError(t, err)

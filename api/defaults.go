@@ -7,10 +7,10 @@ import (
 	"math/big"
 	"path/filepath"
 
-	accscommon "github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/accounts-management/generator"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
+	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"

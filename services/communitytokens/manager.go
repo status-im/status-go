@@ -15,8 +15,10 @@ import (
 	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/contracts/community-tokens/ownertoken"
 	communityownertokenregistry "github.com/status-im/status-go/contracts/community-tokens/registry"
+
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	communitytokendeployer2 "github.com/status-im/status-go/pkg/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -37,7 +39,7 @@ func (m *Manager) NewCollectiblesInstance(chainID uint64, contractAddress common
 	return m.contractMaker.NewCollectiblesInstance(chainID, contractAddress)
 }
 
-func (m *Manager) NewCommunityTokenDeployerInstance(chainID uint64) (*communitytokendeployer.CommunityTokenDeployer, error) {
+func (m *Manager) NewCommunityTokenDeployerInstance(chainID uint64) (*communitytokendeployer2.CommunityTokenDeployer, error) {
 	deployerAddr, err := communitytokendeployer.ContractAddress(chainID)
 	if err != nil {
 		return nil, err

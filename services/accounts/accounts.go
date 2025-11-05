@@ -6,10 +6,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	accscommon "github.com/status-im/status-go/accounts-management/common"
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"

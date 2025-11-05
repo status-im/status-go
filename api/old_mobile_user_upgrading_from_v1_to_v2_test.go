@@ -9,10 +9,10 @@ import (
 
 	"go.uber.org/zap"
 
-	accscommon "github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/accounts-management/generator"
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	d_common "github.com/status-im/status-go/common"
+	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/requests"
 

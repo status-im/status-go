@@ -5,11 +5,10 @@ import (
 	"path"
 	"testing"
 
-	"github.com/status-im/status-go/accounts-management/common"
-	accscommon "github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/accounts-management/generator"
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
+	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
+	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -44,14 +43,14 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 	data = &setupContext{}
 
 	var err error
-	data.mnemonic, err = common.CreateRandomMnemonicWithDefaultLength()
+	data.mnemonic, err = accscommon.CreateRandomMnemonicWithDefaultLength()
 	require.NoError(t, err)
 
-	genMasterAcc, err := generator.CreateAccountFromMnemonic(data.mnemonic, "")
+	genMasterAcc, err := generator2.CreateAccountFromMnemonic(data.mnemonic, "")
 	require.NoError(t, err)
 
 	accountsPaths := []string{accscommon.PathWalletRoot, accscommon.PathEIP1581Chat, accscommon.PathDefaultWalletAccount}
-	derivedAccs, err := generator.DeriveChildrenFromAccount(genMasterAcc, append([]string{accscommon.PathWalletRoot}, accountsPaths...))
+	derivedAccs, err := generator2.DeriveChildrenFromAccount(genMasterAcc, append([]string{accscommon.PathWalletRoot}, accountsPaths...))
 	require.NoError(t, err)
 
 	data.profileKeypair = &accsmanagementtypes.Keypair{
@@ -87,9 +86,9 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 	}
 
 	if useDefaultSettings {
-		derivedAddresses := make(map[string]generator.AccountInfo)
+		derivedAddresses := make(map[string]generator2.AccountInfo)
 		for path, acc := range derivedAccs {
-			derivedAddresses[path] = generator.AccountInfo{
+			derivedAddresses[path] = generator2.AccountInfo{
 				Address:   acc.Address().Hex(),
 				PublicKey: acc.PublicKeyHex(),
 			}

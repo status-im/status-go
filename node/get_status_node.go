@@ -19,10 +19,10 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
 	common2 "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"

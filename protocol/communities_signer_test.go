@@ -1,9 +1,9 @@
 package protocol
 
 import (
-	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/services/personal"
 )

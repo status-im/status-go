@@ -14,6 +14,8 @@ import (
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/contracts/snt"
+
+	snt2 "github.com/status-im/status-go/pkg/contracts/snt"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -144,5 +146,5 @@ func (s *ENSRegisterProcessor) CalculateAmountOut(params ProcessorInputParams) (
 }
 
 func (s *ENSRegisterProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
-	return snt.ContractAddress(params.FromChain.ChainID)
+	return snt2.ContractAddress(params.FromChain.ChainID)
 }

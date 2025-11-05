@@ -14,6 +14,9 @@ import (
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/snt"
 	stickersContracts "github.com/status-im/status-go/contracts/stickers"
+
+	snt2 "github.com/status-im/status-go/pkg/contracts/snt"
+	"github.com/status-im/status-go/pkg/contracts/stickers"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
@@ -63,7 +66,7 @@ func (s *StickersBuyProcessor) PackTxInputData(params ProcessorInputParams) ([]b
 		return []byte{}, createStickersBuyErrorResponse(err)
 	}
 
-	stickerMarketABI, err := abi.JSON(strings.NewReader(stickersContracts.StickerMarketABI))
+	stickerMarketABI, err := abi.JSON(strings.NewReader(stickers.StickerMarketABI))
 	if err != nil {
 		return []byte{}, createStickersBuyErrorResponse(err)
 	}
@@ -132,5 +135,5 @@ func (s *StickersBuyProcessor) CalculateAmountOut(params ProcessorInputParams) (
 }
 
 func (s *StickersBuyProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
-	return snt.ContractAddress(params.FromChain.ChainID)
+	return snt2.ContractAddress(params.FromChain.ChainID)
 }

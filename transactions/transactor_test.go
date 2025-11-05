@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	"github.com/status-im/status-go/accounts-management/generator"
-	accstypes "github.com/status-im/status-go/accounts-management/types"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
+	types2 "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
@@ -220,7 +220,7 @@ func (s *TransactorSuite) TestGasValues() {
 	}
 }
 
-func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *accstypes.SelectedExtKey) {
+func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *types2.SelectedExtKey) {
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(account.Address)), gethrpc.PendingBlockNumber).Return(&testNonce, nil)
 
 	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
@@ -234,9 +234,9 @@ func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs
 
 func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	key, _ := gethcrypto.GenerateKey()
-	selectedAccount := &accstypes.SelectedExtKey{
+	selectedAccount := &types2.SelectedExtKey{
 		Address:    types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
-		AccountKey: &accstypes.Key{PrivateKey: key},
+		AccountKey: &types2.Key{PrivateKey: key},
 	}
 
 	chainID := s.nodeConfig.NetworkID

@@ -5,6 +5,6 @@
 build/bin
 statusd-data
 wnode-data
-_assets/ci
+assets/ci
 Dockerfile
 **/*.test

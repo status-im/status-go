@@ -26,19 +26,17 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	accscommon "github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/accounts-management/generator"
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/centralizedmetrics"
-	centralizedmetricscommon "github.com/status-im/status-go/centralizedmetrics/common"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/accounts-management/common"
+	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
@@ -57,6 +55,8 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server/pairing/statecontrol"
+	"github.com/status-im/status-go/services/centralizedmetrics"
+	centralizedmetricscommon "github.com/status-im/status-go/services/centralizedmetrics/common"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
@@ -661,8 +661,8 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 			return errors.Wrap(err, "failed to derive children accounts")
 		}
 
-		request.Password = generatedDerivedAccountsInfo[accscommon.PathEIP1581Encryption].PublicKey
-		request.KeycardWhisperPrivateKey = generatedDerivedAccountsInfo[accscommon.PathEIP1581Chat].PrivateKey
+		request.Password = generatedDerivedAccountsInfo[common.PathEIP1581Encryption].PublicKey
+		request.KeycardWhisperPrivateKey = generatedDerivedAccountsInfo[common.PathEIP1581Chat].PrivateKey
 	}
 
 	acc := multiaccounts.Account{
@@ -1283,7 +1283,7 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		return nil, err
 	}
 
-	mnemonic, err := accscommon.CreateRandomMnemonicWithDefaultLength()
+	mnemonic, err := common.CreateRandomMnemonicWithDefaultLength()
 	if err != nil {
 		return nil, err
 	}
@@ -1324,7 +1324,7 @@ func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.Rest
 }
 
 func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
-	genAccount, err := generator.CreateAccountFromMnemonic(mnemonic, "")
+	genAccount, err := generator2.CreateAccountFromMnemonic(mnemonic, "")
 	if err != nil {
 		return "", err
 	}
@@ -1334,16 +1334,16 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 	return accInfo.KeyUID, nil
 }
 
-func (b *GethStatusBackend) generateAccount(mnemonic string) (genAcc *generator.Account, accInfo generator.GeneratedAccountInfo, err error) {
+func (b *GethStatusBackend) generateAccount(mnemonic string) (genAcc *generator2.Account, accInfo generator2.GeneratedAccountInfo, err error) {
 	finalMnemonic := mnemonic
 	if mnemonic == "" {
-		finalMnemonic, err = accscommon.CreateRandomMnemonicWithDefaultLength()
+		finalMnemonic, err = common.CreateRandomMnemonicWithDefaultLength()
 		if err != nil {
 			return
 		}
 	}
 
-	genAcc, err = generator.CreateAccountFromMnemonic(finalMnemonic, "")
+	genAcc, err = generator2.CreateAccountFromMnemonic(finalMnemonic, "")
 	if err != nil {
 		return
 	}
@@ -1352,13 +1352,13 @@ func (b *GethStatusBackend) generateAccount(mnemonic string) (genAcc *generator.
 	return
 }
 
-func (b *GethStatusBackend) generateDerivedAddresses(genAcc *generator.Account, paths []string) (genDerivedAccounts map[string]*generator.Account, genDerivedAccountsInfo map[string]generator.AccountInfo, err error) {
-	genDerivedAccounts, err = generator.DeriveChildrenFromAccount(genAcc, paths)
+func (b *GethStatusBackend) generateDerivedAddresses(genAcc *generator2.Account, paths []string) (genDerivedAccounts map[string]*generator2.Account, genDerivedAccountsInfo map[string]generator2.AccountInfo, err error) {
+	genDerivedAccounts, err = generator2.DeriveChildrenFromAccount(genAcc, paths)
 	if err != nil {
 		return
 	}
 
-	genDerivedAccountsInfo = make(map[string]generator.AccountInfo, 0)
+	genDerivedAccountsInfo = make(map[string]generator2.AccountInfo, 0)
 	for path, acc := range genDerivedAccounts {
 		genDerivedAccountsInfo[path] = acc.ToAccountInfo()
 	}
@@ -1418,7 +1418,7 @@ func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, keyUID
 }
 
 func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, mnemonic string, keyUID string, masterAddress string,
-	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (*settings.Settings, error) {
+	derivedAddresses map[string]generator2.AccountInfo, restoreAccount bool) (*settings.Settings, error) {
 	s, err := defaultSettings(keyUID, masterAddress, derivedAddresses)
 	if err != nil {
 		return nil, err
@@ -1455,14 +1455,14 @@ func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, keyUI
 
 func (b *GethStatusBackend) prepareWalletAccount(request *requests.CreateAccount) *accsmanagementtypes.AccountCreationDetails {
 	return &accsmanagementtypes.AccountCreationDetails{
-		Path:    accscommon.PathDefaultWalletAccount,
+		Path:    common.PathDefaultWalletAccount,
 		Name:    walletAccountDefaultName,
 		ColorID: request.CustomizationColor,
 	}
 }
 
 func (b *GethStatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID string, masterAddress string,
-	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (keypair *accsmanagementtypes.Keypair, err error) {
+	derivedAddresses map[string]generator2.AccountInfo, restoreAccount bool) (keypair *accsmanagementtypes.Keypair, err error) {
 	// set up keypair
 	keypair = &accsmanagementtypes.Keypair{
 		Name:                    request.DisplayName,
@@ -1473,26 +1473,26 @@ func (b *GethStatusBackend) prepareKeypair(request *requests.CreateAccount, keyU
 	}
 
 	// add chat account
-	chatDerivedAccount := derivedAddresses[accscommon.PathEIP1581Chat]
+	chatDerivedAccount := derivedAddresses[common.PathEIP1581Chat]
 	keypair.Accounts = append(keypair.Accounts, &accsmanagementtypes.Account{
 		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
 		KeyUID:    keypair.KeyUID,
 		Address:   types.HexToAddress(chatDerivedAccount.Address),
 		Chat:      true,
-		Path:      accscommon.PathEIP1581Chat,
+		Path:      common.PathEIP1581Chat,
 		Position:  -1, // When creating a new account, the chat account should have position -1, cause it doesn't participate
 		Operable:  accsmanagementtypes.AccountFullyOperable,
 	})
 
 	// add wallet account
-	walletDerivedAccount := derivedAddresses[accscommon.PathDefaultWalletAccount]
+	walletDerivedAccount := derivedAddresses[common.PathDefaultWalletAccount]
 	keypair.Accounts = append(keypair.Accounts, &accsmanagementtypes.Account{
 		PublicKey:          types.Hex2Bytes(walletDerivedAccount.PublicKey),
 		KeyUID:             keypair.KeyUID,
 		Address:            types.HexToAddress(walletDerivedAccount.Address),
 		ColorID:            multiacccommon.CustomizationColor(request.CustomizationColor),
 		Wallet:             true,
-		Path:               accscommon.PathDefaultWalletAccount,
+		Path:               common.PathDefaultWalletAccount,
 		Name:               walletAccountDefaultName,
 		AddressWasNotShown: !restoreAccount,
 		Position:           0, // When creating a new account, the wallet account should have position 0, cause it's the default wallet account
@@ -1570,7 +1570,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 
 	// We add these two paths, cause others will be added via `StoreAccount` function call
 	var paths []string
-	paths = append(paths, accscommon.PathWalletRoot, accscommon.PathEIP1581Root)
+	paths = append(paths, common.PathWalletRoot, common.PathEIP1581Root)
 	for _, acc := range knownAccounts {
 		if generatedAccountInfo.KeyUID == acc.KeyUID {
 			paths = append(paths, acc.Path)
@@ -1680,11 +1680,11 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 		chatPrivateKey          *ecdsa.PrivateKey // set only for keycard account
 		chatPublicKey           types.HexBytes
 		customizationColorClock uint64 // not sure if we need this customizationColorClock at all since the desktop app doesn't use it
-		derivedAddresses        = map[string]generator.AccountInfo{
-			accscommon.PathWalletRoot:           {},
-			accscommon.PathEIP1581Root:          {},
-			accscommon.PathEIP1581Chat:          {},
-			accscommon.PathDefaultWalletAccount: {},
+		derivedAddresses        = map[string]generator2.AccountInfo{
+			common.PathWalletRoot:           {},
+			common.PathEIP1581Root:          {},
+			common.PathEIP1581Chat:          {},
+			common.PathDefaultWalletAccount: {},
 		}
 		keypairToStoreDirectly *accsmanagementtypes.Keypair
 	)
@@ -1693,26 +1693,26 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 		keyUID = keycardData.KeyUID
 		masterAddress = keycardData.Address
 
-		derivedAddresses[accscommon.PathWalletRoot] = generator.AccountInfo{
+		derivedAddresses[common.PathWalletRoot] = generator2.AccountInfo{
 			Address: keycardData.WalletRootAddress,
 		}
-		derivedAddresses[accscommon.PathEIP1581Root] = generator.AccountInfo{
+		derivedAddresses[common.PathEIP1581Root] = generator2.AccountInfo{
 			Address: keycardData.Eip1581Address,
 		}
-		derivedAddresses[accscommon.PathEIP1581Chat] = generator.AccountInfo{
+		derivedAddresses[common.PathEIP1581Chat] = generator2.AccountInfo{
 			Address:    keycardData.WhisperAddress,
 			PublicKey:  keycardData.WhisperPublicKey,
 			PrivateKey: keycardData.WhisperPrivateKey,
 		}
-		derivedAddresses[accscommon.PathDefaultWalletAccount] = generator.AccountInfo{
+		derivedAddresses[common.PathDefaultWalletAccount] = generator2.AccountInfo{
 			Address:   keycardData.WalletAddress,
 			PublicKey: keycardData.WalletPublicKey,
 		}
-		derivedAddresses[accscommon.PathEIP1581Encryption] = generator.AccountInfo{
+		derivedAddresses[common.PathEIP1581Encryption] = generator2.AccountInfo{
 			PublicKey: keycardData.EncryptionPublicKey,
 		}
 	} else {
-		genMasterAcc, err := generator.CreateAccountFromMnemonic(mnemonic, "")
+		genMasterAcc, err := generator2.CreateAccountFromMnemonic(mnemonic, "")
 		if err != nil {
 			return nil, err
 		}
@@ -1725,11 +1725,11 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 		}
 
 		derivationPaths := []string{
-			accscommon.PathWalletRoot,
-			accscommon.PathEIP1581Root,
-			accscommon.PathEIP1581Chat,
-			accscommon.PathDefaultWalletAccount,
-			accscommon.PathEIP1581Encryption,
+			common.PathWalletRoot,
+			common.PathEIP1581Root,
+			common.PathEIP1581Chat,
+			common.PathDefaultWalletAccount,
+			common.PathEIP1581Encryption,
 		}
 		_, derivedAddresses, err = b.generateDerivedAddresses(genMasterAcc, derivationPaths)
 		if err != nil {
@@ -1738,7 +1738,7 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 	}
 
 	if isKeycard {
-		genChatAccount, err := generator.CreateAccountFromPrivateKey(derivedAddresses[accscommon.PathEIP1581Chat].PrivateKey)
+		genChatAccount, err := generator2.CreateAccountFromPrivateKey(derivedAddresses[common.PathEIP1581Chat].PrivateKey)
 		if err != nil {
 			return nil, err
 		}
@@ -1746,9 +1746,9 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 		chatPrivateKey = genChatAccount.PrivateKey()
 		chatPublicKey = types.Hex2Bytes(genChatAccount.PublicKeyHex())
 
-		request.Password = derivedAddresses[accscommon.PathEIP1581Encryption].PublicKey
+		request.Password = derivedAddresses[common.PathEIP1581Encryption].PublicKey
 	} else {
-		chatPublicKey = types.Hex2Bytes(derivedAddresses[accscommon.PathEIP1581Chat].PublicKey)
+		chatPublicKey = types.Hex2Bytes(derivedAddresses[common.PathEIP1581Chat].PublicKey)
 	}
 
 	settings, err := b.prepareSettings(request, mnemonic, keyUID, masterAddress, derivedAddresses, restoreAccount)
@@ -2083,7 +2083,7 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 	return types.Hash(hash), err
 }
 
-func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*generator.Account, error) {
+func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*generator2.Account, error) {
 	return b.accountsManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
 }
 

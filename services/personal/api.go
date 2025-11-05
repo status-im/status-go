@@ -3,8 +3,8 @@ package personal
 import (
 	"errors"
 
-	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
 )
 
 var (

@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"

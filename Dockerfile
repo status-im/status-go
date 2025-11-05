@@ -55,7 +55,7 @@ COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/scri
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
 
-COPY _assets/scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY assets/scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # 30304 is used for Discovery v5
