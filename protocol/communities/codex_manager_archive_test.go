@@ -118,6 +118,9 @@ func (s *CodexArchiveManagerSuite) TearDownTest() {
 }
 
 func (s *CodexArchiveManagerSuite) TestDownloadingArchivesFromCodex() {
+	// Subscribe to signals before starting the test
+	subscription := s.manager.Subscribe()
+
 	// Create test archive data and upload multiple archives to Codex
 	archives := []struct {
 		hash string
@@ -186,7 +189,56 @@ func (s *CodexArchiveManagerSuite) TestDownloadingArchivesFromCodex() {
 
 	communityID := types.HexBytes("test-community-id")
 	cancelChan := make(chan struct{})
-	// logger, _ := zap.NewDevelopment()
+
+	// Track received signals
+	receivedSignals := struct {
+		downloadingStarted bool
+		archiveDownloaded  map[string]bool // hash -> received
+		seedingSignal      bool
+	}{
+		archiveDownloaded: make(map[string]bool),
+	}
+
+	// Start goroutine to collect signals
+	done := make(chan struct{})
+	go func() {
+		timeout := time.After(30 * time.Second)
+		for {
+			select {
+			case event := <-subscription:
+				if event.DownloadingHistoryArchivesStartedSignal != nil {
+					receivedSignals.downloadingStarted = true
+					s.T().Logf("Received DownloadingHistoryArchivesStartedSignal for community: %s",
+						event.DownloadingHistoryArchivesStartedSignal.CommunityID)
+				}
+				if event.HistoryArchiveDownloadedSignal != nil {
+					s.T().Logf("Received HistoryArchiveDownloadedSignal for community: %s, From: %d, To: %d",
+						event.HistoryArchiveDownloadedSignal.CommunityID,
+						event.HistoryArchiveDownloadedSignal.From,
+						event.HistoryArchiveDownloadedSignal.To)
+					// Find which archive this corresponds to
+					for _, archive := range archives {
+						if uint64(event.HistoryArchiveDownloadedSignal.From) == archive.from &&
+							uint64(event.HistoryArchiveDownloadedSignal.To) == archive.to {
+							receivedSignals.archiveDownloaded[archive.hash] = true
+						}
+					}
+				}
+				if event.HistoryArchivesSeedingSignal != nil {
+					receivedSignals.seedingSignal = true
+					s.T().Logf("Received HistoryArchivesSeedingSignal for community: %s, MagnetLink: %v, IndexCid: %v",
+						event.HistoryArchivesSeedingSignal.CommunityID,
+						event.HistoryArchivesSeedingSignal.MagnetLink,
+						event.HistoryArchivesSeedingSignal.IndexCid)
+				}
+			case <-timeout:
+				close(done)
+				return
+			case <-done:
+				return
+			}
+		}
+	}()
 
 	taskInfo, err := s.archiveManager.DownloadHistoryArchivesByIndexCid(communityID, cid, cancelChan)
 	s.Require().NoError(err, "Failed to download archives")
@@ -197,11 +249,30 @@ func (s *CodexArchiveManagerSuite) TestDownloadingArchivesFromCodex() {
 
 	s.T().Logf("Download task info: %+v", taskInfo)
 
+	// Stop the signal collection goroutine
+	close(done)
+
+	// Wait a bit for any remaining signals to be processed
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify that archives are stored in persistence
 	for _, archive := range archives {
 		exists, err := s.manager.GetPersistence().HasMessageArchiveID(communityID, archive.hash)
 		s.Require().NoError(err, "Failed to check archive ID %s in persistence", archive.hash)
 		s.Require().True(exists, "Archive hash %s should be stored in persistence", archive.hash)
 	}
+
+	// Verify that all expected signals were received
+	s.Require().True(receivedSignals.downloadingStarted, "Should have received DownloadingHistoryArchivesStartedSignal")
+	s.Require().True(receivedSignals.seedingSignal, "Should have received HistoryArchivesSeedingSignal")
+
+	// Verify that we received download signals for all archives
+	for _, archive := range archives {
+		s.Require().True(receivedSignals.archiveDownloaded[archive.hash],
+			"Should have received HistoryArchiveDownloadedSignal for archive %s", archive.hash)
+	}
+
+	s.T().Logf("All signals verified successfully!")
 }
 
 // Run the integration test suite
