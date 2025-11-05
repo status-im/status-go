@@ -1193,7 +1193,7 @@ github.com/status-im/go-wallet-sdk/pkg/eventfilter
 github.com/status-im/go-wallet-sdk/pkg/eventlog
 github.com/status-im/go-wallet-sdk/pkg/gas
 github.com/status-im/go-wallet-sdk/pkg/multicall
-# github.com/status-im/goroutine-defer-guard v0.1.0
+# github.com/status-im/goroutine-defer-guard v0.1.1
 ## explicit; go 1.24.0
 github.com/status-im/goroutine-defer-guard/cmd/goroutine-defer-guard
 github.com/status-im/goroutine-defer-guard/cmd/goroutine-defer-guard/analyzer
