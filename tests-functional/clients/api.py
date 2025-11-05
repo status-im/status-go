@@ -31,6 +31,9 @@ class ApiClient:
         self.client = client
         self.api_url = api_url
 
+    def method_url(self, method):
+        return f"{self.api_url}/{method}"
+
     def api_request(self, method, data, url=None, quiet=False, **kwargs):
         url = url if url else self.api_url
         url = f"{url}/{method}" if method else url

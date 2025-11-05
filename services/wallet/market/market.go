@@ -129,8 +129,13 @@ func (pm *Manager) symbolProviderSymbolMaps(symbols []string) (symbolsToProvider
 		for _, token := range allTokens {
 			if strings.EqualFold(token.Symbol, symbol) || strings.EqualFold(token.TmpSymbol, symbol) {
 				found = true
-				symbolsToProviderSymbols[symbol] = token.TmpSymbol
-				providerSymbolsToSymbols[token.TmpSymbol] = append(providerSymbolsToSymbols[token.TmpSymbol], symbol)
+				// Use TmpSymbol if it's set (for collision resolution), otherwise use Symbol
+				providerSymbol := token.TmpSymbol
+				if providerSymbol == "" {
+					providerSymbol = token.Symbol
+				}
+				symbolsToProviderSymbols[symbol] = providerSymbol
+				providerSymbolsToSymbols[providerSymbol] = append(providerSymbolsToSymbols[providerSymbol], symbol)
 				break
 			}
 		}

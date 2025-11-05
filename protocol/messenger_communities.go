@@ -38,6 +38,7 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/sharedurls"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/signal"
 )
@@ -2920,7 +2921,7 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 	}
 
 	response := &MessengerResponse{}
-	communityURL, err := m.ShareCommunityURLWithData(request.CommunityID)
+	communityURL, err := sharedurls.ShareCommunityURLWithData(community)
 	if err != nil {
 		return nil, err
 	}

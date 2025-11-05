@@ -10,7 +10,6 @@ from clients.contract_deployers.snt import (
     SNTV2_ABI,
     SNT_TOKEN_CONTROLLER_ABI,
 )
-from clients.signals import SignalType
 from resources.constants import DEPLOYER_ACCOUNT
 from resources.constants import user_1, user_2
 from utils import wallet_utils
@@ -30,14 +29,6 @@ def validate_entry(entry, tx_data):
 @pytest.mark.activity
 @pytest.mark.xdist_group(name="WalletSteps")
 class TestWalletActivitySession:
-    await_signals = [
-        SignalType.NODE_LOGIN.value,
-        SignalType.WALLET.value,
-        SignalType.WALLET_SUGGESTED_ROUTES.value,
-        SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value,
-        SignalType.WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED.value,
-        SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
-    ]
 
     @staticmethod
     def _token_list_to_token_overrides(token_list):

@@ -1,14 +1,16 @@
 import logging
 from uuid import uuid4
+
 import pytest
 from requests import ReadTimeout
 
+from clients.anvil import Anvil
+from clients.contract_deployers.multicall3 import Multicall3Deployer
+from clients.foundry import Foundry
 from clients.status_backend import StatusBackend
 from clients.statusgo_container import StatusGoContainer
-from clients.anvil import Anvil
-from clients.foundry import Foundry
-from clients.contract_deployers.multicall3 import Multicall3Deployer
 from resources.constants import USE_IPV6
+from utils import fake
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -29,9 +31,6 @@ def backend_factory(request):
         self.sender = backend_factory("sender")
         self.receiver = backend_factory("receiver")
     """
-
-    # Get class-level configuration
-    await_signals = getattr(request.cls, "await_signals", ["messages.new", "message.delivered", "node.login", "node.logout"])
 
     # Get parameters from request.param if available
     params = getattr(request, "param", {})
@@ -61,7 +60,7 @@ def backend_factory(request):
         logging.debug(f"📋 [SETUP] Parameters: privileged={privileged}, ipv6={ipv6}")
 
         # Create backend
-        backend = StatusBackend(await_signals=await_signals, privileged=privileged, ipv6=ipv6, **kwargs)
+        backend = StatusBackend(privileged=privileged, ipv6=ipv6, **kwargs)
         created_backends.append(backend)
         logging.debug(f"✅ [SETUP] {name.capitalize()} backend created")
 
@@ -86,18 +85,20 @@ def waku_light_client(request) -> bool:
 def backend_new_profile(request, backend_factory):
     backends: list[StatusBackend] = []
 
-    def _backend_new_profile(name: str, waku_light_client: bool = False, **kwargs) -> StatusBackend:
+    def factory(name: str = "", waku_light_client: bool = False, **kwargs) -> StatusBackend:
+        password = kwargs.pop("password", fake.profile_password())
+
         logging.debug(f"📋 [SETUP] backend_new_profile parameters: wakuV2LightClient={waku_light_client}")
         backend = backend_factory(name, **kwargs)
         backends.append(backend)
 
         backend.init_status_backend()
-        backend.create_account_and_login(waku_light_client=waku_light_client, **kwargs)
+        backend.create_account_and_login(password=password, waku_light_client=waku_light_client, **kwargs)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()
         return backend
 
-    yield _backend_new_profile
+    yield factory
 
     for backend in backends:
         try:

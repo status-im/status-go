@@ -10,10 +10,10 @@ import (
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/featureflags"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/newsfeed"
+	"github.com/status-im/status-go/services/sharedurls"
 
 	"github.com/ethereum/go-ethereum/event"
 
@@ -108,6 +108,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, lns)
 
 	services = append(services, b.NewsFeedService())
+	services = append(services, b.sharedUrlsService())
 
 	b.services = services
 
@@ -323,6 +324,21 @@ func (b *StatusNode) ethService() *eth.Service {
 	return b.ethSrvc
 }
 
+func (b *StatusNode) sharedUrlsService() *sharedurls.Service {
+	if b.sharedUrlsSrvc == nil {
+		b.sharedUrlsSrvc = sharedurls.NewService(nil)
+		if extService := b.WakuV2ExtService(); extService != nil {
+			provider := NewSharedUrlsMessengerAdapter(extService.Messenger())
+			b.sharedUrlsSrvc.SetDataProvider(provider)
+		}
+	}
+	return b.sharedUrlsSrvc
+}
+
+func (b *StatusNode) SharedUrlsService() *sharedurls.Service {
+	return b.sharedUrlsSrvc
+}
+
 func (b *StatusNode) localNotificationsService(network uint64) (*localnotifications.Service, error) {
 	var err error
 	if b.localNotificationsSrvc == nil {
@@ -404,14 +420,6 @@ func (b *StatusNode) timeSourceNow() func() time.Time {
 	return b.TimeSource().Now
 }
 
-type NewsFeedActivityCenter struct {
-	m *protocol.Messenger
-}
-
-func (ac *NewsFeedActivityCenter) AddNotification(response *protocol.MessengerResponse, notification *protocol.ActivityCenterNotification) error {
-	return ac.m.AddActivityCenterNotification(response, notification, nil)
-}
-
 func (b *StatusNode) NewsFeedService() *newsfeed.Service {
 	if !featureflags.EnableNewsFeed {
 		return nil
@@ -419,16 +427,17 @@ func (b *StatusNode) NewsFeedService() *newsfeed.Service {
 
 	if b.newsfeedSrvc == nil {
 		persistence := newsfeed.NewSQLitePersistence(b.appDB)
-		ac := &NewsFeedActivityCenter{}
-		if wakuext := b.WakuV2ExtService(); wakuext != nil {
-			ac.m = wakuext.Messenger()
-		}
 
 		b.newsfeedSrvc = newsfeed.NewService(
 			b.logger.Named("newsfeed"),
 			persistence,
-			ac,
+			nil,
 		)
+
+		if wakuext := b.WakuV2ExtService(); wakuext != nil {
+			ac := NewNewsFeedActivityCenterAdapter(wakuext.Messenger())
+			b.newsfeedSrvc.SetActivityCenter(ac)
+		}
 	}
 	return b.newsfeedSrvc
 }

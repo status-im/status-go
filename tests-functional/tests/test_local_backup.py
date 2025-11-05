@@ -1,9 +1,11 @@
 import os
-from clients.status_backend import StatusBackend
+
 import pytest
+
+from clients.status_backend import StatusBackend
 from resources.constants import Account, user_1
 from resources.test_data import profile_showcase_utils
-
+from utils import fake
 
 test_one_to_one_chat_id = (
     "0x043329fc08727f15c4ec9a17bf7d6a3dc44e9d0d8f782a55804f3660b28827194a365dc1765cf96b6fa5cd666b9ee5298e8ac82f51f7952c4110cbf321d4f63864"
@@ -15,19 +17,12 @@ class TestLocalBackup:
 
     @pytest.mark.init
     def test_local_backup(self, tmp_path):
-        await_signals = [
-            "mediaserver.started",
-            "node.started",
-            "node.ready",
-            "node.login",
-        ]
-
-        backend_client = StatusBackend(await_signals)
+        backend_client = StatusBackend()
         assert backend_client is not None
 
         # Init and login
         backend_client.init_status_backend()
-        backend_client.create_account_and_login()
+        backend_client.create_account_and_login(password=fake.profile_password())
         backend_client.wait_for_login()
         backend_client.wakuext_service.start_messenger()
 
@@ -211,7 +206,7 @@ class TestLocalBackup:
         assert backup_file is not None
 
         # Create a new installation
-        backend_client2 = StatusBackend(await_signals)
+        backend_client2 = StatusBackend()
         assert backend_client2 is not None
 
         # Init and login
@@ -294,13 +289,7 @@ class TestLocalBackup:
         assert one_on_one_chat_recovered, "One-to-one chat was not restored correctly"
 
     def test_local_backup_backwards_compatibility(self, tmp_path):
-        await_signals = [
-            "mediaserver.started",
-            "node.started",
-            "node.ready",
-            "node.login",
-        ]
-        backend_client = StatusBackend(await_signals)
+        backend_client = StatusBackend()
         assert backend_client is not None
         # Restore the account with a hardcoded mnemonic to get the same private key
         backend_client.init_status_backend()

@@ -157,13 +157,24 @@ func (s *DataStorage) GetCombinedData() []Cryptocurrency {
 	// Update with the latest price data where available
 	for i := range result {
 		crypto := &result[i]
-		symbol := crypto.Symbol
+		// Use the cryptocurrency ID (in lowercase) to lookup price data
+		cryptoID := strings.ToLower(crypto.ID)
 
-		// If we have updated price data for this symbol, update the cryptocurrency
-		if priceUpdate, ok := s.priceData[symbol]; ok {
+		// If we have updated price data for this crypto ID, update the cryptocurrency
+		if priceUpdate, ok := s.priceData[cryptoID]; ok {
 			// Update the price
 			if crypto.CurrentPrice != priceUpdate.Price {
 				crypto.CurrentPrice = priceUpdate.Price
+			}
+
+			// Update market cap if available
+			if priceUpdate.MarketCap != 0 {
+				crypto.MarketCap = priceUpdate.MarketCap
+			}
+
+			// Update volume if available
+			if priceUpdate.Volume24h != 0 {
+				crypto.TotalVolume = priceUpdate.Volume24h
 			}
 
 			// Update percentage change if available
@@ -227,10 +238,11 @@ func (s *DataStorage) GetLeaderboardPagePrices(page LeaderboardPage) *Leaderboar
 	}
 
 	for i := range data {
-		symbol := strings.ToUpper(data[i].Symbol)
+		// coingecko id lowercase (e.g., "bitcoin", "ethereum")
+		cryptoID := strings.ToLower(data[i].ID)
 
-		// If we have updated price data for this symbol, update the cryptocurrency
-		if priceUpdate, ok := s.priceData[symbol]; ok {
+		// If we have updated price data for this crypto ID, add it to results
+		if priceUpdate, ok := s.priceData[cryptoID]; ok {
 			priceUpdate.ID = data[i].ID
 			result.Data = append(result.Data, priceUpdate)
 		}

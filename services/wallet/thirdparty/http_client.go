@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -181,6 +182,15 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 	defer resp.Body.Close()
 
 	if mods.etag != "" && resp.StatusCode == http.StatusNotModified {
+		return
+	}
+
+	// A non-2xx status code doesn't cause an error
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		err = fmt.Errorf("HTTP request failed with status code: %d", resp.StatusCode)
+		logutils.ZapLogger().Debug("GET request returned non-2xx status",
+			zap.String("url", url),
+			zap.Int("status", resp.StatusCode))
 		return
 	}
 

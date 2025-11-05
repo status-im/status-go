@@ -116,6 +116,7 @@ func messengerDefaultConfig() config {
 
 	c.codeControlFlags.AutoRequestHistoricMessages = true
 	c.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled = true
+
 	return c
 }
 
