@@ -36,6 +36,12 @@ const (
 	// EventDownloadingHistoryArchivesFinished is triggered when the community member node
 	// has downloaded all archives
 	EventDownloadingHistoryArchivesFinished = "community.downloadingHistoryArchivesFinished"
+	// EventManifestFetched is triggered when the community member node
+	// has successfully fetched the manifest for an archive index
+	EventManifestFetched = "community.manifestFetched"
+	// EventIndexDownloadCompleted is triggered when the community member node
+	// has completed downloading the archive index file
+	EventIndexDownloadCompleted = "community.indexDownloadCompleted"
 )
 
 type CreatingHistoryArchivesSignal struct {
@@ -80,6 +86,16 @@ type ImportingHistoryArchiveMessagesSignal struct {
 
 type DownloadingHistoryArchivesFinishedSignal struct {
 	CommunityID string `json:"communityId"`
+}
+
+type ManifestFetchedSignal struct {
+	CommunityID string `json:"communityId"`
+	IndexCid    string `json:"indexCid"`
+}
+
+type IndexDownloadCompletedSignal struct {
+	CommunityID string `json:"communityId"`
+	IndexCid    string `json:"indexCid"`
 }
 
 func SendHistoryArchivesProtocolEnabled() {
@@ -145,5 +161,19 @@ func SendImportingHistoryArchiveMessages(communityID string) {
 func SendDownloadingHistoryArchivesFinished(communityID string) {
 	send(EventDownloadingHistoryArchivesFinished, DownloadingHistoryArchivesFinishedSignal{
 		CommunityID: communityID,
+	})
+}
+
+func SendManifestFetched(communityID string, indexCid string) {
+	send(EventManifestFetched, ManifestFetchedSignal{
+		CommunityID: communityID,
+		IndexCid:    indexCid,
+	})
+}
+
+func SendIndexDownloadCompleted(communityID string, indexCid string) {
+	send(EventIndexDownloadCompleted, IndexDownloadCompletedSignal{
+		CommunityID: communityID,
+		IndexCid:    indexCid,
 	})
 }

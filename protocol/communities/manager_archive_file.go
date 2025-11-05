@@ -12,6 +12,7 @@ package communities
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -35,7 +36,7 @@ import (
 type ArchiveFileManager struct {
 	torrentConfig *params.TorrentConfig
 	codexConfig   *params.CodexConfig
-	codexClient   *CodexClient
+	codexClient   CodexClientInterface
 	logger        *zap.Logger
 	persistence   *Persistence
 	identity      *ecdsa.PrivateKey
@@ -56,7 +57,7 @@ func NewArchiveFileManager(amc *ArchiveManagerConfig) *ArchiveFileManager {
 	}
 }
 
-func (m *ArchiveFileManager) SetCodexClient(codexClient *CodexClient) {
+func (m *ArchiveFileManager) SetCodexClient(codexClient CodexClientInterface) {
 	m.codexClient = codexClient
 }
 
@@ -593,7 +594,20 @@ func (m *ArchiveFileManager) readCodexIndexFromFile(communityID types.HexBytes) 
 
 func (m *ArchiveFileManager) removeCodexIndexFile(communityID types.HexBytes) error {
 	indexFilePath := m.codexHistoryArchiveIndexFilePath(communityID)
-	return os.Remove(indexFilePath)
+	err := os.Remove(indexFilePath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+func (m *ArchiveFileManager) removeCodexIndexCidFile(communityID types.HexBytes) error {
+	indexCidFilePath := m.codexHistoryArchiveIndexCidFilePath(communityID)
+	err := os.Remove(indexCidFilePath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 func (m *ArchiveFileManager) writeCodexIndexCidToFile(communityID types.HexBytes, cid string) error {
@@ -681,9 +695,7 @@ func (m *ArchiveFileManager) GetHistoryArchiveMagnetlink(communityID types.HexBy
 }
 
 func (m *ArchiveFileManager) GetHistoryArchiveIndexCid(communityID types.HexBytes) (string, error) {
-	codexIndexCidPath := m.codexHistoryArchiveIndexCidFilePath(communityID)
-
-	cidData, err := os.ReadFile(codexIndexCidPath)
+	cidData, err := m.readCodexIndexCidFromFile(communityID)
 	if err != nil {
 		return "", err
 	}

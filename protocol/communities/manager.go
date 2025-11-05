@@ -213,8 +213,8 @@ type ArchiveService interface {
 	SetCodexConfig(*params.CodexConfig)
 	StartTorrentClient() error
 	StartCodexClient() error
-	SetCodexClient(client *CodexClient)
-	GetCodexClient() *CodexClient
+	SetCodexClient(client CodexClientInterface)
+	GetCodexClient() CodexClientInterface
 	Stop() error
 	IsReady() bool
 	GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error)
@@ -227,6 +227,7 @@ type ArchiveService interface {
 	UnseedHistoryArchiveTorrent(communityID types.HexBytes)
 	UnseedHistoryArchiveIndexCid(communityID types.HexBytes)
 	IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool
+	IsSeedingHistoryArchiveCodex(communityID types.HexBytes) bool
 	GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask
 	AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask)
 	DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
@@ -517,6 +518,8 @@ type Subscription struct {
 	DownloadingHistoryArchivesStartedSignal  *signal.DownloadingHistoryArchivesStartedSignal
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
+	ManifestFetchedSignal                    *signal.ManifestFetchedSignal
+	IndexDownloadCompletedSignal             *signal.IndexDownloadCompletedSignal
 	CommunityEventsMessage                   *CommunityEventsMessage
 	AcceptedRequestsToJoin                   []types.HexBytes
 	RejectedRequestsToJoin                   []types.HexBytes

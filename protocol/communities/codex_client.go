@@ -21,13 +21,13 @@ type CodexClient struct {
 }
 
 // NewCodexClient creates a new Codex client
-func NewCodexClient(config params.CodexConfig) (CodexClient, error) {
+func NewCodexClient(config params.CodexConfig) (CodexClientInterface, error) {
 	node, err := codex.New(config.CodexNodeConfig)
 	if err != nil {
-		return CodexClient{}, err
+		return nil, err
 	}
 
-	return CodexClient{
+	return &CodexClient{
 		config:  config.CodexNodeConfig,
 		node:    node,
 		enabled: config.Enabled,
