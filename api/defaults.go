@@ -349,14 +349,17 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	if request.TorrentConfigEnabled != nil {
 		nodeConfig.TorrentConfig.Enabled = *request.TorrentConfigEnabled
-
 	}
 	if request.TorrentConfigPort != nil {
 		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
 	}
 
+	if request.CodexConfigEnabled != nil {
+		nodeConfig.CodexConfig.Enabled = *request.CodexConfigEnabled
+	}
+
 	nodeConfig.CodexConfig = params.CodexConfig{
-		Enabled:               false,
+		Enabled:               nodeConfig.CodexConfig.Enabled,
 		HistoryArchiveDataDir: filepath.Join(nodeConfig.RootDataDir, "codex", "archivedata"),
 		CodexNodeConfig: codex.Config{
 			DataDir:        filepath.Join(nodeConfig.RootDataDir, "codex", "codexdata"),

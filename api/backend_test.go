@@ -1457,6 +1457,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 			},
 			"torrentConfigEnabled":   false,
 			"torrentConfigPort":      0,
+			"codexConfigEnabled":     false,
 			"keycardInstanceUID":     "a84599394887b742eed9a99d3834a797",
 			"keycardPairingDataFile": path.Join(tmpdir, DefaultKeycardPairingDataFileRelativePath),
 		},
