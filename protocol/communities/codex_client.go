@@ -135,3 +135,15 @@ func (c *CodexClient) UploadArchive(encodedArchive []byte) (string, error) {
 func (c *CodexClient) DownloadManifest(cid string) (codex.Manifest, error) {
 	return c.node.DownloadManifest(cid)
 }
+
+func (c *CodexClient) PeerId() (string, error) {
+	return c.node.PeerId()
+}
+
+func (c *CodexClient) Debug() (codex.DebugInfo, error) {
+	return c.node.Debug()
+}
+
+func (c *CodexClient) Connect(peerId string, peerAddresses []string) error {
+	return c.node.Connect(peerId, peerAddresses)
+}

@@ -37,6 +37,11 @@ type CodexClientInterface interface {
 	Stop() error
 	Destroy() error
 
+	// Peer Management methods
+	PeerId() (string, error)
+	Debug() (codex.DebugInfo, error)
+	Connect(peerId string, peerAddresses []string) error
+
 	// logging methods
 	UpdateLogLevel(logLevel string) error
 }
