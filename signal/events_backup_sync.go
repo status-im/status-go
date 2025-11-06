@@ -8,6 +8,8 @@ const (
 
 	// EventBackedUpSettings is emitted while applying backed up settings
 	EventBackedUpSettings = "backedup.settings"
+
+	EventLocalBackUpCompleted = "backup.local.completed"
 )
 
 func SendBackedUpProfile(obj json.Marshaler) {
@@ -16,4 +18,8 @@ func SendBackedUpProfile(obj json.Marshaler) {
 
 func SendBackedUpSettings(obj json.Marshaler) {
 	send(EventBackedUpSettings, obj)
+}
+
+func SendLocalBackUpCompleted(obj json.Marshaler) {
+	send(EventLocalBackUpCompleted, obj)
 }
