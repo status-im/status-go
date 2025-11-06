@@ -476,7 +476,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def get_boot_api_config(self):
         return copy.deepcopy(self._boot_api_config)
-      
+
     def serialize_legacy_key(self, key):
         method = "SerializeLegacyKey"
         # Use client.post directly, because this method is old and has json-incompatible arguments
