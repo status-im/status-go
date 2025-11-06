@@ -62,6 +62,7 @@ type ArchiveManager struct {
 	codexConfig                  *params.CodexConfig
 	codexClient                  CodexClientInterface
 	isCodexClientStarted         bool
+	codexClientMu                sync.RWMutex
 	downloadTimeout              time.Duration // timeout for archive downloads, defaults to 20s
 	torrentTasks                 map[string]metainfo.Hash
 	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
@@ -100,11 +101,17 @@ func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 }
 
 func (m *ArchiveManager) GetCodexClient() CodexClientInterface {
+	m.codexClientMu.RLock()
+	defer m.codexClientMu.RUnlock()
 	return m.codexClient
 }
 
 func (m *ArchiveManager) SetOnline(online bool) {
 	if online {
+		m.codexClientMu.RLock()
+		codexStarted := m.isCodexClientStarted
+		m.codexClientMu.RUnlock()
+
 		if m.torrentConfig != nil && m.torrentConfig.Enabled && !m.torrentClientStarted() {
 			err := m.StartTorrentClient()
 			if err != nil {
@@ -112,7 +119,7 @@ func (m *ArchiveManager) SetOnline(online bool) {
 			}
 		}
 
-		if m.codexConfig != nil && m.codexConfig.Enabled && !m.isCodexClientStarted {
+		if m.codexConfig != nil && m.codexConfig.Enabled && !codexStarted {
 			err := m.StartCodexClient()
 			if err != nil {
 				m.logger.Error("couldn't start codex client", zap.Error(err))
@@ -140,7 +147,7 @@ func (m *ArchiveManager) getTCPandUDPport(portNumber int) (int, error) {
 	}
 
 	// Find free port
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		port := func() int {
 			tcpAddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("localhost", "0"))
 			if err != nil {
@@ -179,6 +186,60 @@ func (m *ArchiveManager) getTCPandUDPport(portNumber int) (int, error) {
 	}
 
 	return 0, fmt.Errorf("no free port found")
+}
+
+func (m *ArchiveManager) getFreeUDPPort() (int, error) {
+	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("localhost", "0"))
+	if err != nil {
+		return 0, err
+	}
+
+	udpListener, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		return 0, err
+	}
+	defer udpListener.Close()
+
+	return udpListener.LocalAddr().(*net.UDPAddr).Port, nil
+}
+
+func (m *ArchiveManager) ensureCodexDiscoveryPort(config *params.CodexConfig) error {
+	checkPortAvailable := func(port int) (bool, error) {
+		addr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("localhost", fmt.Sprintf("%d", port)))
+		if err != nil {
+			return false, err
+		}
+		// Attempt to listen on the port; if it succeeds, it's available.
+		conn, err := net.ListenUDP("udp", addr)
+		if err != nil {
+			return false, nil
+		}
+		_ = conn.Close()
+		return true, nil
+	}
+
+	port := config.CodexNodeConfig.DiscoveryPort
+	if port != 0 {
+		available, err := checkPortAvailable(port)
+		if err != nil {
+			return err
+		}
+		if available {
+			return nil
+		}
+		m.logger.Warn("codex discovery port already in use, selecting a free one", zap.Int("port", port))
+	}
+
+	for range 10 {
+		freePort, err := m.getFreeUDPPort()
+		if err != nil {
+			continue
+		}
+		config.CodexNodeConfig.DiscoveryPort = freePort
+		return nil
+	}
+
+	return fmt.Errorf("no free discovery port found for codex")
 }
 
 func (m *ArchiveManager) StartTorrentClient() error {
@@ -220,6 +281,9 @@ func (m *ArchiveManager) StartTorrentClient() error {
 }
 
 func (m *ArchiveManager) StartCodexClient() error {
+	m.codexClientMu.Lock()
+	defer m.codexClientMu.Unlock()
+
 	if m.codexConfig == nil {
 		return fmt.Errorf("can't start codex client: missing codexConfig")
 	}
@@ -229,18 +293,36 @@ func (m *ArchiveManager) StartCodexClient() error {
 	}
 
 	var err error
-	client, err := NewCodexClient(*m.codexConfig)
+	cfgCopy := *m.codexConfig
+	cfgCopy.CodexNodeConfig = m.codexConfig.CodexNodeConfig
+
+	if err := m.ensureCodexDiscoveryPort(&cfgCopy); err != nil {
+		return err
+	}
+
+	client, err := NewCodexClient(cfgCopy)
 	if err != nil {
 		return err
 	}
 	m.codexClient = client
 	m.ArchiveFileManager.codexClient = client
 	m.isCodexClientStarted = true
+	m.codexConfig.CodexNodeConfig.DiscoveryPort = cfgCopy.CodexNodeConfig.DiscoveryPort
 
-	return m.codexClient.Start()
+	if err := m.codexClient.Start(); err != nil {
+		m.isCodexClientStarted = false
+		m.codexClient = nil
+		m.ArchiveFileManager.codexClient = nil
+		return err
+	}
+
+	return nil
 }
 
 func (m *ArchiveManager) StopCodexClient() error {
+	m.codexClientMu.Lock()
+	defer m.codexClientMu.Unlock()
+
 	errs := []error{}
 	if m.isCodexClientStarted {
 		m.logger.Info("Stopping codex client")
@@ -257,6 +339,7 @@ func (m *ArchiveManager) StopCodexClient() error {
 
 		m.isCodexClientStarted = false
 		m.codexClient = nil
+		m.ArchiveFileManager.codexClient = nil
 	}
 
 	if len(errs) > 0 {
@@ -291,6 +374,9 @@ func (m *ArchiveManager) Stop() error {
 }
 
 func (m *ArchiveManager) SetCodexClient(client CodexClientInterface) {
+	m.codexClientMu.Lock()
+	defer m.codexClientMu.Unlock()
+
 	m.codexClient = client
 	m.ArchiveFileManager.codexClient = client
 	m.isCodexClientStarted = true
@@ -305,6 +391,9 @@ func (m *ArchiveManager) torrentClientStarted() bool {
 }
 
 func (m *ArchiveManager) IsReady() bool {
+	m.codexClientMu.RLock()
+	defer m.codexClientMu.RUnlock()
+
 	// Simply checking for `torrentConfig.Enabled` or `codexConfig.Enabled`
 	// isn't enough as there's a possibility that the torrent client or the
 	// codex client couldn't be instantiated (for example in case of port conflicts)
