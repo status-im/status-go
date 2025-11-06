@@ -3623,6 +3623,11 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				continue
 			}
 
+			filter := m.messaging.ChatFilterByChatID(c.UniversalChatID())
+			if filter != nil {
+				filters = append(filters, filter)
+			}
+
 			if len(filters) == 0 {
 				m.logger.Debug("no filters or chats for this community starting interval", zap.String("id", c.IDString()))
 				go m.archiveManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
@@ -3633,11 +3638,6 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 
 			for _, filter := range filters {
 				topics = append(topics, filter.ContentTopic())
-			}
-
-			filter := m.messaging.ChatFilterByChatID(c.UniversalChatID())
-			if filter != nil {
-				filters = append(filters, filter)
 			}
 
 			// First we need to know the timestamp of the latest waku message
