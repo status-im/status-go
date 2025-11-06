@@ -1263,7 +1263,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		return nil
 	}
 
-	if m.archiveManager.IsReady() && settings.HistoryArchiveSupportEnabled {
+	if m.archiveManager.IsTorrentReady() && settings.HistoryArchiveSupportEnabled {
 		lastMagnetlinkClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
 		if err != nil {
 			return err
@@ -1341,7 +1341,7 @@ func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageSt
 		return nil
 	}
 
-	if m.archiveManager.IsReady() && settings.HistoryArchiveSupportEnabled {
+	if m.archiveManager.IsCodexReady() && settings.HistoryArchiveSupportEnabled {
 		lastIndexCidClock, err := m.communitiesManager.GetIndexCidMessageClock(id)
 		if err != nil {
 			return err
@@ -1768,7 +1768,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 		}
 
 		magnetlink := requestToJoinResponseProto.MagnetUri
-		if m.archiveManager.IsReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
+		if m.archiveManager.IsTorrentReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
 
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
 			go func(currentTask *communities.HistoryArchiveDownloadTask) {
@@ -1797,7 +1797,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 		}
 
 		cid := requestToJoinResponseProto.IndexCid
-		if m.archiveManager.IsReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && cid != "" {
+		if m.archiveManager.IsCodexReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && cid != "" {
 
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
 			go func(currentTask *communities.HistoryArchiveDownloadTask) {

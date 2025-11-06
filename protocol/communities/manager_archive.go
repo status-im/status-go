@@ -390,15 +390,31 @@ func (m *ArchiveManager) torrentClientStarted() bool {
 	return m.torrentClient != nil
 }
 
+func (m *ArchiveManager) IsTorrentReady() bool {
+	m.codexClientMu.RLock()
+	defer m.codexClientMu.RUnlock()
+
+	// Simply checking for `torrentConfig.Enabled`
+	// isn't enough as there's a possibility that the torrent client
+	// couldn't be instantiated (for example in case of port conflicts)
+	return m.torrentConfig != nil && m.torrentConfig.Enabled && m.torrentClientStarted()
+}
+
+func (m *ArchiveManager) IsCodexReady() bool {
+	m.codexClientMu.RLock()
+	defer m.codexClientMu.RUnlock()
+
+	// Simply checking for `codexConfig.Enabled`
+	// isn't enough as there's a possibility that the codex client
+	// couldn't be instantiated (for example in case of port conflicts)
+	return m.codexConfig != nil && m.codexConfig.Enabled && m.isCodexClientStarted
+}
+
 func (m *ArchiveManager) IsReady() bool {
 	m.codexClientMu.RLock()
 	defer m.codexClientMu.RUnlock()
 
-	// Simply checking for `torrentConfig.Enabled` or `codexConfig.Enabled`
-	// isn't enough as there's a possibility that the torrent client or the
-	// codex client couldn't be instantiated (for example in case of port conflicts)
-	return (m.torrentConfig != nil && m.torrentConfig.Enabled && m.torrentClientStarted() ||
-		(m.codexConfig != nil && m.codexConfig.Enabled && m.isCodexClientStarted))
+	return m.IsTorrentReady() || m.IsCodexReady()
 }
 
 func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error) {

@@ -217,6 +217,8 @@ type ArchiveService interface {
 	GetCodexClient() CodexClientInterface
 	Stop() error
 	IsReady() bool
+	IsTorrentReady() bool
+	IsCodexReady() bool
 	GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error)
 	GetCommunityChatsTopics(communityID types.HexBytes) ([]messagingtypes.ContentTopic, error)
 	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)

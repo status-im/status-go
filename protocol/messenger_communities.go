@@ -1975,7 +1975,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 		}
 
 		// The purpose of this torrent code is to get the 'magnetlink' to populate 'requestToJoinResponseProto.MagnetUri'
-		if m.archiveManager.IsReady() && m.archiveManager.TorrentFileExists(community.IDString()) {
+		if m.archiveManager.IsTorrentReady() && m.archiveManager.TorrentFileExists(community.IDString()) {
 			magnetlink, err := m.archiveManager.GetHistoryArchiveMagnetlink(community.ID())
 			if err != nil {
 				m.logger.Warn("couldn't get magnet link for community", zap.Error(err))
@@ -1984,7 +1984,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			requestToJoinResponseProto.MagnetUri = magnetlink
 		}
 
-		if m.archiveManager.IsReady() && m.archiveManager.CodexIndexCidFileExists(community.ID()) {
+		if m.archiveManager.IsCodexReady() && m.archiveManager.CodexIndexCidFileExists(community.ID()) {
 			cid, err := m.archiveManager.GetHistoryArchiveIndexCid(community.ID())
 			if err != nil {
 				m.logger.Warn("couldn't get codex index cid for community", zap.Error(err))
