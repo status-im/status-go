@@ -24,6 +24,9 @@ const (
 	HopSymbol     = "HOP"
 	DaiSymbol     = "DAI"
 	BNBSymbol     = "BNB"
+
+	StatusMainnetTokenCrossChainID = "status"
+	StatusTestTokenCrossChainID    = "status-test-token"
 )
 
 // ProviderID represents the internal ID of a blockchain provider

@@ -388,6 +388,91 @@ func (tm *Manager) GetTokensForActiveNetworksMode() ([]*tokentypes.Token, error)
 	return tm.GetTokensByChains(chainIDs)
 }
 
+// GetTokensForFetchingMarketData returns all unique tokens for fetching market data from Coingecko (doesn't affect CryptoCompare cause it maps tokens differently, by symbol)
+// Special handling for test tokens, for fetching market data from Coingecko, cause their API doesn't support test tokens
+// Corresponding mainnet tokens are needed to fetch market data for test tokens.
+// Returns list of test tokens and list of mainnet tokens that have a cross chain id set.
+func (tm *Manager) GetTokensForFetchingMarketData() ([]*tokentypes.Token, error) {
+	testnetMode, err := tm.settings.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	// If not in testnet mode, use the regular tokens
+	if !testnetMode {
+		return tm.GetTokensForActiveNetworksMode()
+	}
+
+	// Test tokens handling...
+	// Use all test tokens and add to the list only mainnet tokens that have a cross chain id set
+	allWsdkTokens := tm.tokensManager.UniqueTokens()
+	tokens := make([]*tokentypes.Token, 0)
+	for _, token := range allWsdkTokens {
+		if !walletcommon.ChainID(token.ChainID).IsMainnet() {
+			tokens = append(tokens, &tokentypes.Token{Token: token})
+		} else if token.CrossChainID != "" {
+			tokens = append(tokens, &tokentypes.Token{Token: token})
+		}
+	}
+
+	return tokens, nil
+}
+
+// GetTokensByKeysForFetchingMarketData returns all unique tokens for fetching market data from Coingecko (doesn't affect CryptoCompare cause it maps tokens differently, by symbol)
+// Special handling for test tokens, for fetching market data from Coingecko, cause their API doesn't support test tokens
+// Corresponding mainnet tokens are needed to fetch market data for test tokens.
+// Returns list of test tokens that match the given token keys and corresponding mainnet tokens for those test tokens that have a cross chain id set.
+func (tm *Manager) GetTokensByKeysForFetchingMarketData(tokenKeys []string) ([]*tokentypes.Token, error) {
+	testnetMode, err := tm.settings.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	// If not in testnet mode, use the regular tokens
+	if !testnetMode {
+		return tm.GetTokensByKeys(tokenKeys)
+	}
+
+	// Test tokens handling...
+	// Use corresponding mainnet tokens for the test tokens that contains the same cross chain id
+	mainnetTokenKeysByCrossChainIDs := make(map[string][]string, 0) // keeps token keys of all mainnet tokens by cross chain id
+	allWsdkTokens := tm.tokensManager.UniqueTokens()
+	tokens := make([]*tokentypes.Token, 0)
+	for _, token := range allWsdkTokens {
+		if token.CrossChainID != "" && walletcommon.ChainID(token.ChainID).IsMainnet() {
+			mainnetTokenKeysByCrossChainIDs[token.CrossChainID] = append(mainnetTokenKeysByCrossChainIDs[token.CrossChainID], token.Key())
+		}
+		if !slices.Contains(tokenKeys, token.Key()) {
+			continue
+		}
+		tokens = append(tokens, &tokentypes.Token{Token: token})
+	}
+
+	mainnetTokenKeys := make([]string, 0) // keeps token keys of mainnet tokens that have the same cross chain id as the test tokens
+	for _, token := range tokens {
+		crossChainID := token.CrossChainID
+		if crossChainID == "" {
+			continue
+		}
+		// Special handling for status test token STT, cause even it's the same token belongs to different group and has different symbol SNT/STT.
+		if crossChainID == walletcommon.StatusTestTokenCrossChainID {
+			crossChainID = walletcommon.StatusMainnetTokenCrossChainID
+		}
+		if _, ok := mainnetTokenKeysByCrossChainIDs[crossChainID]; !ok {
+			continue
+		}
+		mainnetTokenKeys = append(mainnetTokenKeys, mainnetTokenKeysByCrossChainIDs[crossChainID]...)
+	}
+
+	mainnetTokens, err := tm.GetTokensByKeys(mainnetTokenKeys)
+	if err != nil {
+		return nil, err
+	}
+	tokens = append(tokens, mainnetTokens...)
+
+	return tokens, nil
+}
+
 func (tm *Manager) GetAllTokens() ([]*tokentypes.Token, error) {
 	wsdkTokens := tm.tokensManager.UniqueTokens()
 	tokens := make([]*tokentypes.Token, 0)
