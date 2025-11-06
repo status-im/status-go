@@ -78,6 +78,10 @@ func (tmm *ArchiveManagerNop) SeedHistoryArchiveTorrent(communityID types.HexByt
 	return nil
 }
 
+func (tmm *ArchiveManagerNop) SeedHistoryArchiveIndexCid(communityID types.HexBytes) error {
+	return nil
+}
+
 func (tmm *ArchiveManagerNop) UnseedHistoryArchiveTorrent(communityID types.HexBytes) {}
 
 func (tmm *ArchiveManagerNop) UnseedHistoryArchiveIndexCid(communityID types.HexBytes) {}

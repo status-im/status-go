@@ -592,6 +592,18 @@ func (m *ArchiveFileManager) readCodexIndexFromFile(communityID types.HexBytes) 
 	return os.ReadFile(indexFilePath)
 }
 
+func (m *ArchiveFileManager) codexIndexFileExists(communityID types.HexBytes) (bool, error) {
+	indexFilePath := m.codexHistoryArchiveIndexFilePath(communityID)
+	_, err := os.Stat(indexFilePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (m *ArchiveFileManager) removeCodexIndexFile(communityID types.HexBytes) error {
 	indexFilePath := m.codexHistoryArchiveIndexFilePath(communityID)
 	err := os.Remove(indexFilePath)
