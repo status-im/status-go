@@ -4,9 +4,6 @@ from uuid import uuid4
 import pytest
 from requests import ReadTimeout
 
-from clients.anvil import Anvil
-from clients.contract_deployers.multicall3 import Multicall3Deployer
-from clients.foundry import Foundry
 from clients.status_backend import StatusBackend
 from clients.statusgo_container import StatusGoContainer
 from clients.anvil import Anvil
