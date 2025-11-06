@@ -10,7 +10,13 @@ import (
 )
 
 type RequestPermissionsCommand struct {
-	Db *sql.DB
+	db *sql.DB
+}
+
+func NewRequestPermissionsCommand(db *sql.DB) *RequestPermissionsCommand {
+	return &RequestPermissionsCommand{
+		db: db,
+	}
 }
 
 var (
@@ -81,7 +87,7 @@ func (c *RequestPermissionsCommand) Execute(ctx context.Context, request RPCRequ
 
 	caveats := c.parseCaveats(caveatsMap)
 
-	dApp, err := persistence.SelectDApp(c.Db, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(c.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -91,7 +97,7 @@ func (c *RequestPermissionsCommand) Execute(ctx context.Context, request RPCRequ
 	}
 
 	createdAt := time.Now().Unix()
-	err = persistence.InsertPermission(c.Db, request.URL, request.ClientID, methodName, caveats, createdAt)
+	err = persistence.InsertPermission(c.db, request.URL, request.ClientID, methodName, caveats, createdAt)
 	if err != nil {
 		return "", err
 	}

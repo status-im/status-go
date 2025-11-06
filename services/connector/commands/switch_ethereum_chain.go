@@ -22,8 +22,15 @@ var (
 )
 
 type SwitchEthereumChainCommand struct {
-	NetworkManager *network.Manager
-	Db             *sql.DB
+	networkManager *network.Manager
+	db             *sql.DB
+}
+
+func NewSwitchEthereumChainCommand(db *sql.DB, networkManager *network.Manager) *SwitchEthereumChainCommand {
+	return &SwitchEthereumChainCommand{
+		db:             db,
+		networkManager: networkManager,
+	}
 }
 
 func hexStringToUint64(s string) (uint64, error) {
@@ -52,7 +59,7 @@ func (r *RPCRequest) getChainID() (uint64, error) {
 }
 
 func (c *SwitchEthereumChainCommand) getSupportedChainIDs() ([]uint64, error) {
-	return chainutils.GetSupportedChainIDs(c.NetworkManager)
+	return chainutils.GetSupportedChainIDs(c.networkManager)
 }
 
 func (c *SwitchEthereumChainCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
@@ -75,7 +82,7 @@ func (c *SwitchEthereumChainCommand) Execute(ctx context.Context, request RPCReq
 		return "", ErrUnsupportedNetwork
 	}
 
-	dApp, err := persistence.SelectDApp(c.Db, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(c.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -86,7 +93,7 @@ func (c *SwitchEthereumChainCommand) Execute(ctx context.Context, request RPCReq
 
 	dApp.ChainID = requestedChainID
 
-	err = persistence.UpsertDApp(c.Db, dApp)
+	err = persistence.UpsertDApp(c.db, dApp)
 	if err != nil {
 		return "", err
 	}

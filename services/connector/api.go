@@ -28,58 +28,27 @@ func NewAPI(s *Service) *API {
 	c := commands.NewClientSideHandler(s.db)
 
 	// Transactions and signing
-	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{
-		EthClientGetter: s.ethClientGetter,
-		FeeManager:      s.feeManager,
-		Db:              s.db,
-		ClientHandler:   c,
-	})
-	r.Register("personal_sign", &commands.SignCommand{
-		Db:            s.db,
-		ClientHandler: c,
-	})
-	r.Register("eth_signTypedData_v4", &commands.SignCommand{
-		Db:            s.db,
-		ClientHandler: c,
-	})
+	r.Register("eth_sendTransaction", commands.NewSendTransactionCommand(s.db, s.ethClientGetter, s.feeManager, c))
+	r.Register("personal_sign", commands.NewSignCommand(s.db, c))
+	r.Register("eth_signTypedData_v4", commands.NewSignCommand(s.db, c))
 
 	// Accounts query and dapp permissions
 	// NOTE: Some dApps expect same behavior for both eth_accounts and eth_requestAccounts
-	accountsCommand := &commands.RequestAccountsCommand{
-		ClientHandler: c,
-		Db:            s.db,
-	}
+	accountsCommand := commands.NewRequestAccountsCommand(s.db, c)
 	r.Register("eth_accounts", accountsCommand)
 	r.Register("eth_requestAccounts", accountsCommand)
 
 	// Active chain per dapp management
-	r.Register("eth_chainId", &commands.ChainIDCommand{
-		Db:             s.db,
-		NetworkManager: s.nm,
-	})
-	r.Register("net_version", &commands.NetVersionCommand{
-		Db:             s.db,
-		NetworkManager: s.nm,
-	})
-	r.Register("wallet_switchEthereumChain", &commands.SwitchEthereumChainCommand{
-		Db:             s.db,
-		NetworkManager: s.nm,
-	})
+	r.Register("eth_chainId", commands.NewChainIDCommand(s.db, s.nm))
+	r.Register("net_version", commands.NewNetVersionCommand(s.db, s.nm))
+	r.Register("wallet_switchEthereumChain", commands.NewSwitchEthereumChainCommand(s.db, s.nm))
 
 	// Permissions
-	r.Register("wallet_requestPermissions", &commands.RequestPermissionsCommand{
-		Db: s.db,
-	})
-	r.Register("wallet_getPermissions", &commands.GetPermissionsCommand{
-		Db: s.db,
-	})
-	r.Register("wallet_revokePermissions", &commands.RevokePermissionsCommand{
-		Db: s.db,
-	})
+	r.Register("wallet_requestPermissions", commands.NewRequestPermissionsCommand(s.db))
+	r.Register("wallet_getPermissions", commands.NewGetPermissionsCommand(s.db))
+	r.Register("wallet_revokePermissions", commands.NewRevokePermissionsCommand(s.db))
 
-	changeAccountCommand := &commands.ChangeAccountCommand{
-		Db: s.db,
-	}
+	changeAccountCommand := commands.NewChangeAccountCommand(s.db)
 
 	return &API{
 		s:                    s,

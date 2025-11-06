@@ -27,10 +27,19 @@ var (
 )
 
 type SendTransactionCommand struct {
-	EthClientGetter chainutils.EthClientGetter
-	FeeManager      chainutils.FeeManager
-	Db              *sql.DB
-	ClientHandler   ClientSideHandlerInterface
+	ethClientGetter chainutils.EthClientGetter
+	feeManager      chainutils.FeeManager
+	db              *sql.DB
+	clientHandler   ClientSideHandlerInterface
+}
+
+func NewSendTransactionCommand(db *sql.DB, ethClientGetter chainutils.EthClientGetter, feeManager chainutils.FeeManager, clientHandler ClientSideHandlerInterface) *SendTransactionCommand {
+	return &SendTransactionCommand{
+		db:              db,
+		ethClientGetter: ethClientGetter,
+		feeManager:      feeManager,
+		clientHandler:   clientHandler,
+	}
 }
 
 func (r *RPCRequest) getSendTransactionParams() (*wallettypes.SendTxArgs, error) {
@@ -63,7 +72,7 @@ func (c *SendTransactionCommand) Execute(ctx context.Context, request RPCRequest
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDApp(c.Db, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(c.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -90,7 +99,7 @@ func (c *SendTransactionCommand) Execute(ctx context.Context, request RPCRequest
 	}
 
 	if params.GasPrice == nil || (params.MaxFeePerGas == nil && params.MaxPriorityFeePerGas == nil) {
-		fetchedFees, _, _, err := c.FeeManager.SuggestedFees(ctx, dApp.ChainID, common.Address(dApp.SharedAccount))
+		fetchedFees, _, _, err := c.feeManager.SuggestedFees(ctx, dApp.ChainID, common.Address(dApp.SharedAccount))
 		if err != nil {
 			return "", err
 		}
@@ -108,7 +117,7 @@ func (c *SendTransactionCommand) Execute(ctx context.Context, request RPCRequest
 	}
 
 	if params.Nonce == nil {
-		ethClient, err := c.EthClientGetter.EthClient(dApp.ChainID)
+		ethClient, err := c.ethClientGetter.EthClient(dApp.ChainID)
 		if err != nil {
 			return "", err
 		}
@@ -121,7 +130,7 @@ func (c *SendTransactionCommand) Execute(ctx context.Context, request RPCRequest
 		params.Nonce = (*hexutil.Uint64)(&nonce)
 	}
 
-	hash, err := c.ClientHandler.RequestSendTransaction(signal.ConnectorDApp{
+	hash, err := c.clientHandler.RequestSendTransaction(signal.ConnectorDApp{
 		URL:      request.URL,
 		Name:     request.Name,
 		IconURL:  request.IconURL,

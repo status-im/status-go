@@ -16,8 +16,15 @@ var (
 )
 
 type SignCommand struct {
-	Db            *sql.DB
-	ClientHandler ClientSideHandlerInterface
+	db            *sql.DB
+	clientHandler ClientSideHandlerInterface
+}
+
+func NewSignCommand(db *sql.DB, clientHandler ClientSideHandlerInterface) *SignCommand {
+	return &SignCommand{
+		db:            db,
+		clientHandler: clientHandler,
+	}
 }
 
 type SignParams struct {
@@ -77,7 +84,7 @@ func (c *SignCommand) Execute(ctx context.Context, request RPCRequest) (interfac
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDApp(c.Db, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(c.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -86,7 +93,7 @@ func (c *SignCommand) Execute(ctx context.Context, request RPCRequest) (interfac
 		return "", ErrDAppIsNotPermittedByUser
 	}
 
-	return c.ClientHandler.RequestSign(signal.ConnectorDApp{
+	return c.clientHandler.RequestSign(signal.ConnectorDApp{
 		URL:      request.URL,
 		Name:     request.Name,
 		IconURL:  request.IconURL,

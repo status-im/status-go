@@ -92,54 +92,25 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 
 	switch method {
 	case Method_EthAccounts:
-		state.cmd = &AccountsCommand{
-			Db: state.walletDb,
-		}
+		state.cmd = NewAccountsCommand(state.walletDb)
 	case Method_EthRequestAccounts:
-		state.cmd = &RequestAccountsCommand{
-			ClientHandler: state.handler,
-			Db:            state.walletDb,
-		}
+		state.cmd = NewRequestAccountsCommand(state.walletDb, state.handler)
 	case Method_EthChainId:
-		state.cmd = &ChainIDCommand{
-			Db:             state.walletDb,
-			NetworkManager: networkManager,
-		}
+		state.cmd = NewChainIDCommand(state.walletDb, networkManager)
 	case "net_version":
-		state.cmd = &NetVersionCommand{
-			Db:             state.walletDb,
-			NetworkManager: networkManager,
-		}
+		state.cmd = NewNetVersionCommand(state.walletDb, networkManager)
 	case Method_PersonalSign:
-		state.cmd = &SignCommand{
-			Db:            state.walletDb,
-			ClientHandler: state.handler,
-		}
+		state.cmd = NewSignCommand(state.walletDb, state.handler)
 	case Method_SignTypedDataV4:
-		state.cmd = &SignCommand{
-			Db:            state.walletDb,
-			ClientHandler: state.handler,
-		}
+		state.cmd = NewSignCommand(state.walletDb, state.handler)
 	case Method_EthSendTransaction:
-		state.cmd = &SendTransactionCommand{
-			Db:              state.walletDb,
-			ClientHandler:   state.handler,
-			EthClientGetter: state.ethClientGetter,
-			FeeManager:      state.feeManager,
-		}
+		state.cmd = NewSendTransactionCommand(state.walletDb, state.ethClientGetter, state.feeManager, state.handler)
 	case Method_RequestPermissions:
-		state.cmd = &RequestPermissionsCommand{
-			Db: state.walletDb,
-		}
+		state.cmd = NewRequestPermissionsCommand(state.walletDb)
 	case Method_RevokePermissions:
-		state.cmd = &RevokePermissionsCommand{
-			Db: state.walletDb,
-		}
+		state.cmd = NewRevokePermissionsCommand(state.walletDb)
 	case Method_SwitchEthereumChain:
-		state.cmd = &SwitchEthereumChainCommand{
-			Db:             state.walletDb,
-			NetworkManager: networkManager,
-		}
+		state.cmd = NewSwitchEthereumChainCommand(state.walletDb, networkManager)
 	}
 
 	return state, func() {

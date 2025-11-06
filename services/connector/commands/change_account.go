@@ -8,7 +8,13 @@ import (
 )
 
 type ChangeAccountCommand struct {
-	Db *sql.DB
+	db *sql.DB
+}
+
+func NewChangeAccountCommand(db *sql.DB) *ChangeAccountCommand {
+	return &ChangeAccountCommand{
+		db: db,
+	}
 }
 
 func (c *ChangeAccountCommand) Execute(args ChangeAccountArgs) error {
@@ -17,7 +23,7 @@ func (c *ChangeAccountCommand) Execute(args ChangeAccountArgs) error {
 		return err
 	}
 
-	dApp, err := persistence.SelectDApp(c.Db, args.URL, args.ClientID)
+	dApp, err := persistence.SelectDApp(c.db, args.URL, args.ClientID)
 	if err != nil {
 		return err
 	}
@@ -28,7 +34,7 @@ func (c *ChangeAccountCommand) Execute(args ChangeAccountArgs) error {
 
 	dApp.SharedAccount = args.Account
 
-	err = persistence.UpsertDApp(c.Db, dApp)
+	err = persistence.UpsertDApp(c.db, dApp)
 	if err != nil {
 		return err
 	}

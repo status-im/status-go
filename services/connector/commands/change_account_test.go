@@ -13,9 +13,7 @@ func TestFailToChangeAccountWithMissingFields(t *testing.T) {
 	db, cleanup := createWalletDB(t)
 	t.Cleanup(cleanup)
 
-	cmd := &ChangeAccountCommand{
-		Db: db,
-	}
+	cmd := NewChangeAccountCommand(db)
 
 	args := ChangeAccountArgs{
 		URL:      "",
@@ -48,9 +46,7 @@ func TestChangeAccountForUnpermittedDApp(t *testing.T) {
 	db, cleanup := createWalletDB(t)
 	t.Cleanup(cleanup)
 
-	cmd := &ChangeAccountCommand{
-		Db: db,
-	}
+	cmd := NewChangeAccountCommand(db)
 
 	args := ChangeAccountArgs{
 		URL:      "http://nonexistentDAppURL",
@@ -66,9 +62,7 @@ func TestChangeAccountForPermittedDApp(t *testing.T) {
 	db, cleanup := createWalletDB(t)
 	t.Cleanup(cleanup)
 
-	cmd := &ChangeAccountCommand{
-		Db: db,
-	}
+	cmd := NewChangeAccountCommand(db)
 
 	sharedAccount := types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg")
 	clientID := "testClientID"

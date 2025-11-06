@@ -11,8 +11,15 @@ import (
 )
 
 type ChainIDCommand struct {
-	NetworkManager *network.Manager
-	Db             *sql.DB
+	networkManager *network.Manager
+	db             *sql.DB
+}
+
+func NewChainIDCommand(db *sql.DB, networkManager *network.Manager) *ChainIDCommand {
+	return &ChainIDCommand{
+		db:             db,
+		networkManager: networkManager,
+	}
 }
 
 func (c *ChainIDCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
@@ -21,14 +28,14 @@ func (c *ChainIDCommand) Execute(ctx context.Context, request RPCRequest) (inter
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDApp(c.Db, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(c.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
 
 	var chainId uint64
 	if dApp == nil {
-		chainId, err = chainutils.GetDefaultChainID(c.NetworkManager)
+		chainId, err = chainutils.GetDefaultChainID(c.networkManager)
 		if err != nil {
 			return "", err
 		}

@@ -11,8 +11,15 @@ import (
 )
 
 type NetVersionCommand struct {
-	NetworkManager *network.Manager
-	Db             *sql.DB
+	networkManager *network.Manager
+	db             *sql.DB
+}
+
+func NewNetVersionCommand(db *sql.DB, networkManager *network.Manager) *NetVersionCommand {
+	return &NetVersionCommand{
+		db:             db,
+		networkManager: networkManager,
+	}
 }
 
 func (c *NetVersionCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
@@ -21,14 +28,14 @@ func (c *NetVersionCommand) Execute(ctx context.Context, request RPCRequest) (in
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDApp(c.Db, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(c.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
 
 	var chainId uint64
 	if dApp == nil {
-		chainId, err = chainutils.GetDefaultChainID(c.NetworkManager)
+		chainId, err = chainutils.GetDefaultChainID(c.networkManager)
 		if err != nil {
 			return "", err
 		}

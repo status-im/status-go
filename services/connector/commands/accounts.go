@@ -10,7 +10,13 @@ import (
 )
 
 type AccountsCommand struct {
-	Db *sql.DB
+	db *sql.DB
+}
+
+func NewAccountsCommand(db *sql.DB) *AccountsCommand {
+	return &AccountsCommand{
+		db: db,
+	}
 }
 
 func FormatAccountAddressToResponse(address types.Address) []string {
@@ -23,7 +29,7 @@ func (c *AccountsCommand) Execute(ctx context.Context, request RPCRequest) (inte
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDApp(c.Db, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(c.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
