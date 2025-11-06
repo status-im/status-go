@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/status-im/status-go/pkg/security"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -128,11 +129,47 @@ func (c *Client) mapTokensToIds(tokens []*tokentypes.Token) (map[string][]string
 	mappedTokens := make(map[string][]string) // map[coingeckoId][]tokenKey
 	unmappedTokens := make([]string, 0)
 
+	// Coingecko doesn't provide prices for test tokens, so we need to map them to the mainnet tokens.
+	// We can do that only for test tokens that have a cross chain id.
+	tokenKeysByCrossChainID := make(map[string][]string)
+	for _, token := range tokens {
+		// Skip tokens that don't have a cross chain id
+		if token.CrossChainID == "" {
+			continue
+		}
+		// Skip tokens that are on test networks
+		if !walletcommon.ChainID(token.ChainID).IsMainnet() {
+			continue
+		}
+		tokenKeysByCrossChainID[token.CrossChainID] = append(tokenKeysByCrossChainID[token.CrossChainID], token.Key())
+	}
+
 	for _, token := range tokens {
 		coingeckoToken, ok := coingeckoTokensByTokenKey[token.Key()]
 		if !ok {
-			unmappedTokens = append(unmappedTokens, token.Key())
-			continue
+			if walletcommon.ChainID(token.ChainID).IsMainnet() {
+				unmappedTokens = append(unmappedTokens, token.Key())
+				continue
+			}
+
+			// Check by cross chain id if any of the test tokens have a coingecko token
+			crossChainID := token.CrossChainID
+			// Sepecial handling for status test token STT, cause even it's the same token belongs to different group and has different symbol SNT/STT.
+			if crossChainID == walletcommon.StatusTestTokenCrossChainID {
+				crossChainID = walletcommon.StatusMainnetTokenCrossChainID
+			}
+
+			for _, tokenKey := range tokenKeysByCrossChainID[crossChainID] {
+				coingeckoToken, ok = coingeckoTokensByTokenKey[tokenKey]
+				if ok {
+					break
+				}
+			}
+
+			if !ok {
+				unmappedTokens = append(unmappedTokens, token.Key())
+				continue
+			}
 		}
 		mappedTokens[coingeckoToken.ID] = append(mappedTokens[coingeckoToken.ID], token.Key())
 	}

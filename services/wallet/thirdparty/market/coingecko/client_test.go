@@ -266,26 +266,38 @@ func TestFetchMarketValues(t *testing.T) {
 	tokens := []*tokentypes.Token{
 		{
 			Token: &types.Token{
-				Name:    "USDC",
-				Symbol:  "USDC",
-				ChainID: common.EthereumMainnet,
-				Address: gethcommon.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"),
+				CrossChainID: "usd-coin",
+				Name:         "USDC",
+				Symbol:       "USDC",
+				ChainID:      common.EthereumMainnet,
+				Address:      gethcommon.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"),
 			},
 		},
 		{
 			Token: &types.Token{
-				Name:    "Status",
-				Symbol:  "SNT",
-				ChainID: common.EthereumMainnet,
-				Address: gethcommon.HexToAddress("0x744d70fdbe2ba4cf95131626614a1763df805b9e"),
+				CrossChainID: "usd-coin",
+				Name:         "USDC",
+				Symbol:       "USDC",
+				ChainID:      common.EthereumSepolia,
+				Address:      gethcommon.HexToAddress("0x1c7d4b196cb0c7b01d743fbc6116a902379c7238"),
 			},
 		},
 		{
 			Token: &types.Token{
-				Name:    "Dai",
-				Symbol:  "DAI",
-				ChainID: common.EthereumMainnet,
-				Address: gethcommon.HexToAddress("0x6b175474e89094c44da98b954eedeac495271d0f"),
+				CrossChainID: "status",
+				Name:         "Status",
+				Symbol:       "SNT",
+				ChainID:      common.EthereumMainnet,
+				Address:      gethcommon.HexToAddress("0x744d70fdbe2ba4cf95131626614a1763df805b9e"),
+			},
+		},
+		{
+			Token: &types.Token{
+				CrossChainID: "dai",
+				Name:         "Dai",
+				Symbol:       "DAI",
+				ChainID:      common.EthereumMainnet,
+				Address:      gethcommon.HexToAddress("0x6b175474e89094c44da98b954eedeac495271d0f"),
 			},
 		},
 	}
@@ -293,16 +305,18 @@ func TestFetchMarketValues(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, prices, len(tokens))
 
-	usdcPrice := prices[tokens[0].Key()]
-	require.InDelta(t, 72388338754.0, usdcPrice.MKTCAP, 1e-6)
-	require.InDelta(t, 0.999835, usdcPrice.HIGHDAY, 1e-10)
-	require.InDelta(t, 0.999619, usdcPrice.LOWDAY, 1e-10)
-	require.InDelta(t, 0.00874017695509919, usdcPrice.CHANGEPCTHOUR, 1e-10)
-	require.InDelta(t, 6.0e-05, usdcPrice.CHANGEPCTDAY, 1e-5)
-	require.InDelta(t, 6.0e-05, usdcPrice.CHANGEPCT24HOUR, 1e-5)
-	require.InDelta(t, 6.21125e-07, usdcPrice.CHANGE24HOUR, 1e-10)
+	for _, index := range []int{0, 1} {
+		usdcPrice := prices[tokens[index].Key()]
+		require.InDelta(t, 72388338754.0, usdcPrice.MKTCAP, 1e-6)
+		require.InDelta(t, 0.999835, usdcPrice.HIGHDAY, 1e-10)
+		require.InDelta(t, 0.999619, usdcPrice.LOWDAY, 1e-10)
+		require.InDelta(t, 0.00874017695509919, usdcPrice.CHANGEPCTHOUR, 1e-10)
+		require.InDelta(t, 6.0e-05, usdcPrice.CHANGEPCTDAY, 1e-5)
+		require.InDelta(t, 6.0e-05, usdcPrice.CHANGEPCT24HOUR, 1e-5)
+		require.InDelta(t, 6.21125e-07, usdcPrice.CHANGE24HOUR, 1e-10)
+	}
 
-	sntPrice := prices[tokens[1].Key()]
+	sntPrice := prices[tokens[2].Key()]
 	require.InDelta(t, 103479828.0, sntPrice.MKTCAP, 1e-6)
 	require.InDelta(t, 0.02612809, sntPrice.HIGHDAY, 1e-8)
 	require.InDelta(t, 0.02565221, sntPrice.LOWDAY, 1e-8)
@@ -311,5 +325,5 @@ func TestFetchMarketValues(t *testing.T) {
 	require.InDelta(t, 0.14647083029811012, sntPrice.CHANGEPCT24HOUR, 1e-6)
 	require.InDelta(t, 3.819e-05, sntPrice.CHANGE24HOUR, 1e-8)
 
-	require.Equal(t, prices[tokens[2].Key()], thirdparty.TokenMarketValues{})
+	require.Equal(t, prices[tokens[3].Key()], thirdparty.TokenMarketValues{})
 }

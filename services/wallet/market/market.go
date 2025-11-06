@@ -42,8 +42,8 @@ type TokenMarketCache MarketValuesPerCurrencyAndToken
 type TokenPriceCache DataPerTokenAndCurrency
 
 type TokenManagerInterface interface {
-	GetTokensByKeys(tokensKeys []string) ([]*tokentypes.Token, error)
-	GetTokensForActiveNetworksMode() ([]*tokentypes.Token, error)
+	GetTokensForFetchingMarketData() ([]*tokentypes.Token, error)
+	GetTokensByKeysForFetchingMarketData(tokenKeys []string) ([]*tokentypes.Token, error)
 	GetTokenByKey(tokenKey string) (*tokentypes.Token, error)
 }
 
@@ -123,9 +123,9 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 
 func (pm *Manager) getTokensByKeys(tokensKeys []string) (tokens []*tokentypes.Token, err error) {
 	if len(tokensKeys) > 0 {
-		tokens, err = pm.tokenManager.GetTokensByKeys(tokensKeys)
+		tokens, err = pm.tokenManager.GetTokensByKeysForFetchingMarketData(tokensKeys)
 	} else {
-		tokens, err = pm.tokenManager.GetTokensForActiveNetworksMode()
+		tokens, err = pm.tokenManager.GetTokensForFetchingMarketData()
 	}
 	return
 }
