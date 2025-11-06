@@ -40,6 +40,10 @@ const (
 	maxMessageSenderEphemeralKeys = 3
 )
 
+var (
+	useSDSForCommunitiesByDefault = false
+)
+
 type MessageSender struct {
 	identity    *ecdsa.PrivateKey
 	transport   *transport.Transport
@@ -297,7 +301,7 @@ func (s *MessageSender) sendCommunity(
 		rawMessage.Sender = s.identity
 	}
 
-	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+	if useSDSForCommunitiesByDefault && rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
 		s.logger.Debug("SDS: dispatchCommunityChatMessage with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
 		sdsWrappedPayload, err := s.wrapPayloadForSDS(rawMessage.Payload, rawMessage.CommunityID)
 		if err != nil {
@@ -610,7 +614,7 @@ func (s *MessageSender) SendPublic(
 		rawMessage.Sender = s.identity
 	}
 
-	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+	if useSDSForCommunitiesByDefault && rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
 		s.logger.Debug("SDS: SendPublic with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
 		sdsWrappedPayload, err := s.wrapPayloadForSDS(rawMessage.Payload, rawMessage.CommunityID)
 		if err != nil {
@@ -1274,7 +1278,7 @@ func (s *MessageSender) unwrapPayloadForSDS(msg *messagingtypes.Message) error {
 	if len(msg.EncryptionLayer.Payload) > 0 {
 		unwrappedMessage, err := s.reliabilityManager.UnwrapReceivedMessage(msg.ApplicationLayer.Payload)
 		if err != nil {
-			s.logger.Error("SDS: failed to unwrap received message", zap.Error(err))
+			s.logger.Error("SDS: failed to unwrap received message, may because of not use sds", zap.Error(err))
 		} else {
 			msg.ApplicationLayer.Payload = *unwrappedMessage.Message
 			s.logger.Debug("SDS: missing deps",
