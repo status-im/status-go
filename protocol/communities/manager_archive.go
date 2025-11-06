@@ -726,30 +726,21 @@ func (m *ArchiveManager) SeedHistoryArchiveIndexCid(communityID types.HexBytes) 
 }
 
 func (m *ArchiveManager) UnseedHistoryArchiveIndexCid(communityID types.HexBytes) {
-	// Remove local index file
-	err := m.removeCodexIndexFile(communityID)
-	if err != nil {
-		m.logger.Error("failed to remove local index file", zap.Error(err))
-	}
+	if m.CodexIndexCidFileExists(communityID) {
+		// get currently advertised index Cid
+		cid, err := m.GetHistoryArchiveIndexCid(communityID)
 
-	// get currently advertised index Cid
-	cid, err := m.GetHistoryArchiveIndexCid(communityID)
+		if err != nil {
+			m.logger.Debug("failed to get history archive index CID", zap.Error(err))
+			return
+		}
 
-	if err != nil {
-		m.logger.Debug("failed to get history archive index CID", zap.Error(err))
-		return
-	}
+		m.logger.Debug("Unseeding index CID for community", zap.String("id", communityID.String()), zap.String("cid", cid))
 
-	m.logger.Debug("Unseeding index CID for community", zap.String("id", communityID.String()), zap.String("cid", cid))
-
-	err = m.codexClient.RemoveCid(cid)
-	if err != nil {
-		m.logger.Error("failed to remove CID from Codex", zap.Error(err))
-	}
-
-	err = m.removeCodexIndexCidFile(communityID)
-	if err != nil {
-		m.logger.Error("failed to remove local index file", zap.Error(err))
+		err = m.codexClient.RemoveCid(cid)
+		if err != nil {
+			m.logger.Error("failed to remove CID from Codex", zap.Error(err))
+		}
 	}
 }
 
