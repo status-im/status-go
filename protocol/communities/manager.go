@@ -226,6 +226,7 @@ type ArchiveService interface {
 	StartHistoryArchiveTasksInterval(community *Community, interval time.Duration)
 	StopHistoryArchiveTasksInterval(communityID types.HexBytes)
 	SeedHistoryArchiveTorrent(communityID types.HexBytes) error
+	SeedHistoryArchiveIndexCid(communityID types.HexBytes) error
 	UnseedHistoryArchiveTorrent(communityID types.HexBytes)
 	UnseedHistoryArchiveIndexCid(communityID types.HexBytes)
 	IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool

@@ -1019,6 +1019,13 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 				}
 			}
 
+			if m.archiveManager.IsCodexReady() && communitySettings.HistoryArchiveSupportEnabled {
+				err = m.archiveManager.SeedHistoryArchiveIndexCid(request.CommunityID)
+				if err != nil {
+					m.logger.Error("failed to seed history archive index cid", zap.Error(err))
+				}
+			}
+
 			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
 				go m.archiveManager.StartHistoryArchiveTasksInterval(community, messageArchiveInterval)
 			}
@@ -1817,6 +1824,13 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				err = m.archiveManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
 				if err != nil {
 					m.logger.Error("failed to seed history archive", zap.Error(err))
+				}
+			}
+
+			if m.archiveManager.IsCodexReady() && communitySettings.HistoryArchiveSupportEnabled {
+				err = m.archiveManager.SeedHistoryArchiveIndexCid(discordCommunity.ID())
+				if err != nil {
+					m.logger.Error("failed to seed history archive index cid", zap.Error(err))
 				}
 			}
 

@@ -3829,6 +3829,14 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				}
 			}
 
+			if preference == params.ArchiveDistributionMethodCodex {
+				// Check if there's already a codex file for this community and seed it
+				err = m.archiveManager.SeedHistoryArchiveIndexCid(c.ID())
+				if err != nil {
+					m.logger.Error("failed to seed history archive", zap.Error(err))
+				}
+			}
+
 			filters, err := m.archiveManager.GetCommunityChatsFilters(c.ID())
 			if err != nil {
 				m.logger.Error("failed to get community chats filters for community", zap.Error(err))
@@ -3901,6 +3909,12 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				// Seed current archive in the meantime
 				if preference == params.ArchiveDistributionMethodTorrent {
 					err := m.archiveManager.SeedHistoryArchiveTorrent(c.ID())
+					if err != nil {
+						m.logger.Error("failed to seed history archive", zap.Error(err))
+					}
+				}
+				if preference == params.ArchiveDistributionMethodCodex {
+					err := m.archiveManager.SeedHistoryArchiveIndexCid(c.ID())
 					if err != nil {
 						m.logger.Error("failed to seed history archive", zap.Error(err))
 					}

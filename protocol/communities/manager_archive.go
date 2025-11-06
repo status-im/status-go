@@ -531,11 +531,13 @@ func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes,
 
 	if distributionPreference == params.ArchiveDistributionMethodCodex {
 		archiveCodexCreatedSuccessfully = true
+		m.UnseedHistoryArchiveIndexCid(communityID)
 		_, errCodex := m.ArchiveFileManager.CreateHistoryArchiveCodexFromDB(communityID, topics, startDate, endDate, partition, encrypt)
 		if errCodex != nil {
 			archiveCodexCreatedSuccessfully = false
 			m.logger.Error("failed to create history archive codex", zap.Error(errCodex))
 		}
+		// CreateHistoryArchiveCodexFromDB already seeds the index cid to codex
 	}
 	if !archiveTorrentCreatedSuccessfully && !archiveCodexCreatedSuccessfully {
 		return errors.Join(errTorrent, errCodex)
@@ -688,6 +690,32 @@ func (m *ArchiveManager) UnseedHistoryArchiveTorrent(communityID types.HexBytes)
 			})
 		}
 	}
+}
+
+func (m *ArchiveManager) SeedHistoryArchiveIndexCid(communityID types.HexBytes) error {
+	if !m.IsCodexReady() {
+		return nil
+	}
+	exists, err := m.codexIndexFileExists(communityID)
+	if err != nil {
+		return err
+	}
+	if exists {
+		indexBytes, err := m.readCodexIndexFromFile(communityID)
+		if err != nil {
+			return err
+		}
+		cid, err := m.codexClient.UploadArchive(indexBytes)
+		if err != nil {
+			return err
+		}
+		err = m.writeCodexIndexCidToFile(communityID, cid)
+		if err != nil {
+			m.codexClient.RemoveCid(cid)
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *ArchiveManager) UnseedHistoryArchiveIndexCid(communityID types.HexBytes) {
