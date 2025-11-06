@@ -456,23 +456,23 @@ func (m *ArchiveManager) getLastMessageArchiveEndDate(communityID types.HexBytes
 }
 
 func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error) {
-	filters, err := m.GetCommunityChatsFilters(communityID)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, communityID)
 	if err != nil {
-		m.logger.Error("failed to get community chats filters", zap.Error(err))
+		m.logger.Error("failed to load community", zap.Error(err))
 		return 0, err
-	}
-
-	if len(filters) == 0 {
-		// If we don't have chat filters, we likely don't have any chats
-		// associated to this community, which means there's nothing more
-		// to do here
-		return 0, nil
 	}
 
 	topics := []messagingtypes.ContentTopic{}
 
-	for _, filter := range filters {
+	if filter := m.messaging.ChatFilterByChatID(community.UniversalChatID()); filter != nil {
 		topics = append(topics, filter.ContentTopic())
+	}
+
+	if len(topics) == 0 {
+		// If we don't have universal topic, we likely don't have any chats
+		// associated to this community, which means there's nothing more
+		// to do here
+		return 0, nil
 	}
 
 	lastArchiveEndDateTimestamp, err := m.getLastMessageArchiveEndDate(communityID)
@@ -550,6 +550,7 @@ func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes,
 			IndexCid:    archiveCodexCreatedSuccessfully,   // true if codex created successfully
 		},
 	})
+
 	return nil
 }
 
@@ -573,6 +574,7 @@ func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, 
 		select {
 		case <-ticker.C:
 			m.logger.Debug("starting archive task...", zap.String("id", id))
+
 			lastArchiveEndDateTimestamp, err := m.GetHistoryArchivePartitionStartTimestamp(community.ID())
 			if err != nil {
 				m.logger.Error("failed to get last archive end date", zap.Error(err))
