@@ -62,7 +62,7 @@ class TestCommunityArchives(MessengerSteps):
         # # member_msgs_resp = self.another_member.wakuext_service.chat_messages(chat_id)
         # messages = member_msgs_resp.get("messages", [])
 
-        time.sleep(30)
+        time.sleep(60)
 
         # Ensure that the community archive is available for the creator
         has_archive = self.creator.wakuext_service.has_community_archive(self.community_id)
