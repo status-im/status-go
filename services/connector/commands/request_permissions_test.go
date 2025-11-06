@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	persistence "github.com/status-im/status-go/services/connector/database"
 )
 
 func TestFailToRequestPermissionsWithMissingDAppFields(t *testing.T) {
@@ -22,6 +24,17 @@ func TestFailToRequestPermissionsWithMissingDAppFields(t *testing.T) {
 func TestRequestPermissionsResponse(t *testing.T) {
 	state, close := setupCommand(t, Method_RequestPermissions)
 	t.Cleanup(close)
+
+	dApp := &persistence.DApp{
+		URL:           testDAppData.URL,
+		Name:          testDAppData.Name,
+		IconURL:       testDAppData.IconURL,
+		ClientID:      testDAppData.ClientID,
+		SharedAccount: [20]byte{0x01},
+		ChainID:       1,
+	}
+	err := persistence.UpsertDApp(state.walletDb, dApp)
+	assert.NoError(t, err)
 
 	testCases := []struct {
 		name               string
@@ -96,12 +109,106 @@ func TestRequestPermissionsResponse(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 
-				if permission, ok := response.(Permission); ok {
-					assert.Equal(t, permission.ParentCapability, tc.expectedCapability)
+				if permissions, ok := response.([]persistence.Permission); ok {
+					assert.Len(t, permissions, 1)
+					assert.Equal(t, permissions[0].ParentCapability, tc.expectedCapability)
+					assert.Equal(t, permissions[0].Invoker, testDAppData.URL)
 				} else {
-					assert.Fail(t, "Can't parse permission from the response")
+					assert.Fail(t, "Can't parse permissions array from the response")
 				}
 			}
 		})
 	}
+}
+
+func TestRequestPermissionsWithCaveats(t *testing.T) {
+	state, close := setupCommand(t, Method_RequestPermissions)
+	t.Cleanup(close)
+
+	dApp := &persistence.DApp{
+		URL:           testDAppData.URL,
+		Name:          testDAppData.Name,
+		IconURL:       testDAppData.IconURL,
+		ClientID:      testDAppData.ClientID,
+		SharedAccount: [20]byte{0x01},
+		ChainID:       1,
+	}
+	err := persistence.UpsertDApp(state.walletDb, dApp)
+	assert.NoError(t, err)
+
+	// Test with caveats as map
+	params := []interface{}{
+		map[string]interface{}{
+			"eth_accounts": map[string]interface{}{
+				"requiredMethods": []string{"signTypedData_v4"},
+				"expiry":          float64(1234567890),
+			},
+		},
+	}
+
+	request, err := ConstructRPCRequest("wallet_requestPermissions", params, &testDAppData)
+	assert.NoError(t, err)
+
+	response, err := state.cmd.Execute(state.ctx, request)
+	assert.NoError(t, err)
+
+	permissions, ok := response.([]persistence.Permission)
+	assert.True(t, ok)
+	assert.Len(t, permissions, 1)
+	assert.Equal(t, "eth_accounts", permissions[0].ParentCapability)
+	assert.Len(t, permissions[0].Caveats, 2)
+}
+
+func TestRequestPermissionsWithNonMapCaveats(t *testing.T) {
+	state, close := setupCommand(t, Method_RequestPermissions)
+	t.Cleanup(close)
+
+	dApp := &persistence.DApp{
+		URL:           testDAppData.URL,
+		Name:          testDAppData.Name,
+		IconURL:       testDAppData.IconURL,
+		ClientID:      testDAppData.ClientID,
+		SharedAccount: [20]byte{0x01},
+		ChainID:       1,
+	}
+	err := persistence.UpsertDApp(state.walletDb, dApp)
+	assert.NoError(t, err)
+
+	// Test with non-map caveats value
+	params := []interface{}{
+		map[string]interface{}{
+			"eth_accounts": "not-a-map",
+		},
+	}
+
+	request, err := ConstructRPCRequest("wallet_requestPermissions", params, &testDAppData)
+	assert.NoError(t, err)
+
+	response, err := state.cmd.Execute(state.ctx, request)
+	assert.NoError(t, err)
+
+	permissions, ok := response.([]persistence.Permission)
+	assert.True(t, ok)
+	assert.Len(t, permissions, 1)
+	assert.Equal(t, "eth_accounts", permissions[0].ParentCapability)
+	assert.Empty(t, permissions[0].Caveats)
+}
+
+func TestRequestPermissionsNoDAppFound(t *testing.T) {
+	state, close := setupCommand(t, Method_RequestPermissions)
+	t.Cleanup(close)
+
+	// Don't create a dApp, so it will fail with ErrDAppNotFound
+	params := []interface{}{
+		map[string]interface{}{
+			"eth_accounts": struct{}{},
+		},
+	}
+
+	request, err := ConstructRPCRequest("wallet_requestPermissions", params, &testDAppData)
+	assert.NoError(t, err)
+
+	response, err := state.cmd.Execute(state.ctx, request)
+	assert.Equal(t, ErrDAppNotFound, err)
+	assert.Empty(t, response)
 }

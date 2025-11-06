@@ -105,6 +105,11 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 			Db:             state.walletDb,
 			NetworkManager: networkManager,
 		}
+	case "net_version":
+		state.cmd = &NetVersionCommand{
+			Db:             state.walletDb,
+			NetworkManager: networkManager,
+		}
 	case Method_PersonalSign:
 		state.cmd = &SignCommand{
 			Db:            state.walletDb,
@@ -123,7 +128,9 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 			FeeManager:      state.feeManager,
 		}
 	case Method_RequestPermissions:
-		state.cmd = &RequestPermissionsCommand{}
+		state.cmd = &RequestPermissionsCommand{
+			Db: state.walletDb,
+		}
 	case Method_RevokePermissions:
 		state.cmd = &RevokePermissionsCommand{
 			Db: state.walletDb,
