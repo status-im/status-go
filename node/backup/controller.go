@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/signal"
 )
 
 type BackupConfig struct {
@@ -31,6 +33,19 @@ type Controller struct {
 	quit   chan struct{}
 	mutex  sync.Mutex
 	wg     *sync.WaitGroup
+}
+
+type BackUpCompletedEvent struct {
+	FileName string
+}
+
+func (b BackUpCompletedEvent) MarshalJSON() ([]byte, error) {
+	responseItem := struct {
+		FileName string `json:"fileName,omitempty"`
+	}{
+		FileName: b.FileName,
+	}
+	return json.Marshal(responseItem)
 }
 
 func NewController(config BackupConfig, logger *zap.Logger) (*Controller, error) {
@@ -115,6 +130,10 @@ func (c *Controller) PerformBackup() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	signal.SendLocalBackUpCompleted(BackUpCompletedEvent{
+		FileName: fileName,
+	})
 
 	return fileName, nil
 }
