@@ -226,6 +226,7 @@ class WakuextService(Service):
         membership: CommunityPermissionsAccess = CommunityPermissionsAccess.AUTO_ACCEPT,
         image="",
         image_rect=ImageCropRect(),
+        historyArchiveSupportEnabled=False,
     ):
         params = {
             "membership": membership.value,
@@ -237,6 +238,7 @@ class WakuextService(Service):
             "imageAy": image_rect.ay,
             "imageBx": image_rect.bx,
             "imageBy": image_rect.by,
+            "historyArchiveSupportEnabled": historyArchiveSupportEnabled,
         }
         response = self.rpc_request("createCommunity", [params])
         return response
@@ -768,4 +770,19 @@ class WakuextService(Service):
     def get_verification_request_sent_to(self, contact_id: str):
         params = [contact_id]
         response = self.rpc_request("getVerificationRequestSentTo", params)
+        return response
+
+    def update_message_archive_interval(self, interval_seconds: int):
+        params = [interval_seconds]
+        response = self.rpc_request("updateMessageArchiveInterval", params)
+        return response
+
+    def has_community_archive(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("hasCommunityArchive", params)
+        return response
+
+    def set_archive_distribution_preference(self, preference: str):
+        params = [{"preference": preference}]
+        response = self.rpc_request("setArchiveDistributionPreference", params)
         return response

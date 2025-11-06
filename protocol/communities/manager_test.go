@@ -65,15 +65,31 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
+	messagingEnv, err := messaging.NewTestMessagingEnvironment()
+	s.Require().NoError(err)
+
+	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	s.Require().NoError(err)
+
+	err = sqlite.Migrate(appDb)
+	s.Require().NoError(err)
+
+	core, err := messagingEnv.NewTestCore(
+		messaging.CoreParams{},
+		messaging.WithSQLitePersistence(appDb),
+	)
+	s.Require().NoError(err)
+
 	amc := &ArchiveManagerConfig{
 		TorrentConfig: buildTorrentConfig(),
 		CodexConfig:   buildCodexConfig(s.T()),
 		Logger:        logger,
 		Persistence:   m.GetPersistence(),
-		Messaging:     nil,
+		Messaging:     core.API(),
 		Identity:      key,
 		Publisher:     m,
 	}
+
 	t := NewArchiveManager(amc)
 	s.Require().NoError(err)
 
@@ -1692,6 +1708,7 @@ func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
+
 	chat := &protobuf.CommunityChat{
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "added-chat",

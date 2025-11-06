@@ -5179,3 +5179,7 @@ func (m *Messenger) SetArchiveDistributionPreference(preference string) error {
 func (m *Messenger) GetArchiveDistributionPreference() (string, error) {
 	return m.communitiesManager.GetArchiveDistributionPreference()
 }
+
+func (m *Messenger) CodexIndexCidFileExists(communityID types.HexBytes) bool {
+	return m.archiveManager.CodexIndexCidFileExists(communityID)
+}

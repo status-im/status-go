@@ -462,6 +462,11 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 		return 0, err
 	}
 
+	if community == nil {
+		m.logger.Error("community not found for this id")
+		return 0, err
+	}
+
 	topics := []messagingtypes.ContentTopic{}
 
 	if filter := m.messaging.ChatFilterByChatID(community.UniversalChatID()); filter != nil {

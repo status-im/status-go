@@ -79,6 +79,7 @@ type CreateAccount struct {
 
 	TorrentConfigEnabled *bool
 	TorrentConfigPort    *int
+	CodexConfigEnabled   *bool
 
 	APIConfig *APIConfig `json:"apiConfig"`
 

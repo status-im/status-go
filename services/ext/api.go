@@ -1620,3 +1620,7 @@ func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteComm
 func (api *PublicAPI) PeerID() string {
 	return api.service.messaging.PeerID().String()
 }
+
+func (m *PublicAPI) HasCommunityArchive(communityID types.HexBytes) bool {
+	return m.service.messenger.CodexIndexCidFileExists(communityID)
+}

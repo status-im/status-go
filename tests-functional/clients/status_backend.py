@@ -279,6 +279,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 "wsHost": "0.0.0.0",
                 "wsPort": constants.STATUS_CONNECTOR_WS_PORT,
             },
+            "codexConfigEnabled": kwargs.get("codex_config_enabled", False),
+            "torrentConfigEnabled": False,
+            "torrentConfigPort": 9025,
             "thirdpartyServicesEnabled": True,
         }
         if not Config.disable_override_networks:
