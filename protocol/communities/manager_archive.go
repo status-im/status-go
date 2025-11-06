@@ -467,17 +467,27 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 		return 0, err
 	}
 
-	topics := []messagingtypes.ContentTopic{}
-
-	if filter := m.messaging.ChatFilterByChatID(community.UniversalChatID()); filter != nil {
-		topics = append(topics, filter.ContentTopic())
+	filters, err := m.GetCommunityChatsFilters(communityID)
+	if err != nil {
+		m.logger.Error("failed to get community chats filters", zap.Error(err))
+		return 0, err
 	}
 
-	if len(topics) == 0 {
-		// If we don't have universal topic, we likely don't have any chats
+	filter := m.messaging.ChatFilterByChatID(community.UniversalChatID())
+	if filter != nil {
+		filters = append(filters, filter)
+	}
+
+	if len(filters) == 0 {
+		// If we don't have chat filters, we likely don't have any chats
 		// associated to this community, which means there's nothing more
 		// to do here
 		return 0, nil
+	}
+
+	topics := []messagingtypes.ContentTopic{}
+	for _, filter := range filters {
+		topics = append(topics, filter.ContentTopic())
 	}
 
 	lastArchiveEndDateTimestamp, err := m.getLastMessageArchiveEndDate(communityID)
