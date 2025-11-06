@@ -28,6 +28,7 @@ import (
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
@@ -3798,6 +3799,13 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 
 	peerInfo := m.messaging.GetActiveStorenode()
 
+	preference, err := m.GetArchiveDistributionPreference()
+	if err != nil {
+		m.logger.Error("failed to get archive distribution preference", zap.Error(err))
+		// fallback to codex
+		preference = params.ArchiveDistributionMethodCodex
+	}
+
 	for _, c := range communities {
 
 		if c.Joined() {
@@ -3811,11 +3819,13 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				continue
 			}
 
-			// Check if there's already a torrent file for this community and seed it
-			if m.archiveManager.TorrentFileExists(c.IDString()) {
-				err = m.archiveManager.SeedHistoryArchiveTorrent(c.ID())
-				if err != nil {
-					m.logger.Error("failed to seed history archive", zap.Error(err))
+			if preference == params.ArchiveDistributionMethodTorrent {
+				// Check if there's already a torrent file for this community and seed it
+				if m.archiveManager.TorrentFileExists(c.IDString()) {
+					err = m.archiveManager.SeedHistoryArchiveTorrent(c.ID())
+					if err != nil {
+						m.logger.Error("failed to seed history archive", zap.Error(err))
+					}
 				}
 			}
 
@@ -3889,10 +3899,15 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				// Last archive is less than `interval` old, wait until `interval` is complete,
 				// then create archive and kick off archive creation loop for future archives
 				// Seed current archive in the meantime
-				err := m.archiveManager.SeedHistoryArchiveTorrent(c.ID())
-				if err != nil {
-					m.logger.Error("failed to seed history archive", zap.Error(err))
+				if preference == params.ArchiveDistributionMethodTorrent {
+					err := m.archiveManager.SeedHistoryArchiveTorrent(c.ID())
+					if err != nil {
+						m.logger.Error("failed to seed history archive", zap.Error(err))
+					}
 				}
+				// we do not have to explicitly seed to codex. If codex is enabled
+				// and the index cid was not explicitly removed, it will be
+				// advertised automatically => or maybe we do?
 				timeToNextInterval := messageArchiveInterval - durationSinceLastArchive
 
 				m.logger.Debug("starting history archive tasks interval in", zap.Any("timeLeft", timeToNextInterval))
