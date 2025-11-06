@@ -2527,10 +2527,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 		return nil, err
 	}
 
-	isTorrentActivated := m.config.torrentConfig != nil && m.config.torrentConfig.Enabled
-	isCodexActivated := m.config.codexConfig != nil && m.config.codexConfig.Enabled
-
-	if (isTorrentActivated || isCodexActivated) && communitySettings.HistoryArchiveSupportEnabled {
+	if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
 		go m.archiveManager.StartHistoryArchiveTasksInterval(community, messageArchiveInterval)
 	}
 
