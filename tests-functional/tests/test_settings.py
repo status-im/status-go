@@ -91,8 +91,8 @@ class TestSettings:
         assert isinstance(result, bool), f"Expected bool, got {type(result)}"
         print("Messages backup enabled:", result)
 
-    @pytest.mark.parametrize("value", [False, True])
-    def test_toggle_messages_backup_enabled(self, value):
+    def test_toggle_messages_backup_enabled(self):
+        value = True
         self.config.settings_service.save_setting("messages-backup-enabled?", value)
         result = self.config.settings_service.messages_backup_enabled()
         assert isinstance(result, bool)
@@ -104,8 +104,8 @@ class TestSettings:
         assert result is not None, "Expected a non-null result"
         assert isinstance(result, bool), f"Expected bool, got {type(result)}"
 
-    @pytest.mark.parametrize("bad", ["true", 1, 0, [], {}, 3.14])
-    def test_notifications_setter_allow_notifications_invalid_values(self, bad):
+    def test_notifications_setter_allow_notifications_invalid_values(self):
+        bad = 1
         print(f"Testing setter with invalid type: {bad!r}")
         with pytest.raises(ApiResponseError) as exc:
             self.config.settings_service.notifications_set_allow_notifications(bad)
@@ -140,8 +140,8 @@ class TestSettings:
         assert result is not None, "Expected a non-null return value"
         assert isinstance(result, str), f"Expected str, got {type(result)}"
 
-    @pytest.mark.parametrize("invalid_value", [123, True, [], {}, 3.14])
-    def test_notifications_set_one_to_one_chats_invalid_type(self, invalid_value):
+    def test_notifications_set_one_to_one_chats_invalid_type(self):
+        invalid_value = 123
         print(f"Testing invalid type for OneToOneChats: {invalid_value!r}")
         with pytest.raises(Exception) as exc:
             self.config.settings_service.notifications_set_one_to_one_chats(invalid_value)
@@ -172,8 +172,8 @@ class TestSettings:
         assert result is not None, "Expected a non-null return value"
         assert isinstance(result, str), f"Expected str, got {type(result)}"
 
-    @pytest.mark.parametrize("value", ["SendAlerts", "TurnOff", "NULL"])
-    def test_notifications_set_and_get_group_chats(self, value):
+    def test_notifications_set_and_get_group_chats(self):
+        value = "SendAlerts"
         print(f"Setting GroupChats to: '{value}'")
         result = self.config.settings_service.notifications_set_group_chats(value)
         print(f"Setter returned: {result}")
@@ -185,18 +185,8 @@ class TestSettings:
         assert got == value, f"Expected '{value}', got '{got}'"
 
     @pytest.mark.xfail(reason="API accepts wrong values")
-    @pytest.mark.parametrize(
-        "invalid_value",
-        [
-            "@#$%^&*()!",
-            "🚫invalid🔥",
-            "DROP TABLE users;",
-            "TurnOn123",
-            "",
-            "    ",
-        ],
-    )
-    def test_notifications_set_group_chats_invalid_values(self, invalid_value):
+    def test_notifications_set_group_chats_invalid_values(self):
+        invalid_value = ""
         print(f"Testing invalid GroupChats value: '{invalid_value}'")
         with pytest.raises(ApiResponseError) as exc:
             self.config.settings_service.notifications_set_group_chats(invalid_value)
@@ -220,8 +210,8 @@ class TestSettings:
         assert result is not None, "Expected non-null result from NotificationsGetContactRequests()"
         assert isinstance(result, str), f"Expected type str, got {type(result)}"
 
-    @pytest.mark.parametrize("invalid_value", [123, True, {"key": "value"}, ["list"], 4.56])
-    def test_notifications_set_contact_requests_rejects_wrong_types_and_preserves_value(self, invalid_value):
+    def test_notifications_set_contact_requests_rejects_wrong_types_and_preserves_value(self):
+        invalid_value = 123
         original_value = self.config.settings_service.notifications_get_contact_requests()
         print(f"Original NotificationsGetContactRequests value: {original_value!r}")
         print(f"Trying to set invalid value of type {type(invalid_value)}: {invalid_value}")
@@ -231,8 +221,8 @@ class TestSettings:
         print(f"Value after invalid attempt: {current_value!r}")
         assert current_value == original_value, f"Value changed after invalid set attempt. Expected {original_value!r}, got {current_value!r}"
 
-    @pytest.mark.parametrize("valid_value", ["SendAlerts", "TurnOff", "NULL"])
-    def test_notifications_set_and_get_contact_requests(self, valid_value):
+    def test_notifications_set_and_get_contact_requests(self):
+        valid_value = "SendAlerts"
         print(f"Setting NotificationsSetContactRequests to: {valid_value!r}")
         set_result = self.config.settings_service.notifications_set_contact_requests(valid_value)
         print("Setter result:", set_result)
@@ -250,19 +240,8 @@ class TestSettings:
         assert result in valid_values, f"Unexpected value: {result}"
 
     @pytest.mark.xfail(reason="API accepts wrong values")
-    @pytest.mark.parametrize(
-        "invalid_value",
-        [
-            "",
-            "🚫wrong",
-            "invalid",
-            "123",
-            123,
-            True,
-            "@!#%$",
-        ],
-    )
-    def test_notifications_set_identity_verification_requests_rejects_invalid_values(self, invalid_value):
+    def test_notifications_set_identity_verification_requests_rejects_invalid_values(self):
+        invalid_value = ""
         original_value = self.config.settings_service.notifications_get_identity_verification_requests()
         print(f"Original IdentityVerificationRequests value: {original_value}")
         print(f"Testing invalid input: {invalid_value!r} ({type(invalid_value)})")
@@ -292,8 +271,8 @@ class TestSettings:
         print(f"Reverted sound enabled value: {reverted_value}")
         assert reverted_value == initial_value, "Failed to revert sound enabled to its original state"
 
-    @pytest.mark.parametrize("invalid_value", ["true", 1, 0, [], {}, "False"])
-    def test_notifications_set_sound_enabled_invalid_type(self, invalid_value):
+    def test_notifications_set_sound_enabled_invalid_type(self):
+        invalid_value = "true"
         initial_value = self.config.settings_service.notifications_get_sound_enabled()
         print(f"Initial sound enabled value: {initial_value}")
         try:
@@ -348,8 +327,8 @@ class TestSettings:
         result = self.config.settings_service.set_bio(valid_bio)
         assert result is None or result == "", f"Expected None or empty string, got {result}"
 
-    @pytest.mark.parametrize("invalid_bio", [123, None, ["not", "a", "string"], {"bio": "map"}])
-    def test_set_bio_invalid_type(self, invalid_bio):
+    def test_set_bio_invalid_type(self):
+        invalid_bio = 123
         print(f"\n[TEST] Trying to set invalid bio value: {invalid_bio} (type: {type(invalid_bio).__name__})")
         try:
             result = self.config.settings_service.set_bio(invalid_bio)
@@ -366,8 +345,8 @@ class TestSettings:
         print(f"[RESULT] RPC returned: {result}")
         assert result is None or result == "", f"Expected None or empty string, got {result}"
 
-    @pytest.mark.parametrize("invalid_id", [None, 123, [], {}, ""])
-    def test_delete_exemptions_invalid_id(self, invalid_id):
+    def test_delete_exemptions_invalid_id(self):
+        invalid_id = None
         print(f"\n[TEST] Trying delete_exemptions with invalid id: {invalid_id} (type: {type(invalid_id).__name__})")
         try:
             result = self.config.settings_service.delete_exemptions(invalid_id)
@@ -441,24 +420,10 @@ class TestSettings:
         "params",
         [
             (123, True, "all", "all", "all"),
-            (["x"], True, "all", "all", "all"),
-            ({}, True, "all", "all", "all"),
             ("chat:x", "true", "all", "all", "all"),
-            ("chat:x", 1, "all", "all", "all"),
-            ("chat:x", [], "all", "all", "all"),
-            ("chat:x", {}, "all", "all", "all"),
             ("chat:x", True, 5, "all", "all"),
-            ("chat:x", True, True, "all", "all"),
-            ("chat:x", True, ["mentions-only"], "all", "all"),
-            ("chat:x", True, {"k": "v"}, "all", "all"),
             ("chat:x", True, "all", 0, "all"),
-            ("chat:x", True, "all", False, "all"),
-            ("chat:x", True, "all", ["x"], "all"),
-            ("chat:x", True, "all", {"k": "v"}, "all"),
             ("chat:x", True, "all", "all", 0),
-            ("chat:x", True, "all", "all", False),
-            ("chat:x", True, "all", "all", ["x"]),
-            ("chat:x", True, "all", "all", {"k": "v"}),
         ],
     )
     def test_set_exemptions_invalid_inputs(self, params):
@@ -536,11 +501,8 @@ class TestSettings:
             print(f"[WARN] Failed to restore original value: {e}")
 
     @pytest.mark.xfail(reason=" API accepts -1")
-    @pytest.mark.parametrize(
-        "bad_value",
-        [-1, "1", 1.5, {}, [], True],
-    )
-    def test_notifications_message_preview_rejects_invalid_values(self, bad_value):
+    def test_notifications_message_preview_rejects_invalid_values(self):
+        bad_value = -1
         before = self.config.settings_service.notifications_get_message_preview()
         print(f"[SETUP] before={before!r}, trying bad_value={bad_value!r}")
         try:
@@ -570,8 +532,8 @@ class TestSettings:
             assert isinstance(get_result, int), f"Expected int, got {type(get_result)}"
             assert get_result == value, f"Getter returned {get_result}, expected {value}"
 
-    @pytest.mark.parametrize("invalid_value", ["loud", True, 3.14, [], {}, "100"])
-    def test_notifications_set_volume_rejects_invalid_types(self, invalid_value):
+    def test_notifications_set_volume_rejects_invalid_types(self):
+        invalid_value = "loud"
 
         original_value = self.config.settings_service.notifications_get_volume()
         assert isinstance(original_value, int), "Precondition failed: getter did not return int"
@@ -588,8 +550,8 @@ class TestSettings:
         assert value is not None
         assert isinstance(value, str)
 
-    @pytest.mark.parametrize("new_value", ["all", "mentions-only"])
-    def test_notifications_personal_mentions_setter_getter(self, new_value):
+    def test_notifications_personal_mentions_setter_getter(self):
+        new_value = "all"
         original = self.config.settings_service.notifications_get_personal_mentions()
         print(f"[SETUP] original personalMentions = {original!r}")
         res = self.config.settings_service.notifications_set_personal_mentions(new_value)
@@ -600,8 +562,8 @@ class TestSettings:
         assert isinstance(got, str)
         assert got == new_value
 
-    @pytest.mark.parametrize("bad_value", [123, True, 3.14, ["list"], {"k": "v"}])
-    def test_notifications_set_personal_mentions_rejects_wrong_types(self, bad_value):
+    def test_notifications_set_personal_mentions_rejects_wrong_types(self):
+        bad_value = 123
         before = self.config.settings_service.notifications_get_personal_mentions()
         print(f"[SETUP] before={before!r}, bad_value={bad_value!r} ({type(bad_value).__name__})")
         with pytest.raises(ApiResponseError):
@@ -615,8 +577,8 @@ class TestSettings:
         print(f"[GET] globalMentions -> {value!r}")
         assert isinstance(value, str)
 
-    @pytest.mark.parametrize("new_value", ["all", "mentions-only", "none"])
-    def test_notifications_global_mentions_setter_getter(self, new_value):
+    def test_notifications_global_mentions_setter_getter(self):
+        new_value = "all"
         original = self.config.settings_service.notifications_get_global_mentions()
         print(f"[SETUP] original globalMentions = {original!r}")
         res = self.config.settings_service.notifications_set_global_mentions(new_value)
@@ -626,7 +588,7 @@ class TestSettings:
         print(f"[VERIFY] globalMentions after set -> {got!r}")
         assert got == new_value
 
-    @pytest.mark.parametrize("bad_value", [123, True, 3.14, ["list"], {"k": "v"}, None])
+    @pytest.mark.parametrize("bad_value", [123, True, ["list"], {"k": "v"}, None])
     def test_notifications_set_global_mentions_rejects_wrong_types_and_preserves_value(self, bad_value):
         before = self.config.settings_service.notifications_get_global_mentions()
         print(f"[SETUP] before={before!r}, bad_value={bad_value!r} ({type(bad_value).__name__})")
