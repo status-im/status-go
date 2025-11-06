@@ -1,7 +1,10 @@
+import logging
 import pytest
 from clients.api import ApiResponseError
 import datetime
 import time
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.rpc
@@ -135,7 +138,7 @@ class TestSettings:
         ],
     )
     def test_notifications_set_get_one_to_one_chats(self, value):
-        print(f"Setting OneToOneChats to: '{value}'")
+        logger.info(f"Setting OneToOneChats to: '{value}'")
         result = self.config.settings_service.notifications_set_one_to_one_chats(value)
         assert result is None, f"Expected None, got {result}"
 
@@ -350,7 +353,7 @@ class TestSettings:
     )
     def test_set_exemptions_invalid_inputs(self, params):
         eid, mute, personal, global_, other = params
-        print(
+        logger.info(
             f"\n[TEST] Invalid call: id={eid!r}({type(eid).__name__}), "
             f"mute={mute!r}({type(mute).__name__}), "
             f"personal={personal!r}({type(personal).__name__}), "
@@ -358,11 +361,9 @@ class TestSettings:
             f"other={other!r}({type(other).__name__})"
         )
         try:
-            res = self.config.settings_service.notifications_set_exemptions(eid, mute, personal, global_, other)
-            print(f"[RESULT] RPC returned: {res}")
+            self.config.settings_service.notifications_set_exemptions(eid, mute, personal, global_, other)
             pytest.fail("Expected exception or backend error for invalid types, but call succeeded.")
-        except Exception as e:
-            print(f"[EXCEPTION] {e}")
+        except Exception:
             assert True
 
     @pytest.mark.skip(reason="Backend RPC notificationsGetDefaultExemptions not yet fully deployed/testable")
@@ -487,11 +488,10 @@ class TestSettings:
     @pytest.mark.parametrize("bad_value", [123, True, ["list"], {"k": "v"}, None])
     def test_notifications_set_global_mentions_rejects_wrong_types_and_preserves_value(self, bad_value):
         before = self.config.settings_service.notifications_get_global_mentions()
-        print(f"[SETUP] before={before!r}, bad_value={bad_value!r} ({type(bad_value).__name__})")
+        logger.info(f"[SETUP] before={before!r}, bad_value={bad_value!r} ({type(bad_value).__name__})")
         with pytest.raises(ApiResponseError):
             self.config.settings_service.notifications_set_global_mentions(bad_value)
         after = self.config.settings_service.notifications_get_global_mentions()
-        print(f"[VERIFY] after={after!r} (must equal before)")
         assert after == before
 
     def test_get_settings_reflects(self):
