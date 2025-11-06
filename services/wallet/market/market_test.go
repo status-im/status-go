@@ -22,6 +22,14 @@ import (
 // MockTokenManager implements TokenManagerInterface for testing
 type MockTokenManager struct{}
 
+func (m *MockTokenManager) GetTokensForFetchingMarketData() ([]*tokentypes.Token, error) {
+	return m.GetTokensForActiveNetworksMode()
+}
+
+func (m *MockTokenManager) GetTokensByKeysForFetchingMarketData(tokenKeys []string) ([]*tokentypes.Token, error) {
+	return m.GetTokensByKeys(tokenKeys)
+}
+
 func (m *MockTokenManager) GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, error) {
 	var tokens []*tokentypes.Token
 	for _, key := range tokenKeys {
