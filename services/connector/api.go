@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/status-im/status-go/services/connector/chainutils"
 	"github.com/status-im/status-go/services/connector/commands"
 	persistence "github.com/status-im/status-go/services/connector/database"
 )
@@ -39,8 +40,9 @@ func NewAPI(s *Service) *API {
 	r.Register("eth_requestAccounts", accountsCommand)
 
 	// Active chain per dapp management
-	r.Register("eth_chainId", commands.NewChainIDCommand(s.db, s.nm))
-	r.Register("net_version", commands.NewNetVersionCommand(s.db, s.nm))
+	defaultChainIDGetter := chainutils.NewNetworkManagerAdapter(s.nm)
+	r.Register("eth_chainId", commands.NewChainIDCommand(s.db, defaultChainIDGetter))
+	r.Register("net_version", commands.NewNetVersionCommand(s.db, defaultChainIDGetter))
 	r.Register("wallet_switchEthereumChain", commands.NewSwitchEthereumChainCommand(s.db, s.nm))
 
 	// Permissions

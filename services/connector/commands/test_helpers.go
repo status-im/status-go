@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network"
 	network_testutil "github.com/status-im/status-go/rpc/network/testutil"
+	"github.com/status-im/status-go/services/connector/chainutils"
 	mock_chainutils "github.com/status-im/status-go/services/connector/chainutils/mock"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -96,9 +97,11 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 	case Method_EthRequestAccounts:
 		state.cmd = NewRequestAccountsCommand(state.walletDb, state.handler)
 	case Method_EthChainId:
-		state.cmd = NewChainIDCommand(state.walletDb, networkManager)
+		defaultChainIDGetter := chainutils.NewNetworkManagerAdapter(networkManager)
+		state.cmd = NewChainIDCommand(state.walletDb, defaultChainIDGetter)
 	case "net_version":
-		state.cmd = NewNetVersionCommand(state.walletDb, networkManager)
+		defaultChainIDGetter := chainutils.NewNetworkManagerAdapter(networkManager)
+		state.cmd = NewNetVersionCommand(state.walletDb, defaultChainIDGetter)
 	case Method_PersonalSign:
 		state.cmd = NewSignCommand(state.walletDb, state.handler)
 	case Method_SignTypedDataV4:
