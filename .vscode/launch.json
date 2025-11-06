@@ -1,0 +1,100 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Current Test",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${fileDirname}",
+      "args": ["-test.v", "-test.run", "^${selectedText}$"],
+      "buildFlags": "-tags=gowaku_no_rln,gowaku_skip_migrations",
+      "env": {
+        "CGO_ENABLED": "1"
+      }
+    },
+    {
+      "name": "Debug Current Test Function",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${fileDirname}",
+      "buildFlags": "-tags=gowaku_no_rln,gowaku_skip_migrations",
+      "env": {
+        "CGO_ENABLED": "1"
+      }
+    },
+    {
+      "name": "Debug All Tests in Current File",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${fileDirname}",
+      "args": ["-test.v"],
+      "buildFlags": "-tags=gowaku_no_rln,gowaku_skip_migrations",
+      "env": {
+        "CGO_ENABLED": "1"
+      }
+    },
+    {
+      "name": "Debug All Tests in Current Package",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${fileDirname}",
+      "args": ["-test.v", "-count=1"],
+      "buildFlags": "-tags=gowaku_no_rln,gowaku_skip_migrations",
+      "env": {
+        "CGO_ENABLED": "1"
+      }
+    },
+    {
+      "name": "Debug Specific Test Suite (e.g., TestMessengerCommunitiesTokenPermissionsSuite)",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${workspaceFolder}/protocol",
+      "args": [
+        "-test.v",
+        "-test.run",
+        "TestMessengerCommunitiesTokenPermissionsSuite"
+      ],
+      "buildFlags": "-tags=gowaku_no_rln,gowaku_skip_migrations",
+      "env": {
+        "CGO_ENABLED": "1"
+      }
+    },
+    {
+      "name": "Debug Specific Test Case",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${workspaceFolder}/protocol",
+      "args": [
+        "-test.v",
+        "-test.run",
+        "TestMessengerCommunitiesTokenPermissionsSuite/TestFullCodexIntegration",
+        "-count=1"
+      ],
+      "buildFlags": "-tags=gowaku_no_rln,gowaku_skip_migrations",
+      "env": {
+        "CGO_ENABLED": "1"
+      }
+    },
+    {
+      "name": "Debug Mock Tests (Codex)",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${workspaceFolder}/protocol/communities",
+      "args": ["-test.v", "-test.run", "TestMock"],
+      "buildFlags": "-tags=gowaku_no_rln,gowaku_skip_migrations",
+      "env": {
+        "CGO_ENABLED": "1"
+      }
+    }
+  ]
+}
