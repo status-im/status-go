@@ -503,24 +503,39 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 }
 
 func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
-	archiveTorrentCreatedSuccessfully := true
-	archiveCodexCreatedSuccessfully := true
-	m.UnseedHistoryArchiveTorrent(communityID)
-	_, errTorrent := m.ArchiveFileManager.CreateHistoryArchiveTorrentFromDB(communityID, topics, startDate, endDate, partition, encrypt)
-	if errTorrent != nil {
-		archiveTorrentCreatedSuccessfully = false
-		m.logger.Error("failed to create history archive torrent", zap.Error(errTorrent))
-	} else {
-		errTorrent = m.SeedHistoryArchiveTorrent(communityID)
+	archiveTorrentCreatedSuccessfully := false
+	archiveCodexCreatedSuccessfully := false
+	distributionPreference, err := m.persistence.GetArchiveDistributionPreference()
+	if err != nil {
+		// fallback to codex
+		distributionPreference = params.ArchiveDistributionMethodCodex
+	}
+
+	var errTorrent, errCodex error
+
+	if distributionPreference == params.ArchiveDistributionMethodTorrent {
+		archiveTorrentCreatedSuccessfully = true
+		m.UnseedHistoryArchiveTorrent(communityID)
+		_, errTorrent := m.ArchiveFileManager.CreateHistoryArchiveTorrentFromDB(communityID, topics, startDate, endDate, partition, encrypt)
 		if errTorrent != nil {
 			archiveTorrentCreatedSuccessfully = false
-			m.logger.Error("failed to seed history archive torrent", zap.Error(errTorrent))
+			m.logger.Error("failed to create history archive torrent", zap.Error(errTorrent))
+		} else {
+			errTorrent = m.SeedHistoryArchiveTorrent(communityID)
+			if errTorrent != nil {
+				archiveTorrentCreatedSuccessfully = false
+				m.logger.Error("failed to seed history archive torrent", zap.Error(errTorrent))
+			}
 		}
 	}
-	_, errCodex := m.ArchiveFileManager.CreateHistoryArchiveCodexFromDB(communityID, topics, startDate, endDate, partition, encrypt)
-	if errCodex != nil {
-		archiveCodexCreatedSuccessfully = false
-		m.logger.Error("failed to create history archive codex", zap.Error(errCodex))
+
+	if distributionPreference == params.ArchiveDistributionMethodCodex {
+		archiveCodexCreatedSuccessfully = true
+		_, errCodex := m.ArchiveFileManager.CreateHistoryArchiveCodexFromDB(communityID, topics, startDate, endDate, partition, encrypt)
+		if errCodex != nil {
+			archiveCodexCreatedSuccessfully = false
+			m.logger.Error("failed to create history archive codex", zap.Error(errCodex))
+		}
 	}
 	if !archiveTorrentCreatedSuccessfully && !archiveCodexCreatedSuccessfully {
 		return errors.Join(errTorrent, errCodex)
