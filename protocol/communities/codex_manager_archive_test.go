@@ -2,6 +2,7 @@ package communities_test
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
 	"path/filepath"
@@ -28,11 +29,11 @@ import (
 
 type CodexArchiveManagerSuite struct {
 	suite.Suite
-	codexClient communities.CodexClientInterface
-	// codexConfig    *params.CodexConfig
+	codexClient    communities.CodexClientInterface
 	archiveManager *communities.ArchiveManager
 	manager        *communities.Manager
-	uploadedCIDs   []string // Track uploaded CIDs for cleanup
+	identity       *ecdsa.PrivateKey // Store identity for test access
+	uploadedCIDs   []string          // Track uploaded CIDs for cleanup
 }
 
 func buildCodexConfig(t *testing.T) *params.CodexConfig {
@@ -49,7 +50,7 @@ func buildCodexConfig(t *testing.T) *params.CodexConfig {
 	}
 }
 
-func (s *CodexArchiveManagerSuite) buildManagers() (*communities.Manager, *communities.ArchiveManager) {
+func (s *CodexArchiveManagerSuite) buildManagers() (*communities.Manager, *communities.ArchiveManager, *ecdsa.PrivateKey) {
 	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
@@ -76,7 +77,7 @@ func (s *CodexArchiveManagerSuite) buildManagers() (*communities.Manager, *commu
 	t := communities.NewArchiveManager(amc)
 	s.Require().NoError(err)
 
-	return m, t
+	return m, t, key
 }
 
 func (s *CodexArchiveManagerSuite) CreateCommunity() *communities.Community {
@@ -95,10 +96,11 @@ func (s *CodexArchiveManagerSuite) CreateCommunity() *communities.Community {
 
 // SetupSuite runs once before all tests in the suite
 func (s *CodexArchiveManagerSuite) SetupTest() {
-	m, t := s.buildManagers()
+	m, t, key := s.buildManagers()
 	communities.SetValidateInterval(30 * time.Millisecond)
 	s.manager = m
 	s.archiveManager = t
+	s.identity = key
 	s.Require().NoError(s.archiveManager.StartCodexClient())
 	client := s.archiveManager.GetCodexClient()
 	s.Require().NotNil(client)
@@ -275,6 +277,31 @@ func (s *CodexArchiveManagerSuite) TestDownloadingArchivesFromCodex() {
 	}
 
 	s.T().Logf("All signals verified successfully!")
+
+	// Verify that the index file exists and has correct content
+	loadedIndex, err := s.archiveManager.CodexLoadHistoryArchiveIndexFromFile(s.identity, communityID)
+	s.Require().NoError(err, "Failed to load index file from disk")
+	s.Require().NotNil(loadedIndex, "Loaded index should not be nil")
+	s.Require().Equal(len(archives), len(loadedIndex.Archives), "Loaded index should contain all archives")
+
+	// Verify each archive in the loaded index matches the original
+	for _, archive := range archives {
+		loadedMetadata, exists := loadedIndex.Archives[archive.hash]
+		s.Require().True(exists, "Archive %s should exist in loaded index", archive.hash)
+		s.Require().NotNil(loadedMetadata, "Archive metadata should not be nil for %s", archive.hash)
+		s.Require().Equal(archiveCIDs[archive.hash], loadedMetadata.Cid, "CID should match for archive %s", archive.hash)
+		s.Require().Equal(archive.from, loadedMetadata.Metadata.From, "From timestamp should match for archive %s", archive.hash)
+		s.Require().Equal(archive.to, loadedMetadata.Metadata.To, "To timestamp should match for archive %s", archive.hash)
+	}
+
+	s.T().Logf("Index file content verified successfully!")
+
+	// Verify that the CID file exists and contains the correct CID
+	storedCid, err := s.archiveManager.GetHistoryArchiveIndexCid(communityID)
+	s.Require().NoError(err, "Failed to read CID file")
+	s.Require().Equal(cid, storedCid, "Stored CID should match the uploaded index CID")
+
+	s.T().Logf("CID file content verified successfully! CID: %s", storedCid)
 }
 
 func (s *CodexArchiveManagerSuite) TestDownloadCancellationBeforeManifestFetch() {
