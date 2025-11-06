@@ -137,9 +137,6 @@ func (m *Messenger) handleOtherResendMethods(rawMessage *messagingtypes.RawMessa
 }
 
 func (m *Messenger) shouldResendMessage(message *messagingtypes.RawMessage, t common.TimeSource) bool {
-	if m.featureFlags.ResendRawMessagesDisabled {
-		return false
-	}
 	//exponential backoff depends on how many attempts to send message already made
 	power := math.Pow(2, float64(message.SendCount-1))
 	backoff := uint64(power) * uint64(m.config.messageResendMinDelay.Milliseconds())

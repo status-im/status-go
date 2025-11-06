@@ -75,7 +75,7 @@ func (c *SwitchEthereumChainCommand) Execute(ctx context.Context, request RPCReq
 		return "", ErrUnsupportedNetwork
 	}
 
-	dApp, err := persistence.SelectDAppByUrl(c.Db, request.URL)
+	dApp, err := persistence.SelectDApp(c.Db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}

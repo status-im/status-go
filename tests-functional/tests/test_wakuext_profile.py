@@ -38,9 +38,6 @@ class TestProfile:
     def test_set_syncing_on_mobile_network(self):
         self.rpc_client.wakuext_service.set_syncing_on_mobile_network(False)
 
-    def test_toggle_peer_syncing(self):
-        self.rpc_client.wakuext_service.toggle_peer_syncing(True)
-
     @pytest.mark.parametrize(
         "setting_name, default_value, changed_value",
         [

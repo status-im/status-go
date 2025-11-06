@@ -127,12 +127,11 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 	messaging, err := messagingEnv.NewTestCore(
 		messaging.CoreParams{
 			Identity:       config.privateKey,
-			DB:             appDb,
-			Persistence:    NewMessagingPersistence(appDb),
 			InstallationID: installationID,
 			TimeSource:     &testTimeSource{},
 		},
 		messaging.WithLogger(config.logger),
+		messaging.WithSQLitePersistence(appDb),
 	)
 	if err != nil {
 		return nil, err

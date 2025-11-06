@@ -9,9 +9,8 @@ import (
 	"github.com/status-im/status-go/services/connector/commands"
 )
 
-func TestCallRPC(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+func TestCallRPC_UntrustedConnection(t *testing.T) {
+	state := setupTests(t)
 
 	tests := []struct {
 		request     string
@@ -37,9 +36,20 @@ func TestCallRPC(t *testing.T) {
 			request:     "{\"method\": \"wallet_switchEthereumChain\", \"params\": []}",
 			expectError: commands.ErrRequestMissingDAppData,
 		},
+		{
+			request: `{
+				"method": "eth_chainId",
+				"params": [],
+				"url": "https://example.com",
+				"name": "Example DApp",
+				"iconUrl": "https://example.com/icon.png",
+				"clientId": "wallet-connect"
+			}`,
+			expectError: ErrCannotOverrideClientIDForHttpConnection,
+		},
 	}
 
-	ctx := context.Background()
+	ctx := WithConnectionType(context.Background(), ConnectionTypeHTTP)
 	for _, tt := range tests {
 		t.Run(tt.request, func(t *testing.T) {
 			_, err := state.api.CallRPC(ctx, tt.request)
@@ -47,4 +57,42 @@ func TestCallRPC(t *testing.T) {
 			require.Equal(t, tt.expectError, err)
 		})
 	}
+}
+
+func TestCallRPC_TrustedConnectionRequiresClientID(t *testing.T) {
+	state := setupTests(t)
+
+	// Trusted connection (Internal) without ClientID should fail
+	ctx := WithConnectionType(context.Background(), ConnectionTypeInternal)
+
+	request := `{
+		"method": "eth_chainId",
+		"params": [],
+		"url": "https://example.com",
+		"name": "Example DApp",
+		"iconUrl": "https://example.com/icon.png"
+	}`
+
+	_, err := state.api.CallRPC(ctx, request)
+	require.Error(t, err)
+	require.Equal(t, ErrEmptyClientIDFromTrustedConnection, err)
+}
+
+func TestCallRPC_TrustedConnectionWithClientID(t *testing.T) {
+	state := setupTests(t)
+
+	ctx := WithConnectionType(context.Background(), ConnectionTypeInternal)
+
+	request := `{
+		"method": "eth_chainId",
+		"params": [],
+		"url": "https://example.com",
+		"name": "Example DApp",
+		"iconUrl": "https://example.com/icon.png",
+		"clientId": "status-desktop"
+	}`
+
+	result, err := state.api.CallRPC(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, result)
 }

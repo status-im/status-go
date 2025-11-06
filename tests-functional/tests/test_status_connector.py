@@ -28,16 +28,6 @@ def accept_connector(backend, connector, wallet_acc):
 @pytest.mark.connector
 class TestStatusConnector:
 
-    await_signals = [
-        SignalType.NODE_LOGIN.value,
-        SignalType.CONNECTOR_SEND_REQUEST_ACCOUNTS.value,
-        SignalType.CONNECTOR_SEND_TRANSACTION.value,
-        SignalType.CONNECTOR_SIGN.value,
-        SignalType.CONNECTOR_DAPP_PERMISSION_GRANTED.value,
-        SignalType.CONNECTOR_DAPP_PERMISSION_REVOKED.value,
-        SignalType.CONNECTOR_DAPP_CHAIN_ID_SWITCHED.value,
-    ]
-
     @pytest.fixture
     def backend(self, backend_new_profile):
         yield backend_new_profile("sender", connector_enabled=True)

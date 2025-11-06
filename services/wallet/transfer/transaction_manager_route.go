@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
+	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
@@ -75,6 +76,9 @@ func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *wallet
 
 func buildApprovalTxForPath(transactor transactions.TransactorIface, path *routes.Path, addressFrom common.Address,
 	usedNonces map[uint64]int64, signer ethTypes.Signer) (*wallettypes.TransactionData, error) {
+	if !path.FromChain.EIP1559Enabled {
+		return nil, fees.ErrEIP1559IncompaibleChain
+	}
 	lastUsedNonce := int64(-1)
 	if nonce, ok := usedNonces[path.FromChain.ChainID]; ok {
 		lastUsedNonce = nonce
@@ -98,12 +102,8 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 	}
 
 	// set appropriate fields based on EIP-1559 compatibility of the chain
-	if !path.FromChain.EIP1559Enabled {
-		approavalSendArgs.GasPrice = path.ApprovalGasPrice
-	} else {
-		approavalSendArgs.MaxFeePerGas = path.ApprovalMaxFeesPerGas
-		approavalSendArgs.MaxPriorityFeePerGas = path.ApprovalPriorityFee
-	}
+	approavalSendArgs.MaxFeePerGas = path.ApprovalMaxFeesPerGas
+	approavalSendArgs.MaxPriorityFeePerGas = path.ApprovalPriorityFee
 
 	if path.FromToken != nil {
 		approavalSendArgs.FromTokenID = path.FromToken.Symbol
@@ -125,6 +125,10 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 
 func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.PathProcessor,
 	usedNonces map[uint64]int64, signer ethTypes.Signer, processorInputParams *pathprocessor.ProcessorInputParams) (*wallettypes.TransactionData, error) {
+	if !path.FromChain.EIP1559Enabled {
+		return nil, fees.ErrEIP1559IncompaibleChain
+	}
+
 	lastUsedNonce := int64(-1)
 	if nonce, ok := usedNonces[path.FromChain.ChainID]; ok {
 		lastUsedNonce = nonce
@@ -148,12 +152,8 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 		SlippagePercentage: processorInputParams.SlippagePercentage,
 	}
 
-	if !path.FromChain.EIP1559Enabled {
-		sendArgs.GasPrice = path.TxGasPrice
-	} else {
-		sendArgs.MaxFeePerGas = path.TxMaxFeesPerGas
-		sendArgs.MaxPriorityFeePerGas = path.TxPriorityFee
-	}
+	sendArgs.MaxFeePerGas = path.TxMaxFeesPerGas
+	sendArgs.MaxPriorityFeePerGas = path.TxPriorityFee
 
 	isContractDeployment := path.ProcessorName == pathProcessorCommon.ProcessorCommunityDeployCollectiblesName ||
 		path.ProcessorName == pathProcessorCommon.ProcessorCommunityDeployAssetsName

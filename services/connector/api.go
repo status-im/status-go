@@ -10,7 +10,9 @@ import (
 )
 
 var (
-	ErrInvalidResponseFromForwardedRpc = errors.New("invalid response from forwarded RPC")
+	ErrInvalidResponseFromForwardedRpc         = errors.New("invalid response from forwarded RPC")
+	ErrCannotOverrideClientIDForHttpConnection = errors.New("cannot override clientId for HTTP connection")
+	ErrEmptyClientIDFromTrustedConnection      = errors.New("trusted connection must provide a clientId")
 )
 
 type API struct {
@@ -71,8 +73,8 @@ func NewAPI(s *Service) *API {
 	}
 }
 
-func (api *API) forwardRPC(ctx context.Context, URL string, request commands.RPCRequest) (interface{}, error) {
-	dApp, err := persistence.SelectDAppByUrl(api.s.db, URL)
+func (api *API) forwardRPC(ctx context.Context, request commands.RPCRequest) (interface{}, error) {
+	dApp, err := persistence.SelectDApp(api.s.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -97,6 +99,18 @@ func (api *API) CallRPC(ctx context.Context, inputJSON string) (interface{}, err
 		return "", err
 	}
 
+	// This prevents external clients from spoofing ClientID to impersonate trusted clients
+	if IsUntrustedConnection(ctx) {
+		if request.ClientID != "" {
+			return "", ErrCannotOverrideClientIDForHttpConnection
+		}
+	} else {
+		// Trusted connections MUST provide a ClientID
+		if request.ClientID == "" {
+			return "", ErrEmptyClientIDFromTrustedConnection
+		}
+	}
+
 	if command, exists := api.r.GetCommand(request.Method); exists {
 		return command.Execute(ctx, request)
 	}
@@ -105,12 +119,17 @@ func (api *API) CallRPC(ctx context.Context, inputJSON string) (interface{}, err
 		return nil, fmt.Errorf("method %s is not allowed", request.Method)
 	}
 
-	return api.forwardRPC(ctx, request.URL, request)
+	return api.forwardRPC(ctx, request)
 }
 
+// Deprecated: Use RecallDAppPermissionV2 instead
 func (api *API) RecallDAppPermission(origin string) error {
+	return api.RecallDAppPermissionV2(origin, "")
+}
+
+func (api *API) RecallDAppPermissionV2(origin string, clientID string) error {
 	// TODO: close the websocket connection
-	return api.c.RecallDAppPermissions(commands.RecallDAppPermissionsArgs{URL: origin})
+	return api.c.RecallDAppPermissions(commands.RecallDAppPermissionsArgs{URL: origin, ClientID: clientID})
 }
 
 func (api *API) GetPermittedDAppsList() ([]persistence.DApp, error) {

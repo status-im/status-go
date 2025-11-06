@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet"
@@ -53,11 +54,11 @@ func NewPublicAPI(s *Service) *PublicAPI {
 	}
 }
 
-func (api *PublicAPI) LeaveGroupChat(ctx Context, chatID string, remove bool) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.LeaveGroupChat(ctx, chatID, remove)
 }
 
-func (api *PublicAPI) CreateGroupChatWithMembers(ctx Context, name string, members []string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) CreateGroupChatWithMembers(ctx context.Context, name string, members []string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateGroupChatWithMembers(ctx, name, members)
 }
 
@@ -65,19 +66,19 @@ func (api *PublicAPI) CreateGroupChatFromInvitation(name string, chatID string, 
 	return api.service.messenger.CreateGroupChatFromInvitation(name, chatID, adminPK)
 }
 
-func (api *PublicAPI) AddMembersToGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) AddMembersToGroupChat(ctx context.Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AddMembersToGroupChat(ctx, chatID, members)
 }
 
-func (api *PublicAPI) RemoveMemberFromGroupChat(ctx Context, chatID string, member string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) RemoveMemberFromGroupChat(ctx context.Context, chatID string, member string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemoveMembersFromGroupChat(ctx, chatID, []string{member})
 }
 
-func (api *PublicAPI) RemoveMembersFromGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) RemoveMembersFromGroupChat(ctx context.Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemoveMembersFromGroupChat(ctx, chatID, members)
 }
 
-func (api *PublicAPI) AddAdminsToGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) AddAdminsToGroupChat(ctx context.Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AddAdminsToGroupChat(ctx, chatID, members)
 }
 
@@ -85,11 +86,11 @@ func (api *PublicAPI) ConfirmJoiningGroup(ctx context.Context, chatID string) (*
 	return api.service.messenger.ConfirmJoiningGroup(ctx, chatID)
 }
 
-func (api *PublicAPI) ChangeGroupChatName(ctx Context, chatID string, name string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) ChangeGroupChatName(ctx context.Context, chatID string, name string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.ChangeGroupChatName(ctx, chatID, name)
 }
 
-func (api *PublicAPI) SendGroupChatInvitationRequest(ctx Context, chatID string, adminPK string, message string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) SendGroupChatInvitationRequest(ctx context.Context, chatID string, adminPK string, message string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendGroupChatInvitationRequest(ctx, chatID, adminPK, message)
 }
 
@@ -97,7 +98,7 @@ func (api *PublicAPI) GetGroupChatInvitations() ([]*protocol.GroupChatInvitation
 	return api.service.messenger.GetGroupChatInvitations()
 }
 
-func (api *PublicAPI) SendGroupChatInvitationRejection(ctx Context, invitationRequestID string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) SendGroupChatInvitationRejection(ctx context.Context, invitationRequestID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendGroupChatInvitationRejection(ctx, invitationRequestID)
 }
 
@@ -175,15 +176,15 @@ func (api *PublicAPI) UnblockContact(parent context.Context, contactID string) (
 	return api.service.messenger.UnblockContact(contactID)
 }
 
-func (api *PublicAPI) Contacts(parent context.Context) []*protocol.Contact {
+func (api *PublicAPI) Contacts(parent context.Context) []*contacts.Contact {
 	return api.service.messenger.Contacts()
 }
 
-func (api *PublicAPI) GetContactByID(parent context.Context, id string) *protocol.Contact {
+func (api *PublicAPI) GetContactByID(parent context.Context, id string) *contacts.Contact {
 	return api.service.messenger.GetContactByID(id)
 }
 
-func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*protocol.Contact, error) {
+func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*contacts.Contact, error) {
 	return api.service.messenger.FetchContact(pubkey, true)
 }
 
@@ -311,7 +312,7 @@ func (api *PublicAPI) GetCommunityPublicKeyFromPrivateKey(ctx context.Context, h
 }
 
 // Get community members contact list for provided wallet addresses
-func (api *PublicAPI) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*protocol.Contact, error) {
+func (api *PublicAPI) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*contacts.Contact, error) {
 	return api.service.messenger.GetCommunityMembersForWalletAddresses(communityID, chainID)
 }
 
@@ -868,19 +869,6 @@ func (api *PublicAPI) CreateCommunityTokenDeploymentSignature(ctx context.Contex
 	return api.service.messenger.CreateCommunityTokenDeploymentSignature(ctx, chainID, addressFrom, communityID)
 }
 
-// wallet connect session apis
-func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, request *requests.AddWalletConnectSession) error {
-	return api.service.messenger.AddWalletConnectSession(request)
-}
-
-func (api *PublicAPI) GetWalletConnectSession(ctx context.Context) ([]protocol.WalletConnectSession, error) {
-	return api.service.messenger.GetWalletConnectSession()
-}
-
-func (api *PublicAPI) DestroyWalletConnectSession(ctx context.Context, PeerID string) error {
-	return api.service.messenger.DestroyWalletConnectSession(PeerID)
-}
-
 // Saved Addresses APIs
 func (api *PublicAPI) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAddress) error {
 	return api.service.messenger.UpsertSavedAddress(ctx, sa)
@@ -1145,23 +1133,6 @@ func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids
 	return err
 }
 
-// FetchNewsMessages fetches news messages from the News Feed
-// and returns a MessengerResponse containing the AC notifications
-func (api *PublicAPI) FetchNewsMessages() (*protocol.MessengerResponse, error) {
-	m := api.service.messenger
-	return m.FetchNewsMessages()
-}
-
-func (api *PublicAPI) ToggleNewsFeedEnabled(value bool) error {
-	m := api.service.messenger
-	return m.ToggleNewsFeedEnabled(value)
-}
-
-func (api *PublicAPI) ToggleNewsRSSEnabled(value bool) error {
-	m := api.service.messenger
-	return m.ToggleNewsRSSEnabled(value)
-}
-
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RequestAllHistoricMessages(false)
 }
@@ -1287,10 +1258,6 @@ func (api *PublicAPI) ToggleUseMailservers(value bool) error {
 	return api.service.messenger.ToggleUseMailservers(value)
 }
 
-func (api *PublicAPI) TogglePeerSyncing(request *requests.TogglePeerSyncingRequest) error {
-	return api.service.messenger.TogglePeerSyncing(request)
-}
-
 func (api *PublicAPI) SetSyncingOnMobileNetwork(request *requests.SetSyncingOnMobileNetwork) error {
 	return api.service.messenger.SetSyncingOnMobileNetwork(request)
 }
@@ -1323,7 +1290,7 @@ func (api *PublicAPI) RequestCancelDiscordChannelImport(discordChannelID string)
 	api.service.messenger.MarkDiscordChannelImportAsCancelled(discordChannelID)
 }
 
-func (api *PublicAPI) BuildContact(request *requests.BuildContact) (*protocol.Contact, error) {
+func (api *PublicAPI) BuildContact(request *requests.BuildContact) (*contacts.Contact, error) {
 	return api.service.messenger.BuildContact(request)
 }
 
@@ -1386,38 +1353,6 @@ func (api *PublicAPI) CheckAllCommunityChannelsPermissions(request *requests.Che
 
 func (api *PublicAPI) CollectCommunityMetrics(request *requests.CommunityMetricsRequest) (*protocol.CommunityMetricsResponse, error) {
 	return api.service.messenger.CollectCommunityMetrics(request)
-}
-
-func (api *PublicAPI) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
-	return api.service.messenger.ShareCommunityURLWithChatKey(communityID)
-}
-
-func (api *PublicAPI) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
-	return api.service.messenger.ShareCommunityURLWithData(communityID)
-}
-
-func (api *PublicAPI) ShareCommunityChannelURLWithChatKey(request *requests.CommunityChannelShareURL) (string, error) {
-	return api.service.messenger.ShareCommunityChannelURLWithChatKey(request)
-}
-
-func (api *PublicAPI) ShareCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
-	return api.service.messenger.ShareCommunityChannelURLWithData(request)
-}
-
-func (api *PublicAPI) ShareUserURLWithENS(pubKey string) (string, error) {
-	return api.service.messenger.ShareUserURLWithENS(pubKey)
-}
-
-func (api *PublicAPI) ShareUserURLWithChatKey(pubKey string) (string, error) {
-	return api.service.messenger.ShareUserURLWithChatKey(pubKey)
-}
-
-func (api *PublicAPI) ShareUserURLWithData(pubKey string) (string, error) {
-	return api.service.messenger.ShareUserURLWithData(pubKey)
-}
-
-func (api *PublicAPI) ParseSharedURL(url string) (*protocol.URLDataResponse, error) {
-	return protocol.ParseSharedURL(url)
 }
 
 func (api *PublicAPI) Messenger() *protocol.Messenger {

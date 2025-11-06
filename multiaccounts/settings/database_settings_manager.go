@@ -48,7 +48,6 @@ type DatabaseSettingsManager interface {
 	SetPinnedMailservers(mailservers map[string]string) error
 	SetUseMailservers(value bool) error
 	SetTokenGroupByCommunity(value bool) error
-	SetPeerSyncingEnabled(value bool) error
 	SetSyncingOnMobileNetwork(value bool) error
 
 	CreateSettings(s Settings, n params.NodeConfig) error
@@ -76,12 +75,7 @@ type DatabaseSettingsManager interface {
 	URLUnfurlingMode() (result int64, err error)
 	SubscribeToChanges() chan *SyncSettingField
 	MnemonicWasShown() error
-	GetPeerSyncingEnabled() (result bool, err error)
 	AutoRefreshTokensEnabled() (result bool, err error)
 	LastTokensUpdate() (result time.Time, err error)
-	NewsFeedLastFetchedTimestamp() (result time.Time, err error)
-	NewsFeedEnabled() (result bool, err error)
-	NewsNotificationsEnabled() (result bool, err error)
-	NewsRSSEnabled() (result bool, err error)
 	ThirdpartyServicesEnabled() (result bool, err error)
 }

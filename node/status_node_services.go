@@ -8,9 +8,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/pkg/featureflags"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
+	"github.com/status-im/status-go/services/newsfeed"
+	"github.com/status-im/status-go/services/sharedurls"
 
 	"github.com/ethereum/go-ethereum/event"
 
@@ -104,7 +107,19 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	}
 	services = append(services, lns)
 
+	services = append(services, b.NewsFeedService())
+	services = append(services, b.sharedUrlsService())
+
 	b.services = services
+
+	return nil
+}
+
+func (b *StatusNode) runServicesMigrations() error {
+	err := newsfeed.SQLiteMigrate(b.appDB)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -159,11 +174,12 @@ func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
 
 func (b *StatusNode) connectorService() *connector.Service {
 	if b.connectorSrvc == nil {
+		logger := b.logger.Named("connector")
 		b.connectorSrvc = connector.NewService(
-			b.logger.Named("connector"),
+			logger,
 			b.walletDB,
 			b.rpcClient,
-			fees.NewFeeManager(b.rpcClient),
+			fees.NewFeeManager(b.rpcClient, logger.Named("feeManager")),
 			b.rpcClient.GetNetworkManager(),
 			&connector.Config{
 				WSHost: b.config.WSHost,
@@ -308,6 +324,21 @@ func (b *StatusNode) ethService() *eth.Service {
 	return b.ethSrvc
 }
 
+func (b *StatusNode) sharedUrlsService() *sharedurls.Service {
+	if b.sharedUrlsSrvc == nil {
+		b.sharedUrlsSrvc = sharedurls.NewService(nil)
+		if extService := b.WakuV2ExtService(); extService != nil {
+			provider := NewSharedUrlsMessengerAdapter(extService.Messenger())
+			b.sharedUrlsSrvc.SetDataProvider(provider)
+		}
+	}
+	return b.sharedUrlsSrvc
+}
+
+func (b *StatusNode) SharedUrlsService() *sharedurls.Service {
+	return b.sharedUrlsSrvc
+}
+
 func (b *StatusNode) localNotificationsService(network uint64) (*localnotifications.Service, error) {
 	var err error
 	if b.localNotificationsSrvc == nil {
@@ -387,6 +418,28 @@ func (b *StatusNode) TimeSource() timesource.Provider {
 
 func (b *StatusNode) timeSourceNow() func() time.Time {
 	return b.TimeSource().Now
+}
+
+func (b *StatusNode) NewsFeedService() *newsfeed.Service {
+	if !featureflags.EnableNewsFeed {
+		return nil
+	}
+
+	if b.newsfeedSrvc == nil {
+		persistence := newsfeed.NewSQLitePersistence(b.appDB)
+
+		b.newsfeedSrvc = newsfeed.NewService(
+			b.logger.Named("newsfeed"),
+			persistence,
+			nil,
+		)
+
+		if wakuext := b.WakuV2ExtService(); wakuext != nil {
+			ac := NewNewsFeedActivityCenterAdapter(wakuext.Messenger())
+			b.newsfeedSrvc.SetActivityCenter(ac)
+		}
+	}
+	return b.newsfeedSrvc
 }
 
 func (b *StatusNode) Cleanup() error {

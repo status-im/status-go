@@ -18,7 +18,9 @@ from clients.services.appgeneral import AppgeneralService
 from clients.services.connector import ConnectorService
 from clients.services.eth import EthService
 from clients.services.multiaccounts import MultiAccountsService
+from clients.services.newsfeed import NewsFeedService
 from clients.services.settings import SettingsService
+from clients.services.sharedurls import SharedURLsService
 from clients.services.wakuext import (
     WakuextService,
     PushNotificationRegistrationTokenType,
@@ -26,7 +28,7 @@ from clients.services.wakuext import (
 from clients.services.wallet import WalletService
 from clients.signals import SignalClient, SignalType
 from clients.statusgo_container import StatusBackendContainer
-from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID, Account
+from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID
 from utils import fake
 from utils import keys
 from utils.config import Config
@@ -38,7 +40,7 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 class StatusBackend(RpcClient, SignalClient, ApiClient):
     container = None
 
-    def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6, **kwargs):
+    def __init__(self, privileged=False, ipv6=USE_IPV6, **kwargs):
         self.temp_dir = None
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
@@ -82,7 +84,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self._boot_api_config = None
         RpcClient.__init__(self)
         ApiClient.__init__(self, self.api_url)
-        SignalClient.__init__(self, self.ws_url, await_signals)
+        SignalClient.__init__(self, self.ws_url)
 
         self.wait_for_healthy()
 
@@ -91,8 +93,10 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.wallet_service = WalletService(self)
         self.wakuext_service = WakuextService(self)
         self.accounts_service = AccountService(self)
+        self.newsfeed_service = NewsFeedService(self)
         self.multiaccounts_service = MultiAccountsService(self)
         self.settings_service = SettingsService(self)
+        self.sharedurls_service = SharedURLsService(self)
         self.connector_service = ConnectorService(self)
         self.appgeneral_service = AppgeneralService(self)
         self.eth_service = EthService(self)
@@ -251,8 +255,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
     def _set_display_name(self, **kwargs):
         self.display_name = kwargs.get("display_name", fake.profile_name())
 
-    def _create_account_request(self, user, **kwargs):
-        self.password = kwargs.get("password", user.password)
+    def _create_account_request(self, password: str, **kwargs):
+        self.password = password
         data = {
             "rootDataDir": self.data_dir,
             "kdfIterations": 256000,
@@ -288,28 +292,27 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = self._set_multicall_overrides(data, kwargs)
         return data
 
-    def create_account_and_login(self, user=user_1, **kwargs):
+    def create_account_and_login(self, password: str, **kwargs):
         self._set_display_name(**kwargs)
         method = "CreateAccountAndLogin"
-        data = self._create_account_request(user, **kwargs)
-        self._boot_api_config = copy.deepcopy(data.get("apiConfig", {}))
+        data = self._create_account_request(password=password, **kwargs)
         return self.api_request_json(method, data)
 
     def restore_account_and_login(self, user=user_1, **kwargs):
         self._set_display_name(**kwargs)
         method = "RestoreAccountAndLogin"
-        data = self._create_account_request(user, **kwargs)
+        data = self._create_account_request(password=user.password, **kwargs)
         data["mnemonic"] = user.passphrase
         self._boot_api_config = copy.deepcopy(data.get("apiConfig", {}))
         return self.api_request_json(method, data)
 
-    def login(self, keyUid, user=user_1):
-        self.password = user.password
+    def login(self, key_uid, password: str, kdf_iterations=256000):
+        self.password = password
         method = "LoginAccount"
         data = {
-            "password": user.password,
-            "keyUid": keyUid,
-            "kdfIterations": 256000,
+            "password": self.password,
+            "keyUid": key_uid,
+            "kdfIterations": kdf_iterations,
         }
         data = self._set_proxy_credentials(data)
         data = self._set_wallet_secrets(data)
@@ -389,16 +392,10 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
     def input_connection_string_for_bootstrapping(self, connection_string):
         method = "InputConnectionStringForBootstrappingV2"
         # Empty user
-        user = Account(
-            address="",
-            private_key="",
-            password="",
-            passphrase="",
-        )
         data = {
             "connectionString": connection_string,
             "receiverClientConfig": {
-                "receiverConfig": {"createAccount": self._create_account_request(user)},
+                "receiverConfig": {"createAccount": self._create_account_request(password="")},
                 "clientConfig": {},
             },
         }
@@ -406,15 +403,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def get_connection_string_for_being_bootstrapped(self):
         method = "GetConnectionStringForBeingBootstrapped"
-        user = Account(
-            address="",
-            private_key="",
-            password="",
-            passphrase="",
-        )
         data = {
             "receiverConfig": {
-                "createAccount": self._create_account_request(user),
+                "createAccount": self._create_account_request(password=""),
                 "deviceType": "macos",
             },
             "serverConfig": {
@@ -485,3 +476,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def get_boot_api_config(self):
         return copy.deepcopy(self._boot_api_config)
+      
+    def serialize_legacy_key(self, key):
+        method = "SerializeLegacyKey"
+        # Use client.post directly, because this method is old and has json-incompatible arguments
+        response = self.client.post(self.method_url(method), data=key)
+        return response.content.decode()

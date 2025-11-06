@@ -276,7 +276,7 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *pro
 		if statusUpdate.StatusType == int(protobuf.StatusUpdate_AUTOMATIC) ||
 			statusUpdate.StatusType == int(protobuf.StatusUpdate_ALWAYS_ONLINE) ||
 			statusUpdate.StatusType == int(protobuf.StatusUpdate_INACTIVE) {
-			m.messaging.ResetDatasyncForPeer(state.CurrentMessageState.PublicKey, statusUpdate.Clock)
+			m.messaging.ReportUserOnline(state.CurrentMessageState.PublicKey, statusUpdate.Clock)
 		}
 	}
 

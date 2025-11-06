@@ -1,26 +1,20 @@
+import copy
 import random
 import string
-import copy
-from clients.status_backend import StatusBackend
-from clients.signals import SignalType
-import pytest
-from clients.api import ApiResponseError
 
+import pytest
+
+from clients.api import ApiResponseError
+from clients.signals import SignalType
+from clients.status_backend import StatusBackend
 from resources.constants import user_mnemonic_12, user_mnemonic_15, user_mnemonic_24, user_keycard_1
 from resources.utils import assert_response_attributes
+from utils import fake
 
 
 @pytest.mark.create_account
 @pytest.mark.rpc
 class TestBackupMnemonicAndRestore:
-
-    await_signals = [
-        SignalType.MEDIASERVER_STARTED.value,
-        SignalType.NODE_STARTED.value,
-        SignalType.NODE_READY.value,
-        SignalType.NODE_LOGIN.value,
-        SignalType.NODE_STOPPED.value,
-    ]
 
     @pytest.fixture(autouse=True)
     def setup_cleanup(self, close_status_backend_containers):
@@ -29,9 +23,9 @@ class TestBackupMnemonicAndRestore:
 
     def test_profile_creation_and_mnemonics_backup(self):
         # Create a new account container and initialize
-        account = StatusBackend(self.await_signals)
+        account = StatusBackend()
         account.init_status_backend()
-        account.create_account_and_login()
+        account.create_account_and_login(password=fake.profile_password())
         account.wait_for_login()
 
         # Retrieve and verify the mnemonic
@@ -43,9 +37,9 @@ class TestBackupMnemonicAndRestore:
 
     def test_backup_account_and_restore_it_via_mnemonics(self):
         # Create original account and backup mnemonic
-        original_account = StatusBackend(self.await_signals)
+        original_account = StatusBackend()
         original_account.init_status_backend()
-        original_account.create_account_and_login()
+        original_account.create_account_and_login(password=fake.profile_password())
         original_account.wait_for_login()
         original_get_settings_response = original_account.settings_service.get_settings()
         original_settings = original_get_settings_response
@@ -56,7 +50,7 @@ class TestBackupMnemonicAndRestore:
         user.passphrase = mnemonic
 
         # Restore account in a new container
-        restored_account = StatusBackend(self.await_signals)
+        restored_account = StatusBackend()
         restored_account.init_status_backend()
         restored_account.restore_account_and_login(user=user)
         restored_account.wait_for_login()
@@ -90,7 +84,7 @@ class TestBackupMnemonicAndRestore:
     )
     def test_restore_app_different_valid_size_mnemonics(self, user_mnemonic):
         # Initialize backend client and restore account using user_mnemonic.
-        restored_account = StatusBackend(self.await_signals)
+        restored_account = StatusBackend()
         restored_account.init_status_backend()
         restored_account.restore_account_and_login(user=user_mnemonic)
         restored_account.wait_for_login()
@@ -116,7 +110,7 @@ class TestBackupMnemonicAndRestore:
         user = copy.deepcopy(user_mnemonic_12)
         user.passphrase = " ".join("".join(random.choice(string.ascii_lowercase) for _ in range(random.randint(2, 10))) for _ in range(mnemonic_size))
 
-        restored_account = StatusBackend(self.await_signals)
+        restored_account = StatusBackend()
         restored_account.init_status_backend()
         restored_account.restore_account_and_login(user=user)
         restored_account.wait_for_login()
@@ -131,7 +125,7 @@ class TestBackupMnemonicAndRestore:
         user = copy.deepcopy(user_mnemonic_12)
         user.passphrase = "<>?`~!@#$%^&*()_+1 $fgdg ^&*()"
 
-        restored_account = StatusBackend(self.await_signals)
+        restored_account = StatusBackend()
         restored_account.init_status_backend()
         restored_account.restore_account_and_login(user=user)
         restored_account.wait_for_login()
@@ -144,10 +138,10 @@ class TestBackupMnemonicAndRestore:
         # Restore with empty mnemonic isn't allowed
         user = copy.deepcopy(user_mnemonic_12)
 
-        restored_account = StatusBackend(self.await_signals)
+        restored_account = StatusBackend()
         restored_account.init_status_backend()
         restored_account._set_display_name()
-        data = restored_account._create_account_request(user)
+        data = restored_account._create_account_request(password=user.password)
         data["mnemonic"] = ""
         with pytest.raises(ApiResponseError, match=r"restore-account: mnemonic is not set"):
             restored_account.api_request_json("RestoreAccountAndLogin", data)
@@ -155,10 +149,10 @@ class TestBackupMnemonicAndRestore:
     def test_restore_with_both_mnemonic_and_keycard(self):
         # Restore with both keycard and mnemonic isn't allowed
         user = copy.deepcopy(user_mnemonic_12)
-        restored_account = StatusBackend(self.await_signals)
+        restored_account = StatusBackend()
         restored_account.init_status_backend()
         restored_account._set_display_name()
-        data = restored_account._create_account_request(user)
+        data = restored_account._create_account_request(password=user.password)
         data["mnemonic"] = user.passphrase
         data["keycard"] = user_keycard_1
         with pytest.raises(ApiResponseError, match=r"restore-account: mnemonic is set for keycard account"):
@@ -166,7 +160,7 @@ class TestBackupMnemonicAndRestore:
 
     def test_restored_on_existing_restored_account_fails(self):
         user = copy.deepcopy(user_mnemonic_12)
-        restored_account = StatusBackend(self.await_signals)
+        restored_account = StatusBackend()
         restored_account.init_status_backend()
         restored_account.restore_account_and_login(user=user)
         restored_account.wait_for_login()

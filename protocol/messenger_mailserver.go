@@ -589,18 +589,11 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 }
 
 func (m *Messenger) canSyncWithStoreNodes() (bool, error) {
-	if m.featureFlags.StoreNodesDisabled {
-		return false, nil
-	}
 	if m.connectionState.IsExpensive() {
 		return m.settings.CanSyncOnMobileNetwork()
 	}
 
 	return true, nil
-}
-
-func (m *Messenger) DisableStoreNodes() {
-	m.featureFlags.StoreNodesDisabled = true
 }
 
 func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch messagingtypes.StoreNodeBatch) error {

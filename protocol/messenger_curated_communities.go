@@ -13,6 +13,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/services/wallet/common"
 )
 
 const (
@@ -93,9 +94,9 @@ func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCom
 		return nil, err
 	}
 
-	chainID := uint64(10) // Optimism Mainnet
+	chainID := common.OptimismMainnet
 	if testNetworksEnabled {
-		chainID = 11155420 // Optimism Sepolia
+		chainID = common.OptimismSepolia
 	}
 
 	directory, err := m.contractMaker.NewDirectory(chainID)

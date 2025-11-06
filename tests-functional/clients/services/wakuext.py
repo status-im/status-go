@@ -160,7 +160,7 @@ class WakuextService(Service):
         return response
 
     def create_group_chat_with_members(self, pubkey_list: list, group_chat_name: str):
-        params = [None, group_chat_name, pubkey_list]
+        params = [group_chat_name, pubkey_list]
         response = self.rpc_request("createGroupChatWithMembers", params)
         return response
 
@@ -170,7 +170,7 @@ class WakuextService(Service):
         return response
 
     def leave_group_chat(self, chat_id: str, remove: bool):
-        params = [None, chat_id, remove]
+        params = [chat_id, remove]
         response = self.rpc_request("leaveGroupChat", params)
         return response
 
@@ -180,17 +180,17 @@ class WakuextService(Service):
         return response
 
     def add_members_to_group_chat(self, chat_id: str, members: list):
-        params = [None, chat_id, members]
+        params = [chat_id, members]
         response = self.rpc_request("addMembersToGroupChat", params)
         return response
 
     def remove_member_from_group_chat(self, chat_id: str, member: str):
-        params = [None, chat_id, member]
+        params = [chat_id, member]
         response = self.rpc_request("removeMemberFromGroupChat", params)
         return response
 
     def remove_members_from_group_chat(self, chat_id: str, members: list):
-        params = [None, chat_id, members]
+        params = [chat_id, members]
         response = self.rpc_request("removeMembersFromGroupChat", params)
         return response
 
@@ -200,12 +200,12 @@ class WakuextService(Service):
         return response
 
     def change_group_chat_name(self, chat_id: str, name: str):
-        params = [None, chat_id, name]
+        params = [chat_id, name]
         response = self.rpc_request("changeGroupChatName", params)
         return response
 
     def send_group_chat_invitation_request(self, chat_id: str, admin_pk: str, message: str):
-        params = [None, chat_id, admin_pk, message]
+        params = [chat_id, admin_pk, message]
         response = self.rpc_request("sendGroupChatInvitationRequest", params)
         return response
 
@@ -214,7 +214,7 @@ class WakuextService(Service):
         return response
 
     def send_group_chat_invitation_rejection(self, invitation_request_id: str):
-        params = [None, invitation_request_id]
+        params = [invitation_request_id]
         response = self.rpc_request("sendGroupChatInvitationRejection", params)
         return response
 
@@ -426,11 +426,6 @@ class WakuextService(Service):
     def set_syncing_on_mobile_network(self, enabled: bool):
         params = [{"enabled": enabled}]
         response = self.rpc_request("setSyncingOnMobileNetwork", params)
-        return response
-
-    def toggle_peer_syncing(self, enabled: bool):
-        args = {"enabled": enabled}
-        response = self.rpc_request("togglePeerSyncing", [args])
         return response
 
     def status_updates(self):
@@ -713,21 +708,6 @@ class WakuextService(Service):
     def reorder_community_chat(self, community_id: str, chat_id: str, position: int):
         params = [{"communityId": community_id, "chatId": chat_id, "position": position}]
         response = self.rpc_request("reorderCommunityChat", params)
-        return response
-
-    def share_community_channel_url_with_chat_key(self, community_id: str, channel_id: str):
-        params = [{"communityId": community_id, "channelId": channel_id}]
-        response = self.rpc_request("shareCommunityChannelURLWithChatKey", params)
-        return response
-
-    def share_community_url_with_chat_key(self, community_id: str):
-        params = [community_id]
-        response = self.rpc_request("shareCommunityURLWithChatKey", params)
-        return response
-
-    def parse_shared_url(self, url: str):
-        params = [url]
-        response = self.rpc_request("parseSharedURL", params)
         return response
 
     def mute_community_chats(self, community_id: str, muted_type):

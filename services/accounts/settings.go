@@ -65,19 +65,6 @@ func (api *SettingsAPI) NodeConfig(ctx context.Context) (*params.NodeConfig, err
 	return api.config, nil
 }
 
-// News Settings
-func (api *SettingsAPI) NewsFeedEnabled() (bool, error) {
-	return api.db.NewsFeedEnabled()
-}
-
-func (api *SettingsAPI) NewsNotificationsEnabled() (bool, error) {
-	return api.db.NewsNotificationsEnabled()
-}
-
-func (api *SettingsAPI) NewsRSSEnabled() (bool, error) {
-	return api.db.NewsRSSEnabled()
-}
-
 // Backup Settings
 func (api *SettingsAPI) BackupPath() (string, error) {
 	return api.db.BackupPath()

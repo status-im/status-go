@@ -22,6 +22,7 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -448,7 +449,7 @@ func (m *Messenger) GetProfileShowcaseEntriesLimit() (int, error) {
 	return identity.MaxProfileShowcaseEntriesLimit, nil
 }
 
-func (m *Messenger) EncryptProfileShowcaseEntriesWithContactPubKeys(entries *protobuf.ProfileShowcaseEntries, contacts []*Contact) (*protobuf.ProfileShowcaseEntriesEncrypted, error) {
+func (m *Messenger) EncryptProfileShowcaseEntriesWithContactPubKeys(entries *protobuf.ProfileShowcaseEntries, contacts []*contacts.Contact) (*protobuf.ProfileShowcaseEntriesEncrypted, error) {
 	// Make AES key
 	AESKey := make([]byte, 32)
 	_, err := crand.Read(AESKey)
@@ -571,11 +572,11 @@ func (m *Messenger) GetProfileShowcaseForSelfIdentity() (*protobuf.ProfileShowca
 		SocialLinks:      m.toProfileShowcaseSocialLinksProto(preferences.SocialLinks, identity.ProfileShowcaseVisibilityIDVerifiedContacts),
 	}
 
-	mutualContacts := []*Contact{}
-	iDVerifiedContacts := []*Contact{}
+	mutualContacts := []*contacts.Contact{}
+	iDVerifiedContacts := []*contacts.Contact{}
 
-	m.allContacts.Range(func(_ string, contact *Contact) (shouldContinue bool) {
-		if contact.mutual() {
+	m.allContacts.Range(func(_ string, contact *contacts.Contact) (shouldContinue bool) {
+		if contact.Mutual() {
 			mutualContacts = append(mutualContacts, contact)
 			if contact.IsVerified() {
 				iDVerifiedContacts = append(iDVerifiedContacts, contact)

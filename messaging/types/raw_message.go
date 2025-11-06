@@ -63,10 +63,13 @@ type RawMessage struct {
 	LastSent    uint64
 	SendCount   int
 	Sent        bool
-	// don't wrap message into ProtocolMessage.
-	// when this is true, the message will not be resent via ResendTypeDataSync, but it's possible to
-	// resend it via ResendTypeRawMessage specified in ResendType
-	// MVDS only supports sending encrypted message.
+	// SkipEncryptionLayer instructs the sender to bypass the encryption-layer protobuf wrapper.
+	// Both public and private messages normally include that wrapper so the X3DH bundle travels with
+	// them, though only private messages encrypt their payload.
+	// Use this when the message must avoid exposing our bundle (e.g. anonymous sends or publishing with
+	// a non-identity key).
+	// With this flag set, MVDS resends are unavailable because they require encrypted
+	// payloads, but RawMessage-based retries remain possible via ResendTypeRawMessage.
 	SkipEncryptionLayer   bool
 	SendPushNotification  bool
 	MessageType           protobuf.ApplicationMetadataMessage_Type

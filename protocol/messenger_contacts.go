@@ -17,6 +17,7 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -38,7 +39,7 @@ type SelfContactChangeEvent struct {
 	ImagesChanged        bool
 }
 
-func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType MutualStateUpdateType, clock uint64, timestamp uint64, outgoing bool) (*common.Message, error) {
+func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType contacts.MutualStateUpdateType, clock uint64, timestamp uint64, outgoing bool) (*common.Message, error) {
 	var text string
 	var to string
 	var from string
@@ -48,13 +49,13 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		from = m.myHexIdentity()
 
 		switch updateType {
-		case MutualStateUpdateTypeSent:
+		case contacts.MutualStateUpdateTypeSent:
 			text = fmt.Sprintf(outgoingMutualStateEventSentDefaultText, contactID)
 			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT
-		case MutualStateUpdateTypeAdded:
+		case contacts.MutualStateUpdateTypeAdded:
 			text = fmt.Sprintf(outgoingMutualStateEventAcceptedDefaultText, contactID)
 			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED
-		case MutualStateUpdateTypeRemoved:
+		case contacts.MutualStateUpdateTypeRemoved:
 			text = fmt.Sprintf(outgoingMutualStateEventRemovedDefaultText, contactID)
 			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED
 		default:
@@ -65,13 +66,13 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		from = contactID
 
 		switch updateType {
-		case MutualStateUpdateTypeSent:
+		case contacts.MutualStateUpdateTypeSent:
 			text = fmt.Sprintf(incomingMutualStateEventSentDefaultText, contactID)
 			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT
-		case MutualStateUpdateTypeAdded:
+		case contacts.MutualStateUpdateTypeAdded:
 			text = fmt.Sprintf(incomingMutualStateEventAcceptedDefaultText, contactID)
 			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED
-		case MutualStateUpdateTypeRemoved:
+		case contacts.MutualStateUpdateTypeRemoved:
 			text = fmt.Sprintf(incomingMutualStateEventRemovedDefaultText, contactID)
 			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED
 		default:
@@ -175,7 +176,7 @@ func (m *Messenger) declineContactRequest(requestID, contactID string, fromSynci
 	}
 
 	response := &MessengerResponse{}
-	var contact *Contact
+	var contact *contacts.Contact
 	if contactRequest != nil {
 		contact, err = m.BuildContact(&requests.BuildContact{PublicKey: contactRequest.From})
 		if err != nil {
@@ -369,7 +370,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 
 	// Add mutual state update message for incoming contact request
 	clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
-	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, true)
+	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, contacts.MutualStateUpdateTypeAdded, clock, timestamp, true)
 	if err != nil {
 		return nil, err
 	}
@@ -542,7 +543,7 @@ func (m *Messenger) addContact(ctx context.Context,
 	// Add mutual state update message for outgoing contact request
 	if len(contactRequestID) == 0 {
 		clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
-		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, true)
+		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, contacts.MutualStateUpdateTypeSent, clock, timestamp, true)
 		if err != nil {
 			return nil, err
 		}
@@ -594,7 +595,7 @@ func (m *Messenger) addContact(ctx context.Context,
 	return response, nil
 }
 
-func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, contact *Contact, text string, outgoing bool) (*common.Message, error) {
+func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, contact *contacts.Contact, text string, outgoing bool) (*common.Message, error) {
 	if contact == nil {
 		return nil, errors.New("contact cannot be nil")
 	}
@@ -615,7 +616,7 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 	contactRequest.LocalChatID = contact.ID
 	contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
 	contactRequest.Clock = clock
-	if contact.mutual() {
+	if contact.Mutual() {
 		contactRequest.ContactRequestState = common.ContactRequestStateAccepted
 	} else {
 		contactRequest.ContactRequestState = common.ContactRequestStatePending
@@ -624,7 +625,7 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 	return contactRequest, err
 }
 
-func (m *Messenger) generateOutgoingContactRequestNotification(contact *Contact, contactRequest *common.Message) *ActivityCenterNotification {
+func (m *Messenger) generateOutgoingContactRequestNotification(contact *contacts.Contact, contactRequest *common.Message) *ActivityCenterNotification {
 	return &ActivityCenterNotification{
 		ID:        types.FromHex(contactRequest.ID),
 		Type:      ActivityCenterNotificationTypeContactRequest,
@@ -687,7 +688,7 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 		return err
 	}
 	timestamp := m.getTimesource().GetCurrentTime()
-	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeRemoved, clock, timestamp, true)
+	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, contacts.MutualStateUpdateTypeRemoved, clock, timestamp, true)
 	if err != nil {
 		return err
 	}
@@ -758,7 +759,7 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 		}
 	}
 
-	response.Contacts = []*Contact{contact}
+	response.Contacts = []*contacts.Contact{contact}
 	return nil
 }
 
@@ -773,7 +774,7 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 	return response, nil
 }
 
-func (m *Messenger) updateContactImagesURL(contact *Contact) error {
+func (m *Messenger) updateContactImagesURL(contact *contacts.Contact) error {
 	if m.httpServer != nil {
 		for k, v := range contact.Images {
 			publicKey, err := contact.PublicKey()
@@ -788,53 +789,53 @@ func (m *Messenger) updateContactImagesURL(contact *Contact) error {
 	return nil
 }
 
-func (m *Messenger) Contacts() []*Contact {
-	var contacts []*Contact
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		contacts = append(contacts, contact)
+func (m *Messenger) Contacts() []*contacts.Contact {
+	var out []*contacts.Contact
+	m.allContacts.Range(func(contactID string, contact *contacts.Contact) (shouldContinue bool) {
+		out = append(out, contact)
 		return true
 	})
-	return contacts
+	return out
 }
 
-func (m *Messenger) AddedContacts() []*Contact {
-	var contacts []*Contact
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.added() {
-			contacts = append(contacts, contact)
+func (m *Messenger) AddedContacts() []*contacts.Contact {
+	var out []*contacts.Contact
+	m.allContacts.Range(func(contactID string, contact *contacts.Contact) (shouldContinue bool) {
+		if contact.Added() {
+			out = append(out, contact)
 		}
 		return true
 	})
-	return contacts
+	return out
 }
 
-func (m *Messenger) MutualContacts() []*Contact {
-	var contacts []*Contact
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.mutual() {
-			contacts = append(contacts, contact)
+func (m *Messenger) MutualContacts() []*contacts.Contact {
+	var out []*contacts.Contact
+	m.allContacts.Range(func(contactID string, contact *contacts.Contact) (shouldContinue bool) {
+		if contact.Mutual() {
+			out = append(out, contact)
 		}
 		return true
 	})
-	return contacts
+	return out
 }
 
-func (m *Messenger) BlockedContacts() []*Contact {
-	var contacts []*Contact
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
+func (m *Messenger) BlockedContacts() []*contacts.Contact {
+	var out []*contacts.Contact
+	m.allContacts.Range(func(contactID string, contact *contacts.Contact) (shouldContinue bool) {
 		if contact.Blocked {
-			contacts = append(contacts, contact)
+			out = append(out, contact)
 		}
 		return true
 	})
-	return contacts
+	return out
 }
 
 // GetContactByID returns a Contact for given pubKey, if it's known.
 // This function automatically checks if pubKey is self identity key and returns a Contact
 // filled with self information.
 // pubKey is assumed to include `0x` prefix
-func (m *Messenger) GetContactByID(pubKey string) *Contact {
+func (m *Messenger) GetContactByID(pubKey string) *contacts.Contact {
 	if pubKey == m.IdentityPublicKeyString() {
 		return m.selfContact
 	}
@@ -842,7 +843,7 @@ func (m *Messenger) GetContactByID(pubKey string) *Contact {
 	return contact
 }
 
-func (m *Messenger) GetSelfContact() *Contact {
+func (m *Messenger) GetSelfContact() *contacts.Contact {
 	return m.selfContact
 }
 
@@ -876,7 +877,7 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	m.allContacts.Store(contact.ID, contact)
 
 	response := &MessengerResponse{}
-	response.Contacts = []*Contact{contact}
+	response.Contacts = []*contacts.Contact{contact}
 
 	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
 	if err != nil {
@@ -899,7 +900,7 @@ func (m *Messenger) blockContact(ctx context.Context, response *MessengerRespons
 		return err
 	}
 
-	contactWasAdded := contact.added()
+	contactWasAdded := contact.Added()
 	contact.Block(clock)
 
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
@@ -1027,7 +1028,7 @@ func (m *Messenger) UnblockContact(contactID string) (*MessengerResponse, error)
 
 // Send contact updates to all contacts added by us
 func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImage string, customizationColor multiaccountscommon.CustomizationColor) (err error) {
-	myID := contactIDFromPublicKey(&m.identity.PublicKey)
+	myID := contacts.ContactIDFromPublicKey(&m.identity.PublicKey)
 
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
@@ -1043,8 +1044,8 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 	}
 
 	// TODO: This should not be sending paired messages, as we do it above
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.added() {
+	m.allContacts.Range(func(contactID string, contact *contacts.Contact) (shouldContinue bool) {
+		if contact.Added() {
 			if _, err = m.sendContactUpdate(ctx, contact.ID, displayName, ensName, profileImage, customizationColor, m.dispatchMessage); err != nil {
 				return false
 			}
@@ -1077,7 +1078,7 @@ func (m *Messenger) sendContactUpdate(ctx context.Context,
 	var response MessengerResponse
 
 	contact, ok := m.allContacts.Load(chatID)
-	if !ok || !contact.added() {
+	if !ok || !contact.Added() {
 		return nil, nil
 	}
 
@@ -1114,7 +1115,7 @@ func (m *Messenger) sendContactUpdate(ctx context.Context,
 		return nil, err
 	}
 
-	response.Contacts = []*Contact{contact}
+	response.Contacts = []*contacts.Contact{contact}
 	response.AddChat(chat)
 
 	chat.LastClockValue = clock
@@ -1125,7 +1126,7 @@ func (m *Messenger) sendContactUpdate(ctx context.Context,
 	return &response, nil
 }
 
-func (m *Messenger) addENSNameToContact(contact *Contact) error {
+func (m *Messenger) addENSNameToContact(contact *contacts.Contact) error {
 	if m.ensVerifier == nil {
 		return nil
 	}
@@ -1169,7 +1170,7 @@ func (m *Messenger) RetractContactRequest(request *requests.RetractContactReques
 }
 
 // Send message to remote account to remove our contact from their end.
-func (m *Messenger) sendRetractContactRequest(contact *Contact) error {
+func (m *Messenger) sendRetractContactRequest(contact *contacts.Contact) error {
 	_, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {
 		return err
@@ -1256,11 +1257,11 @@ func defaultContactRequestText() string {
 	return "Please add me to your contacts"
 }
 
-func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, error) {
+func (m *Messenger) BuildContact(request *requests.BuildContact) (*contacts.Contact, error) {
 	contact, ok := m.allContacts.Load(request.PublicKey)
 	if !ok {
 		var err error
-		contact, err = buildContactFromPkString(request.PublicKey)
+		contact, err = contacts.BuildContactFromPkString(request.PublicKey)
 		if err != nil {
 			return nil, err
 		}
@@ -1301,7 +1302,7 @@ func (m *Messenger) scheduleSyncFiltersForContact(publicKey *ecdsa.PublicKey) (*
 	return filter, nil
 }
 
-func (m *Messenger) FetchContact(contactID string, waitForResponse bool) (*Contact, error) {
+func (m *Messenger) FetchContact(contactID string, waitForResponse bool) (*contacts.Contact, error) {
 	options := []StoreNodeRequestOption{
 		WithWaitForResponseOption(waitForResponse),
 	}

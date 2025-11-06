@@ -14,9 +14,10 @@ const (
 )
 
 type ConnectorDApp struct {
-	URL     string `json:"url"`
-	Name    string `json:"name"`
-	IconURL string `json:"iconUrl"`
+	URL      string `json:"url"`
+	Name     string `json:"name"`
+	IconURL  string `json:"iconUrl"`
+	ClientID string `json:"clientId"`
 }
 
 // ConnectorSendRequestAccountsSignal is triggered when a request for accounts is sent.

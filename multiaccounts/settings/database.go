@@ -149,11 +149,10 @@ INSERT INTO settings (
   test_networks_enabled,
   fleet,
   auto_refresh_tokens_enabled,
-  news_feed_last_fetched_timestamp,
   thirdparty_services_enabled
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -188,8 +187,6 @@ INSERT INTO settings (
 		s.TestNetworksEnabled,
 		s.Fleet,
 		s.AutoRefreshTokensEnabled,
-		// Default the news feed last fetched timestamp to now
-		time.Now().Unix(),
 		s.ThirdpartyServicesEnabled,
 	)
 	if err != nil {
@@ -388,9 +385,8 @@ func (db *Database) SetSettingLastSynced(setting SettingField, clock uint64) err
 
 func (db *Database) GetSettings() (Settings, error) {
 	var (
-		s                            Settings
-		lastTokensUpdate             sql.NullTime
-		newsFeedLastFetchedTimestamp sql.NullTime
+		s                Settings
+		lastTokensUpdate sql.NullTime
 	)
 	err := db.db.QueryRow(`
 	SELECT
@@ -399,7 +395,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing,
 		last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level,
 		mnemonic, mnemonic_removed, name, networks, notifications_enabled,
-		push_notifications_from_contacts_only, remote_push_notifications_enabled, news_notifications_enabled, messenger_notifications_enabled,
+		push_notifications_from_contacts_only, remote_push_notifications_enabled, messenger_notifications_enabled,
 		send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key,
 		remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers,
 		syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance,
@@ -409,7 +405,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, wallet_token_preferences_group_by_community, url_unfurling_mode,
 		mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
 		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community,
-		peer_syncing_enabled, auto_refresh_tokens_enabled, last_tokens_update, news_feed_enabled, news_feed_last_fetched_timestamp, news_rss_enabled, backup_path,
+		auto_refresh_tokens_enabled, last_tokens_update, backup_path,
 		thirdparty_services_enabled, messages_backup_enabled
 	FROM
 		settings
@@ -444,7 +440,6 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.NotificationsEnabled,
 		&s.PushNotificationsFromContactsOnly,
 		&s.RemotePushNotificationsEnabled,
-		&s.NewsNotificationsEnabled,
 		&s.MessengerNotificationsEnabled,
 		&s.SendPushNotifications,
 		&s.PushNotificationsBlockMentions,
@@ -489,12 +484,8 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.DisplayAssetsBelowBalanceThreshold,
 		&s.CollectibleGroupByCollection,
 		&s.CollectibleGroupByCommunity,
-		&s.PeerSyncingEnabled,
 		&s.AutoRefreshTokensEnabled,
 		&lastTokensUpdate,
-		&s.NewsFeedEnabled,
-		&newsFeedLastFetchedTimestamp,
-		&s.NewsRSSEnabled,
 		&s.BackupPath,
 		&s.ThirdpartyServicesEnabled,
 		&s.MessagesBackupEnabled,
@@ -506,10 +497,6 @@ func (db *Database) GetSettings() (Settings, error) {
 
 	if lastTokensUpdate.Valid {
 		s.LastTokensUpdate = lastTokensUpdate.Time
-	}
-
-	if newsFeedLastFetchedTimestamp.Valid {
-		s.NewsFeedLastFetchedTimestamp = newsFeedLastFetchedTimestamp.Time
 	}
 
 	return s, err
@@ -758,24 +745,12 @@ func (db *Database) GetTestNetworksEnabled() (result bool, err error) {
 	return result, err
 }
 
-func (db *Database) SetPeerSyncingEnabled(value bool) error {
-	return db.SaveSettingField(PeerSyncingEnabled, value)
-}
-
 func (db *Database) SetSyncingOnMobileNetwork(value bool) error {
 	err := db.SaveSettingField(SyncingOnMobileNetwork, value)
 	if err != nil {
 		return err
 	}
 	return db.SaveSettingField(RememberSyncingChoice, true)
-}
-
-func (db *Database) GetPeerSyncingEnabled() (result bool, err error) {
-	err = db.makeSelectRow(PeerSyncingEnabled).Scan(&result)
-	if err == sql.ErrNoRows {
-		return result, nil
-	}
-	return result, err
 }
 
 func (db *Database) GetTokenGroupByCommunity() (result bool, err error) {
@@ -866,42 +841,6 @@ func (db *Database) LastTokensUpdate() (result time.Time, err error) {
 		result = lastTokensUpdate.Time
 	}
 	return
-}
-
-func (db *Database) NewsFeedLastFetchedTimestamp() (result time.Time, err error) {
-	var newsFeedLastFetchedTimestamp sql.NullTime
-	err = db.makeSelectRow(NewsFeedLastFetchedTimestamp).Scan(&newsFeedLastFetchedTimestamp)
-	if err == sql.ErrNoRows {
-		return result, nil
-	}
-	if newsFeedLastFetchedTimestamp.Valid {
-		result = newsFeedLastFetchedTimestamp.Time
-	}
-	return
-}
-
-func (db *Database) NewsFeedEnabled() (result bool, err error) {
-	err = db.makeSelectRow(NewsFeedEnabled).Scan(&result)
-	if err == sql.ErrNoRows {
-		return result, nil
-	}
-	return result, err
-}
-
-func (db *Database) NewsNotificationsEnabled() (result bool, err error) {
-	err = db.makeSelectRow(NewsNotificationsEnabled).Scan(&result)
-	if err == sql.ErrNoRows {
-		return result, nil
-	}
-	return result, err
-}
-
-func (db *Database) NewsRSSEnabled() (result bool, err error) {
-	err = db.makeSelectRow(NewsRSSEnabled).Scan(&result)
-	if err == sql.ErrNoRows {
-		return result, nil
-	}
-	return result, err
 }
 
 func (db *Database) BackupPath() (result string, err error) {

@@ -344,24 +344,17 @@ func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint6
 // @deprecated we should remove it once clients fully switched to wallet router, `GetSuggestedRoutesAsync` should be used instead
 func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (fees.TransactionEstimation, error) {
 	logutils.ZapLogger().Debug("call to getTransactionEstimatedTime")
-	return api.s.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, gweiToWei(maxFeePerGas)), nil
-}
-
-func (api *API) GetTransactionEstimatedTimeV2(ctx context.Context, chainID uint64, gasPrice *hexutil.Big, maxFeePerGas *hexutil.Big, maxPriorityFeePerGas *hexutil.Big) (uint, error) {
-	logutils.ZapLogger().Debug("call to getTransactionEstimatedTimeV2")
-	isEIP1559Enabled, err := api.s.router.GetFeesManager().IsEIP1559Enabled(ctx, chainID)
-	if err != nil {
-		return 0, err
-	}
-	if !isEIP1559Enabled {
-		return api.s.router.GetFeesManager().TransactionEstimatedTimeV2Legacy(ctx, chainID, gasPrice.ToInt()), nil
-	}
-	return api.s.router.GetFeesManager().TransactionEstimatedTimeV2(ctx, chainID, maxFeePerGas.ToInt(), maxPriorityFeePerGas.ToInt()), nil
+	return api.s.router.GetFeesManager().EstimatedTimeLevel(ctx, chainID, gweiToWei(maxFeePerGas))
 }
 
 func gweiToWei(val *big.Float) *big.Int {
 	res, _ := new(big.Float).Mul(val, big.NewFloat(1000000000)).Int(nil)
 	return res
+}
+
+func (api *API) GetTransactionEstimatedTimeV2(ctx context.Context, chainID uint64, gasPrice *hexutil.Big, maxFeePerGas *hexutil.Big, maxPriorityFeePerGas *hexutil.Big) (uint, error) {
+	logutils.ZapLogger().Debug("call to getTransactionEstimatedTimeV2")
+	return api.s.router.GetFeesManager().EstimatedTime(ctx, chainID, maxFeePerGas.ToInt(), maxPriorityFeePerGas.ToInt())
 }
 
 func (api *API) GetSuggestedRoutes(ctx context.Context, input *requests.RouteInputParams) (*router.SuggestedRoutes, error) {

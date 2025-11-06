@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/identity"
 )
 
@@ -316,14 +317,14 @@ func (s *TestProfileShowcasePersistence) TestFetchingProfileShowcaseAccountsByAd
 	s.Require().NoError(err)
 	persistence := newSQLitePersistence(db)
 
-	conatacts := []*Contact{
-		&Contact{
+	conatacts := []*contacts.Contact{
+		&contacts.Contact{
 			ID: "contact_1",
 		},
-		&Contact{
+		&contacts.Contact{
 			ID: "contact_2",
 		},
-		&Contact{
+		&contacts.Contact{
 			ID: "contact_3",
 		},
 	}

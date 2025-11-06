@@ -116,6 +116,7 @@ func messengerDefaultConfig() config {
 
 	c.codeControlFlags.AutoRequestHistoricMessages = true
 	c.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled = true
+
 	return c
 }
 
@@ -330,13 +331,6 @@ func WithMessageSigner(signer communities.MessageSigner) Option {
 func WithAccountsPublisher(publisher *pubsub.Publisher) Option {
 	return func(c *config) error {
 		c.accountsPublisher = publisher
-		return nil
-	}
-}
-
-func WithNewsFeed() func(c *config) error {
-	return func(c *config) error {
-		c.featureFlags.EnableNewsFeed = true
 		return nil
 	}
 }

@@ -91,7 +91,7 @@ func (s *TestMessengerProfileShowcase) mutualContact(theirMessenger *Messenger) 
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().True(resp.Contacts[0].mutual())
+	s.Require().True(resp.Contacts[0].Mutual())
 }
 
 func (s *TestMessengerProfileShowcase) verifiedContact(theirMessenger *Messenger) {

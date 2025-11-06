@@ -7,31 +7,27 @@ import (
 )
 
 func TestNewService(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+	state := setupTests(t)
 
 	assert.NotNil(t, state.service)
 }
 
 func TestService_Start(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+	state := setupTests(t)
 
 	err := state.service.Start()
 	assert.NoError(t, err)
 }
 
 func TestService_Stop(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+	state := setupTests(t)
 
 	err := state.service.Stop()
 	assert.NoError(t, err)
 }
 
 func TestService_APIs(t *testing.T) {
-	state, closeFn := setupTests(t)
-	t.Cleanup(closeFn)
+	state := setupTests(t)
 
 	apis := state.api.s.APIs()
 

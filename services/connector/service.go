@@ -77,6 +77,11 @@ func (s *Service) Start() error {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+
+		// Inject connection type into request context
+		ctx := WithConnectionType(r.Context(), ConnectionTypeHTTP)
+		r = r.WithContext(ctx)
+
 		// FIXME: this is a temporary solution to allow all origins
 		origins := []string{"*"}
 		wsHandler := s.rpcServer.WebsocketHandler(origins)

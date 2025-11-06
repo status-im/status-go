@@ -11,6 +11,7 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/services/sharedurls"
 )
 
 type StatusUnfurler struct {
@@ -134,7 +135,7 @@ func (u *StatusUnfurler) Unfurl() (*common.StatusLinkPreview, error) {
 	preview := new(common.StatusLinkPreview)
 	preview.URL = u.url
 
-	resp, err := ParseSharedURL(u.url)
+	resp, err := sharedurls.ParseSharedURL(u.url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse shared url: %w", err)
 	}

@@ -1,11 +1,12 @@
-from uuid import uuid4
 from datetime import datetime, timezone, timedelta
+from uuid import uuid4
+
 import pytest
 
-from steps.messenger import MessengerSteps
 from clients.services.wakuext import ActivityCenterNotificationType
 from clients.signals import SignalType
 from resources.enums import MuteType
+from steps.messenger import MessengerSteps
 
 
 @pytest.mark.rpc
@@ -97,23 +98,6 @@ class TestCommunityChats(MessengerSteps):
         assert chats_after[0]["position"] == 0
         assert chats_after[1]["id"] == first_chat["id"]
         assert chats_after[1]["position"] == 1
-
-    def test_create_and_share_community_channel_url(self):
-        self.creator.wakuext_service.create_community_chat(self.community_id, self.chat_payload)
-
-        channel_id = str(uuid4())
-        share_resp = self.creator.wakuext_service.share_community_channel_url_with_chat_key(self.community_id, channel_id)
-        assert share_resp is not None
-        assert f"https://status.app/cc/{channel_id}" in share_resp
-
-        parsed = self.creator.wakuext_service.parse_shared_url(share_resp)
-        assert parsed["channel"].get("channelUuid") == channel_id
-        assert parsed["community"].get("communityId") == self.community_id
-
-        share_comm_resp = self.creator.wakuext_service.share_community_url_with_chat_key(self.community_id)
-        assert "https://status.app/c" in share_comm_resp
-        parsed_comm = self.creator.wakuext_service.parse_shared_url(share_comm_resp)
-        assert parsed_comm["community"].get("communityId") == self.community_id
 
     def test_mute_and_unmute_community_chats(self):
         self.creator.wakuext_service.create_community_chat(self.community_id, self.chat_payload)

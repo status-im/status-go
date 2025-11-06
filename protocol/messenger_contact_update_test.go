@@ -43,7 +43,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().Len(response.Contacts, 1)
 	contact := response.Contacts[0]
 	// It should add the contact
-	s.Require().True(contact.added())
+	s.Require().True(contact.Added())
 
 	if deprecation.ChatProfileDeprecated {
 		// It should a one to one chat
@@ -76,7 +76,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().Equal(theirName, receivedContact.EnsName)
 	s.Require().False(receivedContact.ENSVerified)
 	s.Require().NotEmpty(receivedContact.LastUpdated)
-	s.Require().True(receivedContact.hasAddedUs())
+	s.Require().True(receivedContact.HasAddedUs())
 
 	newPicture := "new-picture"
 	err = theirMessenger.SendContactUpdates(context.Background(), newEnsName, newPicture, multiaccountscommon.CustomizationColorRed)
@@ -124,7 +124,7 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	}
 
 	// It should add the contact
-	s.Require().True(contact.added())
+	s.Require().True(contact.Added())
 	s.Require().Equal(contact.CustomizationColor, multiaccountscommon.CustomizationColorRed)
 
 	// Wait for the message to reach its destination
@@ -168,7 +168,7 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 	}
 
 	// It should add the contact
-	s.Require().True(contact.added())
+	s.Require().True(contact.Added())
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(

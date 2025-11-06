@@ -38,8 +38,6 @@ profile_data = {
     "mutual-contact-enabled?": False,
     "name": "Anchored Open Wirehair",
     "networks/networks": [],
-    "news-feed-enabled?": True,
-    "news-rss-enabled?": True,
     "photo-path": "",
     "preview-privacy?": False,
     "public-key": (

@@ -8,6 +8,7 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/communities"
+	contacts2 "github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/signal"
 )
@@ -23,7 +24,7 @@ type CommunitySet struct {
 
 func (m *Messenger) backupContacts() []*protobuf.Backup {
 	var contacts []*protobuf.SyncInstallationContactV2
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
+	m.allContacts.Range(func(contactID string, contact *contacts2.Contact) (shouldContinue bool) {
 		syncContact := m.buildSyncContactMessage(contact)
 		if syncContact != nil {
 			contacts = append(contacts, syncContact)

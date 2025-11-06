@@ -21,6 +21,8 @@ type Cryptocurrency struct {
 type PriceData struct {
 	ID               string  `json:"id,omitempty"`
 	Price            float64 `json:"current_price"`
+	MarketCap        float64 `json:"market_cap"`
+	Volume24h        float64 `json:"volume_24h"`
 	PercentChange24h float64 `json:"price_change_percentage_24h"`
 }
 

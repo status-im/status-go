@@ -217,26 +217,6 @@ var (
 		dBColumnName:   "networks",
 		valueHandler:   JSONBlobHandler,
 	}
-	NewsFeedEnabled = SettingField{
-		reactFieldName: "news-feed-enabled?",
-		dBColumnName:   "news_feed_enabled",
-		valueHandler:   BoolHandler,
-	}
-	NewsFeedLastFetchedTimestamp = SettingField{
-		reactFieldName: "news-feed-last-fetched-timestamp",
-		dBColumnName:   "news_feed_last_fetched_timestamp",
-		valueHandler:   TimeHandler,
-	}
-	NewsNotificationsEnabled = SettingField{
-		reactFieldName: "news-notifications-enabled?",
-		dBColumnName:   "news_notifications_enabled",
-		valueHandler:   BoolHandler,
-	}
-	NewsRSSEnabled = SettingField{
-		reactFieldName: "news-rss-enabled?",
-		dBColumnName:   "news_rss_enabled",
-		valueHandler:   BoolHandler,
-	}
 	NodeConfig = SettingField{
 		reactFieldName: "node-config",
 		dBColumnName:   "node_config",
@@ -507,11 +487,6 @@ var (
 		dBColumnName:   "mnemonic_was_not_shown",
 		valueHandler:   BoolHandler,
 	}
-	PeerSyncingEnabled = SettingField{
-		reactFieldName: "peer-syncing-enabled?",
-		dBColumnName:   "peer_syncing_enabled",
-		valueHandler:   BoolHandler,
-	}
 	AutoRefreshTokensEnabled = SettingField{
 		reactFieldName: "auto-refresh-tokens-enabled",
 		dBColumnName:   "auto_refresh_tokens_enabled",
@@ -573,15 +548,10 @@ var (
 		Name,
 		NetworksCurrentNetwork,
 		NetworksNetworks,
-		NewsFeedEnabled,
-		NewsFeedLastFetchedTimestamp,
-		NewsNotificationsEnabled,
-		NewsRSSEnabled,
 		MessengerNotificationsEnabled,
 		NodeConfig,
 		NotificationsEnabled,
 		OpenseaEnabled,
-		PeerSyncingEnabled,
 		PhotoPath,
 		PinnedMailservers,
 		PreferredName,

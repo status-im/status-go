@@ -74,7 +74,6 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.UseMailservers = true
 
 	s.PreviewPrivacy = true
-	s.PeerSyncingEnabled = false
 	s.Currency = "usd"
 	s.LinkPreviewRequestEnabled = true
 
