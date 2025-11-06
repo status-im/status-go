@@ -537,12 +537,23 @@ func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes,
 	if distributionPreference == params.ArchiveDistributionMethodCodex {
 		archiveCodexCreatedSuccessfully = true
 		m.UnseedHistoryArchiveIndexCid(communityID)
-		_, errCodex := m.ArchiveFileManager.CreateHistoryArchiveCodexFromDB(communityID, topics, startDate, endDate, partition, encrypt)
+		codexArchiveIDs, errCodex := m.ArchiveFileManager.CreateHistoryArchiveCodexFromDB(communityID, topics, startDate, endDate, partition, encrypt)
 		if errCodex != nil {
 			archiveCodexCreatedSuccessfully = false
 			m.logger.Error("failed to create history archive codex", zap.Error(errCodex))
+		} else {
+			if len(codexArchiveIDs) == 0 {
+				// no new codex archives were created - no need to distribute new index cid
+				// but we need to (re)start seeding what we stopped above
+				archiveCodexCreatedSuccessfully = false
+				m.logger.Debug("no codex archive ids were created")
+				if err = m.SeedHistoryArchiveIndexCid(communityID); err != nil {
+					m.logger.Error("failed to seed existing history archive codex index cid", zap.Error(err))
+				}
+			}
+			// else: we created new codex archives and they are already published to codex
+			// in CreateHistoryArchiveCodexFromDB (thus they are seeded)
 		}
-		// CreateHistoryArchiveCodexFromDB already seeds the index cid to codex
 	}
 	if !archiveTorrentCreatedSuccessfully && !archiveCodexCreatedSuccessfully {
 		return errors.Join(errTorrent, errCodex)
@@ -703,6 +714,10 @@ func (m *ArchiveManager) SeedHistoryArchiveIndexCid(communityID types.HexBytes) 
 	if !m.IsCodexReady() {
 		return nil
 	}
+	// do not seed if already seeding
+	if m.IsSeedingHistoryArchiveCodex(communityID) {
+		return nil
+	}
 	exists, err := m.codexIndexFileExists(communityID)
 	if err != nil {
 		return err
@@ -726,6 +741,12 @@ func (m *ArchiveManager) SeedHistoryArchiveIndexCid(communityID types.HexBytes) 
 }
 
 func (m *ArchiveManager) UnseedHistoryArchiveIndexCid(communityID types.HexBytes) {
+	if !m.IsCodexReady() {
+		return
+	}
+	if !m.IsSeedingHistoryArchiveCodex(communityID) {
+		return
+	}
 	if m.CodexIndexCidFileExists(communityID) {
 		// get currently advertised index Cid
 		cid, err := m.GetHistoryArchiveIndexCid(communityID)
@@ -752,6 +773,9 @@ func (m *ArchiveManager) IsSeedingHistoryArchiveTorrent(communityID types.HexByt
 }
 
 func (m *ArchiveManager) IsSeedingHistoryArchiveCodex(communityID types.HexBytes) bool {
+	if !m.IsCodexReady() {
+		return false
+	}
 	if m.CodexIndexCidFileExists(communityID) {
 		cid, err := m.GetHistoryArchiveIndexCid(communityID)
 		if err != nil {
