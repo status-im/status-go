@@ -1441,7 +1441,7 @@ func (m *Messenger) downloadAndImportCodexHistoryArchives(id types.HexBytes, ind
 	downloadTaskInfo, err := m.archiveManager.DownloadHistoryArchivesByIndexCid(id, indexCid, cancel)
 	if err != nil {
 		logMsg := "failed to download history archive data"
-		if err == communities.ErrTorrentTimedout {
+		if err == communities.ErrTorrentTimedout || err == communities.ErrIndexCidTimedout {
 			m.logger.Debug("downloading indexCid has timed out, trying once more...")
 			downloadTaskInfo, err = m.archiveManager.DownloadHistoryArchivesByIndexCid(id, indexCid, cancel)
 			if err != nil {
