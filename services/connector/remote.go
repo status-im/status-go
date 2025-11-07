@@ -44,7 +44,7 @@ var dappAllowedRemoteMethods = [...]string{
 	"eth_getWork",
 	"eth_submitWork",
 	"eth_submitHashrate",
-	"net_version",
+	// 	"net_version", 		  // should be available before connection
 	"net_peerCount",
 	"net_listening",
 }

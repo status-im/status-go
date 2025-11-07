@@ -27,6 +27,7 @@ func (c *RevokePermissionsCommand) Execute(ctx context.Context, request RPCReque
 		return "", ErrDAppIsNotPermittedByUser
 	}
 
+	// Delete the dApp entry (CASCADE will automatically delete permissions)
 	err = persistence.DeleteDApp(c.Db, dApp.URL, dApp.ClientID)
 	if err != nil {
 		return "", err
