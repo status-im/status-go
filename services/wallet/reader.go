@@ -14,6 +14,8 @@ import (
 
 	"github.com/bep/debounce"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -354,12 +356,19 @@ func (r *Reader) GetCachedBalances(chainIDs []uint64, addresses []common.Address
 		return nil, err
 	}
 
-	allTokens, err := r.tokenManager.GetTokensByChains(chainIDs)
+	balances, err := tokensToBalancesPerChain(cachedTokens)
 	if err != nil {
 		return nil, err
 	}
 
-	balances, err := tokensToBalancesPerChain(cachedTokens)
+	tokensOfInterest := make(map[string]struct{}, 0)
+	for _, cachedToken := range cachedTokens {
+		for _, token := range cachedToken {
+			tokensOfInterest[types.TokenKey(token.TokenChainID, token.TokenAddress)] = struct{}{}
+		}
+	}
+
+	allTokens, err := r.tokenManager.GetTokensByKeys(maps.Keys(tokensOfInterest))
 	if err != nil {
 		return nil, err
 	}
