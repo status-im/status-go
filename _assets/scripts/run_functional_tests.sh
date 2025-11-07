@@ -46,6 +46,11 @@ docker build . \
   --build-arg "enable_go_cache=false" \
   --tag "${image_name}"
 
+if [[ $? -ne 0 ]]; then
+    echo -e "${RED}Docker build failed. Exiting.${RST}"
+    exit 1
+fi
+
 # Run docker
 echo -e "${GRN}Running status-go external dependencies${RST}"
 docker compose -p ${project_name} ${all_compose_files} up -d --build --remove-orphans
