@@ -30,13 +30,13 @@ mkdir -p "${test_results_path}"
 mkdir -p "${logs_path}"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.waku.yml"
-identifier=${BUILD_TAG:-$(git rev-parse --short HEAD)}
-project_name="status-go-func-tests-${identifier}"
-image_name="statusgo-${identifier}"
+identifier=${BUILD_TAG:-"status-go-func-tests-$(git rev-parse --short HEAD)"}
+project_name="${identifier,,}"
+image_name="statusgo-${identifier,,}"
 
 # Remove orphans
 echo -e "${GRN}Cleanup old containers${RST}"
-docker ps -a --filter "name=status-go-func-tests-${identifier}" --filter "status=exited" -q | xargs -r docker rm -f
+docker ps -a --filter "name=${project_name}" --filter "status=exited" -q | xargs -r docker rm -f
 
 # Build statusgo image
 echo -e "${GRN}Building status-go${RST}"
