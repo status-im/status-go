@@ -8,7 +8,13 @@ import (
 )
 
 type GetPermissionsCommand struct {
-	Db *sql.DB
+	db *sql.DB
+}
+
+func NewGetPermissionsCommand(db *sql.DB) *GetPermissionsCommand {
+	return &GetPermissionsCommand{
+		db: db,
+	}
 }
 
 func (c *GetPermissionsCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
@@ -17,7 +23,7 @@ func (c *GetPermissionsCommand) Execute(ctx context.Context, request RPCRequest)
 		return "", err
 	}
 
-	permissions, err := persistence.SelectPermissions(c.Db, request.URL, request.ClientID)
+	permissions, err := persistence.SelectPermissions(c.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}

@@ -18,3 +18,7 @@ type FeeManager interface {
 type EthClientGetter interface {
 	EthClient(chainID uint64) (ethclient.EthClientInterface, error)
 }
+
+type DefaultChainIDGetter interface {
+	GetDefaultChainID() (uint64, error)
+}

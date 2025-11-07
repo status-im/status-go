@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/status-im/status-go/services/connector/chainutils"
 	"github.com/status-im/status-go/services/connector/commands"
 	persistence "github.com/status-im/status-go/services/connector/database"
 )
@@ -12,13 +13,15 @@ import (
 var (
 	ErrInvalidResponseFromForwardedRpc         = errors.New("invalid response from forwarded RPC")
 	ErrCannotOverrideClientIDForHttpConnection = errors.New("cannot override clientId for HTTP connection")
+	ErrNotAllowedForUntrustedConnection        = errors.New("cannot call from untrusted connection")
 	ErrEmptyClientIDFromTrustedConnection      = errors.New("trusted connection must provide a clientId")
 )
 
 type API struct {
-	s *Service
-	r *CommandRegistry
-	c *commands.ClientSideHandler
+	s                    *Service
+	r                    *CommandRegistry
+	c                    *commands.ClientSideHandler
+	changeAccountCommand *commands.ChangeAccountCommand
 }
 
 func NewAPI(s *Service) *API {
@@ -26,59 +29,34 @@ func NewAPI(s *Service) *API {
 	c := commands.NewClientSideHandler(s.db)
 
 	// Transactions and signing
-	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{
-		EthClientGetter: s.ethClientGetter,
-		FeeManager:      s.feeManager,
-		Db:              s.db,
-		ClientHandler:   c,
-	})
-	r.Register("personal_sign", &commands.SignCommand{
-		Db:            s.db,
-		ClientHandler: c,
-	})
-	r.Register("eth_signTypedData_v4", &commands.SignCommand{
-		Db:            s.db,
-		ClientHandler: c,
-	})
+	r.Register("eth_sendTransaction", commands.NewSendTransactionCommand(s.db, s.ethClientGetter, s.feeManager, c))
+	r.Register("personal_sign", commands.NewSignCommand(s.db, c))
+	r.Register("eth_signTypedData_v4", commands.NewSignCommand(s.db, c))
 
 	// Accounts query and dapp permissions
 	// NOTE: Some dApps expect same behavior for both eth_accounts and eth_requestAccounts
-	accountsCommand := &commands.RequestAccountsCommand{
-		ClientHandler: c,
-		Db:            s.db,
-	}
+	accountsCommand := commands.NewRequestAccountsCommand(s.db, c)
 	r.Register("eth_accounts", accountsCommand)
 	r.Register("eth_requestAccounts", accountsCommand)
 
 	// Active chain per dapp management
-	r.Register("eth_chainId", &commands.ChainIDCommand{
-		Db:             s.db,
-		NetworkManager: s.nm,
-	})
-	r.Register("net_version", &commands.NetVersionCommand{
-		Db:             s.db,
-		NetworkManager: s.nm,
-	})
-	r.Register("wallet_switchEthereumChain", &commands.SwitchEthereumChainCommand{
-		Db:             s.db,
-		NetworkManager: s.nm,
-	})
+	defaultChainIDGetter := chainutils.NewNetworkManagerAdapter(s.nm)
+	r.Register("eth_chainId", commands.NewChainIDCommand(s.db, defaultChainIDGetter))
+	r.Register("net_version", commands.NewNetVersionCommand(s.db, defaultChainIDGetter))
+	r.Register("wallet_switchEthereumChain", commands.NewSwitchEthereumChainCommand(s.db, s.nm))
 
 	// Permissions
-	r.Register("wallet_requestPermissions", &commands.RequestPermissionsCommand{
-		Db: s.db,
-	})
-	r.Register("wallet_getPermissions", &commands.GetPermissionsCommand{
-		Db: s.db,
-	})
-	r.Register("wallet_revokePermissions", &commands.RevokePermissionsCommand{
-		Db: s.db,
-	})
+	r.Register("wallet_requestPermissions", commands.NewRequestPermissionsCommand(s.db))
+	r.Register("wallet_getPermissions", commands.NewGetPermissionsCommand(s.db))
+	r.Register("wallet_revokePermissions", commands.NewRevokePermissionsCommand(s.db))
+
+	changeAccountCommand := commands.NewChangeAccountCommand(s.db)
 
 	return &API{
-		s: s,
-		r: r,
-		c: c,
+		s:                    s,
+		r:                    r,
+		c:                    c,
+		changeAccountCommand: changeAccountCommand,
 	}
 }
 
@@ -167,4 +145,11 @@ func (api *API) SignAccepted(args commands.SignAcceptedArgs) error {
 
 func (api *API) SignRejected(args commands.RejectedArgs) error {
 	return api.c.SignRejected(args)
+}
+
+func (api *API) ChangeAccount(ctx context.Context, args commands.ChangeAccountArgs) error {
+	if IsUntrustedConnection(ctx) {
+		return ErrNotAllowedForUntrustedConnection
+	}
+	return api.changeAccountCommand.Execute(args)
 }

@@ -5,14 +5,20 @@ import (
 	"database/sql"
 	"strconv"
 
-	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/services/connector/database"
 )
 
 type NetVersionCommand struct {
-	NetworkManager *network.Manager
-	Db             *sql.DB
+	defaultChainIDGetter chainutils.DefaultChainIDGetter
+	db                   *sql.DB
+}
+
+func NewNetVersionCommand(db *sql.DB, defaultChainIDGetter chainutils.DefaultChainIDGetter) *NetVersionCommand {
+	return &NetVersionCommand{
+		db:                   db,
+		defaultChainIDGetter: defaultChainIDGetter,
+	}
 }
 
 func (c *NetVersionCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
@@ -21,14 +27,14 @@ func (c *NetVersionCommand) Execute(ctx context.Context, request RPCRequest) (in
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDApp(c.Db, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(c.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
 
 	var chainId uint64
 	if dApp == nil {
-		chainId, err = chainutils.GetDefaultChainID(c.NetworkManager)
+		chainId, err = c.defaultChainIDGetter.GetDefaultChainID()
 		if err != nil {
 			return "", err
 		}

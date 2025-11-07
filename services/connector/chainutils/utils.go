@@ -13,6 +13,21 @@ var (
 	ErrUnsupportedNetwork = errors.New("unsupported network")
 )
 
+// Implement DefaultChainIDGetter interface
+type NetworkManagerAdapter struct {
+	networkManager *network.Manager
+}
+
+func NewNetworkManagerAdapter(networkManager *network.Manager) *NetworkManagerAdapter {
+	return &NetworkManagerAdapter{
+		networkManager: networkManager,
+	}
+}
+
+func (a *NetworkManagerAdapter) GetDefaultChainID() (uint64, error) {
+	return GetDefaultChainID(a.networkManager)
+}
+
 // GetSupportedChainIDs retrieves the chain IDs from the provided NetworkManager.
 func GetSupportedChainIDs(networkManager *network.Manager) ([]uint64, error) {
 	activeNetworks, err := networkManager.GetActiveNetworks()
