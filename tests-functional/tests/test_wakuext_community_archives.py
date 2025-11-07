@@ -83,14 +83,14 @@ class TestCommunityArchives(MessengerSteps):
         has_archive = self.creator.wakuext_service.has_community_archive(self.community_id)
         assert has_archive is True, "Creator should have community archive after messages are sent"
 
-        # TODO: try to disable the store node
+        # TODO: try to disable the store node ??
         # self.member.wakuext_service.toggle_use_mail_servers(enabled=False)
 
         # Another member joins and checks for the message
         self.join_community(member=self.another_member, admin=self.creator)
         self.another_member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=chat_id, timeout=10)
         member_msgs_resp = self.another_member.wakuext_service.chat_messages(chat_id)
-        assert member_msgs_resp.get("messages")[0].get("text") == text
+        assert member_msgs_resp.get("messages") is None, "Another member should not have messages before archive is dispatched"
 
         # Ensure that the another member received the archive dispatch message
         time.sleep(5)
@@ -100,5 +100,8 @@ class TestCommunityArchives(MessengerSteps):
 
         has_archive = self.another_member.wakuext_service.has_community_archive(self.community_id)
         assert has_archive is True, "Another member should have community archive after messages are sent"
+
+        member_msgs_resp = self.member.wakuext_service.chat_messages(chat_id)
+        assert member_msgs_resp.get("messages")[0].get("text") == text, "Member should have the message after archive is dispatched"
 
         # TODO: Verify in db
