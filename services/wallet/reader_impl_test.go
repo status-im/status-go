@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	wsdktypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -410,8 +411,12 @@ func TestGetCachedBalancesInternal(t *testing.T) {
 		},
 	}
 
+	tokensOfInterest := []string{
+		types.TokenKey(cachedTokens[addresses[1]][0].TokenChainID, cachedTokens[addresses[1]][0].TokenAddress),
+	}
+
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
-	tokenManager.EXPECT().GetTokensByChains(chainIDs).Return(allTokens, nil)
+	tokenManager.EXPECT().GetTokensByKeys(tokensOfInterest).Return(allTokens, nil)
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
 	require.NoError(t, err)
 
