@@ -68,6 +68,7 @@ type CommunityTokenImageBuilder interface {
 type ManagerInterface interface {
 	GetTokenByChainAddress(chainID uint64, address common.Address) (*tokentypes.Token, error)
 	GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, error)
+	GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, error)
 	GetCachedBalances() (map[common.Address][]tokentypes.StorageToken, error)
 	CacheBalances(balances map[common.Address][]tokentypes.StorageToken) error
 	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error)

@@ -16,7 +16,6 @@ import (
 
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/services/wallet/testutils"
 	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	mock_tokenbalances "github.com/status-im/status-go/services/wallet/tokenbalances/mock/storage"
@@ -121,8 +120,12 @@ func TestGetCachedBalances(t *testing.T) {
 		},
 	}
 
+	tokensOfInterest := []string{
+		types.TokenKey(cachedTokens[addresses[1]][0].TokenChainID, cachedTokens[addresses[1]][0].TokenAddress),
+	}
+
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
-	tokenManager.EXPECT().GetTokensByChains(testutils.NewUint64SliceMatcher(chainIDs)).Return(allTokens, nil)
+	tokenManager.EXPECT().GetTokensByKeys(tokensOfInterest).Return(allTokens, nil)
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
 	require.NoError(t, err)
 
@@ -191,9 +194,13 @@ func TestFetchBalances(t *testing.T) {
 		},
 	}
 
+	tokensOfInterest := []string{
+		types.TokenKey(cachedTokens[addresses[1]][0].TokenChainID, cachedTokens[addresses[1]][0].TokenAddress),
+	}
+
 	// Test GetCachedBalances with cached data
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
-	tokenManager.EXPECT().GetTokensByChains(testutils.NewUint64SliceMatcher(chainIDs)).Return(allTokens, nil)
+	tokenManager.EXPECT().GetTokensByKeys(tokensOfInterest).Return(allTokens, nil)
 
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
 	require.NoError(t, err)
