@@ -6,9 +6,16 @@ ENV CC=clang
 ENV CXX=clang++
 
 RUN apt-get update \
-    && apt-get install -y git bash make llvm clang protobuf-compiler build-essential pkg-config \
+    && apt-get install -y git bash make llvm clang protobuf-compiler build-essential pkg-config curl jq \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Rust (rustc/cargo) via rustup in a system-wide location
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/cargo/bin:$PATH
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal --no-modify-path \
+ && rustc --version && cargo --version
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
@@ -20,6 +27,9 @@ WORKDIR /go/src/github.com/status-im/status-go
 ADD go.mod go.sum ./
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
+ADD Makefile .
+RUN make build-libwaku USE_NWAKU=true
+
 ADD . .
 ARG cache_id='local'
 ARG enable_go_cache=true
@@ -29,7 +39,7 @@ RUN if [ "$enable_go_cache" = "true" ]; then \
     fi
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
     --mount=type=cache,target="/root/.cache/go-generate-fast",id=statusgo-build-$cache_id \
-    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" \
+    make $build_target USE_NWAKU=true BUILD_FLAGS="$build_flags" \
       GO_GENERATE_FAST_RECACHE=$([ "$enable_go_cache" = "true" ] && echo false || echo true) \
       GO_GENERATE_FAST_DIR="/root/.cache/go-generate-fast"
 
@@ -54,6 +64,9 @@ COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/push-notifi
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/scripts/scan_waku_fleet.py /usr/local/bin
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
+
+COPY --from=builder /go/src/github.com/status-im/nwaku/build/libwaku.so /usr/local/lib/
+ENV LD_LIBRARY_PATH=/usr/local/lib/
 
 COPY _assets/scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
