@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	otelattribute "go.opentelemetry.io/otel/attribute"
@@ -58,13 +59,14 @@ var grantUpdateInterval = 24 * time.Hour
 // 4 hours interval
 var grantInvokesProfileDispatchInterval = 4 * time.Hour
 
+var importInitialDelay = time.Minute * 5
+
 const discordTimestampLayout = time.RFC3339
 
 const (
 	importSlowRate          = time.Second / 1
 	importFastRate          = time.Second / 100
 	importMessagesChunkSize = 10
-	importInitialDelay      = time.Minute * 5
 )
 
 const (
@@ -3731,6 +3733,7 @@ func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
 	go func() {
 		defer gocommon.LogOnPanic()
 		time.Sleep(importInitialDelay)
+
 		m.importDelayer.once.Do(func() {
 			close(m.importDelayer.wait)
 		})
@@ -3941,7 +3944,7 @@ func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
 		return err
 	}
 
-	chatID := community.MagnetlinkMessageChannelID()
+	chatID := community.UniversalChatID()
 	rawMessage := common.RawMessage{
 		LocalChatID:          chatID,
 		Sender:               community.PrivateKey(),
@@ -3965,7 +3968,6 @@ func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
 }
 
 func (m *Messenger) dispatchIndexCidMessage(communityID string) error {
-
 	community, err := m.communitiesManager.GetByIDString(communityID)
 	if err != nil {
 		return err
@@ -3986,7 +3988,8 @@ func (m *Messenger) dispatchIndexCidMessage(communityID string) error {
 		return err
 	}
 
-	chatID := community.MagnetlinkMessageChannelID()
+	chatID := community.UniversalChatID()
+
 	rawMessage := messagingtypes.RawMessage{
 		LocalChatID:          chatID,
 		Sender:               community.PrivateKey(),
@@ -4006,6 +4009,7 @@ func (m *Messenger) dispatchIndexCidMessage(communityID string) error {
 	if err != nil {
 		return err
 	}
+
 	return m.communitiesManager.UpdateIndexCidMessageClock(community.ID(), indexCidMessage.Clock)
 }
 
@@ -4041,6 +4045,7 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 
 	if archiveDistributionPreference == communities.ArchiveDistributionMethodCodex {
 		nodeConfig.CodexConfig.Enabled = true
+
 		err = m.settings.SaveSetting("node-config", nodeConfig)
 		if err != nil {
 			return err
@@ -4048,6 +4053,7 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 
 		m.config.codexConfig = &nodeConfig.CodexConfig
 		m.archiveManager.SetCodexConfig(&nodeConfig.CodexConfig)
+
 		err = m.archiveManager.StartCodexClient()
 		if err != nil {
 			return err
@@ -4094,15 +4100,6 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 		m.config.messengerSignalsHandler.HistoryArchivesProtocolDisabled()
 	}
 	return nil
-}
-
-func (m *Messenger) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
-	messageArchiveInterval = duration
-	return messageArchiveInterval, nil
-}
-
-func (m *Messenger) GetMessageArchiveInterval() (time.Duration, error) {
-	return messageArchiveInterval, nil
 }
 
 func (m *Messenger) GetCommunitiesSettings() ([]communities.CommunitySettings, error) {
@@ -4964,4 +4961,12 @@ func (m *Messenger) GetArchiveDistributionPreference() (string, error) {
 
 func (m *Messenger) CodexIndexCidFileExists(communityID types.HexBytes) bool {
 	return m.archiveManager.CodexIndexCidFileExists(communityID)
+}
+
+func (m *Messenger) Connect(peerId string, addrs []string) error {
+	return m.archiveManager.GetCodexClient().Connect(peerId, addrs)
+}
+
+func (m *Messenger) Debug() (codex.DebugInfo, error) {
+	return m.archiveManager.GetCodexClient().Debug()
 }
