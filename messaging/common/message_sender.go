@@ -1278,7 +1278,9 @@ func (s *MessageSender) unwrapPayloadForSDS(msg *messagingtypes.Message) error {
 	if len(msg.EncryptionLayer.Payload) > 0 {
 		unwrappedMessage, err := s.reliabilityManager.UnwrapReceivedMessage(msg.ApplicationLayer.Payload)
 		if err != nil {
-			s.logger.Error("SDS: failed to unwrap received message, may because of not use sds", zap.Error(err))
+			if useSDSForCommunitiesByDefault {
+				s.logger.Error("SDS: failed to unwrap received message, may because of not use sds", zap.Error(err))
+			}
 		} else {
 			msg.ApplicationLayer.Payload = *unwrappedMessage.Message
 			s.logger.Debug("SDS: missing deps",

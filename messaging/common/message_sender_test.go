@@ -401,3 +401,37 @@ func (s *MessageSenderSuite) TestGetEphemeralKey() {
 
 	s.Require().True(keyMap[crypto.PubkeyToHex(&key.PublicKey)])
 }
+
+func (s *MessageSenderSuite) TestSDSWrappedMessages() {
+	payload := []byte("hello")
+	communityID := []byte("community123")
+
+	wrappedPayload, err := s.sender.wrapPayloadForSDS(payload, communityID)
+	s.Require().NoError(err)
+	s.Require().True(len(wrappedPayload) > 0)
+
+	receivedMsg := messagingtypes.Message{
+		EncryptionLayer: messagingtypes.EncryptionLayer{
+			Payload: []byte("encrypted-data"),
+		},
+		ApplicationLayer: messagingtypes.ApplicationLayer{
+			Payload: wrappedPayload,
+		},
+	}
+
+	err = s.sender.unwrapPayloadForSDS(&receivedMsg)
+	s.Require().NoError(err)
+	s.Require().Equal(payload, receivedMsg.ApplicationLayer.Payload)
+
+	receivedMsg2 := messagingtypes.Message{
+		EncryptionLayer: messagingtypes.EncryptionLayer{
+			Payload: []byte{},
+		},
+		ApplicationLayer: messagingtypes.ApplicationLayer{
+			Payload: wrappedPayload,
+		},
+	}
+	err = s.sender.unwrapPayloadForSDS(&receivedMsg2)
+	s.Require().NoError(err)
+	s.Require().Equal(wrappedPayload, receivedMsg2.ApplicationLayer.Payload)
+}
