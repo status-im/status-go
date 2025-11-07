@@ -219,6 +219,9 @@ type NodeConfig struct {
 	CodexConfig CodexConfig
 
 	OutputMessageCSVEnabled bool
+
+	ImportInitialDelay     int
+	MessageArchiveInterval int
 }
 
 // WalletConfig extra configuration for wallet.Service.

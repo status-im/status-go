@@ -773,11 +773,6 @@ class WakuextService(Service):
         response = self.rpc_request("getVerificationRequestSentTo", params)
         return response
 
-    def update_message_archive_interval(self, interval_seconds: int):
-        params = [interval_seconds]
-        response = self.rpc_request("updateMessageArchiveInterval", params)
-        return response
-
     def has_community_archive(self, community_id: str):
         params = [community_id]
         response = self.rpc_request("hasCommunityArchive", params)
@@ -786,4 +781,19 @@ class WakuextService(Service):
     def set_archive_distribution_preference(self, preference: str):
         params = [{"preference": preference}]
         response = self.rpc_request("setArchiveDistributionPreference", params)
+        return response
+
+    def toggle_use_mail_servers(self, enabled: bool):
+        params = [enabled]
+        response = self.rpc_request("toggleUseMailservers", params)
+        return response
+
+    def connect(self, peerId: str, addrs: list = []):
+        params = [peerId, addrs]
+        response = self.rpc_request("connect", params)
+        return response
+
+    def debug(self):
+        params = []
+        response = self.rpc_request("debug", params)
         return response

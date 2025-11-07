@@ -358,6 +358,14 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.CodexConfig.Enabled = *request.CodexConfigEnabled
 	}
 
+	if request.ImportInitialDelay != nil {
+		nodeConfig.ImportInitialDelay = *request.ImportInitialDelay
+	}
+
+	if request.MessageArchiveInterval != nil {
+		nodeConfig.MessageArchiveInterval = *request.MessageArchiveInterval
+	}
+
 	nodeConfig.CodexConfig = params.CodexConfig{
 		Enabled:               nodeConfig.CodexConfig.Enabled,
 		HistoryArchiveDataDir: filepath.Join(nodeConfig.RootDataDir, "codex", "archivedata"),

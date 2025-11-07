@@ -77,9 +77,11 @@ type CreateAccount struct {
 	WalletConfig
 	WalletSecretsConfig
 
-	TorrentConfigEnabled *bool
-	TorrentConfigPort    *int
-	CodexConfigEnabled   *bool
+	TorrentConfigEnabled   *bool
+	TorrentConfigPort      *int
+	CodexConfigEnabled     *bool
+	ImportInitialDelay     *int
+	MessageArchiveInterval *int
 
 	APIConfig *APIConfig `json:"apiConfig"`
 
