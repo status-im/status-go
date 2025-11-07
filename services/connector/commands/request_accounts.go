@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/status-im/status-go/accounts-management/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
@@ -57,6 +58,15 @@ func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest
 		if err != nil {
 			return "", err
 		}
+
+		// Store eth_accounts permission (EIP-2255)
+		createdAt := time.Now().Unix()
+		emptyCaveats := []persistence.Caveat{}
+		err = persistence.InsertPermission(c.Db, dApp.URL, dApp.ClientID, "eth_accounts", emptyCaveats, createdAt)
+		if err != nil {
+			return "", err
+		}
+
 		signal.SendConnectorDAppPermissionGranted(connectorDApp, account, []uint64{chainID})
 	}
 

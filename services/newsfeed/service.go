@@ -33,18 +33,24 @@ type Service struct {
 	storage         Persistence
 	ac              ActivityCenter
 	newsFeedManager *newsfeed.NewsFeedManager
+	started         bool
 }
 
 func NewService(logger *zap.Logger, storage Persistence, ac ActivityCenter) *Service {
 	service := &Service{
 		logger:  logger,
 		storage: storage,
+		started: false,
 	}
 	service.SetActivityCenter(ac)
 	return service
 }
 
 func (s *Service) Start() error {
+	if isNil(s.ac) || s.started {
+		// Cannot start the service without an Activity Center reference
+		return nil
+	}
 	lastFetched, err := s.storage.GetLastFetchedTimestamp()
 	if err != nil {
 		return err
@@ -99,6 +105,10 @@ func (s *Service) SetActivityCenter(ac ActivityCenter) {
 		s.ac = nil
 	} else {
 		s.ac = ac
+		err := s.Start() // We can now start the service
+		if err != nil {
+			s.logger.Error("SetActivityCenter: failed to start service", zap.Error(err))
+		}
 	}
 }
 
