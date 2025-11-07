@@ -3,9 +3,9 @@ package ext
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
@@ -1190,27 +1190,6 @@ func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
 }
 
-func (api *PublicAPI) GetMessageArchiveInterval() (float64, error) {
-	interval, err := api.service.messenger.GetMessageArchiveInterval()
-	if err != nil {
-		return 0, err
-	}
-	return float64(interval) / float64(time.Second), nil
-}
-
-func (api *PublicAPI) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
-	if duration <= 0 {
-		return 0, errors.New("duration must be greater than zero")
-	}
-
-	d := duration * time.Second
-	updatedInterval, err := api.service.messenger.UpdateMessageArchiveInterval(d)
-	if err != nil {
-		return 0, err
-	}
-	return updatedInterval / time.Second, nil
-}
-
 func (api *PublicAPI) SubscribeToPubsubTopic(topic string, optPublicKey string) error {
 	var publicKey *ecdsa.PublicKey
 	if optPublicKey != "" {
@@ -1623,4 +1602,12 @@ func (api *PublicAPI) PeerID() string {
 
 func (m *PublicAPI) HasCommunityArchive(communityID types.HexBytes) bool {
 	return m.service.messenger.CodexIndexCidFileExists(communityID)
+}
+
+func (m *PublicAPI) Connect(peerId string, addrs []string) error {
+	return m.service.messenger.Connect(peerId, addrs)
+}
+
+func (m *PublicAPI) Debug() (codex.DebugInfo, error) {
+	return m.service.messenger.Debug()
 }

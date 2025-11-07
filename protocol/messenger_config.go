@@ -348,3 +348,23 @@ func WithCodexConfig(codexConfig *params.CodexConfig) func(c *config) error {
 		return nil
 	}
 }
+
+func WithImportInitialDelay(delay int) func(c *config) error {
+	return func(c *config) error {
+		if delay <= 0 {
+			return nil
+		}
+		importInitialDelay = time.Duration(delay) * time.Second
+		return nil
+	}
+}
+
+func WithMessageArchiveInterval(interval int) func(c *config) error {
+	return func(c *config) error {
+		if interval <= 0 {
+			return nil
+		}
+		messageArchiveInterval = time.Duration(interval) * time.Second
+		return nil
+	}
+}

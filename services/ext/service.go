@@ -342,6 +342,8 @@ func buildMessengerOptions(
 		protocol.WithClusterConfig(config.ClusterConfig),
 		protocol.WithTorrentConfig(&config.TorrentConfig),
 		protocol.WithCodexConfig(&config.CodexConfig),
+		protocol.WithImportInitialDelay(config.ImportInitialDelay),
+		protocol.WithMessageArchiveInterval(config.MessageArchiveInterval),
 		protocol.WithHTTPServer(httpServer),
 		protocol.WithRPCClient(rpcClient),
 		protocol.WithMessageCSV(config.OutputMessageCSVEnabled),
