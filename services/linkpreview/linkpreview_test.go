@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/services/linkpreview/mock"
+	mock_linkpreview "github.com/status-im/status-go/services/linkpreview/mock"
 	"github.com/status-im/status-go/services/sharedurls"
 	"github.com/status-im/status-go/t"
 )

@@ -7,7 +7,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 )
 
-
 type Service struct {
 	logger             *zap.Logger
 	storage            Persistence
