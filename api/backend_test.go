@@ -44,7 +44,6 @@ import (
 	walletservice "github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -107,8 +106,6 @@ func handleError(t *testing.T, err error) {
 }
 
 func TestBackendStartNodeConcurrently(t *testing.T) {
-	utils.Init()
-
 	backend, stop1, stop2, stop3, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
@@ -130,7 +127,7 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 	}()
 	require.NoError(t, err)
 
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	config, err := makeTestNodeConfig(t)
 	require.NoError(t, err)
 
 	count := 2
@@ -162,8 +159,6 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 }
 
 func TestBackendRestartNodeConcurrently(t *testing.T) {
-	utils.Init()
-
 	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
@@ -185,7 +180,7 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 	}()
 	require.NoError(t, err)
 
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	config, err := makeTestNodeConfig(t)
 	require.NoError(t, err)
 	const count = 3
 
@@ -208,8 +203,6 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 }
 
 func TestBackendGettersConcurrently(t *testing.T) {
-	utils.Init()
-
 	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
@@ -231,7 +224,7 @@ func TestBackendGettersConcurrently(t *testing.T) {
 	}()
 	require.NoError(t, err)
 
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	config, err := makeTestNodeConfig(t)
 	require.NoError(t, err)
 
 	err = backend.StartNode(config)
@@ -315,8 +308,6 @@ func TestBackendConnectionChangesToOffline(t *testing.T) {
 }
 
 func TestBackendCallRPCConcurrently(t *testing.T) {
-	utils.Init()
-
 	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
@@ -338,7 +329,7 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 	}()
 	require.NoError(t, err)
 
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	config, err := makeTestNodeConfig(t)
 	require.NoError(t, err)
 
 	err = backend.StartNode(config)
@@ -424,8 +415,6 @@ func TestCallRPCWithStoppedNode(t *testing.T) {
 // TODO(adam): add concurrent tests for: SendTransaction
 
 func TestStartStopMultipleTimes(t *testing.T) {
-	utils.Init()
-
 	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
@@ -447,7 +436,7 @@ func TestStartStopMultipleTimes(t *testing.T) {
 	}()
 	require.NoError(t, err)
 
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	config, err := makeTestNodeConfig(t)
 	require.NoError(t, err)
 	require.NoError(t, backend.StartNode(config))
 	require.NoError(t, backend.StopNode())
@@ -456,8 +445,6 @@ func TestStartStopMultipleTimes(t *testing.T) {
 }
 
 func TestHashTypedData(t *testing.T) {
-	utils.Init()
-
 	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
@@ -479,7 +466,7 @@ func TestHashTypedData(t *testing.T) {
 	}()
 	require.NoError(t, err)
 
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	config, err := makeTestNodeConfig(t)
 	require.NoError(t, err)
 
 	err = backend.StartNode(config)
@@ -524,8 +511,6 @@ func TestHashTypedData(t *testing.T) {
 }
 
 func TestBackendGetVerifiedAccount(t *testing.T) {
-	utils.Init()
-
 	testContext := setupTestContext(t, testPassword, true, true, false)
 
 	err := testContext.backend.StartNode(testContext.config)
@@ -653,8 +638,6 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 }
 
 func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
-	utils.Init()
-
 	testContext := setupTestContext(t, testPassword, false, false, false)
 
 	json := `{
@@ -713,8 +696,6 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 }
 
 func TestLoginAccount(t *testing.T) {
-	utils.Init()
-
 	testContext := setupTestContext(t, testPassword, false, false, false)
 
 	nameserver := "8.8.8.8"
@@ -777,8 +758,6 @@ func TestLoginAccount(t *testing.T) {
 }
 
 func TestVerifyDatabasePassword(t *testing.T) {
-	utils.Init()
-
 	testContext := setupTestContext(t, testPassword, false, false, false)
 
 	request := &requests.CreateAccount{
@@ -995,8 +974,6 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig, keyUID string) {
 }
 
 func TestLoginAndMigrationsStillWorkWithExistingDesktopUser(t *testing.T) {
-	utils.Init()
-
 	keyUID := "0x7c46c8f6f059ab72d524f2a6d356904db30bb0392636172ab3929a6bd2220f84" // #nosec G101
 
 	srcFolder := "../static/test-0.132.0-account/"
@@ -1019,8 +996,6 @@ func TestLoginAndMigrationsStillWorkWithExistingDesktopUser(t *testing.T) {
 }
 
 func TestChangeDatabasePassword(t *testing.T) {
-	utils.Init()
-
 	testContext := setupTestContext(t, testPassword, true, true, false)
 
 	err := testContext.backend.StartNode(testContext.config)
@@ -1076,8 +1051,6 @@ func TestChangeDatabasePassword(t *testing.T) {
 }
 
 func TestCreateWallet(t *testing.T) {
-	utils.Init()
-
 	testContext := setupTestContext(t, testPassword, false, false, true)
 
 	createAccountRequest := &requests.CreateAccount{
@@ -1138,8 +1111,6 @@ func TestCreateWallet(t *testing.T) {
 }
 
 func TestSetFleet(t *testing.T) {
-	utils.Init()
-
 	testContext := setupTestContext(t, testPassword, false, false, true)
 
 	createAccountRequest := &requests.CreateAccount{
@@ -1203,8 +1174,6 @@ func fakeToken() security.SensitiveString {
 }
 
 func TestWalletConfigOnLoginAccount(t *testing.T) {
-	utils.Init()
-
 	testContext := setupTestContext(t, testPassword, false, false, true)
 
 	poktToken := fakeToken()
@@ -1267,7 +1236,6 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 }
 
 func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
-	utils.Init()
 	tmpdir := t.TempDir()
 
 	b := NewGethStatusBackend(tt.MustCreateTestLogger())
@@ -1313,7 +1281,6 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 }
 
 func TestRestoreAccountAndLogin(t *testing.T) {
-	utils.Init()
 	tmpdir := t.TempDir()
 
 	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
@@ -1347,7 +1314,6 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 }
 
 func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
-	utils.Init()
 	tmpdir := t.TempDir()
 
 	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
@@ -1415,7 +1381,6 @@ func TestCreateAccountPathsValidation(t *testing.T) {
 }
 
 func TestRestoreKeycardAccountAndLogin(t *testing.T) {
-	utils.Init()
 	tmpdir := t.TempDir()
 
 	exampleKeycardEvent := map[string]interface{}{

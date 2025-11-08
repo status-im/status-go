@@ -12,12 +12,9 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/t/utils"
 )
 
 func TestHashMessage(t *testing.T) {
-	utils.Init()
-
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	addr := crypto.PubkeyToAddress(key.PublicKey)
