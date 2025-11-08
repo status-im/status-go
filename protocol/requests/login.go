@@ -39,13 +39,8 @@ type Login struct {
 	WalletConfig
 	WalletSecretsConfig
 
-	APIConfig *APIConfig `json:"apiConfig"`
-
-	// Following fields are used for migration from old node config to new one
-	WakuV2LightClient                            bool    `json:"wakuV2LightClient"`
-	WakuV2EnableStoreConfirmationForMessagesSent bool    `json:"wakuV2EnableStoreConfirmationForMessagesSent"`
-	WakuV2EnableMissingMessageVerification       bool    `json:"wakuV2EnableMissingMessageVerification"`
-	VerifyENSContractAddress                     *string `json:"verifyENSContractAddress"`
+	APIConfig          *APIConfig `json:"apiConfig"`
+	StatusProxyEnabled bool       `json:"statusProxyEnabled"`
 }
 
 func (c *Login) Validate() error {
