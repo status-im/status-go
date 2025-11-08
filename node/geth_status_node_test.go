@@ -11,11 +11,10 @@ import (
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/utils"
 )
 
 func TestStatusNodeStart(t *testing.T) {
-	config, err := utils.MakeTestNodeConfigWithDataDir("", "", params.StatusChainNetworkID)
+	config, err := params.NewNodeConfig("", params.StatusChainNetworkID)
 	require.NoError(t, err)
 	n := New(nil, nil, tt.MustCreateTestLogger())
 

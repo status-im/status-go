@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/t"
 )
@@ -69,25 +68,6 @@ func GetAccount1PKFile() string {
 // private network w/o access to the ACCOUNT_PASSWORD env variable
 func GetAccount2PKFile() string {
 	return "test-account2-status-chain.pk"
-}
-
-// MakeTestNodeConfigWithDataDir defines a function to return a params.NodeConfig
-// where specific network addresses are assigned based on provided network id, and assigns
-// a given name and data dir.
-func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*params.NodeConfig, error) {
-	cfg, err := params.NewNodeConfig(dataDir, networkID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Only attempt to validate if a dataDir is specified, we only support in-memory DB for tests
-	if dataDir != "" {
-		if err := cfg.Validate(); err != nil {
-			return nil, err
-		}
-	}
-
-	return cfg, nil
 }
 
 type account struct {

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/brianvoe/gofakeit/v7"
+
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/accounts-management/generator"
 	accstypes "github.com/status-im/status-go/accounts-management/types"
@@ -30,13 +32,11 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
 	mock_fake "github.com/status-im/status-go/transactions/fake"
 )
 
 func TestTransactorSuite(t *testing.T) {
-	utils.Init()
 	suite.Run(t, new(TransactorSuite))
 }
 
@@ -67,9 +67,11 @@ func (s *TransactorSuite) SetupTest() {
 	ethClientGetter := mock_rpcclient.NewMockEthClientGetter(s.txServiceMockCtrl)
 	ethClientGetter.EXPECT().EthClient(chainID).Return(localClient, nil).AnyTimes()
 
-	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", "/tmp", chainID)
+	var err error
+	s.nodeConfig, err = params.NewNodeConfig("/tmp", chainID)
 	s.Require().NoError(err)
-	s.nodeConfig = nodeConfig
+	err = s.nodeConfig.Validate()
+	s.Require().NoError(err)
 
 	s.manager = NewTransactor()
 	s.manager.SetEthClientGetter(ethClientGetter, time.Second)
@@ -202,10 +204,9 @@ func (s *TransactorSuite) TestGasValues() {
 	for _, testCase := range testCases {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.SetupTest()
-			to := types.HexToAddress(utils.TestConfig.Account2.WalletAddress)
 			args := wallettypes.SendTxArgs{
 				From:                 selectedAccount.Address(),
-				To:                   &to,
+				To:                   fakeAddress(),
 				Gas:                  testCase.gas,
 				GasPrice:             testCase.gasPrice,
 				MaxFeePerGas:         testCase.maxFeePerGas,
@@ -233,15 +234,18 @@ func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs
 }
 
 func (s *TransactorSuite) TestBuildAndValidateTransaction() {
+	address1 := fakeAddress()
+	address2 := fakeAddress()
+
 	key, _ := gethcrypto.GenerateKey()
 	selectedAccount := &accstypes.SelectedExtKey{
-		Address:    types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
+		Address:    *address1,
 		AccountKey: &accstypes.Key{PrivateKey: key},
 	}
 
 	chainID := s.nodeConfig.NetworkID
-	fromAddress := types.HexToAddress(utils.TestConfig.Account1.WalletAddress)
-	toAddress := types.HexToAddress(utils.TestConfig.Account2.WalletAddress)
+	fromAddress := *address1
+	toAddress := *address2
 	value := (*hexutil.Big)(big.NewInt(10))
 
 	expectedGasPrice := (*big.Int)(testGasPrice)
@@ -328,11 +332,16 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	})
 }
 
+func fakeAddress() *types.Address {
+	var address types.Address
+	gofakeit.Slice(&address)
+	return &address
+}
+
 func (s *TransactorSuite) TestArgsValidation() {
-	to := types.HexToAddress(utils.TestConfig.Account2.WalletAddress)
 	args := wallettypes.SendTxArgs{
-		From:  types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
-		To:    &to,
+		From:  *fakeAddress(),
+		To:    fakeAddress(),
 		Data:  types.HexBytes([]byte{0x01, 0x02}),
 		Input: types.HexBytes([]byte{0x02, 0x01}),
 	}
@@ -343,10 +352,9 @@ func (s *TransactorSuite) TestArgsValidation() {
 }
 
 func (s *TransactorSuite) TestAccountMismatch() {
-	to := types.HexToAddress(utils.TestConfig.Account2.WalletAddress)
 	args := wallettypes.SendTxArgs{
-		From: types.HexToAddress(utils.TestConfig.Account1.WalletAddress),
-		To:   &to,
+		From: *fakeAddress(),
+		To:   fakeAddress(),
 	}
 
 	var err error
