@@ -1,4 +1,4 @@
-package linkpreview
+package unfurlers
 
 import (
 	"encoding/json"

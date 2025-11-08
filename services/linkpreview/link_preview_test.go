@@ -18,7 +18,8 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	mock_linkpreview "github.com/status-im/status-go/services/linkpreview/mock"
+	"github.com/status-im/status-go/services/linkpreview/unfurlers"
+	mock_unfurlers "github.com/status-im/status-go/services/linkpreview/unfurlers/mock"
 	"github.com/status-im/status-go/services/sharedurls"
 	"github.com/status-im/status-go/t"
 )
@@ -281,19 +282,19 @@ func (s *LinkPreviewsTestSuite) Test_GetFavicon() {
 		</head>
 	</html>`)
 
-	faviconPath := GetFavicon(goodHTMLPNG)
+	faviconPath := unfurlers.GetFavicon(goodHTMLPNG)
 	s.Require().Equal("https://www.somehost.com/favicon.png", faviconPath)
 
-	faviconPath = GetFavicon(goodHTMLSVG)
+	faviconPath = unfurlers.GetFavicon(goodHTMLSVG)
 	s.Require().Equal("https://www.somehost.com/favicon.svg", faviconPath)
 
-	faviconPath = GetFavicon(goodHTMLICO)
+	faviconPath = unfurlers.GetFavicon(goodHTMLICO)
 	s.Require().Equal("https://www.somehost.com/favicon.ico", faviconPath)
 
-	faviconPath = GetFavicon(GoodHTMLRelAttributeIcon)
+	faviconPath = unfurlers.GetFavicon(GoodHTMLRelAttributeIcon)
 	s.Require().Equal("https://www.somehost.com/favicon.png", faviconPath)
 
-	faviconPath = GetFavicon(badHTMLNoRelAttr)
+	faviconPath = unfurlers.GetFavicon(badHTMLNoRelAttr)
 	s.Require().Equal("", faviconPath)
 }
 
@@ -448,7 +449,7 @@ func (s *LinkPreviewsTestSuite) Test_isSupportedImageURL() {
 	for _, e := range examples {
 		parsedURL, err := url.Parse(e.url)
 		s.Require().NoError(err, e)
-		s.Require().Equal(e.expected, IsSupportedImageURL(parsedURL), e.url)
+		s.Require().Equal(e.expected, unfurlers.IsSupportedImageURL(parsedURL), e.url)
 	}
 }
 
@@ -517,7 +518,7 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 		images.SmallDimName: icon,
 	}
 
-	dataProvider := mock_linkpreview.NewMockStatusDataProvider(s.ctrl)
+	dataProvider := mock_unfurlers.NewMockStatusDataProvider(s.ctrl)
 	dataProvider.EXPECT().GetContactByID(gomock.Eq(c2.ID)).Return(c2).Times(1)
 
 	r, err := UnfurlURLs([]string{u}, nil, dataProvider, s.logger)
@@ -573,7 +574,7 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
 	s.Require().NoError(err)
 
 	// Instantiate provider
-	dataProvider := mock_linkpreview.NewMockStatusDataProvider(s.ctrl)
+	dataProvider := mock_unfurlers.NewMockStatusDataProvider(s.ctrl)
 	dataProvider.EXPECT().FetchCommunity(gomock.Eq(community.IDString()), gomock.Eq(community.Shard())).
 		Return(community, nil).Times(1)
 

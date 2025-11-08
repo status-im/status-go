@@ -5,15 +5,16 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/services/linkpreview/unfurlers"
 )
 
 type Service struct {
 	logger             *zap.Logger
 	storage            Persistence
-	statusDataProvider StatusDataProvider
+	statusDataProvider unfurlers.StatusDataProvider
 }
 
-func NewService(logger *zap.Logger, settingsProvider Persistence, statusDataProvider StatusDataProvider) *Service {
+func NewService(logger *zap.Logger, settingsProvider Persistence, statusDataProvider unfurlers.StatusDataProvider) *Service {
 	return &Service{
 		logger:             logger,
 		storage:            settingsProvider,

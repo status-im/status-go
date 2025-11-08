@@ -15,6 +15,7 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/services/linkpreview/unfurlers"
 	"github.com/status-im/status-go/services/sharedurls"
 )
 
@@ -28,16 +29,16 @@ func normalizeHostname(hostname string) string {
 	return re.ReplaceAllString(hostname, "$1")
 }
 
-func newURLUnfurler(httpClient *http.Client, url *neturl.URL, logger *zap.Logger) Unfurler {
-	if IsSupportedImageURL(url) {
-		return NewImageUnfurler(url, logger, httpClient)
+func newURLUnfurler(httpClient *http.Client, url *neturl.URL, logger *zap.Logger) unfurlers.Unfurler {
+	if unfurlers.IsSupportedImageURL(url) {
+		return unfurlers.NewImageUnfurler(url, logger, httpClient)
 	}
 
 	switch normalizeHostname(url.Hostname()) {
 	case "reddit.com":
-		return NewOEmbedUnfurler("https://www.reddit.com/oembed", url, logger, httpClient)
+		return unfurlers.NewOEmbedUnfurler("https://www.reddit.com/oembed", url, logger, httpClient)
 	default:
-		return NewOpenGraphUnfurler(url, logger, httpClient)
+		return unfurlers.NewOpenGraphUnfurler(url, logger, httpClient)
 	}
 }
 
@@ -136,12 +137,12 @@ func GetTextURLsToUnfurl(text string, URLUnfurlingMode settings.URLUnfurlingMode
 }
 
 func NewDefaultHTTPClient() *http.Client {
-	return &http.Client{Timeout: DefaultRequestTimeout}
+	return &http.Client{Timeout: unfurlers.DefaultRequestTimeout}
 }
 
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and
 // processed by GetTextURLsToUnfurl.
-func UnfurlURLs(urls []string, httpClient *http.Client, statusDataProvider StatusDataProvider, logger *zap.Logger) (UnfurlURLsResponse, error) {
+func UnfurlURLs(urls []string, httpClient *http.Client, statusDataProvider unfurlers.StatusDataProvider, logger *zap.Logger) (UnfurlURLsResponse, error) {
 	response := UnfurlURLsResponse{}
 
 	// Unfurl in a loop
@@ -157,7 +158,7 @@ func UnfurlURLs(urls []string, httpClient *http.Client, statusDataProvider Statu
 		logger.Debug("unfurling", zap.String("url", url))
 
 		if sharedurls.IsStatusSharedURL(url) {
-			unfurler := NewStatusUnfurler(url, statusDataProvider, logger)
+			unfurler := unfurlers.NewStatusUnfurler(url, statusDataProvider, logger)
 			preview, err := unfurler.Unfurl()
 			if err != nil {
 				logger.Warn("failed to unfurl status link", zap.String("url", url), zap.Error(err))
