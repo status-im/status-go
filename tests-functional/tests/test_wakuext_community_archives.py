@@ -38,7 +38,7 @@ class TestCommunityArchives(MessengerSteps):
         assert has_archive is False, "Another member should not have community archive initially"
 
         # Connect members to community codex client
-        # In the real life, this would be done via DHT discovery
+        # In the real life, this would be done via discovery
         info = self.creator.wakuext_service.debug()
         self.member.wakuext_service.connect(info["id"], info["addrs"])
         self.another_member.wakuext_service.connect(info["id"], info["addrs"])

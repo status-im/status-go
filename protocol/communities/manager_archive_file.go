@@ -407,7 +407,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 
 		if len(messages) == 0 {
 			// No need to create an archive with zero messages
-			m.logger.Debug("no messages in this partition")
+			m.logger.Debug("[CODEX] no messages in this partition")
 			from = to
 			to = to.Add(partition)
 			if to.After(endDate) {
@@ -416,7 +416,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 			continue
 		}
 
-		m.logger.Debug("creating Codex archive with messages", zap.Int("messagesCount", len(messages)))
+		m.logger.Debug("[CODEX] creating Codex archive with messages", zap.Int("messagesCount", len(messages)))
 
 		// Not only do we partition messages, we also chunk them
 		// roughly by size, such that each chunk will not exceed a given
@@ -427,8 +427,14 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 
 		for _, msg := range messages {
 			msgSize := len(msg.Payload) + len(msg.Sig)
+			m.logger.Debug("[CODEX] message size",
+				zap.Int("messageSize", msgSize),
+				zap.String("contentTopic", string(msg.Topic[:])),
+				zap.ByteString("payload[0:31]", msg.Payload[:min(32, len(msg.Payload))]),
+			)
 			if msgSize > maxArchiveSizeInBytes {
 				// we drop messages this big
+				m.logger.Debug("[CODEX] dropping message due to size", zap.Int("messageSize", msgSize))
 				continue
 			}
 
@@ -459,11 +465,11 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 			// upload archive to codex and get CID back
 			cid, err := m.codexClient.UploadArchive(encodedArchive)
 			if err != nil {
-				m.logger.Error("failed to upload to codex", zap.Error(err))
+				m.logger.Error("[CODEX] failed to upload to codex", zap.Error(err))
 				return codexArchiveIDs, err
 			}
 
-			m.logger.Debug("archive uploaded to codex", zap.String("cid", cid))
+			m.logger.Debug("[CODEX] archive uploaded to codex", zap.String("cid", cid))
 
 			codexWakuMessageArchiveIndexMetadata := &protobuf.CodexWakuMessageArchiveIndexMetadata{
 				Metadata: wakuMessageArchive.Metadata,
@@ -504,7 +510,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 		// upload index file to codex
 		cid, err := m.codexClient.UploadArchive(codexIndexBytes)
 		if err != nil {
-			m.logger.Error("failed to upload to codex", zap.Error(err))
+			m.logger.Error("[CODEX] failed to upload to codex", zap.Error(err))
 			return codexArchiveIDs, err
 		}
 
@@ -518,7 +524,9 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 			return codexArchiveIDs, err
 		}
 
-		m.logger.Debug("archives uploaded to Codex", zap.Any("from", startDate.Unix()), zap.Any("to", endDate.Unix()))
+		m.logger.Debug("[CODEX] index uploaded to codex", zap.String("cid", cid))
+
+		m.logger.Debug("[CODEX] archives uploaded to Codex", zap.Any("from", startDate.Unix()), zap.Any("to", endDate.Unix()))
 
 		m.publisher.publish(&Subscription{
 			HistoryArchivesCreatedSignal: &signal.HistoryArchivesCreatedSignal{
@@ -528,7 +536,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 			},
 		})
 	} else {
-		m.logger.Debug("no archives created")
+		m.logger.Debug("[CODEX] no archives created")
 		m.publisher.publish(&Subscription{
 			NoHistoryArchivesCreatedSignal: &signal.NoHistoryArchivesCreatedSignal{
 				CommunityID: communityID.String(),
@@ -789,7 +797,7 @@ func (m *ArchiveFileManager) ExtractMessagesFromCodexHistoryArchive(communityID 
 	var buf bytes.Buffer
 	err = m.codexClient.LocalDownload(cid, &buf)
 	if err != nil {
-		m.logger.Error("failed to download archive from codex", zap.Error(err))
+		m.logger.Error("[CODEX] failed to download archive from codex", zap.Error(err))
 		return nil, err
 	}
 	data := buf.Bytes()

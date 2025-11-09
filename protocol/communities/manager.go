@@ -2327,7 +2327,15 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 
 	cdMagnetlinkClock := community.config.CommunityDescription.ArchiveMagnetlinkClock
 	cdIndexCidClock := community.config.CommunityDescription.ArchiveIndexCidClock
+
+	m.logger.Debug("[CODEX][handleCommunityDescription] handling community description archive info",
+		zap.String("communityID", community.IDString()),
+		zap.Uint64("magnetlinkClock", cdMagnetlinkClock),
+		zap.Uint64("indexCidClock", cdIndexCidClock),
+	)
+
 	if !hasCommunityArchiveInfo {
+		m.logger.Debug("[CODEX][handleCommunityDescription] saving community archive info: hasCommunityArchiveInfo=false")
 		err = m.persistence.SaveCommunityArchiveInfo(community.ID(), cdMagnetlinkClock, 0, cdIndexCidClock)
 		if err != nil {
 			return nil, err
@@ -2349,7 +2357,13 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		if err != nil {
 			return nil, err
 		}
+		m.logger.Debug("[CODEX][handleCommunityDescription] comparing index CID clocks",
+			zap.String("communityID", community.IDString()),
+			zap.Uint64("cdIndexCidClock", cdIndexCidClock),
+			zap.Uint64("indexCidClock", indexCidClock),
+		)
 		if cdIndexCidClock > indexCidClock {
+			m.logger.Debug("[CODEX][handleCommunityDescription] updating index CID clock (cdIndexCidClock > indexCidClock)")
 			err = m.persistence.UpdateIndexCidMessageClock(community.ID(), cdIndexCidClock)
 			if err != nil {
 				return nil, err
