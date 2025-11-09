@@ -279,7 +279,7 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 						if sub.HistoryArchivesSeedingSignal.IndexCid {
 							err := m.dispatchIndexCidMessage(sub.HistoryArchivesSeedingSignal.CommunityID)
 							if err != nil {
-								m.logger.Debug("failed to dispatch index cid message", zap.Error(err))
+								m.logger.Debug("[CODEX] failed to dispatch index cid message", zap.Error(err))
 							}
 						}
 					}
@@ -1934,7 +1934,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 }
 
 func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) (*MessengerResponse, error) {
-	m.logger.Debug("accept request to join community",
+	m.logger.Debug("[CODEX][acceptRequestToJoinCommunity] accept request to join community",
 		zap.String("community", requestToJoin.CommunityID.String()),
 		zap.String("pubkey", requestToJoin.PublicKey))
 
@@ -1988,11 +1988,13 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 		}
 
 		if m.archiveManager.IsCodexReady() && m.archiveManager.CodexIndexCidFileExists(community.ID()) {
+			m.logger.Debug("[CODEX][acceptRequestToJoinCommunity] calling GetHistoryArchiveIndexCid", zap.String("communityID", community.IDString()))
 			cid, err := m.archiveManager.GetHistoryArchiveIndexCid(community.ID())
 			if err != nil {
 				m.logger.Warn("couldn't get codex index cid for community", zap.Error(err))
 				return nil, err
 			}
+			m.logger.Debug("[CODEX][acceptRequestToJoinCommunity] setting requestToJoinResponseProto.IndexCid", zap.String("communityID", community.IDString()), zap.String("cid", cid))
 			requestToJoinResponseProto.IndexCid = cid
 		}
 
@@ -3819,6 +3821,8 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 		cancelFunc()
 	}()
 
+	m.logger.Debug("[CODEX][importHistoryArchives] waiting to start importing history archive messages (importDelayer.wait)", zap.String("communityID", types.EncodeHex(communityID)))
+
 	// don't proceed until initial import delay has passed
 	select {
 	case <-m.importDelayer.wait:
@@ -3828,12 +3832,14 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 
 	delayImport := false
 
+	m.logger.Info("[CODEX][importHistoryArchives] starting to import history archive messages", zap.String("communityID", types.EncodeHex(communityID)))
+
 importMessageArchivesLoop:
 	for {
 		if delayImport {
 			select {
 			case <-ctx.Done():
-				m.logger.Debug("interrupted importing history archive messages")
+				m.logger.Debug("[CODEX][importHistoryArchives] interrupted importing history archive messages")
 				return nil
 			case <-time.After(1 * time.Hour):
 				delayImport = false
@@ -3842,7 +3848,7 @@ importMessageArchivesLoop:
 
 		select {
 		case <-ctx.Done():
-			m.logger.Debug("interrupted importing history archive messages")
+			m.logger.Debug("[CODEX][importHistoryArchives] interrupted importing history archive messages")
 			return nil
 		case <-importTicker.C:
 			err := m.checkIfIMemberOfCommunity(communityID)
@@ -3851,16 +3857,16 @@ importMessageArchivesLoop:
 			}
 			archiveIDsToImport, err := m.archiveManager.GetMessageArchiveIDsToImport(communityID)
 			if err != nil {
-				m.logger.Error("couldn't get message archive IDs to import", zap.Error(err))
+				m.logger.Error("[CODEX][importHistoryArchives] couldn't get message archive IDs to import", zap.Error(err))
 				return err
 			}
 
 			if len(archiveIDsToImport) == 0 {
-				m.logger.Debug("no message archives to import")
+				m.logger.Debug("[CODEX][importHistoryArchives] no message archives to import")
 				break importMessageArchivesLoop
 			}
 
-			m.logger.Info("importing message archive", zap.Int("left", len(archiveIDsToImport)))
+			m.logger.Info("[CODEX][importHistoryArchives] importing message archive", zap.Int("left", len(archiveIDsToImport)))
 
 			// only process one archive at a time, so in case of cancel we don't
 			// wait for all archives to be processed first
@@ -3869,10 +3875,11 @@ importMessageArchivesLoop:
 			var archiveMessages []*protobuf.WakuMessage
 			preference, err := m.GetArchiveDistributionPreference()
 			if err != nil {
-				m.logger.Warn("failed to get archive distribution preference, using codex", zap.Error(err))
+				m.logger.Warn("[CODEX][importHistoryArchives] failed to get archive distribution preference, using codex", zap.Error(err))
 				preference = communities.ArchiveDistributionMethodCodex
 			}
 			if preference == communities.ArchiveDistributionMethodCodex {
+				m.logger.Debug("[CODEX][importHistoryArchives] using codex to extract messages")
 				archiveMessages, err = m.archiveManager.ExtractMessagesFromCodexHistoryArchive(communityID, downloadedArchiveID)
 			} else {
 				archiveMessages, err = m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
@@ -3884,7 +3891,7 @@ importMessageArchivesLoop:
 					delayImport = true
 					continue
 				}
-				m.logger.Error("failed to extract history archive messages", zap.Error(err))
+				m.logger.Error("[CODEX][importHistoryArchives] failed to extract history archive messages", zap.Error(err))
 				continue
 			}
 
@@ -3893,14 +3900,14 @@ importMessageArchivesLoop:
 			for _, messagesChunk := range chunkSlice(archiveMessages, importMessagesChunkSize) {
 				if err := m.importRateLimiter.Wait(ctx); err != nil {
 					if !errors.Is(err, context.Canceled) {
-						m.logger.Error("rate limiter error when handling archive messages", zap.Error(err))
+						m.logger.Error("[CODEX][importHistoryArchives] rate limiter error when handling archive messages", zap.Error(err))
 					}
 					continue importMessageArchivesLoop
 				}
 
 				response, err := m.handleArchiveMessages(messagesChunk)
 				if err != nil {
-					m.logger.Error("failed to handle archive messages", zap.Error(err))
+					m.logger.Error("[CODEX][importHistoryArchives] failed to handle archive messages", zap.Error(err))
 					continue importMessageArchivesLoop
 				}
 
@@ -3914,7 +3921,7 @@ importMessageArchivesLoop:
 
 			err = m.archiveManager.SetMessageArchiveIDImported(communityID, downloadedArchiveID, true)
 			if err != nil {
-				m.logger.Error("failed to mark history message archive as imported", zap.Error(err))
+				m.logger.Error("[CODEX][importHistoryArchives] failed to mark history message archive as imported", zap.Error(err))
 				continue
 			}
 		}
@@ -4000,15 +4007,31 @@ func (m *Messenger) dispatchIndexCidMessage(communityID string) error {
 		Priority:             &messagingtypes.LowPriority,
 	}
 
+	m.logger.Info("[CODEX][dispatchIndexCidMessage] dispatching index cid message",
+		zap.String("communityID", communityID),
+		zap.String("chatID", chatID),
+		zap.String("cid", indexCid),
+	)
+
 	_, err = m.messaging.SendPublic(context.Background(), chatID, rawMessage)
 	if err != nil {
 		return err
 	}
 
+	m.logger.Info("[CODEX][dispatchIndexCidMessage] dispatched index cid message",
+		zap.String("communityID", communityID),
+		zap.String("chatID", chatID),
+		zap.String("cid", indexCid),
+	)
+
+	m.logger.Info("[CODEX][dispatchIndexCidMessage] calling UpdateCommunityDescriptionIndexCidMessageClock", zap.String("communityID", community.IDString()), zap.Uint64("clock", indexCidMessage.Clock))
+
 	err = m.communitiesManager.UpdateCommunityDescriptionIndexCidMessageClock(community.ID(), indexCidMessage.Clock)
 	if err != nil {
 		return err
 	}
+
+	m.logger.Info("[CODEX][dispatchIndexCidMessage] calling UpdateIndexCidMessageClock", zap.String("communityID", community.IDString()), zap.Uint64("clock", indexCidMessage.Clock))
 
 	return m.communitiesManager.UpdateIndexCidMessageClock(community.ID(), indexCidMessage.Clock)
 }

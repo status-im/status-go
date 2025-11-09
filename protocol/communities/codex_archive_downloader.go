@@ -246,7 +246,7 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 			err := d.triggerSingleArchiveDownload(archiveHash, archiveCid, archiveCancel)
 			if err != nil {
 				// Don't proceed to polling if trigger failed (could be cancellation or other error)
-				d.logger.Debug("failed to trigger download",
+				d.logger.Debug("[CODEX] failed to trigger download",
 					zap.String("cid", archiveCid),
 					zap.String("hash", archiveHash),
 					zap.Error(err))
@@ -262,13 +262,13 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 			for {
 				select {
 				case <-timeout:
-					d.logger.Debug("timeout waiting for CID to be available locally",
+					d.logger.Debug("[CODEX] timeout waiting for CID to be available locally",
 						zap.String("cid", archiveCid),
 						zap.String("hash", archiveHash),
 						zap.Duration("timeout", d.pollingTimeout))
 					return // Exit without success callback or count increment
 				case <-archiveCancel:
-					d.logger.Debug("download cancelled",
+					d.logger.Debug("[CODEX] download cancelled",
 						zap.String("cid", archiveCid),
 						zap.String("hash", archiveHash))
 					return // Exit without success callback or count increment
@@ -276,7 +276,7 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 					hasCid, err := d.codexClient.HasCid(archiveCid)
 					if err != nil {
 						// Log error but continue polling
-						d.logger.Debug("error checking CID availability",
+						d.logger.Debug("[CODEX] error checking CID availability",
 							zap.String("cid", archiveCid),
 							zap.String("hash", archiveHash),
 							zap.Error(err))
@@ -288,7 +288,7 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 						d.totalDownloadedArchivesCount++
 						d.mu.Unlock()
 
-						d.logger.Debug("archive download completed",
+						d.logger.Debug("[CODEX] archive download completed",
 							zap.String("cid", archiveCid),
 							zap.String("totalDownloadedArchivesCount", fmt.Sprintf("%d", d.totalDownloadedArchivesCount)),
 						)

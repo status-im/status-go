@@ -122,7 +122,7 @@ func (m *ArchiveManager) SetOnline(online bool) {
 		if m.codexConfig != nil && m.codexConfig.Enabled && !codexStarted {
 			err := m.StartCodexClient()
 			if err != nil {
-				m.logger.Error("couldn't start codex client", zap.Error(err))
+				m.logger.Error("[CODEX] couldn't start codex client", zap.Error(err))
 			}
 		}
 	}
@@ -227,7 +227,7 @@ func (m *ArchiveManager) ensureCodexDiscoveryPort(config *params.CodexConfig) er
 		if available {
 			return nil
 		}
-		m.logger.Warn("codex discovery port already in use, selecting a free one", zap.Int("port", port))
+		m.logger.Warn("[CODEX] discovery port already in use, selecting a free one", zap.Int("port", port))
 	}
 
 	for range 10 {
@@ -325,7 +325,7 @@ func (m *ArchiveManager) StopCodexClient() error {
 
 	errs := []error{}
 	if m.isCodexClientStarted {
-		m.logger.Info("Stopping codex client")
+		m.logger.Info("[CODEX] Stopping codex client")
 
 		e := m.codexClient.Stop()
 		if e != nil {
@@ -523,6 +523,7 @@ func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes,
 	distributionPreference, err := m.persistence.GetArchiveDistributionPreference()
 	if err != nil {
 		// fallback to codex
+		m.logger.Debug("[CODEX][CreateAndSeedHistoryArchive] failed to get archive distribution preference - falling back to codex", zap.Error(err))
 		distributionPreference = params.ArchiveDistributionMethodCodex
 	}
 
@@ -550,15 +551,15 @@ func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes,
 		codexArchiveIDs, errCodex := m.ArchiveFileManager.CreateHistoryArchiveCodexFromDB(communityID, topics, startDate, endDate, partition, encrypt)
 		if errCodex != nil {
 			archiveCodexCreatedSuccessfully = false
-			m.logger.Error("failed to create history archive codex", zap.Error(errCodex))
+			m.logger.Error("[CODEX][CreateAndSeedHistoryArchive] failed to create history archive codex", zap.Error(errCodex))
 		} else {
 			if len(codexArchiveIDs) == 0 {
 				// no new codex archives were created - no need to distribute new index cid
 				// but we need to (re)start seeding what we stopped above
 				archiveCodexCreatedSuccessfully = false
-				m.logger.Debug("no codex archive ids were created")
+				m.logger.Debug("[CODEX][CreateAndSeedHistoryArchive] no new codex archive ids were created - re-seeding existing index cid")
 				if err = m.SeedHistoryArchiveIndexCid(communityID); err != nil {
-					m.logger.Error("failed to seed existing history archive codex index cid", zap.Error(err))
+					m.logger.Error("[CODEX][CreateAndSeedHistoryArchive] failed to seed existing history archive codex index cid", zap.Error(err))
 				}
 			}
 			// else: we created new codex archives and they are already published to codex
@@ -762,15 +763,15 @@ func (m *ArchiveManager) UnseedHistoryArchiveIndexCid(communityID types.HexBytes
 		cid, err := m.GetHistoryArchiveIndexCid(communityID)
 
 		if err != nil {
-			m.logger.Debug("failed to get history archive index CID", zap.Error(err))
+			m.logger.Debug("[CODEX] failed to get history archive index CID", zap.Error(err))
 			return
 		}
 
-		m.logger.Debug("Unseeding index CID for community", zap.String("id", communityID.String()), zap.String("cid", cid))
+		m.logger.Debug("[CODEX] Unseeding index CID for community", zap.String("id", communityID.String()), zap.String("cid", cid))
 
 		err = m.codexClient.RemoveCid(cid)
 		if err != nil {
-			m.logger.Error("failed to remove CID from Codex", zap.Error(err))
+			m.logger.Error("[CODEX] failed to remove CID from Codex", zap.Error(err))
 		}
 	}
 }
@@ -789,12 +790,12 @@ func (m *ArchiveManager) IsSeedingHistoryArchiveCodex(communityID types.HexBytes
 	if m.CodexIndexCidFileExists(communityID) {
 		cid, err := m.GetHistoryArchiveIndexCid(communityID)
 		if err != nil {
-			m.logger.Debug("failed to read Codex index CID", zap.String("communityID", communityID.String()), zap.Error(err))
+			m.logger.Debug("[CODEX] failed to read Codex index CID", zap.String("communityID", communityID.String()), zap.Error(err))
 			return false
 		}
 		hasCid, err := m.codexClient.HasCid(cid)
 		if err != nil {
-			m.logger.Debug("failed to verify Codex CID availability", zap.String("communityID", communityID.String()), zap.String("cid", cid), zap.Error(err))
+			m.logger.Debug("[CODEX] failed to verify Codex CID availability", zap.String("communityID", communityID.String()), zap.String("cid", cid), zap.Error(err))
 			return false
 		}
 		return hasCid
@@ -999,7 +1000,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 	indexDownloaderCancel := make(chan struct{})
 
 	if err := m.ensureCodexCommunityDir(communityID); err != nil {
-		m.logger.Error("failed to ensure Codex archive directory", zap.String("communityID", id), zap.Error(err))
+		m.logger.Error("[CODEX] failed to ensure Codex archive directory", zap.String("communityID", id), zap.Error(err))
 		return nil, err
 	}
 
@@ -1007,12 +1008,12 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 	indexFilePath := m.codexHistoryArchiveIndexFilePath(communityID)
 	indexDownloader := NewCodexIndexDownloader(m.codexClient, indexCid, indexFilePath, indexDownloaderCancel, m.logger)
 
-	m.logger.Debug("fetching history index from Codex", zap.String("indexCid", indexCid))
+	m.logger.Debug("[CODEX] fetching history index from Codex", zap.String("indexCid", indexCid))
 	select {
 	case <-timeout:
 		return nil, ErrIndexCidTimedout
 	case <-cancelTask:
-		m.logger.Debug("cancelled fetching history index from Codex")
+		m.logger.Debug("[CODEX] cancelled fetching history index from Codex")
 		close(indexDownloaderCancel) // Forward cancellation to index downloader
 		downloadTaskInfo.Cancelled = true
 		return downloadTaskInfo, nil
@@ -1021,12 +1022,14 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 		err := indexDownloader.GetError()
 		if indexDownloader.GetDatasetSize() == 0 || err != nil {
 			if err != nil {
-				m.logger.Error("failed to fetch Codex manifest", zap.Error(err))
+				m.logger.Error("[CODEX] failed to fetch Codex manifest", zap.Error(err))
 			} else {
-				m.logger.Error("failed to fetch Codex manifest - dataset size is 0")
+				m.logger.Error("[CODEX] failed to fetch Codex manifest - dataset size is 0")
 			}
 			return nil, fmt.Errorf("failed to fetch Codex manifest for CID %s: %w", indexCid, err)
 		}
+
+		m.logger.Debug("[CODEX] got manifest of the index file from Codex", zap.String("indexCid", indexCid), zap.Int64("datasetSize", indexDownloader.GetDatasetSize()))
 
 		// Publish manifest fetched signal
 		m.publisher.publish(&Subscription{
@@ -1039,7 +1042,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 		// Start downloading the index file
 		indexDownloader.DownloadIndexFile()
 
-		m.logger.Debug("downloading history archive index with CID:", zap.String("indexCid", indexCid))
+		m.logger.Debug("[CODEX] downloading history archive index with CID:", zap.String("indexCid", indexCid))
 
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
@@ -1047,18 +1050,19 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 		for {
 			select {
 			case <-cancelTask:
-				m.logger.Debug("cancelled downloading archive index")
+				m.logger.Debug("[CODEX] cancelled downloading archive index")
 				close(indexDownloaderCancel) // Forward cancellation to index downloader
 				downloadTaskInfo.Cancelled = true
 				return downloadTaskInfo, nil
 			case <-ticker.C:
 				err := indexDownloader.GetError()
 				if err != nil {
-					m.logger.Error("error during index download", zap.Error(err))
+					m.logger.Error("[CODEX] error during index download", zap.Error(err))
 					return nil, err
 				}
 
 				if indexDownloader.IsDownloadComplete() {
+					m.logger.Info("[CODEX] history archive index download completed", zap.String("indexCid", indexCid))
 
 					// Publish index download completed signal
 					m.publisher.publish(&Subscription{
@@ -1070,7 +1074,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 
 					err := m.writeCodexIndexCidToFile(communityID, indexCid)
 					if err != nil {
-						m.logger.Error("failed to write Codex index CID to file", zap.Error(err))
+						m.logger.Error("[CODEX] failed to write Codex index CID to file", zap.Error(err))
 						return nil, err
 					}
 
@@ -1085,7 +1089,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 					}
 
 					if len(existingArchiveIDs) == len(index.Archives) {
-						m.logger.Debug("download cancelled, no new archives")
+						m.logger.Debug("[CODEX] aborting download, no new archives")
 						return downloadTaskInfo, nil
 					}
 
@@ -1102,7 +1106,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 					archiveDownloader.SetOnArchiveDownloaded(func(hash string, from, to uint64) {
 						err = m.persistence.SaveMessageArchiveID(communityID, hash)
 						if err != nil {
-							m.logger.Error("couldn't save message archive ID", zap.Error(err))
+							m.logger.Error("[CODEX] couldn't save message archive ID", zap.Error(err))
 						}
 						m.publisher.publish(&Subscription{
 							HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
@@ -1112,11 +1116,13 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 							},
 						})
 
-						m.logger.Debug("archive downloaded successfully",
+						m.logger.Debug("[CODEX] archive downloaded successfully",
 							zap.String("hash", hash),
 							zap.Uint64("from", from),
 							zap.Uint64("to", to))
 					})
+
+					m.logger.Debug("[CODEX] starting downloading individual archives from Codex")
 
 					archiveDownloader.StartDownload()
 
@@ -1133,7 +1139,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 					for {
 						select {
 						case <-cancelTask:
-							m.logger.Debug("cancelled downloading individual archives")
+							m.logger.Debug("[CODEX] cancelled downloading individual archives")
 							close(archiveDownloaderCancel)
 							downloadTaskInfo.TotalDownloadedArchivesCount = archiveDownloader.GetTotalDownloadedArchivesCount()
 							downloadTaskInfo.Cancelled = true
@@ -1152,7 +1158,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 								// Always update final progress
 								downloadTaskInfo.TotalDownloadedArchivesCount = archiveDownloader.GetTotalDownloadedArchivesCount()
 
-								m.logger.Info("Downloading archives from Codex finished",
+								m.logger.Info("[CODEX] downloading archives from Codex completed",
 									zap.Int("totalArchives", downloadTaskInfo.TotalArchivesCount),
 									zap.Int("downloadedArchives", downloadTaskInfo.TotalDownloadedArchivesCount))
 
@@ -1167,7 +1173,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 								if archiveDownloader.IsCancelled() {
 									// archive was cancelled, but it does not mean that
 									// no single archive was downloaded before cancellation
-									m.logger.Debug("archive download was cancelled")
+									m.logger.Debug("[CODEX] archive download was cancelled")
 									downloadTaskInfo.Cancelled = true
 									return downloadTaskInfo, nil
 								}
@@ -1176,7 +1182,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 							} else {
 								// Update progress
 								downloadTaskInfo.TotalDownloadedArchivesCount = archiveDownloader.GetTotalDownloadedArchivesCount()
-								m.logger.Debug("downloading archives",
+								m.logger.Debug("[CODEX] downloading archives in progress",
 									zap.Int("completed", downloadTaskInfo.TotalDownloadedArchivesCount),
 									zap.Int("total", downloadTaskInfo.TotalArchivesCount),
 									zap.Int("inProgress in this session", archiveDownloader.GetPendingArchivesCount()),

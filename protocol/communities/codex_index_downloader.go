@@ -88,7 +88,7 @@ func (d *CodexIndexDownloader) GotManifest() <-chan struct{} {
 			d.mu.Lock()
 			d.downloadError = err
 			d.mu.Unlock()
-			d.logger.Debug("failed to fetch manifest",
+			d.logger.Debug("[CODEX] failed to fetch manifest",
 				zap.String("indexCid", d.indexCid),
 				zap.Error(err))
 			// Don't close channel on error - let timeout handle it
@@ -100,7 +100,7 @@ func (d *CodexIndexDownloader) GotManifest() <-chan struct{} {
 			d.mu.Lock()
 			d.downloadError = fmt.Errorf("manifest CID mismatch: expected %s, got %s", d.indexCid, manifest.Cid)
 			d.mu.Unlock()
-			d.logger.Debug("manifest CID mismatch",
+			d.logger.Debug("[CODEX] manifest CID mismatch",
 				zap.String("expected", d.indexCid),
 				zap.String("got", manifest.Cid))
 			// Don't close channel on error - let timeout handle it
@@ -160,7 +160,7 @@ func (d *CodexIndexDownloader) DownloadIndexFile() {
 			d.mu.Lock()
 			d.downloadError = fmt.Errorf("failed to create temporary file: %w", err)
 			d.mu.Unlock()
-			d.logger.Debug("failed to create temporary file",
+			d.logger.Debug("[CODEX] failed to create temporary file",
 				zap.String("filePath", d.filePath),
 				zap.Error(err))
 			return
@@ -185,7 +185,7 @@ func (d *CodexIndexDownloader) DownloadIndexFile() {
 			d.mu.Lock()
 			d.downloadError = fmt.Errorf("failed to download index file: %w", err)
 			d.mu.Unlock()
-			d.logger.Debug("failed to download index file",
+			d.logger.Debug("[CODEX] failed to download index file",
 				zap.String("indexCid", d.indexCid),
 				zap.String("filePath", d.filePath),
 				zap.String("tmpPath", tmpPath),
@@ -198,7 +198,7 @@ func (d *CodexIndexDownloader) DownloadIndexFile() {
 			d.mu.Lock()
 			d.downloadError = fmt.Errorf("failed to close temporary file: %w", err)
 			d.mu.Unlock()
-			d.logger.Debug("failed to close temporary file",
+			d.logger.Debug("[CODEX] failed to close temporary file",
 				zap.String("tmpPath", tmpPath),
 				zap.Error(err))
 			return
@@ -210,7 +210,7 @@ func (d *CodexIndexDownloader) DownloadIndexFile() {
 			d.mu.Lock()
 			d.downloadError = fmt.Errorf("failed to rename temporary file to final destination: %w", err)
 			d.mu.Unlock()
-			d.logger.Debug("failed to rename temporary file to final destination",
+			d.logger.Debug("[CODEX] failed to rename temporary file to final destination",
 				zap.String("tmpPath", tmpPath),
 				zap.String("filePath", d.filePath),
 				zap.Error(err))
