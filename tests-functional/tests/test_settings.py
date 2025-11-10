@@ -55,14 +55,12 @@ class TestSettings:
         disabled_state = newsfeed.notifications_enabled()
         assert disabled_state is False, "Expected news notifications to be disabled"
 
-    # def test_toggle_news_rss_enabled(self):
-    #     s = self.config.settings_service
-    #     ret = s.save_setting("news-rss-enabled?", False)
-    #     assert ret is None
-    #     assert s.news_rss_enabled() is False
-    #     ret = s.save_setting("news-rss-enabled?", True)
-    #     assert ret is None
-    #     assert s.news_rss_enabled() is True
+    def test_toggle_news_rss_enabled(self):
+        newsfeed = self.config.newsfeed_service
+        assert newsfeed.set_rss_enabled(False) is None
+        assert newsfeed.rss_enabled() is False, "Expected RSS news to be disabled"
+        assert newsfeed.set_rss_enabled(True) is None
+        assert newsfeed.rss_enabled() is True, "Expected RSS news to be enabled"
 
     @pytest.mark.xfail(reason="backend currently does not validate backup-path; it is stored verbatim")
     def test_set_invalid_backup_path(self):
