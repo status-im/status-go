@@ -26,7 +26,7 @@ services:
         "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
         "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
         "--tcp-port=60001",
-        "--store-message-retention-policy=120s"
+        "--store-message-retention-policy=60s"
       ]
     depends_on:
       - store
