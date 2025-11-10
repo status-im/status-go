@@ -13,9 +13,7 @@ func TestGetPermissionsWithNoPermissions(t *testing.T) {
 	state, close := setupCommand(t, Method_RequestPermissions)
 	t.Cleanup(close)
 
-	getPermissionsCmd := &GetPermissionsCommand{
-		Db: state.walletDb,
-	}
+	getPermissionsCmd := NewGetPermissionsCommand(state.walletDb)
 
 	request, err := ConstructRPCRequest("wallet_getPermissions", []interface{}{}, &testDAppData)
 	require.NoError(t, err)
@@ -48,9 +46,7 @@ func TestGetPermissionsWithExistingPermissions(t *testing.T) {
 	err = persistence.InsertPermission(state.walletDb, testDAppData.URL, testDAppData.ClientID, "eth_accounts", caveats, 123)
 	require.NoError(t, err)
 
-	getPermissionsCmd := &GetPermissionsCommand{
-		Db: state.walletDb,
-	}
+	getPermissionsCmd := NewGetPermissionsCommand(state.walletDb)
 
 	request, err := ConstructRPCRequest("wallet_getPermissions", []interface{}{}, &testDAppData)
 	require.NoError(t, err)
@@ -68,9 +64,7 @@ func TestGetPermissionsValidationError(t *testing.T) {
 	state, close := setupCommand(t, Method_RequestPermissions)
 	t.Cleanup(close)
 
-	getPermissionsCmd := &GetPermissionsCommand{
-		Db: state.walletDb,
-	}
+	getPermissionsCmd := NewGetPermissionsCommand(state.walletDb)
 
 	// Missing DApp data
 	request, err := ConstructRPCRequest("wallet_getPermissions", []interface{}{}, nil)

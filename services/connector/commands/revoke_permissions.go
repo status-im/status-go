@@ -9,7 +9,13 @@ import (
 )
 
 type RevokePermissionsCommand struct {
-	Db *sql.DB
+	db *sql.DB
+}
+
+func NewRevokePermissionsCommand(db *sql.DB) *RevokePermissionsCommand {
+	return &RevokePermissionsCommand{
+		db: db,
+	}
 }
 
 func (c *RevokePermissionsCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
@@ -18,7 +24,7 @@ func (c *RevokePermissionsCommand) Execute(ctx context.Context, request RPCReque
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDApp(c.Db, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(c.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -28,7 +34,7 @@ func (c *RevokePermissionsCommand) Execute(ctx context.Context, request RPCReque
 	}
 
 	// Delete the dApp entry (CASCADE will automatically delete permissions)
-	err = persistence.DeleteDApp(c.Db, dApp.URL, dApp.ClientID)
+	err = persistence.DeleteDApp(c.db, dApp.URL, dApp.ClientID)
 	if err != nil {
 		return "", err
 	}

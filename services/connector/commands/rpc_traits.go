@@ -72,6 +72,12 @@ type RecallDAppPermissionsArgs struct {
 	ClientID string `json:"clientId"`
 }
 
+type ChangeAccountArgs struct {
+	URL      string        `json:"url"`
+	Account  types.Address `json:"account"`
+	ClientID string        `json:"clientId"`
+}
+
 type ClientSideHandlerInterface interface {
 	RequestShareAccountForDApp(dApp signal.ConnectorDApp) (types.Address, uint64, error)
 	RequestAccountsAccepted(args RequestAccountsAcceptedArgs) error
@@ -110,5 +116,14 @@ func (r *RPCRequest) Validate() error {
 		return ErrRequestMissingDAppData
 	}
 
+	return nil
+}
+func (c *ChangeAccountArgs) Validate() error {
+	if c.ClientID == "" || c.URL == "" {
+		return ErrEmptyRPCParams
+	}
+	if c.Account == types.ZeroAddress() {
+		return ErrEmptyRPCParams
+	}
 	return nil
 }

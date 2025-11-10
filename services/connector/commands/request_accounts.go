@@ -11,8 +11,15 @@ import (
 )
 
 type RequestAccountsCommand struct {
-	ClientHandler ClientSideHandlerInterface
-	Db            *sql.DB
+	clientHandler ClientSideHandlerInterface
+	db            *sql.DB
+}
+
+func NewRequestAccountsCommand(db *sql.DB, clientHandler ClientSideHandlerInterface) *RequestAccountsCommand {
+	return &RequestAccountsCommand{
+		db:            db,
+		clientHandler: clientHandler,
+	}
 }
 
 type RawAccountsResponse struct {
@@ -27,7 +34,7 @@ func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest
 		return "", err
 	}
 
-	dApp, err := persistence.SelectDApp(c.Db, request.URL, request.ClientID)
+	dApp, err := persistence.SelectDApp(c.db, request.URL, request.ClientID)
 	if err != nil {
 		return "", err
 	}
@@ -40,7 +47,7 @@ func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest
 			IconURL:  request.IconURL,
 			ClientID: request.ClientID,
 		}
-		account, chainID, err := c.ClientHandler.RequestShareAccountForDApp(connectorDApp)
+		account, chainID, err := c.clientHandler.RequestShareAccountForDApp(connectorDApp)
 		if err != nil {
 			return "", err
 		}
@@ -54,7 +61,7 @@ func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest
 			ChainID:       chainID,
 		}
 
-		err = persistence.UpsertDApp(c.Db, dApp)
+		err = persistence.UpsertDApp(c.db, dApp)
 		if err != nil {
 			return "", err
 		}
@@ -62,7 +69,7 @@ func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest
 		// Store eth_accounts permission (EIP-2255)
 		createdAt := time.Now().Unix()
 		emptyCaveats := []persistence.Caveat{}
-		err = persistence.InsertPermission(c.Db, dApp.URL, dApp.ClientID, "eth_accounts", emptyCaveats, createdAt)
+		err = persistence.InsertPermission(c.db, dApp.URL, dApp.ClientID, "eth_accounts", emptyCaveats, createdAt)
 		if err != nil {
 			return "", err
 		}
