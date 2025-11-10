@@ -10,7 +10,7 @@ class TestCommunityArchives(MessengerSteps):
     @pytest.fixture(autouse=True)
     def setup_backends(self, backend_new_profile):
         """Initialize three backends (creator, member and another_member) for each test function"""
-        self.message_archive_interval = 130
+        self.message_archive_interval = 70
 
         # Community owner
         self.creator = backend_new_profile("creator", codex_config_enabled=True, message_archive_interval=self.message_archive_interval)
