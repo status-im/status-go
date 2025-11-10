@@ -9,4 +9,5 @@ class Service:
 
     def rpc_request(self, method: str, params=None):
         full_method_name = f"{self.name}_{method}"
+        print(f"full_method_name: {full_method_name}")
         return self.rpc_client.rpc_valid_request(full_method_name, params)

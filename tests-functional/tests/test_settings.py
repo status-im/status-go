@@ -37,9 +37,9 @@ class TestSettings:
         assert network_id is not None, f"NetworkId key missing in node config: {cfg}"
         assert int(network_id) == forced_network_id, f"Expected NetworkId={forced_network_id}, got {network_id}"
 
-    # def test_news_feed_enabled(self):
-    #     result = self.config.settings_service.news_feed_enabled()
-    #     assert isinstance(result, bool), f"Expected boolean, got {type(result)}"
+    def test_news_feed_enabled(self):
+        result = self.config.settings_service.news_feed_enabled()
+        assert isinstance(result, bool), f"Expected boolean, got {type(result)}"
 
     # def test_news_notifications_enabled(self):
     #     result = self.config.settings_service.news_notifications_enabled()

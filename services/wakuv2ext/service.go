@@ -24,7 +24,7 @@ func New(config params.NodeConfig, rpcClient *rpc.Client, logger *zap.Logger) *S
 func (s *Service) APIs() []gethrpc.API {
 	apis := []gethrpc.API{
 		{
-			Namespace: "wakuext",
+			Namespace: "owakuext",
 			Version:   "1.0",
 			Service:   NewPublicAPI(s),
 			Public:    false,
