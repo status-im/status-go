@@ -18,9 +18,6 @@ class SettingsService(Service):
         return self.rpc_request("nodeConfig")
 
     # News Settings
-    def news_feed_enabled(self):
-        return self.rpc_request("newsFeedEnabled")
-
     def news_notifications_enabled(self):
         return self.rpc_request("newsNotificationsEnabled")
 
