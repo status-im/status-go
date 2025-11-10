@@ -117,7 +117,7 @@ func (s *CodexArchiveManagerSuite) TearDownTest() {
 			s.T().Logf("Successfully removed CID: %s", cid)
 		}
 	}
-	s.archiveManager.StopCodexClient()
+	s.Require().NoError(s.archiveManager.StopCodexClient())
 	s.Require().NoError(s.manager.Stop())
 }
 
