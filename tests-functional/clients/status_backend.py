@@ -296,6 +296,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self._set_display_name(**kwargs)
         method = "CreateAccountAndLogin"
         data = self._create_account_request(password=password, **kwargs)
+        self._boot_api_config = copy.deepcopy(data.get("apiConfig", {}))
         return self.api_request_json(method, data)
 
     def restore_account_and_login(self, user=user_1, **kwargs):
