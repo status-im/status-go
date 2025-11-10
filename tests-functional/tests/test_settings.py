@@ -70,12 +70,18 @@ class TestSettings:
         assert backup_path != invalid_path, f"Backend incorrectly saved invalid path: {backup_path}"
         assert result is None or result == "", f"Expected save_setting to fail or return None, got: {result}"
 
-    # def test_set_valid_backup_path(self):
-    #     valid_path = "/root/.config/Status/backups"
-    #     assert self.config.settings_service.backup_path() == valid_path
-    #     result = self.config.settings_service.save_setting("backup-path", valid_path)
-    #     assert result is None
-    #     assert self.config.settings_service.backup_path() == valid_path
+    def test_set_valid_backup_path(self):
+        current_path = self.config.settings_service.backup_path()
+
+        # Verify it's a valid path (not empty and is a string)
+        assert current_path is not None, "Backup path should not be None"
+        assert isinstance(current_path, str), f"Expected string, got {type(current_path)}"
+        assert current_path != "", "Backup path should not be empty"
+
+        # Test setting the same path explicitly (round-trip test)
+        result = self.config.settings_service.save_setting("backup-path", current_path)
+        assert result is None
+        assert self.config.settings_service.backup_path() == current_path
 
     def test_get_backup_path_type_and_value(self):
         backup_path = self.config.settings_service.backup_path()
