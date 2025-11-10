@@ -349,7 +349,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 	codexArchiveDir := m.codexHistoryArchiveDataDirPath(communityID)
 	codexIndexPath := m.codexHistoryArchiveIndexFilePath(communityID)
 
-	m.logger.Debug("codexArchiveDir", zap.String("codexArchiveDir", codexArchiveDir))
+	m.logger.Debug("[CODEX][createHistoryArchiveCodex] codexArchiveDir", zap.String("codexArchiveDir", codexArchiveDir))
 
 	codexWakuMessageArchiveIndexProto := &protobuf.CodexWakuMessageArchiveIndex{}
 	codexWakuMessageArchiveIndex := make(map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata)
@@ -361,6 +361,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 
 	_, err := os.Stat(codexIndexPath)
 	if err == nil {
+		m.logger.Debug("[CODEX][createHistoryArchiveCodex] codex index file exists, loading from file")
 		codexWakuMessageArchiveIndexProto, err = m.CodexLoadHistoryArchiveIndexFromFile(m.identity, communityID)
 		if err != nil {
 			return codexArchiveIDs, err
@@ -377,7 +378,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 		CommunityID: communityID.String(),
 	}})
 
-	m.logger.Debug("creating archives",
+	m.logger.Debug("[CODEX][createHistoryArchiveCodex] creating archives",
 		zap.Any("startDate", startDate),
 		zap.Any("endDate", endDate),
 		zap.Duration("partition", partition),
@@ -416,7 +417,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 			continue
 		}
 
-		m.logger.Debug("[CODEX] creating Codex archive with messages", zap.Int("messagesCount", len(messages)))
+		m.logger.Debug("[CODEX][createHistoryArchiveCodex] creating Codex archive with messages", zap.Int("messagesCount", len(messages)))
 
 		// Not only do we partition messages, we also chunk them
 		// roughly by size, such that each chunk will not exceed a given
@@ -427,14 +428,14 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 
 		for _, msg := range messages {
 			msgSize := len(msg.Payload) + len(msg.Sig)
-			m.logger.Debug("[CODEX] message size",
+			m.logger.Debug("[CODEX][createHistoryArchiveCodex] message size",
 				zap.Int("messageSize", msgSize),
 				zap.String("contentTopic", string(msg.Topic[:])),
 				zap.ByteString("payload[0:31]", msg.Payload[:min(32, len(msg.Payload))]),
 			)
 			if msgSize > maxArchiveSizeInBytes {
 				// we drop messages this big
-				m.logger.Debug("[CODEX] dropping message due to size", zap.Int("messageSize", msgSize))
+				m.logger.Debug("[CODEX][createHistoryArchiveCodex] dropping message due to size", zap.Int("messageSize", msgSize))
 				continue
 			}
 
@@ -469,7 +470,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 				return codexArchiveIDs, err
 			}
 
-			m.logger.Debug("[CODEX] archive uploaded to codex", zap.String("cid", cid))
+			m.logger.Debug("[CODEX][createHistoryArchiveCodex] archive uploaded to codex", zap.String("cid", cid))
 
 			codexWakuMessageArchiveIndexMetadata := &protobuf.CodexWakuMessageArchiveIndexMetadata{
 				Metadata: wakuMessageArchive.Metadata,
@@ -510,7 +511,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 		// upload index file to codex
 		cid, err := m.codexClient.UploadArchive(codexIndexBytes)
 		if err != nil {
-			m.logger.Error("[CODEX] failed to upload to codex", zap.Error(err))
+			m.logger.Error("[CODEX][createHistoryArchiveCodex] failed to upload to codex", zap.Error(err))
 			return codexArchiveIDs, err
 		}
 
@@ -524,9 +525,9 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 			return codexArchiveIDs, err
 		}
 
-		m.logger.Debug("[CODEX] index uploaded to codex", zap.String("cid", cid))
+		m.logger.Debug("[CODEX][createHistoryArchiveCodex] index uploaded to codex", zap.String("cid", cid))
 
-		m.logger.Debug("[CODEX] archives uploaded to Codex", zap.Any("from", startDate.Unix()), zap.Any("to", endDate.Unix()))
+		m.logger.Debug("[CODEX][createHistoryArchiveCodex] archives uploaded to Codex", zap.Any("from", startDate.Unix()), zap.Any("to", endDate.Unix()))
 
 		m.publisher.publish(&Subscription{
 			HistoryArchivesCreatedSignal: &signal.HistoryArchivesCreatedSignal{
@@ -536,7 +537,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 			},
 		})
 	} else {
-		m.logger.Debug("[CODEX] no archives created")
+		m.logger.Debug("[CODEX][createHistoryArchiveCodex] no archives created")
 		m.publisher.publish(&Subscription{
 			NoHistoryArchivesCreatedSignal: &signal.NoHistoryArchivesCreatedSignal{
 				CommunityID: communityID.String(),
@@ -551,6 +552,7 @@ func (m *ArchiveFileManager) createHistoryArchiveCodex(communityID types.HexByte
 		return codexArchiveIDs, err
 	}
 
+	m.logger.Debug("[CODEX][createHistoryArchiveCodex] updating/setting lastMessageArchiveEndDate", zap.Uint64("lastMessageArchiveEndDate", lastMessageArchiveEndDate))
 	if lastMessageArchiveEndDate > 0 {
 		err = m.persistence.UpdateLastMessageArchiveEndDate(communityID, uint64(from.Unix()))
 	} else {
