@@ -35,6 +35,9 @@ class SignalType(Enum):
     CONNECTOR_DAPP_PERMISSION_GRANTED = "connector.dAppPermissionGranted"
     CONNECTOR_DAPP_PERMISSION_REVOKED = "connector.dAppPermissionRevoked"
     CONNECTOR_DAPP_CHAIN_ID_SWITCHED = "connector.dAppChainIdSwitched"
+    COMMUNITY_HISTORY_ARCHIVES_CREATED = "community.historyArchivesCreated"
+    COMMUNITY_ARCHIVE_DOWNLOAD_COMPLETED = "community.historyArchiveDownloaded"
+    COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES = "community.importingHistoryArchiveMessages"
 
 
 class WalletEventType(Enum):

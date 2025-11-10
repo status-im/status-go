@@ -1500,3 +1500,11 @@ func (m *PublicAPI) Connect(peerId string, addrs []string) error {
 func (m *PublicAPI) Debug() (codex.DebugInfo, error) {
 	return m.service.messenger.Debug()
 }
+
+func (m *PublicAPI) GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error) {
+	return m.service.messenger.GetDownloadedMessageArchiveIDs(communityID)
+}
+
+func (m *PublicAPI) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
+	return m.service.messenger.GetMessageArchiveIDsToImport(communityID)
+}

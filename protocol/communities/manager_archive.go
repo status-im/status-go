@@ -1232,3 +1232,7 @@ func findIndexFile(files []*torrent.File) (index int, ok bool) {
 func torrentFile(torrentDir, communityID string) string {
 	return path.Join(torrentDir, communityID+".torrent")
 }
+
+func (m *ArchiveManager) GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error) {
+	return m.persistence.GetDownloadedMessageArchiveIDs(communityID)
+}
