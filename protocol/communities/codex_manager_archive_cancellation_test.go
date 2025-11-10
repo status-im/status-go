@@ -313,7 +313,7 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchive
 		DoAndReturn(func(ctx context.Context, cid string, output interface{}) error {
 			// Write the index bytes to whatever writer we receive
 			if w, ok := output.(io.Writer); ok {
-				w.Write(codexIndexBytes)
+				_, _ = w.Write(codexIndexBytes)
 			}
 			return nil
 		}).

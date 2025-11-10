@@ -743,9 +743,14 @@ func (m *ArchiveManager) SeedHistoryArchiveIndexCid(communityID types.HexBytes) 
 			return err
 		}
 		err = m.writeCodexIndexCidToFile(communityID, cid)
+		var errs []error
 		if err != nil {
-			m.codexClient.RemoveCid(cid)
-			return err
+			errs = append(errs, err)
+			err := m.codexClient.RemoveCid(cid)
+			if err != nil {
+				errs = append(errs, err)
+			}
+			return errors.Join(errs...)
 		}
 	}
 	return nil
