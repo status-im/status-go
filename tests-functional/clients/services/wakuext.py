@@ -782,11 +782,6 @@ class WakuextService(Service):
         response = self.rpc_request("setArchiveDistributionPreference", params)
         return response
 
-    def toggle_use_mail_servers(self, enabled: bool):
-        params = [enabled]
-        response = self.rpc_request("toggleUseMailservers", params)
-        return response
-
     def connect(self, peerId: str, addrs: list = []):
         params = [peerId, addrs]
         response = self.rpc_request("connect", params)
@@ -795,4 +790,14 @@ class WakuextService(Service):
     def debug(self):
         params = []
         response = self.rpc_request("debug", params)
+        return response
+
+    def get_downloaded_message_archive_ids(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("getDownloadedMessageArchiveIDs", params)
+        return response
+
+    def get_message_archive_ids_to_import(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("getMessageArchiveIDsToImport", params)
         return response

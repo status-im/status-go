@@ -1,6 +1,5 @@
 from uuid import uuid4
 import pytest
-import time
 
 from steps.messenger import MessengerSteps
 from clients.signals import SignalType
@@ -11,8 +10,10 @@ class TestCommunityArchives(MessengerSteps):
     @pytest.fixture(autouse=True)
     def setup_backends(self, backend_new_profile):
         """Initialize three backends (creator, member and another_member) for each test function"""
+        self.message_archive_interval = 130
+
         # Community owner
-        self.creator = backend_new_profile("creator", codex_config_enabled=True, message_archive_interval=10)
+        self.creator = backend_new_profile("creator", codex_config_enabled=True, message_archive_interval=self.message_archive_interval)
         # Define codex as archive distribution preference
         self.creator.wakuext_service.set_archive_distribution_preference("codex")
 
@@ -26,6 +27,7 @@ class TestCommunityArchives(MessengerSteps):
         # Define codex as archive distribution preference
         self.another_member.wakuext_service.set_archive_distribution_preference("codex")
 
+        # Create the community
         self.fake_address = "0x" + str(uuid4())[:8]
         self.community_id = self.create_community(self.creator, historyArchiveSupportEnabled=True)
 
@@ -74,34 +76,62 @@ class TestCommunityArchives(MessengerSteps):
         # Wait for member to receive the new message
         self.member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id, timeout=10)
         member_msgs_resp = self.member.wakuext_service.chat_messages(chat_id)
-        assert member_msgs_resp.get("messages")[0].get("text") == text
+        assert member_msgs_resp.get("messages") is not None, "Member should have messages after receiving signal"
+        message_text = member_msgs_resp.get("messages")[0].get("text")
+        assert message_text == text, "Member should have received the message"
 
-        # Just make sure that archive are generated
-        time.sleep(10)
+        # Wait for the community archive to be created for the community owner
+        self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=self.message_archive_interval + 10)
 
-        # Ensure that the community archive is available for the creator
+        # Ensure that the community archive exists in the file system for the community owner
         has_archive = self.creator.wakuext_service.has_community_archive(self.community_id)
         assert has_archive is True, "Creator should have community archive after messages are sent"
 
-        # TODO: try to disable the store node ??
-        # self.member.wakuext_service.toggle_use_mail_servers(enabled=False)
+        # Wait for the community archive to be created for the first member
+        self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_DOWNLOAD_COMPLETED.value, timeout=self.message_archive_interval + 10)
 
-        # Another member joins and checks for the message
-        self.join_community(member=self.another_member, admin=self.creator)
-        self.another_member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=chat_id, timeout=10)
-        member_msgs_resp = self.another_member.wakuext_service.chat_messages(chat_id)
-        assert member_msgs_resp.get("messages") is None, "Another member should not have messages before archive is dispatched"
+        # Ensure that the member has the archive IDs to import in database
+        archive_ids = self.member.wakuext_service.get_message_archive_ids_to_import(self.community_id)
+        assert len(archive_ids) > 0, "Member should have archive IDs to import"
+        archive_id = archive_ids[0]
 
-        # Ensure that the another member received the archive dispatch message
-        time.sleep(5)
-
+        # Ensure that the community archive exists in the file system for the member
         has_archive = self.member.wakuext_service.has_community_archive(self.community_id)
         assert has_archive is True, "Member should have community archive after messages are sent"
 
+        # Ensure that the member has downloaded the community archive and the database is updated
+        download_archive_ids = self.member.wakuext_service.get_downloaded_message_archive_ids(self.community_id)
+        assert archive_id in download_archive_ids, "Member should have downloaded the community archive"
+
+        # Wait for another member to join the community
+        self.join_community(member=self.another_member, admin=self.creator)
+        self.another_member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=chat_id, timeout=10)
+
+        # Ensure that another member does not have the message before archive import
+        member_msgs_resp = self.another_member.wakuext_service.chat_messages(chat_id)
+        message = member_msgs_resp.get("messages")
+        assert message is None, "Another member should not have messages before archive is dispatched"
+
+        # Wait for the community archive to be downloaded for another member
+        self.another_member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_DOWNLOAD_COMPLETED.value, timeout=self.message_archive_interval + 10)
+
+        # Get the archive IDs to import for another member
+        archive_ids = self.another_member.wakuext_service.get_message_archive_ids_to_import(self.community_id)
+        assert len(archive_ids) > 0, "Another member should have archive IDs to import"
+        archive_id = archive_ids[0]
+
+        # Ensure that the community archive exists in the file system for another member
         has_archive = self.another_member.wakuext_service.has_community_archive(self.community_id)
         assert has_archive is True, "Another member should have community archive after messages are sent"
 
-        member_msgs_resp = self.member.wakuext_service.chat_messages(chat_id)
-        assert member_msgs_resp.get("messages")[0].get("text") == text, "Member should have the message after archive is dispatched"
+        # Ensure that another member has downloaded the community archive and the database is updated
+        download_archive_ids = self.another_member.wakuext_service.get_downloaded_message_archive_ids(self.community_id)
+        assert archive_id in download_archive_ids, "Another member should have downloaded the community archive"
 
-        # TODO: Verify in db
+        # Wait for the archive import to complete for another member
+        self.another_member.wait_for_signal(SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES.value, timeout=self.message_archive_interval + 10)
+
+        # Verify that another member has the message after archive import
+        another_member_msgs_resp = self.another_member.wakuext_service.chat_messages(chat_id)
+        assert another_member_msgs_resp.get("messages") is not None, "Another member should have messages after archive is dispatched"
+        assert another_member_msgs_resp.get("messages")[0].get("text") == text, "Another member should have the message after archive is dispatched"

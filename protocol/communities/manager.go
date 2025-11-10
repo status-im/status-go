@@ -237,6 +237,7 @@ type ArchiveService interface {
 	DownloadHistoryArchivesByIndexCid(communityID types.HexBytes, indexCid string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
 	TorrentFileExists(communityID string) bool
 	CodexIndexCidFileExists(communityID types.HexBytes) bool
+	GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error)
 }
 
 type ArchiveManagerConfig struct {
