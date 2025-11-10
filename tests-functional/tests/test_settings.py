@@ -41,10 +41,10 @@ class TestSettings:
         result = self.config.newsfeed_service.enabled()
         assert isinstance(result, bool), f"Expected boolean, got {type(result)}"
 
-    # def test_news_notifications_enabled(self):
-    #     result = self.config.settings_service.news_notifications_enabled()
-    #     assert result is not None, "Expected a non-null result"
-    #     assert isinstance(result, bool), f"Expected bool, got {type(result)}"
+    def test_news_notifications_enabled(self):
+        result = self.config.newsfeed_service.notifications_enabled()
+        assert result is not None, "Expected a non-null result"
+        assert isinstance(result, bool), f"Expected bool, got {type(result)}"
 
     # def test_toggle_news_notifications_enabled(self):
     #     settings = self.config.settings_service
