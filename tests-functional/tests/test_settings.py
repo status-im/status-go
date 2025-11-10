@@ -46,14 +46,14 @@ class TestSettings:
         assert result is not None, "Expected a non-null result"
         assert isinstance(result, bool), f"Expected bool, got {type(result)}"
 
-    # def test_toggle_news_notifications_enabled(self):
-    #     settings = self.config.settings_service
-    #     settings.save_setting("news-notifications-enabled?", True)
-    #     enabled_state = settings.news_notifications_enabled()
-    #     assert enabled_state is True, "Expected news notifications to be enabled"
-    #     settings.save_setting("news-notifications-enabled?", False)
-    #     disabled_state = settings.news_notifications_enabled()
-    #     assert disabled_state is False, "Expected news notifications to be disabled"
+    def test_toggle_news_notifications_enabled(self):
+        newsfeed = self.config.newsfeed_service
+        newsfeed.set_notifications_enabled(True)
+        enabled_state = newsfeed.notifications_enabled()
+        assert enabled_state is True, "Expected news notifications to be enabled"
+        newsfeed.set_notifications_enabled(False)
+        disabled_state = newsfeed.notifications_enabled()
+        assert disabled_state is False, "Expected news notifications to be disabled"
 
     # def test_toggle_news_rss_enabled(self):
     #     s = self.config.settings_service
