@@ -14,7 +14,7 @@ func defaultConfigHelper(t *testing.T) Config {
 		LogFormat:      LogFormatNoColors,
 		MetricsEnabled: false,
 		BlockRetries:   3000,
-		LogLevel:       "ERROR",
+		Nat:            "none",
 	}
 }
 
@@ -42,6 +42,10 @@ func newCodexNode(t *testing.T, opts ...Config) *CodexNode {
 
 		if c.DiscoveryPort != 0 {
 			config.DiscoveryPort = c.DiscoveryPort
+		}
+
+		if c.StorageQuota != 0 {
+			config.StorageQuota = c.StorageQuota
 		}
 	}
 

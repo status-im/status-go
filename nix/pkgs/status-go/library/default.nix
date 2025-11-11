@@ -8,7 +8,7 @@
 
 let
   optionalString = pkgs.lib.optionalString;
-  codexVersion = "v0.0.26";
+  codexVersion = "v0.0.27";
   arch =
     if stdenv.hostPlatform.isx86_64 then "amd64"
     else if stdenv.hostPlatform.isAarch64 then "arm64"
@@ -16,10 +16,10 @@ let
   os = if stdenv.isDarwin then "macos" else "Linux";
   hash = 
     if stdenv.hostPlatform.isDarwin 
-    # nix store prefetch-file --json --unpack https://github.com/codex-storage/codex-go-bindings/releases/download/v0.0.26/codex-macos-arm64.zip | jq -r .hash
-    then "sha256-3CHIWoSjo0plsYqzXQWm1EtY1STcljV4yfXTPon90uE="
-    # nix store prefetch-file --json --unpack https://github.com/codex-storage/codex-go-bindings/releases/download/v0.0.26/codex-Linux-amd64.zip | jq -r .hash
-    else "sha256-YxW2vFZlcLrOx1PYgWW4MIstH/oFBRF0ooS0sl3v6ig=";
+    # nix store prefetch-file --json --unpack https://github.com/codex-storage/codex-go-bindings/releases/download/v0.0.27/codex-macos-arm64.zip | jq -r .hash
+    then "sha256-9E4NTmJU8+Mz8fHMmex7C0c/ppdMkBZ/dc3iesCbw+A="
+    # nix store prefetch-file --json --unpack https://github.com/codex-storage/codex-go-bindings/releases/download/v0.0.27/codex-Linux-amd64.zip | jq -r .hash
+    else "sha256-ozpOPXJBHhpYElbtVISmWGq+gsQNPMvsNmJ4BLVA7Zk=";
 
   # Pre-fetch libcodex to avoid network during build
   codexLib = pkgs.fetchzip {
