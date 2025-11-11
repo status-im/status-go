@@ -571,12 +571,79 @@ func (s *MessengerContactRequestSuite) TestAliceTriesToSpamBobWithContactRequest
 	s.Require().Equal(common.ContactRequestStatePending, contactRequest.ContactRequestState)
 	s.Require().Equal(request.Message, contactRequest.Text)
 
-	// We should not receive a CR from a rejected contact
+	// We should not receive a CR or an AC notification from a rejected contact
 	_, err = WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool {
-			return len(r.Messages()) > 0 &&
-				s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST) != nil
+			return (len(r.Messages()) > 0 &&
+				s.findFirstByContentType(r.Messages(), protobuf.ChatMessage_CONTACT_REQUEST) != nil) ||
+				len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+	s.Require().Error(err)
+	s.Require().ErrorContains(err, "no messages")
+}
+
+// The scenario tested is as follow:
+// 1) Alice sends a contact request to Bob
+// 2) Bob declines the contact request
+// 3) Alice blocks Bob
+// 4) Alice unblocks Bob (this retracts the contact request and allows sending a new one)
+// 5) Alice sends a new contact request to Bob but Bob still doesn't get bothered
+func (s *MessengerContactRequestSuite) TestAliceTriesToSpamBobWithContactRequestsByBlocking() {
+	messageTextAlice := "You wanna play with fire, Bobby?!"
+	alice := s.m
+
+	bob := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, bob)
+	bobID := bob.IdentityPublicKeyString()
+
+	// Alice sends a contact request to Bob
+	request := &requests.SendContactRequest{
+		ID:      bobID,
+		Message: messageTextAlice,
+	}
+	s.sendContactRequest(request, alice)
+
+	contactRequest := s.receiveContactRequest(messageTextAlice, bob)
+	s.Require().NotNil(contactRequest)
+
+	// Bob declines the contact request
+	s.declineContactRequest(contactRequest, bob)
+
+	// Alice blocks Bob
+	_, err := alice.BlockContact(context.Background(), bobID, false)
+	s.Require().NoError(err)
+	s.Require().Len(alice.BlockedContacts(), 1)
+	s.Require().Equal(bobID, alice.BlockedContacts()[0].ID)
+
+	// Alice unblocks Bob
+	_, err = alice.UnblockContact(bobID)
+	s.Require().NoError(err)
+	s.Require().Len(alice.BlockedContacts(), 0)
+
+	// Alice sends a new contact request
+	resp, err := alice.SendContactRequest(context.Background(), request)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+
+	// Check CR and mutual state update messages
+	s.Require().Len(resp.Messages(), 2)
+
+	contactRequest = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequest)
+
+	s.Require().Equal(common.ContactRequestStatePending, contactRequest.ContactRequestState)
+	s.Require().Equal(request.Message, contactRequest.Text)
+
+	// We should not receive a CR or an AC notification from a rejected contact
+	_, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return (len(r.Messages()) > 0 &&
+				s.findFirstByContentType(r.Messages(), protobuf.ChatMessage_CONTACT_REQUEST) != nil) ||
+				len(r.ActivityCenterNotifications()) > 0
 		},
 		"no messages",
 	)
@@ -678,7 +745,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 		theirMessenger,
 		func(r *MessengerResponse) bool {
 			return len(r.Messages()) > 0 &&
-				s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST) != nil
+				s.findFirstByContentType(r.Messages(), protobuf.ChatMessage_CONTACT_REQUEST) != nil
 		},
 		"no messages",
 	)
