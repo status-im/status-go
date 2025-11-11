@@ -1,4 +1,6 @@
 import logging
+import time
+
 import pytest
 from clients.api import ApiResponseError
 import datetime
@@ -258,15 +260,17 @@ class TestSettings:
         except Exception as e:
             pytest.fail(f"Returned value is not a valid ISO datetime string: {result}. Error: {e}")
 
-    # def test_last_tokens_update_advances_after_updating_token_preferences(self):
-    #     t1_raw = self.config.settings_service.last_tokens_update()
-    #     t1 = datetime.datetime.fromisoformat(t1_raw.replace("Z", "+00:00"))
-    #     time.sleep(1.2)
-    #     current_prefs = self.config.accounts_service.get_token_preferences()
-    #     self.config.accounts_service.update_token_preferences(current_prefs)
-    #     t2_raw = self.config.settings_service.last_tokens_update()
-    #     t2 = datetime.datetime.fromisoformat(t2_raw.replace("Z", "+00:00"))
-    #     assert t2 >= t1, f"Expected last-tokens-update to advance or stay same; got T1={t1} T2={t2}"
+    def test_last_tokens_update_advances_after_updating_token_preferences(self):
+        dummy_prefs = [{"key": "0x1234567890abcdef1234567890abcdef12345678", "position": 1, "visible": True}]
+        self.config.accounts_service.update_token_preferences(dummy_prefs)
+        t1_raw = self.config.settings_service.last_tokens_update()
+        t1 = datetime.datetime.fromisoformat(t1_raw.replace("Z", "+00:00"))
+        time.sleep(1.2)
+        current_prefs = self.config.accounts_service.get_token_preferences()
+        self.config.accounts_service.update_token_preferences(current_prefs)
+        t2_raw = self.config.settings_service.last_tokens_update()
+        t2 = datetime.datetime.fromisoformat(t2_raw.replace("Z", "+00:00"))
+        assert t2 >= t1, f"Expected last-tokens-update to advance or stay same; got T1={t1} T2={t2}"
 
     def test_mnemonic_was_shown(self):
         result = self.config.settings_service.mnemonic_was_shown()
