@@ -42,6 +42,7 @@ import (
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/gif"
+	"github.com/status-im/status-go/services/linkpreview"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/newsfeed"
 	"github.com/status-im/status-go/services/permissions"
@@ -127,6 +128,7 @@ type StatusNode struct {
 	ethSrvc                *eth.Service
 	newsfeedSrvc           *newsfeed.Service
 	sharedUrlsSrvc         *sharedurls.Service
+	linkPreviewSrvc        *linkpreview.Service
 
 	walletFeed        event.Feed
 	accountsPublisher *pubsub.Publisher

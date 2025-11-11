@@ -17,7 +17,7 @@ import (
 //go:generate go tool mockgen -package=mock_unfurlers -source=unfurler_status.go -destination=./mock/unfurler_status.go
 
 type StatusDataProvider interface {
-	GetContactByID(pubKey string) *contacts.Contact
+	GetContactByID(pubKey string) (*contacts.Contact, error)
 	FetchContact(contactID string, waitForResponse bool) (*contacts.Contact, error)
 	FetchCommunity(communityID string, shard *messagingtypes.Shard) (*communities.Community, error)
 }
@@ -65,7 +65,10 @@ func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusConta
 		return nil, err
 	}
 
-	contact := u.provider.GetContactByID(contactID)
+	contact, err := u.provider.GetContactByID(contactID)
+	if err != nil {
+		return nil, err
+	}
 
 	// If no contact found locally, fetch it from waku
 	if contact == nil {

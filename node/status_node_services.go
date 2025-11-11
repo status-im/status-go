@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
+	"github.com/status-im/status-go/services/linkpreview"
 	"github.com/status-im/status-go/services/newsfeed"
 	"github.com/status-im/status-go/services/sharedurls"
 
@@ -338,6 +339,18 @@ func (b *StatusNode) sharedUrlsService() *sharedurls.Service {
 
 func (b *StatusNode) SharedUrlsService() *sharedurls.Service {
 	return b.sharedUrlsSrvc
+}
+
+func (b *StatusNode) linkPreviewService(accDB *accounts.Database) *linkpreview.Service {
+	if b.linkPreviewSrvc == nil {
+		settingsProvider := adapters.NewLinkPreviewSettingsAdapter(accDB)
+		b.linkPreviewSrvc = linkpreview.NewService(b.logger.Named("linkpreview"), settingsProvider, nil)
+	}
+	return b.linkPreviewSrvc
+}
+
+func (b *StatusNode) LinkPreviewService() *linkpreview.Service {
+	return b.linkPreviewSrvc
 }
 
 func (b *StatusNode) localNotificationsService(network uint64) (*localnotifications.Service, error) {

@@ -10,11 +10,11 @@ import (
 
 type Service struct {
 	logger             *zap.Logger
-	storage            Persistence
+	storage            Settings
 	statusDataProvider unfurlers.StatusDataProvider
 }
 
-func NewService(logger *zap.Logger, settingsProvider Persistence, statusDataProvider unfurlers.StatusDataProvider) *Service {
+func NewService(logger *zap.Logger, settingsProvider Settings, statusDataProvider unfurlers.StatusDataProvider) *Service {
 	return &Service{
 		logger:             logger,
 		storage:            settingsProvider,
@@ -40,6 +40,10 @@ func (s *Service) APIs() []rpc.API {
 			},
 		},
 	}
+}
+
+func (s *Service) SetStatusDataProvider(provider unfurlers.StatusDataProvider) {
+	s.statusDataProvider = provider
 }
 
 func (s *Service) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {

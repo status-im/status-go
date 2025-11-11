@@ -2272,6 +2272,7 @@ func (b *GethStatusBackend) initProtocol() error {
 	b.statusNode.CommunityTokensService().Init(messenger)
 	b.statusNode.SharedUrlsService().SetDataProvider(adapters.NewSharedUrlsMessengerAdapter(messenger))
 	b.statusNode.NewsFeedService().SetActivityCenter(adapters.NewNewsFeedActivityCenterAdapter(messenger))
+	b.statusNode.LinkPreviewService().SetStatusDataProvider(adapters.NewLinkPreviewMessengerAdapter(messenger))
 
 	return nil
 }
