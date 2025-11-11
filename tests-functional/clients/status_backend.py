@@ -476,7 +476,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         return response.content.decode("utf-8")
 
     def get_boot_api_config(self):
-        return copy.deepcopy(self._boot_api_config)
+        return self._boot_api_config
 
     def serialize_legacy_key(self, key):
         method = "SerializeLegacyKey"
