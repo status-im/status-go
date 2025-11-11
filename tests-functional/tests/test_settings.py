@@ -293,13 +293,13 @@ class TestSettings:
         result = self.config.settings_service.delete_exemptions("12345")
         assert result is None or result == "", f"Expected None or empty string, got {result}"
 
-    # def test_delete_exemptions_invalid_id(self):
-    #     invalid_id = None
-    #     try:
-    #         result = self.config.settings_service.delete_exemptions(invalid_id)
-    #         pytest.fail(f"Expected exception for invalid id: {invalid_id}, but got {result}")
-    #     except Exception:
-    #         assert True
+    def test_delete_exemptions_invalid_id(self):
+        invalid_id = None
+        try:
+            result = self.config.settings_service.delete_exemptions(invalid_id)
+            pytest.fail(f"Expected exception for invalid id: {invalid_id}, but got {result}")
+        except Exception:
+            assert True
 
     def test_notifications_set_exemptions_valid(self):
         test_id = "chat:12345"
