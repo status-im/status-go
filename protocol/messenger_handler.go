@@ -1470,6 +1470,7 @@ func (m *Messenger) downloadAndImportCodexHistoryArchives(id types.HexBytes, ind
 		if downloadTaskInfo.TotalDownloadedArchivesCount > 0 {
 			m.logger.Debug(fmt.Sprintf("[CODEX][downloadAndImportCodexHistoryArchives] downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
 		}
+		m.archiveManager.UnseedHistoryArchiveIndexCid(id)
 		return
 	}
 
@@ -1790,7 +1791,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		if communitySettings == nil {
 			communitySettings, err = m.communitiesManager.GetCommunitySettingsByID(requestToJoinResponseProto.CommunityId)
 			if err != nil {
-				return nil
+				return err
 			}
 		}
 
@@ -1798,6 +1799,9 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		if m.archiveManager.IsTorrentReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
 
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
+			if err := m.communitiesManager.UpdateMagnetlinkMessageClock(requestToJoinResponseProto.CommunityId, requestToJoinResponseProto.Clock); err != nil {
+				return err
+			}
 			go func(currentTask *communities.HistoryArchiveDownloadTask) {
 				defer gocommon.LogOnPanic()
 				// Cancel ongoing download/import task
@@ -1827,6 +1831,10 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		if m.archiveManager.IsCodexReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && cid != "" {
 
 			m.logger.Debug("[CODEX][HandleCommunityRequestToJoinResponse] Received index CID to download history archives", zap.String("cid", cid))
+
+			if err := m.communitiesManager.UpdateIndexCidMessageClock(requestToJoinResponseProto.CommunityId, requestToJoinResponseProto.Clock); err != nil {
+				return err
+			}
 
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
 			go func(currentTask *communities.HistoryArchiveDownloadTask) {

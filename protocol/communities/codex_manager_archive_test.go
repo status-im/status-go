@@ -345,6 +345,7 @@ func (s *CodexArchiveManagerSuite) TestDownloadCancellationBeforeManifestFetch()
 	downloadStartedReceived := false
 	manifestFetchedReceived := false
 	signalDone := make(chan struct{})
+	doneMarker := make(chan struct{})
 	go func() {
 		timeout := time.After(10 * time.Second)
 		for {
@@ -360,6 +361,7 @@ func (s *CodexArchiveManagerSuite) TestDownloadCancellationBeforeManifestFetch()
 				close(signalDone)
 				return
 			case <-signalDone:
+				doneMarker <- struct{}{}
 				return
 			}
 		}
@@ -375,7 +377,14 @@ func (s *CodexArchiveManagerSuite) TestDownloadCancellationBeforeManifestFetch()
 	s.Require().Equal(0, taskInfo.TotalDownloadedArchivesCount, "No archives should be downloaded")
 
 	close(signalDone)
-	time.Sleep(100 * time.Millisecond)
+
+	// Wait for signal goroutine to finish with timeout
+	select {
+	case <-doneMarker:
+		// Goroutine finished successfully
+	case <-time.After(200 * time.Millisecond):
+		s.T().Fatal("Timeout waiting for signal goroutine to finish")
+	}
 
 	// Verify that neither signal was received
 	s.Require().False(downloadStartedReceived, "DownloadingHistoryArchivesStartedSignal should not be received when cancelled early")
@@ -426,6 +435,7 @@ func (s *CodexArchiveManagerSuite) TestDownloadCancellationDuringIndexDownload()
 	indexDownloadCompletedReceived := false
 	downloadStartedReceived := false
 	signalDone := make(chan struct{})
+	doneMarker := make(chan struct{})
 
 	go func() {
 		timeout := time.After(10 * time.Second)
@@ -448,6 +458,7 @@ func (s *CodexArchiveManagerSuite) TestDownloadCancellationDuringIndexDownload()
 				close(signalDone)
 				return
 			case <-signalDone:
+				doneMarker <- struct{}{}
 				return
 			}
 		}
@@ -473,7 +484,14 @@ func (s *CodexArchiveManagerSuite) TestDownloadCancellationDuringIndexDownload()
 	s.Require().True(result.taskInfo.Cancelled, "Download should be marked as cancelled")
 
 	close(signalDone)
-	time.Sleep(100 * time.Millisecond)
+
+	// Wait for signal goroutine to finish with timeout
+	select {
+	case <-doneMarker:
+		// Goroutine finished successfully
+	case <-time.After(200 * time.Millisecond):
+		s.T().Fatal("Timeout waiting for signal goroutine to finish")
+	}
 
 	// Verify signals
 	s.Require().True(manifestFetchedReceived, "Should have received ManifestFetchedSignal")
@@ -541,6 +559,7 @@ func (s *CodexArchiveManagerSuite) TestDownloadCancellationDuringArchiveDownload
 	indexDownloadCompletedReceived := false
 	archivesDownloaded := 0
 	signalDone := make(chan struct{})
+	doneMarker := make(chan struct{})
 
 	go func() {
 		timeout := time.After(15 * time.Second)
@@ -568,6 +587,7 @@ func (s *CodexArchiveManagerSuite) TestDownloadCancellationDuringArchiveDownload
 				close(signalDone)
 				return
 			case <-signalDone:
+				doneMarker <- struct{}{}
 				return
 			}
 		}
@@ -593,7 +613,14 @@ func (s *CodexArchiveManagerSuite) TestDownloadCancellationDuringArchiveDownload
 	s.Require().True(result.taskInfo.Cancelled, "Download should be marked as cancelled")
 
 	close(signalDone)
-	time.Sleep(100 * time.Millisecond)
+
+	// Wait for signal goroutine to finish with timeout
+	select {
+	case <-doneMarker:
+		// Goroutine finished successfully
+	case <-time.After(200 * time.Millisecond):
+		s.T().Fatal("Timeout waiting for signal goroutine to finish")
+	}
 
 	// Verify signals
 	s.Require().True(downloadStartedReceived, "Should have received DownloadingHistoryArchivesStartedSignal")
@@ -611,6 +638,175 @@ func (s *CodexArchiveManagerSuite) TestDownloadCancellationDuringArchiveDownload
 	// The important thing is that we successfully cancelled based on a signal and the Cancelled flag is set.
 	s.T().Logf("Signals received: %d archives downloaded, TaskInfo reports: %d archives",
 		archivesDownloaded, result.taskInfo.TotalDownloadedArchivesCount)
+}
+
+func (s *CodexArchiveManagerSuite) TestHistoryArchivesSeedingSignalWhenAllArchivesExist() {
+	// Subscribe to signals before starting the test
+	subscription := s.manager.Subscribe()
+
+	// Create test archive data and upload archives to Codex
+	archives := []struct {
+		hash string
+		from uint64
+		to   uint64
+		data []byte
+	}{
+		{"existing-archive-1", 1000, 2000, make([]byte, 512)},
+		{"existing-archive-2", 2000, 3000, make([]byte, 768)},
+	}
+
+	// Generate random data for each archive
+	archiveCIDs := make(map[string]string)
+	for i := range archives {
+		if _, err := rand.Read(archives[i].data); err != nil {
+			s.T().Fatalf("Failed to generate random data for %s: %v", archives[i].hash, err)
+		}
+		s.T().Logf("Generated %s data (first 16 bytes hex): %s",
+			archives[i].hash, hex.EncodeToString(archives[i].data[:16]))
+	}
+
+	// Upload all archives to Codex
+	for _, archive := range archives {
+		cid, err := s.codexClient.Upload(bytes.NewReader(archive.data), archive.hash+".bin")
+		require.NoError(s.T(), err, "Failed to upload %s", archive.hash)
+
+		archiveCIDs[archive.hash] = cid
+		s.uploadedCIDs = append(s.uploadedCIDs, cid)
+		s.T().Logf("Uploaded %s to CID: %s", archive.hash, cid)
+
+		// Verify upload succeeded
+		exists, err := s.codexClient.HasCid(cid)
+		require.NoError(s.T(), err, "Failed to check CID existence for %s", archive.hash)
+		require.True(s.T(), exists, "CID %s should exist after upload", cid)
+	}
+
+	// Create archive index
+	index := &protobuf.CodexWakuMessageArchiveIndex{
+		Archives: make(map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata),
+	}
+
+	for _, archive := range archives {
+		cid := archiveCIDs[archive.hash]
+		index.Archives[archive.hash] = &protobuf.CodexWakuMessageArchiveIndexMetadata{
+			Cid: cid,
+			Metadata: &protobuf.WakuMessageArchiveMetadata{
+				From: archive.from,
+				To:   archive.to,
+			},
+		}
+	}
+
+	// Upload archive index to codex
+	codexIndexBytes, err := proto.Marshal(index)
+	s.Require().NoError(err, "Failed to marshal index")
+
+	indexCid, err := s.codexClient.UploadArchive(codexIndexBytes)
+	s.Require().NoError(err, "Failed to upload archive index to Codex")
+	s.Require().NotEmpty(indexCid, "Uploaded index CID should not be empty")
+
+	s.T().Logf("Uploaded archive index to CID: %s", indexCid)
+
+	communityID := types.HexBytes("existing-archives-test")
+	cancelChan := make(chan struct{})
+
+	// FIRST RUN: Download all archives normally
+	s.T().Logf("=== FIRST RUN: Downloading archives for the first time ===")
+
+	taskInfo1, err := s.archiveManager.DownloadHistoryArchivesByIndexCid(communityID, indexCid, cancelChan)
+	s.Require().NoError(err, "Failed to download archives on first run")
+	s.Require().NotNil(taskInfo1, "Download task info should not be nil")
+	s.Require().Equal(len(archives), taskInfo1.TotalArchivesCount, "Should report all archives")
+	s.Require().Equal(len(archives), taskInfo1.TotalDownloadedArchivesCount, "Should have downloaded all archives")
+	s.Require().False(taskInfo1.Cancelled, "Download should not be cancelled")
+
+	// Verify that archives are stored in persistence
+	for _, archive := range archives {
+		exists, err := s.manager.GetPersistence().HasMessageArchiveID(communityID, archive.hash)
+		s.Require().NoError(err, "Failed to check archive ID %s in persistence", archive.hash)
+		s.Require().True(exists, "Archive hash %s should be stored in persistence", archive.hash)
+	}
+
+	s.T().Logf("First run completed successfully, all archives downloaded and stored")
+
+	// SECOND RUN: Download again with same index - should abort early and emit seeding signal
+	s.T().Logf("=== SECOND RUN: Re-downloading with same index (all archives exist) ===")
+
+	// Create a fresh subscription for the second run to avoid picking up signals from the first run
+	subscription = s.manager.Subscribe()
+
+	// Track received signals for second run
+	receivedSeedingSignal := false
+	receivedDownloadingStarted := false
+	receivedArchiveDownloaded := false
+	signalDone := make(chan struct{})
+	doneMarker := make(chan struct{})
+
+	go func() {
+		timeout := time.After(10 * time.Second)
+		for {
+			select {
+			case event := <-subscription:
+				if event.HistoryArchivesSeedingSignal != nil {
+					s.T().Logf("Received HistoryArchivesSeedingSignal for community: %s, MagnetLink: %v, IndexCid: %v",
+						event.HistoryArchivesSeedingSignal.CommunityID,
+						event.HistoryArchivesSeedingSignal.MagnetLink,
+						event.HistoryArchivesSeedingSignal.IndexCid)
+					receivedSeedingSignal = true
+
+					// Verify the signal has correct values
+					s.Require().Equal(communityID.String(), event.HistoryArchivesSeedingSignal.CommunityID,
+						"CommunityID should match")
+					s.Require().False(event.HistoryArchivesSeedingSignal.MagnetLink,
+						"MagnetLink should be false")
+					s.Require().True(event.HistoryArchivesSeedingSignal.IndexCid,
+						"IndexCid should be true")
+				}
+				if event.DownloadingHistoryArchivesStartedSignal != nil {
+					s.T().Logf("WARNING: Received unexpected DownloadingHistoryArchivesStartedSignal")
+					receivedDownloadingStarted = true
+				}
+				if event.HistoryArchiveDownloadedSignal != nil {
+					s.T().Logf("WARNING: Received unexpected HistoryArchiveDownloadedSignal")
+					receivedArchiveDownloaded = true
+				}
+			case <-timeout:
+				close(signalDone)
+				return
+			case <-signalDone:
+				doneMarker <- struct{}{}
+				return
+			}
+		}
+	}()
+
+	// Create a new cancel channel for the second run
+	cancelChan2 := make(chan struct{})
+	taskInfo2, err := s.archiveManager.DownloadHistoryArchivesByIndexCid(communityID, indexCid, cancelChan2)
+	s.Require().NoError(err, "Second download should succeed without error")
+	s.Require().NotNil(taskInfo2, "Task info should not be nil")
+
+	// Stop signal collection
+	close(signalDone)
+
+	// Wait for signal goroutine to finish with timeout
+	select {
+	case <-doneMarker:
+		// Goroutine finished successfully
+	case <-time.After(200 * time.Millisecond):
+		s.T().Fatal("Timeout waiting for signal goroutine to finish")
+	}
+
+	// Verify task info for second run
+	s.Require().Equal(len(archives), taskInfo2.TotalArchivesCount, "Should report all archives")
+	s.Require().Equal(len(archives), taskInfo2.TotalDownloadedArchivesCount, "Should report all archives as already downloaded")
+	s.Require().False(taskInfo2.Cancelled, "Download should not be marked as cancelled")
+
+	// Verify that the seeding signal was received and no download signals were sent
+	s.Require().True(receivedSeedingSignal, "Should have received HistoryArchivesSeedingSignal when all archives exist")
+	s.Require().False(receivedDownloadingStarted, "Should NOT have received DownloadingHistoryArchivesStartedSignal when aborting")
+	s.Require().False(receivedArchiveDownloaded, "Should NOT have received HistoryArchiveDownloadedSignal when aborting")
+
+	s.T().Logf("Second run completed successfully - seeding signal emitted correctly when all archives exist!")
 }
 
 // Run the integration test suite

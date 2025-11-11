@@ -1093,13 +1093,20 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 						return nil, err
 					}
 
-					if len(existingArchiveIDs) == len(index.Archives) {
-						m.logger.Debug("[CODEX] aborting download, no new archives")
-						return downloadTaskInfo, nil
-					}
-
 					downloadTaskInfo.TotalDownloadedArchivesCount = len(existingArchiveIDs)
 					downloadTaskInfo.TotalArchivesCount = len(index.Archives)
+
+					if len(existingArchiveIDs) == len(index.Archives) {
+						m.logger.Debug("[CODEX] aborting download, no new archives")
+						m.publisher.publish(&Subscription{
+							HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
+								CommunityID: communityID.String(),
+								MagnetLink:  false, // Not downloaded via magnet link
+								IndexCid:    true,  // Downloaded via Codex CID
+							},
+						})
+						return downloadTaskInfo, nil
+					}
 
 					// Create separate cancel channel for the archive downloader to avoid channel competition
 					archiveDownloaderCancel := make(chan struct{})
@@ -1174,14 +1181,6 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 										IndexCid:    true,  // Downloaded via Codex CID
 									},
 								})
-
-								if archiveDownloader.IsCancelled() {
-									// archive was cancelled, but it does not mean that
-									// no single archive was downloaded before cancellation
-									m.logger.Debug("[CODEX] archive download was cancelled")
-									downloadTaskInfo.Cancelled = true
-									return downloadTaskInfo, nil
-								}
 
 								return downloadTaskInfo, nil
 							} else {
