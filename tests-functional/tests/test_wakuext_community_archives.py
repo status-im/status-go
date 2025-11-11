@@ -10,7 +10,7 @@ class TestCommunityArchives(MessengerSteps):
     @pytest.fixture(autouse=True)
     def setup_backends(self, backend_new_profile):
         """Initialize three backends (creator, member and another_member) for each test function"""
-        self.message_archive_interval = 70
+        self.message_archive_interval = 80
 
         # Community owner
         self.creator = backend_new_profile("creator", codex_config_enabled=True, message_archive_interval=self.message_archive_interval)
@@ -87,8 +87,12 @@ class TestCommunityArchives(MessengerSteps):
         has_archive = self.creator.wakuext_service.has_community_archive(self.community_id)
         assert has_archive is True, "Creator should have community archive after messages are sent"
 
+        # The timeout is arbitrary set to 10 seconds
+        # We need to wait for the archive dispatch + download + import which should not take more than 10 seconds
+        archive_timeout = 10
+
         # Wait for the community archive to be created for the first member
-        self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_DOWNLOAD_COMPLETED.value, timeout=self.message_archive_interval + 10)
+        self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
 
         # Ensure that the member has the archive IDs to import in database
         archive_ids = self.member.wakuext_service.get_message_archive_ids_to_import(self.community_id)
@@ -113,7 +117,7 @@ class TestCommunityArchives(MessengerSteps):
         assert message is None, "Another member should not have messages before archive is dispatched"
 
         # Wait for the community archive to be downloaded for another member
-        self.another_member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_DOWNLOAD_COMPLETED.value, timeout=self.message_archive_interval + 10)
+        self.another_member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
 
         # Get the archive IDs to import for another member
         archive_ids = self.another_member.wakuext_service.get_message_archive_ids_to_import(self.community_id)
@@ -129,7 +133,7 @@ class TestCommunityArchives(MessengerSteps):
         assert archive_id in download_archive_ids, "Another member should have downloaded the community archive"
 
         # Wait for the archive import to complete for another member
-        self.another_member.wait_for_signal(SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES.value, timeout=self.message_archive_interval + 10)
+        self.another_member.wait_for_signal(SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES.value, timeout=archive_timeout)
 
         # Verify that another member has the message after archive import
         another_member_msgs_resp = self.another_member.wakuext_service.chat_messages(chat_id)
