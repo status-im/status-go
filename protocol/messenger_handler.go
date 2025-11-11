@@ -1044,6 +1044,13 @@ func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, con
 		return nil
 	}
 
+	m.allContacts.Store(contact.ID, contact)
+
+	if contact.Dismissed() {
+		// We dismissed this contact request locally already, no need to proceed
+		return nil
+	}
+
 	// System message for mutual state update
 	chat, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {
@@ -1095,8 +1102,6 @@ func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, con
 		m.logger.Warn("failed to create activity center notification", zap.Error(err))
 		return err
 	}
-
-	m.allContacts.Store(contact.ID, contact)
 
 	return nil
 }
@@ -2185,6 +2190,11 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	}
 
 	contact := state.CurrentMessageState.Contact
+
+	if chat.ChatType == ChatTypeOneToOne && contact.Dismissed() {
+		m.logger.Info("ignoring one on one messages dismissed contacts")
+		return nil
+	}
 
 	if receivedMessage.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE {
 		discordMessage := receivedMessage.GetDiscordMessage()
