@@ -13,7 +13,7 @@ if [[ "$*" != *"-test.run"* ]]; then
   count=${TEST_WITH_COVERAGE_COUNT}
 fi
 
-env LD_LIBRARY_PATH="${LD_LIBRARY_PATH}" go test -json \
+go test -json \
   ${packages} \
   -count=${count} \
   -covermode=atomic \
