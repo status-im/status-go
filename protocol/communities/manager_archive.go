@@ -1069,6 +1069,12 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 				if indexDownloader.IsDownloadComplete() {
 					m.logger.Info("[CODEX] history archive index download completed", zap.String("indexCid", indexCid))
 
+					err := m.writeCodexIndexCidToFile(communityID, indexCid)
+					if err != nil {
+						m.logger.Error("[CODEX] failed to write Codex index CID to file", zap.Error(err))
+						return nil, err
+					}
+
 					// Publish index download completed signal
 					m.publisher.publish(&Subscription{
 						IndexDownloadCompletedSignal: &signal.IndexDownloadCompletedSignal{
@@ -1076,12 +1082,6 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 							IndexCid:    indexCid,
 						},
 					})
-
-					err := m.writeCodexIndexCidToFile(communityID, indexCid)
-					if err != nil {
-						m.logger.Error("[CODEX] failed to write Codex index CID to file", zap.Error(err))
-						return nil, err
-					}
 
 					index, err := m.CodexLoadHistoryArchiveIndexFromFile(m.identity, communityID)
 					if err != nil {

@@ -42,6 +42,8 @@ type MessengerSignalsHandler interface {
 	HistoryArchivesSeeding(communityID string, magnetLink bool, indexCid bool)
 	HistoryArchivesUnseeded(communityID string)
 	HistoryArchiveDownloaded(communityID string, from int, to int)
+	ManifestFetched(communityID string, indexCid string)
+	IndexDownloadCompleted(communityID string, indexCid string)
 	DownloadingHistoryArchivesStarted(communityID string)
 	DownloadingHistoryArchivesFinished(communityID string)
 	ImportingHistoryArchiveMessages(communityID string)

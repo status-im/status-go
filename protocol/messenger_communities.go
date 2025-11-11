@@ -280,6 +280,20 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 					m.config.messengerSignalsHandler.HistoryArchivesUnseeded(sub.HistoryArchivesUnseededSignal.CommunityID)
 				}
 
+				if sub.ManifestFetchedSignal != nil {
+					m.config.messengerSignalsHandler.ManifestFetched(
+						sub.ManifestFetchedSignal.CommunityID,
+						sub.ManifestFetchedSignal.IndexCid,
+					)
+				}
+
+				if sub.IndexDownloadCompletedSignal != nil {
+					m.config.messengerSignalsHandler.IndexDownloadCompleted(
+						sub.IndexDownloadCompletedSignal.CommunityID,
+						sub.IndexDownloadCompletedSignal.IndexCid,
+					)
+				}
+
 				if sub.HistoryArchiveDownloadedSignal != nil {
 					m.config.messengerSignalsHandler.HistoryArchiveDownloaded(
 						sub.HistoryArchiveDownloadedSignal.CommunityID,

@@ -109,6 +109,14 @@ func (m *MessengerSignalsHandler) HistoryArchiveDownloaded(communityID string, f
 	signal.SendHistoryArchiveDownloaded(communityID, from, to)
 }
 
+func (m *MessengerSignalsHandler) ManifestFetched(communityID string, indexCid string) {
+	signal.SendManifestFetched(communityID, indexCid)
+}
+
+func (m *MessengerSignalsHandler) IndexDownloadCompleted(communityID string, indexCid string) {
+	signal.SendIndexDownloadCompleted(communityID, indexCid)
+}
+
 func (m *MessengerSignalsHandler) DownloadingHistoryArchivesStarted(communityID string) {
 	signal.SendDownloadingHistoryArchivesStarted(communityID)
 }

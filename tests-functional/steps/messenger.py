@@ -21,8 +21,12 @@ class MessengerSteps(NetworkConditionsSteps):
         SignalType.NODE_LOGIN.value,
         SignalType.NODE_STOPPED.value,
         SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value,
+        SignalType.COMMUNITY_ARCHIVE_MANIFEST_FETCHED.value,
+        SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value,
         SignalType.COMMUNITY_ARCHIVE_DOWNLOAD_COMPLETED.value,
-        SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES.value,
+        SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value,
+        SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_STARTED.value,
+        SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_FINISHED.value,
     ]
 
     def send_contact_request_and_wait_for_signal_to_be_received(self, sender=None, receiver=None) -> str:
