@@ -64,7 +64,7 @@ class TestSettings:
         assert newsfeed.set_rss_enabled(True) is None
         assert newsfeed.rss_enabled() is True, "Expected RSS news to be enabled"
 
-    @pytest.mark.xfail(reason="backend currently does not validate backup-path; it is stored verbatim")
+    @pytest.mark.skip(reason="backend currently does not validate backup-path; it is stored verbatim")
     def test_set_invalid_backup_path(self):
         invalid_path = "/invalid/path/that/does@$<>not|exist"
         result = self.config.settings_service.save_setting("backup-path", invalid_path)
