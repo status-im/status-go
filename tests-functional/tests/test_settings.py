@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 
 import pytest
@@ -42,6 +43,7 @@ class TestSettings:
     def test_news_feed_enabled(self):
         result = self.config.newsfeed_service.enabled()
         assert isinstance(result, bool), f"Expected boolean, got {type(result)}"
+        assert result is True, "Expected news feed to be enabled"
 
     def test_news_notifications_enabled(self):
         result = self.config.newsfeed_service.notifications_enabled()
@@ -109,10 +111,8 @@ class TestSettings:
         assert isinstance(result, bool), f"Expected bool, got {type(result)}"
 
     def test_notifications_setter_allow_notifications_invalid_values(self):
-        with pytest.raises(ApiResponseError) as exc:
+        with pytest.raises(ApiResponseError, match=re.escape("json: cannot unmarshal")):
             self.config.settings_service.notifications_set_allow_notifications(1)
-        msg = str(exc.value)
-        assert "-32602" in msg or "cannot unmarshal" in msg.lower()
 
     def test_notifications_setter_allow_notifications_none(self):
         res = self.config.settings_service.notifications_set_allow_notifications(None)
@@ -134,7 +134,7 @@ class TestSettings:
         assert isinstance(result, str), f"Expected str, got {type(result)}"
 
     def test_notifications_set_one_to_one_chats_invalid_type(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ApiResponseError, match=re.escape("json: cannot unmarshal")):
             self.config.settings_service.notifications_set_one_to_one_chats(123)
 
     @pytest.mark.parametrize(
@@ -157,6 +157,7 @@ class TestSettings:
         result = self.config.settings_service.notifications_get_group_chats()
         assert result is not None, "Expected a non-null return value"
         assert isinstance(result, str), f"Expected str, got {type(result)}"
+        assert result != "", "Expected non-empty string"
 
     def test_notifications_set_and_get_group_chats(self):
         value = "SendAlerts"
@@ -169,8 +170,8 @@ class TestSettings:
 
     @pytest.mark.xfail(reason="API accepts wrong values")
     def test_notifications_set_group_chats_invalid_values(self):
-        with pytest.raises(ApiResponseError):
-            self.config.settings_service.notifications_set_group_chats("")
+        with pytest.raises(ApiResponseError, match=re.escape("json: cannot unmarshal")):
+            self.config.settings_service.notifications_set_group_chats(123)
 
     def test_notifications_set_and_get_all_messages(self):
         value = "AllMessages"
@@ -185,10 +186,11 @@ class TestSettings:
         result = self.config.settings_service.notifications_get_contact_requests()
         assert result is not None, "Expected non-null result from NotificationsGetContactRequests()"
         assert isinstance(result, str), f"Expected type str, got {type(result)}"
+        assert result != "", "Expected non-empty string"
 
     def test_notifications_set_contact_requests_rejects_wrong_types_and_preserves_value(self):
         original_value = self.config.settings_service.notifications_get_contact_requests()
-        with pytest.raises(ApiResponseError):
+        with pytest.raises(ApiResponseError, match=re.escape("json: cannot unmarshal")):
             self.config.settings_service.notifications_set_contact_requests(123)
         current_value = self.config.settings_service.notifications_get_contact_requests()
         assert current_value == original_value, f"Value changed after invalid set attempt. Expected {original_value!r}, got {current_value!r}"
@@ -209,9 +211,9 @@ class TestSettings:
 
     @pytest.mark.xfail(reason="API accepts wrong values")
     def test_notifications_set_identity_verification_requests_rejects_invalid_values(self):
-        invalid_value = ""
+        invalid_value = 123
         original_value = self.config.settings_service.notifications_get_identity_verification_requests()
-        with pytest.raises(ApiResponseError):
+        with pytest.raises(ApiResponseError, match=re.escape("json: cannot unmarshal")):
             self.config.settings_service.notifications_set_identity_verification_requests(invalid_value)
         current_value = self.config.settings_service.notifications_get_identity_verification_requests()
         assert current_value == original_value, f"Value changed after invalid input {invalid_value!r}: expected {original_value}, got {current_value}"
@@ -221,6 +223,7 @@ class TestSettings:
         result = self.config.settings_service.notifications_get_sound_enabled()
         assert result is not None, "Expected non-null result"
         assert isinstance(result, bool), f"Expected bool, got {type(result)}"
+        assert result is True, "Expected True"
 
     def test_toggle_notifications_sound_enabled(self):
         initial_value = self.config.settings_service.notifications_get_sound_enabled()
@@ -247,11 +250,13 @@ class TestSettings:
         result = self.config.settings_service.thirdparty_services_enabled()
         assert result is not None, "Expected a non-null result"
         assert isinstance(result, bool), f"Expected bool, got {type(result)}"
+        assert result is True, "Expected True"
 
     def test_last_tokens_update_type_check(self):
         result = self.config.settings_service.last_tokens_update()
         assert result is not None, "Expected non-null timestamp"
         assert isinstance(result, str), f"Expected string, got {type(result)}"
+        assert result != "", "Expected non-empty string"
 
     def test_last_tokens_update_returns_valid_iso_datetime(self):
         result = self.config.settings_service.last_tokens_update()
@@ -405,6 +410,7 @@ class TestSettings:
         value = self.config.settings_service.notifications_get_message_preview()
         assert value is not None
         assert isinstance(value, int)
+        assert value in [0, 1, 2], f"Unexpected value: {value}"
 
     def test_notifications_message_preview_roundtrip_set_and_get(self):
         original = self.config.settings_service.notifications_get_message_preview()
@@ -454,7 +460,7 @@ class TestSettings:
         original_value = self.config.settings_service.notifications_get_volume()
         assert isinstance(original_value, int), "Precondition failed: getter did not return int"
 
-        with pytest.raises(ApiResponseError):
+        with pytest.raises(ApiResponseError, match=re.escape("json: cannot unmarshal")):
             self.config.settings_service.notifications_set_volume(invalid_value)
         current_value = self.config.settings_service.notifications_get_volume()
         assert isinstance(current_value, int), f"Getter returned {type(current_value)} after invalid input"
@@ -464,6 +470,7 @@ class TestSettings:
         value = self.config.settings_service.notifications_get_personal_mentions()
         assert value is not None
         assert isinstance(value, str)
+        assert value != "", "Expected non-empty string"
 
     def test_notifications_personal_mentions_setter_getter(self):
         new_value = "all"
@@ -477,7 +484,7 @@ class TestSettings:
     def test_notifications_set_personal_mentions_rejects_wrong_types(self):
         bad_value = 123
         before = self.config.settings_service.notifications_get_personal_mentions()
-        with pytest.raises(ApiResponseError):
+        with pytest.raises(ApiResponseError, match=re.escape("json: cannot unmarshal")):
             self.config.settings_service.notifications_set_personal_mentions(bad_value)
         after = self.config.settings_service.notifications_get_personal_mentions()
         assert after == before
@@ -485,6 +492,7 @@ class TestSettings:
     def test_notifications_get_global_mentions_returns_string(self):
         value = self.config.settings_service.notifications_get_global_mentions()
         assert isinstance(value, str)
+        assert value != "", "Expected non-empty string"
 
     def test_notifications_global_mentions_setter_getter(self):
         new_value = "all"
@@ -514,6 +522,7 @@ class TestSettings:
     def test_notifications_get_identity_verification_requests_returns_string(self):
         value = self.config.settings_service.notifications_get_identity_verification_requests()
         assert isinstance(value, str)
+        assert value != "", "Expected non-empty string"
 
     def test_notifications_identity_verification_requests_roundtrip(self):
         original = self.config.settings_service.notifications_get_identity_verification_requests()
