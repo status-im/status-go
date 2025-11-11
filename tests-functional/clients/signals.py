@@ -36,8 +36,12 @@ class SignalType(Enum):
     CONNECTOR_DAPP_PERMISSION_REVOKED = "connector.dAppPermissionRevoked"
     CONNECTOR_DAPP_CHAIN_ID_SWITCHED = "connector.dAppChainIdSwitched"
     COMMUNITY_HISTORY_ARCHIVES_CREATED = "community.historyArchivesCreated"
+    COMMUNITY_ARCHIVE_MANIFEST_FETCHED = "community.manifestFetched"
+    COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED = "community.indexDownloadCompleted"
     COMMUNITY_ARCHIVE_DOWNLOAD_COMPLETED = "community.historyArchiveDownloaded"
-    COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES = "community.importingHistoryArchiveMessages"
+    COMMUNITY_HISTORY_ARCHIVES_SEEDING = "community.historyArchivesSeeding"
+    COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_STARTED = "community.importingHistoryArchiveMessages"
+    COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_FINISHED = "community.downloadingHistoryArchivesFinished"
 
 
 class WalletEventType(Enum):
