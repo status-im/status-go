@@ -494,14 +494,14 @@ class TestSettings:
         got = self.config.settings_service.notifications_get_global_mentions()
         assert got == new_value
 
-    # @pytest.mark.parametrize("bad_value", [123, True, ["list"], {"k": "v"}, None])
-    # def test_notifications_set_global_mentions_rejects_wrong_types_and_preserves_value(self, bad_value):
-    #     before = self.config.settings_service.notifications_get_global_mentions()
-    #     logger.info(f"[SETUP] before={before!r}, bad_value={bad_value!r} ({type(bad_value).__name__})")
-    #     with pytest.raises(ApiResponseError):
-    #         self.config.settings_service.notifications_set_global_mentions(bad_value)
-    #     after = self.config.settings_service.notifications_get_global_mentions()
-    #     assert after == before
+    @pytest.mark.parametrize("bad_value", [123, True, ["list"], {"k": "v"}, None])
+    def test_notifications_set_global_mentions_rejects_wrong_types_and_preserves_value(self, bad_value):
+        before = self.config.settings_service.notifications_get_global_mentions()
+        logger.info(f"[SETUP] before={before!r}, bad_value={bad_value!r} ({type(bad_value).__name__})")
+        with pytest.raises(ApiResponseError):
+            self.config.settings_service.notifications_set_global_mentions(bad_value)
+        after = self.config.settings_service.notifications_get_global_mentions()
+        assert after == before
 
     def test_get_settings_reflects(self):
         all_before = self.config.settings_service.get_settings()

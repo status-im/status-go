@@ -113,6 +113,9 @@ func (api *SettingsAPI) NotificationsGetGlobalMentions() (string, error) {
 }
 
 func (api *SettingsAPI) NotificationsSetGlobalMentions(value string) error {
+	if value == "" {
+		return fmt.Errorf("invalid global mentions value: cannot be empty")
+	}
 	return api.db.SetGlobalMentions(value)
 }
 
