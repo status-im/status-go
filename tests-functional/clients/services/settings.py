@@ -17,10 +17,6 @@ class SettingsService(Service):
     def get_node_config(self):
         return self.rpc_request("nodeConfig")
 
-    # News Settings
-    def news_rss_enabled(self):
-        return self.rpc_request("newsRSSEnabled")
-
     # Backup Settings
     def backup_path(self):
         return self.rpc_request("backupPath")
