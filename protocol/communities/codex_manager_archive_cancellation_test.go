@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"io"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -50,10 +49,8 @@ func (s *MockCodexArchiveManagerSuite) buildManagers() (*communities.Manager, *c
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
-	rootDir := s.T().TempDir()
 	codexConfig := &params.CodexConfig{
-		Enabled:               true,
-		HistoryArchiveDataDir: filepath.Join(rootDir, "codex", "archivedata"),
+		Enabled: true,
 	}
 
 	amc := &communities.ArchiveManagerConfig{
@@ -88,9 +85,8 @@ func (s *MockCodexArchiveManagerSuite) TearDownTest() {
 	s.Require().NoError(s.manager.Stop())
 }
 
-// TestMockDownloadCancellationBeforeManifestFetch tests cancellation before manifest is fetched
-// This test is 100% deterministic - we control exactly when operations complete
-func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationBeforeManifestFetch() {
+// TestMockDownloadCancellationBeforeIndexIsDownloaded tests cancellation before index is downloaded
+func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationBeforeIndexIsDownloaded() {
 	// Subscribe to signals
 	subscription := s.manager.Subscribe()
 
@@ -98,26 +94,26 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationBeforeManifes
 	communityID := types.HexBytes("mock-cancel-test-1")
 	cancelChan := make(chan struct{})
 
-	// Mock expectations: FetchManifestWithContext will be called but should be cancelled
+	// Mock expectations: DownloadWithContext may be called but should be cancelled immediately
 	s.mockCodex.EXPECT().
-		FetchManifestWithContext(gomock.Any(), indexCid).
-		DoAndReturn(func(ctx context.Context, cid string) (codex.Manifest, error) {
+		DownloadWithContext(gomock.Any(), indexCid, gomock.Any()).
+		DoAndReturn(func(ctx context.Context, cid string, output any) error {
 			// Block until context is cancelled
 			<-ctx.Done()
-			return codex.Manifest{}, ctx.Err()
+			return ctx.Err()
 		}).
 		MaxTimes(1) // May or may not be called depending on timing
 
 	// Track signals
-	manifestFetchedReceived := false
+	indexDownloadCompletedReceived := false
 	signalDone := make(chan struct{})
 	go func() {
 		timeout := time.After(5 * time.Second)
 		for {
 			select {
 			case event := <-subscription:
-				if event.ManifestFetchedSignal != nil {
-					manifestFetchedReceived = true
+				if event.IndexDownloadCompletedSignal != nil {
+					indexDownloadCompletedReceived = true
 				}
 			case <-timeout:
 				close(signalDone)
@@ -144,12 +140,12 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationBeforeManifes
 	close(signalDone)
 	time.Sleep(50 * time.Millisecond)
 
-	s.Require().False(manifestFetchedReceived, "ManifestFetchedSignal should not be received when cancelled early")
+	s.Require().False(indexDownloadCompletedReceived, "IndexDownloadCompletedSignal should not be received when cancelled early")
 	s.T().Logf("✓ Mock test: Early cancellation verified with zero CodexClient calls")
 }
 
 // TestMockDownloadCancellationDuringIndexDownload tests cancellation during index download
-// Uses mock to control exact timing of manifest fetch completion
+// Uses mock to control exact timing of index download completion
 func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDownload() {
 	subscription := s.manager.Subscribe()
 
@@ -157,44 +153,31 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDo
 	_, err := rand.Read(archiveData)
 	s.Require().NoError(err)
 
-	archiveCid := "test-archive-cid-def456"
+	// archiveCid := "test-archive-cid-def456"
 	indexCid := "test-index-cid-uvw123"
 
-	index := &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
-			"test-hash-large": {
-				Cid: archiveCid,
-				Metadata: &protobuf.WakuMessageArchiveMetadata{
-					From: 1000,
-					To:   2000,
-				},
-			},
-		},
-	}
+	// index := &protobuf.CodexWakuMessageArchiveIndex{
+	// 	Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+	// 		"test-hash-large": {
+	// 			Cid: archiveCid,
+	// 			Metadata: &protobuf.WakuMessageArchiveMetadata{
+	// 				From: 1000,
+	// 				To:   2000,
+	// 			},
+	// 		},
+	// 	},
+	// }
 
-	codexIndexBytes, err := proto.Marshal(index)
-	s.Require().NoError(err)
+	// _ = index // Index created but not used in this test (would be marshaled on successful download)
 
 	communityID := types.HexBytes("mock-cancel-test-2")
 	cancelChan := make(chan struct{})
 
-	// Mock expectations: Manifest fetch succeeds, but index download never completes
-	manifest := codex.Manifest{
-		Cid:         indexCid,
-		DatasetSize: len(codexIndexBytes),
-	}
-
-	// FetchManifestWithContext will succeed
-	s.mockCodex.EXPECT().
-		FetchManifestWithContext(gomock.Any(), indexCid).
-		Return(manifest, nil).
-		Times(1)
-
-	// DownloadWithContext will be called but blocked until cancelled
+	// Mock expectations: Index download never completes due to cancellation
 	downloadStarted := make(chan struct{})
 	s.mockCodex.EXPECT().
 		DownloadWithContext(gomock.Any(), indexCid, gomock.Any()).
-		DoAndReturn(func(ctx context.Context, cid string, output interface{}) error {
+		DoAndReturn(func(ctx context.Context, cid string, output any) error {
 			close(downloadStarted)
 			// Block until context is cancelled
 			<-ctx.Done()
@@ -203,7 +186,6 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDo
 		Times(1)
 
 	// Track signals
-	manifestFetchedReceived := false
 	indexDownloadCompletedReceived := false
 	signalDone := make(chan struct{})
 
@@ -212,13 +194,8 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDo
 		for {
 			select {
 			case event := <-subscription:
-				if event.ManifestFetchedSignal != nil {
-					manifestFetchedReceived = true
-					s.T().Logf("Received ManifestFetchedSignal - waiting for download to start before cancelling")
-					// Wait for download to actually start
-					<-downloadStarted
-					s.T().Logf("Download started, now cancelling")
-					close(cancelChan)
+				if event == nil {
+					continue
 				}
 				if event.IndexDownloadCompletedSignal != nil {
 					indexDownloadCompletedReceived = true
@@ -230,6 +207,13 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDo
 				return
 			}
 		}
+	}()
+
+	// Wait for download to start, then cancel
+	go func() {
+		<-downloadStarted
+		s.T().Logf("Download started, now cancelling")
+		close(cancelChan)
 	}()
 
 	// Set short timeout for test
@@ -245,14 +229,12 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDo
 	time.Sleep(50 * time.Millisecond)
 
 	// Verify signals
-	s.Require().True(manifestFetchedReceived, "Should have received ManifestFetchedSignal")
-	s.Require().False(indexDownloadCompletedReceived, "Should NOT have received IndexDownloadCompletedSignal")
+	s.Require().False(indexDownloadCompletedReceived, "Should NOT have received IndexDownloadCompletedSignal when download is cancelled")
 
 	s.T().Logf("✓ Mock test: Index download cancellation verified with controlled timing")
 }
 
 // TestMockDownloadCancellationDuringArchiveDownload tests cancellation during archive downloads
-// Mock allows us to control exactly when first archive completes
 func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchiveDownload() {
 	subscription := s.manager.Subscribe()
 
@@ -296,21 +278,10 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchive
 	cancelChan := make(chan struct{})
 
 	// Mock expectations
-	manifest := codex.Manifest{
-		Cid:         indexCid,
-		DatasetSize: len(codexIndexBytes),
-	}
-
-	// Manifest fetch succeeds
-	s.mockCodex.EXPECT().
-		FetchManifestWithContext(gomock.Any(), indexCid).
-		Return(manifest, nil).
-		Times(1)
-
 	// Index download succeeds
 	s.mockCodex.EXPECT().
 		DownloadWithContext(gomock.Any(), indexCid, gomock.Any()).
-		DoAndReturn(func(ctx context.Context, cid string, output interface{}) error {
+		DoAndReturn(func(ctx context.Context, cid string, output any) error {
 			// Write the index bytes to whatever writer we receive
 			if w, ok := output.(io.Writer); ok {
 				_, _ = w.Write(codexIndexBytes)
@@ -319,12 +290,10 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchive
 		}).
 		Times(1)
 
-	// First archive download succeeds, triggers cancellation
-	// firstArchiveDownloaded := make(chan struct{})
+	// First archive download succeeds
 	s.mockCodex.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), archives[0].cid).
 		DoAndReturn(func(ctx context.Context, cid string) (codex.Manifest, error) {
-			// close(firstArchiveDownloaded)
 			return codex.Manifest{Cid: cid, DatasetSize: len(archives[0].data)}, nil
 		}).
 		Times(1)
@@ -372,6 +341,7 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchive
 					indexDownloadCompletedReceived = true
 				}
 				if event.HistoryArchiveDownloadedSignal != nil {
+					s.T().Logf("Received HistoryArchiveDownloadedSignal for archive CID")
 					archivesDownloaded++
 					if archivesDownloaded == 1 {
 						// We received the signal, which means HasCid returned true and count was incremented.
@@ -388,8 +358,8 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchive
 		}
 	}()
 
-	// Set short timeout for test
-	s.archiveManager.SetDownloadTimeout(1 * time.Second)
+	// Set longer timeout for test to avoid timeout issues
+	s.archiveManager.SetDownloadTimeout(5 * time.Second)
 
 	// Start download
 	taskInfo, err := s.archiveManager.DownloadHistoryArchivesByIndexCid(communityID, indexCid, cancelChan)

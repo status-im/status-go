@@ -1675,8 +1675,7 @@ func buildTorrentConfig() *params.TorrentConfig {
 
 func buildCodexConfig(t *testing.T) *params.CodexConfig {
 	return &params.CodexConfig{
-		Enabled:               true,
-		HistoryArchiveDataDir: filepath.Join(t.TempDir(), "codex", "archivedata"),
+		Enabled: true,
 		CodexNodeConfig: codex.Config{
 			DataDir:      filepath.Join(t.TempDir(), "codex", "codexdata"),
 			BlockRetries: 5,

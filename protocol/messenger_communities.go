@@ -2001,15 +2001,17 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			requestToJoinResponseProto.MagnetUri = magnetlink
 		}
 
-		if m.archiveManager.IsCodexReady() && m.archiveManager.CodexIndexCidFileExists(community.ID()) {
-			m.logger.Debug("[CODEX][acceptRequestToJoinCommunity] calling GetHistoryArchiveIndexCid", zap.String("communityID", community.IDString()))
-			cid, err := m.archiveManager.GetHistoryArchiveIndexCid(community.ID())
+		if m.archiveManager.IsCodexReady() {
+			m.logger.Debug("[CODEX][acceptRequestToJoinCommunity] checking if currently seeding", zap.String("communityID", community.IDString()))
+			cid, err := m.communitiesManager.GetLastSeenIndexCid(community.ID())
 			if err != nil {
 				m.logger.Warn("couldn't get codex index cid for community", zap.Error(err))
 				return nil, err
 			}
-			m.logger.Debug("[CODEX][acceptRequestToJoinCommunity] setting requestToJoinResponseProto.IndexCid", zap.String("communityID", community.IDString()), zap.String("cid", cid))
-			requestToJoinResponseProto.IndexCid = cid
+			if m.archiveManager.IsSeedingHistoryArchiveCodex(community.ID(), cid) {
+				m.logger.Debug("[CODEX][acceptRequestToJoinCommunity] setting requestToJoinResponseProto.IndexCid", zap.String("communityID", community.IDString()), zap.String("cid", cid))
+				requestToJoinResponseProto.IndexCid = cid
+			}
 		}
 
 		payload, err := proto.Marshal(requestToJoinResponseProto)
@@ -2756,11 +2758,15 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 	}
 
 	id := community.ID()
+	currentIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(id)
+	if err != nil {
+		return nil, err
+	}
 
 	if m.archiveManager.IsReady() {
 		if !communitySettings.HistoryArchiveSupportEnabled {
 			m.archiveManager.StopHistoryArchiveTasksInterval(id)
-		} else if !m.archiveManager.IsSeedingHistoryArchiveTorrent(id) && !m.archiveManager.IsSeedingHistoryArchiveCodex(id) {
+		} else if !m.archiveManager.IsSeedingHistoryArchiveTorrent(id) && !m.archiveManager.IsSeedingHistoryArchiveCodex(id, currentIndexCid) {
 			var communities []*communities.Community
 			communities = append(communities, community)
 			go m.InitHistoryArchiveTasks(communities)
@@ -3629,9 +3635,15 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 
 			if preference == params.ArchiveDistributionMethodCodex {
 				// Check if there's already a codex file for this community and seed it
-				err = m.archiveManager.SeedHistoryArchiveIndexCid(c.ID())
+				currenctIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(c.ID())
 				if err != nil {
-					m.logger.Error("failed to seed history archive", zap.Error(err))
+					m.logger.Error("[CODEX][init_history_archive_tasks] failed to get last seen index cid", zap.Error(err))
+				}
+				if err == nil {
+					err = m.archiveManager.SeedHistoryArchiveIndexCid(c.ID(), currenctIndexCid)
+					if err != nil {
+						m.logger.Error("[CODEX][init_history_archive_tasks] failed to seed history archive", zap.Error(err))
+					}
 				}
 			}
 
@@ -3712,9 +3724,14 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 					}
 				}
 				if preference == params.ArchiveDistributionMethodCodex {
-					err := m.archiveManager.SeedHistoryArchiveIndexCid(c.ID())
+					currenctIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(c.ID())
 					if err != nil {
-						m.logger.Error("failed to seed history archive", zap.Error(err))
+						m.logger.Error("[CODEX][init_history_archive_tasks] failed to get last seen index cid", zap.Error(err))
+					} else {
+						err := m.archiveManager.SeedHistoryArchiveIndexCid(c.ID(), currenctIndexCid)
+						if err != nil {
+							m.logger.Error("[CODEX][init_history_archive_tasks] failed to seed history archive", zap.Error(err))
+						}
 					}
 				}
 				// we do not have to explicitly seed to codex. If codex is enabled
@@ -3807,7 +3824,12 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 	go func() {
 		defer gocommon.LogOnPanic()
 		defer task.Waiter.Done()
-		err := m.importHistoryArchives(communityID, task.CancelChan)
+		lastSeenIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(communityID)
+		if err != nil {
+			m.logger.Error("failed to get last seen index cid", zap.Error(err))
+			return
+		}
+		err = m.importHistoryArchives(communityID, task.CancelChan, lastSeenIndexCid)
 		if err != nil {
 			m.logger.Error("failed to import history archives", zap.Error(err))
 		}
@@ -3824,7 +3846,7 @@ func (m *Messenger) SlowdownArchivesImport() {
 	m.importRateLimiter.SetLimit(rate.Every(importSlowRate))
 }
 
-func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel chan struct{}) error {
+func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel chan struct{}, indexCid string) error {
 	importTicker := time.NewTicker(100 * time.Millisecond)
 	defer importTicker.Stop()
 
@@ -3834,6 +3856,20 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 		<-cancel
 		cancelFunc()
 	}()
+
+	preference, err := m.GetArchiveDistributionPreference()
+	if err != nil {
+		m.logger.Warn("[CODEX][importHistoryArchives] failed to get archive distribution preference, using codex", zap.Error(err))
+		preference = communities.ArchiveDistributionMethodCodex
+	}
+	var codexIndex *protobuf.CodexWakuMessageArchiveIndex
+	if preference == communities.ArchiveDistributionMethodCodex {
+		codexIndex, err = m.archiveManager.CodexLoadHistoryArchiveIndex(
+			ctx, m.identity, communityID, indexCid, true)
+		if err != nil {
+			return err
+		}
+	}
 
 	m.logger.Debug("[CODEX][importHistoryArchives] waiting to start importing history archive messages (importDelayer.wait)", zap.String("communityID", types.EncodeHex(communityID)))
 
@@ -3855,7 +3891,7 @@ importMessageArchivesLoop:
 			case <-ctx.Done():
 				m.logger.Debug("[CODEX][importHistoryArchives] interrupted importing history archive messages")
 				return nil
-			case <-time.After(1 * time.Hour):
+			case <-time.After(m.ratchetNotFoundDelay):
 				delayImport = false
 			}
 		}
@@ -3887,19 +3923,16 @@ importMessageArchivesLoop:
 			downloadedArchiveID := archiveIDsToImport[0]
 
 			var archiveMessages []*protobuf.WakuMessage
-			preference, err := m.GetArchiveDistributionPreference()
-			if err != nil {
-				m.logger.Warn("[CODEX][importHistoryArchives] failed to get archive distribution preference, using codex", zap.Error(err))
-				preference = communities.ArchiveDistributionMethodCodex
-			}
+
 			if preference == communities.ArchiveDistributionMethodCodex {
 				m.logger.Debug("[CODEX][importHistoryArchives] using codex to extract messages")
-				archiveMessages, err = m.archiveManager.ExtractMessagesFromCodexHistoryArchive(communityID, downloadedArchiveID)
+				archiveMessages, err = m.archiveManager.ExtractMessagesFromCodexHistoryArchive(communityID, downloadedArchiveID, codexIndex)
 			} else {
 				archiveMessages, err = m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
 			}
 			if err != nil {
 				if errors.Is(err, messagingtypes.ErrHashRatchetGroupIDNotFound) {
+					m.logger.Error("[CODEX][importHistoryArchives] ErrHashRatchetGroupIDNotFound", zap.Error(err))
 					// In case we're missing hash ratchet keys, best we can do is
 					// to wait for them to be received and try import again.
 					delayImport = true
@@ -3994,7 +4027,7 @@ func (m *Messenger) dispatchIndexCidMessage(communityID string) error {
 		return err
 	}
 
-	indexCid, err := m.archiveManager.GetHistoryArchiveIndexCid(community.ID())
+	indexCid, err := m.communitiesManager.GetLastSeenIndexCid(community.ID())
 	if err != nil {
 		return err
 	}
@@ -5076,8 +5109,12 @@ func (m *Messenger) GetArchiveDistributionPreference() (string, error) {
 	return m.communitiesManager.GetArchiveDistributionPreference()
 }
 
-func (m *Messenger) CodexIndexCidFileExists(communityID types.HexBytes) bool {
-	return m.archiveManager.CodexIndexCidFileExists(communityID)
+func (m *Messenger) IsSeedingHistoryArchiveCodex(communityID types.HexBytes) bool {
+	currentIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(communityID)
+	if err != nil {
+		return false
+	}
+	return m.archiveManager.IsSeedingHistoryArchiveCodex(communityID, currentIndexCid)
 }
 
 func (m *Messenger) Connect(peerId string, addrs []string) error {

@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	gocommon "github.com/status-im/status-go/common"
-	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
@@ -145,6 +144,7 @@ type Messenger struct {
 		wait chan struct{}
 		once sync.Once
 	}
+	ratchetNotFoundDelay time.Duration
 
 	contractMaker         *contracts.ContractMaker
 	verificationDatabase  *verification.Persistence
@@ -435,8 +435,9 @@ func NewMessenger(
 			wait chan struct{}
 			once sync.Once
 		}{wait: make(chan struct{})},
-		browserDatabase: c.browserDatabase,
-		httpServer:      c.httpServer,
+		ratchetNotFoundDelay: 1 * time.Hour,
+		browserDatabase:      c.browserDatabase,
+		httpServer:           c.httpServer,
 		shutdownTasks: []func() error{
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
@@ -667,7 +668,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := utils.ValidateDisplayName(&displayName); err != nil {
+	if err := gocommon.ValidateDisplayName(&displayName); err != nil {
 		// Somehow a wrong display name was saved. We need to update it so that others accept our messages
 		pubKey, err := m.settings.GetPublicKey()
 		if err != nil {

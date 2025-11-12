@@ -1368,7 +1368,7 @@ func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageSt
 
 			// All checks passed - proceed with download
 			m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Unseeding existing history archive index CID for community (if any)", zap.String("communityID", community.IDString()))
-			m.archiveManager.UnseedHistoryArchiveIndexCid(id)
+			m.archiveManager.UnseedHistoryArchiveIndexCid(id, lastSeenCid)
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
 
 			m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Starting download and import of history archives", zap.String("cid", cid))
@@ -1444,7 +1444,7 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 		return
 	}
 
-	err = m.importHistoryArchives(id, cancel)
+	err = m.importHistoryArchives(id, cancel, "")
 	if err != nil {
 		m.logger.Error("failed to import history archives", zap.Error(err))
 		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
@@ -1457,32 +1457,31 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 func (m *Messenger) downloadAndImportCodexHistoryArchives(id types.HexBytes, indexCid string, cancel chan struct{}) {
 	downloadTaskInfo, err := m.archiveManager.DownloadHistoryArchivesByIndexCid(id, indexCid, cancel)
 	if err != nil {
-		logMsg := "[CODEX][downloadAndImportCodexHistoryArchives] failed to download history archive data"
-		if err == communities.ErrIndexCidTimedout {
-			m.logger.Debug("[CODEX][downloadAndImportCodexHistoryArchives] downloading indexCid has timed out, trying once more...")
-			downloadTaskInfo, err = m.archiveManager.DownloadHistoryArchivesByIndexCid(id, indexCid, cancel)
-			if err != nil {
-				m.logger.Error(logMsg, zap.Error(err))
-				return
-			}
-		} else {
-			m.logger.Debug(logMsg, zap.Error(err))
-			return
-		}
+		m.logger.Error(
+			"[CODEX][downloadAndImportCodexHistoryArchives] failed to download history archive data",
+			zap.Error(err),
+		)
+		return
 	}
 
 	if downloadTaskInfo.Cancelled {
 		if downloadTaskInfo.TotalDownloadedArchivesCount > 0 {
 			m.logger.Debug(fmt.Sprintf("[CODEX][downloadAndImportCodexHistoryArchives] downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
 		}
-		m.archiveManager.UnseedHistoryArchiveIndexCid(id)
+		m.archiveManager.UnseedHistoryArchiveIndexCid(id, indexCid)
 		return
 	}
 
+	m.logger.Debug("[CODEX][download_and_import_codex_history_archives] Updating last seen indexCid",
+		zap.String("indexCid", indexCid))
 	err = m.communitiesManager.UpdateLastSeenIndexCid(id, indexCid)
 	if err != nil {
-		m.logger.Error("[CODEX][downloadAndImportCodexHistoryArchives] couldn't update last seen indexCid", zap.Error(err))
+		m.logger.Error("[CODEX][download_and_import_codex_history_archives] couldn't update last seen indexCid",
+			zap.String("indexCid", indexCid), zap.Error(err))
+		return
 	}
+
+	m.archiveManager.PublishHistoryArchivesSeedingSignal(id, false, true)
 
 	err = m.checkIfIMemberOfCommunity(id)
 	if err != nil {
@@ -1491,7 +1490,7 @@ func (m *Messenger) downloadAndImportCodexHistoryArchives(id types.HexBytes, ind
 
 	m.logger.Debug("[CODEX][downloadAndImportCodexHistoryArchives] Importing history archives now")
 
-	err = m.importHistoryArchives(id, cancel)
+	err = m.importHistoryArchives(id, cancel, indexCid)
 	if err != nil {
 		m.logger.Error("[CODEX][downloadAndImportCodexHistoryArchives] failed to import history archives", zap.Error(err))
 		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))

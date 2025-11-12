@@ -2323,7 +2323,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		close(s.bob.importDelayer.wait)
 	})
 	cancel := make(chan struct{})
-	err = s.bob.importHistoryArchives(community.ID(), cancel)
+	err = s.bob.importHistoryArchives(community.ID(), cancel, "")
 	s.Require().NoError(err)
 
 	// Ensure message1 wasn't imported, as it's encrypted, and we don't have access to the channel
@@ -2383,16 +2383,14 @@ func PrintArchiveIndex(index *protobuf.CodexWakuMessageArchiveIndex) {
 	}
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedCodexArchiveMessages() {
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHistoryArchives_withSharedCodexClient() {
 	dataDir := s.T().TempDir()
-	archiveDataDir := filepath.Join(dataDir, "codex", "archivedata")
 	codexDataDir := filepath.Join(dataDir, "codex", "codexdata")
 
-	log.Println("Data directory:", archiveDataDir)
+	log.Println("Codex data directory:", codexDataDir)
 
 	codexConfig := params.CodexConfig{
-		Enabled:               false,
-		HistoryArchiveDataDir: archiveDataDir,
+		Enabled: false,
 		CodexNodeConfig: codex.Config{
 			DataDir:      codexDataDir,
 			BlockRetries: 10,
@@ -2402,8 +2400,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedCodexArch
 		},
 	}
 
-	// Share archive directory between all users
-	// so that bob can access owner's created archive
+	// Share CodexClient between owner and bob
 	s.owner.archiveManager.SetCodexConfig(&codexConfig)
 	s.bob.archiveManager.SetCodexConfig(&codexConfig)
 
@@ -2547,251 +2544,16 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedCodexArch
 	// https://github.com/status-im/status-go/blob/6c82a6c2be7ebed93bcae3b9cf5053da3820de50/protocol/communities/manager.go#L4403
 
 	// Ensure owner has archive
-	archiveIndex, err := s.owner.archiveManager.CodexLoadHistoryArchiveIndexFromFile(s.owner.identity, community.ID())
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	indexCid, err := s.owner.communitiesManager.GetLastSeenIndexCid(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotEmpty(indexCid)
+	archiveIndex, err := s.owner.archiveManager.CodexLoadHistoryArchiveIndex(ctx, s.owner.identity, community.ID(), indexCid, true)
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
 	PrintArchiveIndex(archiveIndex)
-
-	// Ensure bob has archive (because they share same local directory)
-	archiveIndex, err = s.bob.archiveManager.CodexLoadHistoryArchiveIndexFromFile(s.bob.identity, community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(archiveIndex.Archives, 1)
-
-	PrintArchiveIndex(archiveIndex)
-
-	archiveHash := maps.Keys(archiveIndex.Archives)[0]
-
-	// Save message archive ID as in
-	// https://github.com/status-im/status-go/blob/6c82a6c2be7ebed93bcae3b9cf5053da3820de50/protocol/communities/manager.go#L4325-L4336
-	err = s.bob.archiveManager.SaveMessageArchiveID(community.ID(), archiveHash)
-	s.Require().NoError(err)
-
-	// Import archive
-	s.bob.importDelayer.once.Do(func() {
-		close(s.bob.importDelayer.wait)
-	})
-	cancel := make(chan struct{})
-	err = s.bob.importHistoryArchives(community.ID(), cancel)
-	s.Require().NoError(err)
-
-	// Ensure message1 wasn't imported, as it's encrypted, and we don't have access to the channel
-	receivedMessage1, err := s.bob.MessageByID(message1.ID)
-	s.Require().Nil(receivedMessage1)
-	s.Require().Error(err)
-
-	chatID := []byte(chat.ID)
-	hashRatchetMessagesCount, err := s.bob.persistence.GetHashRatchetMessagesCountForGroup(chatID)
-	s.Require().NoError(err)
-	s.Require().Equal(1, hashRatchetMessagesCount)
-
-	// Make bob satisfy channel criteria
-	waitOnChannelKeyToBeDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
-		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
-		if !ok || action.ActionType != communities.EncryptionKeySendToMembers {
-			return false
-		}
-		_, ok = action.Members[crypto.PubkeyToHex(&s.bob.identity.PublicKey)]
-		return ok
-	})
-
-	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermission.TokenCriteria[0])
-
-	// force owner to reevaluate channel members
-	// in production it will happen automatically, by periodic check
-	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
-	s.Require().NoError(err)
-
-	err = <-waitOnChannelKeyToBeDistributedToBob
-	s.Require().NoError(err)
-
-	// Finally ensure that the message from archive was retrieved and decrypted
-
-	// NOTE: In theory a single RetrieveAll call should be enough,
-	// 		 because we immediately process all hash ratchet messages
-	response, err = s.bob.RetrieveAll()
-	s.Require().NoError(err)
-	s.Require().Len(response.Messages(), 1)
-
-	receivedMessage1, ok := response.messages[message1.ID]
-	log.Printf("Received message: %+v, ok: %v", receivedMessage1, ok)
-	s.Require().True(ok)
-	s.Require().Equal(messageText1, receivedMessage1.Text)
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestFullCodexIntegration() {
-
-	dataDir := s.T().TempDir()
-	archiveDataDir := filepath.Join(dataDir, "codex", "archivedata")
-	codexDataDir := filepath.Join(dataDir, "codex", "codexdata")
-
-	log.Println("Data directory:", archiveDataDir)
-
-	codexConfig := params.CodexConfig{
-		Enabled:               false,
-		HistoryArchiveDataDir: archiveDataDir,
-		CodexNodeConfig: codex.Config{
-			DataDir:      codexDataDir,
-			BlockRetries: 10,
-			LogLevel:     "ERROR",
-			LogFormat:    codex.LogFormatNoColors,
-			Nat:          "none",
-		},
-	}
-
-	// Share archive directory between all users
-	// so that bob can access owner's created archive
-	s.owner.archiveManager.SetCodexConfig(&codexConfig)
-	s.bob.archiveManager.SetCodexConfig(&codexConfig)
-
-	err := s.owner.archiveManager.StartCodexClient()
-	s.Require().NoError(err)
-	codexClient := s.owner.archiveManager.GetCodexClient()
-	s.Require().NotNil(codexClient)
-	// no need to stop codex client, as it will be stopped during messenger Stop
-	// defer codexClient.Stop() //nolint: errcheck
-
-	s.bob.archiveManager.SetCodexClient(codexClient)
-
-	// 1.1. Create community
-	community, chat := s.createCommunity()
-
-	archiveDistributionPreferenceOwner, err := s.owner.GetArchiveDistributionPreference()
-	s.Require().NoError(err)
-	log.Println("Archive distribution preference for owner:", archiveDistributionPreferenceOwner)
-	s.Require().Equal(communities.ArchiveDistributionMethodCodex, archiveDistributionPreferenceOwner)
-
-	archiveDistributionPreferenceBob, err := s.bob.GetArchiveDistributionPreference()
-	s.Require().NoError(err)
-	log.Println("Archive distribution preference for bob:", archiveDistributionPreferenceBob)
-	s.Require().Equal(communities.ArchiveDistributionMethodCodex, archiveDistributionPreferenceBob)
-
-	// 1.2. Setup permissions
-	communityPermission := &requests.CreateCommunityTokenPermission{
-		CommunityID: community.ID(),
-		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
-		TokenCriteria: []*protobuf.TokenCriteria{
-			{
-				Type:              protobuf.CommunityTokenType_ERC20,
-				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
-				Symbol:            "TEST2",
-				AmountInWei:       "100000000000000000000",
-				Decimals:          uint64(18),
-			},
-		},
-	}
-
-	channelPermission := &requests.CreateCommunityTokenPermission{
-		CommunityID: community.ID(),
-		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
-		ChatIds:     []string{chat.ID},
-		TokenCriteria: []*protobuf.TokenCriteria{
-			{
-				Type:              protobuf.CommunityTokenType_ERC20,
-				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
-				Symbol:            "TEST2",
-				AmountInWei:       "200000000000000000000",
-				Decimals:          uint64(18),
-			},
-		},
-	}
-
-	waitOnChannelKeyAdded := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
-		action, ok := sub.keyActions.ChannelKeysActions[chat.CommunityChatID()]
-		if !ok || action.ActionType != communities.EncryptionKeyAdd {
-			return false
-		}
-		_, ok = action.Members[crypto.PubkeyToHex(&s.owner.identity.PublicKey)]
-		return ok
-	})
-
-	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-		return len(sub.Community.TokenPermissions()) == 2
-	})
-
-	response, err := s.owner.CreateCommunityTokenPermission(communityPermission)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-
-	response, err = s.owner.CreateCommunityTokenPermission(channelPermission)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-
-	community = response.Communities()[0]
-	s.Require().True(community.HasTokenPermissions())
-	s.Require().Len(community.TokenPermissions(), 2)
-
-	err = <-waitOnCommunityPermissionCreated
-	s.Require().NoError(err)
-	s.Require().True(community.Encrypted())
-
-	err = <-waitOnChannelKeyAdded
-	s.Require().NoError(err)
-
-	// 2. Owner: Send a message A
-	messageText1 := RandomLettersString(10)
-	message1 := s.sendChatMessage(s.owner, chat.ID, messageText1)
-
-	// 2.2. Retrieve own message (to make it stored in the archive later)
-	_, err = s.owner.RetrieveAll()
-	s.Require().NoError(err)
-
-	log.Println("Message sent with ID:", message1.ID)
-
-	// 3. Owner: Create community archive
-	const partition = 2 * time.Minute
-	messageDate := time.UnixMilli(int64(message1.Timestamp))
-	startDate := messageDate.Add(-time.Minute)
-	endDate := messageDate.Add(time.Minute)
-	topic := messagingtypes.BytesToContentTopic(messaging.ToContentTopic(chat.ID))
-	communityCommonTopic := messagingtypes.BytesToContentTopic(messaging.ToContentTopic(community.UniversalChatID()))
-	topics := []messagingtypes.ContentTopic{topic, communityCommonTopic}
-
-	s.owner.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
-	s.bob.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
-
-	archiveIDs, err := s.owner.archiveManager.CreateHistoryArchiveCodexFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
-	s.Require().NoError(err)
-	s.Require().Len(archiveIDs, 1)
-
-	community, err = s.owner.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-
-	// 4. Bob: join community (satisfying membership, but not channel permissions)
-	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, communityPermission.TokenCriteria[0])
-	s.advertiseCommunityTo(community, s.bob)
-
-	waitForKeysDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
-		action := sub.keyActions.CommunityKeyAction
-		if action.ActionType != communities.EncryptionKeySendToMembers {
-			return false
-		}
-		_, ok := action.Members[s.bob.IdentityPublicKeyString()]
-		return ok
-	})
-
-	s.joinCommunity(community, s.bob)
-
-	err = <-waitForKeysDistributedToBob
-	s.Require().NoError(err)
-
-	// 5. Bob: Import community archive
-	// The archive is successfully decrypted, but the message inside is not.
-	// https://github.com/status-im/status-desktop/issues/13105 can be reproduced at this stage
-	// by forcing `encryption.ErrHashRatchetGroupIDNotFound` in `ExtractMessagesFromHistoryArchive` after decryption here:
-	// https://github.com/status-im/status-go/blob/6c82a6c2be7ebed93bcae3b9cf5053da3820de50/protocol/communities/manager.go#L4403
-
-	// Ensure owner has archive
-	archiveIndex, err := s.owner.archiveManager.CodexLoadHistoryArchiveIndexFromFile(s.owner.identity, community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(archiveIndex.Archives, 1)
-
-	PrintArchiveIndex(archiveIndex)
-
-	indexCid, err := s.owner.archiveManager.GetHistoryArchiveIndexCid(community.ID())
-	s.Require().NoError(err)
 
 	// log
 	s.T().Logf("Codex archive OWNER index CID: %s", indexCid)
@@ -2804,7 +2566,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestFullCodexIntegration() {
 	})
 
 	s.bob.downloadAndImportCodexHistoryArchives(community.ID(), indexCid, cancelChan)
-	s.Require().NoError(err)
 
 	// Ensure message1 wasn't imported, as it's encrypted, and we don't have access to the channel
 	receivedMessage1, err := s.bob.MessageByID(message1.ID)
@@ -2850,19 +2611,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestFullCodexIntegration() {
 	s.Require().Equal(messageText1, receivedMessage1.Text)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestFullCodexIntegration2() {
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHistoryArchives_withSharedCodexClient_usingHandleCommunityMessageArchiveIndexCid() {
 	// skip for now - WIP
 	s.T().Skip("WIP")
 
 	dataDir := s.T().TempDir()
-	archiveDataDir := filepath.Join(dataDir, "codex", "archivedata")
 	codexDataDir := filepath.Join(dataDir, "codex", "codexdata")
 
-	log.Println("Data directory:", archiveDataDir)
+	log.Println("Codex data directory:", codexDataDir)
 
 	codexConfig := params.CodexConfig{
-		Enabled:               false,
-		HistoryArchiveDataDir: archiveDataDir,
+		Enabled: false,
 		CodexNodeConfig: codex.Config{
 			DataDir:      codexDataDir,
 			BlockRetries: 10,
@@ -2872,8 +2631,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestFullCodexIntegration2() 
 		},
 	}
 
-	// Share archive directory between all users
-	// so that bob can access owner's created archive
+	// Share CodexClient between owner and bob
 	s.owner.archiveManager.SetCodexConfig(&codexConfig)
 	s.bob.archiveManager.SetCodexConfig(&codexConfig)
 
@@ -3017,13 +2775,18 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestFullCodexIntegration2() 
 	// https://github.com/status-im/status-go/blob/6c82a6c2be7ebed93bcae3b9cf5053da3820de50/protocol/communities/manager.go#L4403
 
 	// Ensure owner has archive
-	archiveIndex, err := s.owner.archiveManager.CodexLoadHistoryArchiveIndexFromFile(s.owner.identity, community.ID())
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	indexCid, err := s.owner.communitiesManager.GetLastSeenIndexCid(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotEmpty(indexCid)
+	archiveIndex, err := s.owner.archiveManager.CodexLoadHistoryArchiveIndex(ctx, s.owner.identity, community.ID(), indexCid, true)
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
 	PrintArchiveIndex(archiveIndex)
 
-	indexCid, err := s.owner.archiveManager.GetHistoryArchiveIndexCid(community.ID())
+	indexCid, err = s.owner.communitiesManager.GetLastSeenIndexCid(community.ID())
 	s.Require().NoError(err)
 
 	// log
@@ -3139,7 +2902,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestFullCodexIntegration2() 
 	s.Require().Equal(messageText1, receivedMessage1.Text)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestLoadingConfigFromDatabase() {
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHistoryArchives() {
 	// The messengers used in the tests in this suite use the helper newTestMessenger (protocol/messenger_builder_test.go). In the config setup (config.complete), tmc.nodeConfig defaults to an empty params.NodeConfig{} unless the test overrides it. The default params.NodeConfig zero-value has all nested configs (including CodexConfig.Enabled) set to false.
 
 	// During newTestMessenger, the in-memory appDb is migrated and then sDB.CreateSettings(*config.appSettings, *config.nodeConfig) is called (messenger_builder_test.go (line 120)). If you don’t override config.nodeConfig beforehand, this writes CodexConfig.Enabled = false into the node-config tables—mirroring what a brand-new install would do.
@@ -3297,13 +3060,18 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestLoadingConfigFromDatabas
 	s.Require().Len(archiveIDs, 1)
 
 	// Ensure owner has archive
-	archiveIndex, err := s.owner.archiveManager.CodexLoadHistoryArchiveIndexFromFile(s.owner.identity, community.ID())
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	indexCid, err := s.owner.communitiesManager.GetLastSeenIndexCid(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotEmpty(indexCid)
+	archiveIndex, err := s.owner.archiveManager.CodexLoadHistoryArchiveIndex(ctx, s.owner.identity, community.ID(), indexCid, true)
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
 	PrintArchiveIndex(archiveIndex)
 
-	indexCid, err := s.owner.archiveManager.GetHistoryArchiveIndexCid(community.ID())
+	indexCid, err = s.owner.communitiesManager.GetLastSeenIndexCid(community.ID())
 	s.Require().NoError(err)
 
 	// log
@@ -3343,18 +3111,21 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestLoadingConfigFromDatabas
 		close(s.bob.importDelayer.wait)
 	})
 
-	s.bob.downloadAndImportCodexHistoryArchives(community.ID(), indexCid, cancelChan)
-	s.Require().NoError(err)
+	s.bob.ratchetNotFoundDelay = 1 * time.Second
 
-	// Ensure owner has archive
-	archiveIndex, err = s.bob.archiveManager.CodexLoadHistoryArchiveIndexFromFile(s.bob.identity, community.ID())
+	s.bob.downloadAndImportCodexHistoryArchives(community.ID(), indexCid, cancelChan)
+
+	// Ensure bob has archive
+	ctx, cancel = context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	indexCid, err = s.bob.communitiesManager.GetLastSeenIndexCid(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotEmpty(indexCid)
+	archiveIndex, err = s.bob.archiveManager.CodexLoadHistoryArchiveIndex(ctx, s.bob.identity, community.ID(), indexCid, true)
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
 	PrintArchiveIndex(archiveIndex)
-
-	indexCid, err = s.bob.archiveManager.GetHistoryArchiveIndexCid(community.ID())
-	s.Require().NoError(err)
 
 	// log
 	s.T().Logf("Codex archive BOB index CID: %s", indexCid)
@@ -3365,9 +3136,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestLoadingConfigFromDatabas
 	s.Require().Error(err)
 
 	chatID := []byte(chat.ID)
-	hashRatchetMessagesCount, err := s.bob.persistence.GetHashRatchetMessagesCountForGroup(chatID)
-	s.Require().NoError(err)
-	s.Require().Equal(1, hashRatchetMessagesCount)
+	s.Require().Eventually(func() bool {
+		count, err := s.bob.persistence.GetHashRatchetMessagesCountForGroup(chatID)
+		s.Require().NoError(err)
+		return count == 1
+	}, 30*time.Second, 500*time.Millisecond)
+	// hashRatchetMessagesCount, err := s.bob.persistence.GetHashRatchetMessagesCountForGroup(chatID)
+	// s.Require().NoError(err)
+	// s.Require().Equal(1, hashRatchetMessagesCount)
 
 	// Make bob satisfy channel criteria
 	waitOnChannelKeyToBeDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
@@ -3401,7 +3177,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestLoadingConfigFromDatabas
 	log.Printf("Received message: %+v, ok: %v", receivedMessage1, ok)
 	s.Require().True(ok)
 	s.Require().Equal(messageText1, receivedMessage1.Text)
-
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestDeleteChannelWithTokenPermission() {

@@ -1021,9 +1021,14 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			}
 
 			if m.archiveManager.IsCodexReady() && communitySettings.HistoryArchiveSupportEnabled {
-				err = m.archiveManager.SeedHistoryArchiveIndexCid(request.CommunityID)
+				lastSeenIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(request.CommunityID)
 				if err != nil {
-					m.logger.Error("[CODEX][RequestImportDiscordChannel] failed to seed history archive index cid", zap.Error(err))
+					m.logger.Error("[CODEX][RequestImportDiscordChannel] failed to get last seen index cid", zap.Error(err))
+				} else {
+					err = m.archiveManager.SeedHistoryArchiveIndexCid(request.CommunityID, lastSeenIndexCid)
+					if err != nil {
+						m.logger.Error("[CODEX][RequestImportDiscordChannel] failed to seed history archive index cid", zap.Error(err), zap.String("indexCid", lastSeenIndexCid))
+					}
 				}
 			}
 
@@ -1831,9 +1836,14 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 
 			if m.archiveManager.IsCodexReady() && communitySettings.HistoryArchiveSupportEnabled {
-				err = m.archiveManager.SeedHistoryArchiveIndexCid(discordCommunity.ID())
+				lastSeenIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(discordCommunity.ID())
 				if err != nil {
-					m.logger.Error("[CODEX][RequestImportDiscordCommunity] failed to seed history archive index cid", zap.Error(err))
+					m.logger.Error("[CODEX][RequestImportDiscordCommunity] failed to get last seen index cid", zap.Error(err))
+				} else {
+					err = m.archiveManager.SeedHistoryArchiveIndexCid(discordCommunity.ID(), lastSeenIndexCid)
+					if err != nil {
+						m.logger.Error("[CODEX][RequestImportDiscordCommunity] failed to seed history archive index cid", zap.Error(err), zap.String("indexCid", lastSeenIndexCid))
+					}
 				}
 			}
 

@@ -266,12 +266,12 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 						zap.String("cid", archiveCid),
 						zap.String("hash", archiveHash),
 						zap.Duration("timeout", d.pollingTimeout))
-					return // Exit without success callback or count increment
+					return
 				case <-archiveCancel:
 					d.logger.Debug("[CODEX] download cancelled",
 						zap.String("cid", archiveCid),
 						zap.String("hash", archiveHash))
-					return // Exit without success callback or count increment
+					return
 				case <-ticker.C:
 					hasCid, err := d.codexClient.HasCid(archiveCid)
 					if err != nil {
@@ -297,7 +297,7 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 						if d.onArchiveDownloaded != nil {
 							d.onArchiveDownloaded(archiveHash, archiveFrom, archiveTo)
 						}
-						return // Exit after successful completion
+						return
 					}
 				}
 			}

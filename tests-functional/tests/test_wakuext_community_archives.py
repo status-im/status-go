@@ -110,9 +110,9 @@ class TestCommunityArchives(MessengerSteps):
 
         logging.info("Checking that community owner has local index CID file...")
 
-        # Ensure that the community archive index exists in the file system of the community owner.
-        # We test this by checking the corresponding archive index CID file exists.
-        # This index CID file contains the Codex CID of the archive index.
+        # Ensure that the community archive index is being seeded by the community owner.
+        # has_community_archive returns true if lastSeenIndexCid from DB is not empty
+        # and HasCid on the CodexClient returns true.
         has_archive_index = self.creator.wakuext_service.has_community_archive(community_id)
         assert has_archive_index is True, "Creator should have community archive index after messages are sent"
 
@@ -122,30 +122,25 @@ class TestCommunityArchives(MessengerSteps):
         # We need to wait for the archive dispatch + download + import which should not take more than 10 seconds
         archive_timeout = 10
 
-        logging.info("Waiting for community member to download manifest of the archive index...")
-        # Wait for the community member to download the archive index manifest
-        self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_MANIFEST_FETCHED.value, timeout=archive_timeout)
-        logging.info("Success! Manifest of the archive index fetched!")
-
-        # When wait for index download completed signal - at this stage the index and index CID files
-        # should both exist in the file system of the member.
+        # Wait for index download completed signal. This signal is emitted
+        # immediately after archive index is downloaded from Codex node.
         logging.info("Waiting for community member to download archive index...")
         self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
         logging.info("Success! Archive index downloaded!")
 
-        # Ensure that the community archive index CID file exists in the file system for the member.
-        # After successfully downloading the archive index, its CID is stored in the the
-        # index CID file and the file is written immediately after the archive index has been downloaded.
-        # Notice that at this stage, the node still does not have any single archive downloaded.
+        # The HistoryArchivesSeedingSignal is emitted right after all archives
+        # are downloaded to the Codex node and the corresponding index CID is
+        # recorded in the database as "lastSeenIndexCid".
+        logging.info("Waiting for community member to download ALL history archives...")
+        self.member.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout)
+        logging.info("Success! Community member has downloaded ALL history archives!")
+
+        # The archive index should be "seeding": index CID in the database and
+        # HasCid on the CodexClient returns true.
         logging.info("Verifying that community member has index CID file...")
         has_archive_index = self.member.wakuext_service.has_community_archive(community_id)
         assert has_archive_index is True, "Member should have community archive index after messages are sent"
         logging.info("Success! Community member has index CID file!")
-
-        # Wait for the community archives to be downloaded for the first member.
-        logging.info("Waiting for community member to download ALL history archives...")
-        self.member.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout)
-        logging.info("Success! Community member has downloaded ALL history archives!")
 
         # Once the historyArchivesSeeding signal is received, the database
         # should be already updated: archive ID (HASH) should be stored in the database.
@@ -170,30 +165,23 @@ class TestCommunityArchives(MessengerSteps):
         assert message is None, "Another member should not have messages before archive is dispatched, downloaded and imported"
         logging.info("Verified that another member does not have the message before archive import.")
 
-        # Wait for another community member to download the archive index manifest
-        logging.info("Waiting for another member to download manifest of the archive index...")
-        self.another_member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_MANIFEST_FETCHED.value, timeout=archive_timeout)
-        logging.info("Success! Manifest of the archive index fetched by another member!")
-
-        # Then wait for index download completed signal - at this stage the index and index CID files
-        # should both exist in the file system of another member.
+        # Wait for index download completed signal - index should be now downloaded
+        # for Codex.
         logging.info("Waiting for another member to download archive index...")
         self.another_member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
         logging.info("Success! Archive index downloaded by another member!")
 
-        # Ensure that the community archive index exists in the file system of another member
-        logging.info("Verifying that another member has index CID file...")
-        has_archive_index = self.another_member.wakuext_service.has_community_archive(community_id)
-        assert has_archive_index is True, "Another member should have community archive index after messages are sent"
-        logging.info("Success! Another member has index CID file.")
-
-        # Wait for the community archives to be downloaded for another member.
+        # Wait for seeding signal - all archives should be now downloaded to Codex node
+        # and index should be seeding.
         logging.info("Waiting for another member to download ALL history archives...")
         self.another_member.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout)
         logging.info("Success! Another member has downloaded ALL history archives!")
 
-        # Wait for the archive to be downloaded by another member
-        # self.another_member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
+        # IndexCid in the database and HasCid on the CodexClient returns true (seeding).
+        logging.info("Verifying that another member has index CID file...")
+        has_archive_index = self.another_member.wakuext_service.has_community_archive(community_id)
+        assert has_archive_index is True, "Another member should have community archive index after messages are sent"
+        logging.info("Success! Another member has index CID file.")
 
         # Ensure that another member has downloaded the community archive and stored its ID in database
         logging.info("Verifying that another member has archive ID (HASH) recorded in the database...")
@@ -244,7 +232,7 @@ class TestCommunityArchives(MessengerSteps):
         # Wait for the community archive to be created for the community owner
         self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=message_archive_interval + 10)
 
-        # Ensure that the community archive exists in the file system for the community owner
+        # Ensure that the archive index is seeding.
         has_archive = self.creator.wakuext_service.has_community_archive(community_id)
         assert has_archive is True, "Creator should have community archive after messages are sent"
 
@@ -258,7 +246,7 @@ class TestCommunityArchives(MessengerSteps):
 
         time.sleep(message_archive_interval + 10)
 
-        # Ensure that the community archive exists in the file system for the community owner
+        # Ensure that no archive index is seeding.
         has_archive = self.creator.wakuext_service.has_community_archive(community_id)
         assert has_archive is False, "Creator should not have community archive without message"
 
@@ -286,31 +274,28 @@ class TestCommunityArchives(MessengerSteps):
             # We need to wait for the archive dispatch + download + import which should not take more than 10 seconds
             archive_timeout = 10
 
-            # When wait for index download completed signal - at this stage the index and index CID files
-            # should both exist in the file system of the member.
+            # Wait for the archive index to be downloaded from Codex node.
             logging.info("Waiting for community member to download archive index...")
             self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
             logging.info("Success! Archive index downloaded!")
 
-            # Ensure that the community archive index CID file exists in the file system for the member.
-            # After successfully downloading the archive index, its CID is stored in the the
-            # index CID file and the file is written immediately after the archive index has been downloaded.
-            # Notice that at this stage, the node still does not have any single archive downloaded.
+            # Wait for the seeding signal.
+            logging.info("Waiting for community member to download ALL history archives...")
+            self.member.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout)
+            logging.info("Success! Community member has downloaded ALL history archives!")
+
+            # The archive index should be "seeding": index CID in the database and
+            # HasCid on the CodexClient returns true.
             logging.info("Verifying that community member has index CID file...")
             has_archive_index = self.member.wakuext_service.has_community_archive(community_id)
             assert has_archive_index is True, "Member should have community archive index after messages are sent"
             logging.info("Success! Community member has index CID file!")
 
-            # Wait for the community archives to be downloaded for the first member.
-            logging.info("Waiting for community member to download ALL history archives...")
-            self.member.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout)
-            logging.info("Success! Community member has downloaded ALL history archives!")
-
             # Once the historyArchivesSeeding signal is received, the database
             # should be already updated: archive ID (HASH) should be stored in the database.
             logging.info("Verifying that archive ID (HASH) is recorded in the database...")
             download_archive_ids = self.member.wakuext_service.get_downloaded_message_archive_ids(community_id)
-            assert len(download_archive_ids) == i + 1, "Member should have exactly 1 archive ID downloaded"
+            assert len(download_archive_ids) == i + 1, f"Member should have exactly {i+1} archive IDs downloaded"
             logging.info("Success! Archive ID (HASH) is recorded in the database!")
 
     def test_archive_is_downloaded_after_logout_login(self):
@@ -363,21 +348,17 @@ class TestCommunityArchives(MessengerSteps):
         # We need to wait for the archive dispatch + download + import which should not take more than 10 seconds
         archive_timeout = 20
 
-        logging.info("Waiting for community member to download manifest of the archive index...")
-        # Wait for the community member to download the archive index manifest
-        self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_MANIFEST_FETCHED.value, timeout=archive_timeout)
-        logging.info("Success! Manifest of the archive index fetched!")
-
-        # When wait for index download completed signal - at this stage the index and index CID files
-        # should both exist in the file system of the member.
+        # When wait for index download completed signal.
         logging.info("Waiting for community member to download archive index...")
         self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
         logging.info("Success! Archive index downloaded!")
 
-        # Ensure that the community archive index CID file exists in the file system for the member.
-        # After successfully downloading the archive index, its CID is stored in the the
-        # index CID file and the file is written immediately after the archive index has been downloaded.
-        # Notice that at this stage, the node still does not have any single archive downloaded.
+        # Wait for the seeding signal.
+        logging.info("Waiting for community member to download ALL history archives...")
+        self.member.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout)
+        logging.info("Success! Community member has downloaded ALL history archives!")
+
+        # Confirm that the archive index is seeding.
         logging.info("Verifying that community member has index CID file...")
         has_archive_index = self.member.wakuext_service.has_community_archive(community_id)
         assert has_archive_index is True, "Member should have community archive index after messages are sent"

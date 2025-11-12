@@ -58,8 +58,7 @@ func randomNodeConfig() *params.NodeConfig {
 			LightClient: randomBool(),
 		},
 		CodexConfig: params.CodexConfig{
-			Enabled:               randomBool(),
-			HistoryArchiveDataDir: randomString(),
+			Enabled: randomBool(),
 			CodexNodeConfig: codex.Config{
 				DataDir:       randomString(),
 				DiscoveryPort: randomInt(65535),

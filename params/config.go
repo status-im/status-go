@@ -345,9 +345,8 @@ type TorrentConfig struct {
 }
 
 type CodexConfig struct {
-	Enabled               bool
-	HistoryArchiveDataDir string
-	CodexNodeConfig       codex.Config
+	Enabled         bool
+	CodexNodeConfig codex.Config
 }
 
 const (
@@ -409,9 +408,6 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 
 	if c.HistoryArchiveDistributionPreference == ArchiveDistributionMethodCodex {
 		if c.CodexConfig.Enabled {
-			if c.CodexConfig.HistoryArchiveDataDir == "" {
-				c.CodexConfig.HistoryArchiveDataDir = filepath.Join(c.RootDataDir, "codex", "archivedata")
-			}
 			if c.CodexConfig.CodexNodeConfig.DataDir == "" {
 				c.CodexConfig.CodexNodeConfig.DataDir = filepath.Join(c.RootDataDir, "codex", "codexdata")
 			}
@@ -453,8 +449,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			TorrentDir: dataDir + "/torrents",
 		},
 		CodexConfig: CodexConfig{
-			Enabled:               false,
-			HistoryArchiveDataDir: filepath.Join(dataDir, "codex", "archivedata"),
+			Enabled: false,
 			CodexNodeConfig: codex.Config{
 				BlockRetries:   BlockRetries,
 				DataDir:        filepath.Join(dataDir, "codex", "codexdata"),

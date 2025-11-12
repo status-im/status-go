@@ -22,8 +22,7 @@ func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_AllFields(
 
 	overrides := map[string]string{
 		// params.CodexConfig fields
-		"Enabled":               "true",
-		"HistoryArchiveDataDir": "/custom/archive/path",
+		"Enabled": "true",
 
 		// codex.Config fields (nested under CodexNodeConfig)
 		"CodexNodeConfig.LogLevel":                       "DEBUG",
@@ -55,7 +54,6 @@ func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_AllFields(
 
 	// Verify params.CodexConfig fields
 	s.Equal(true, cfg.Enabled)
-	s.Equal("/custom/archive/path", cfg.HistoryArchiveDataDir)
 
 	// Verify codex.Config fields
 	s.Equal("DEBUG", cfg.CodexNodeConfig.LogLevel)
