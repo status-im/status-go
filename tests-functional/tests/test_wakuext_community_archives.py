@@ -50,7 +50,7 @@ class TestCommunityArchives(MessengerSteps):
         }
 
     def test_community_archive_index_exists(self):
-        community_id = self.create_community(self.creator, historyArchiveSupportEnabled=True)
+        community_id = self.create_community(self.creator, history_archive_support_enabled=True)
 
         # Ensure that no community archive exists initially
         has_archive_index = self.creator.wakuext_service.has_community_archive(community_id)
@@ -203,7 +203,7 @@ class TestCommunityArchives(MessengerSteps):
 
     def test_community_archive_exists_for_default_chat(self):
         # Create a community
-        response = self.creator.wakuext_service.create_community("Codex community", "No one should join", historyArchiveSupportEnabled=True)
+        response = self.creator.wakuext_service.create_community("Codex community", "No one should join", history_archive_support_enabled=True)
         community_id = response.get("communities", [{}])[0].get("id")
         default_chat_id = response.get("chats", [{}])[0].get("id")
 
