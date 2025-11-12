@@ -226,7 +226,7 @@ class WakuextService(Service):
         membership: CommunityPermissionsAccess = CommunityPermissionsAccess.AUTO_ACCEPT,
         image="",
         image_rect=ImageCropRect(),
-        historyArchiveSupportEnabled=False,
+        history_archive_support_enabled=False,
     ):
         params = {
             "membership": membership.value,
@@ -238,7 +238,7 @@ class WakuextService(Service):
             "imageAy": image_rect.ay,
             "imageBx": image_rect.bx,
             "imageBy": image_rect.by,
-            "historyArchiveSupportEnabled": historyArchiveSupportEnabled,
+            "historyArchiveSupportEnabled": history_archive_support_enabled,
         }
         response = self.rpc_request("createCommunity", [params])
         return response
