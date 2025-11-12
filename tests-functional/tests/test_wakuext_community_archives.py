@@ -28,24 +28,14 @@ class TestCommunityArchives(MessengerSteps):
         # Define codex as archive distribution preference
         self.another_member.wakuext_service.set_archive_distribution_preference("codex")
 
-        # Create the community
-        self.fake_address = "0x" + str(uuid4())[:8]
-        self.community_id = self.create_community(self.creator, historyArchiveSupportEnabled=True)
-
-        # Ensure that no community archive exists initially
-        has_archive_index = self.creator.wakuext_service.has_community_archive(self.community_id)
-        assert has_archive_index is False, "Creator should not have community archive initially"
-        has_archive_index = self.member.wakuext_service.has_community_archive(self.community_id)
-        assert has_archive_index is False, "Member should not have community archive initially"
-        has_archive_index = self.another_member.wakuext_service.has_community_archive(self.community_id)
-        assert has_archive_index is False, "Another member should not have community archive initially"
-
         # Connect members to community codex client
         # In the real life, this would be done via discovery
         info = self.creator.wakuext_service.debug()
         self.member.wakuext_service.connect(info["id"], info["addrs"])
         self.another_member.wakuext_service.connect(info["id"], info["addrs"])
 
+        # Create the community
+        self.fake_address = "0x" + str(uuid4())[:8]
         self.display_name = "chat_" + str(uuid4())
         self.chat_payload = {
             "identity": {
@@ -60,8 +50,18 @@ class TestCommunityArchives(MessengerSteps):
         }
 
     def test_community_archive_index_exists(self):
+        community_id = self.create_community(self.creator, historyArchiveSupportEnabled=True)
+
+        # Ensure that no community archive exists initially
+        has_archive_index = self.creator.wakuext_service.has_community_archive(community_id)
+        assert has_archive_index is False, "Creator should not have community archive initially"
+        has_archive_index = self.member.wakuext_service.has_community_archive(community_id)
+        assert has_archive_index is False, "Member should not have community archive initially"
+        has_archive_index = self.another_member.wakuext_service.has_community_archive(community_id)
+        assert has_archive_index is False, "Another member should not have community archive initially"
+
         # Create community chat
-        create_resp = self.creator.wakuext_service.create_community_chat(self.community_id, self.chat_payload)
+        create_resp = self.creator.wakuext_service.create_community_chat(community_id, self.chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
 
         # Wait for member to receive chat creation signal
@@ -90,8 +90,8 @@ class TestCommunityArchives(MessengerSteps):
 
         # Ensure that the community archive index exists in the file system of the community owner.
         # We test this by checking the corresponding archive index CID file exists.
-        # This index CID file contains the Codex CID of the archive index. 
-        has_archive_index = self.creator.wakuext_service.has_community_archive(self.community_id)
+        # This index CID file contains the Codex CID of the archive index.
+        has_archive_index = self.creator.wakuext_service.has_community_archive(community_id)
         assert has_archive_index is True, "Creator should have community archive index after messages are sent"
 
         logging.info("Success! History archive created and dispatched!")
@@ -116,7 +116,7 @@ class TestCommunityArchives(MessengerSteps):
         # index CID file and the file is written immediately after the archive index has been downloaded.
         # Notice that at this stage, the node still does not have any single archive downloaded.
         logging.info("Verifying that community member has index CID file...")
-        has_archive_index = self.member.wakuext_service.has_community_archive(self.community_id)
+        has_archive_index = self.member.wakuext_service.has_community_archive(community_id)
         assert has_archive_index is True, "Member should have community archive index after messages are sent"
         logging.info("Success! Community member has index CID file!")
 
@@ -128,14 +128,13 @@ class TestCommunityArchives(MessengerSteps):
         # Once the historyArchivesSeeding signal is received, the database
         # should be already updated: archive ID (HASH) should be stored in the database.
         logging.info("Verifying that archive ID (HASH) is recorded in the database...")
-        download_archive_ids = self.member.wakuext_service.get_downloaded_message_archive_ids(self.community_id)
+        download_archive_ids = self.member.wakuext_service.get_downloaded_message_archive_ids(community_id)
         assert len(download_archive_ids) == 1, "Member should have exactly 1 archive ID downloaded"
         logging.info("Success! Archive ID (HASH) is recorded in the database!")
 
         # Note: We don't check get_message_archive_ids_to_import here because archives are automatically
         # imported in the background, and by the time we check, they might already be marked as imported.
         # The important thing is that the archive was downloaded (checked above) and will be imported.
-    
 
         # Wait for another member to join the community
         logging.info("Another member is joining the community...")
@@ -161,8 +160,8 @@ class TestCommunityArchives(MessengerSteps):
         logging.info("Success! Archive index downloaded by another member!")
 
         # Ensure that the community archive index exists in the file system of another member
-        logging.info("Verifying that another member has index CID file...") 
-        has_archive_index = self.another_member.wakuext_service.has_community_archive(self.community_id)
+        logging.info("Verifying that another member has index CID file...")
+        has_archive_index = self.another_member.wakuext_service.has_community_archive(community_id)
         assert has_archive_index is True, "Another member should have community archive index after messages are sent"
         logging.info("Success! Another member has index CID file.")
 
@@ -176,9 +175,8 @@ class TestCommunityArchives(MessengerSteps):
 
         # Ensure that another member has downloaded the community archive and stored its ID in database
         logging.info("Verifying that another member has archive ID (HASH) recorded in the database...")
-        download_archive_ids = self.another_member.wakuext_service.get_downloaded_message_archive_ids(self.community_id)
+        download_archive_ids = self.another_member.wakuext_service.get_downloaded_message_archive_ids(community_id)
         assert len(download_archive_ids) == 1, "Another member should have exactly 1 archive ID downloaded"
-        download_archive_id = download_archive_ids[0]
         logging.info("Success! Another member has archive ID (HASH) recorded in the database!")
 
         # Note: Same as above - archives are automatically imported, so we skip checking
@@ -188,16 +186,39 @@ class TestCommunityArchives(MessengerSteps):
         logging.info("Waiting for another member to start importing history archive messages...")
         self.another_member.wait_for_signal(SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_STARTED.value, timeout=archive_timeout)
         logging.info("Another member has started importing history archive messages.")
-        
+
         # Wait for the archive import to complete for another member
         logging.info("Waiting for another member to finish importing history archive messages...")
-        self.another_member.wait_for_signal(SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_FINISHED.value, 
-        timeout=archive_timeout)
+        self.another_member.wait_for_signal(SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_FINISHED.value, timeout=archive_timeout)
         logging.info("Another member has finished importing history archive messages.")
 
         # Verify that another member has the message after archive import
         logging.info("Verifying that another member has the message after archive import...")
         another_member_msgs_resp = self.another_member.wakuext_service.chat_messages(chat_id)
         assert another_member_msgs_resp.get("messages") is not None, "Another member should have messages after importing history archive"
-        assert another_member_msgs_resp.get("messages")[0].get("text") == text, "Another member should have the message after importing history archive"
+        assert (
+            another_member_msgs_resp.get("messages")[0].get("text") == text
+        ), "Another member should have the message after importing history archive"
         logging.info("Success! Another member has the message after importing history archive.")
+
+    def test_community_archive_exists_for_default_chat(self):
+        # Create a community
+        response = self.creator.wakuext_service.create_community("Codex community", "No one should join", historyArchiveSupportEnabled=True)
+        community_id = response.get("communities", [{}])[0].get("id")
+        default_chat_id = response.get("chats", [{}])[0].get("id")
+
+        # Ensure that no community archive exists initially
+        has_archive_index = self.creator.wakuext_service.has_community_archive(community_id)
+        assert has_archive_index is False, "Creator should not have community archive initially"
+
+        # Send a message to the default community chat
+        text = "Hi myself!"
+        send_resp = self.creator.wakuext_service.send_chat_message(default_chat_id, text)
+        assert send_resp.get("chats")[0].get("lastMessage").get("text") == text
+
+        # Wait for the community archive to be created for the community owner
+        self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=self.message_archive_interval + 10)
+
+        # Ensure that the community archive exists in the file system for the community owner
+        has_archive = self.creator.wakuext_service.has_community_archive(community_id)
+        assert has_archive is True, "Creator should have community archive after messages are sent"
