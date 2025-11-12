@@ -49,6 +49,9 @@ pkgs.buildGoModule {
     export CGO_LDFLAGS="-L${pkgs.lib-sds-pkg}/lib -Wl,-rpath,${pkgs.lib-sds-pkg}/lib"
   '';
 
+  # Build the Go library
+  # ld flags and netgo tag are necessary for integration tests to work on MacOS
+  # https://github.com/status-im/status-mobile/issues/20135
   buildPhase = ''
     # make sure Go modules build correctly
     export GOPATH=$NIX_BUILD_TOP/go
