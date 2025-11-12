@@ -2,7 +2,6 @@ package accounts
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -96,9 +95,6 @@ func (api *SettingsAPI) NotificationsGetGlobalMentions() (string, error) {
 }
 
 func (api *SettingsAPI) NotificationsSetGlobalMentions(value string) error {
-	if value == "" {
-		return fmt.Errorf("invalid global mentions value: cannot be empty")
-	}
 	return api.db.SetGlobalMentions(value)
 }
 
@@ -173,9 +169,6 @@ func (api *SettingsAPI) NotificationsSetExemptions(id string, muteAllMessages bo
 }
 
 func (api *SettingsAPI) DeleteExemptions(id string) error {
-	if id == "" {
-		return fmt.Errorf("invalid exemption id: cannot be empty")
-	}
 	return api.db.DeleteExemptions(id)
 }
 
