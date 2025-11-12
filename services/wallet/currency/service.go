@@ -100,7 +100,7 @@ func (s *Service) getAllFiatCurrencyFormats() (FormatPerKey, error) {
 }
 
 func (s *Service) getAllFixedTokenCurrencyFormats() (FormatPerKey, error) {
-	tokens, err := s.tokenManager.GetTokensForActiveNetworksMode()
+	tokens, err := s.tokenManager.GetTokensOfInterestForActiveNetworksMode()
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func (s *Service) getAllFixedTokenCurrencyFormats() (FormatPerKey, error) {
 }
 
 func (s *Service) fetchAllTokenCurrencyFormats() (FormatPerKey, error) {
-	tokens, err := s.tokenManager.GetTokensForActiveNetworksMode()
+	tokens, err := s.tokenManager.GetTokensOfInterestForActiveNetworksMode()
 	if err != nil {
 		return nil, err
 	}

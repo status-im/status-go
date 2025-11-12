@@ -64,7 +64,7 @@ func getTokenSymbols(t *testing.T) []*tokentypes.Token {
 	err = tm.Start(context.Background())
 	require.NoError(t, err)
 
-	tokens, err := tm.GetTokensForActiveNetworksMode()
+	tokens, err := tm.GetTokensOfInterestForActiveNetworksMode()
 	require.NoError(t, err)
 	require.Greater(t, len(tokens), 0)
 

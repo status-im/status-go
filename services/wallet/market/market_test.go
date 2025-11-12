@@ -23,7 +23,7 @@ import (
 type MockTokenManager struct{}
 
 func (m *MockTokenManager) GetTokensForFetchingMarketData() ([]*tokentypes.Token, error) {
-	return m.GetTokensForActiveNetworksMode()
+	return m.GetTokensOfInterestForActiveNetworksMode()
 }
 
 func (m *MockTokenManager) GetTokensByKeysForFetchingMarketData(tokenKeys []string) ([]*tokentypes.Token, error) {
@@ -53,7 +53,7 @@ func (m *MockTokenManager) GetTokensByKeys(tokenKeys []string) ([]*tokentypes.To
 	return tokens, nil
 }
 
-func (m *MockTokenManager) GetTokensForActiveNetworksMode() ([]*tokentypes.Token, error) {
+func (m *MockTokenManager) GetTokensOfInterestForActiveNetworksMode() ([]*tokentypes.Token, error) {
 	return m.GetTokensByKeys(testTokensKeys)
 }
 
