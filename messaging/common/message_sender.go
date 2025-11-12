@@ -12,13 +12,10 @@ import (
 	mvdsnode "github.com/status-im/mvds/node"
 	"go.uber.org/zap"
 
-	sds "github.com/waku-org/sds-go-bindings/sds"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/messaging/adapters"
@@ -40,10 +37,6 @@ const (
 	maxMessageSenderEphemeralKeys = 3
 )
 
-var (
-	useSDSForCommunitiesByDefault = false
-)
-
 type MessageSender struct {
 	identity    *ecdsa.PrivateKey
 	transport   *transport.Transport
@@ -58,8 +51,6 @@ type MessageSender struct {
 	// to decrypt messages
 	ephemeralKeys      map[string]*ecdsa.PrivateKey
 	ephemeralKeysMutex sync.Mutex
-
-	reliabilityManager *sds.ReliabilityManager
 }
 
 func NewMessageSender(
@@ -73,39 +64,16 @@ func NewMessageSender(
 ) (*MessageSender, error) {
 	logger = logger.Named("message_sender")
 
-	reliabilityManager, err := sds.NewReliabilityManager()
-	if err != nil {
-		return nil, errors.Wrap(err, "SDS: failed to create reliability manager")
-	}
-	callbacks := sds.EventCallbacks{
-		OnMessageSent: func(messageId sds.MessageID, channelId string) {
-			logger.Debug("SDS: message sent", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
-		},
-		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.MessageID, channelId string) {
-			logger.Debug("SDS: missing dependencies",
-				zap.String("messageId", string(messageId)),
-				zap.String("channelId", channelId),
-				zap.Any("missingDeps", missingDeps))
-		},
-		OnMessageReady: func(messageId sds.MessageID, channelId string) {
-			logger.Debug("SDS: message ready",
-				zap.String("messageId", string(messageId)),
-				zap.String("channelId", channelId))
-		},
-	}
-	reliabilityManager.RegisterCallbacks(callbacks)
-
 	p := &MessageSender{
-		identity:           identity,
-		transport:          transport,
-		segmenter:          segmentation.NewSegmenter(segmentationPersistence, logger),
-		protocol:           encryptor,
-		reliability:        reliability.NewReliability(mvdsPersistence, identity, logger),
-		persistence:        persistence,
-		publisher:          pubsub.NewPublisher(),
-		logger:             logger,
-		ephemeralKeys:      make(map[string]*ecdsa.PrivateKey),
-		reliabilityManager: reliabilityManager,
+		identity:      identity,
+		transport:     transport,
+		segmenter:     segmentation.NewSegmenter(segmentationPersistence, logger),
+		protocol:      encryptor,
+		reliability:   reliability.NewReliability(mvdsPersistence, identity, logger),
+		persistence:   persistence,
+		publisher:     pubsub.NewPublisher(),
+		logger:        logger,
+		ephemeralKeys: make(map[string]*ecdsa.PrivateKey),
 	}
 
 	return p, nil
@@ -299,15 +267,6 @@ func (s *MessageSender) sendCommunity(
 	// Set sender
 	if rawMessage.Sender == nil {
 		rawMessage.Sender = s.identity
-	}
-
-	if useSDSForCommunitiesByDefault && rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		s.logger.Debug("SDS: dispatchCommunityChatMessage with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
-		sdsWrappedPayload, err := s.wrapPayloadForSDS(rawMessage.Payload, rawMessage.CommunityID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
-		}
-		rawMessage.Payload = sdsWrappedPayload
 	}
 
 	messageID, err := s.getMessageID(rawMessage)
@@ -614,15 +573,6 @@ func (s *MessageSender) SendPublic(
 		rawMessage.Sender = s.identity
 	}
 
-	if useSDSForCommunitiesByDefault && rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		s.logger.Debug("SDS: SendPublic with communityID", zap.String("communityID", types.EncodeHex(rawMessage.CommunityID)))
-		sdsWrappedPayload, err := s.wrapPayloadForSDS(rawMessage.Payload, rawMessage.CommunityID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
-		}
-		rawMessage.Payload = sdsWrappedPayload
-	}
-
 	var wrappedMessage []byte
 	var err error
 	if rawMessage.SkipApplicationWrap {
@@ -859,11 +809,6 @@ func (s *MessageSender) handleMessage(receivedMsg *messagingtypes.ReceivedMessag
 			zap.String("envelopeHash", hexutil.Encode(msg.TransportLayer.Hash)),
 			zap.String("messageId", hexutil.Encode(msg.ApplicationLayer.ID)),
 		)
-
-		err = s.unwrapPayloadForSDS(msg)
-		if err != nil {
-			hlogger.Error("failed to unwrap payload for SDS", zap.Error(err))
-		}
 	}
 
 	return response, nil
@@ -1254,40 +1199,5 @@ func populateMessageApplicationLayer(m *messagingtypes.Message) error {
 	m.ApplicationLayer.ID = messagingtypes.MessageID(recoveredKey, m.EncryptionLayer.Payload)
 	m.ApplicationLayer.Payload = message.Payload
 	m.ApplicationLayer.Type = message.Type
-	return nil
-}
-
-// Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
-func (s *MessageSender) wrapPayloadForSDS(payload []byte, communityID []byte) ([]byte, error) {
-	sdsMessageID := crypto.Keccak256(payload)
-
-	s.logger.Debug("SDS: original payload",
-		zap.String("channelId", types.EncodeHex(communityID)),
-		zap.Int("payload-length", len(payload)),
-		zap.String("messageId", types.EncodeHex(sdsMessageID)),
-	)
-	sdsWrappedPayload, err := s.reliabilityManager.WrapOutgoingMessage(payload, sds.MessageID(types.EncodeHex(sdsMessageID)), types.EncodeHex(communityID))
-	if err != nil {
-		return nil, errors.Wrap(err, "SDS: failed to wrap a community message")
-	}
-
-	return sdsWrappedPayload, nil
-}
-
-func (s *MessageSender) unwrapPayloadForSDS(msg *messagingtypes.Message) error {
-	if len(msg.EncryptionLayer.Payload) > 0 {
-		unwrappedMessage, err := s.reliabilityManager.UnwrapReceivedMessage(msg.ApplicationLayer.Payload)
-		if err != nil {
-			if useSDSForCommunitiesByDefault {
-				s.logger.Error("SDS: failed to unwrap received message, may because of not use sds", zap.Error(err))
-			}
-		} else {
-			msg.ApplicationLayer.Payload = *unwrappedMessage.Message
-			s.logger.Debug("SDS: missing deps",
-				zap.Any("missing-deps", *unwrappedMessage.MissingDeps),
-			)
-		}
-	}
-
 	return nil
 }
