@@ -192,17 +192,12 @@ type HistoryArchiveDownloadTaskInfo struct {
 type ArchiveFileService interface {
 	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
 	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
-	CreateHistoryArchiveCodexFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
-	CreateHistoryArchiveCodexFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
 	SaveMessageArchiveID(communityID types.HexBytes, hash string) error
 	GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error)
 	SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error
 	ExtractMessagesFromHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error)
-	ExtractMessagesFromCodexHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error)
 	GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error)
-	GetHistoryArchiveIndexCid(communityID types.HexBytes) (string, error)
 	LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error)
-	CodexLoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.CodexWakuMessageArchiveIndex, error)
 }
 
 type ArchiveService interface {
@@ -210,15 +205,10 @@ type ArchiveService interface {
 
 	SetOnline(bool)
 	SetTorrentConfig(*params.TorrentConfig)
-	SetCodexConfig(*params.CodexConfig)
 	StartTorrentClient() error
-	StartCodexClient() error
-	SetCodexClient(client CodexClientInterface)
-	GetCodexClient() CodexClientInterface
 	Stop() error
 	IsReady() bool
 	IsTorrentReady() bool
-	IsCodexReady() bool
 	GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error)
 	GetCommunityChatsTopics(communityID types.HexBytes) ([]messagingtypes.ContentTopic, error)
 	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
@@ -226,18 +216,28 @@ type ArchiveService interface {
 	StartHistoryArchiveTasksInterval(community *Community, interval time.Duration)
 	StopHistoryArchiveTasksInterval(communityID types.HexBytes)
 	SeedHistoryArchiveTorrent(communityID types.HexBytes) error
-	SeedHistoryArchiveIndexCid(communityID types.HexBytes) error
 	UnseedHistoryArchiveTorrent(communityID types.HexBytes)
-	UnseedHistoryArchiveIndexCid(communityID types.HexBytes)
 	IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool
-	IsSeedingHistoryArchiveCodex(communityID types.HexBytes) bool
 	GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask
 	AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask)
 	DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
-	DownloadHistoryArchivesByIndexCid(communityID types.HexBytes, indexCid string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
+	PublishHistoryArchivesSeedingSignal(communityID types.HexBytes, magnetLink bool, indexCid bool)
 	TorrentFileExists(communityID string) bool
-	CodexIndexCidFileExists(communityID types.HexBytes) bool
 	GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error)
+
+	SetCodexConfig(*params.CodexConfig)
+	SetCodexClient(client CodexClientInterface)
+	StartCodexClient() error
+	GetCodexClient() CodexClientInterface
+	IsCodexReady() bool
+	SeedHistoryArchiveIndexCid(communityID types.HexBytes, indexCid string) error
+	UnseedHistoryArchiveIndexCid(communityID types.HexBytes, indexCid string)
+	IsSeedingHistoryArchiveCodex(communityID types.HexBytes, indexCid string) bool
+	DownloadHistoryArchivesByIndexCid(communityID types.HexBytes, indexCid string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
+	CreateHistoryArchiveCodexFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveCodexFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	ExtractMessagesFromCodexHistoryArchive(communityID types.HexBytes, archiveID string, codexIndex *protobuf.CodexWakuMessageArchiveIndex) ([]*protobuf.WakuMessage, error)
+	CodexLoadHistoryArchiveIndex(ctx context.Context, myKey *ecdsa.PrivateKey, communityID types.HexBytes, indexCid string, isLocal bool) (*protobuf.CodexWakuMessageArchiveIndex, error)
 }
 
 type ArchiveManagerConfig struct {

@@ -12,8 +12,7 @@ import (
 
 func NewCodexClientTest(t *testing.T) communities.CodexClientInterface {
 	client, err := communities.NewCodexClient(params.CodexConfig{
-		Enabled:               true,
-		HistoryArchiveDataDir: filepath.Join(t.TempDir(), "codex", "archivedata"),
+		Enabled: true,
 		CodexNodeConfig: codex.Config{
 			DataDir:        filepath.Join(t.TempDir(), "codex", "codexdata"),
 			LogFormat:      codex.LogFormatNoColors,

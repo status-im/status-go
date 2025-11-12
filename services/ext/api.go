@@ -1606,7 +1606,7 @@ func (api *PublicAPI) PeerID() string {
 }
 
 func (m *PublicAPI) HasCommunityArchive(communityID types.HexBytes) bool {
-	return m.service.messenger.CodexIndexCidFileExists(communityID)
+	return m.service.messenger.IsSeedingHistoryArchiveCodex(communityID)
 }
 
 func (m *PublicAPI) Connect(peerId string, addrs []string) error {

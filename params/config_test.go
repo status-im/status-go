@@ -32,7 +32,6 @@ func TestNewConfigFromJSON(t *testing.T) {
 		},
 		"CodexConfig": {
 			"Enabled": false,
-			"HistoryArchiveDataDir": "` + tmpDir + `/codex/archivedata",
 			"CodexNodeConfig": {
 				"data-dir": "` + tmpDir + `/codex/codexdata",
 				"block-retries": 5
@@ -49,7 +48,6 @@ func TestNewConfigFromJSON(t *testing.T) {
 	require.Equal(t, tmpDir+"/archivedata", c.TorrentConfig.DataDir)
 	require.Equal(t, tmpDir+"/torrents", c.TorrentConfig.TorrentDir)
 	require.Equal(t, "DEBUG", c.RuntimeLogLevel)
-	require.Equal(t, filepath.Join(tmpDir, "codex", "archivedata"), c.CodexConfig.HistoryArchiveDataDir)
 	require.Equal(t, filepath.Join(tmpDir, "codex", "codexdata"), c.CodexConfig.CodexNodeConfig.DataDir)
 	require.Equal(t, 5, c.CodexConfig.CodexNodeConfig.BlockRetries)
 }

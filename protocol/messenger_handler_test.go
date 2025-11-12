@@ -213,8 +213,7 @@ func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithC
 	s.Require().NoError(err)
 
 	s.m.archiveManager.SetCodexConfig(&params.CodexConfig{
-		Enabled:               true,
-		HistoryArchiveDataDir: filepath.Join(s.T().TempDir(), "codex", "archivedata"),
+		Enabled: true,
 		CodexNodeConfig: codex.Config{
 			DataDir:        filepath.Join(s.T().TempDir(), "codex", "codexdata"),
 			LogFormat:      codex.LogFormatNoColors,
