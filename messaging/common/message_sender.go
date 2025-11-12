@@ -10,6 +10,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	mvdsnode "github.com/status-im/mvds/node"
+	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -51,6 +52,8 @@ type MessageSender struct {
 	// to decrypt messages
 	ephemeralKeys      map[string]*ecdsa.PrivateKey
 	ephemeralKeysMutex sync.Mutex
+
+	reliabilityManager *sds.ReliabilityManager
 }
 
 func NewMessageSender(
