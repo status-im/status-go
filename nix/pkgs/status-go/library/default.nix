@@ -42,15 +42,6 @@ pkgs.buildGoModule {
   # FIXME: Remove this when go 1.23 or later versions fix this madness.
   allowGoReference = true;
 
-  patchPhase = ''
-    mkdir -p vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build
-    mkdir -p vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library
-    chmod 775 -R vendor/github.com/waku-org/sds-go-bindings/third_party/
-
-    cp ${pkgs.lib-sds-pkg}/include/*h vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library
-    cp ${pkgs.lib-sds-pkg}/lib/* vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/
-  '';
-
   preBuild = ''
     go run cmd/library/*.go > $NIX_BUILD_TOP/main.go
     make generate SHELL=$SHELL GO111MODULE=on GO_GENERATE_CMD='go generate'
