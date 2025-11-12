@@ -3,31 +3,16 @@ package utils
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"testing"
 	"time"
 
-	"github.com/status-im/status-go/common"
-
-	_ "github.com/stretchr/testify/suite" // required to register testify flags
-
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/t"
-)
-
-var (
-	networkSelected = flag.String("network", "statuschain", "-network=NETWORKID or -network=NETWORKNAME to select network used for tests")
-	logLevel        = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 )
 
 var (
@@ -36,18 +21,6 @@ var (
 
 	// RootDir is the main application directory
 	RootDir string
-
-	// TestDataDir is data directory used for tests
-	TestDataDir string
-
-	// TestNetworkNames network ID to name mapping
-	TestNetworkNames = map[int]string{
-		params.MainNetworkID:        "Ethereum",
-		params.StatusChainNetworkID: "StatusChain",
-		params.SepoliaNetworkID:     "Sepolia",
-	}
-
-	syncTimeout = 50 * time.Minute
 )
 
 func Init() {
@@ -56,12 +29,10 @@ func Init() {
 		panic(err)
 	}
 
-	flag.Parse()
-
 	// set up logger
 	err = logutils.OverrideRootLoggerWithConfig(logutils.LogSettings{
-		Enabled: *logLevel != "",
-		Level:   *logLevel,
+		Enabled: true,
+		Level:   "INFO",
 	})
 	if err != nil {
 		panic(err)
@@ -79,105 +50,24 @@ func Init() {
 		}
 	}
 
-	// setup auxiliary directories
-	TestDataDir = filepath.Join(RootDir, ".ethereumtest")
-
 	TestConfig, err = loadTestConfig()
 	if err != nil {
 		panic(err)
 	}
 }
 
-// GetNetworkID returns appropriate network id for test based on
-// default or provided -network flag.
-func GetNetworkID() int {
-	switch strings.ToLower(*networkSelected) {
-	case fmt.Sprintf("%d", params.MainNetworkID), "mainnet":
-		return params.MainNetworkID
-	case fmt.Sprintf("%d", params.StatusChainNetworkID), "statuschain":
-		return params.StatusChainNetworkID
-	case fmt.Sprintf("%d", params.SepoliaNetworkID), "sepolia":
-		return params.SepoliaNetworkID
-	}
-	// Every other selected network must break the test.
-	panic(fmt.Sprintf("invalid selected network: %q", *networkSelected))
-}
-
 // GetAccount1PKFile returns the filename for Account1 keystore based
 // on the current network. This allows running the e2e tests on the
 // private network w/o access to the ACCOUNT_PASSWORD env variable
 func GetAccount1PKFile() string {
-	if GetNetworkID() == params.StatusChainNetworkID {
-		return "test-account1-status-chain.pk"
-	}
-	return "test-account1.pk"
+	return "test-account1-status-chain.pk"
 }
 
 // GetAccount2PKFile returns the filename for Account2 keystore based
 // on the current network. This allows running the e2e tests on the
 // private network w/o access to the ACCOUNT_PASSWORD env variable
 func GetAccount2PKFile() string {
-	if GetNetworkID() == params.StatusChainNetworkID {
-		return "test-account2-status-chain.pk"
-	}
-	return "test-account2.pk"
-}
-
-// MakeTestNodeConfig defines a function to return a params.NodeConfig
-// where specific network addresses are assigned based on provided network id.
-func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
-	testDir := filepath.Join(TestDataDir, TestNetworkNames[networkID])
-
-	if common.OperatingSystemIs(common.WindowsPlatform) {
-		testDir = filepath.ToSlash(testDir)
-	}
-
-	// run tests with "INFO" log level only
-	// when `go test` invoked with `-v` flag
-	errorLevel := "ERROR"
-	if testing.Verbose() {
-		errorLevel = "INFO"
-	}
-
-	configJSON := `{
-		"Name": "test",
-		"NetworkId": ` + strconv.Itoa(networkID) + `,
-		"RootDataDir": "` + testDir + `",
-		"KeycardPairingDataFile": "` + path.Join(testDir, "keycard/pairings.json") + `",
-		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
-		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
-		"LogLevel": "` + errorLevel + `",
-		"NoDiscovery": true,
-		"LightEthConfig": {
-			"Enabled": true
-		}
-	}`
-
-	nodeConfig, err := params.NewConfigFromJSON(configJSON)
-	if err != nil {
-		return nil, err
-	}
-
-	return nodeConfig, nil
-}
-
-// MakeTestNodeConfigWithDataDir defines a function to return a params.NodeConfig
-// where specific network addresses are assigned based on provided network id, and assigns
-// a given name and data dir.
-func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*params.NodeConfig, error) {
-	cfg, err := params.NewNodeConfig(dataDir, networkID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Only attempt to validate if a dataDir is specified, we only support in-memory DB for tests
-	if dataDir != "" {
-		if err := cfg.Validate(); err != nil {
-			return nil, err
-		}
-	}
-
-	return cfg, nil
+	return "test-account2-status-chain.pk"
 }
 
 type account struct {
@@ -199,8 +89,6 @@ type testConfig struct {
 	Account3 account
 }
 
-const passphraseEnvName = "ACCOUNT_PASSWORD"
-
 // loadTestConfig loads test configuration values from disk
 func loadTestConfig() (*testConfig, error) {
 	var config testConfig
@@ -210,25 +98,9 @@ func loadTestConfig() (*testConfig, error) {
 		return nil, err
 	}
 
-	if GetNetworkID() == params.StatusChainNetworkID {
-		err := parseTestConfigFromFile("config/status-chain-accounts.json", &config)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		err := parseTestConfigFromFile("public-chain-accounts.json", &config)
-		if err != nil {
-			return nil, err
-		}
-
-		pass, ok := os.LookupEnv(passphraseEnvName)
-		if !ok {
-			err := fmt.Errorf("Missing %s environment variable", passphraseEnvName)
-			return nil, err
-		}
-
-		config.Account1.Password = pass
-		config.Account2.Password = pass
+	err = parseTestConfigFromFile("config/status-chain-accounts.json", &config)
+	if err != nil {
+		return nil, err
 	}
 
 	return &config, nil
