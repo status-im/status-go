@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	statusRPC "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
 )
 
@@ -40,10 +39,6 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	}
 	rpcClient, err := statusRPC.NewClient(config)
 	require.NoError(t, err)
-
-	// import account keys
-	utils.Init()
-	require.NoError(t, utils.ImportTestAccount(t.TempDir(), utils.GetAccount1PKFile()))
 
 	return NewAPI(rpcClient, nil, nil, nil, db, time.Now, nil), cancel
 }

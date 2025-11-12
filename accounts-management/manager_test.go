@@ -8,6 +8,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
+
 	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/keystore"
@@ -16,11 +20,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/utils"
-
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	customerrors "github.com/status-im/status-go/accounts-management/errors"
 )
@@ -29,6 +28,19 @@ const testPassword = "test-password"
 const newTestPassword = "new-test-password"
 
 func TestVerifyAccountPassword(t *testing.T) {
+	filename := "testdata/test-account1-status-chain.pk"
+	account1 := struct {
+		KeyUID        string
+		WalletAddress string
+		ChatAddress   string
+		Password      string
+	}{
+		KeyUID:        "0x0000000000000000000000000000000000000000000000000000000000000001",
+		WalletAddress: "0xbF164ca341326a03b547c05B343b2E21eFAe24b9",
+		ChatAddress:   "0xbF164ca341326a03b547c05B343b2E21eFAe24b9",
+		Password:      "password",
+	}
+
 	accManager, err := NewAccountsManager(tt.MustCreateTestLogger())
 	require.NoError(t, err)
 
@@ -37,8 +49,6 @@ func TestVerifyAccountPassword(t *testing.T) {
 
 	persistence := mock_persistence.NewMockPersistence(ctrl)
 	accManager.SetPersistence(persistence)
-
-	utils.Init() // initialize the test config
 
 	testCases := []struct {
 		name             string
@@ -51,44 +61,44 @@ func TestVerifyAccountPassword(t *testing.T) {
 	}{
 		{
 			"correct address, correct password (decrypt should succeed)",
-			utils.TestConfig.Account1.KeyUID,
-			utils.TestConfig.Account1.WalletAddress,
-			utils.TestConfig.Account1.Password,
+			account1.KeyUID,
+			account1.WalletAddress,
+			account1.Password,
 			true,
 			true,
 			nil,
 		},
 		{
 			"correct address, correct password, non-existent key store",
-			utils.TestConfig.Account1.KeyUID,
-			utils.TestConfig.Account1.WalletAddress,
-			utils.TestConfig.Account1.Password,
+			account1.KeyUID,
+			account1.WalletAddress,
+			account1.Password,
 			false,
 			false,
 			ErrKeystoreMissing,
 		},
 		{
 			"correct address, correct password, empty key store (pk is not there)",
-			utils.TestConfig.Account1.KeyUID,
-			utils.TestConfig.Account1.WalletAddress,
-			utils.TestConfig.Account1.Password,
+			account1.KeyUID,
+			account1.WalletAddress,
+			account1.Password,
 			true,
 			false,
 			keystore.ErrKeystoreFileMissing,
 		},
 		{
 			"wrong address, correct password",
-			utils.TestConfig.Account1.KeyUID,
+			account1.KeyUID,
 			"0x79791d3e8f2daa1f7fec29649d152c0ada3cc535",
-			utils.TestConfig.Account1.Password,
+			account1.Password,
 			true,
 			true,
 			keystore.ErrKeystoreFileMissing,
 		},
 		{
 			"correct address, wrong password",
-			utils.TestConfig.Account1.KeyUID,
-			utils.TestConfig.Account1.WalletAddress,
+			account1.KeyUID,
+			account1.WalletAddress,
 			"wrong password", // wrong password
 			true,
 			true,
@@ -103,10 +113,10 @@ func TestVerifyAccountPassword(t *testing.T) {
 		require.NoError(t, err)
 
 		if testCase.importToLocation {
-			err = utils.ImportTestAccount(keystore.KeystorePath(), utils.GetAccount1PKFile())
+			err = os.Link(filename, filepath.Join(keystore.KeystorePath(), filepath.Base(filename)))
 			require.NoError(t, err)
 
-			// now we need to re-create the keystore in order to make the get-keystore aware of the copied account
+			// now we need to re-create the keystore in order to make the get-keystore aware of the copied account1
 			keystore, err = accManager.createKeystore(testCase.keyUID)
 			require.NoError(t, err)
 		}
@@ -145,9 +155,20 @@ func TestVerifyAccountPassword(t *testing.T) {
 // TestVerifyAccountPasswordWithAccountBeforeEIP55 verifies if VerifyAccountPassword
 // can handle accounts before introduction of EIP55.
 func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
-	rootDataDir := t.TempDir()
+	testKeyFile := "testdata/test-account3-before-eip55.pk"
+	account3 := struct {
+		KeyUID        string
+		WalletAddress string
+		ChatAddress   string
+		Password      string
+	}{
+		KeyUID:        "0x2084cb9965e28dacf4d4ef4ea900c4d30144f1ce4729c00e46f5dfb509b91b08",
+		WalletAddress: "0x3ad34e698d4806afd08b359b920f5c6b62b68ee4",
+		ChatAddress:   "0x3ad34e698d4806afd08b359b920f5c6b62b68ee4",
+		Password:      "password",
+	}
 
-	utils.Init() // initialize the test config
+	rootDataDir := t.TempDir()
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -160,10 +181,11 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 
 	accManager.SetRootDataDir(rootDataDir)
 
-	keystore, err := accManager.createKeystore(utils.TestConfig.Account3.KeyUID)
+	keystore, err := accManager.createKeystore(account3.KeyUID)
 	require.NoError(t, err)
 
-	err = utils.ImportTestAccount(keystore.KeystorePath(), "test-account3-before-eip55.pk") // Import keys and make sure one was created before EIP55 introduction.
+	// Copy file to keystore directory (simplest way is to make a link)
+	err = os.Link(testKeyFile, filepath.Join(keystore.KeystorePath(), filepath.Base(testKeyFile)))
 	require.NoError(t, err)
 
 	// now we need to reload the keystore (re-create it) in order to make the get-keystore aware of the copied account
@@ -173,17 +195,17 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 
 	persistence.EXPECT().GetProfileKeypair().Return(
 		&types.Keypair{
-			KeyUID: utils.TestConfig.Account3.KeyUID,
+			KeyUID: account3.KeyUID,
 		},
 		nil,
 	).Times(1)
 
 	// Set the chat account, this will create a new keystore
-	err = accManager.SetChatAccount(cryptotypes.HexToAddress(utils.TestConfig.Account3.ChatAddress), utils.TestConfig.Account3.Password, nil)
+	err = accManager.SetChatAccount(cryptotypes.HexToAddress(account3.ChatAddress), account3.Password, nil)
 	require.NoError(t, err)
 
-	address := cryptotypes.HexToAddress(utils.TestConfig.Account3.ChatAddress)
-	ok, err := accManager.VerifyAccountPassword(address, utils.TestConfig.Account3.Password)
+	address := cryptotypes.HexToAddress(account3.ChatAddress)
+	ok, err := accManager.VerifyAccountPassword(address, account3.Password)
 	require.NoError(t, err)
 	require.True(t, ok)
 }
