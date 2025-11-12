@@ -2,57 +2,55 @@ package following
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/thirdparty/efp"
 )
 
-// Manager handles following address operations using EFP providers
+// Manager handles following address operations using EFP provider
 type Manager struct {
-	providers []efp.FollowingDataProvider
+	provider efp.FollowingDataProvider
+	logger   *zap.Logger
 }
 
-// NewManager creates a new following manager with the provided EFP providers
-func NewManager(providers []efp.FollowingDataProvider) *Manager {
+// NewManager creates a new following manager with the provided EFP provider
+func NewManager(provider efp.FollowingDataProvider, logger *zap.Logger) *Manager {
 	return &Manager{
-		providers: providers,
+		provider: provider,
+		logger:   logger,
 	}
 }
 
 // FetchFollowingAddresses fetches the list of addresses that the given user is following
-// Uses the first available provider (can be enhanced later with fallback logic)
 func (m *Manager) FetchFollowingAddresses(ctx context.Context, userAddress common.Address, search string, limit, offset int) ([]efp.FollowingAddress, error) {
-	logutils.ZapLogger().Debug("following.Manager.FetchFollowingAddresses",
+	m.logger.Debug("following.Manager.FetchFollowingAddresses",
 		zap.String("userAddress", userAddress.Hex()),
 		zap.String("search", search),
 		zap.Int("limit", limit),
 		zap.Int("offset", offset),
-		zap.Int("providers.len", len(m.providers)),
 	)
 
-	if len(m.providers) == 0 {
-		return []efp.FollowingAddress{}, nil
+	if m.provider == nil {
+		return nil, errors.New("EFP provider not initialized")
 	}
 
-	// Use the first provider (EFP client)
-	provider := m.providers[0]
-	if !provider.IsConnected() {
-		logutils.ZapLogger().Warn("EFP provider not connected", zap.String("providerID", provider.ID()))
+	if !m.provider.IsConnected() {
+		m.logger.Warn("EFP provider not connected", zap.String("providerID", m.provider.ID()))
 		return []efp.FollowingAddress{}, nil
 	}
 
 	startTime := time.Now()
-	addresses, err := provider.FetchFollowingAddresses(ctx, userAddress, search, limit, offset)
+	addresses, err := m.provider.FetchFollowingAddresses(ctx, userAddress, search, limit, offset)
 	duration := time.Since(startTime)
 
-	logutils.ZapLogger().Debug("following.Manager.FetchFollowingAddresses completed",
+	m.logger.Debug("following.Manager.FetchFollowingAddresses completed",
 		zap.String("userAddress", userAddress.Hex()),
-		zap.String("providerID", provider.ID()),
+		zap.String("providerID", m.provider.ID()),
 		zap.Int("addresses.len", len(addresses)),
 		zap.Duration("duration", duration),
 		zap.Error(err),
@@ -67,27 +65,26 @@ func (m *Manager) FetchFollowingAddresses(ctx context.Context, userAddress commo
 
 // FetchFollowingStats fetches the stats (following count) for a user
 func (m *Manager) FetchFollowingStats(ctx context.Context, userAddress common.Address) (int, error) {
-	logutils.ZapLogger().Debug("following.Manager.FetchFollowingStats",
+	m.logger.Debug("following.Manager.FetchFollowingStats",
 		zap.String("userAddress", userAddress.Hex()),
 	)
 
-	if len(m.providers) == 0 {
+	if m.provider == nil {
+		return 0, errors.New("EFP provider not initialized")
+	}
+
+	if !m.provider.IsConnected() {
+		m.logger.Warn("EFP provider not connected", zap.String("providerID", m.provider.ID()))
 		return 0, nil
 	}
 
-	provider := m.providers[0]
-	if !provider.IsConnected() {
-		logutils.ZapLogger().Warn("EFP provider not connected", zap.String("providerID", provider.ID()))
-		return 0, nil
-	}
-
-	count, err := provider.FetchFollowingStats(ctx, userAddress)
+	count, err := m.provider.FetchFollowingStats(ctx, userAddress)
 	if err != nil {
-		logutils.ZapLogger().Error("following.Manager.FetchFollowingStats error", zap.Error(err))
+		m.logger.Error("following.Manager.FetchFollowingStats error", zap.Error(err))
 		return 0, err
 	}
 
-	logutils.ZapLogger().Debug("following.Manager.FetchFollowingStats completed",
+	m.logger.Debug("following.Manager.FetchFollowingStats completed",
 		zap.String("userAddress", userAddress.Hex()),
 		zap.Int("count", count),
 	)

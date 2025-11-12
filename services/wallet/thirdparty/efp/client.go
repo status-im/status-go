@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -13,10 +12,6 @@ import (
 )
 
 const baseURL = "https://api.ethfollow.xyz/api/v1"
-
-const (
-	requestDelay = 100 * time.Millisecond
-)
 
 // ENSData represents ENS information from the EFP API
 type ENSData struct {
@@ -61,17 +56,7 @@ type Client struct {
 	baseURL    string
 }
 
-func NewClient() *Client {
-	httpClient := thirdparty.NewHTTPClient(
-		thirdparty.WithDetailedTimeouts(
-			5*time.Second,  // dialTimeout
-			5*time.Second,  // tlsHandshakeTimeout
-			5*time.Second,  // responseHeaderTimeout
-			20*time.Second, // requestTimeout
-		),
-		thirdparty.WithMaxRetries(5),
-	)
-
+func NewClient(httpClient *thirdparty.HTTPClient) *Client {
 	return &Client{
 		httpClient: httpClient,
 		baseURL:    baseURL,
