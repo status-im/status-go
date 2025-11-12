@@ -1,10 +1,7 @@
 package sds
 
 /*
-	#cgo LDFLAGS: -L../third_party/nim-sds/build/ -lsds
-	#cgo LDFLAGS: -L../third_party/nim-sds -Wl,-rpath,../third_party/nim-sds/build/
-
-	#include "../third_party/nim-sds/library/libsds.h"
+	#include <libsds.h>
 	#include <stdio.h>
 	#include <stdlib.h>
 
