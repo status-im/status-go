@@ -168,7 +168,6 @@ class TestSettings:
         assert isinstance(got, str), f"Expected str, got {type(got)}"
         assert got == value, f"Expected '{value}', got '{got}'"
 
-    @pytest.mark.xfail(reason="API accepts wrong values")
     def test_notifications_set_group_chats_invalid_values(self):
         with pytest.raises(ApiResponseError, match=re.escape("json: cannot unmarshal")):
             self.config.settings_service.notifications_set_group_chats(123)
