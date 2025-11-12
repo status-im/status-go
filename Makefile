@@ -334,10 +334,10 @@ setup-dev:
 USE_SYSTEM_NIM ?= 0
 
 generate-sds:  ##@ Build libsds third_party
-	$(MAKE) -C vendor/github.com/waku-org/sds-go-bindings/sds/ build USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
+	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
 
 generate-sds-android:  ##@ Build libsds third_party for Android
-	$(MAKE) -C vendor/github.com/waku-org/sds-go-bindings/sds/ build-android USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
+	cd vendor/github.com/waku-org/sds-go-bindings/sds/ && make build-android USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
 
 generate: generate-sds
 generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
