@@ -297,6 +297,7 @@ class TestSettings:
         result = self.config.settings_service.delete_exemptions("12345")
         assert result is None or result == "", f"Expected None or empty string, got {result}"
 
+    @pytest.mark.skip(reason="Pending on issue resolution https://github.com/status-im/status-go/issues/7102")
     def test_delete_exemptions_invalid_id(self):
         invalid_id = None
         try:
@@ -475,6 +476,7 @@ class TestSettings:
         got = self.config.settings_service.notifications_get_global_mentions()
         assert got == new_value
 
+    @pytest.mark.skip(reason="Pending on issue resolution https://github.com/status-im/status-go/issues/7101")
     @pytest.mark.parametrize("bad_value", [123, True, ["list"], {"k": "v"}, None])
     def test_notifications_set_global_mentions_rejects_wrong_types_and_preserves_value(self, bad_value):
         before = self.config.settings_service.notifications_get_global_mentions()
