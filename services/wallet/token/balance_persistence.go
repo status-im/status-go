@@ -10,6 +10,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
@@ -181,4 +184,38 @@ func (p *balanceStorage) getCachedBalancesByChain(accounts []common.Address, tok
 	}
 
 	return ret, nil
+}
+
+func (p *balanceStorage) getUsedTokensKeys(testnetMode bool) (map[string]interface{}, error) {
+	query := `SELECT token_address, chain_id FROM token_balances`
+	rows, err := p.walletDB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tokenKeys := make(map[string]interface{}, 0)
+
+	for rows.Next() {
+		var tokenAddressStr string
+		var chainID uint64
+
+		err := rows.Scan(&tokenAddressStr, &chainID)
+		if err != nil {
+			return nil, err
+		}
+
+		if testnetMode && walletcommon.ChainID(chainID).IsMainnet() ||
+			!testnetMode && !walletcommon.ChainID(chainID).IsMainnet() {
+			continue
+		}
+
+		tokenKey := types.TokenKey(chainID, common.HexToAddress(tokenAddressStr))
+
+		if _, ok := tokenKeys[tokenKey]; !ok {
+			tokenKeys[tokenKey] = nil
+		}
+	}
+
+	return tokenKeys, nil
 }

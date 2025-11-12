@@ -13,6 +13,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/autofetcher"
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/fetcher"
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/manager"
@@ -389,6 +391,58 @@ func (tm *Manager) GetTokensForActiveNetworksMode() ([]*tokentypes.Token, error)
 	return tm.GetTokensByChains(chainIDs)
 }
 
+// getTokenKeysForTokensOfInterestForActiveNetworksMode returns the token keys for the tokens of interest for the active networks mode (testnet or mainnet)
+// On top of the used tokens keys, it adds all tokens that share the same cross chain id (because of grouping) and all mandatory tokens.
+func (tm *Manager) getTokenKeysForTokensOfInterestForActiveNetworksMode() ([]string, error) {
+	testnetMode, err := tm.settings.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	usedTokensKeys, err := tm.tokenBalancesStorage.getUsedTokensKeys(testnetMode)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens, err := tm.GetTokensByKeys(maps.Keys(usedTokensKeys))
+	if err != nil {
+		return nil, err
+	}
+
+	// Because of grouping it's important to add all tokens that share the same cross chain id to the used tokens keys
+	for _, token := range tokens {
+		if token.CrossChainID == "" {
+			continue
+		}
+		usedTokensKeys[token.Key()] = nil
+	}
+
+	// It's also important to add all mandatory tokens to the used tokens keys
+	for _, tokenKey := range walletcommon.MandatoryTokens() {
+		if _, ok := usedTokensKeys[tokenKey]; ok {
+			continue
+		}
+		chainID, _, ok := types.ChainAndAddressFromTokenKey(tokenKey)
+		if !ok {
+			continue
+		}
+		if walletcommon.ChainID(chainID).IsMainnet() == testnetMode {
+			continue
+		}
+		usedTokensKeys[tokenKey] = nil
+	}
+
+	return maps.Keys(usedTokensKeys), nil
+}
+
+func (tm *Manager) GetTokensOfInterestForActiveNetworksMode() ([]*tokentypes.Token, error) {
+	tokensKeys, err := tm.getTokenKeysForTokensOfInterestForActiveNetworksMode()
+	if err != nil {
+		return nil, err
+	}
+	return tm.GetTokensByKeys(tokensKeys)
+}
+
 // GetTokensForFetchingMarketData returns all unique tokens for fetching market data from Coingecko (doesn't affect CryptoCompare cause it maps tokens differently, by symbol)
 // Special handling for test tokens, for fetching market data from Coingecko, cause their API doesn't support test tokens
 // Corresponding mainnet tokens are needed to fetch market data for test tokens.
@@ -401,22 +455,16 @@ func (tm *Manager) GetTokensForFetchingMarketData() ([]*tokentypes.Token, error)
 
 	// If not in testnet mode, use the regular tokens
 	if !testnetMode {
-		return tm.GetTokensForActiveNetworksMode()
+		return tm.GetTokensOfInterestForActiveNetworksMode()
 	}
 
 	// Test tokens handling...
 	// Use all test tokens and add to the list only mainnet tokens that have a cross chain id set
-	allWsdkTokens := tm.tokensManager.UniqueTokens()
-	tokens := make([]*tokentypes.Token, 0)
-	for _, token := range allWsdkTokens {
-		if !walletcommon.ChainID(token.ChainID).IsMainnet() {
-			tokens = append(tokens, &tokentypes.Token{Token: token})
-		} else if token.CrossChainID != "" {
-			tokens = append(tokens, &tokentypes.Token{Token: token})
-		}
+	tokensKeys, err := tm.getTokenKeysForTokensOfInterestForActiveNetworksMode()
+	if err != nil {
+		return nil, err
 	}
-
-	return tokens, nil
+	return tm.GetTokensByKeysForFetchingMarketData(tokensKeys)
 }
 
 // GetTokensByKeysForFetchingMarketData returns all unique tokens for fetching market data from Coingecko (doesn't affect CryptoCompare cause it maps tokens differently, by symbol)
