@@ -83,8 +83,8 @@ GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 export NIM_SDS_HEADER_PATH ?= $(GIT_ROOT)/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library
 export NIM_SDS_LIB_PATH ?= $(GIT_ROOT)/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build
-export CGO_CFLAGS ?= -I${NIM_SDS_HEADER_PATH}/
-export CGO_LDFLAGS ?= -L${NIM_SDS_LIB_PATH}/ -lsds -Wl,-rpath,${NIM_SDS_LIB_PATH}/
+export CGO_CFLAGS = -I${NIM_SDS_HEADER_PATH}/
+export CGO_LDFLAGS = -L${NIM_SDS_LIB_PATH}/ -lsds -Wl,-rpath,${NIM_SDS_LIB_PATH}/
 
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
