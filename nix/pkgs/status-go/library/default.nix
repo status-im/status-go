@@ -19,6 +19,7 @@ pkgs.buildGoModule {
 
   nativeBuildInputs =
     let
+      # Fixes fatal: not a git repository (or any of the parent directories): .git
       fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
     in
     with pkgs; [
