@@ -27,7 +27,6 @@ pkgs.buildGoModule {
       protoc-gen-go
       protobuf3_24
       fakeGit
-      llvmPackages.clang
     ];
 
   phases = ["unpackPhase" "configurePhase" "patchPhase" "buildPhase"];
