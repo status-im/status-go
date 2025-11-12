@@ -654,7 +654,7 @@ class WakuextService(Service):
         response = self.rpc_request("getSavedAddressesPerMode", params)
         return response
 
-    def upsert_saved_address(self, address: str, name: str, color_id: str, ens: str = "", chain_short_names: str = "", is_test: bool = False):
+    def upsert_saved_address(self, address: str, name: str, color_id: str = "", ens: str = "", chain_short_names: str = "", is_test: bool = False):
         params = [
             {
                 "address": address,

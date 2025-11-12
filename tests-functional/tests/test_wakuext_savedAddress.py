@@ -132,9 +132,9 @@ class TestSavedAddresses:
         # Step: Checking remaining capacity
         remaining_capacity = self.rpc_client.wakuext_service.remaining_capacity_for_saved_addresses(is_test)
 
-        # Step: adding  addresses to fill capacity
+        # Step: adding addresses to fill capacity
         for i in range(remaining_capacity):
-            self.rpc_client.wakuext_service.upsert_saved_address(address=addresses[i], name=f"test{i}", isTest=is_test)
+            self.rpc_client.wakuext_service.upsert_saved_address(address=addresses[i], name=f"test{i}", is_test=is_test)
 
         # Step: Verifying that capacity is now 0
         with pytest.raises(ApiResponseError, match=re.escape("no more save addresses can be added")):
