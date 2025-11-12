@@ -168,13 +168,12 @@ func insertCodexConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	}
 	_, err = tx.Exec(`
 		INSERT OR REPLACE INTO codex_config (
-			enabled, history_archive_data_dir, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
+			enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
 			listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
 			repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
 			block_retries, cache_size, log_file, synthetic_id
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
 		c.CodexConfig.Enabled,
-		c.CodexConfig.HistoryArchiveDataDir,
 		c.CodexConfig.CodexNodeConfig.LogLevel,
 		c.CodexConfig.CodexNodeConfig.LogFormat,
 		c.CodexConfig.CodexNodeConfig.MetricsEnabled,
@@ -356,9 +355,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
-	if nodecfg.HistoryArchiveDistributionPreference == "" {
-		nodecfg.HistoryArchiveDistributionPreference = params.DefaultHistoryArchiveDistributionPreference
-	}
+
 	if nodecfg.HistoryArchiveDistributionPreference == "" {
 		nodecfg.HistoryArchiveDistributionPreference = params.DefaultHistoryArchiveDistributionPreference
 	}
@@ -366,14 +363,13 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	// Load codex_config
 	var listenAddrsStr, bootstrapNodesStr string
 	err = tx.QueryRow(`
-	  SELECT enabled, history_archive_data_dir, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
+	  SELECT enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
 			 listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
 			 repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
 			 block_retries, cache_size, log_file
 	  FROM codex_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.CodexConfig.Enabled,
-		&nodecfg.CodexConfig.HistoryArchiveDataDir,
 		&nodecfg.CodexConfig.CodexNodeConfig.LogLevel,
 		&nodecfg.CodexConfig.CodexNodeConfig.LogFormat,
 		&nodecfg.CodexConfig.CodexNodeConfig.MetricsEnabled,
