@@ -152,6 +152,11 @@ func (api *API) GetAllTokens(ctx context.Context) ([]*tokentypes.Token, error) {
 	return api.s.tokenManager.GetAllTokens()
 }
 
+// GetTokensOfInterestForActiveNetworksMode returns all unique tokens that are of interest for the current active networks mode (testnet or mainnet).
+func (api *API) GetTokensOfInterestForActiveNetworksMode(ctx context.Context) ([]*tokentypes.Token, error) {
+	return api.s.tokenManager.GetTokensOfInterestForActiveNetworksMode()
+}
+
 // GetTokensForActiveNetworksMode returns all unique tokens for the current active networks mode (testnet or mainnet).
 func (api *API) GetTokensForActiveNetworksMode(ctx context.Context) ([]*tokentypes.Token, error) {
 	return api.s.tokenManager.GetTokensForActiveNetworksMode()
@@ -327,14 +332,14 @@ func (api *API) GetFlatEthereumChains(ctx context.Context) ([]*params.Network, e
 }
 
 // @deprecated
-// FetchPrices fetches prices for a given token keys and currencies. If no tokens are provided, all tokens are fetched.
+// FetchPrices fetches prices for a given token keys and currencies. If no tokens are provided, all tokens of interest are fetched.
 func (api *API) FetchPrices(ctx context.Context, tokensKeys []string, currencies []string) (map[string]map[string]float64, error) {
 	logutils.ZapLogger().Debug("call to FetchPrices")
 	return api.s.marketManager.FetchPrices(tokensKeys, currencies)
 }
 
 // @deprecated
-// FetchTokenMarketValues fetches market values for a given token keys and currency. If no tokens are provided, all tokens are fetched.
+// FetchTokenMarketValues fetches market values for a given token keys and currency. If no tokens are provided, all tokens of interest are fetched.
 func (api *API) FetchMarketValues(ctx context.Context, tokensKeys []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
 	logutils.ZapLogger().Debug("call to FetchMarketValues")
 	return api.s.marketManager.FetchTokenMarketValues(tokensKeys, currency)
@@ -351,7 +356,7 @@ func (api *API) GetDailyMarketValues(ctx context.Context, tokenKey string, curre
 }
 
 // @deprecated
-// FetchTokenDetails fetches token details for a given tokens. If no tokens are provided, all tokens are fetched.
+// FetchTokenDetails fetches token details for a given tokens. If no tokens are provided, all tokens of interest are fetched.
 func (api *API) FetchTokenDetails(ctx context.Context, tokensKeys []string) (map[string]thirdparty.TokenDetails, error) {
 	logutils.ZapLogger().Debug("call to FetchTokenDetails")
 	return api.s.marketManager.FetchTokenDetails(tokensKeys)
