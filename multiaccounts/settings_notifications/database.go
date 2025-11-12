@@ -70,21 +70,6 @@ const (
 type NotificationsSettings struct {
 	db *sql.DB
 }
-type ExemptionsDefaults struct {
-	MuteAllMessages  bool
-	PersonalMentions string
-	GlobalMentions   string
-	OtherMessages    string
-}
-
-func (ns *NotificationsSettings) GetDefaultExemptions() ExemptionsDefaults {
-	return ExemptionsDefaults{
-		MuteAllMessages:  defaultExMuteAllMessagesValue,
-		PersonalMentions: defaultExPersonalMentionsValue,
-		GlobalMentions:   defaultExGlobalMentionsValue,
-		OtherMessages:    defaultExOtherMessagesValue,
-	}
-}
 
 func NewNotificationsSettings(db *sql.DB) *NotificationsSettings {
 	return &NotificationsSettings{

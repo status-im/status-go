@@ -138,6 +138,3 @@ class SettingsService(Service):
 
     def thirdparty_services_enabled(self):
         return self.rpc_request("thirdpartyServicesEnabled")
-
-    def notifications_get_default_exemptions(self):
-        return self.rpc_request("notificationsGetDefaultExemptions")

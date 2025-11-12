@@ -380,32 +380,6 @@ class TestSettings:
         except Exception:
             assert True
 
-    @pytest.mark.skip(reason="Backend RPC notificationsGetDefaultExemptions not yet fully deployed/testable")
-    def test_delete_exemptions_matches_defaults(self):
-        eid = "chat:defaults-check"
-        mute = True
-        personal = "all"
-        global_ = "mentions-only"
-        other = "none"
-
-        res = self.config.settings_service.notifications_set_exemptions(eid, mute, personal, global_, other)
-        assert res is None or res == ""
-
-        res_del = self.config.settings_service.delete_exemptions(eid)
-        assert res_del is None or res_del == ""
-
-        got_mute = self.config.settings_service.notifications_get_ex_mute_all_messages(eid)
-        got_personal = self.config.settings_service.notifications_get_ex_personal_mentions(eid)
-        got_global = self.config.settings_service.notifications_get_ex_global_mentions(eid)
-        got_other = self.config.settings_service.notifications_get_ex_other_messages(eid)
-
-        defaults = self.config.settings_service.notifications_get_default_exemptions()
-
-        assert got_mute is defaults["muteAllMessages"], f"Expected mute={defaults['muteAllMessages']}, got {got_mute}"
-        assert got_personal == defaults["personalMentions"], f"Expected personal={defaults['personalMentions']}, got {got_personal}"
-        assert got_global == defaults["globalMentions"], f"Expected global={defaults['globalMentions']}, got {got_global}"
-        assert got_other == defaults["otherMessages"], f"Expected other={defaults['otherMessages']}, got {got_other}"
-
     def test_notifications_get_message_preview_type(self):
         value = self.config.settings_service.notifications_get_message_preview()
         assert value is not None
