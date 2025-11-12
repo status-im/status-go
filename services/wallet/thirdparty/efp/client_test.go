@@ -1,11 +1,11 @@
 package efp
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -52,7 +52,8 @@ func TestFetchFollowingAddressesPagination(t *testing.T) {
 		},
 	}
 
-	response, _ := json.Marshal(expected)
+	response, err := json.Marshal(expected)
+	require.NoError(t, err)
 	srv, stop := setupTest(t, response)
 	defer stop()
 
@@ -62,7 +63,7 @@ func TestFetchFollowingAddressesPagination(t *testing.T) {
 	}
 
 	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
-	addresses, err := efpClient.FetchFollowingAddresses(context.Background(), userAddress, "", 10, 0)
+	addresses, err := efpClient.FetchFollowingAddresses(t.Context(), userAddress, "", 10, 0)
 
 	require.NoError(t, err)
 	require.Len(t, addresses, 2)
@@ -87,7 +88,8 @@ func TestFetchFollowingAddressesSearch(t *testing.T) {
 		},
 	}
 
-	response, _ := json.Marshal(expected)
+	response, err := json.Marshal(expected)
+	require.NoError(t, err)
 	srv, stop := setupTest(t, response)
 	defer stop()
 
@@ -97,7 +99,7 @@ func TestFetchFollowingAddressesSearch(t *testing.T) {
 	}
 
 	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
-	addresses, err := efpClient.FetchFollowingAddresses(context.Background(), userAddress, "vitalik", 0, 0)
+	addresses, err := efpClient.FetchFollowingAddresses(t.Context(), userAddress, "vitalik", 0, 0)
 
 	require.NoError(t, err)
 	require.Len(t, addresses, 1)
@@ -110,7 +112,8 @@ func TestFetchFollowingStats(t *testing.T) {
 		FollowersCount: 42,
 	}
 
-	response, _ := json.Marshal(expected)
+	response, err := json.Marshal(expected)
+	require.NoError(t, err)
 	srv, stop := setupTest(t, response)
 	defer stop()
 
@@ -120,7 +123,7 @@ func TestFetchFollowingStats(t *testing.T) {
 	}
 
 	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
-	count, err := efpClient.FetchFollowingStats(context.Background(), userAddress)
+	count, err := efpClient.FetchFollowingStats(t.Context(), userAddress)
 
 	require.NoError(t, err)
 	require.Equal(t, 150, count)
@@ -138,17 +141,35 @@ func TestFetchFollowingAddressesError(t *testing.T) {
 	}
 
 	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
-	_, err := efpClient.FetchFollowingAddresses(context.Background(), userAddress, "", 10, 0)
+	_, err := efpClient.FetchFollowingAddresses(t.Context(), userAddress, "", 10, 0)
 
 	require.Error(t, err)
 }
 
 func TestClientID(t *testing.T) {
-	efpClient := NewClient()
+	httpClient := thirdparty.NewHTTPClient(
+		thirdparty.WithDetailedTimeouts(
+			5*time.Second,
+			5*time.Second,
+			5*time.Second,
+			20*time.Second,
+		),
+		thirdparty.WithMaxRetries(5),
+	)
+	efpClient := NewClient(httpClient)
 	require.Equal(t, "efp", efpClient.ID())
 }
 
 func TestClientIsConnected(t *testing.T) {
-	efpClient := NewClient()
+	httpClient := thirdparty.NewHTTPClient(
+		thirdparty.WithDetailedTimeouts(
+			5*time.Second,
+			5*time.Second,
+			5*time.Second,
+			20*time.Second,
+		),
+		thirdparty.WithMaxRetries(5),
+	)
+	efpClient := NewClient(httpClient)
 	require.True(t, efpClient.IsConnected())
 }

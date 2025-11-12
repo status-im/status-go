@@ -1,13 +1,13 @@
 package following
 
 import (
-	"context"
 	"errors"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/services/wallet/thirdparty/efp"
 	mock_efp "github.com/status-im/status-go/services/wallet/thirdparty/efp/mock"
@@ -17,7 +17,7 @@ func TestFetchFollowingAddressesSuccess(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	ctx := context.TODO()
+	ctx := t.Context()
 	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
 
 	expected := []efp.FollowingAddress{
@@ -32,7 +32,7 @@ func TestFetchFollowingAddressesSuccess(t *testing.T) {
 	mockProvider.EXPECT().IsConnected().Return(true)
 	mockProvider.EXPECT().FetchFollowingAddresses(ctx, userAddress, "", 10, 0).Return(expected, nil)
 
-	manager := NewManager([]efp.FollowingDataProvider{mockProvider})
+	manager := NewManager(mockProvider, zap.NewNop())
 
 	result, err := manager.FetchFollowingAddresses(ctx, userAddress, "", 10, 0)
 
@@ -46,7 +46,7 @@ func TestFetchFollowingStatsSuccess(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	ctx := context.TODO()
+	ctx := t.Context()
 	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
 	expectedCount := 150
 
@@ -54,7 +54,7 @@ func TestFetchFollowingStatsSuccess(t *testing.T) {
 	mockProvider.EXPECT().IsConnected().Return(true)
 	mockProvider.EXPECT().FetchFollowingStats(ctx, userAddress).Return(expectedCount, nil)
 
-	manager := NewManager([]efp.FollowingDataProvider{mockProvider})
+	manager := NewManager(mockProvider, zap.NewNop())
 
 	result, err := manager.FetchFollowingStats(ctx, userAddress)
 
@@ -66,14 +66,14 @@ func TestFetchFollowingAddressesProviderNotConnected(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	ctx := context.TODO()
+	ctx := t.Context()
 	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
 
 	mockProvider := mock_efp.NewMockFollowingDataProvider(mockCtrl)
 	mockProvider.EXPECT().IsConnected().Return(false)
 	mockProvider.EXPECT().ID().Return("efp").AnyTimes()
 
-	manager := NewManager([]efp.FollowingDataProvider{mockProvider})
+	manager := NewManager(mockProvider, zap.NewNop())
 
 	result, err := manager.FetchFollowingAddresses(ctx, userAddress, "", 10, 0)
 
@@ -85,7 +85,7 @@ func TestFetchFollowingAddressesProviderError(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	ctx := context.TODO()
+	ctx := t.Context()
 	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
 	expectedError := errors.New("provider error")
 
@@ -94,7 +94,7 @@ func TestFetchFollowingAddressesProviderError(t *testing.T) {
 	mockProvider.EXPECT().IsConnected().Return(true)
 	mockProvider.EXPECT().FetchFollowingAddresses(ctx, userAddress, "", 10, 0).Return(nil, expectedError)
 
-	manager := NewManager([]efp.FollowingDataProvider{mockProvider})
+	manager := NewManager(mockProvider, zap.NewNop())
 
 	result, err := manager.FetchFollowingAddresses(ctx, userAddress, "", 10, 0)
 
@@ -103,14 +103,15 @@ func TestFetchFollowingAddressesProviderError(t *testing.T) {
 	require.Equal(t, expectedError, err)
 }
 
-func TestFetchFollowingAddressesNoProviders(t *testing.T) {
-	ctx := context.TODO()
+func TestFetchFollowingAddressesNoProvider(t *testing.T) {
+	ctx := t.Context()
 	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
 
-	manager := NewManager([]efp.FollowingDataProvider{})
+	manager := NewManager(nil, zap.NewNop())
 
 	result, err := manager.FetchFollowingAddresses(ctx, userAddress, "", 10, 0)
 
-	require.NoError(t, err)
-	require.Len(t, result, 0)
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.Contains(t, err.Error(), "EFP provider not initialized")
 }

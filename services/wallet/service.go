@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 
@@ -117,6 +118,7 @@ func NewService(
 	var collectibleProviders thirdparty.CollectibleProviders = thirdparty.CollectibleProviders{}
 	var pathProcessors []pathprocessor.PathProcessor = []pathprocessor.PathProcessor{}
 	var leaderboardConfig leaderboard.ServiceConfig = leaderboard.NewDefaultServiceConfig()
+	var followingManager *following.Manager
 
 	if thirdpartyServicesEnabled {
 
@@ -176,6 +178,24 @@ func NewService(
 		pathProcessors = buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags)
 
 		leaderboardConfig = leaderboard.NewLeaderboardConfig(config.WalletConfig.MarketDataProxyConfig)
+
+		// EFP (Ethereum Follow Protocol) provider
+		efpHTTPClient := thirdparty.NewHTTPClient(
+			thirdparty.WithDetailedTimeouts(
+				5*time.Second,  // dialTimeout
+				5*time.Second,  // tlsHandshakeTimeout
+				5*time.Second,  // responseHeaderTimeout
+				20*time.Second, // requestTimeout
+			),
+			thirdparty.WithMaxRetries(5),
+		)
+		efpClient := efp.NewClient(efpHTTPClient)
+		followingManager = following.NewManager(efpClient, logutils.ZapLogger().Named("FollowingManager"))
+	}
+
+	// Initialize followingManager with nil provider if third-party services are disabled
+	if followingManager == nil {
+		followingManager = following.NewManager(nil, logutils.ZapLogger().Named("FollowingManager"))
 	}
 
 	cryptoOnRampManager := onramp.NewManager(cryptoOnRampProviders)
@@ -247,13 +267,6 @@ func NewService(
 		collectiblesManager,
 		collectiblesOwnershipController,
 		collectiblesPublisher)
-
-	// EFP (Ethereum Follow Protocol) providers
-	efpClient := efp.NewClient()
-	followingProviders := []efp.FollowingDataProvider{
-		efpClient,
-	}
-	followingManager := following.NewManager(followingProviders)
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
