@@ -95,7 +95,6 @@ else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
  LIBWAKU_EXT := dll
  LIBSDS_EXT := dll
- GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-L${NIM_SDS_LIB_PATH}/ -lsds"
 else ifeq ($(detected_OS),Linux)
  GOBIN_SHARED_LIB_EXT := so
  LIBWAKU_EXT := so
