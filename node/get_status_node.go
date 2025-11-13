@@ -29,7 +29,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node/backup"
 	"github.com/status-im/status-go/params"
-	rpc2 "github.com/status-im/status-go/pkg/backend"
+	rpc2 "github.com/status-im/status-go/pkg/backend/rpc"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"

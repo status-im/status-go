@@ -1,4 +1,4 @@
-package backend
+package rpc
 
 import (
 	"encoding/json"
