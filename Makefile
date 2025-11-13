@@ -192,7 +192,7 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 # Flag needed by Nim deps that use nimbus-build-system.
 # When USE_SYSTEM_NIM=1 skips compiling Nim compiler locally and instead,
 # enforces to use system-installed Nim.
-USE_SYSTEM_NIM ?= 0
+USE_SYSTEM_NIM ?= 1
 
 # Libwaku targets
 
