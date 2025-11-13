@@ -318,6 +318,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 "wsPort": constants.STATUS_CONNECTOR_WS_PORT,
             },
             "codexConfigEnabled": kwargs.get("codex_config_enabled", False),
+            "codexConfigBootstrapNode": kwargs.get("codex_config_bootstrap_node", None),
             "importInitialDelay": kwargs.get("import_initial_delay", None),
             "messageArchiveInterval": kwargs.get("message_archive_interval", None),
             "torrentConfigEnabled": False,

@@ -358,6 +358,10 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.CodexConfig.Enabled = *request.CodexConfigEnabled
 	}
 
+	if request.CodexConfigBootstrapNode != nil {
+		nodeConfig.CodexConfig.CodexNodeConfig.BootstrapNodes = []string{*request.CodexConfigBootstrapNode}
+	}
+
 	if request.ImportInitialDelay != nil {
 		nodeConfig.ImportInitialDelay = *request.ImportInitialDelay
 	}
@@ -374,6 +378,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 			BlockRetries:   params.BlockRetries,
 			MetricsEnabled: false,
 			LogFormat:      codex.LogFormatNoColors,
+			BootstrapNodes: nodeConfig.CodexConfig.CodexNodeConfig.BootstrapNodes,
 		},
 	}
 
