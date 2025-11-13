@@ -56,8 +56,8 @@ jobs:
 
       - name: golangci-lint
         env:
-          CGO_CFLAGS: "-I${{ github.workspace }}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/library"
-          CGO_LDFLAGS: "-L${{ github.workspace }}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build -lsds -Wl,-rpath,${{ github.workspace }}/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build"
+          CGO_CFLAGS: "-I${{ github.workspace }}/third-party/nim-sds/library"
+          CGO_LDFLAGS: "-L${{ github.workspace }}/third_party/nim-sds/build -lsds"
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.3.1
