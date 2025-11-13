@@ -54,6 +54,11 @@ jobs:
         run: |
           make generate
 
+      - name: Install Nim 2.2.4
+        uses: nim-lang/setup-nim@v2
+        with:
+          nim-version: '2.2.4'
+
       - name: Build third-party libs
         run: |
           make build-libsds
