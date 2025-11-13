@@ -54,10 +54,14 @@ jobs:
         run: |
           make generate
 
+      - name: Clone third-party repos
+        run: |
+          make clone-nim-sds
+
       - name: golangci-lint
         env:
           NIM_SDS_HEADER_PATH: "${{ github.workspace }}/third-party/nim-sds/library"
-          NIM_SDS_LIB_PATH: "${{ github.workspace }}/third_party/nim-sds/build"
+          NIM_SDS_LIB_PATH: "${{ github.workspace }}/third-party/nim-sds/build"
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.3.1
