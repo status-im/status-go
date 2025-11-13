@@ -62,7 +62,7 @@ jobs:
 
       - name: Build third-party libs
         run: |
-          make build-libsds
+          make build-libsds USE_SYSTEM_NIM=1
 
       - name: golangci-lint
         env:
