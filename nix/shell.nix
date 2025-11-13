@@ -28,7 +28,6 @@ in mkShell {
   shellHook = ''
     export USE_SYSTEM_NIM=1
     export CGO_CFLAGS="$CGO_CFLAGS $NIX_CFLAGS_COMPILE"
-    export CGO_LDFLAGS="$CGO_LDFLAGS $NIX_LDFLAGS"
   ''
   + lib.optionalString (!isMacM1) ''
     export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
