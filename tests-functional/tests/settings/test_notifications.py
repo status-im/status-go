@@ -1,83 +1,18 @@
 import logging
 import re
-import time
 
 import pytest
 from clients.api import ApiResponseError
-import datetime
-
-# import time
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.mark.rpc
-class TestSettings:
+class TestNotificationSettings:
 
     @pytest.fixture(autouse=True)
     def setup_backends(self, backend_new_profile):
         self.config = backend_new_profile("sender")
-
-    def test_verify_node_config_stability(self):
-        cfg1 = self.config.settings_service.get_node_config()
-        cfg2 = self.config.settings_service.get_node_config()
-        assert cfg1 == cfg2, "NodeConfig should be stable across calls"
-
-    def test_check_node_config_params(self):
-        cfg = self.config.settings_service.get_node_config()
-        boot_api = self.config.get_boot_api_config()
-        assert cfg["WSEnabled"] == boot_api["wsEnabled"]
-        assert cfg["WSHost"] == boot_api["wsHost"]
-        assert cfg["WSPort"] == boot_api["wsPort"]
-        assert cfg["HTTPEnabled"] == boot_api["httpEnabled"]
-        assert cfg["HTTPPort"] == boot_api["httpPort"]
-
-    def test_verify_node_config_enforce(self, backend_new_profile):
-        forced_network_id = 4242
-        backend = backend_new_profile("forced_network", network_id=forced_network_id)
-        cfg = backend.settings_service.get_node_config()
-        network_id = cfg.get("NetworkId")
-        assert network_id is not None, f"NetworkId key missing in node config: {cfg}"
-        assert int(network_id) == forced_network_id, f"Expected NetworkId={forced_network_id}, got {network_id}"
-
-    @pytest.mark.skip(reason="backend currently does not validate backup-path; it is stored verbatim")
-    def test_set_invalid_backup_path(self):
-        invalid_path = "/invalid/path/that/does@$<>not|exist"
-        result = self.config.settings_service.save_setting("backup-path", invalid_path)
-        backup_path = self.config.settings_service.backup_path()
-        assert backup_path != invalid_path, f"Backend incorrectly saved invalid path: {backup_path}"
-        assert result is None or result == "", f"Expected save_setting to fail or return None, got: {result}"
-
-    def test_set_valid_backup_path(self):
-        current_path = self.config.settings_service.backup_path()
-
-        # Verify it's a valid path (not empty and is a string)
-        assert current_path is not None, "Backup path should not be None"
-        assert isinstance(current_path, str), f"Expected string, got {type(current_path)}"
-        assert current_path != "", "Backup path should not be empty"
-
-        # Test setting the same path explicitly (round-trip test)
-        result = self.config.settings_service.save_setting("backup-path", current_path)
-        assert result is None
-        assert self.config.settings_service.backup_path() == current_path
-
-    def test_get_backup_path_type_and_value(self):
-        backup_path = self.config.settings_service.backup_path()
-        assert backup_path is not None, "Expected a non-null backup path"
-        assert isinstance(backup_path, str), f"Expected string, got {type(backup_path)}"
-        assert backup_path != "", "Expected backup path to be non-empty"
-
-    def test_messages_backup_enabled_type(self):
-        result = self.config.settings_service.messages_backup_enabled()
-        assert result is not None, "Expected a non-null result"
-        assert isinstance(result, bool), f"Expected bool, got {type(result)}"
-
-    def test_toggle_messages_backup_enabled(self):
-        value = True
-        self.config.settings_service.save_setting("messages-backup-enabled?", value)
-        result = self.config.settings_service.messages_backup_enabled()
-        assert isinstance(result, bool)
-        assert result is value
 
     def test_notifications_get_allow_notifications(self):
         result = self.config.settings_service.notifications_get_allow_notifications()
@@ -218,67 +153,6 @@ class TestSettings:
             pass
         final_value = self.config.settings_service.notifications_get_sound_enabled()
         assert final_value == initial_value, f"Sound enabled changed after invalid input {invalid_value}"
-
-    def test_thirdparty_services_enabled(self):
-        result = self.config.settings_service.thirdparty_services_enabled()
-        assert result is not None, "Expected a non-null result"
-        assert isinstance(result, bool), f"Expected bool, got {type(result)}"
-        assert result is True, "Expected True"
-
-    def test_last_tokens_update_type_check(self):
-        result = self.config.settings_service.last_tokens_update()
-        assert result is not None, "Expected non-null timestamp"
-        assert isinstance(result, str), f"Expected string, got {type(result)}"
-        assert result != "", "Expected non-empty string"
-
-    def test_last_tokens_update_returns_valid_iso_datetime(self):
-        result = self.config.settings_service.last_tokens_update()
-        try:
-            _ = datetime.datetime.fromisoformat(result.replace("Z", "+00:00"))
-        except Exception as e:
-            pytest.fail(f"Returned value is not a valid ISO datetime string: {result}. Error: {e}")
-
-    def test_last_tokens_update_advances_after_updating_token_preferences(self):
-        dummy_prefs = [{"key": "0x1234567890abcdef1234567890abcdef12345678", "position": 1, "visible": True}]
-        self.config.accounts_service.update_token_preferences(dummy_prefs)
-        t1_raw = self.config.settings_service.last_tokens_update()
-        t1 = datetime.datetime.fromisoformat(t1_raw.replace("Z", "+00:00"))
-        time.sleep(1.2)
-        current_prefs = self.config.accounts_service.get_token_preferences()
-        self.config.accounts_service.update_token_preferences(current_prefs)
-        t2_raw = self.config.settings_service.last_tokens_update()
-        t2 = datetime.datetime.fromisoformat(t2_raw.replace("Z", "+00:00"))
-        assert t2 >= t1, f"Expected last-tokens-update to advance or stay same; got T1={t1} T2={t2}"
-
-    def test_mnemonic_was_shown(self):
-        result = self.config.settings_service.mnemonic_was_shown()
-        assert result is None or result == "", f"Expected no return value, got: {result}"
-
-    def test_set_bio_valid_string(self):
-        valid_bio = "This is a new test bio"
-        result = self.config.settings_service.set_bio(valid_bio)
-        assert result is None or result == "", f"Expected None or empty string, got {result}"
-
-    def test_set_bio_invalid_type(self):
-        invalid_bio = 123
-        try:
-            result = self.config.settings_service.set_bio(invalid_bio)
-            pytest.fail(f"Expected an exception for invalid bio {invalid_bio}, got {result}")
-        except Exception:
-            assert True
-
-    def test_delete_exemptions_valid_id(self):
-        result = self.config.settings_service.delete_exemptions("12345")
-        assert result is None or result == "", f"Expected None or empty string, got {result}"
-
-    @pytest.mark.skip(reason="Pending on issue resolution https://github.com/status-im/status-go/issues/7102")
-    def test_delete_exemptions_invalid_id(self):
-        invalid_id = None
-        try:
-            result = self.config.settings_service.delete_exemptions(invalid_id)
-            pytest.fail(f"Expected exception for invalid id: {invalid_id}, but got {result}")
-        except Exception:
-            assert True
 
     def test_notifications_set_exemptions_valid(self):
         test_id = "chat:12345"
