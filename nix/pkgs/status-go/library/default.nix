@@ -46,7 +46,7 @@ pkgs.buildGoModule {
     make generate SHELL=$SHELL GO111MODULE=on GO_GENERATE_CMD='go generate'
 
     export CGO_CFLAGS="-I${pkgs.lib-sds-pkg}/include"
-    export CGO_LDFLAGS="-L${pkgs.lib-sds-pkg}/lib -Wl,-rpath,${pkgs.lib-sds-pkg}/lib"
+    export CGO_LDFLAGS="-L${pkgs.lib-sds-pkg}/lib"
   '';
 
   # Build the Go library
