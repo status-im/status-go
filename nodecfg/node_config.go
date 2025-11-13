@@ -3,7 +3,6 @@ package nodecfg
 import (
 	"context"
 	"database/sql"
-	"strings"
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
@@ -21,68 +20,35 @@ func nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {
 
 type insertFn func(tx *sql.Tx, c *params.NodeConfig) error
 
-func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig, includeConnector bool) error {
-	query := `
+func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
+	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO node_config (
 		network_id, data_dir, keystore_dir, node_key,
 		api_modules, enable_ntp_sync, wallet_enabled,
-		browser_enabled, permissions_enabled`
-
-	args := []any{
+		browser_enabled, permissions_enabled, connector_enabled, synthetic_id)
+		VALUES (
+		?, ?, ?, ?,
+		?, ?, ?,
+		?, ?, ?, 'id'
+	)`,
 		c.NetworkID, "", "", c.NodeKey, c.APIModules, true,
 		c.WalletConfig.Enabled, c.BrowsersConfig.Enabled,
-		c.PermissionsConfig.Enabled,
-	}
-
-	if includeConnector {
-		query += `, connector_enabled`
-		args = append(args, c.ConnectorConfig.Enabled)
-	}
-
-	query += `, synthetic_id) VALUES (?` + strings.Repeat(",?", len(args)) + `)`
-	args = append(args, "id")
-
-	_, err := tx.Exec(query, args...)
+		c.PermissionsConfig.Enabled, c.ConnectorConfig.Enabled,
+	)
 	return err
-}
-
-func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	return insertNodeConfigBase(tx, c, false)
-}
-
-func insertNodeConfigWithConnector(tx *sql.Tx, c *params.NodeConfig) error {
-	return insertNodeConfigBase(tx, c, true)
-}
-
-func insertLogConfigBase(tx *sql.Tx, c *params.NodeConfig, includeNamespaces bool) error {
-	query := `
-	INSERT OR REPLACE INTO log_config (
-		enabled, log_dir, log_level, max_backups, max_size,
-		file, compress_rotated, log_to_stderr`
-
-	args := []any{
-		c.LogEnabled, c.LogDir, c.LogLevel, c.LogMaxBackups, c.LogMaxSize,
-		c.LogFile, c.LogCompressRotated, c.LogToStderr,
-	}
-
-	if includeNamespaces {
-		query += `, log_namespaces`
-		args = append(args, c.LogNamespaces)
-	}
-
-	query += `, synthetic_id) VALUES (?` + strings.Repeat(",?", len(args)) + `)`
-	args = append(args, "id")
-
-	_, err := tx.Exec(query, args...)
-	return err
-}
-
-func insertLogConfigWithNamespaces(tx *sql.Tx, c *params.NodeConfig) error {
-	return insertLogConfigBase(tx, c, true)
 }
 
 func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	return insertLogConfigBase(tx, c, false)
+	_, err := tx.Exec(`
+	INSERT OR REPLACE INTO log_config (
+		enabled, log_dir, log_level, log_namespaces, max_backups, max_size,
+		file, compress_rotated, log_to_stderr, synthetic_id
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		c.LogEnabled, c.LogDir, c.LogLevel, c.LogNamespaces, c.LogMaxBackups, c.LogMaxSize,
+		c.LogFile, c.LogCompressRotated, c.LogToStderr,
+	)
+
+	return err
 }
 
 func insertClusterConfig(tx *sql.Tx, c *params.NodeConfig) error {
@@ -172,8 +138,8 @@ func nodeConfigNormalInserts() []insertFn {
 	// the selects being used there are not affected.
 
 	return []insertFn{
-		insertNodeConfigWithConnector,
-		insertLogConfigWithNamespaces,
+		insertNodeConfig,
+		insertLogConfig,
 		insertClusterConfig,
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
@@ -330,7 +296,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	return nodecfg, nil
 }
 
-func MigrateNodeConfig(db *sql.DB) (err error) {
+func MigrateNodeConfig(db *sql.DB) error {
 	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
