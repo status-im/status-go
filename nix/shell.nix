@@ -26,9 +26,11 @@ in mkShell {
   ];
 
   shellHook = ''
+    CGO_CFLAGS_SDS="-I$(pwd)/third-party/nim-sds/library/"
+    CGO_LDFLAGS_SDS="-L$(pwd)/third-party/nim-sds/build/ -lsds"
     export USE_SYSTEM_NIM=1
-    export CGO_CFLAGS="$CGO_CFLAGS $NIX_CFLAGS_COMPILE"
-    export CGO_LDFLAGS="$CGO_LDFLAGS $NIX_LDFLAGS"
+    export CGO_CFLAGS="$CGO_CFLAGS_SDS"
+    export CGO_LDFLAGS="$CGO_LDFLAGS_SDS"
   ''
   + lib.optionalString (!isMacM1) ''
     export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
