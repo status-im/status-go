@@ -60,6 +60,7 @@ func initialize(requestJSON string) (*InitializeResponse, error) {
 		return nil, err
 	}
 
+	// Prepare StatusBackend options based on the request
 	opts := []Option{
 		WithLogger(
 			logutils.ZapLogger().Named("backend")),
@@ -90,18 +91,20 @@ func initialize(requestJSON string) (*InitializeResponse, error) {
 		opts = append(opts, WithAPILogging())
 	}
 
+	// Create a global StatusBackend instance
 	statusBackend, err = NewStatusBackend(request.DataDir, opts...)
 	if err != nil {
 		return nil, err
 	}
 
+	// Get metrics info for the response
 	metricsInfo, err := statusBackend.CentralizedMetricsInfo()
 	if err != nil {
 		return nil, err
 	}
 
-	// Get list of existing users (accounts in multiaccounts db)
-	accs, err := statusBackend.ListAccounts()
+	// Get list of existing users (accounts in multiaccounts db) for the response
+	accs, err := statusBackend.RootService().ListAccounts()
 	if err != nil {
 		return nil, err
 	}

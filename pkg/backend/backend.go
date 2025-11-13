@@ -11,13 +11,15 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/centralizedmetrics"
-	common2 "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/requestlog"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/pkg/backend/rpc"
 	"github.com/status-im/status-go/pkg/sentry"
+	"github.com/status-im/status-go/pkg/services/root"
+	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/server"
 )
 
@@ -36,10 +38,10 @@ type StatusBackend struct {
 	multiaccountsDB *multiaccounts.Database // FIXME: Remove this pointer
 
 	// RPC server
+	rpcServer *gethrpc.Server
 
 	// Services
-	services  []common2.StatusService
-	rpcServer *gethrpc.Server
+	rootService *root.Service
 
 	// FIXME: Extract to separate services
 	ipfs               *ipfs.Downloader
@@ -146,6 +148,25 @@ func NewStatusBackend(rootDataDir string, opts ...Option) (*StatusBackend, error
 		}
 	}
 
+	// Create root service
+	b.rootService, err = root.NewService(
+		b.rootDataDir,
+		b.logger.Named("root"),
+		b.multiaccountsDB,
+		b.mediaServer)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create root service")
+	}
+
+	err = b.rpcServer.RegisterName("root", b.rootService.API())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to register root service")
+	}
+
+	b.logger.Info("status backend initialized",
+		zap.String("version", version.Version()),
+		zap.String("commit", version.GitCommit()))
+
 	return b, nil
 }
 
@@ -218,25 +239,12 @@ func (b *StatusBackend) CentralizedMetricsInfo() (*centralizedmetrics.MetricsInf
 	return b.centralizedMetrics.Info()
 }
 
-// TODO: Move to a separate service
-func (b *StatusBackend) ListAccounts() ([]multiaccounts.Account, error) {
-	accs, err := b.multiaccountsDB.GetAccounts()
-	if err != nil {
-		return nil, err
-	}
-
-	for i, acc := range accs {
-		for j, images := range acc.Images {
-			url := b.mediaServer.MakeAccountImageURL(acc.KeyUID, images.Name, images.Clock)
-			accs[i].Images[j].LocalURL = url
-		}
-	}
-
-	return accs, nil
+func (b *StatusBackend) RootService() *root.API {
+	return b.rootService.API()
 }
 
 func (b *StatusBackend) CallInProcessRPC(inputJSON string) string {
-	codec := NewSingleRequestCodec(inputJSON)
+	codec := rpc.NewSingleRequestCodec(inputJSON)
 	b.rpcServer.ServeCodec(codec.GethCodec(), 0)
 	return codec.Output()
 }
