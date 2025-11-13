@@ -55,9 +55,10 @@ jobs:
           make generate
 
       - name: Install Nim 2.2.4
-        uses: nim-lang/setup-nim@v2
+        uses: jiro4989/setup-nim-action@v2
         with:
           nim-version: '2.2.4'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build third-party libs
         run: |
