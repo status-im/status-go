@@ -27,7 +27,6 @@ ARG enable_go_cache=true
 RUN if [ "$enable_go_cache" = "true" ]; then \
       go env -w GOCACHE=/root/.cache/go-build; \
     fi
-RUN rm /go/src/github.com/status-im/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/vendor/nimbus-build-system/vendor/Nim/bin/nim*
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
     --mount=type=cache,target="/root/.cache/go-generate-fast",id=statusgo-build-$cache_id \
     make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" \
@@ -55,7 +54,7 @@ COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/push-notifi
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/scripts/scan_waku_fleet.py /usr/local/bin
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
-COPY --from=builder /go/src/github.com/status-im/status-go/vendor/github.com/waku-org/sds-go-bindings/third_party/nim-sds/build/libsds.so /usr/local/lib/
+COPY --from=builder /go/src/github.com/status-im/status-go/third-party/nim-sds/build/libsds.so /usr/local/lib/
 
 ENV LD_LIBRARY_PATH=/usr/local/lib/
 
