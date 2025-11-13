@@ -420,6 +420,7 @@ benchmark:
 
 lint-panics: export GOFLAGS ?= -tags='$(BUILD_TAGS)'
 lint-panics: generate
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go tool goroutine-defer-guard -skip=./cmd -test=false ./...
 
 lint: generate lint-panics
