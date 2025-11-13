@@ -222,3 +222,64 @@ class TestCommunityArchives(MessengerSteps):
         # Ensure that the community archive exists in the file system for the community owner
         has_archive = self.creator.wakuext_service.has_community_archive(community_id)
         assert has_archive is True, "Creator should have community archive after messages are sent"
+
+    def test_archive_is_not_created_without_messages(self):
+        # Create a community
+        response = self.creator.wakuext_service.create_community("Codex community", "No one should join", history_archive_support_enabled=True)
+        community_id = response.get("communities", [{}])[0].get("id")
+
+        # Wait to be sure that the archive creation signal is not sent
+        with pytest.raises(TimeoutError):
+            self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=self.message_archive_interval + 10)
+
+        # Ensure that the community archive exists in the file system for the community owner
+        has_archive = self.creator.wakuext_service.has_community_archive(community_id)
+        assert has_archive is False, "Creator should not have community archive without message"
+
+    def test_different_archives_are_created_with_multiple_messages(self):
+        community_id = self.create_community(self.creator, history_archive_support_enabled=True)
+
+        # Create community chat
+        create_resp = self.creator.wakuext_service.create_community_chat(community_id, self.chat_payload)
+        chat_id = create_resp.get("chats")[0].get("id")
+
+        # Join community so the member can receive messages
+        self.join_community(member=self.member, admin=self.creator)
+
+        for i in range(2):
+            # Send a message to the default community chat
+            text = f"Hi @{self.member.public_key}!"
+            self.creator.wakuext_service.send_chat_message(chat_id, text)
+
+            self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=self.message_archive_interval + 10)
+
+            # The timeout is arbitrary set to 10 seconds
+            # We need to wait for the archive dispatch + download + import which should not take more than 10 seconds
+            archive_timeout = 10
+
+            # When wait for index download completed signal - at this stage the index and index CID files
+            # should both exist in the file system of the member.
+            logging.info("Waiting for community member to download archive index...")
+            self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
+            logging.info("Success! Archive index downloaded!")
+
+            # Ensure that the community archive index CID file exists in the file system for the member.
+            # After successfully downloading the archive index, its CID is stored in the the
+            # index CID file and the file is written immediately after the archive index has been downloaded.
+            # Notice that at this stage, the node still does not have any single archive downloaded.
+            logging.info("Verifying that community member has index CID file...")
+            has_archive_index = self.member.wakuext_service.has_community_archive(community_id)
+            assert has_archive_index is True, "Member should have community archive index after messages are sent"
+            logging.info("Success! Community member has index CID file!")
+
+            # Wait for the community archives to be downloaded for the first member.
+            logging.info("Waiting for community member to download ALL history archives...")
+            self.member.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout)
+            logging.info("Success! Community member has downloaded ALL history archives!")
+
+            # Once the historyArchivesSeeding signal is received, the database
+            # should be already updated: archive ID (HASH) should be stored in the database.
+            logging.info("Verifying that archive ID (HASH) is recorded in the database...")
+            download_archive_ids = self.member.wakuext_service.get_downloaded_message_archive_ids(community_id)
+            assert len(download_archive_ids) == i + 1, "Member should have exactly 1 archive ID downloaded"
+            logging.info("Success! Archive ID (HASH) is recorded in the database!")
