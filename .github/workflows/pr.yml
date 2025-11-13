@@ -60,8 +60,8 @@ jobs:
 
       - name: golangci-lint
         env:
-          NIM_SDS_HEADER_PATH: "${{ github.workspace }}/third-party/nim-sds/library"
-          NIM_SDS_LIB_PATH: "${{ github.workspace }}/third-party/nim-sds/build"
+          CGO_CFLAGS: "-I${{ github.workspace }}/third-party/nim-sds/library"
+          CGO_LDFLAGS: "-L${{ github.workspace }}/third-party/nim-sds/build -lsds -Wl,-rpath,${{ github.workspace }}/third-party/nim-sds/build"
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.3.1
