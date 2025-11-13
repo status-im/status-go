@@ -151,3 +151,77 @@ func TestResourceURL(t *testing.T) {
 	require.Equal(t, "noahzinsmeister.com", uri.Host)
 	require.Equal(t, "", uri.Path)
 }
+
+func TestValidateUsername(t *testing.T) {
+	testCases := []struct {
+		name        string
+		username    string
+		expectedErr bool
+		errContains string
+	}{
+		{
+			name:        "valid username with .eth",
+			username:    "validusername.eth",
+			expectedErr: false,
+		},
+		{
+			name:        "valid username with subdomain",
+			username:    "sub.validusername.eth",
+			expectedErr: false,
+		},
+		{
+			name:        "valid stateofus username",
+			username:    "username.stateofus.eth",
+			expectedErr: false,
+		},
+		{
+			name:        "invalid - no .eth suffix",
+			username:    "invalidusername",
+			expectedErr: true,
+			errContains: "user name must be a valid ENS name ending with .eth",
+		},
+		{
+			name:        "invalid - .com suffix",
+			username:    "username.com",
+			expectedErr: true,
+			errContains: "user name must be a valid ENS name ending with .eth",
+		},
+		{
+			name:        "invalid - duplicated stateofus domain",
+			username:    "username.stateofus.eth.stateofus.eth",
+			expectedErr: true,
+			errContains: "must not have a duplicated domain",
+		},
+		{
+			name:        "invalid - duplicated stateofus domain with subdomain",
+			username:    "sub.username.stateofus.eth.stateofus.eth",
+			expectedErr: true,
+			errContains: "must not have a duplicated domain",
+		},
+		{
+			name:        "invalid - empty string should fail",
+			username:    "",
+			expectedErr: true,
+			errContains: "user name must be a valid ENS name ending with .eth",
+		},
+		{
+			name:        "invalid - only .eth",
+			username:    ".eth",
+			expectedErr: true, // This is technically valid per the current implementation
+			errContains: "user name must be a valid ENS name ending with .eth",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateUsername(tc.username)
+
+			if tc.expectedErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errContains)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

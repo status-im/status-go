@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -37,6 +39,23 @@ func NewAPI(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManag
 		timeSource:         timeSource,
 		syncUserDetailFunc: syncUserDetailFunc,
 	}
+}
+
+func ValidateUsername(username string) error {
+	// Validate ENS name format: allows subdomains (e.g., subdomain.domain.eth)
+	ensPattern := `^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.eth$`
+	matched, err := regexp.MatchString(ensPattern, username)
+	if err != nil {
+		return fmt.Errorf("failed to validate username: %w", err)
+	}
+	if !matched {
+		return fmt.Errorf("user name must be a valid ENS name ending with .eth")
+	}
+	// Make sure the username does not end with .stateofus.eth.stateofus.eth, which happens due to a bug in some older clients
+	if strings.HasSuffix(username, ".stateofus.eth.stateofus.eth") {
+		return fmt.Errorf("user name must not have a duplicated domain")
+	}
+	return nil
 }
 
 type URI struct {
@@ -78,6 +97,9 @@ func (api *API) GetEnsUsernames(ctx context.Context) ([]*UsernameDetail, error) 
 }
 
 func (api *API) Add(ctx context.Context, chainID uint64, username string) error {
+	if err := ValidateUsername(username); err != nil {
+		return err
+	}
 	ud := &UsernameDetail{Username: username, ChainID: chainID, Clock: api.unixTime()}
 	err := api.db.AddEnsUsername(ud)
 	if err != nil {
