@@ -108,7 +108,7 @@ endif
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)third-party/nim-sds
 LIBSDS := $(NIM_SDS_SOURCE_DIR)/build/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_SOURCE_DIR)/library
-CGO_LDFLAGS+=-L$(NIM_SDS_SOURCE_DIR)/build -lsds -Wl,-rpath,$(NIM_SDS_SOURCE_DIR)/build
+CGO_LDFLAGS+=-L$(NIM_SDS_SOURCE_DIR)/build -lsds
 
 BUILD_FLAGS ?= -ldflags=""
 BUILD_FLAGS_MOBILE ?=
