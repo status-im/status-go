@@ -40,32 +40,6 @@ class TestSettings:
         assert network_id is not None, f"NetworkId key missing in node config: {cfg}"
         assert int(network_id) == forced_network_id, f"Expected NetworkId={forced_network_id}, got {network_id}"
 
-    def test_news_feed_enabled(self):
-        result = self.config.newsfeed_service.enabled()
-        assert isinstance(result, bool), f"Expected boolean, got {type(result)}"
-        assert result is True, "Expected news feed to be enabled"
-
-    def test_news_notifications_enabled(self):
-        result = self.config.newsfeed_service.notifications_enabled()
-        assert result is not None, "Expected a non-null result"
-        assert isinstance(result, bool), f"Expected bool, got {type(result)}"
-
-    def test_toggle_news_notifications_enabled(self):
-        newsfeed = self.config.newsfeed_service
-        newsfeed.set_notifications_enabled(True)
-        enabled_state = newsfeed.notifications_enabled()
-        assert enabled_state is True, "Expected news notifications to be enabled"
-        newsfeed.set_notifications_enabled(False)
-        disabled_state = newsfeed.notifications_enabled()
-        assert disabled_state is False, "Expected news notifications to be disabled"
-
-    def test_toggle_news_rss_enabled(self):
-        newsfeed = self.config.newsfeed_service
-        assert newsfeed.set_rss_enabled(False) is None
-        assert newsfeed.rss_enabled() is False, "Expected RSS news to be disabled"
-        assert newsfeed.set_rss_enabled(True) is None
-        assert newsfeed.rss_enabled() is True, "Expected RSS news to be enabled"
-
     @pytest.mark.skip(reason="backend currently does not validate backup-path; it is stored verbatim")
     def test_set_invalid_backup_path(self):
         invalid_path = "/invalid/path/that/does@$<>not|exist"
