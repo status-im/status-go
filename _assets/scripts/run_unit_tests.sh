@@ -73,7 +73,7 @@ run_test_for_packages() {
   rm -f "${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.*"
 
   # Run tests
-  env CGO_LDFLAGS="${CGO_LDFLAGS}" CGO_CFLAGS="${CGO_CFLAGS}" \
+  env LD_LIBRARY_PATH="${LD_LIBRARY_PATH}" CGO_LDFLAGS="${CGO_LDFLAGS}" CGO_CFLAGS="${CGO_CFLAGS}" \
   gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
     ./_assets/scripts/test-with-coverage.sh \
     ${GOTEST_EXTRAFLAGS} \
