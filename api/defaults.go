@@ -39,7 +39,7 @@ var (
 	DefaultFleet = params.FleetStatusProd
 )
 
-func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
+func DefaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[accscommon.PathEIP1581Chat].PublicKey
 
 	s := &settings.Settings{}

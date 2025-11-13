@@ -1331,7 +1331,7 @@ func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, keyUID
 
 func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, mnemonic string, keyUID string, masterAddress string,
 	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (*settings.Settings, error) {
-	s, err := defaultSettings(keyUID, masterAddress, derivedAddresses)
+	s, err := DefaultSettings(keyUID, masterAddress, derivedAddresses)
 	if err != nil {
 		return nil, err
 	}

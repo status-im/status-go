@@ -95,7 +95,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 			}
 		}
 
-		defSettings, err := defaultSettings(genMasterAcc.KeyUID(), genMasterAcc.Address().Hex(), derivedAddresses)
+		defSettings, err := DefaultSettings(genMasterAcc.KeyUID(), genMasterAcc.Address().Hex(), derivedAddresses)
 		require.NoError(t, err)
 
 		data.settings = *defSettings
