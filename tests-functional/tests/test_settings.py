@@ -34,9 +34,9 @@ class TestSettings:
 
     def test_verify_node_config_enforce(self, backend_new_profile):
         forced_network_id = 4242
-        forced = backend_new_profile("forced_network", network_id=forced_network_id)
-        cfg = forced.settings_service.get_node_config()
-        network_id = cfg.get("NetworkId", cfg.get("networkId"))
+        backend = backend_new_profile("forced_network", network_id=forced_network_id)
+        cfg = backend.settings_service.get_node_config()
+        network_id = cfg.get("NetworkId")
         assert network_id is not None, f"NetworkId key missing in node config: {cfg}"
         assert int(network_id) == forced_network_id, f"Expected NetworkId={forced_network_id}, got {network_id}"
 
