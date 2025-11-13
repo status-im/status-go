@@ -54,9 +54,9 @@ jobs:
         run: |
           make generate
 
-      - name: Clone third-party repos
+      - name: Build third-party libs
         run: |
-          make clone-nim-sds
+          make build-libsds
 
       - name: golangci-lint
         env:
