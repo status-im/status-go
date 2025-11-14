@@ -3,6 +3,7 @@ package ext
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"time"
 
 	"github.com/codex-storage/codex-go-bindings/codex"
@@ -1618,4 +1619,17 @@ func (m *PublicAPI) GetDownloadedMessageArchiveIDs(communityID types.HexBytes) (
 
 func (m *PublicAPI) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
 	return m.service.messenger.GetMessageArchiveIDsToImport(communityID)
+}
+
+func (api *PublicAPI) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
+	if duration <= 0 {
+		return 0, errors.New("duration must be greater than zero")
+	}
+
+	d := duration * time.Second
+	updatedInterval, err := api.service.messenger.UpdateMessageArchiveInterval(d)
+	if err != nil {
+		return 0, err
+	}
+	return updatedInterval / time.Second, nil
 }

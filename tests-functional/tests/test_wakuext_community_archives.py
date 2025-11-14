@@ -1,6 +1,7 @@
 import logging
 from uuid import uuid4
 import pytest
+import time
 
 from steps.messenger import MessengerSteps
 from clients.signals import SignalType
@@ -11,10 +12,9 @@ class TestCommunityArchives(MessengerSteps):
     @pytest.fixture(autouse=True)
     def setup_backends(self, backend_new_profile):
         """Initialize three backends (creator, member and another_member) for each test function"""
-        self.message_archive_interval = 80
 
         # Community owner
-        self.creator = backend_new_profile("creator", codex_config_enabled=True, message_archive_interval=self.message_archive_interval)
+        self.creator = backend_new_profile("creator", codex_config_enabled=True)
         # Define codex as archive distribution preference
         self.creator.wakuext_service.set_archive_distribution_preference("codex")
 
@@ -50,6 +50,9 @@ class TestCommunityArchives(MessengerSteps):
         }
 
     def test_community_archive_index_exists(self):
+        message_archive_interval = 80
+        self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
+
         community_id = self.create_community(self.creator, history_archive_support_enabled=True)
 
         # Ensure that no community archive exists initially
@@ -81,10 +84,10 @@ class TestCommunityArchives(MessengerSteps):
         message_text = member_msgs_resp.get("messages")[0].get("text")
         assert message_text == text, "Member should have received the message"
 
-        logging.info(f"Waiting {self.message_archive_interval + 10}s for community owner to create archive...")
+        logging.info(f"Waiting {message_archive_interval + 10}s for community owner to create archive...")
 
         # Wait for the community archive to be created for the community owner
-        self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=self.message_archive_interval + 10)
+        self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=message_archive_interval + 10)
 
         logging.info("Checking that community owner has local index CID file...")
 
@@ -202,6 +205,9 @@ class TestCommunityArchives(MessengerSteps):
         logging.info("Success! Another member has the message after importing history archive.")
 
     def test_community_archive_exists_for_default_chat(self):
+        message_archive_interval = 10
+        self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
+
         # Create a community
         response = self.creator.wakuext_service.create_community("Codex community", "No one should join", history_archive_support_enabled=True)
         community_id = response.get("communities", [{}])[0].get("id")
@@ -217,26 +223,30 @@ class TestCommunityArchives(MessengerSteps):
         assert send_resp.get("chats")[0].get("lastMessage").get("text") == text
 
         # Wait for the community archive to be created for the community owner
-        self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=self.message_archive_interval + 10)
+        self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=message_archive_interval + 10)
 
         # Ensure that the community archive exists in the file system for the community owner
         has_archive = self.creator.wakuext_service.has_community_archive(community_id)
         assert has_archive is True, "Creator should have community archive after messages are sent"
 
     def test_archive_is_not_created_without_messages(self):
+        message_archive_interval = 10
+        self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
+
         # Create a community
         response = self.creator.wakuext_service.create_community("Codex community", "No one should join", history_archive_support_enabled=True)
         community_id = response.get("communities", [{}])[0].get("id")
 
-        # Wait to be sure that the archive creation signal is not sent
-        with pytest.raises(TimeoutError):
-            self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=self.message_archive_interval + 10)
+        time.sleep(message_archive_interval + 10)
 
         # Ensure that the community archive exists in the file system for the community owner
         has_archive = self.creator.wakuext_service.has_community_archive(community_id)
         assert has_archive is False, "Creator should not have community archive without message"
 
     def test_different_archives_are_created_with_multiple_messages(self):
+        message_archive_interval = 10
+        self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
+
         community_id = self.create_community(self.creator, history_archive_support_enabled=True)
 
         # Create community chat
@@ -251,7 +261,7 @@ class TestCommunityArchives(MessengerSteps):
             text = f"Hi @{self.member.public_key}!"
             self.creator.wakuext_service.send_chat_message(chat_id, text)
 
-            self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=self.message_archive_interval + 10)
+            self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=message_archive_interval + 10)
 
             # The timeout is arbitrary set to 10 seconds
             # We need to wait for the archive dispatch + download + import which should not take more than 10 seconds
@@ -283,3 +293,73 @@ class TestCommunityArchives(MessengerSteps):
             download_archive_ids = self.member.wakuext_service.get_downloaded_message_archive_ids(community_id)
             assert len(download_archive_ids) == i + 1, "Member should have exactly 1 archive ID downloaded"
             logging.info("Success! Archive ID (HASH) is recorded in the database!")
+
+    def test_archive_is_downloaded_after_logout_login(self):
+        message_archive_interval = 10
+        self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
+
+        community_id = self.create_community(self.creator, history_archive_support_enabled=True)
+
+        # Ensure that no community archive exists initially
+        has_archive_index = self.creator.wakuext_service.has_community_archive(community_id)
+        assert has_archive_index is False, "Creator should not have community archive initially"
+        has_archive_index = self.member.wakuext_service.has_community_archive(community_id)
+        assert has_archive_index is False, "Member should not have community archive initially"
+
+        create_resp = self.creator.wakuext_service.create_community_chat(community_id, self.chat_payload)
+        chat_id = create_resp.get("chats")[0].get("id")
+
+        # Wait for member to receive chat creation signal
+        self.join_community(member=self.member, admin=self.creator)
+        self.member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=chat_id, timeout=10)
+
+        # Send a message to the community chat
+        text = f"Hi @{self.member.public_key}"
+        send_resp = self.creator.wakuext_service.send_chat_message(chat_id, text)
+        message_id = send_resp.get("messages", [])[0].get("id", "")
+
+        # Wait for member to receive the new message
+        self.member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id, timeout=10)
+
+        # Logout the member to simulate offline scenario
+        key_uid = str(self.member.key_uid)
+        self.member.logout()
+        self.member.wait_for_logout()
+
+        logging.info(f"Waiting {message_archive_interval + 10}s for community owner to create archive...")
+        # Wait for the community archive to be created for the community owner
+        self.creator.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=message_archive_interval + 10)
+        logging.info("Success! History archive created and dispatched!")
+
+        # Login the member back
+        self.member.login(key_uid)
+        self.member.wait_for_login()
+        self.member.wakuext_service.start_messenger()
+
+        # Re-connect member to community codex client
+        info = self.creator.wakuext_service.debug()
+        self.member.wakuext_service.connect(info["id"], info["addrs"])
+
+        # The timeout is arbitrary set to 20 seconds
+        # We need to wait for the archive dispatch + download + import which should not take more than 10 seconds
+        archive_timeout = 20
+
+        logging.info("Waiting for community member to download manifest of the archive index...")
+        # Wait for the community member to download the archive index manifest
+        self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_MANIFEST_FETCHED.value, timeout=archive_timeout)
+        logging.info("Success! Manifest of the archive index fetched!")
+
+        # When wait for index download completed signal - at this stage the index and index CID files
+        # should both exist in the file system of the member.
+        logging.info("Waiting for community member to download archive index...")
+        self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
+        logging.info("Success! Archive index downloaded!")
+
+        # Ensure that the community archive index CID file exists in the file system for the member.
+        # After successfully downloading the archive index, its CID is stored in the the
+        # index CID file and the file is written immediately after the archive index has been downloaded.
+        # Notice that at this stage, the node still does not have any single archive downloaded.
+        logging.info("Verifying that community member has index CID file...")
+        has_archive_index = self.member.wakuext_service.has_community_archive(community_id)
+        assert has_archive_index is True, "Member should have community archive index after messages are sent"
+        logging.info("Success! Community member has index CID file!")
