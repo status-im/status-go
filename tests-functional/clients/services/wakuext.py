@@ -802,3 +802,8 @@ class WakuextService(Service):
         params = [community_id]
         response = self.rpc_request("getMessageArchiveIDsToImport", params)
         return response
+
+    def update_message_archive_interval(self, duration_seconds: int):
+        params = [duration_seconds]
+        response = self.rpc_request("updateMessageArchiveInterval", params)
+        return response

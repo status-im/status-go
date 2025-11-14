@@ -4692,3 +4692,8 @@ func (m *Messenger) GetDownloadedMessageArchiveIDs(communityID types.HexBytes) (
 func (m *Messenger) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
 	return m.archiveManager.GetMessageArchiveIDsToImport(communityID)
 }
+
+func (m *Messenger) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
+	messageArchiveInterval = duration
+	return duration, nil
+}
