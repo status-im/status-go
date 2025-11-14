@@ -263,7 +263,7 @@ func (m *ArchiveManager) StartCodexClient() error {
 	cfgCopy := *m.codexConfig
 	cfgCopy.CodexNodeConfig = m.codexConfig.CodexNodeConfig
 
-	m.logger.Info("[CODEX][start_codex_config] Using the following CodexNodeConfig", zap.Any("config", cfgCopy.CodexNodeConfig))
+	m.logger.Info("[CODEX][start_codex_client] Using the following CodexNodeConfig", zap.Any("config", cfgCopy.CodexNodeConfig))
 
 	client, err := NewCodexClient(cfgCopy)
 	if err != nil {

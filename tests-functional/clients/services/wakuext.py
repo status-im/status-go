@@ -807,3 +807,16 @@ class WakuextService(Service):
         params = [duration_seconds]
         response = self.rpc_request("updateMessageArchiveInterval", params)
         return response
+
+    def enable_community_history_archive_protocol(self):
+        return self.rpc_request("enableCommunityHistoryArchiveProtocol")
+    
+    def enable_codex_community_history_archive_protocol(self, codex_overrides=None):
+        params = []
+        if codex_overrides:
+            params = [{k: str(v) for k, v in codex_overrides.items()}]
+        return self.rpc_request("enableCodexCommunityHistoryArchiveProtocol", params)
+
+    def disable_community_history_archive_protocol(self):
+        response = self.rpc_request("disableCommunityHistoryArchiveProtocol")
+        return response

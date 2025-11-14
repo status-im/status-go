@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -4051,50 +4053,44 @@ func (m *Messenger) dispatchIndexCidMessage(communityID string) error {
 }
 
 func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
-	nodeConfig, err := m.settings.GetNodeConfig()
-	if err != nil {
-		return err
-	}
-
-	if nodeConfig.TorrentConfig.Enabled || nodeConfig.CodexConfig.Enabled {
-		return nil
-	}
-
+	m.logger.Info("enabling community history archive protocol")
+	m.logger.Info("checking archive distribution preference")
 	archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
 	if err != nil {
 		return err
 	}
 
-	if archiveDistributionPreference == communities.ArchiveDistributionMethodTorrent {
-		nodeConfig.TorrentConfig.Enabled = true
-		err = m.settings.SaveSetting("node-config", nodeConfig)
-		if err != nil {
-			return err
-		}
-
-		m.config.torrentConfig = &nodeConfig.TorrentConfig
-		m.archiveManager.SetTorrentConfig(&nodeConfig.TorrentConfig)
-		err = m.archiveManager.StartTorrentClient()
-		if err != nil {
-			return err
-		}
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodCodex {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] archive distribution preference is codex, skipping enabling Torrent distribution")
+		return nil
+	}
+	nodeConfig, err := m.settings.GetNodeConfig()
+	if err != nil {
+		return err
 	}
 
-	if archiveDistributionPreference == communities.ArchiveDistributionMethodCodex {
-		nodeConfig.CodexConfig.Enabled = true
+	if nodeConfig.CodexConfig.Enabled {
+		m.logger.Info("Codex archive distribution is enabled")
+		return fmt.Errorf("cannot enable Torrent archive distribution when Codex archive distribution is already enabled")
+	}
 
-		err = m.settings.SaveSetting("node-config", nodeConfig)
-		if err != nil {
-			return err
-		}
+	if nodeConfig.TorrentConfig.Enabled {
+		m.logger.Info("Torrent archive distribution is already enabled")
+		return nil
+	}
 
-		m.config.codexConfig = &nodeConfig.CodexConfig
-		m.archiveManager.SetCodexConfig(&nodeConfig.CodexConfig)
+	m.logger.Info("enabling torrent archive distribution")
+	nodeConfig.TorrentConfig.Enabled = true
+	err = m.settings.SaveSetting("node-config", nodeConfig)
+	if err != nil {
+		return err
+	}
 
-		err = m.archiveManager.StartCodexClient()
-		if err != nil {
-			return err
-		}
+	m.config.torrentConfig = &nodeConfig.TorrentConfig
+	m.archiveManager.SetTorrentConfig(&nodeConfig.TorrentConfig)
+	err = m.archiveManager.StartTorrentClient()
+	if err != nil {
+		return err
 	}
 
 	controlledCommunities, err := m.communitiesManager.Controlled()
@@ -4103,11 +4099,210 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 	}
 
 	if len(controlledCommunities) > 0 {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] initializing history archive tasks for controlled communities", zap.Int("count", len(controlledCommunities)))
 		go m.InitHistoryArchiveTasks(controlledCommunities)
 	}
 	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.HistoryArchivesProtocolEnabled()
 	}
+	return nil
+}
+
+func (m *Messenger) EnableCodexCommunityHistoryArchiveProtocol(overrides map[string]string) error {
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] enabling community history archive protocol")
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] checking archive distribution preference")
+
+	archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
+	if err != nil {
+		return err
+	}
+
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodTorrent {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] archive distribution preference is torrent, skipping Codex enabling")
+		return nil
+	}
+
+	nodeConfig, err := m.settings.GetNodeConfig()
+	if err != nil {
+		return err
+	}
+
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] current CodexConfig for history archive protocol", zap.Any("CodexConfig", nodeConfig.CodexConfig))
+
+	if nodeConfig.TorrentConfig.Enabled {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] torrent archive distribution is enabled")
+		return fmt.Errorf("cannot enable Codex archive distribution when Torrent archive distribution is already enabled")
+	}
+
+	if nodeConfig.CodexConfig.Enabled {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] codex archive distribution is already enabled")
+		return nil
+	}
+
+	if len(overrides) > 0 {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] applying CodexConfig overrides", zap.Any("overrides", overrides))
+		if err := applyCodexConfigOverrides(&nodeConfig.CodexConfig, overrides); err != nil {
+			return err
+		}
+	}
+
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] enabling codex archive distribution")
+	nodeConfig.CodexConfig.Enabled = true
+
+	err = m.settings.SaveSetting("node-config", nodeConfig)
+	if err != nil {
+		return err
+	}
+
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] CodexConfig (with potential overrides)", zap.Any("CodexConfig", nodeConfig.CodexConfig))
+
+	m.config.codexConfig = &nodeConfig.CodexConfig
+	m.archiveManager.SetCodexConfig(&nodeConfig.CodexConfig)
+
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] starting codex client")
+	err = m.archiveManager.StartCodexClient()
+	if err != nil {
+		return err
+	}
+
+	controlledCommunities, err := m.communitiesManager.Controlled()
+	if err != nil {
+		return err
+	}
+
+	if len(controlledCommunities) > 0 {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] initializing history archive tasks for controlled communities", zap.Int("count", len(controlledCommunities)))
+		go m.InitHistoryArchiveTasks(controlledCommunities)
+	}
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryArchivesProtocolEnabled()
+	}
+	return nil
+}
+
+func applyCodexConfigOverrides(cfg *params.CodexConfig, overrides map[string]string) error {
+	if cfg == nil || len(overrides) == 0 {
+		return nil
+	}
+
+	for key, raw := range overrides {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		if err := setStructFieldValue(reflect.ValueOf(cfg), key, raw); err != nil {
+			return fmt.Errorf("failed to apply CodexConfig override %q: %w", key, err)
+		}
+	}
+
+	return nil
+}
+
+func setStructFieldValue(target reflect.Value, path, raw string) error {
+	if target.Kind() != reflect.Pointer {
+		return fmt.Errorf("target must be a pointer, got %s", target.Kind())
+	}
+
+	current := target.Elem()
+	if !current.IsValid() {
+		return fmt.Errorf("invalid target for path %q", path)
+	}
+
+	parts := strings.Split(path, ".")
+	for idx, part := range parts {
+		if part == "" {
+			return fmt.Errorf("invalid empty segment in path %q", path)
+		}
+		field := current.FieldByName(part)
+		if !field.IsValid() {
+			return fmt.Errorf("unknown field %q in path %q", part, path)
+		}
+
+		if idx == len(parts)-1 {
+			if !field.CanSet() {
+				return fmt.Errorf("cannot set field %q in path %q", part, path)
+			}
+			return assignValue(field, raw)
+		}
+
+		switch field.Kind() {
+		case reflect.Struct:
+			current = field
+		case reflect.Pointer:
+			if field.IsNil() {
+				field.Set(reflect.New(field.Type().Elem()))
+			}
+			current = field.Elem()
+		default:
+			return fmt.Errorf("field %q in path %q is not addressable struct or pointer", part, path)
+		}
+	}
+
+	return nil
+}
+
+func assignValue(field reflect.Value, raw string) error {
+	switch field.Kind() {
+	case reflect.String:
+		field.SetString(raw)
+	case reflect.Bool:
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			return err
+		}
+		field.SetBool(parsed)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		parsed, err := strconv.ParseInt(raw, 10, field.Type().Bits())
+		if err != nil {
+			return err
+		}
+		field.SetInt(parsed)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		parsed, err := strconv.ParseUint(raw, 10, field.Type().Bits())
+		if err != nil {
+			return err
+		}
+		field.SetUint(parsed)
+	case reflect.Float32, reflect.Float64:
+		parsed, err := strconv.ParseFloat(raw, field.Type().Bits())
+		if err != nil {
+			return err
+		}
+		field.SetFloat(parsed)
+	case reflect.Slice:
+		return assignSlice(field, raw)
+	default:
+		return fmt.Errorf("unsupported field kind %s", field.Kind())
+	}
+
+	return nil
+}
+
+func assignSlice(field reflect.Value, raw string) error {
+	elemKind := field.Type().Elem().Kind()
+	switch elemKind {
+	case reflect.String:
+		if raw == "" {
+			field.Set(reflect.Zero(field.Type()))
+			return nil
+		}
+
+		var parsed []string
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			chunks := strings.SplitSeq(raw, ",")
+			for chunk := range chunks {
+				chunk = strings.TrimSpace(chunk)
+				if chunk == "" {
+					continue
+				}
+				parsed = append(parsed, chunk)
+			}
+		}
+		field.Set(reflect.ValueOf(parsed))
+	default:
+		return fmt.Errorf("unsupported slice element kind %s", elemKind)
+	}
+
 	return nil
 }
 
@@ -4117,7 +4312,7 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 	if err != nil {
 		return err
 	}
-	if !nodeConfig.TorrentConfig.Enabled {
+	if !nodeConfig.TorrentConfig.Enabled && !nodeConfig.CodexConfig.Enabled {
 		return nil
 	}
 
@@ -4126,13 +4321,26 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 		m.logger.Error("failed to stop torrent manager", zap.Error(err))
 	}
 
-	nodeConfig.TorrentConfig.Enabled = false
-	err = m.settings.SaveSetting("node-config", nodeConfig)
-	m.config.torrentConfig = &nodeConfig.TorrentConfig
-	m.archiveManager.SetTorrentConfig(&nodeConfig.TorrentConfig)
-	if err != nil {
-		return err
+	if nodeConfig.TorrentConfig.Enabled {
+		nodeConfig.TorrentConfig.Enabled = false
+		err = m.settings.SaveSetting("node-config", nodeConfig)
+		m.config.torrentConfig = &nodeConfig.TorrentConfig
+		m.archiveManager.SetTorrentConfig(&nodeConfig.TorrentConfig)
+		if err != nil {
+			return err
+		}
 	}
+
+	if nodeConfig.CodexConfig.Enabled {
+		nodeConfig.CodexConfig.Enabled = false
+		err = m.settings.SaveSetting("node-config", nodeConfig)
+		m.config.codexConfig = &nodeConfig.CodexConfig
+		m.archiveManager.SetCodexConfig(&nodeConfig.CodexConfig)
+		if err != nil {
+			return err
+		}
+	}
+
 	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.HistoryArchivesProtocolDisabled()
 	}
