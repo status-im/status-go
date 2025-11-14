@@ -74,13 +74,6 @@ ifeq ($(MAKECMDGOALS),statusgo-ios-library)
     CGO_LDFLAGS+=-Os -flto
 endif
 
-CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
-export GOPATH ?= $(HOME)/go
-
-GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
-GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
-
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
  LIB_EXT := dylib
@@ -93,6 +86,13 @@ else ifeq ($(detected_OS),Linux)
  LIB_EXT := so
  CGO_LDFLAGS += "-Wl,-soname,libstatus.so.0"
 endif
+
+CGO_CFLAGS+=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
+export GOPATH ?= $(HOME)/go
+
+GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
+GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 BUILD_TAGS ?= gowaku_no_rln
 
