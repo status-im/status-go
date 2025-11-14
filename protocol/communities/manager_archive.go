@@ -209,45 +209,6 @@ func (m *ArchiveManager) getFreeUDPPort() (int, error) {
 	return udpListener.LocalAddr().(*net.UDPAddr).Port, nil
 }
 
-func (m *ArchiveManager) ensureCodexDiscoveryPort(config *params.CodexConfig) error {
-	checkPortAvailable := func(port int) (bool, error) {
-		addr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("localhost", fmt.Sprintf("%d", port)))
-		if err != nil {
-			return false, err
-		}
-		// Attempt to listen on the port; if it succeeds, it's available.
-		conn, err := net.ListenUDP("udp", addr)
-		if err != nil {
-			return false, nil
-		}
-		_ = conn.Close()
-		return true, nil
-	}
-
-	port := config.CodexNodeConfig.DiscoveryPort
-	if port != 0 {
-		available, err := checkPortAvailable(port)
-		if err != nil {
-			return err
-		}
-		if available {
-			return nil
-		}
-		m.logger.Warn("[CODEX] discovery port already in use, selecting a free one", zap.Int("port", port))
-	}
-
-	for range 10 {
-		freePort, err := m.getFreeUDPPort()
-		if err != nil {
-			continue
-		}
-		config.CodexNodeConfig.DiscoveryPort = freePort
-		return nil
-	}
-
-	return fmt.Errorf("no free discovery port found for codex")
-}
-
 func (m *ArchiveManager) StartTorrentClient() error {
 	if m.torrentConfig == nil {
 		return fmt.Errorf("can't start torrent client: missing torrentConfig")
@@ -302,10 +263,6 @@ func (m *ArchiveManager) StartCodexClient() error {
 	cfgCopy := *m.codexConfig
 	cfgCopy.CodexNodeConfig = m.codexConfig.CodexNodeConfig
 
-	// if err := m.ensureCodexDiscoveryPort(&cfgCopy); err != nil {
-	// 	return err
-	// }
-
 	m.logger.Info("[CODEX][start_codex_config] Using the following CodexNodeConfig", zap.Any("config", cfgCopy.CodexNodeConfig))
 
 	client, err := NewCodexClient(cfgCopy)
@@ -314,7 +271,6 @@ func (m *ArchiveManager) StartCodexClient() error {
 	}
 	m.codexClient = client
 	m.ArchiveFileManager.codexClient = client
-	// m.codexConfig.CodexNodeConfig.DiscoveryPort = cfgCopy.CodexNodeConfig.DiscoveryPort
 
 	if err := m.codexClient.Start(); err != nil {
 		m.isCodexClientStarted = false
