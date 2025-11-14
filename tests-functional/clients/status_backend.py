@@ -32,6 +32,7 @@ from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID
 from utils import fake
 from utils import keys
 from utils.config import Config
+import copy
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
@@ -80,7 +81,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.events = Events()
         self.version = "unknown"
         self.network_id = 1
-
+        self._boot_api_config = None
         RpcClient.__init__(self)
         ApiClient.__init__(self, self.api_url)
         SignalClient.__init__(self, self.ws_url)
@@ -295,6 +296,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self._set_display_name(**kwargs)
         method = "CreateAccountAndLogin"
         data = self._create_account_request(password=password, **kwargs)
+        self._boot_api_config = copy.deepcopy(data.get("apiConfig", {}))
         return self.api_request_json(method, data)
 
     def restore_account_and_login(self, user=user_1, **kwargs):
@@ -302,6 +304,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         method = "RestoreAccountAndLogin"
         data = self._create_account_request(password=user.password, **kwargs)
         data["mnemonic"] = user.passphrase
+        self._boot_api_config = copy.deepcopy(data.get("apiConfig", {}))
         return self.api_request_json(method, data)
 
     def login(self, key_uid, password: str, kdf_iterations=256000):
@@ -471,6 +474,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         method = "ImageServerTLSCert"
         response = self.api_request(method, {})
         return response.content.decode("utf-8")
+
+    def get_boot_api_config(self):
+        return self._boot_api_config
 
     def serialize_legacy_key(self, key):
         method = "SerializeLegacyKey"

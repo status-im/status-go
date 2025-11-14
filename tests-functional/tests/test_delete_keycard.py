@@ -11,7 +11,7 @@ class TestDeleteKeycard:
     @pytest.fixture(autouse=True)
     def setup_backends(self, backend_new_profile):
         self.account = backend_new_profile("sender")
-        self.keycard = keycard_1
+        self.keycard = copy.deepcopy(keycard_1)
         self.keycard["key-uid"] = self.account.key_uid
 
     def test_delete_existing_keycard(self):

@@ -13,7 +13,7 @@ class TestGetKeycards:
     @pytest.fixture(autouse=True)
     def setup_backends(self, backend_new_profile):
         self.account = backend_new_profile("sender")
-        self.keycard = keycard_1
+        self.keycard = copy.deepcopy(keycard_1)
         self.keycard["key-uid"] = self.account.key_uid
         self.account.accounts_service.save_or_update_keycard(self.keycard, self.account.password)
         self.second_keycard = copy.deepcopy(self.keycard)
