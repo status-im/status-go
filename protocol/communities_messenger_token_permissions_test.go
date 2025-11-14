@@ -3164,8 +3164,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestLoadingConfigFromDatabas
 	s.Assert().False(ownerNodeCfgFromDB.CodexConfig.Enabled)
 	s.Assert().False(bobNodeCfgFromDB.CodexConfig.Enabled)
 
-	s.Require().NoError(s.owner.EnableCommunityHistoryArchiveProtocol())
-	s.Require().NoError(s.bob.EnableCommunityHistoryArchiveProtocol())
+	s.Require().NoError(s.owner.EnableCodexCommunityHistoryArchiveProtocol(nil))
+	s.Require().NoError(s.bob.EnableCodexCommunityHistoryArchiveProtocol(nil))
 
 	ownerNodeCfgFromDB2, err := s.owner.settings.GetNodeConfig()
 	s.Require().NoError(err)

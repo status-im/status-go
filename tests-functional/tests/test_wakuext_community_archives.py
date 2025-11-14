@@ -14,23 +14,42 @@ class TestCommunityArchives(MessengerSteps):
         """Initialize three backends (creator, member and another_member) for each test function"""
 
         # Community owner
-        self.creator = backend_new_profile("creator", codex_config_enabled=True)
+        self.creator = backend_new_profile("creator")
         # Define codex as archive distribution preference
         self.creator.wakuext_service.set_archive_distribution_preference("codex")
+        # Enable community history archive protocol
+        self.creator.wakuext_service.enable_codex_community_history_archive_protocol(
+            {
+                "CodexNodeConfig.DiscoveryPort": 8091,
+            }
+        )
+
+        info = self.creator.wakuext_service.debug()
 
         # Create a first member that will join the community first
-        self.member = backend_new_profile("member", codex_config_enabled=True, import_initial_delay=5)
+        self.member = backend_new_profile("member", import_initial_delay=5)
         # Define codex as archive distribution preference
         self.member.wakuext_service.set_archive_distribution_preference("codex")
+        self.member.wakuext_service.enable_codex_community_history_archive_protocol(
+            {
+                "CodexNodeConfig.DiscoveryPort": 8092,
+                "CodexNodeConfig.BootstrapNodes": f'["{info["spr"]}"]',
+            }
+        )
 
         # Create another member that will join the community later after the first message is sent
-        self.another_member = backend_new_profile("member", codex_config_enabled=True, import_initial_delay=5)
+        self.another_member = backend_new_profile("member", import_initial_delay=5)
         # Define codex as archive distribution preference
         self.another_member.wakuext_service.set_archive_distribution_preference("codex")
+        self.another_member.wakuext_service.enable_codex_community_history_archive_protocol(
+            {
+                "CodexNodeConfig.DiscoveryPort": 8093,
+                "CodexNodeConfig.BootstrapNodes": f'["{info["spr"]}"]',
+            }
+        )
 
-        # Connect members to community codex client
-        # In the real life, this would be done via discovery
-        info = self.creator.wakuext_service.debug()
+        # Using bootstrap nodes does not seem to be working in our setup,
+        # thus we need to connect members manually.
         self.member.wakuext_service.connect(info["id"], info["addrs"])
         self.another_member.wakuext_service.connect(info["id"], info["addrs"])
 

@@ -1183,6 +1183,10 @@ func (api *PublicAPI) GetCommunitiesSettings() ([]communities.CommunitySettings,
 	return api.service.messenger.GetCommunitiesSettings()
 }
 
+func (api *PublicAPI) EnableCodexCommunityHistoryArchiveProtocol(overrides map[string]string) error {
+	return api.service.messenger.EnableCodexCommunityHistoryArchiveProtocol(overrides)
+}
+
 func (api *PublicAPI) EnableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.EnableCommunityHistoryArchiveProtocol()
 }
