@@ -19,17 +19,17 @@ const maxEmojiReactionsPerMessage = 20
 func ConvertEmojiIDToString(emojiID protobuf.EmojiReaction_Type) string {
 	switch emojiID {
 	case protobuf.EmojiReaction_LOVE:
-		return "❤️"
+		return "2764"
 	case protobuf.EmojiReaction_THUMBS_UP:
-		return "👍"
+		return "1f44d"
 	case protobuf.EmojiReaction_THUMBS_DOWN:
-		return "👎"
+		return "1f44e"
 	case protobuf.EmojiReaction_LAUGH:
-		return "😂"
+		return "1f602"
 	case protobuf.EmojiReaction_SAD:
-		return "😢"
+		return "1f622"
 	case protobuf.EmojiReaction_ANGRY:
-		return "😠"
+		return "1f620"
 	}
 
 	return ""
@@ -57,7 +57,8 @@ func (m *Messenger) CheckMaxNumberOfEmojiReactionsPerMessage(chatID string, mess
 	return nil
 }
 
-func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emoji string) (*MessengerResponse, error) {
+// TODO remove emojiID once the client supports sending custom emojis
+func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID string, messageID string, emojiID protobuf.EmojiReaction_Type, emoji string) (*MessengerResponse, error) {
 	var response MessengerResponse
 
 	chat, ok := m.allChats.Load(chatID)
@@ -67,7 +68,10 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	if emoji == "" {
-		return nil, errors.New("no emoji provided")
+		emoji = ConvertEmojiIDToString(emojiID)
+		if emoji == "" {
+			return nil, errors.New("invalid emojiID")
+		}
 	}
 
 	// Validate that the emoji is valid

@@ -23,8 +23,8 @@ class TestMessageReactions(MessengerSteps):
         message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id, sender_chat_id = message["id"], message["chatId"]
         receiver_chat_id = self.receiver.wakuext_service.chats()[0]["id"]
-        # Send emoji reaction (V1)
-        response = self.receiver.wakuext_service.send_emoji_reaction(receiver_chat_id, message_id, 1)
+        # Send emoji reaction
+        response = self.receiver.wakuext_service.send_emoji_reaction(receiver_chat_id, message_id, "2764")
         # TODO: Add more assertions on response
         self.sender.find_signal_containing_pattern(
             SignalType.MESSAGES_NEW.value,
@@ -39,7 +39,7 @@ class TestMessageReactions(MessengerSteps):
                 len(result) == 1,
                 result[0]["chatId"] == receiver_chat_id,
                 result[0]["messageId"] == message_id,
-                result[0]["emoji"] == "❤️",
+                result[0]["emoji"] == "2764",
             )
         )
         emoji_id = result[0]["id"]
@@ -58,8 +58,8 @@ class TestMessageReactions(MessengerSteps):
 
         response = self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, "test_message 1")
         message_1 = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
-        # Send emoji reaction (V2)
-        response = self.receiver.wakuext_service.send_emoji_reaction_v2(receiver_chat_id, message_1["id"], "🙂")
+        # Send emoji reaction
+        response = self.receiver.wakuext_service.send_emoji_reaction(receiver_chat_id, message_1["id"], "1f642")
         emoji_1_id = response["emojiReactions"][0]["id"]
         self.sender.find_signal_containing_pattern(
             SignalType.MESSAGES_NEW.value,
@@ -69,7 +69,7 @@ class TestMessageReactions(MessengerSteps):
 
         response = self.receiver.wakuext_service.send_one_to_one_message(self.sender.public_key, "test_message 2")
         message_2 = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
-        response = self.sender.wakuext_service.send_emoji_reaction_v2(sender_chat_id, message_2["id"], "🙁")
+        response = self.sender.wakuext_service.send_emoji_reaction(sender_chat_id, message_2["id"], "1f641")
         emoji_2_id = response["emojiReactions"][0]["id"]
         self.receiver.find_signal_containing_pattern(
             SignalType.MESSAGES_NEW.value,
@@ -85,13 +85,13 @@ class TestMessageReactions(MessengerSteps):
                 (
                     item["chatId"] == sender_chat_id,
                     item["messageId"] == message_2["id"],
-                    item["emoji"] == "🙁",
+                    item["emoji"] == "1f641",
                 )
             ) or all(
                 (
                     item["chatId"] == receiver_chat_id,
                     item["messageId"] == message_1["id"],
-                    item["emoji"] == "🙂",
+                    item["emoji"] == "1f642",
                 )
             )
 
@@ -109,22 +109,42 @@ class TestMessageReactions(MessengerSteps):
         receiver_chat_id = receiver.wakuext_service.chats()[0]["id"]
 
         # Send 20 emojis
-        emojis = ["😀", "🤓", "😄", "😁", "😆", "😅", "🤣", "😂", "🥹", "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😗", "☺️"]
+        emojis = [
+            "1f600",
+            "1f913",
+            "1f604",
+            "1f601",
+            "1f606",
+            "1f605",
+            "1f923",
+            "1f602",
+            "1f97a",
+            "1f642",
+            "1f643",
+            "1f609",
+            "1f60a",
+            "1f607",
+            "1f970",
+            "1f60d",
+            "1f929",
+            "1f618",
+            "1f617",
+            "263a",
+        ]
         last_emoji_id = None
         for emoji in emojis:
-            response = sender.wakuext_service.send_emoji_reaction_v2(sender_chat_id, message_id, emoji)
+            response = sender.wakuext_service.send_emoji_reaction(sender_chat_id, message_id, emoji)
             assert response["emojiReactions"][0]["emoji"] == emoji
             last_emoji_id = response["emojiReactions"][0]["id"]
 
         # The 21st emoji sent should fail
         with pytest.raises(ApiResponseError, match=re.escape("too many emoji reactions for message")):
-            _ = sender.wakuext_service.send_emoji_reaction_v2(sender_chat_id, message_id, "😋")
-
+            _ = sender.wakuext_service.send_emoji_reaction(sender_chat_id, message_id, "1f60b")
         # Test retract the 20th emoji and adding a new one
         response = sender.wakuext_service.send_emoji_reaction_retraction(last_emoji_id)
 
-        response = sender.wakuext_service.send_emoji_reaction_v2(sender_chat_id, message_id, "⚓️")
-        assert response["emojiReactions"][0]["emoji"] == "⚓️"
+        response = sender.wakuext_service.send_emoji_reaction(sender_chat_id, message_id, "2693")
+        assert response["emojiReactions"][0]["emoji"] == "2693"
         new_emoji_id = response["emojiReactions"][0]["id"]
 
         # Wait for receiver to get the reaction
@@ -135,9 +155,9 @@ class TestMessageReactions(MessengerSteps):
         )
 
         # Test receiver sending the SAME type of a previous reaction (should be allowed)
-        response = receiver.wakuext_service.send_emoji_reaction_v2(receiver_chat_id, message_id, "⚓️")
+        response = receiver.wakuext_service.send_emoji_reaction(receiver_chat_id, message_id, "2693")
         emoji_2_id = response["emojiReactions"][0]["id"]
-        assert response["emojiReactions"][0]["emoji"] == "⚓️"
+        assert response["emojiReactions"][0]["emoji"] == "2693"
 
         sender.find_signal_containing_pattern(
             SignalType.MESSAGES_NEW.value,

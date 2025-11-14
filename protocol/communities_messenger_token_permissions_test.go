@@ -940,7 +940,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 		if viewersCanAddReactions {
 			s.Require().NoError(err)
 			s.Require().Len(response.EmojiReactions(), 1)
-			s.Require().Equal(response.EmojiReactions()[0].Type, protobuf.EmojiReaction_THUMBS_UP)
+			s.Require().Equal(response.EmojiReactions()[0].Emoji, "1f44d")
 		} else {
 			s.Require().Error(err)
 			s.Require().Len(response.EmojiReactions(), 0)
