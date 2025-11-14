@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	mock_provider "github.com/status-im/status-go/services/sharedurls/mock"
+	"github.com/status-im/status-go/t"
 
 	"github.com/status-im/status-go/protocol/communities"
 )
@@ -111,16 +112,8 @@ func (s *ShareUrlsSuite) addFakeChannel(community *communities.Community) (*comm
 }
 
 func (s *ShareUrlsSuite) fakeContact() *contacts.Contact {
-	key, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	var contact *contacts.Contact
-	err = gofakeit.Struct(&contact)
-	s.Require().NoError(err)
-
-	contact.ID = contacts.ContactIDFromPublicKey(&key.PublicKey)
+	contact := t.FakeContact(s.T())
 	contact.ENSVerified = true
-
 	return contact
 }
 
