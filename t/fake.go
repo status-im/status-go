@@ -70,6 +70,10 @@ func FakeCommunity(t *testing.T, options ...FakeCommunityOption) *communities.Co
 	err = gofakeit.Struct(&request)
 	require.NoError(t, err)
 
+	// Image has to be real, otherwise the request doesn't pass validation
+	request.Image = ""
+	request.Banner.ImagePath = ""
+
 	for _, opt := range options {
 		opt(&request)
 	}
