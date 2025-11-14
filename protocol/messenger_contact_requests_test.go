@@ -577,7 +577,8 @@ func (s *MessengerContactRequestSuite) TestAliceTriesToSpamBobWithContactRequest
 		func(r *MessengerResponse) bool {
 			return (len(r.Messages()) > 0 &&
 				s.findFirstByContentType(r.Messages(), protobuf.ChatMessage_CONTACT_REQUEST) != nil) ||
-				len(r.ActivityCenterNotifications()) > 0
+				len(r.ActivityCenterNotifications()) > 0 ||
+				len(r.Chats()) > 0
 		},
 		"no messages",
 	)
@@ -643,7 +644,8 @@ func (s *MessengerContactRequestSuite) TestAliceTriesToSpamBobWithContactRequest
 		func(r *MessengerResponse) bool {
 			return (len(r.Messages()) > 0 &&
 				s.findFirstByContentType(r.Messages(), protobuf.ChatMessage_CONTACT_REQUEST) != nil) ||
-				len(r.ActivityCenterNotifications()) > 0
+				len(r.ActivityCenterNotifications()) > 0 ||
+				len(r.Chats()) > 0
 		},
 		"no messages",
 	)

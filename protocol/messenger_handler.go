@@ -1040,7 +1040,7 @@ func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, con
 	m.logger.Debug("handling retracted contact request", zap.Uint64("clock", message.Clock))
 	r := contact.ContactRequestRetracted(message.Clock, false)
 	if !r.Processed() {
-		m.logger.Debug("not handling retract since clock lower")
+		m.logger.Debug("not handling retract since clock lower or already retracted")
 		return nil
 	}
 
