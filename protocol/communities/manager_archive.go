@@ -107,22 +107,28 @@ func (m *ArchiveManager) GetCodexClient() CodexClientInterface {
 }
 
 func (m *ArchiveManager) SetOnline(online bool) {
+	m.logger.Info("[CODEX][set_online] testing online status:", zap.Bool("online", online))
 	if online {
+		m.logger.Info("[CODEX][set_online] Online: checking if torrent/codex clients need to be started...")
 		m.codexClientMu.RLock()
 		codexStarted := m.isCodexClientStarted
 		m.codexClientMu.RUnlock()
 
+		m.logger.Info("[CODEX][set_online] Online. codexStarted:", zap.Bool("codexStarted", codexStarted))
+
 		if m.torrentConfig != nil && m.torrentConfig.Enabled && !m.torrentClientStarted() {
+			m.logger.Info("[CODEX][set_online] Starting torrent client...")
 			err := m.StartTorrentClient()
 			if err != nil {
-				m.logger.Error("couldn't start torrent client", zap.Error(err))
+				m.logger.Error("[CODEX][set_online] couldn't start torrent client", zap.Error(err))
 			}
 		}
 
 		if m.codexConfig != nil && m.codexConfig.Enabled && !codexStarted {
+			m.logger.Info("[CODEX][set_online] Starting codex client...")
 			err := m.StartCodexClient()
 			if err != nil {
-				m.logger.Error("[CODEX] couldn't start codex client", zap.Error(err))
+				m.logger.Error("[CODEX][set_online] couldn't start codex client", zap.Error(err))
 			}
 		}
 	}
@@ -299,6 +305,8 @@ func (m *ArchiveManager) StartCodexClient() error {
 	// if err := m.ensureCodexDiscoveryPort(&cfgCopy); err != nil {
 	// 	return err
 	// }
+
+	m.logger.Info("[CODEX][start_codex_config] Using the following CodexNodeConfig", zap.Any("config", cfgCopy.CodexNodeConfig))
 
 	client, err := NewCodexClient(cfgCopy)
 	if err != nil {
