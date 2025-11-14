@@ -67,7 +67,7 @@ pkgs.buildGoModule {
 
     # Avoid building nim-sds because the lib and header comes from nim-sds flake in patchPhase
     substituteInPlace Makefile \
-      --replace-warn "\$(MAKE) -C \$(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=\$(USE_SYSTEM_NIM) SHELL=/bin/bash" "echo 'Skipping nim-sds build...'"
+      --replace-warn "cd \$(NIM_SDS_SOURCE_DIR) && \$(MAKE) update && \$(MAKE) libsds USE_SYSTEM_NIM=\$(USE_SYSTEM_NIM) SHELL=/bin/bash" "echo 'Skipping nim-sds build...'"
 
     runHook preBuild
     go build \
