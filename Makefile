@@ -105,7 +105,7 @@ ifeq ($(USE_NWAKU), true)
 	CGO_LDFLAGS+=-L$(NWAKU_SOURCE_DIR)/build -lwaku -Wl,-rpath,$(NWAKU_SOURCE_DIR)/build
 endif
 
-NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)third-party/nim-sds
+NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/third-party/nim-sds
 LIBSDS := $(NIM_SDS_SOURCE_DIR)/build/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_SOURCE_DIR)/library
 CGO_LDFLAGS+=-L$(NIM_SDS_SOURCE_DIR)/build -lsds
