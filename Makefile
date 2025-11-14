@@ -262,6 +262,7 @@ run-status-backend: ##@run Start status-backend server listening to localhost:PO
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
 
+cmd: ##@build Build all public apps in ./cmd
 cmd: status-backend push-notification-server
 
 status-go-deps:
