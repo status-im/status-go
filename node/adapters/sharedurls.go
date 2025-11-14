@@ -1,16 +1,10 @@
-package node
+package adapters
 
 import (
-	"errors"
-
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
-)
-
-var (
-	ErrMessengerNotReady = errors.New("messenger not ready")
 )
 
 // SharedUrlsMessengerAdapter is a wrapper around the messenger to make it compatible with the sharedurls service.
@@ -38,21 +32,4 @@ func (p *SharedUrlsMessengerAdapter) GetContactByID(pubKey string) (*contacts.Co
 		return nil, ErrMessengerNotReady
 	}
 	return p.messenger.GetContactByID(pubKey), nil
-}
-
-type NewsFeedActivityCenterAdapter struct {
-	messenger *protocol.Messenger
-}
-
-func NewNewsFeedActivityCenterAdapter(messenger *protocol.Messenger) *NewsFeedActivityCenterAdapter {
-	return &NewsFeedActivityCenterAdapter{
-		messenger: messenger,
-	}
-}
-
-func (p *NewsFeedActivityCenterAdapter) AddNotification(response *protocol.MessengerResponse, notification *protocol.ActivityCenterNotification) error {
-	if p.messenger == nil {
-		return ErrMessengerNotReady
-	}
-	return p.messenger.AddActivityCenterNotification(response, notification, nil)
 }
