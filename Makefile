@@ -278,7 +278,6 @@ statusgo-c-bindings:
 statusgo-library: generate
 statusgo-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
-	## cmd/library/README.md explains the magic incantation behind this
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build \
 		-tags '$(BUILD_TAGS)' \
@@ -359,7 +358,7 @@ generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
-	GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
+	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
 
 generate-contracts:
 	go generate ./contracts
