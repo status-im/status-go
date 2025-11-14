@@ -270,12 +270,15 @@ status-go-deps:
 	go clean -modcache || true
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
-statusgo-library: generate
-statusgo-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as static library for current platform
-	@echo "Building static library..."
+statusgo-c-bindings:
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
+
+statusgo-library: generate
+statusgo-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as static library for current platform
+	@echo "Building static library..."
+	## cmd/library/README.md explains the magic incantation behind this
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build \
 		-tags '$(BUILD_TAGS)' \
@@ -287,11 +290,9 @@ statusgo-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as stati
 	@ls -la build/bin/libstatus.*
 
 statusgo-shared-library: generate
-statusgo-shared-library: $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
-	mkdir -p build/bin/statusgo-lib
-	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
  	go build \
 		-tags '$(BUILD_TAGS)' \
@@ -308,7 +309,7 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
-statusgo-android-library: generate $(LIBWAKU) ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
@@ -317,7 +318,7 @@ statusgo-android-library: generate $(LIBWAKU) ##@cross-compile Build status-go a
 	@echo "Android library built"
 	@file build/bin/libstatus.so
 
-statusgo-ios-library: generate $(LIBWAKU) ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
