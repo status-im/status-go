@@ -73,7 +73,7 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 	emojiID := response.EmojiReactions()[0].ID()
 
 	// Try sending a non-emoji reaction
-	_, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, "haha")
+	_, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, "xD")
 	s.Require().Error(err)
 
 	// Wait for the emoji to arrive to alice
@@ -86,8 +86,7 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 
 	s.Require().Len(response.EmojiReactions(), 1)
 	s.Require().Equal(response.EmojiReactions()[0].ID(), emojiID)
-	s.Require().Equal(response.EmojiReactions()[0].Type, protobuf.EmojiReaction_SAD)
-	s.Require().Equal(response.EmojiReactions()[0].Emoji, "😢")
+	s.Require().Equal(response.EmojiReactions()[0].Emoji, "1f622")
 
 	// Retract the emoji
 	response, err = bob.SendEmojiReactionRetraction(context.Background(), emojiID)
@@ -105,7 +104,6 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 
 	s.Require().Len(response.EmojiReactions(), 1)
 	s.Require().Equal(response.EmojiReactions()[0].ID(), emojiID)
-	s.Require().Equal(response.EmojiReactions()[0].Type, protobuf.EmojiReaction_SAD)
 	s.Require().True(response.EmojiReactions()[0].Retracted)
 }
 
@@ -224,7 +222,28 @@ func (s *MessengerEmojiSuite) TestMaxEmojiReactionsPerMessage() {
 	messageID := response.Messages()[0].ID
 
 	// Respond with the max amount of emojis
-	emojis := []string{"😀", "🤓", "😄", "😁", "😆", "😅", "🤣", "😂", "🥹", "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😗", "☺️"}
+	emojis := []string{
+		"1f600",
+		"1f913",
+		"1f604",
+		"1f601",
+		"1f606",
+		"1f605",
+		"1f923",
+		"1f602",
+		"1f979",
+		"1f642",
+		"1f643",
+		"1f609",
+		"1f60a",
+		"1f607",
+		"1f970",
+		"1f60d",
+		"1f929",
+		"1f618",
+		"1f617",
+		"263a-fe0f",
+	}
 	for _, emoji := range emojis {
 		response, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, emoji)
 		s.Require().NoError(err)
@@ -232,7 +251,7 @@ func (s *MessengerEmojiSuite) TestMaxEmojiReactionsPerMessage() {
 	}
 
 	// Try sending one more (should fail)
-	_, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, "😋")
+	_, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, "1f60b")
 	s.Require().Error(err)
 	s.Require().Equal(ErrTooManyEmojiReactionsForMessage, err)
 
@@ -249,7 +268,7 @@ func (s *MessengerEmojiSuite) TestMaxEmojiReactionsPerMessage() {
 		&protobuf.EmojiReaction{
 			MessageId:   messageID,
 			ChatId:      chat.ID,
-			Emoji:       "😋",
+			Emoji:       "1f60b",
 			Type:        protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE,
 			Clock:       123,
 			MessageType: protobuf.MessageType_PUBLIC_GROUP,
@@ -260,7 +279,7 @@ func (s *MessengerEmojiSuite) TestMaxEmojiReactionsPerMessage() {
 	s.Require().Equal(ErrTooManyEmojiReactionsForMessage, err)
 
 	// Sending an existing emoji should work
-	response, err = alice.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, "😀")
+	response, err = alice.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, "1f600")
 	s.Require().NoError(err)
 	s.Require().Len(response.EmojiReactions(), 1)
 

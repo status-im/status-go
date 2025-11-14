@@ -620,14 +620,9 @@ class WakuextService(Service):
         response = self.rpc_request("peerID", params)
         return response
 
-    def send_emoji_reaction(self, receiver_chat_id: str, message_id: str, emoji_id: int):
-        params = [receiver_chat_id, message_id, emoji_id]
-        response = self.rpc_request(method="sendEmojiReaction", params=params)
-        return response
-
-    def send_emoji_reaction_v2(self, chat_id: str, message_id: str, emoji: str):
+    def send_emoji_reaction(self, chat_id: str, message_id: str, emoji: str):
         params = [chat_id, message_id, emoji]
-        response = self.rpc_request(method="sendEmojiReactionV2", params=params)
+        response = self.rpc_request(method="sendEmojiReaction", params=params)
         return response
 
     def send_emoji_reaction_retraction(self, last_emoji_id: str):

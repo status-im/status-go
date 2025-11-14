@@ -979,7 +979,7 @@ func (api *PublicAPI) RegisteredForPushNotifications() (bool, error) {
 
 // Emoji
 func (api *PublicAPI) SendEmojiReaction(ctx context.Context, chatID, messageID string, emoji string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SendEmojiReaction(ctx, chatID, messageID, emoji)
+	return api.service.messenger.SendEmojiReaction(ctx, chatID, messageID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, emoji)
 }
 
 func (api *PublicAPI) SendEmojiReactionRetraction(ctx context.Context, emojiReactionID string) (*protocol.MessengerResponse, error) {
