@@ -159,12 +159,12 @@ type Config struct {
 
 	// Default block timeout in seconds - 0 disables the ttl
 	// Default: 30 days
-	BlockTtl int `json:"block-ttl,omitempty"`
+	BlockTtl string `json:"block-ttl,omitempty"`
 
 	// Time interval in seconds - determines frequency of block
 	// maintenance cycle: how often blocks are checked for expiration and cleanup
 	// Default: 10 minutes
-	BlockMaintenanceInterval int `json:"block-mi,omitempty"`
+	BlockMaintenanceInterval string `json:"block-mi,omitempty"`
 
 	// Number of blocks to check every maintenance cycle
 	// Default: 1000

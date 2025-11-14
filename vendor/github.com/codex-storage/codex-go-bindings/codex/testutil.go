@@ -47,6 +47,18 @@ func newCodexNode(t *testing.T, opts ...Config) *CodexNode {
 		if c.StorageQuota != 0 {
 			config.StorageQuota = c.StorageQuota
 		}
+
+		if c.NumThreads != 0 {
+			config.NumThreads = c.NumThreads
+		}
+
+		if c.BlockTtl != "" {
+			config.BlockTtl = c.BlockTtl
+		}
+
+		if c.BlockMaintenanceInterval != "" {
+			config.BlockMaintenanceInterval = c.BlockMaintenanceInterval
+		}
 	}
 
 	node, err := New(config)
