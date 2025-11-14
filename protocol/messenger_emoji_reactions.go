@@ -57,8 +57,7 @@ func (m *Messenger) CheckMaxNumberOfEmojiReactionsPerMessage(chatID string, mess
 	return nil
 }
 
-// TODO remove emojiID once the client supports sending custom emojis
-func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type, emoji string) (*MessengerResponse, error) {
+func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emoji string) (*MessengerResponse, error) {
 	var response MessengerResponse
 
 	chat, ok := m.allChats.Load(chatID)
@@ -68,10 +67,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	if emoji == "" {
-		emoji = ConvertEmojiIDToString(emojiID)
-		if emoji == "" {
-			return nil, errors.New("invalid emojiID")
-		}
+		return nil, errors.New("no emoji provided")
 	}
 
 	// Validate that the emoji is valid
@@ -89,7 +85,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 			Clock:     clock,
 			MessageId: messageID,
 			ChatId:    chatID,
-			Type:      emojiID,
+			Type:      protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE,
 			Emoji:     emoji,
 		},
 		LocalChatID: chatID,
