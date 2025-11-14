@@ -1,4 +1,4 @@
-package root
+package backend
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/services/root/requests"
+	requests2 "github.com/status-im/status-go/pkg/backend/requests"
 	identityutils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/services/wallet"
@@ -40,7 +40,22 @@ type MediaProvider interface {
 	MakeAccountImageURL(keyUid string, imageType string, imageClock uint64) string
 }
 
-type Service struct {
+//type ServiceConfiguration struct {
+//	MessengerEnabled bool
+//	WalletEnabled    bool
+//	NewsFeedEnabled  bool
+//	ConnectorEnabled bool
+//}
+//
+//type Persistence interface {
+//	//MessengerServiceEnabled() (bool, error)
+//	//WalletServiceEnabled() (bool, error)
+//	//NewsFeedServiceEnabled() (bool, error)
+//
+//	ServicesEnabled() (*ServiceConfiguration, error)
+//}
+
+type AccountCreator struct {
 	rootDataDir string
 
 	multiaccountsDB *multiaccounts.Database // FIXME: Use persistence interface instead
@@ -50,7 +65,7 @@ type Service struct {
 	//accsManager *accsmanagement.AccountsManager
 }
 
-func NewService(rootDataDir string, logger *zap.Logger, db *multiaccounts.Database, mediaProvider MediaProvider) (*Service, error) {
+func NewAccountCreator(rootDataDir string, logger *zap.Logger, db *multiaccounts.Database, mediaProvider MediaProvider) *AccountCreator {
 	//accountsManager, err := accsmanagement.NewAccountsManager(logger.Named("accounts-manager"))
 	//if err != nil {
 	//	return nil, errors.Wrap(err, "failed to create AccountsManager")
@@ -58,43 +73,20 @@ func NewService(rootDataDir string, logger *zap.Logger, db *multiaccounts.Databa
 	//
 	//accountsManager.SetRootDataDir(rootDataDir)
 
-	return &Service{
+	return &AccountCreator{
 		rootDataDir:     rootDataDir,
 		multiaccountsDB: db,
 		logger:          logger,
 		mediaProvider:   mediaProvider,
 		//accsManager:     accountsManager,
-	}, nil
-}
-
-func (s *Service) Start() error {
-	return nil
-}
-
-func (s *Service) Stop() error {
-	return nil
-}
-
-func (s *Service) API() *API {
-	return &API{
-		service: s,
 	}
 }
 
-func (s *Service) CreateAccount(ctx context.Context, request *requests.CreateAccount, keycardData *requests.KeycardData) (*multiaccounts.Account, error) {
-	mnemonic, err := accscommon.CreateRandomMnemonicWithDefaultLength()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create random mnemonic")
-	}
-
-	return s.StartNodeWithChatKeyOrMnemonic(ctx, request, mnemonic, keycardData, false)
-}
-
-func (s *Service) StartNodeWithChatKeyOrMnemonic(
+func (b *AccountCreator) StartNodeWithChatKeyOrMnemonic(
 	ctx context.Context,
-	request *requests.CreateAccount,
+	request *requests2.CreateAccount,
 	mnemonic string, // empty mnemonic is used for keycard account, not empty for regular account
-	keycardData *requests.KeycardData, // nil for regular account, not nil for account with already set keycard
+	keycardData *requests2.KeycardData, // nil for regular account, not nil for account with already set keycard
 	restoreAccount bool,
 ) (*multiaccounts.Account, error) {
 	var (
@@ -154,7 +146,7 @@ func (s *Service) StartNodeWithChatKeyOrMnemonic(
 			accscommon.PathDefaultWalletAccount,
 			accscommon.PathEIP1581Encryption,
 		}
-		_, derivedAddresses, err = s.generateDerivedAddresses(genMasterAcc, derivationPaths)
+		_, derivedAddresses, err = b.generateDerivedAddresses(genMasterAcc, derivationPaths)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate derived addresses")
 		}
@@ -174,12 +166,17 @@ func (s *Service) StartNodeWithChatKeyOrMnemonic(
 		chatPublicKey = derivedAddresses[accscommon.PathEIP1581Chat].PublicKey
 	}
 
-	settings, err := s.prepareSettings(request, mnemonic, keyUID, masterAddress, derivedAddresses, restoreAccount)
+	accountsCount, err := b.multiaccountsDB.GetAccountsCount()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get accounts count")
+	}
+
+	settings, err := prepareSettings(request, mnemonic, keyUID, masterAddress, derivedAddresses, restoreAccount)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to prepare settings")
 	}
 
-	acc, err := s.buildAccount(request, keyUID, customizationColorClock, chatPublicKey)
+	acc, err := buildAccount(request, keyUID, customizationColorClock, chatPublicKey, accountsCount == 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build account")
 	}
@@ -188,20 +185,20 @@ func (s *Service) StartNodeWithChatKeyOrMnemonic(
 		acc.Name = settings.Name
 	}
 
-	//nodeConfig, err := s.prepareConfig(request, keyUID, settings.InstallationID)
+	//nodeConfig, err := b.prepareConfig(request, keyUID, settings.InstallationID)
 	//if err != nil {
 	//	return nil, errors.Wrap(err, "failed to prepare node config")
 	//}
 
 	// Create app database
-	appDB, err := s.createAppDatabase(acc.KeyUID, acc.KDFIterations, request.Password)
+	appDB, err := b.createAppDatabase(acc.KeyUID, acc.KDFIterations, request.Password)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create app database")
 	}
 	defer func() {
 		err := appDB.Close()
 		if err != nil {
-			s.logger.Error("failed to close app database", zap.Error(err))
+			b.logger.Error("failed to close app database", zap.Error(err))
 		}
 	}()
 
@@ -211,33 +208,34 @@ func (s *Service) StartNodeWithChatKeyOrMnemonic(
 	}
 
 	// Create wallet database
-	walletDB, err := s.createWalletDatabase(acc.KeyUID, acc.KDFIterations, request.Password)
+	walletDB, err := b.createWalletDatabase(acc.KeyUID, acc.KDFIterations, request.Password)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create wallet database")
 	}
 	defer func() {
 		err := walletDB.Close()
 		if err != nil {
-			s.logger.Error("failed to close wallet database", zap.Error(err))
+			b.logger.Error("failed to close wallet database", zap.Error(err))
 		}
 	}()
 
 	// Set accounts management persistence
-	accountsManager, err := accsmanagement.NewAccountsManager(s.logger.Named("accounts-manager"))
+	accountsManager, err := accsmanagement.NewAccountsManager(b.logger.Named("accounts-manager"))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create AccountsManager")
 	}
 
-	accountsManager.SetRootDataDir(s.rootDataDir)
+	accountsManager.SetRootDataDir(b.rootDataDir)
 	accountsManager.SetPersistence(accdb)
+	defer accountsManager.Logout()
 
 	if isKeycard {
-		err = s.prepareForKeycard(request, acc, settings)
+		err = b.prepareForKeycard(request, acc, settings)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to prepare for keycard")
 		}
 
-		keypairToStoreDirectly, err = s.prepareKeypair(request, keyUID, masterAddress, derivedAddresses, restoreAccount)
+		keypairToStoreDirectly, err = b.prepareKeypair(request, keyUID, masterAddress, derivedAddresses, restoreAccount)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to prepare keypair")
 		}
@@ -254,7 +252,7 @@ func (s *Service) StartNodeWithChatKeyOrMnemonic(
 		}
 	}
 
-	//err = s.StartNodeWithAccountAndInitialConfig(
+	//err = b.StartNodeWithAccountAndInitialConfig(
 	//	acc,
 	//	request.Password,
 	//	*settings,
@@ -263,12 +261,12 @@ func (s *Service) StartNodeWithChatKeyOrMnemonic(
 	//	chatPrivateKey,
 	//)
 
-	//err := s.ensureDBsOpened(*acc, password)
+	//err := b.ensureDBsOpened(*acc, password)
 	//if err != nil {
 	//	return err
 	//}
 
-	err = s.saveAccount(*acc)
+	err = b.saveAccount(*acc)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to save account")
 	}
@@ -285,21 +283,21 @@ func (s *Service) StartNodeWithChatKeyOrMnemonic(
 		}
 	}
 
-	//err = s.saveKeypairAndSettings(settings, nodecfg, keypair)
+	//err = b.saveKeypairAndSettings(settings, nodecfg, keypair)
 	//if err != nil {
 	//	return err
 	//}
 
-	//err = s.StartNodeWithAccount(*acc, password, nodecfg, chatKey)
+	//err = b.StartNodeWithAccount(*acc, password, nodecfg, chatKey)
 	//if err != nil {
-	//	s.logger.Error("start node with account and initial config", zap.Error(err))
+	//	b.logger.Error("start node with account and initial config", zap.Error(err))
 	//	return err
 	//}
 
 	return acc, nil
 }
 
-func (s *Service) getAppDBPath(keyUID string) (string, error) {
+func (s *AccountCreator) getAppDBPath(keyUID string) (string, error) {
 	if len(s.rootDataDir) == 0 {
 		return "", errors.New("empty root data dir")
 	}
@@ -307,7 +305,7 @@ func (s *Service) getAppDBPath(keyUID string) (string, error) {
 	return filepath.Join(s.rootDataDir, fmt.Sprintf("%s-v4.db", keyUID)), nil
 }
 
-func (s *Service) getWalletDBPath(keyUID string) (string, error) {
+func (s *AccountCreator) getWalletDBPath(keyUID string) (string, error) {
 	if len(s.rootDataDir) == 0 {
 		return "", errors.New("root datadir wasn't provided")
 	}
@@ -315,7 +313,7 @@ func (s *Service) getWalletDBPath(keyUID string) (string, error) {
 	return filepath.Join(s.rootDataDir, fmt.Sprintf("%s-wallet.db", keyUID)), nil
 }
 
-func (s *Service) createAppDatabase(keyUID string, kdfIterations int, password string) (*sql.DB, error) {
+func (s *AccountCreator) createAppDatabase(keyUID string, kdfIterations int, password string) (*sql.DB, error) {
 	// WARNING: Decide if we want to drop this migration
 	//dbFilePath, err := s.runDBFileMigrations(account, password)
 	//if err != nil {
@@ -343,7 +341,7 @@ func (s *Service) createAppDatabase(keyUID string, kdfIterations int, password s
 	return db, nil
 }
 
-func (s *Service) createWalletDatabase(keyUID string, kdfIterations int, password string) (*sql.DB, error) {
+func (s *AccountCreator) createWalletDatabase(keyUID string, kdfIterations int, password string) (*sql.DB, error) {
 	dbWalletPath, err := s.getWalletDBPath(keyUID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get wallet database file path")
@@ -358,11 +356,11 @@ func (s *Service) createWalletDatabase(keyUID string, kdfIterations int, passwor
 	return db, nil
 }
 
-func (s *Service) saveAccount(account multiaccounts.Account) error {
+func (s *AccountCreator) saveAccount(account multiaccounts.Account) error {
 	return s.multiaccountsDB.SaveAccount(account)
 }
 
-func (s *Service) generateDerivedAddresses(genAcc *generator.Account, paths []string) (genDerivedAccounts map[string]*generator.Account, genDerivedAccountsInfo map[string]generator.AccountInfo, err error) {
+func (s *AccountCreator) generateDerivedAddresses(genAcc *generator.Account, paths []string) (genDerivedAccounts map[string]*generator.Account, genDerivedAccountsInfo map[string]generator.AccountInfo, err error) {
 	genDerivedAccounts, err = generator.DeriveChildrenFromAccount(genAcc, paths)
 	if err != nil {
 		return
@@ -376,7 +374,7 @@ func (s *Service) generateDerivedAddresses(genAcc *generator.Account, paths []st
 	return
 }
 
-func (s *Service) prepareSettings(request *requests.CreateAccount, mnemonic string, keyUID string, masterAddress string,
+func prepareSettings(request *requests2.CreateAccount, mnemonic string, keyUID string, masterAddress string,
 	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (*settings.Settings, error) {
 	newSettings, err := api.DefaultSettings(keyUID, masterAddress, derivedAddresses)
 	if err != nil {
@@ -403,7 +401,7 @@ func (s *Service) prepareSettings(request *requests.CreateAccount, mnemonic stri
 	return newSettings, nil
 }
 
-func (s *Service) buildAccount(request *requests.CreateAccount, keyUID string, customizationColorClock uint64, chatKey string) (*multiaccounts.Account, error) {
+func buildAccount(request *requests2.CreateAccount, keyUID string, customizationColorClock uint64, chatKey string, hasAcceptedTerms bool) (*multiaccounts.Account, error) {
 	//err := s.OpenAccounts(request.ThirdpartyServicesEnabled)
 	//if err != nil {
 	//	return nil, err
@@ -422,19 +420,11 @@ func (s *Service) buildAccount(request *requests.CreateAccount, keyUID string, c
 		acc.KDFIterations = dbsetup.ReducedKDFIterationsNumber
 	}
 
-	count, err := s.multiaccountsDB.GetAccountsCount()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get accounts count")
-	}
-	if count == 0 {
-		acc.HasAcceptedTerms = true
-	}
-
 	if request.ImagePath != "" {
 		imageCropRectangle := request.ImageCropRectangle
 		if imageCropRectangle == nil {
 			// Default crop rectangle used by mobile
-			imageCropRectangle = &requests.ImageCropRectangle{
+			imageCropRectangle = &requests2.ImageCropRectangle{
 				Ax: 0,
 				Ay: 0,
 				Bx: 1000,
@@ -451,6 +441,7 @@ func (s *Service) buildAccount(request *requests.CreateAccount, keyUID string, c
 		acc.Images = iis
 	}
 
+	var err error
 	acc.ColorHash, err = colorhash.GenerateFor(chatKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate color hash")
@@ -464,7 +455,7 @@ func (s *Service) buildAccount(request *requests.CreateAccount, keyUID string, c
 	return acc, nil
 }
 
-func (s *Service) prepareForKeycard(request *requests.CreateAccount, multiAccount *multiaccounts.Account, settings *settings.Settings) error {
+func (s *AccountCreator) prepareForKeycard(request *requests2.CreateAccount, multiAccount *multiaccounts.Account, settings *settings.Settings) error {
 	if request.KeycardInstanceUID == "" {
 		return nil
 	}
@@ -502,7 +493,7 @@ func (s *Service) prepareForKeycard(request *requests.CreateAccount, multiAccoun
 	return nil
 }
 
-func (s *Service) prepareKeypair(request *requests.CreateAccount, keyUID string, masterAddress string,
+func (s *AccountCreator) prepareKeypair(request *requests2.CreateAccount, keyUID string, masterAddress string,
 	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (keypair *accsmanagementtypes.Keypair, err error) {
 	// set up keypair
 	keypair = &accsmanagementtypes.Keypair{

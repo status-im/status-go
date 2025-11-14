@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"path"
@@ -10,16 +11,18 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/centralizedmetrics"
 	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/requestlog"
 	"github.com/status-im/status-go/multiaccounts"
+	requests2 "github.com/status-im/status-go/pkg/backend/requests"
 	"github.com/status-im/status-go/pkg/backend/rpc"
 	"github.com/status-im/status-go/pkg/sentry"
-	"github.com/status-im/status-go/pkg/services/root"
 	"github.com/status-im/status-go/pkg/version"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server"
 )
 
@@ -41,7 +44,6 @@ type StatusBackend struct {
 	rpcServer *gethrpc.Server
 
 	// Services
-	rootService *root.Service
 
 	// FIXME: Extract to separate services
 	ipfs               *ipfs.Downloader
@@ -137,6 +139,7 @@ func NewStatusBackend(rootDataDir string, opts ...Option) (*StatusBackend, error
 	}
 
 	// Create IPFS downloader
+	// TODO: No need to create it before login.
 	b.ipfs = ipfs.NewDownloader(b.rootDataDir)
 
 	// Create media server
@@ -148,17 +151,8 @@ func NewStatusBackend(rootDataDir string, opts ...Option) (*StatusBackend, error
 		}
 	}
 
-	// Create root service
-	b.rootService, err = root.NewService(
-		b.rootDataDir,
-		b.logger.Named("root"),
-		b.multiaccountsDB,
-		b.mediaServer)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create root service")
-	}
-
-	err = b.rpcServer.RegisterName("root", b.rootService.API())
+	// Register ourselves as a service
+	err = b.rpcServer.RegisterName("backend", b.API())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to register root service")
 	}
@@ -207,6 +201,12 @@ func (b *StatusBackend) Stop() error {
 	return nil
 }
 
+func (b *StatusBackend) API() *API {
+	return &API{
+		backend: b,
+	}
+}
+
 func (b *StatusBackend) startMediaServer(address, advertizeHost string, advertizePort int) error {
 	if b.mediaServer != nil {
 		if err := b.mediaServer.Stop(); err != nil {
@@ -239,12 +239,68 @@ func (b *StatusBackend) CentralizedMetricsInfo() (*centralizedmetrics.MetricsInf
 	return b.centralizedMetrics.Info()
 }
 
-func (b *StatusBackend) RootService() *root.API {
-	return b.rootService.API()
-}
-
 func (b *StatusBackend) CallInProcessRPC(inputJSON string) string {
 	codec := rpc.NewSingleRequestCodec(inputJSON)
 	b.rpcServer.ServeCodec(codec.GethCodec(), 0)
 	return codec.Output()
+}
+
+func (b *StatusBackend) ListAccounts(ctx context.Context) ([]multiaccounts.Account, error) {
+	accs, err := b.multiaccountsDB.GetAccounts()
+
+	if b.mediaServer != nil {
+		for i, acc := range accs {
+			for j, images := range acc.Images {
+				url := b.mediaServer.MakeAccountImageURL(acc.KeyUID, images.Name, images.Clock)
+				accs[i].Images[j].LocalURL = url
+			}
+		}
+	}
+
+	return accs, err
+}
+
+func (b *StatusBackend) CreateAccount(ctx context.Context, request *requests2.CreateAccount, keycardData *requests2.KeycardData) (*multiaccounts.Account, error) {
+	mnemonic, err := accscommon.CreateRandomMnemonicWithDefaultLength()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create random mnemonic")
+	}
+
+	creator := NewAccountCreator(b.rootDataDir, b.logger.Named("account-creator"), b.multiaccountsDB, b.mediaServer)
+	return creator.StartNodeWithChatKeyOrMnemonic(ctx, request, mnemonic, keycardData, true)
+}
+
+func (b *StatusBackend) Login(request *requests.Login) error {
+	// Get account from database
+	acc, err := b.multiaccountsDB.GetAccount(request.KeyUID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get account")
+	}
+	if acc == nil {
+		return errors.New("account not found")
+	}
+
+	// Set runtime parameters
+	if request.RuntimeLogLevel != "" {
+		// TODO
+	}
+
+	// Open databases
+
+	// Run migrations
+
+	// Register and start services, according to persisted settings
+	// Root service should only load the settings required to define the list of services to start
+	// Other services should load their settings through its persistence interfaces.
+	// NOTE: For now we always register and start all services, as we did before.
+	//   (messenger and wallet started by client)
+
+	// Send LoggedIn signal to the client
+	// TODO: Perhaps this signal makes no sense when Login is a sync call
+	err = b.LoggedIn(request.KeyUID, err)
+	if err != nil {
+		return errors.Wrap(err, "failed to send LoggedIn signal")
+	}
+
+	return nil
 }

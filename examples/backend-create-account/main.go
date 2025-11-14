@@ -8,7 +8,7 @@ import (
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/pkg/backend"
-	"github.com/status-im/status-go/pkg/services/root/requests"
+	"github.com/status-im/status-go/pkg/backend/requests"
 )
 
 func main() {
