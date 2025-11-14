@@ -111,6 +111,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 
 	services = append(services, b.NewsFeedService())
 	services = append(services, b.sharedUrlsService())
+	services = append(services, b.linkPreviewService(accDB))
 
 	b.services = services
 
