@@ -149,6 +149,11 @@ class WakuextService(Service):
         response = self.rpc_request("contacts")
         return response
 
+    def get_contact_by_id(self, id: str):
+        params = [id]
+        response = self.rpc_request("getContactByID", params)
+        return response
+
     def add_contact(self, contact_id: str, displayName: str):
         params = [{"id": contact_id, "nickname": "fake_nickname", "displayName": displayName, "ensName": ""}]
         response = self.rpc_request("addContact", params)
@@ -346,8 +351,15 @@ class WakuextService(Service):
         response = self.rpc_request("generateEditCommunityRequestsForSigning", params)
         return response
 
-    def send_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value):
-        params = [{"chatId": chat_id, "text": message, "contentType": content_type}]
+    def send_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value, responseTo: str = ""):
+        params = [
+            {
+                "chatId": chat_id,
+                "text": message,
+                "contentType": content_type,
+                "responseTo": responseTo,
+            }
+        ]
         response = self.rpc_request("sendChatMessage", params)
         return response
 
@@ -642,8 +654,17 @@ class WakuextService(Service):
         response = self.rpc_request("getSavedAddressesPerMode", params)
         return response
 
-    def upsert_saved_address(self, address_payload: dict):
-        params = [address_payload]
+    def upsert_saved_address(self, address: str, name: str, color_id: str = "", ens: str = "", chain_short_names: str = "", is_test: bool = False):
+        params = [
+            {
+                "address": address,
+                "name": name,
+                "ens": ens,
+                "colorId": color_id,
+                "isTest": is_test,
+                "chainShortNames": chain_short_names,
+            },
+        ]
         response = self.rpc_request("upsertSavedAddress", params)
         return response
 

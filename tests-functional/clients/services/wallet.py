@@ -88,3 +88,7 @@ class WalletService(Service):
 
     def stop_suggested_routes_async_calculation(self):
         return self.rpc_request("stopSuggestedRoutesAsyncCalculation")
+
+    def fetch_or_get_cached_wallet_balances(self, addresses: list, force_refresh: bool = False):
+        params = [addresses, force_refresh]
+        return self.rpc_request("fetchOrGetCachedWalletBalances", params)

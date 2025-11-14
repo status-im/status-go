@@ -1,5 +1,7 @@
 import re
+
 import pytest
+
 from clients.api import ApiResponseError
 
 
@@ -45,7 +47,14 @@ class TestSavedAddresses:
         """Test adding saved addresses and verifying their presence in the lists."""
 
         # Step: Adding item in mainnet mode
-        self.rpc_client.wakuext_service.upsert_saved_address(params)
+        self.rpc_client.wakuext_service.upsert_saved_address(
+            address=params.get("address", ""),
+            name=params.get("name", ""),
+            color_id=params.get("colorId", ""),
+            ens=params.get("ens", ""),
+            is_test=params.get("isTest", False),
+            chain_short_names=params.get("chainShortNames"),
+        )
         response = self.rpc_client.wakuext_service.get_saved_addresses()
         # TODO: Add more assertions on response
 
@@ -63,21 +72,31 @@ class TestSavedAddresses:
 
     def test_delete_saved_address(self):
         """Test deleting a saved address and verifying its removal."""
-        address, is_test = "0xc6a54e79fb8915efbe00a8adac5bd94b68022fb6", True
-        params = {
-            "address": address,
-            "name": "testnet_yellow_ENS",
-            "colorId": "red",
-            "ens": "some_red_ENS.stateofus.eth",
-            "isTest": is_test,
-        }
+        address = "0xc6a54e79fb8915efbe00a8adac5bd94b68022fb6"
+        is_test = True
+        name = "testnet_yellow_ENS"
+        color = "red"
+        ens = "some_red_ENS.stateofus.eth"
 
         # Step: Adding item in testnet mode
-        self.rpc_client.wakuext_service.upsert_saved_address(params)
+        self.rpc_client.wakuext_service.upsert_saved_address(
+            address=address,
+            name=name,
+            color_id=color,
+            ens=ens,
+            is_test=is_test,
+        )
 
         # Step: Verifying the item exists in testnet saved addresses
         response = self.rpc_client.wakuext_service.get_saved_addresses_per_mode(is_test)
-        assert any(params.items() <= item.items() for item in response), f"{params['name']} not found in getSavedAddressesPerMode"
+        assert len(response) == 1
+
+        saved_address = response[0]
+        assert saved_address["address"].lower() == address.lower()
+        assert saved_address["name"] == name
+        assert saved_address["colorId"] == color
+        assert saved_address["ens"] == ens
+        assert saved_address["isTest"] == is_test
 
         # Step: Deleting the item and verifying removal
         self.rpc_client.wakuext_service.delete_saved_address(address, is_test)
@@ -113,9 +132,9 @@ class TestSavedAddresses:
         # Step: Checking remaining capacity
         remaining_capacity = self.rpc_client.wakuext_service.remaining_capacity_for_saved_addresses(is_test)
 
-        # Step: adding  addresses to fill capacity
+        # Step: adding addresses to fill capacity
         for i in range(remaining_capacity):
-            self.rpc_client.wakuext_service.upsert_saved_address({"address": addresses[i], "name": f"test{i}", "isTest": is_test})
+            self.rpc_client.wakuext_service.upsert_saved_address(address=addresses[i], name=f"test{i}", is_test=is_test)
 
         # Step: Verifying that capacity is now 0
         with pytest.raises(ApiResponseError, match=re.escape("no more save addresses can be added")):

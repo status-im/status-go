@@ -335,6 +335,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
         return signal
 
+    def wait_for_messages(self, timeout: int | None = 20):
+        return self.wait_for_signal(SignalType.MESSAGES_NEW, timeout)
+
     def container_pause(self):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
