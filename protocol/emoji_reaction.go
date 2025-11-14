@@ -14,9 +14,9 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-// There is no foolproof way to validate emojis, but this regex should cover all standard emojis
-// it will also allow some non-emoji unicode characters, but that's not a big issue
-var emojiRegex = regexp.MustCompile("(?:\u00A9|\u00AE|[\u2000-\u3300]|[\U0001F000-\U0001FBFF])")
+// Validates that the emoji string is a valid hex string (used for emojis hexcodes
+// eg: 1f385-1f3fe
+var emojiRegex = regexp.MustCompile("[a-f0-9\\-]+")
 
 // EmojiReaction represents an emoji reaction from a user in the application layer, used for persistence, querying and
 // signaling
