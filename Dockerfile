@@ -24,8 +24,10 @@ ADD . .
 ARG cache_id='local'
 ARG enable_go_cache=true
 
-# Install choosenim and Nim 2.2.4
-RUN curl https://nim-lang.org/choosenim/init.sh -sSf | sh -s -- -y --version 2.2.4
+# Install Nim 2.2.4 with choosenim
+RUN curl -sSf https://nim-lang.org/choosenim/init.sh -o /tmp/init.sh \
+    && bash /tmp/init.sh -y --version:2.2.4 \
+    && rm /tmp/init.sh
 # Add Nim to PATH
 ENV PATH="/root/.nimble/bin:${PATH}"
 
