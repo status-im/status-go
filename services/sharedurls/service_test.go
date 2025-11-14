@@ -3,18 +3,16 @@ package sharedurls
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api/multiformat"
-	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	mock_provider "github.com/status-im/status-go/services/sharedurls/mock"
+	"github.com/status-im/status-go/t"
 
 	"github.com/status-im/status-go/protocol/communities"
 )
@@ -46,43 +44,6 @@ func (s *ShareUrlsSuite) SetupTest() {
 	s.service = NewService(s.provider)
 }
 
-type TimeSourceStub struct {
-}
-
-func (t *TimeSourceStub) GetCurrentTime() uint64 {
-	return uint64(time.Now().Unix())
-}
-
-func (s *ShareUrlsSuite) fakeCommunity() *communities.Community {
-	timeSource := TimeSourceStub{}
-
-	var config communities.Config
-	err := gofakeit.Struct(&config)
-	s.Require().NoError(err)
-
-	memberKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	key, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	config.ID = &key.PublicKey
-	config.PrivateKey = key
-	config.ControlNode = &key.PublicKey
-	config.Logger = zap.NewNop()
-	config.MemberIdentity = memberKey
-	config.ControlDevice = true
-	config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat) // Create community with no chats
-
-	//description.ID = types.EncodeHex(crypto.CompressPubkey(&key.PublicKey))
-
-	var community *communities.Community
-	community, err = communities.New(config, &timeSource, nil, nil)
-	s.Require().NoError(err)
-
-	return community
-}
-
 func (s *ShareUrlsSuite) addFakeChannel(community *communities.Community) (*communities.Community, *protobuf.CommunityChat, string) {
 	chat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
@@ -111,17 +72,13 @@ func (s *ShareUrlsSuite) addFakeChannel(community *communities.Community) (*comm
 }
 
 func (s *ShareUrlsSuite) fakeContact() *contacts.Contact {
-	key, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	var contact *contacts.Contact
-	err = gofakeit.Struct(&contact)
-	s.Require().NoError(err)
-
-	contact.ID = contacts.ContactIDFromPublicKey(&key.PublicKey)
+	contact := t.FakeContact(s.T(), nil)
 	contact.ENSVerified = true
-
 	return contact
+}
+
+func (s *ShareUrlsSuite) fakeCommunity() *communities.Community {
+	return t.FakeCommunity(s.T())
 }
 
 func (s *ShareUrlsSuite) verifyCommunityURL(url string, community *communities.Community, channel *protobuf.CommunityChat) {
