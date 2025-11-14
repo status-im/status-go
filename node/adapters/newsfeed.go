@@ -4,17 +4,17 @@ import (
 	"github.com/status-im/status-go/protocol"
 )
 
-type NewsFeedActivityCenterAdapter struct {
+type NewsFeedActivityCenter struct {
 	messenger *protocol.Messenger
 }
 
-func NewNewsFeedActivityCenterAdapter(messenger *protocol.Messenger) *NewsFeedActivityCenterAdapter {
-	return &NewsFeedActivityCenterAdapter{
+func NewNewsFeedActivityCenterAdapter(messenger *protocol.Messenger) *NewsFeedActivityCenter {
+	return &NewsFeedActivityCenter{
 		messenger: messenger,
 	}
 }
 
-func (p *NewsFeedActivityCenterAdapter) AddNotification(response *protocol.MessengerResponse, notification *protocol.ActivityCenterNotification) error {
+func (p *NewsFeedActivityCenter) AddNotification(response *protocol.MessengerResponse, notification *protocol.ActivityCenterNotification) error {
 	if p.messenger == nil {
 		return ErrMessengerNotReady
 	}

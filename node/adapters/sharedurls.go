@@ -7,27 +7,27 @@ import (
 	"github.com/status-im/status-go/protocol/contacts"
 )
 
-// SharedUrlsMessengerAdapter is a wrapper around the messenger to make it compatible with the sharedurls service.
+// SharedUrlsMessenger is a wrapper around the messenger to make it compatible with the sharedurls service.
 // This is to `return (contact, error)` in `GetContactByID`, which Messenger didn't do atm.
 // The return error is needed to enable returning errNoDataProvider in NopDataProvider (nil object pattern).
-type SharedUrlsMessengerAdapter struct {
+type SharedUrlsMessenger struct {
 	messenger *protocol.Messenger
 }
 
-func NewSharedUrlsMessengerAdapter(messenger *protocol.Messenger) *SharedUrlsMessengerAdapter {
-	return &SharedUrlsMessengerAdapter{
+func NewSharedUrlsMessengerAdapter(messenger *protocol.Messenger) *SharedUrlsMessenger {
+	return &SharedUrlsMessenger{
 		messenger: messenger,
 	}
 }
 
-func (p *SharedUrlsMessengerAdapter) GetCommunityByID(communityID types.HexBytes) (*communities.Community, error) {
+func (p *SharedUrlsMessenger) GetCommunityByID(communityID types.HexBytes) (*communities.Community, error) {
 	if p.messenger == nil {
 		return nil, ErrMessengerNotReady
 	}
 	return p.messenger.GetCommunityByID(communityID)
 }
 
-func (p *SharedUrlsMessengerAdapter) GetContactByID(pubKey string) (*contacts.Contact, error) {
+func (p *SharedUrlsMessenger) GetContactByID(pubKey string) (*contacts.Contact, error) {
 	if p.messenger == nil {
 		return nil, ErrMessengerNotReady
 	}
