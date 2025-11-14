@@ -296,9 +296,9 @@ func (m *ArchiveManager) StartCodexClient() error {
 	cfgCopy := *m.codexConfig
 	cfgCopy.CodexNodeConfig = m.codexConfig.CodexNodeConfig
 
-	if err := m.ensureCodexDiscoveryPort(&cfgCopy); err != nil {
-		return err
-	}
+	// if err := m.ensureCodexDiscoveryPort(&cfgCopy); err != nil {
+	// 	return err
+	// }
 
 	client, err := NewCodexClient(cfgCopy)
 	if err != nil {
@@ -306,8 +306,7 @@ func (m *ArchiveManager) StartCodexClient() error {
 	}
 	m.codexClient = client
 	m.ArchiveFileManager.codexClient = client
-	m.isCodexClientStarted = true
-	m.codexConfig.CodexNodeConfig.DiscoveryPort = cfgCopy.CodexNodeConfig.DiscoveryPort
+	// m.codexConfig.CodexNodeConfig.DiscoveryPort = cfgCopy.CodexNodeConfig.DiscoveryPort
 
 	if err := m.codexClient.Start(); err != nil {
 		m.isCodexClientStarted = false
@@ -315,6 +314,8 @@ func (m *ArchiveManager) StartCodexClient() error {
 		m.ArchiveFileManager.codexClient = nil
 		return err
 	}
+
+	m.isCodexClientStarted = true
 
 	return nil
 }
