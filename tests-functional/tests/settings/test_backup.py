@@ -19,7 +19,7 @@ class TestBackupSettings:
     def test_set_valid_backup_path(self):
         current_path = self.config.settings_service.backup_path()
 
-        # Verify it's a valid path (not empty and is a string)
+        # Verify it is a valid path (not empty and is a string)
         assert current_path is not None, "Backup path should not be None"
         assert isinstance(current_path, str), f"Expected string, got {type(current_path)}"
         assert current_path != "", "Backup path should not be empty"
