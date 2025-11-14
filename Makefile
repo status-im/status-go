@@ -352,6 +352,7 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
+generate: build-libsds build-libwaku
 generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
 generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
 generate: export GO_GENERATE_FAST_DEBUG ?= false
