@@ -519,7 +519,7 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	}
 
 	dataProvider := mock_unfurlers.NewMockStatusDataProvider(s.ctrl)
-	dataProvider.EXPECT().GetContactByID(gomock.Eq(c2.ID)).Return(c2).Times(1)
+	dataProvider.EXPECT().GetContactByID(gomock.Eq(c2.ID)).Return(c2, nil).Times(1)
 
 	r, err := UnfurlURLs([]string{u}, nil, dataProvider, s.logger)
 	s.Require().NoError(err)
@@ -544,7 +544,6 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 }
 
 func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
-
 	community := t.FakeCommunity(s.T(),
 		t.WithCommunityImage("../../_assets/tests/status.png", 0, 0, 256, 256),        // 256*256 px
 		t.WithCommunityBanner("../../_assets/tests/IMG_1205.HEIC.jpg", 0, 0, 160, 90), // 2282*3352 px

@@ -1,8 +1,7 @@
 package requests
 
 import (
-	"errors"
-
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/images"
