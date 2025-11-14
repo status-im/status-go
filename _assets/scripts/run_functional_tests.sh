@@ -76,7 +76,8 @@ pytest --reruns 2 -m rpc -c "${root_path}/pytest.ini" -n 12 \
   --docker-image=${image_name} \
   --codecov_dir="${binary_coverage_reports_path}" \
   --logs-dir="${logs_path}" \
-  --junitxml="${test_results_path}/report.xml"
+  --junitxml="${test_results_path}/report.xml" \
+  ./tests-functional
 exit_code=$?
 
 # Stop containers
