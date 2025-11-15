@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/node/adapters"
 	"github.com/status-im/status-go/pkg/featureflags"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
@@ -328,7 +329,7 @@ func (b *StatusNode) sharedUrlsService() *sharedurls.Service {
 	if b.sharedUrlsSrvc == nil {
 		b.sharedUrlsSrvc = sharedurls.NewService(nil)
 		if extService := b.WakuV2ExtService(); extService != nil {
-			provider := NewSharedUrlsMessengerAdapter(extService.Messenger())
+			provider := adapters.NewSharedUrlsMessengerAdapter(extService.Messenger())
 			b.sharedUrlsSrvc.SetDataProvider(provider)
 		}
 	}
@@ -435,7 +436,7 @@ func (b *StatusNode) NewsFeedService() *newsfeed.Service {
 		)
 
 		if wakuext := b.WakuV2ExtService(); wakuext != nil && wakuext.Messenger() != nil {
-			ac := NewNewsFeedActivityCenterAdapter(wakuext.Messenger())
+			ac := adapters.NewNewsFeedActivityCenterAdapter(wakuext.Messenger())
 			b.newsfeedSrvc.SetActivityCenter(ac)
 		}
 	}

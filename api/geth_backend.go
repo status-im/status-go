@@ -46,6 +46,7 @@ import (
 	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
+	"github.com/status-im/status-go/node/adapters"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/sentry"
@@ -2269,8 +2270,8 @@ func (b *GethStatusBackend) initProtocol() error {
 	b.statusNode.ChatService(accDB).Init(messenger)
 	b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
 	b.statusNode.CommunityTokensService().Init(messenger)
-	b.statusNode.SharedUrlsService().SetDataProvider(node.NewSharedUrlsMessengerAdapter(messenger))
-	b.statusNode.NewsFeedService().SetActivityCenter(node.NewNewsFeedActivityCenterAdapter(messenger))
+	b.statusNode.SharedUrlsService().SetDataProvider(adapters.NewSharedUrlsMessengerAdapter(messenger))
+	b.statusNode.NewsFeedService().SetActivityCenter(adapters.NewNewsFeedActivityCenterAdapter(messenger))
 
 	return nil
 }
