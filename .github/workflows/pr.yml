@@ -66,8 +66,8 @@ jobs:
 
       - name: golangci-lint
         env:
-          CGO_CFLAGS: "-I${{ github.workspace }}/third-party/nim-sds/library"
-          CGO_LDFLAGS: "-L${{ github.workspace }}/third-party/nim-sds/build -lsds -Wl,-rpath,${{ github.workspace }}/third-party/nim-sds/build"
+          CGO_CFLAGS: "-I${{ github.workspace }}/../nim-sds/library"
+          CGO_LDFLAGS: "-L${{ github.workspace }}/../nim-sds/build -lsds -Wl,-rpath,${{ github.workspace }}/../nim-sds/build"
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.3.1
