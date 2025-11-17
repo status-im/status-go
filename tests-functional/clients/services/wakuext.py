@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import TypedDict, Union
+from typing import TypedDict, Union, Optional
 
 from clients.rpc import RpcClient
 from clients.services.service import Service
@@ -769,4 +769,97 @@ class WakuextService(Service):
     def get_verification_request_sent_to(self, contact_id: str):
         params = [contact_id]
         response = self.rpc_request("getVerificationRequestSentTo", params)
+        return response
+
+    def save_community_token(self, token_data: dict):
+        params = [token_data]
+        response = self.rpc_request("saveCommunityToken", params)
+        return response
+
+    def add_community_token(self, community_id: str, chain_id: int, contract_address: str):
+        params = [community_id, chain_id, contract_address]
+        response = self.rpc_request("addCommunityToken", params)
+        return response
+
+    def create_history_archive_torrent_from_db(self, community_id: str, topics: list, start_date, end_date, partition_duration, encrypted: bool):
+        params = [
+            community_id,
+            topics,
+            start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date),
+            end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date),
+            partition_duration,
+            encrypted,
+        ]
+        response = self.rpc_request("createHistoryArchiveTorrentFromDB", params)
+        return response
+
+    def load_history_archive_index_from_file(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("loadHistoryArchiveIndexFromFile", params)
+        return response
+
+    def save_message_archive_id(self, community_id: str, archive_hash: str):
+        params = [community_id, archive_hash]
+        response = self.rpc_request("saveMessageArchiveID", params)
+        return response
+
+    def import_history_archives(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("importHistoryArchives", params)
+        return response
+
+    def backup_community(self, community_id: str, clock: int):
+        params = [community_id, clock]
+        response = self.rpc_request("backupCommunity", params)
+        return response
+
+    def handle_local_backup_communities(self, communities_data: dict):
+        params = [communities_data]
+        response = self.rpc_request("handleLocalBackupCommunities", params)
+        return response
+
+    def generate_hash_ratchet_key(self, group_id: str):
+        params = [group_id]
+        response = self.rpc_request("generateHashRatchetKey", params)
+        return response
+
+    def create_community_token_permission(self, community_id: str, permission_type: int, token_criteria: list, chat_ids: Optional[list] = None):
+        params = [
+            {
+                "communityId": community_id,
+                "type": permission_type,
+                "tokenCriteria": token_criteria,
+            }
+        ]
+        if chat_ids:
+            params[0]["chatIds"] = chat_ids
+        response = self.rpc_request("createCommunityTokenPermission", params)
+        return response
+
+    def edit_community_token_permission(
+        self, permission_id: str, community_id: str, permission_type: int, token_criteria: list, chat_ids: Optional[list] = None
+    ):
+        params = [
+            {
+                "permissionId": permission_id,
+                "createCommunityTokenPermission": {
+                    "communityId": community_id,
+                    "type": permission_type,
+                    "tokenCriteria": token_criteria,
+                },
+            }
+        ]
+        if chat_ids:
+            params[0]["createCommunityTokenPermission"]["chatIds"] = chat_ids
+        response = self.rpc_request("editCommunityTokenPermission", params)
+        return response
+
+    def delete_community_token_permission(self, community_id: str, permission_id: str):
+        params = [
+            {
+                "communityId": community_id,
+                "permissionId": permission_id,
+            }
+        ]
+        response = self.rpc_request("deleteCommunityTokenPermission", params)
         return response
