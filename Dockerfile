@@ -24,19 +24,12 @@ ADD . .
 ARG cache_id='local'
 ARG enable_go_cache=true
 
-# Install Nim 2.2.4 with choosenim
-RUN curl -sSf https://nim-lang.org/choosenim/init.sh -o /tmp/init.sh \
-    && bash /tmp/init.sh -y --version:2.2.4 \
-    && rm /tmp/init.sh
-# Add Nim to PATH
-ENV PATH="/root/.nimble/bin:${PATH}"
-
 RUN if [ "$enable_go_cache" = "true" ]; then \
       go env -w GOCACHE=/root/.cache/go-build; \
     fi
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
     --mount=type=cache,target="/root/.cache/go-generate-fast",id=statusgo-build-$cache_id \
-    make $build_target USE_SYSTEM_NIM=1 BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" \
+    make $build_target USE_SYSTEM_NIM=0 BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" \
       GO_GENERATE_FAST_RECACHE=$([ "$enable_go_cache" = "true" ] && echo false || echo true) \
       GO_GENERATE_FAST_DIR="/root/.cache/go-generate-fast"
 
