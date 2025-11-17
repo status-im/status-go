@@ -20,8 +20,8 @@ jobs:
 
       - name: Run messaging import check
         run: |
-          echo "Finding all Go files outside the messaging and vendor directories..."
-          files=$(find . -type f -name '*.go' ! -path './messaging/*' ! -path './vendor/*')
+          echo "Finding all Go files outside the messaging directory..."
+          files=$(find . -type f -name '*.go' ! -path './messaging/*')
 
           echo "Checking for invalid imports of github.com/status-im/status-go/messaging/*..."
           for file in $files; do

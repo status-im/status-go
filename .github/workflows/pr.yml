@@ -1,9 +1,6 @@
 name: Go Lint
 on:
   pull_request:
-    branches:
-      - develop
-      - release/**
 
 permissions:
   contents: read
@@ -18,6 +15,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: 1.24
+
+      - name: Get dependencies
+        run: go mod download
 
       - name: Cache Go dependencies
         uses: actions/cache@v4
@@ -63,6 +63,9 @@ jobs:
       - name: lint-panics
         run: |
           make lint-panics
+
+      - name: go mod tidy
+        run: go mod tidy && git diff --exit-code
 
   migration-check:
     name: Check SQL migrations order
