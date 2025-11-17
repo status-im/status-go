@@ -12,7 +12,6 @@ A comprehensive list of `status-go` functionality can be found in [Brief overvie
 - [How to Contribute](CONTRIBUTING.md)
 - [How to Release](docs/RELEASING.md)
 - [How to run status-go as HTTP server](/cmd/status-backend/README.md)
-- [Policies](./_docs/policies/README.md)
 
 # License
 
