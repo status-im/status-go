@@ -26,8 +26,8 @@ in mkShell {
   ];
 
   shellHook = ''
-    CGO_CFLAGS_SDS="-I$(pwd)/../nim-sds/library/"
-    CGO_LDFLAGS_SDS="-L$(pwd)/../nim-sds/build/ -lsds"
+    CGO_CFLAGS_SDS="-I$(realpath ../nim-sds/library/)"
+    CGO_LDFLAGS_SDS="-L$(realpath ../nim-sds/build/) -lsds"
     export USE_SYSTEM_NIM=1
     export CGO_CFLAGS="$CGO_CFLAGS_SDS"
     export CGO_LDFLAGS="$CGO_LDFLAGS_SDS"
