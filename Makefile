@@ -232,7 +232,7 @@ clone-nim-sds: $(NIM_SDS_SOURCE_DIR)
 
 $(LIBSDS): clone-nim-sds
 	@echo "Building nim-sds" $(LIBSDS)
-	cd $(NIM_SDS_SOURCE_DIR) && $(MAKE) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
+	cd $(NIM_SDS_SOURCE_DIR) && $(MAKE) update && $(MAKE) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
 
 build-libsds: $(LIBSDS)
 
