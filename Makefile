@@ -1,6 +1,7 @@
 .PHONY: statusgo all test clean help
 .PHONY: statusgo-ios-library statusgo-android-library
 .PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
+.PHONY: build-libsds clean-libsds rebuild-libsds
 
 # Clear any GOROOT set outside of the Nix shell
 export GOROOT=
@@ -75,14 +76,14 @@ endif
 
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
- LIBWAKU_EXT := so
+ LIB_EXT := dylib
  GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
- LIBWAKU_EXT := dll
+ LIB_EXT := dll
 else ifeq ($(detected_OS),Linux)
  GOBIN_SHARED_LIB_EXT := so
- LIBWAKU_EXT := so
+ LIB_EXT := so
  CGO_LDFLAGS += "-Wl,-soname,libstatus.so.0"
 endif
 
@@ -95,14 +96,45 @@ GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 BUILD_TAGS ?= gowaku_no_rln
 
+# `nwaku` variables
+
 ifeq ($(USE_NWAKU), true)
     BUILD_TAGS += use_nwaku
     NWAKU_VERSION ?= v0.37.0-rc.3
     NWAKU_SOURCE_DIR ?= $(GIT_ROOT)/../nwaku
-    LIBWAKU := $(NWAKU_SOURCE_DIR)/build/libwaku.$(LIBWAKU_EXT)
+    LIBWAKU := $(NWAKU_SOURCE_DIR)/build/libwaku.$(LIB_EXT)
     CGO_CFLAGS+=-I$(NWAKU_SOURCE_DIR)/library
 	CGO_LDFLAGS+=-L$(NWAKU_SOURCE_DIR)/build -lwaku -Wl,-rpath,$(NWAKU_SOURCE_DIR)/build
 endif
+
+
+# `nim-sds` variables
+
+# Option 1: Provide NIM_SDS_SOURCE_DIR
+NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
+
+# Option 2: Provide NIM_SDS_LIB_DIR and NIM_SDS_INC_DIR
+
+# Determine which approach to use
+ifdef NIM_SDS_LIB_DIR
+ifdef NIM_SDS_INC_DIR
+    # External lib/include approach (e.g. used in Nix)
+    NIM_SDS_BUILD_FROM_SOURCE := false
+else
+    $(error NIM_SDS_INC_DIR must be provided when NIM_SDS_LIB_DIR is set)
+endif
+else
+    # Source directory approach
+    NIM_SDS_LIB_DIR := $(NIM_SDS_SOURCE_DIR)/build
+    NIM_SDS_INC_DIR := $(NIM_SDS_SOURCE_DIR)/library
+    NIM_SDS_BUILD_FROM_SOURCE := true
+endif
+
+LIBSDS := $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
+CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
+CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+
+# Common flags
 
 BUILD_FLAGS ?= -ldflags=""
 BUILD_FLAGS_MOBILE ?=
@@ -154,7 +186,6 @@ nix-gc-protected:
 	@echo -e "$(YELLOW)The following paths are protected:$(RESET)" && \
 	ls -1 $(_NIX_GCROOTS) | sed 's/^/ - /'
 
-
 nix-upgrade: SHELL := /bin/sh
 nix-upgrade: ##@nix Upgrade Nix interpreter to current version.
 	nix/scripts/upgrade.sh
@@ -175,7 +206,7 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
-$(GO_CMD_BUILDS): generate $(LIBWAKU)
+$(GO_CMD_BUILDS): generate $(LIBWAKU) $(LIBSDS)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -v \
@@ -184,6 +215,13 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	@echo "Compilation done."
 	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
+# Flag needed by nim-based dependencies (e.g., nwaku and nim-sds) that also use nimbus-build-system.
+# When USE_SYSTEM_NIM=1 skips compiling Nim compiler locally and instead,
+# enforces to use system-installed Nim.
+# This is not needed if nim dependencies use nimble.
+USE_SYSTEM_NIM ?= 0
+
+# Libwaku targets
 
 $(NWAKU_SOURCE_DIR): ##@build Clone nwaku
 ifeq ($(USE_NWAKU),true)
@@ -196,7 +234,7 @@ clone-nwaku: $(NWAKU_SOURCE_DIR)
 $(LIBWAKU): clone-nwaku
 ifeq ($(USE_NWAKU),true)
 	@echo "Building libwaku" $(LIBWAKU)
-	$(MAKE) -C $(NWAKU_SOURCE_DIR) libwaku SHELL=/bin/bash
+	$(MAKE) -C $(NWAKU_SOURCE_DIR) libwaku USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
 endif
 
 build-libwaku: $(LIBWAKU)
@@ -209,6 +247,39 @@ clean-libwaku:
 	rm $(LIBWAKU)
 
 rebuild-libwaku: | clean-libwaku $(LIBWAKU)
+
+# libsds targets
+
+$(NIM_SDS_SOURCE_DIR): ##@build Clone nim-sds
+ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
+	@echo "Cloning nim-sds ..."
+	git clone --branch v0.1.0 https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR)
+endif
+
+clone-nim-sds: $(NIM_SDS_SOURCE_DIR)
+
+$(LIBSDS): clone-nim-sds
+ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
+	@echo "Building nim-sds: $(LIBSDS)"
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) update
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
+else
+	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
+endif
+
+build-libsds: $(LIBSDS)
+
+#build-libsds-android: clone-nim-sds
+#	@echo "Building nim-sds for Android" $(LIBSDS)
+#	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
+
+clean-libsds:
+	@echo "Removing libsds"
+	rm $(LIBSDS)
+
+rebuild-libsds: | clean-libsds $(LIBSDS)
+
+# Status-go targets
 
 statusgo: ##@build Build status-go as status-backend server
 statusgo: build/bin/status-backend
@@ -227,34 +298,33 @@ push-notification-server: build/bin/push-notification-server
 cmd: ##@build Build all public apps in ./cmd
 cmd: status-backend push-notification-server
 
-
 status-go-deps:
 	go clean -cache || true
 	go clean -modcache || true
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
-
-
+statusgo-c-bindings: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-c-bindings:
-	## cmd/library/README.md explains the magic incantation behind this
-	mkdir -p build/bin/statusgo-lib
-	go run -mod=mod cmd/library/*.go > build/bin/statusgo-lib/main.go
+	@## cmd/library/README.md explains the magic incantation behind this
+	mkdir -p $(STATUS_GO_BINDINGS_PATH)
+	go run -mod=mod cmd/library/*.go > $(STATUS_GO_BINDINGS_PATH)/main.go
 
+statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
+statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
 statusgo-library: generate
-statusgo-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
+statusgo-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-archive \
-		-o build/bin/libstatus.a \
-		./build/bin/statusgo-lib
-	@echo "Static library built:"
-	@ls -la build/bin/libstatus.*
+		-o $(STATUS_GO_LIBRARY_OUT)/libstatus.a \
+		"$(STATUS_GO_BINDINGS_PATH)/main.go"
+	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 
 statusgo-shared-library: generate
-statusgo-shared-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
@@ -340,7 +410,7 @@ clean-release:
 	rm -rf $(RELEASE_DIR)
 
 lint-fix:
-	golangci-lint --build-tags '$(BUILD_TAGS)' run --fix ./...
+	golangci-lint --build-tags '$(BUILD_TAGS) lint' run --fix ./...
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
@@ -363,6 +433,7 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
 	grep -v /transactions/fake | \
 	grep -v /tests-unit-network)
 test-unit: ##@tests Run unit and integration tests
+	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	./_assets/scripts/run_unit_tests.sh
 
 test-unit-network: test-unit-prep
@@ -384,12 +455,13 @@ benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 benchmark:
 	@./_assets/scripts/run_benchmark.sh
 
-lint-panics: export GOFLAGS ?= -tags='$(BUILD_TAGS)'
 lint-panics: generate
+	GOFLAGS=-tags='$(BUILD_TAGS),lint' \
 	go tool goroutine-defer-guard -skip=./cmd -test=false ./...
 
 lint: generate lint-panics
-	golangci-lint --build-tags '$(BUILD_TAGS)' run ./...
+lint:
+	golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*
