@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/centralizedmetrics/common"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 )
 
 func TestMixpanelMetricProcessor(t *testing.T) {
@@ -56,7 +56,7 @@ func TestMixpanelMetricProcessor(t *testing.T) {
 	defer testServer.Close()
 
 	// Initialize the MixpanelMetricProcessor with the test server URL
-	processor := NewMixpanelMetricProcessor("testAppID", "testSecret", testServer.URL, tt.MustCreateTestLogger())
+	processor := NewMixpanelMetricProcessor("testAppID", "testSecret", testServer.URL, testutils.MustCreateTestLogger())
 
 	// Example metrics
 	metrics := []common.Metric{

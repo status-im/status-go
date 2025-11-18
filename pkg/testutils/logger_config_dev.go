@@ -1,6 +1,6 @@
 //go:build !test_silent
 
-package tt
+package testutils
 
 import "go.uber.org/zap"
 

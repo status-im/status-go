@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 )
 
 func TestServiceTestSuite(t *testing.T) {
@@ -20,7 +20,7 @@ type PublisherTestSuite struct {
 }
 
 func (p *PublisherTestSuite) SetupTest(installationID string) {
-	p.logger = tt.MustCreateTestLogger()
+	p.logger = testutils.MustCreateTestLogger()
 	p.publisher = New(p.logger)
 }
 

@@ -17,10 +17,10 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestMessengerProfilePictureHandlerSuite(t *testing.T) {
@@ -193,7 +193,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided()
 		b.MaxElapsedTime = 2 * time.Second
 	}
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
@@ -364,7 +364,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		b.MaxElapsedTime = 2 * time.Second
 	}
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := bob.RetrieveAll()
 		if err != nil {
 			return err

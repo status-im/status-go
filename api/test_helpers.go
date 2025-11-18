@@ -14,8 +14,8 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 
 	"github.com/stretchr/testify/require"
 )
@@ -145,7 +145,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 		}
 	}
 
-	data.backend = NewGethStatusBackend(tt.MustCreateTestLogger())
+	data.backend = NewGethStatusBackend(testutils.MustCreateTestLogger())
 	data.backend.UpdateRootDataDir(tmpdir)
 
 	err = data.backend.OpenAccounts(true)

@@ -12,8 +12,8 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/pkg/testutils"
 	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestMessengerSyncWalletSuite(t *testing.T) {
@@ -177,7 +177,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", false, nil)
 	s.Require().NoError(err)
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -246,7 +246,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	// Sync between devices is triggered automatically
 	// via watch account changes subscription
 	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -276,7 +276,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 		s.Require().NoError(err, "updated account on alice primary device")
 	}
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -388,7 +388,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	}
 
 	// Sync between devices is triggered automatically
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -438,7 +438,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	}
 
 	// Sync between devices is triggered automatically
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -570,7 +570,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", false, nil)
 	s.Require().NoError(err)
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -612,7 +612,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	s.Require().NoError(err)
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -648,7 +648,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 
 	totalNumOfAccounts-- //one acc less
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err

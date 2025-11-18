@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 )
 
 func TestMessengerSyncProfilePictureSuite(t *testing.T) {
@@ -71,7 +71,7 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	s.Require().NoError(s.m.multiAccounts.StoreIdentityImages(keyUID, iis, true))
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = theirMessenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -109,7 +109,7 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	iis = append(iis, iis2...)
 	s.Require().NoError(s.m.multiAccounts.StoreIdentityImages(keyUID, iis, true))
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = theirMessenger.RetrieveAll()
 		if err != nil {
 			return err

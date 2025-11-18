@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/verification"
 )
 
@@ -71,7 +71,7 @@ func (s *MessengerSyncVerificationRequests) TestSyncVerificationRequests() {
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = theirMessenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -133,7 +133,7 @@ func (s *MessengerSyncVerificationRequests) TestSyncTrust() {
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = theirMessenger.RetrieveAll()
 		if err != nil {
 			return err

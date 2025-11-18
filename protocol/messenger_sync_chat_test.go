@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 const publicChatName = "status"
@@ -82,7 +82,7 @@ func (s *MessengerSyncChatSuite) TestRemovePubChat() {
 
 	var allChats []*Chat
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		var err error
 		response, err := s.alice2.RetrieveAll()
 		if err != nil {
@@ -131,7 +131,7 @@ func (s *MessengerSyncChatSuite) TestMarkChatMessagesRead() {
 	s.Require().NoError(err)
 
 	var receivedPubChatMessage *common.Message
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		var err error
 		response, err := s.alice2.RetrieveAll()
 		if err != nil {
@@ -156,7 +156,7 @@ func (s *MessengerSyncChatSuite) TestMarkChatMessagesRead() {
 	s.Require().NoError(err)
 
 	var receivedChat *Chat
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		var err error
 		response, err := s.alice2.RetrieveAll()
 		if err != nil {

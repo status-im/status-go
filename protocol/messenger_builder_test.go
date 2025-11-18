@@ -18,11 +18,11 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -57,7 +57,7 @@ func (tmc *testMessengerConfig) complete() error {
 	}
 
 	if tmc.logger == nil {
-		logger := tt.MustCreateTestLogger()
+		logger := testutils.MustCreateTestLogger()
 		tmc.logger = logger.Named(tmc.name)
 	}
 

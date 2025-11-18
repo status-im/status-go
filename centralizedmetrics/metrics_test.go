@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/centralizedmetrics/common"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 )
 
 var testMetric = common.Metric{ID: "user-id", EventName: "test-name", EventValue: map[string]interface{}{"test-name": "test-value"}, Platform: "android", AppVersion: "2.30.0"}
 
 func newMetricService(t *testing.T, repository MetricRepository, processor common.MetricProcessor, interval time.Duration) *MetricService {
-	return NewMetricService(repository, processor, interval, tt.MustCreateTestLogger())
+	return NewMetricService(repository, processor, interval, testutils.MustCreateTestLogger())
 }
 
 // TestMetricService covers the main functionalities of MetricService
@@ -34,7 +34,7 @@ func TestMetricService(t *testing.T) {
 		t.Fatalf("failed to add metric: %v", err)
 	}
 
-	err := tt.RetryWithBackOff(func() error {
+	err := testutils.RetryWithBackOff(func() error {
 		// Verify metrics were processed and deleted
 		if len(processor.processedMetrics) != 1 {
 			return fmt.Errorf("expected 1 processed metric, got %d", len(processor.processedMetrics))
@@ -168,7 +168,7 @@ func TestStartStop(t *testing.T) {
 	require.True(t, service.started)
 	service.Stop()
 
-	err := tt.RetryWithBackOff(func() error {
+	err := testutils.RetryWithBackOff(func() error {
 		if service.started {
 			return errors.New("expected service to be stopped, but it is still running")
 		}

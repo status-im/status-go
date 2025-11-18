@@ -1,4 +1,4 @@
-package tt
+package testutils
 
 import (
 	"github.com/status-im/status-go/protocol/zaputil"
@@ -8,10 +8,10 @@ import (
 
 // MustCreateTestLogger returns a logger based on the passed flags.
 func MustCreateTestLogger() *zap.Logger {
-	return MustCreateTestLoggerWithConfig(loggerConfig())
+	return mustCreateTestLoggerWithConfig(loggerConfig())
 }
 
-func MustCreateTestLoggerWithConfig(cfg zap.Config) *zap.Logger {
+func mustCreateTestLoggerWithConfig(cfg zap.Config) *zap.Logger {
 	if err := zaputil.RegisterConsoleHexEncoder(); err != nil {
 		panic(err)
 	}

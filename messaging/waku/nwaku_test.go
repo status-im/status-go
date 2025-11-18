@@ -20,8 +20,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 // var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
@@ -52,7 +50,7 @@ func TestDiscoveryV5(t *testing.T) {
 	w, err := New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		if len(w.Peers()) == 0 {
 			return errors.New("no peers discovered")
 		}
@@ -80,7 +78,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 		b.MaxElapsedTime = 2 * time.Second
 	}
 	// Sanity check, not great, but it's probably helpful
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		if len(w.Peers()) == 0 {
 			return errors.New("no peers discovered")
 		}
@@ -91,7 +89,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	options = func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 90 * time.Second
 	}
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		if len(w.Peers()) == 0 {
 			return errors.New("no peers discovered")
 		}
@@ -205,7 +203,7 @@ func TestBasicWakuV2(t *testing.T) {
 	}
 
 	// Sanity check, not great, but it's probably helpful
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		numConnected, err := w.node.GetNumConnectedPeers()
 		if err != nil {
 			return err
@@ -287,7 +285,7 @@ func TestBasicWakuV2(t *testing.T) {
 		b.MaxElapsedTime = 60 * time.Second
 		b.InitialInterval = 500 * time.Millisecond
 	}
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		err := w.HistoryRetriever.Query(
 			context.Background(),
 			store.FilterCriteria{
@@ -413,7 +411,7 @@ func TestPeerExchange(t *testing.T) {
 	}
 
 	// Check that pxServerNode has discV5Node in its Peer Store
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		peers, err := pxServerNode.node.GetPeerIDsFromPeerStore()
 
 		if err != nil {
@@ -456,7 +454,7 @@ func TestPeerExchange(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that the light node discovered the discV5Node and has both nodes in its peer store
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		peers, err := lightNode.node.GetPeerIDsFromPeerStore()
 		if err != nil {
 			return err
@@ -470,7 +468,7 @@ func TestPeerExchange(t *testing.T) {
 	require.NoError(t, err)
 
 	// Now perform the PX request manually to see if it also works
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		numPeersReceived, err := lightNode.node.PeerExchangeRequest(1)
 		if err != nil {
 			return err
@@ -531,7 +529,7 @@ func TestPeerExchange(t *testing.T) {
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 30 * time.Second
 	}
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		// we should not use lightNode.Peers() here as it only indicates peers that are connected right now,
 		// in light client mode,the peer will be closed via `w.node.Host().Network().ClosePeer(peerInfo.ID)`
 		// after invoking identifyAndConnect, instead, we should check the peerStore, peers from peerStore
@@ -677,7 +675,7 @@ func TestWakuV2Filter(t *testing.T) {
 	}
 	time.Sleep(10 * time.Second) //TODO: Check if we can remove this sleep.
 	// Sanity check, not great, but it's probably helpful
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		peers, err := w.GetPeerIdsByProtocol(string(filter.FilterSubscribeID_v20beta1))
 		if err != nil {
 			return err
@@ -934,7 +932,7 @@ func TestLightpushRateLimit(t *testing.T) {
 	//Connect the relay peer and full node
 	err = w1.DialPeer(ctx, w0.ListenAddresses()[0].String())
 	require.NoError(t, err)
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		if len(w1.Peers()) == 0 {
 			return errors.New("no peers discovered")
 		}

@@ -16,9 +16,9 @@ import (
 	userimage "github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 )
@@ -272,7 +272,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	var actualContact *contacts.Contact
 	var bookmarks []*browsers.Bookmark
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		var err error
 		response, err = theirMessenger.RetrieveAll()
 		if err != nil {

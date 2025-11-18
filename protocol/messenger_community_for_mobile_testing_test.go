@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 )
 
 type MessengerCommunityForMobileTestingTestSuite struct {
@@ -25,7 +25,7 @@ func (s *MessengerCommunityForMobileTestingTestSuite) TestCreateClosedCommunity(
 	wg.Add(1)
 	// simulate invoking `HandleCommunityDescription`
 	go func() {
-		err := tt.RetryWithBackOff(func() error {
+		err := testutils.RetryWithBackOff(func() error {
 			r, err := s.m.RetrieveAll()
 			s.Require().NoError(err)
 			if len(r.Communities()) > 0 {
