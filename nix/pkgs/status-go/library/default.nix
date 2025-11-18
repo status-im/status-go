@@ -11,7 +11,7 @@ let
 in pkgs.buildGoModule {
   pname = "status-go";
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
-  vendorHash = "sha256-pxkFTHFLrTOdCh9V/Mzjt5/NHCzjmIuN5fIt5EptHSE=";
+  vendorHash = "sha256-t6dtjRx3xBg15WhNe7oenkPPHTZrsajvc60pWnj1OxY=";
 
   inherit meta version;
 
@@ -39,8 +39,10 @@ in pkgs.buildGoModule {
   allowGoReference = true;
 
   preBuild = ''
-    go run cmd/library/*.go > $NIX_BUILD_TOP/main.go
-    make generate SHELL=$SHELL GO111MODULE=on GO_GENERATE_CMD='go generate'
+    export NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include"
+    export NIM_SDS_LIB_DIR="${pkgs.lib-sds-pkg}/lib"
+    export GO_GENERATE_CMD='go generate'
+    make generate
   '';
 
   # Build the Go library
@@ -48,12 +50,9 @@ in pkgs.buildGoModule {
   # https://github.com/status-im/status-mobile/issues/20135
   buildPhase = ''
     runHook preBuild
-    go build \
-      -buildmode='c-archive' \
-      ${optionalString stdenv.isDarwin "-ldflags=-extldflags=-lresolv"} \
-      -tags='gowaku_skip_migrations gowaku_no_rln ${optionalString stdenv.isDarwin "netgo"}' \
-      -o "$out/libstatus.a" \
-      $NIX_BUILD_TOP/main.go
+    make statusgo-library \
+        STATUS_GO_BINDINGS_PATH="$NIX_BUILD_TOP" \
+        STATUS_GO_LIBRARY_OUT="$out"
     runHook postBuild
   '';
 }

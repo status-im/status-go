@@ -24,7 +24,7 @@ jobs:
         id: cache-go-deps
         with:
           path: ~/go/bin
-          key: go-deps-${{ runner.os }}-v4.0.2-protoc-gen-go-v1.34.1-gopls-latest
+          key: go-deps-${{ runner.os }}-v4.0.2-protoc-gen-go-v1.34.1
           restore-keys: |
             go-deps-${{ runner.os }}-
 
@@ -32,8 +32,6 @@ jobs:
         if: steps.cache-go-deps.outputs.cache-hit != 'true'
         run: |
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
-          go install golang.org/x/tools/gopls@latest
-          which gopls
 
       - name: Setup Protocol Buffer Compiler
         uses: arduino/setup-protoc@v3
@@ -58,7 +56,7 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.3.1
-          args: --build-tags=gowaku_no_rln
+          args: --build-tags=gowaku_no_rln,lint
 
       - name: lint-panics
         run: |
