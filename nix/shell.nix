@@ -18,7 +18,7 @@ in mkShell {
   buildInputs = with pkgs;
     lib.optionals (stdenv.isDarwin) [ xcodeWrapper ] ++ [
     git jq which
-    go golangci-lint go-junit-report gopls codecov-cli go-generate-fast
+    go golangci-lint go-junit-report gopls codecov-cli
     protobuf3_24 protoc-gen-go gotestsum openjdk openssl
     rustc cargo
   ];

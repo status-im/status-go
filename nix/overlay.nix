@@ -55,5 +55,4 @@ in rec {
 
   # Custom packages
   codecov-cli = callPackage ./pkgs/codecov-cli { };
-  go-generate-fast = callPackage ./pkgs/go-generate-fast { };
 }

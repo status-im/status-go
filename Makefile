@@ -9,10 +9,10 @@ export GOROOT=
 # It supports ANSI colors and categories.
 # To add new item into help output, simply add comments
 # starting with '##'. To add category, use @category.
-GREEN  := $(shell echo "\e[32m")
-WHITE  := $(shell echo "\e[37m")
-YELLOW := $(shell echo "\e[33m")
-RESET  := $(shell echo "\e[0m")
+GREEN  := $(shell printf "\e[32m")
+WHITE  := $(shell printf "\e[37m")
+YELLOW := $(shell printf "\e[33m")
+RESET  := $(shell printf "\e[0m")
 HELP_FUN = \
 		   %help; \
 		   while(<>) { push @{$$help{$$2 // 'options'}}, [$$1, $$3] if /^([a-zA-Z0-9\-]+)\s*:.*\#\#(?:@([a-zA-Z\-]+))?\s(.*)$$/ }; \
@@ -178,7 +178,7 @@ all: $(GO_CMD_NAMES)
 $(GO_CMD_BUILDS): generate $(LIBWAKU)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -mod=vendor -v \
+	go build -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
 	@echo "Compilation done."
@@ -219,7 +219,7 @@ status-backend: build/bin/status-backend
 run-status-backend: PORT ?= 0
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
-	go run ./cmd/status-backend --address localhost:${PORT}
+	go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
@@ -238,7 +238,7 @@ status-go-deps:
 statusgo-c-bindings:
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
-	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
+	go run -mod=mod cmd/library/*.go > build/bin/statusgo-lib/main.go
 
 statusgo-library: generate
 statusgo-library: statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
@@ -318,7 +318,7 @@ setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
 generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
-generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
+generate: GO_GENERATE_CMD ?= go tool go-generate-fast
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
@@ -327,9 +327,9 @@ generate:  ##@ Run generate for all given packages using go-generate-fast, fallb
 generate-contracts:
 	go generate ./contracts
 download-tokens:
-	go run ./services/wallet/token/token-lists/default-lists/downloader/main.go
+	go run -mod=mod ./services/wallet/token/token-lists/default-lists/downloader/main.go
 analyze-token-stores:
-	go run ./services/wallet/token/token-lists/analyzer/main.go
+	go run -mod=mod ./services/wallet/token/token-lists/analyzer/main.go
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
@@ -358,7 +358,6 @@ test-unit-prep: export UNIT_TEST_REPORT_CODECOV ?= false
 test-unit: test-unit-prep
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true
 test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
-	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake | \
@@ -404,11 +403,22 @@ deep-clean: clean git-clean
 tidy:
 	go mod tidy
 
-vendor: generate
-	go mod tidy
-	go mod vendor
-	go tool modvendor -copy="**/*.c **/*.h" -v
-.PHONY: vendor
+# Temporarily redirect the well-known `vendor` target to `vendor-hash`.
+# This target will be removed in the future.
+vendor: vendor-hash
+
+# https://gitlab.com/peerdb/peerdb/-/blob/d1dbd0c6533dca16bf57322b57cc8fb6ab897a66/nix-update.sh
+# After stopping vendoring https://github.com/status-im/status-go/pull/6951,
+# we have to manually update `vendorHash` in the nix derivation.
+# This target runs the nix build, extracts the expected vendorHash and updates with it the nix derivation.
+vendor-hash:
+	@echo "$(GREEN)Running nix build...$(RESET)"; \
+	NIX_OUTPUT="$$(nix build --extra-experimental-features 'nix-command flakes' '.?submodules=1#status-go-library' 2>&1)"; \
+	CURRENT_VENDOR_HASH="$$(echo $${NIX_OUTPUT} | sed -n 's/.*specified:[[:space:]]*\(sha256-[A-Za-z0-9+/=]*\).*/\1/p' | head -1)"; \
+	NEW_VENDOR_HASH="$$(echo $${NIX_OUTPUT} | sed -n 's/.*got:[[:space:]]*\(sha256-[A-Za-z0-9+/=]*\).*/\1/p' | head -1)"; \
+	sed -i '' "s|vendorHash = \"$${CURRENT_VENDOR_HASH}\";|vendorHash = \"$${NEW_VENDOR_HASH}\";|g" ./nix/pkgs/status-go/library/default.nix; \
+	echo "Replaced vendorHash $${CURRENT_VENDOR_HASH} with $${NEW_VENDOR_HASH}"
+
 
 migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
 migration:

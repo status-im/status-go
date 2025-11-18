@@ -18,6 +18,7 @@ RUN mkdir -p /go/src/github.com/status-im/status-go
 WORKDIR /go/src/github.com/status-im/status-go
 
 ADD go.mod go.sum ./
+RUN go mod download
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
 ADD . .
@@ -28,10 +29,7 @@ RUN if [ "$enable_go_cache" = "true" ]; then \
       go env -w GOCACHE=/root/.cache/go-build; \
     fi
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
-    --mount=type=cache,target="/root/.cache/go-generate-fast",id=statusgo-build-$cache_id \
-    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" \
-      GO_GENERATE_FAST_RECACHE=$([ "$enable_go_cache" = "true" ] && echo false || echo true) \
-      GO_GENERATE_FAST_DIR="/root/.cache/go-generate-fast"
+    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags"
 
 # Copy binaries to the second image
 FROM debian:bookworm-slim
