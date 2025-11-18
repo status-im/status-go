@@ -8,8 +8,8 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiAccCommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet"
 )
@@ -60,11 +60,11 @@ func (m *Messenger) dispatchSyncSavedAddress(ctx context.Context, syncMessage *p
 		return err
 	}
 
-	rawMessage := messagingtypes.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_SAVED_ADDRESS,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
@@ -111,7 +111,7 @@ func (m *Messenger) syncSavedAddress(ctx context.Context, savedAddress *wallet.S
 	return
 }
 
-func (m *Messenger) HandleSyncSavedAddress(state *ReceivedMessageState, syncMessage *protobuf.SyncSavedAddress, statusMessage *messagingtypes.Message) (err error) {
+func (m *Messenger) HandleSyncSavedAddress(state *ReceivedMessageState, syncMessage *protobuf.SyncSavedAddress, statusMessage *common.StatusMessage) (err error) {
 	address := gethcommon.BytesToAddress(syncMessage.Address)
 	if syncMessage.Removed {
 		deleted, err := m.savedAddressesManager.DeleteSavedAddress(

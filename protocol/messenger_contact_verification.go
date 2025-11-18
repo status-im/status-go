@@ -13,7 +13,6 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -70,11 +69,11 @@ func (m *Messenger) SendContactVerificationRequest(ctx context.Context, contactI
 		return nil, err
 	}
 
-	rawMessage, err := m.dispatchMessage(ctx, messagingtypes.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_REQUEST_CONTACT_VERIFICATION,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	})
 
 	if err != nil {
@@ -235,11 +234,11 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 		return nil, err
 	}
 
-	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_CANCEL_CONTACT_VERIFICATION,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	})
 
 	if err != nil {
@@ -326,11 +325,11 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		return nil, err
 	}
 
-	rawMessage, err := m.dispatchMessage(ctx, messagingtypes.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_VERIFICATION,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	})
 
 	if err != nil {
@@ -646,11 +645,11 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 		return nil, err
 	}
 
-	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_DECLINE_CONTACT_VERIFICATION,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	})
 
 	if err != nil {
@@ -778,7 +777,7 @@ func ValidateContactVerificationRequest(request *protobuf.RequestContactVerifica
 	return nil
 }
 
-func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState, request *protobuf.RequestContactVerification, statusMessage *messagingtypes.Message) error {
+func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState, request *protobuf.RequestContactVerification, statusMessage *common.StatusMessage) error {
 	if err := ValidateContactVerificationRequest(request); err != nil {
 		m.logger.Debug("Invalid verification request", zap.Error(err))
 		return err
@@ -871,7 +870,7 @@ func ValidateAcceptContactVerification(request *protobuf.AcceptContactVerificati
 	return nil
 }
 
-func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState, request *protobuf.AcceptContactVerification, statusMessage *messagingtypes.Message) error {
+func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState, request *protobuf.AcceptContactVerification, statusMessage *common.StatusMessage) error {
 	if err := ValidateAcceptContactVerification(request); err != nil {
 		m.logger.Debug("Invalid AcceptContactVerification", zap.Error(err))
 		return err
@@ -965,7 +964,7 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 	return nil
 }
 
-func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState, request *protobuf.DeclineContactVerification, statusMessage *messagingtypes.Message) error {
+func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState, request *protobuf.DeclineContactVerification, statusMessage *common.StatusMessage) error {
 	if crypto.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		return nil // Is ours, do nothing
 	}
@@ -1047,7 +1046,7 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 	return m.createOrUpdateOutgoingContactVerificationNotification(contact, state.Response, persistedVR, msg, nil)
 }
 
-func (m *Messenger) HandleCancelContactVerification(state *ReceivedMessageState, request *protobuf.CancelContactVerification, statusMessage *messagingtypes.Message) error {
+func (m *Messenger) HandleCancelContactVerification(state *ReceivedMessageState, request *protobuf.CancelContactVerification, statusMessage *common.StatusMessage) error {
 	myPubKey := hexutil.Encode(crypto.FromECDSAPub(&m.identity.PublicKey))
 	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
 

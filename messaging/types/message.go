@@ -8,7 +8,6 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 // TransportLayer is the lowest layer and represents waku message.
@@ -31,20 +30,10 @@ type EncryptionLayer struct {
 	HashRatchetInfo []*HashRatchetInfo
 }
 
-// ApplicationLayer is the topmost layer and represents the application message.
-type ApplicationLayer struct {
-	// Payload after having been unwrapped from the application layer
-	Payload   []byte                                   `json:"-"`
-	ID        types.HexBytes                           `json:"id"`
-	SigPubKey *ecdsa.PublicKey                         `json:"-"`
-	Type      protobuf.ApplicationMetadataMessage_Type `json:"-"`
-}
-
-// Message encapsulates all layers of the protocol
+// Message encapsulates layers of the protocol
 type Message struct {
-	TransportLayer   TransportLayer   `json:"transportLayer"`
-	EncryptionLayer  EncryptionLayer  `json:"encryptionLayer"`
-	ApplicationLayer ApplicationLayer `json:"applicationLayer"`
+	TransportLayer  TransportLayer  `json:"transportLayer"`
+	EncryptionLayer EncryptionLayer `json:"encryptionLayer"`
 }
 
 // Temporary JSON marshaling for those messages that are not yet processed
@@ -56,8 +45,8 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		From      types.HexBytes `json:"from"`
 		Timestamp uint32         `json:"timestamp"`
 	}{
-		ID:        m.ApplicationLayer.ID,
-		Payload:   string(m.ApplicationLayer.Payload),
+		ID:        MessageID(m.SigPubKey(), m.EncryptionLayer.Payload),
+		Payload:   string(m.EncryptionLayer.Payload),
 		Timestamp: m.TransportLayer.Message.Timestamp,
 		From:      m.TransportLayer.Message.Sig,
 	}
@@ -66,10 +55,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 
 // SigPubKey returns the most important signature, from the application layer to transport
 func (m *Message) SigPubKey() *ecdsa.PublicKey {
-	if m.ApplicationLayer.SigPubKey != nil {
-		return m.ApplicationLayer.SigPubKey
-	}
-
 	return m.TransportLayer.SigPubKey
 }
 

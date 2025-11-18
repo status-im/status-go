@@ -7,12 +7,14 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type CommunitiesKeyDistributorImpl struct {
 	messaging *messaging.API
+	sender    *common.MessageSender
 }
 
 func (ckd *CommunitiesKeyDistributorImpl) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
@@ -86,7 +88,7 @@ func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.C
 }
 
 func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *communities.Community, hashRatchetGroupID []byte, pubkeys []*ecdsa.PublicKey, msgType messagingtypes.CommKeyExMsgType) error {
-	rawMessage := messagingtypes.RawMessage{
+	rawMessage := common.RawMessage{
 		Sender:                community.PrivateKey(),
 		SkipEncryptionLayer:   false,
 		CommunityID:           community.ID(),
@@ -96,7 +98,7 @@ func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *comm
 		HashRatchetGroupID:    hashRatchetGroupID,
 		PubsubTopic:           community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
-	_, err := ckd.messaging.SendCommunityMessage(context.Background(), &rawMessage)
+	_, err := ckd.sender.SendCommunity(context.Background(), &rawMessage)
 
 	if err != nil {
 		return err

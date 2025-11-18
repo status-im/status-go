@@ -11,3 +11,8 @@ type ProcessedMessageIDsCachePersistence interface {
 	Add(ids []string, timestamp uint64) error
 	Clean(timestamp uint64) error
 }
+
+type Persistence interface {
+	KeysStorage() KeysPersistence
+	ProcessedMessageIDsCacheStorage() ProcessedMessageIDsCachePersistence
+}

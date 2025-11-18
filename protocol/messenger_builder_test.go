@@ -14,11 +14,11 @@ import (
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -214,7 +214,7 @@ func newRunningTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, c
 }
 
 type unhandedMessage struct {
-	*messagingtypes.Message
+	*common.StatusMessage
 	err error
 }
 
@@ -222,7 +222,7 @@ type unhandledMessagesTracker struct {
 	messages map[protobuf.ApplicationMetadataMessage_Type][]*unhandedMessage
 }
 
-func (u *unhandledMessagesTracker) addMessage(msg *messagingtypes.Message, err error) {
+func (u *unhandledMessagesTracker) addMessage(msg *common.StatusMessage, err error) {
 	msgType := msg.ApplicationLayer.Type
 
 	if _, exists := u.messages[msgType]; !exists {
@@ -230,8 +230,8 @@ func (u *unhandledMessagesTracker) addMessage(msg *messagingtypes.Message, err e
 	}
 
 	newMessage := &unhandedMessage{
-		Message: msg,
-		err:     err,
+		StatusMessage: msg,
+		err:           err,
 	}
 	u.messages[msgType] = append(u.messages[msgType], newMessage)
 }

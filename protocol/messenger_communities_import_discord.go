@@ -183,14 +183,14 @@ func (m *Messenger) createPinMessageFromDiscordMessage(message *common.Message, 
 		return nil, discord.Warning(err.Error())
 	}
 
-	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, community.PrivateKey())
+	wrappedPayload, err := v1protocol.WrapIntoAppLayerMessage(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, community.PrivateKey())
 	if err != nil {
 		m.logger.Error("failed to wrap pin message", zap.Error(err))
 		return nil, discord.Warning(err.Error())
 	}
 
 	pinMessageToSave := &common.PinMessage{
-		ID:               types.EncodeHex(v1protocol.MessageID(&community.PrivateKey().PublicKey, wrappedPayload)),
+		ID:               types.EncodeHex(messagingtypes.MessageID(&community.PrivateKey().PublicKey, wrappedPayload)),
 		PinMessage:       &pinMessage,
 		LocalChatID:      channelID,
 		From:             message.From,
@@ -1380,7 +1380,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 							continue
 						}
 
-						wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, discordCommunity.PrivateKey())
+						wrappedPayload, err := v1protocol.WrapIntoAppLayerMessage(encodedPayload, protobuf.ApplicationMetadataMessage_PIN_MESSAGE, discordCommunity.PrivateKey())
 						if err != nil {
 							m.logger.Error("failed to wrap pin message", zap.Error(err))
 							importProgress.AddTaskError(discord.ImportMessagesTask, discord.Warning(err.Error()))
@@ -1389,7 +1389,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 						}
 
 						pinMessageToSave := common.PinMessage{
-							ID:               types.EncodeHex(v1protocol.MessageID(&communityPubKey, wrappedPayload)),
+							ID:               types.EncodeHex(messagingtypes.MessageID(&communityPubKey, wrappedPayload)),
 							PinMessage:       &pinMessage,
 							LocalChatID:      processedChannelIds[channel.Channel.ID],
 							From:             messageToSave.From,

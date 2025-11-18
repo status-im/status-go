@@ -46,42 +46,42 @@ func (a *API) Publisher() *pubsub.Publisher {
 }
 
 func (a *API) InitChats(chats types.ChatsToInitialize, publicKeys []*ecdsa.PublicKey) error {
-	_, err := a.core.transport.InitFilters(adapters.ChatsToInitializeToTransport(chats), publicKeys)
+	_, err := a.core.stack.Transport.InitFilters(adapters.ChatsToInitializeToTransport(chats), publicKeys)
 	return err
 }
 
 func (a *API) InitPublicChats(chats types.ChatsToInitialize) (types.ChatFilters, error) {
-	filters, err := a.core.transport.InitPublicFilters(adapters.ChatsToInitializeToTransport(chats))
+	filters, err := a.core.stack.Transport.InitPublicFilters(adapters.ChatsToInitializeToTransport(chats))
 	return adapters.FromTransportFilters(filters), err
 }
 
 func (a *API) InitCommunities(communities types.CommunitiesToInitialize) (types.ChatFilters, error) {
-	filters, err := a.core.transport.InitCommunityFilters(adapters.CommunitiesToInitializeToTransport(communities))
+	filters, err := a.core.stack.Transport.InitCommunityFilters(adapters.CommunitiesToInitializeToTransport(communities))
 	return adapters.FromTransportFilters(filters), err
 }
 
 func (a *API) ChatFilters() types.ChatFilters {
-	return adapters.FromTransportFilters(a.core.transport.Filters())
+	return adapters.FromTransportFilters(a.core.stack.Transport.Filters())
 }
 
 func (a *API) ChatFilterByChatID(chatID string) *types.ChatFilter {
-	return adapters.FromTransportFilter(a.core.transport.FilterByChatID(chatID))
+	return adapters.FromTransportFilter(a.core.stack.Transport.FilterByChatID(chatID))
 }
 
 func (a *API) ChatFilterByTopic(topic []byte) *types.ChatFilter {
-	return adapters.FromTransportFilter(a.core.transport.FilterByTopic(topic))
+	return adapters.FromTransportFilter(a.core.stack.Transport.FilterByTopic(topic))
 }
 
 func (a *API) ChatFiltersByIdentities(identities []string) types.ChatFilters {
-	return adapters.FromTransportFilters(a.core.transport.FiltersByIdentities(identities))
+	return adapters.FromTransportFilters(a.core.stack.Transport.FiltersByIdentities(identities))
 }
 
 func (a *API) RemoveFilters(filters types.ChatFilters) error {
-	return a.core.transport.RemoveFilters(adapters.ToTransportFilters(filters))
+	return a.core.stack.Transport.RemoveFilters(adapters.ToTransportFilters(filters))
 }
 
 func (a *API) RemoveFilterByChatID(chatID string) (*types.ChatFilter, error) {
-	filter, err := a.core.transport.RemoveFilterByChatID(chatID)
+	filter, err := a.core.stack.Transport.RemoveFilterByChatID(chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (a *API) RemoveFilterByChatID(chatID string) (*types.ChatFilter, error) {
 }
 
 func (a *API) UpdateFilterPriority(chatID string, priority uint64) error {
-	transportFilter := a.core.transport.FilterByChatID(chatID)
+	transportFilter := a.core.stack.Transport.FilterByChatID(chatID)
 	if transportFilter == nil {
 		return errors.New("filter not found")
 	}
@@ -100,7 +100,7 @@ func (a *API) UpdateFilterPriority(chatID string, priority uint64) error {
 }
 
 func (a *API) UpdateFilterEphemerality(chatID string, ephemeral bool) error {
-	transportFilter := a.core.transport.FilterByChatID(chatID)
+	transportFilter := a.core.stack.Transport.FilterByChatID(chatID)
 	if transportFilter == nil {
 		return errors.New("filter not found")
 	}
@@ -111,7 +111,7 @@ func (a *API) UpdateFilterEphemerality(chatID string, ephemeral bool) error {
 }
 
 func (a *API) JoinPublicChat(chatID string) (*types.ChatFilter, error) {
-	f, err := a.core.sender.JoinPublic(chatID)
+	f, err := a.core.stack.Transport.JoinPublic(chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (a *API) JoinPublicChat(chatID string) (*types.ChatFilter, error) {
 }
 
 func (a *API) JoinPrivateChat(publicKey *ecdsa.PublicKey) (*types.ChatFilter, error) {
-	filter, err := a.core.transport.JoinPrivate(publicKey)
+	filter, err := a.core.stack.Transport.JoinPrivate(publicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func (a *API) JoinPrivateChat(publicKey *ecdsa.PublicKey) (*types.ChatFilter, er
 }
 
 func (a *API) JoinGroupChat(publicKeys []*ecdsa.PublicKey) (types.ChatFilters, error) {
-	filters, err := a.core.transport.JoinGroup(publicKeys)
+	filters, err := a.core.stack.Transport.JoinGroup(publicKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -135,11 +135,11 @@ func (a *API) JoinGroupChat(publicKeys []*ecdsa.PublicKey) (types.ChatFilters, e
 }
 
 func (a *API) GetStats() types.TransportStats {
-	return adapters.FromWakuTransportStats(a.core.transport.GetStats())
+	return adapters.FromWakuTransportStats(a.core.stack.Transport.GetStats())
 }
 
 func (a *API) RetrieveRawAll() (map[types.ChatFilter][]*types.ReceivedMessage, error) {
-	filters, err := a.core.transport.RetrieveRawAll()
+	filters, err := a.core.stack.Transport.RetrieveRawAll()
 	if err != nil {
 		return nil, err
 	}
@@ -150,68 +150,44 @@ func (a *API) RetrieveRawAll() (map[types.ChatFilter][]*types.ReceivedMessage, e
 	return chatFilters, nil
 }
 
-func (a *API) SendPublic(ctx context.Context, chatName string, rawMessage types.RawMessage) ([]byte, error) {
-	return a.core.sender.SendPublic(ctx, chatName, rawMessage)
-}
-
-func (a *API) SendPrivate(ctx context.Context, recipient *ecdsa.PublicKey, rawMessage *types.RawMessage) ([]byte, error) {
-	return a.core.sender.SendPrivate(ctx, recipient, rawMessage)
-}
-
-func (a *API) SendGroup(ctx context.Context, recipients []*ecdsa.PublicKey, rawMessage types.RawMessage) ([]byte, error) {
-	return a.core.sender.SendGroup(ctx, recipients, rawMessage)
-}
-
-func (a *API) SendCommunityMessage(ctx context.Context, rawMessage *types.RawMessage) ([]byte, error) {
-	return a.core.sender.SendCommunityMessage(ctx, rawMessage)
-}
-
 func (a *API) HandleReceivedMessages(msg *types.ReceivedMessage) (*types.HandleMessageResponse, error) {
-	return a.core.sender.HandleMessages(msg)
-}
-
-func (a *API) ValidateRawMessage(rawMessage *types.RawMessage) error {
-	return a.core.sender.ValidateRawMessage(rawMessage)
+	return a.core.controller.Processor().ProcessMessage(msg)
 }
 
 func (a *API) GetKeysForGroup(groupID []byte) ([]*encryption.HashRatchetKeyCompatibility, error) {
-	return a.core.sender.GetKeysForGroup(groupID)
+	return a.core.stack.Encryption.GetKeysForGroup(groupID)
 }
 
 func (a *API) GetCurrentKeyForGroup(groupID []byte) (*encryption.HashRatchetKeyCompatibility, error) {
-	return a.core.sender.GetCurrentKeyForGroup(groupID)
+	return a.core.stack.Encryption.GetCurrentKeyForGroup(groupID)
 }
 
 func (a *API) SaveHashRatchetMessage(groupID []byte, keyID []byte, m *types.ReceivedMessage) error {
-	return a.core.sender.SaveHashRatchetMessage(groupID, keyID, m)
+	return a.core.controller.SaveHashRatchetMessage(groupID, keyID, m)
 }
 
-func (a *API) SendPubsubTopicKey(ctx context.Context, rawMessage *types.RawMessage) ([]byte, error) {
-	return a.core.sender.SendPubsubTopicKey(ctx, rawMessage)
-}
-
-func (a *API) SendPairInstallation(ctx context.Context, recipient *ecdsa.PublicKey, rawMessage types.RawMessage) ([]byte, error) {
-	return a.core.sender.SendPairInstallation(ctx, recipient, rawMessage)
+func (a *API) GetHashRatchetMessagesCountForGroup(groupID []byte) (int, error) {
+	return a.core.controller.GetHashRatchetMessagesCountForGroup(groupID)
 }
 
 func (a *API) GetEphemeralKey() (*ecdsa.PrivateKey, error) {
-	return a.core.sender.GetEphemeralKey()
+	return a.core.controller.Processor().GetEphemeralKey()
 }
 
 func (a *API) PersonalTopicFilter() *types.ChatFilter {
-	return adapters.FromTransportFilter(a.core.transport.PersonalTopicFilter())
+	return adapters.FromTransportFilter(a.core.stack.Transport.PersonalTopicFilter())
 }
 
 func (a *API) GetCurrentTime() uint64 {
-	return a.core.transport.GetCurrentTime()
+	return a.core.stack.Transport.GetCurrentTime()
 }
 
 func (a *API) PeerCount() int {
-	return a.core.transport.PeerCount()
+	return a.core.stack.Transport.PeerCount()
 }
 
 func (a *API) Peers() types.PeerStats {
-	return adapters.FromWakuPeerStats(a.core.transport.Peers())
+	return adapters.FromWakuPeerStats(a.core.stack.Transport.Peers())
 }
 
 func (a *API) PeerID() peer.ID {
@@ -219,47 +195,47 @@ func (a *API) PeerID() peer.ID {
 }
 
 func (a *API) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
-	return a.core.transport.ConfirmMessagesProcessed(ids, timestamp)
+	return a.core.stack.Transport.ConfirmMessagesProcessed(ids, timestamp)
 }
 
 func (a *API) CleanMessagesProcessed(timestamp uint64) error {
-	return a.core.transport.CleanMessagesProcessed(timestamp)
+	return a.core.stack.Transport.CleanMessagesProcessed(timestamp)
 }
 
 func (a *API) SetEnvelopeEventsHandler(handler types.EnvelopeEventsHandler) error {
-	return a.core.transport.SetEnvelopeEventsHandler(handler)
+	return a.core.stack.Transport.SetEnvelopeEventsHandler(handler)
 }
 
 func (a *API) ClearProcessedMessageIDsCache() error {
-	return a.core.transport.ClearProcessedMessageIDsCache()
+	return a.core.stack.Transport.ClearProcessedMessageIDsCache()
 }
 
 func (a *API) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return a.core.transport.ListenAddresses()
+	return a.core.stack.Transport.ListenAddresses()
 }
 
 func (a *API) ENR() (*enode.Node, error) {
-	return a.core.transport.ENR()
+	return a.core.stack.Transport.ENR()
 }
 
 func (a *API) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	return a.core.transport.AddRelayPeer(address)
+	return a.core.stack.Transport.AddRelayPeer(address)
 }
 
 func (a *API) DialPeer(address multiaddr.Multiaddr) error {
-	return a.core.transport.DialPeer(address)
+	return a.core.stack.Transport.DialPeer(address)
 }
 
 func (a *API) DialPeerByID(peerID peer.ID) error {
-	return a.core.transport.DialPeerByID(peerID)
+	return a.core.stack.Transport.DialPeerByID(peerID)
 }
 
 func (a *API) DropPeer(peerID peer.ID) error {
-	return a.core.transport.DropPeer(peerID)
+	return a.core.stack.Transport.DropPeer(peerID)
 }
 
 func (a *API) MarkP2PMessageAsProcessed(hash ethcommon.Hash) {
-	a.core.transport.MarkP2PMessageAsProcessed(hash)
+	a.core.stack.Transport.MarkP2PMessageAsProcessed(hash)
 }
 
 func (a *API) ConnectionChanged(state connection.State) {
@@ -267,55 +243,55 @@ func (a *API) ConnectionChanged(state connection.State) {
 }
 
 func (a *API) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
-	return a.core.transport.SubscribeToPubsubTopic(topic, optPublicKey)
+	return a.core.stack.Transport.SubscribeToPubsubTopic(topic, optPublicKey)
 }
 
 func (a *API) UnsubscribeFromPubsubTopic(topic string) error {
-	return a.core.transport.UnsubscribeFromPubsubTopic(topic)
+	return a.core.stack.Transport.UnsubscribeFromPubsubTopic(topic)
 }
 
 func (a *API) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
-	return a.core.transport.StorePubsubTopicKey(topic, privKey)
+	return a.core.stack.Transport.StorePubsubTopicKey(topic, privKey)
 }
 
 func (a *API) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
-	return a.core.transport.RetrievePubsubTopicKey(topic)
+	return a.core.stack.Transport.RetrievePubsubTopicKey(topic)
 }
 
 func (a *API) RemovePubsubTopicKey(topic string) error {
-	return a.core.transport.RemovePubsubTopicKey(topic)
+	return a.core.stack.Transport.RemovePubsubTopicKey(topic)
 }
 
 func (a *API) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters types.ChatFilters) {
-	a.core.transport.SetCriteriaForMissingMessageVerification(peerInfo, adapters.ToTransportFilters(filters))
+	a.core.stack.Transport.SetCriteriaForMissingMessageVerification(peerInfo, adapters.ToTransportFilters(filters))
 }
 
 func (a *API) GetActiveStorenode() peer.AddrInfo {
-	return a.core.transport.GetActiveStorenode()
+	return a.core.stack.Transport.GetActiveStorenode()
 }
 
 func (a *API) DisconnectActiveStorenode(ctx context.Context, backoffReason time.Duration, shouldCycle bool) {
-	a.core.transport.DisconnectActiveStorenode(ctx, backoffReason, shouldCycle)
+	a.core.stack.Transport.DisconnectActiveStorenode(ctx, backoffReason, shouldCycle)
 }
 
 func (a *API) OnStorenodeChanged() <-chan peer.ID {
-	return a.core.transport.OnStorenodeChanged()
+	return a.core.stack.Transport.OnStorenodeChanged()
 }
 
 func (a *API) OnStorenodeNotWorking() <-chan struct{} {
-	return a.core.transport.OnStorenodeNotWorking()
+	return a.core.stack.Transport.OnStorenodeNotWorking()
 }
 
 func (a *API) OnStorenodeAvailable() <-chan peer.ID {
-	return a.core.transport.OnStorenodeAvailable()
+	return a.core.stack.Transport.OnStorenodeAvailable()
 }
 
 func (a *API) WaitForAvailableStoreNode(ctx context.Context) bool {
-	return a.core.transport.WaitForAvailableStoreNode(ctx)
+	return a.core.stack.Transport.WaitForAvailableStoreNode(ctx)
 }
 
 func (a *API) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
-	return a.core.transport.PerformStorenodeTask(fn, opts...)
+	return a.core.stack.Transport.PerformStorenodeTask(fn, opts...)
 }
 
 func (a *API) ProcessMailserverBatch(
@@ -326,15 +302,15 @@ func (a *API) ProcessMailserverBatch(
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	return a.core.transport.ProcessMailserverBatch(ctx, *adapters.ToWakuBatch(&batch), storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return a.core.stack.Transport.ProcessMailserverBatch(ctx, *adapters.ToWakuBatch(&batch), storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (a *API) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
-	a.core.transport.SetStorenodeConfigProvider(c)
+	a.core.stack.Transport.SetStorenodeConfigProvider(c)
 }
 
 func (a *API) ReportUserOnline(publicKey *ecdsa.PublicKey, eventTime uint64) {
-	a.core.sender.ReportUserOnline(publicKey, eventTime)
+	a.core.stack.Reliability.ReportPeerOnline(publicKey, eventTime)
 }
 
 func (a *API) MetricsPushReceivedMessages(receivedMessages types.ReceivedMessages) {
@@ -343,20 +319,26 @@ func (a *API) MetricsPushReceivedMessages(receivedMessages types.ReceivedMessage
 	}
 }
 
+func (a *API) MetricsPushSentMessage(pubsubTopic string, contentTopic string, messageType string, messageSize uint32) {
+	if a.core.wakumetrics != nil {
+		a.core.wakumetrics.PushRawMessageByType(pubsubTopic, contentTopic, messageType, messageSize)
+	}
+}
+
 func (a *API) GenerateHashRatchetKey(groupID []byte) error {
 	return a.core.generateHashRatchetKey(groupID)
 }
 
 func (a *API) EncryptionSubscriptions() *types.EncryptionSubscriptions {
-	return adapters.FromEncryptionSubscriptions(a.core.encryptor.Subscriptions())
+	return adapters.FromEncryptionSubscriptions(a.core.stack.Encryption.Subscriptions())
 }
 
 func (a *API) GetAllHRKeysMarshaledV1(groupID []byte) ([]byte, error) {
-	return a.core.encryptor.GetAllHRKeysMarshaledV1(groupID)
+	return a.core.stack.Encryption.GetAllHRKeysMarshaledV1(groupID)
 }
 
 func (a *API) GetAllHRKeysMarshaledV2(groupID []byte) ([]byte, error) {
-	return a.core.encryptor.GetAllHRKeysMarshaledV2(groupID)
+	return a.core.stack.Encryption.GetAllHRKeysMarshaledV2(groupID)
 }
 
 func (a *API) EncryptWithHashRatchet(groupID []byte, payload []byte) ([]byte, []byte, uint32, error) {
@@ -364,7 +346,7 @@ func (a *API) EncryptWithHashRatchet(groupID []byte, payload []byte) ([]byte, []
 }
 
 func (a *API) DecryptWithHashRatchet(keyID []byte, seqNo uint32, payload []byte) ([]byte, error) {
-	data, err := a.core.encryptor.DecryptWithHashRatchet(keyID, seqNo, payload)
+	data, err := a.core.stack.Encryption.DecryptWithHashRatchet(keyID, seqNo, payload)
 	if err == encryption.ErrNoRatchetKey {
 		return nil, types.ErrNoRatchetKey
 	}
@@ -384,24 +366,24 @@ func (a *API) DecryptMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ec
 }
 
 func (a *API) EncryptCommunityGrants(privateKey *ecdsa.PrivateKey, recipientGrants map[*ecdsa.PublicKey][]byte) (map[uint32][]byte, error) {
-	return a.core.encryptor.EncryptCommunityGrants(privateKey, recipientGrants)
+	return a.core.stack.Encryption.EncryptCommunityGrants(privateKey, recipientGrants)
 }
 
 func (a *API) DecryptCommunityGrant(myIdentityKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, grants map[uint32][]byte) ([]byte, error) {
-	return a.core.encryptor.DecryptCommunityGrant(myIdentityKey, senderKey, grants)
+	return a.core.stack.Encryption.DecryptCommunityGrant(myIdentityKey, senderKey, grants)
 }
 
 func (a *API) HandleHashRatchetKeysPayload(groupID, encodedKeys []byte, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) error {
-	_, err := a.core.encryptor.HandleHashRatchetKeysPayload(groupID, encodedKeys, myIdentityKey, theirIdentityKey)
+	_, err := a.core.stack.Encryption.HandleHashRatchetKeysPayload(groupID, encodedKeys, myIdentityKey, theirIdentityKey)
 	return err
 }
 
 func (a *API) HandleHashRatchetHeadersPayload(encodedHeaders [][]byte) error {
-	return a.core.encryptor.HandleHashRatchetHeadersPayload(encodedHeaders)
+	return a.core.stack.Encryption.HandleHashRatchetHeadersPayload(encodedHeaders)
 }
 
 func (a *API) AddInstallation(identity []byte, timestamp int64, installation *types.Installation, enabled bool) ([]*types.Installation, error) {
-	allInstallations, err := a.core.encryptor.AddInstallation(identity, timestamp, adapters.ToEncryptionInstallation(installation), enabled)
+	allInstallations, err := a.core.stack.Encryption.AddInstallation(identity, timestamp, adapters.ToEncryptionInstallation(installation), enabled)
 	if err != nil {
 		return nil, err
 	}
@@ -409,7 +391,7 @@ func (a *API) AddInstallation(identity []byte, timestamp int64, installation *ty
 }
 
 func (a *API) AddInstallations(identity []byte, timestamp int64, installations []*types.Installation, enabled bool) ([]*types.Installation, error) {
-	allInstallations, err := a.core.encryptor.AddInstallations(identity, timestamp, adapters.ToEncryptionInstallations(installations), enabled)
+	allInstallations, err := a.core.stack.Encryption.AddInstallations(identity, timestamp, adapters.ToEncryptionInstallations(installations), enabled)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +399,7 @@ func (a *API) AddInstallations(identity []byte, timestamp int64, installations [
 }
 
 func (a *API) GetOurInstallations(myIdentityKey *ecdsa.PublicKey) ([]*types.Installation, error) {
-	installations, err := a.core.encryptor.GetOurInstallations(myIdentityKey)
+	installations, err := a.core.stack.Encryption.GetOurInstallations(myIdentityKey)
 	if err != nil {
 		return nil, err
 	}
@@ -425,7 +407,7 @@ func (a *API) GetOurInstallations(myIdentityKey *ecdsa.PublicKey) ([]*types.Inst
 }
 
 func (a *API) GetOurActiveInstallations(myIdentityKey *ecdsa.PublicKey) ([]*types.Installation, error) {
-	installations, err := a.core.encryptor.GetOurActiveInstallations(myIdentityKey)
+	installations, err := a.core.stack.Encryption.GetOurActiveInstallations(myIdentityKey)
 	if err != nil {
 		return nil, err
 	}
@@ -433,19 +415,19 @@ func (a *API) GetOurActiveInstallations(myIdentityKey *ecdsa.PublicKey) ([]*type
 }
 
 func (a *API) SetInstallationMetadata(myIdentityKey *ecdsa.PublicKey, installationID string, data *types.InstallationMetadata) error {
-	return a.core.encryptor.SetInstallationMetadata(myIdentityKey, installationID, adapters.ToEncryptionInstallationMetadata(data))
+	return a.core.stack.Encryption.SetInstallationMetadata(myIdentityKey, installationID, adapters.ToEncryptionInstallationMetadata(data))
 }
 
 func (a *API) SetInstallationName(myIdentityKey *ecdsa.PublicKey, installationID string, name string) error {
-	return a.core.encryptor.SetInstallationName(myIdentityKey, installationID, name)
+	return a.core.stack.Encryption.SetInstallationName(myIdentityKey, installationID, name)
 }
 
 func (a *API) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
-	return a.core.encryptor.EnableInstallation(myIdentityKey, installationID)
+	return a.core.stack.Encryption.EnableInstallation(myIdentityKey, installationID)
 }
 
 func (a *API) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
-	return a.core.encryptor.DisableInstallation(myIdentityKey, installationID)
+	return a.core.stack.Encryption.DisableInstallation(myIdentityKey, installationID)
 }
 
 func (a *API) Metrics() string {

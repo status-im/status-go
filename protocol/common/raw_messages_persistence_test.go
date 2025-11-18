@@ -23,25 +23,25 @@ func TestSaveRawMessage(t *testing.T) {
 	pk, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	err = p.SaveRawMessage(&messagingtypes.RawMessage{
+	err = p.SaveRawMessage(&RawMessage{
 		ID:                    "1",
-		ResendType:            messagingtypes.ResendTypeRawMessage,
+		ResendType:            ResendTypeRawMessage,
 		LocalChatID:           "",
 		CommunityID:           []byte("c1"),
 		CommunityKeyExMsgType: messagingtypes.KeyExMsgRekey,
 		Sender:                pk,
-		ResendMethod:          messagingtypes.ResendMethodSendPrivate,
+		ResendMethod:          ResendMethodSendPrivate,
 		Recipients:            []*ecdsa.PublicKey{pk.Public().(*ecdsa.PublicKey)},
 	})
 	require.NoError(t, err)
 	m, err := p.RawMessageByID("1")
 	require.NoError(t, err)
 	require.Equal(t, "1", m.ID)
-	require.Equal(t, messagingtypes.ResendTypeRawMessage, m.ResendType)
+	require.Equal(t, ResendTypeRawMessage, m.ResendType)
 	require.Equal(t, messagingtypes.KeyExMsgRekey, m.CommunityKeyExMsgType)
 	require.Equal(t, "c1", string(m.CommunityID))
 	require.Equal(t, pk, m.Sender)
-	require.Equal(t, messagingtypes.ResendMethodSendPrivate, m.ResendMethod)
+	require.Equal(t, ResendMethodSendPrivate, m.ResendMethod)
 	require.Equal(t, 1, len(m.Recipients))
 }
 
@@ -97,15 +97,15 @@ func TestUpdateRawMessageLastSent(t *testing.T) {
 	require.Equal(t, m.LastSent, uint64(0))
 }
 
-func buildRawMessage(rawMessageID string, pk *ecdsa.PrivateKey) *messagingtypes.RawMessage {
-	return &messagingtypes.RawMessage{
+func buildRawMessage(rawMessageID string, pk *ecdsa.PrivateKey) *RawMessage {
+	return &RawMessage{
 		ID:                    rawMessageID,
-		ResendType:            messagingtypes.ResendTypeRawMessage,
+		ResendType:            ResendTypeRawMessage,
 		LocalChatID:           "",
 		CommunityID:           []byte("c1"),
 		CommunityKeyExMsgType: messagingtypes.KeyExMsgRekey,
 		Sender:                pk,
-		ResendMethod:          messagingtypes.ResendMethodSendPrivate,
+		ResendMethod:          ResendMethodSendPrivate,
 		Recipients:            []*ecdsa.PublicKey{pk.Public().(*ecdsa.PublicKey)},
 		Sent:                  true,
 		LastSent:              uint64(time.Now().UnixNano() / int64(time.Millisecond)),

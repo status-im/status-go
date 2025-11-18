@@ -10,8 +10,8 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -273,7 +273,7 @@ func (s *MessengerEmojiSuite) TestMaxEmojiReactionsPerMessage() {
 			Clock:       123,
 			MessageType: protobuf.MessageType_PUBLIC_GROUP,
 		},
-		&messagingtypes.Message{},
+		&common.StatusMessage{},
 	)
 	s.Require().Error(err)
 	s.Require().Equal(ErrTooManyEmojiReactionsForMessage, err)

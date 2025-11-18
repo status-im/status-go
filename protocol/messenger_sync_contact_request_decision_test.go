@@ -8,7 +8,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -42,12 +42,12 @@ func (s *MessengerSyncContactRequestDecisionSuite) TestSyncAcceptContactRequest(
 
 	numM1DispatchedAcceptContactRequest := 0
 	numM2DispatchedAcceptContactRequest := 0
-	s.m.dispatchMessageTestCallback = func(message messagingtypes.RawMessage) {
+	s.m.dispatchMessageTestCallback = func(message common.RawMessage) {
 		if message.MessageType == protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST {
 			numM1DispatchedAcceptContactRequest++
 		}
 	}
-	s.m2.dispatchMessageTestCallback = func(message messagingtypes.RawMessage) {
+	s.m2.dispatchMessageTestCallback = func(message common.RawMessage) {
 		if message.MessageType == protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST {
 			numM2DispatchedAcceptContactRequest++
 		}

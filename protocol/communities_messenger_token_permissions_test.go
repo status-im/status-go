@@ -190,6 +190,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string
 	messenger := newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			extraOptions: extraOptions,
+			name:         name,
 		},
 		password:            password,
 		walletAddresses:     walletAddresses,
@@ -2288,7 +2289,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().Error(err)
 
 	chatID := []byte(chat.ID)
-	hashRatchetMessagesCount, err := s.bob.persistence.GetHashRatchetMessagesCountForGroup(chatID)
+	hashRatchetMessagesCount, err := s.bob.messaging.GetHashRatchetMessagesCountForGroup(chatID)
 	s.Require().NoError(err)
 	s.Require().Equal(1, hashRatchetMessagesCount)
 
@@ -2313,16 +2314,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().NoError(err)
 
 	// Finally ensure that the message from archive was retrieved and decrypted
-
-	// NOTE: In theory a single RetrieveAll call should be enough,
-	// 		 because we immediately process all hash ratchet messages
-	response, err = s.bob.RetrieveAll()
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			_, ok := r.messages[message1.ID]
+			return ok
+		},
+		"no messages",
+	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
-
-	receivedMessage1, ok := response.messages[message1.ID]
-	s.Require().True(ok)
-	s.Require().Equal(messageText1, receivedMessage1.Text)
+	s.Require().Equal(messageText1, response.Messages()[0].Text)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestDeleteChannelWithTokenPermission() {
