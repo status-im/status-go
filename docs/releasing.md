@@ -12,6 +12,18 @@ The release branch takes the form of `release/vA.B.x`, where `x` is hardcoded.
 For example a valid release branch name is `release/v0.177.x` or `release/v10.7.x`.
 Commits on this branch may be tagged as releases.
 
+### Creating a new release branch
+
+Only admins can create release branches. To prevent direct pushes to existing `release/*` branches, we use a GitHub ruleset that blocks pushes for everyone, including admins.
+
+**To create a new release branch**, an admin must:
+1. Go to GitHub repository Settings → Rules → Rulesets → "Release Update Rules"
+2. For `Repository admin` in `Bypass list`: temporarily change `Bypass actor actions` from `For pull requests only` to `Always`
+3. Create and push the new release branch
+4. **Immediately** switch the setting back to "For pull requests only"
+
+Once created, all changes to release branches must go through pull requests.
+
 ## Tagging versions
 
 To tag a version, you should run the command:
