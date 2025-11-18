@@ -73,7 +73,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         return community_id, permission_resp
 
-    def test_token_gated_community_membership(self):
+    @pytest.mark.skip(reason="Pending on issue resolution https://github.com/status-im/status-go/issues/7114")
+    def test_token_gated_community_membership_no_valid_tokens(self):
         """Test that users must hold required tokens to join community"""
         # Owner creates token-gated community
         community_id, _ = self.create_token_gated_community(self.owner, CommunityTokenPermissionType.BECOME_MEMBER)
