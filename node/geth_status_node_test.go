@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 )
 
 func TestStatusNodeStart(t *testing.T) {
 	config, err := params.NewNodeConfig("", params.StatusChainNetworkID)
 	require.NoError(t, err)
-	n := New(nil, nil, tt.MustCreateTestLogger())
+	n := New(nil, nil, testutils.MustCreateTestLogger())
 
 	// checks before node is started
 	require.Nil(t, n.Config())

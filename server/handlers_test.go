@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/pkg/testutils"
 
 	"github.com/status-im/status-go/crypto"
 
@@ -26,7 +27,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -48,7 +48,7 @@ func (s *HandlersSuite) SetupTest() {
 	err = sqlite.Migrate(db)
 	s.Require().NoError(err)
 
-	s.logger = tt.MustCreateTestLogger()
+	s.logger = testutils.MustCreateTestLogger()
 	s.db = db
 
 	s.server = &MediaServer{

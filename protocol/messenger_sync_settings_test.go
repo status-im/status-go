@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/services/stickers"
 )
 
@@ -131,7 +131,7 @@ func (s *MessengerSyncSettingsSuite) syncSettingAndCheck(m1 *Messenger, m2 *Mess
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		mr, err := m2.RetrieveAll()
 		if err != nil {
 			return err
@@ -213,7 +213,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 	s.Require().Equal(2169, len(spi))
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		mr, err := s.alice2.RetrieveAll()
 		if err != nil {
 			return err
@@ -257,7 +257,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_PreferredName() {
 	s.Require().Equal(pf2, apn)
 
 	// Wait for the sync message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		mr, err := s.alice2.RetrieveAll()
 		if err != nil {
 			return err

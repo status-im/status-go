@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -25,7 +25,7 @@ type SharedSecretTestSuite struct {
 }
 
 func (s *SharedSecretTestSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.logger = testutils.MustCreateTestLogger()
 
 	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
 		{

@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestMessengerDeleteMessageForMeSuite(t *testing.T) {
@@ -87,7 +87,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	var receivedPubChatMessage *common.Message
 	var alice1ReceivedMessage, alice2ReceivedMessage bool
 	var notReceivedMessageError = errors.New("not received all messages")
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.m.RetrieveAll()
 		if err != nil {
 			return err
@@ -130,7 +130,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Require().Equal(response.Chats()[0].LastMessage.ID, messageID)
 	s.Require().Equal(response.Chats()[0].LastMessage.DeletedForMe, true)
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.m2.RetrieveAll()
 		if err != nil {
 			return err
@@ -149,7 +149,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Require().True(deletedForMeMessage.DeletedForMe)
 
 	// no DeletedForMe in others' message
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = otherMessenger.RetrieveAll()
 		if err != nil {
 			return err

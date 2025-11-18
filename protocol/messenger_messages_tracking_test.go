@@ -12,7 +12,7 @@ import (
 
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -138,7 +138,7 @@ func (s *MessengerMessagesTrackingSuite) testMessageMarkedAsSent(textSize int) {
 	}
 
 	// Message should be marked as sent eventually
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		rawMessage, err = s.bob.persistence.RawMessageByID(inputMessage.ID)
 		if err != nil || rawMessage.SendCount < 1 {
 			return errors.New("message not marked as sent")

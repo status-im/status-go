@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/services/browsers"
 )
 
@@ -68,7 +68,7 @@ func (s *MessengerSyncBookmarkSuite) TestSyncBookmark() {
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = theirMessenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -92,7 +92,7 @@ func (s *MessengerSyncBookmarkSuite) TestSyncBookmark() {
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = theirMessenger.RetrieveAll()
 		if err != nil {
 			return err

@@ -12,10 +12,10 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -50,7 +50,7 @@ func (s *ClientSuite) SetupTest() {
 
 	config := &Config{
 		Identity:                   identity,
-		Logger:                     tt.MustCreateTestLogger(),
+		Logger:                     testutils.MustCreateTestLogger(),
 		RemoteNotificationsEnabled: true,
 		InstallationID:             s.installationID,
 	}

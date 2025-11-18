@@ -7,10 +7,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestMessengerRawMessageResendTestSuite(t *testing.T) {
@@ -67,7 +67,7 @@ func (s *MessengerRawMessageResendTest) TearDownTest() {
 }
 
 func (s *MessengerRawMessageResendTest) waitForMessageSent(messageID string) {
-	err := tt.RetryWithBackOff(func() error {
+	err := testutils.RetryWithBackOff(func() error {
 		rawMessage, err := s.bobMessenger.RawMessageByID(messageID)
 		s.Require().NoError(err)
 		s.Require().NotNil(rawMessage)
@@ -103,7 +103,7 @@ func (s *MessengerRawMessageResendTest) TestMessageResend() {
 	s.Require().NoError(s.bobMessenger.UpdateRawMessageSent(rawMessage.ID, false))
 	s.Require().NoError(s.bobMessenger.UpdateRawMessageLastSent(rawMessage.ID, 0))
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		msg, err := s.bobMessenger.RawMessageByID(rawMessage.ID)
 		s.Require().NoError(err)
 		s.Require().NotNil(msg)
@@ -151,7 +151,7 @@ func (s *MessengerRawMessageResendTest) TestInvalidRawMessageToWatchDoesNotProdu
 	s.Require().NoError(s.bobMessenger.UpdateRawMessageLastSent(rawMessage.ID, 0))
 
 	// check counter increased for invalid message to escape the loop
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		msg, err := s.bobMessenger.RawMessageByID(rawMessage.ID)
 		s.Require().NoError(err)
 		s.Require().NotNil(msg)

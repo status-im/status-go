@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestMessengerSyncClearHistorySuite(t *testing.T) {
@@ -73,7 +73,7 @@ func (s *MessengerSyncClearHistory) TestSyncClearHistory() {
 	_, err = s.m.SendChatMessage(context.Background(), message)
 	s.Require().NoError(err)
 	var receivedPubChatMessage *common.Message
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		var err error
 		response, err := theirMessenger.RetrieveAll()
 		if err != nil {
@@ -103,7 +103,7 @@ func (s *MessengerSyncClearHistory) TestSyncClearHistory() {
 		ID: publicChatName,
 	})
 	s.Require().NoError(err)
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = theirMessenger.RetrieveAll()
 		if err != nil {
 			return err
