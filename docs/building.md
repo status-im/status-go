@@ -1,44 +1,12 @@
 # Build status-go
 
-## Introduction
-
-status-go is an underlying part of Status. It heavily depends on [go-ethereum](https://github.com/ethereum/go-ethereum/) which is [forked](https://github.com/status-im/go-ethereum) and slightly modified by us.
-
-## Build status-go
-
-### 1. Requirements
-
-* Docker (only if cross-compiling).
-
-> go is provided by Nix, if Nix shell is used else go has to be
-  downloaded and installed (https://go.dev/doc/install).
-
-### 2. Clone the repository
+## Quick start
 
 ```shell
-git clone https://github.com/status-im/status-go
-cd status-go
+make statusgo
 ```
 
-### 3. Set up build environment
-
-status-go uses nix in the Makefile to provide every tools required. It is advised but not required to use Nix shell prior to executing other make targets.
-You can enter the development shell by using either of two:
-```bash
-make shell
-nix develop
-```
-		OR
-
-If not using nix shell, go dependency packages have to be installed by using the following make command:
-
-```
-make status-go-deps
-```
-
-### 4. Build the status-backend
-
-To get started, let’s build the Ethereum node Command Line Interface tool, called `statusd`.
+### Run status-backend
 
 ```shell
 make status-backend
@@ -52,7 +20,28 @@ Once that is completed, you can start it straight away by running
 This will provide full API at http://localhost:12345. \
 Checkout [`status-backend docs`](../cmd/status-backend/README.md) for more details.
 
-### 5. Build a library for current platform
+## Building with your IDE
+
+`status-go` can be build as a regular Go project, but requires to pre-generate some files first:
+- `make status-go-deps` - install required tools
+- `make generate` - compile protobuf files, build SQL migrations, generate mocks
+
+## Building with Docker
+
+```shell
+docker build .
+```
+
+## Building using Nix shell
+
+It is advised but not required to use Nix shell before executing other make targets. Nix shell will ensure that all dependencies are installed.
+You can enter the development shell by using either of two:
+```bash
+make shell
+nix develop --extra-experimental-features 'nix-command flakes'
+```
+
+### Build a library for the current platform
 
 ```shell
 make statusgo-library      # Build static library
@@ -108,14 +97,14 @@ make test
 Unit tests can also be run using `go test` command. If you want to launch specific test, for instance `RPCSendTransactions`, use the following command:
 
 ```shell
-go test -tags gowaku_skip_migrations -v ./api/ -testify.m ^RPCSendTransaction$
+go test -v ./api/ -testify.m ^RPCSendTransaction$
 ```
 
 Note -testify.m as [testify/suite](https://godoc.org/github.com/stretchr/testify/suite) is used to group individual tests.
 
 To run a single test in a test suite (e.g. `TestTransferringKeystoreFiles`, which is part of `SyncDeviceSuite`):
 ```shell
-go test -tags gowaku_skip_migrations -v ./server/pairing -test.run TestSyncDeviceSuite -testify.m ^TestTransferringKeystoreFiles$
+go test -v ./server/pairing -test.run TestSyncDeviceSuite -testify.m ^TestTransferringKeystoreFiles$
 ```
 
 Note: `TestSyncDeviceSuite` is not the name of the test suite, but the name of the test function that runs the `SyncDeviceSuite` suite.
