@@ -69,6 +69,10 @@ class TestCommunityArchives(MessengerSteps):
         }
 
     def test_community_archive_index_exists(self):
+        # Set message archive interval to 80 seconds which is longer that the retention policy
+        # of the Waky node.
+        # So we are expecting to retrieve the archive from Codex even after the Waky node
+        # has already deleted the messages locally.
         message_archive_interval = 80
         self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
 
@@ -212,6 +216,8 @@ class TestCommunityArchives(MessengerSteps):
         logging.info("Success! Another member has the message after importing history archive.")
 
     def test_community_archive_exists_for_default_chat(self):
+        # Set message archive interval to 10 seconds for faster test,
+        # we only want to check that the archive is created for the default chat.
         message_archive_interval = 10
         self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
 
@@ -237,6 +243,8 @@ class TestCommunityArchives(MessengerSteps):
         assert has_archive is True, "Creator should have community archive after messages are sent"
 
     def test_archive_is_not_created_without_messages(self):
+        # Set message archive interval to 10 seconds for faster test,
+        # we only want to check that no archive is created when there is no message.
         message_archive_interval = 10
         self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
 
@@ -251,6 +259,9 @@ class TestCommunityArchives(MessengerSteps):
         assert has_archive is False, "Creator should not have community archive without message"
 
     def test_different_archives_are_created_with_multiple_messages(self):
+        # Set message archive interval to 10 seconds for faster test.
+        # We want to check that different archives are created for multiple messages,
+        # so it does not matter if the Waku stode node has the messages locally.
         message_archive_interval = 10
         self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
 
@@ -299,6 +310,10 @@ class TestCommunityArchives(MessengerSteps):
             logging.info("Success! Archive ID (HASH) is recorded in the database!")
 
     def test_archive_is_downloaded_after_logout_login(self):
+        # Set message archive interval to 10 seconds for faster test.
+        # We want to check that the archive is downloaded after logout/login,
+        # so it does not matter if the Waku stode node has the messages locally.
+
         message_archive_interval = 10
         self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
 
