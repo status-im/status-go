@@ -276,7 +276,7 @@ func arbitrumSepolia(proxyHost, stageName string, enableRpcProviders bool) param
 		ChainID:                chainID,
 		ChainName:              "Arbitrum Sepolia",
 		RpcProviders:           rpcProviders,
-		BlockExplorerURL:       "https://sepolia-explorer.arbitrum.io/",
+		BlockExplorerURL:       "https://sepolia.arbiscan.io/",
 		IconURL:                "network/Network=Arbitrum-test",
 		ChainColor:             "#51D0F0",
 		ShortName:              "arb1",
