@@ -54,7 +54,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         token_criteria = [
             {
                 "type": CommunityTokenType.ERC20,
-                "contractAddresses": {1: "0x1234567890123456789012345678901234567890"},
+                "contract_addresses": {31337: "0x1234567890123456789012345678901234567890"},
                 "symbol": "TEST",
                 "amountInWei": "100000000000000000000",  # 100 tokens
                 "decimals": 18,
