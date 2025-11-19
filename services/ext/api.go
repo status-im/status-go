@@ -2,7 +2,6 @@ package ext
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -16,7 +15,6 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -279,11 +277,6 @@ func (api *PublicAPI) EditCommunity(request *requests.EditCommunity) (*protocol.
 // RemovePrivateKey removes the private key of the community with given ID
 func (api *PublicAPI) RemovePrivateKey(id types.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemovePrivateKey(id)
-}
-
-// Sets the community shard for a community and updates all active filters for the community
-func (api *PublicAPI) SetCommunityShard(request *requests.SetCommunityShard) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SetCommunityShard(request)
 }
 
 // ExportCommunity exports the private key of the community with given ID
@@ -1021,56 +1014,6 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 	return api.service.messenger.ENSVerified(pk, ensName)
 }
 
-// Deprecated: RequestCommunityInfoFromMailserver is deprecated in favor of
-// configurable FetchCommunity.
-func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
-	request := &protocol.FetchCommunityRequest{
-		CommunityKey:    communityID,
-		Shard:           nil,
-		TryDatabase:     true,
-		WaitForResponse: true,
-	}
-	return api.FetchCommunity(request)
-}
-
-// Deprecated: RequestCommunityInfoFromMailserverWithShard is deprecated in favor of
-// configurable FetchCommunity.
-func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID string, shard *messagingtypes.Shard) (*communities.Community, error) {
-	request := &protocol.FetchCommunityRequest{
-		CommunityKey:    communityID,
-		Shard:           shard,
-		TryDatabase:     true,
-		WaitForResponse: true,
-	}
-	return api.FetchCommunity(request)
-}
-
-// Deprecated: RequestCommunityInfoFromMailserverAsync is deprecated in favor of
-// configurable FetchCommunity.
-func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string) error {
-	request := &protocol.FetchCommunityRequest{
-		CommunityKey:    communityID,
-		Shard:           nil,
-		TryDatabase:     true,
-		WaitForResponse: false,
-	}
-	_, err := api.FetchCommunity(request)
-	return err
-}
-
-// Deprecated: RequestCommunityInfoFromMailserverAsyncWithShard is deprecated in favor of
-// configurable FetchCommunity.
-func (api *PublicAPI) RequestCommunityInfoFromMailserverAsyncWithShard(communityID string, shard *messagingtypes.Shard) error {
-	request := &protocol.FetchCommunityRequest{
-		CommunityKey:    communityID,
-		Shard:           shard,
-		TryDatabase:     true,
-		WaitForResponse: false,
-	}
-	_, err := api.FetchCommunity(request)
-	return err
-}
-
 func (api *PublicAPI) FetchCommunity(request *protocol.FetchCommunityRequest) (*communities.Community, error) {
 	return api.service.messenger.FetchCommunity(request)
 }
@@ -1160,35 +1103,8 @@ func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
 }
 
-func (api *PublicAPI) SubscribeToPubsubTopic(topic string, optPublicKey string) error {
-	var publicKey *ecdsa.PublicKey
-	if optPublicKey != "" {
-		keyBytes, err := hexutil.Decode(optPublicKey)
-		if err != nil {
-			return err
-		}
-
-		publicKey, err = crypto.UnmarshalPubkey(keyBytes)
-		if err != nil {
-			return err
-		}
-	}
-
-	return api.service.messenger.SubscribeToPubsubTopic(topic, publicKey)
-}
-
-func (api *PublicAPI) StorePubsubTopicKey(topic string, privKey string) error {
-	keyBytes, err := hexutil.Decode(privKey)
-	if err != nil {
-		return err
-	}
-
-	p, err := crypto.ToECDSA(keyBytes)
-	if err != nil {
-		return err
-	}
-
-	return api.service.messenger.StorePubsubTopicKey(topic, p)
+func (api *PublicAPI) SubscribeToPubsubTopic(topic string) error {
+	return api.service.messenger.SubscribeToPubsubTopic(topic)
 }
 
 func (api *PublicAPI) AddRelayPeer(address string) (peer.ID, error) {

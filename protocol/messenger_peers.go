@@ -1,8 +1,6 @@
 package protocol
 
 import (
-	"crypto/ecdsa"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
@@ -39,11 +37,7 @@ func (m *Messenger) ENR() (*enode.Node, error) {
 	return m.messaging.ENR()
 }
 
-// Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
-func (m *Messenger) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
-	return m.messaging.SubscribeToPubsubTopic(topic, optPublicKey)
-}
-
-func (m *Messenger) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
-	return m.messaging.StorePubsubTopicKey(topic, privKey)
+// Subscribe to a pubsub topic
+func (m *Messenger) SubscribeToPubsubTopic(topic string) error {
+	return m.messaging.SubscribeToPubsubTopic(topic)
 }

@@ -15,14 +15,11 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"github.com/status-im/status-go/api/multiformat"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -55,8 +52,6 @@ type Config struct {
 	RequestsToJoin                      []*RequestToJoin
 	MemberIdentity                      *ecdsa.PrivateKey
 	EventsData                          *EventsData
-	Shard                               *messagingtypes.Shard
-	PubsubTopicPrivateKey               *ecdsa.PrivateKey
 	LastOpenedAt                        int64
 }
 
@@ -178,17 +173,13 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
 		ActiveMembersCount      uint64                               `json:"activeMembersCount"`
 		PubsubTopic             string                               `json:"pubsubTopic"`
-		PubsubTopicKey          string                               `json:"pubsubTopicKey"`
-		Shard                   *messagingtypes.Shard                `json:"shard"`
 	}{
-		ID:             o.ID(),
-		Verified:       o.config.Verified,
-		Chats:          make(map[string]CommunityChat),
-		Categories:     make(map[string]CommunityCategory),
-		Tags:           o.Tags(),
-		PubsubTopic:    o.PubsubTopic(),
-		PubsubTopicKey: o.PubsubTopicKey(),
-		Shard:          o.Shard(),
+		ID:          o.ID(),
+		Verified:    o.config.Verified,
+		Chats:       make(map[string]CommunityChat),
+		Categories:  make(map[string]CommunityCategory),
+		Tags:        o.Tags(),
+		PubsubTopic: o.PubsubTopic(),
 	}
 
 	if o.config.CommunityDescription != nil {
@@ -238,10 +229,6 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
 
 		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x", o.ID())
-		if o.Shard() != nil {
-			communityItem.Link = fmt.Sprintf("%s/%d/%d", communityItem.Link, o.Shard().Cluster, o.Shard().Index)
-		}
-
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
 		communityItem.CommunityTokensMetadata = o.config.CommunityDescription.CommunityTokensMetadata
@@ -314,8 +301,6 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		CommunityTokensMetadata     []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
 		ActiveMembersCount          uint64                               `json:"activeMembersCount"`
 		PubsubTopic                 string                               `json:"pubsubTopic"`
-		PubsubTopicKey              string                               `json:"pubsubTopicKey"`
-		Shard                       *messagingtypes.Shard                `json:"shard"`
 		LastOpenedAt                int64                                `json:"lastOpenedAt"`
 		Clock                       uint64                               `json:"clock"`
 	}{
@@ -340,8 +325,6 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Tags:                        o.Tags(),
 		Encrypted:                   o.Encrypted(),
 		PubsubTopic:                 o.PubsubTopic(),
-		PubsubTopicKey:              o.PubsubTopicKey(),
-		Shard:                       o.Shard(),
 		LastOpenedAt:                o.config.LastOpenedAt,
 	}
 	if o.config.CommunityDescription != nil {
@@ -466,21 +449,6 @@ func (o *Community) DescriptionText() string {
 		return o.config.CommunityDescription.Identity.Description
 	}
 	return ""
-}
-
-func (o *Community) Shard() *messagingtypes.Shard {
-	if o != nil && o.config != nil {
-		return o.config.Shard
-	}
-
-	return nil
-}
-
-func (o *Community) CommunityShard() CommunityShard {
-	return CommunityShard{
-		CommunityID: o.IDString(),
-		Shard:       o.Shard(),
-	}
 }
 
 func (o *Community) IntroMessage() string {
@@ -1554,22 +1522,7 @@ func (o *Community) MemberUpdateChannelID() string {
 }
 
 func (o *Community) PubsubTopic() string {
-	return o.Shard().PubsubTopic()
-}
-
-func (o *Community) PubsubTopicPrivateKey() *ecdsa.PrivateKey {
-	return o.config.PubsubTopicPrivateKey
-}
-
-func (o *Community) SetPubsubTopicPrivateKey(privKey *ecdsa.PrivateKey) {
-	o.config.PubsubTopicPrivateKey = privKey
-}
-
-func (o *Community) PubsubTopicKey() string {
-	if o.config.PubsubTopicPrivateKey == nil {
-		return ""
-	}
-	return hexutil.Encode(crypto.FromECDSAPub(&o.config.PubsubTopicPrivateKey.PublicKey))
+	return ""
 }
 
 func (o *Community) PrivateKey() *ecdsa.PrivateKey {
@@ -2430,8 +2383,6 @@ func (o *Community) CreateDeepCopy() *Community {
 			RequestsToJoin:                      o.config.RequestsToJoin,
 			MemberIdentity:                      o.config.MemberIdentity,
 			EventsData:                          o.config.EventsData,
-			Shard:                               o.config.Shard,
-			PubsubTopicPrivateKey:               o.config.PubsubTopicPrivateKey,
 			LastOpenedAt:                        o.config.LastOpenedAt,
 		},
 		timesource:  o.timesource,

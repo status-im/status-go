@@ -83,10 +83,9 @@ const (
 
 type FetchCommunityRequest struct {
 	// CommunityKey should be either a public or a private community key
-	CommunityKey    string                `json:"communityKey"`
-	Shard           *messagingtypes.Shard `json:"shard"`
-	TryDatabase     bool                  `json:"tryDatabase"`
-	WaitForResponse bool                  `json:"waitForResponse"`
+	CommunityKey    string `json:"communityKey"`
+	TryDatabase     bool   `json:"tryDatabase"`
+	WaitForResponse bool   `json:"waitForResponse"`
 }
 
 func (r *FetchCommunityRequest) Validate() error {
@@ -356,13 +355,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 			return
 		}
 		m.logger.Debug("published org")
-
-		// publish shard information
-		err = m.sendPublicCommunityShardInfo(community)
-		if err != nil {
-			m.logger.Warn("failed to publish public shard info", zap.Error(err))
-			return
-		}
 
 		// signal client with published community
 		if m.config.messengerSignalsHandler != nil {
@@ -953,7 +945,6 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 		// Init the community filter so we can receive messages on the community
 
 		communityFilters, err := m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
-			Shard:   community.Shard(),
 			PrivKey: community.PrivateKey(),
 		}})
 
@@ -1028,19 +1019,6 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 	return mr, nil
 }
 
-func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *messagingtypes.Shard) error {
-	if !m.started {
-		return nil
-	}
-	return m.messaging.SubscribeToPubsubTopic(shard.PubsubTopic(), nil)
-}
-
-func (m *Messenger) unsubscribeFromShard(shard *messagingtypes.Shard) error {
-	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
-
-	return m.messaging.UnsubscribeFromPubsubTopic(shard.PubsubTopic())
-}
-
 func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
 	logger := m.logger.Named("joinCommunity")
 	response := &MessengerResponse{}
@@ -1062,10 +1040,6 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 		response.AddChats(chats)
 
 		if _, err = m.initCommunitySettings(communityID); err != nil {
-			return nil, err
-		}
-
-		if err = m.subscribeToCommunityShard(community.ID(), community.Shard()); err != nil {
 			return nil, err
 		}
 	}
@@ -1152,10 +1126,6 @@ func (m *Messenger) SpectateCommunity(communityID types.HexBytes) (*MessengerRes
 	response.AddCommunitySettings(settings)
 
 	response.AddCommunity(community)
-
-	if err = m.subscribeToCommunityShard(community.ID(), community.Shard()); err != nil {
-		return nil, err
-	}
 
 	// sync community
 	m.asyncRequestAllHistoricMessages()
@@ -1948,12 +1918,6 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			return nil, err
 		}
 
-		var key *ecdsa.PrivateKey
-		key, err = m.messaging.RetrievePubsubTopicKey(community.PubsubTopic())
-		if err != nil {
-			return nil, err
-		}
-
 		encryptedDescription, err := community.EncryptedDescription()
 		if err != nil {
 			return nil, err
@@ -1970,8 +1934,6 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			CommunityId:                         community.ID(),
 			Community:                           encryptedDescription, // Deprecated but kept for backward compatibility, to be removed in future
 			Grant:                               grant,
-			ProtectedTopicPrivateKey:            crypto.FromECDSA(key),
-			Shard:                               community.Shard().Protobuffer(),
 			CommunityDescriptionProtocolMessage: descriptionMessage,
 		}
 
@@ -2473,13 +2435,8 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 		return nil, err
 	}
 
-	if err = m.subscribeToCommunityShard(community.ID(), community.Shard()); err != nil {
-		return nil, err
-	}
-
 	// Init the community filter so we can receive messages on the community
 	_, err = m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
-		Shard:   community.Shard(),
 		PrivKey: community.PrivateKey(),
 	}})
 	if err != nil {
@@ -2527,87 +2484,6 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	return response, nil
 }
 
-func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*MessengerResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-
-	community, err := m.communitiesManager.GetByID(request.CommunityID)
-	if err != nil {
-		return nil, err
-	}
-
-	if !community.IsControlNode() {
-		return nil, errors.New(ErrNotAdminOrOwner)
-	}
-
-	// Reset the community private key
-	community.SetPubsubTopicPrivateKey(nil)
-
-	// Removing the private key (if it exist)
-	err = m.RemovePubsubTopicPrivateKey(community.PubsubTopic())
-	if err != nil {
-		return nil, err
-	}
-
-	// Unsubscribing from existing shard
-	if community.Shard() != nil {
-		err := m.unsubscribeFromShard(community.Shard())
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	community, err = m.communitiesManager.SetShard(request.CommunityID, request.Shard)
-	if err != nil {
-		return nil, err
-	}
-
-	if request.Shard != nil {
-		var topicPrivKey *ecdsa.PrivateKey
-		if request.PrivateKey != nil {
-			topicPrivKey, err = crypto.ToECDSA(*request.PrivateKey)
-		} else {
-			topicPrivKey, err = crypto.GenerateKey()
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		community.SetPubsubTopicPrivateKey(topicPrivKey)
-
-		err = m.communitiesManager.UpdatePubsubTopicPrivateKey(community.PubsubTopic(), topicPrivKey)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// TODO: Check
-	err = m.UpdateCommunityFilters(community)
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.SendCommunityShardKey(community, community.GetMemberPubkeys())
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.sendPublicCommunityShardInfo(community)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &MessengerResponse{}
-	response.AddCommunity(community)
-
-	return response, nil
-}
-
-func (m *Messenger) RemovePubsubTopicPrivateKey(topic string) error {
-	return m.messaging.RemovePubsubTopicKey(topic)
-}
-
 func (m *Messenger) UpdateCommunityFilters(community *communities.Community) error {
 	defaultFilters := m.DefaultFilters(community)
 	publicFiltersToInit := make(messagingtypes.ChatsToInitialize, 0, len(defaultFilters)+len(community.Chats()))
@@ -2626,7 +2502,6 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 
 	// Init the community filter so we can receive messages on the community
 	_, err = m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
-		Shard:   community.Shard(),
 		PrivKey: community.PrivateKey(),
 	}})
 	if err != nil {
@@ -2636,10 +2511,6 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 	// Init the default community filters
 	_, err = m.messaging.InitPublicChats(publicFiltersToInit)
 	if err != nil {
-		return err
-	}
-
-	if err = m.subscribeToCommunityShard(community.ID(), community.Shard()); err != nil {
 		return err
 	}
 
@@ -2868,7 +2739,6 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 
 	_, err = m.FetchCommunity(&FetchCommunityRequest{
 		CommunityKey:    community.IDString(),
-		Shard:           community.Shard(),
 		TryDatabase:     false,
 		WaitForResponse: true,
 	})
@@ -2936,7 +2806,6 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 		message := common.NewMessage()
 		message.StatusLinkPreviews = []common.StatusLinkPreview{statusLinkPreview}
 		message.ChatId = pk.String()
-		message.Shard = community.Shard().Protobuffer()
 		message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 		message.Text = communityURL
 		if request.InviteMessage != "" {
@@ -3019,41 +2888,6 @@ func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	return response, nil
-}
-
-func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubkeys []*ecdsa.PublicKey) error {
-	if !community.IsControlNode() {
-		return nil
-	}
-
-	keyBytes := make([]byte, 0)
-	key := community.PubsubTopicPrivateKey()
-	if key != nil {
-		keyBytes = crypto.FromECDSA(key)
-	}
-
-	communityShardKey := &protobuf.CommunityShardKey{
-		Clock:       community.Clock(),
-		CommunityId: community.ID(),
-		PrivateKey:  keyBytes,
-		Shard:       community.Shard().Protobuffer(),
-	}
-
-	encodedMessage, err := proto.Marshal(communityShardKey)
-	if err != nil {
-		return err
-	}
-
-	rawMessage := common.RawMessage{
-		Recipients:  pubkeys,
-		ResendType:  common.ResendTypeDataSync,
-		MessageType: protobuf.ApplicationMetadataMessage_COMMUNITY_SHARD_KEY,
-		Payload:     encodedMessage,
-	}
-
-	_, err = m.sender.SendGroup(context.Background(), pubkeys, &rawMessage)
-
-	return err
 }
 
 func (m *Messenger) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*MessengerResponse, error) {
@@ -3170,16 +3004,11 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 		}
 	}
 
-	communityAddress := communities.CommunityShard{
-		CommunityID: communityID,
-		Shard:       request.Shard,
-	}
-
 	options := []StoreNodeRequestOption{
 		WithWaitForResponseOption(request.WaitForResponse),
 	}
 
-	community, _, err := m.storeNodeRequestsManager.FetchCommunity(m.ctx, communityAddress, options)
+	community, _, err := m.storeNodeRequestsManager.FetchCommunity(m.ctx, communityID, options)
 
 	return community, err
 }
@@ -3193,8 +3022,8 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(community *communitie
 }
 
 // handleCommunityDescription handles an community description
-func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte, verifiedOwner *ecdsa.PublicKey, shard *protobuf.Shard) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, verifiedOwner, shard)
+func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte, verifiedOwner *ecdsa.PublicKey) error {
+	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, verifiedOwner)
 	if err != nil {
 		return err
 	}
@@ -3389,80 +3218,6 @@ func (m *Messenger) HandleCommunityEventsMessage(state *ReceivedMessageState, me
 	}
 
 	return m.handleCommunityResponse(state, communityResponse)
-}
-
-// HandleCommunityShardKey handles the private keys for the community shards
-func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message *protobuf.CommunityShardKey, statusMessage *common.StatusMessage) error {
-	community, err := m.communitiesManager.GetByID(message.CommunityId)
-	if err != nil {
-		return err
-	}
-
-	// If we haven't joined the community, nothing to do
-	if !community.Joined() {
-		return nil
-	}
-
-	signer := state.CurrentMessageState.PublicKey
-	if signer == nil {
-		return errors.New(ErrReceiverIsNil)
-	}
-
-	err = m.handleCommunityShardAndFiltersFromProto(community, message)
-	if err != nil {
-		return err
-	}
-
-	state.Response.AddCommunity(community)
-
-	return nil
-}
-
-func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communities.Community, message *protobuf.CommunityShardKey) error {
-	err := m.communitiesManager.UpdateShard(community, messagingtypes.FromShardProtobuff(message.Shard), message.Clock)
-	if err != nil {
-		return err
-	}
-
-	var privKey *ecdsa.PrivateKey = nil
-	if message.Shard != nil {
-		if message.PrivateKey != nil {
-			privKey, err = crypto.ToECDSA(message.PrivateKey)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	// Removing the existing private key (if any)
-	err = m.RemovePubsubTopicPrivateKey(community.PubsubTopic())
-	if err != nil {
-		return err
-	}
-
-	// Unsubscribing from existing shard
-	if community.Shard() != nil && community.Shard() != messagingtypes.FromShardProtobuff(message.GetShard()) {
-		err := m.unsubscribeFromShard(community.Shard())
-		if err != nil {
-			return err
-		}
-	}
-
-	community.SetPubsubTopicPrivateKey(privKey)
-
-	err = m.communitiesManager.UpdatePubsubTopicPrivateKey(community.PubsubTopic(), privKey)
-	if err != nil {
-		return err
-	}
-	// Update community filters in case of change of shard
-	if community.Shard() != messagingtypes.FromShardProtobuff(message.GetShard()) {
-		err = m.UpdateCommunityFilters(community)
-		if err != nil {
-			return err
-		}
-
-	}
-	return nil
 }
 
 func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMessageState, signer *ecdsa.PublicKey, message *protobuf.CommunityPrivilegedUserSyncMessage) error {
@@ -3677,8 +3432,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		return err
 	}
 
-	// Passing shard as nil so that defaultProtected shard 32 is considered
-	err = m.handleCommunityDescription(messageState, signer, &cd, syncCommunity.Description, signer, nil)
+	err = m.handleCommunityDescription(messageState, signer, &cd, syncCommunity.Description, signer)
 	// Even if the Description is outdated we should proceed in order to sync settings and joined state
 	if err != nil && err != communities.ErrInvalidCommunityDescriptionClockOutdated {
 		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
@@ -4684,7 +4438,6 @@ func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*Messe
 
 	community, err := m.FetchCommunity(&FetchCommunityRequest{
 		CommunityKey:    types.EncodeHex(communityID),
-		Shard:           nil,
 		TryDatabase:     true,
 		WaitForResponse: true,
 	})

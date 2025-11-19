@@ -2,9 +2,7 @@ package protocol
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -14,7 +12,6 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 
@@ -41,8 +38,6 @@ func (r *storeNodeRequestID) getCommunityID() string {
 	switch r.RequestType {
 	case storeNodeCommunityRequest:
 		return r.DataID
-	case storeNodeShardRequest:
-		return strings.TrimSuffix(r.DataID, messaging.CommunityShardInfoTopicPrefix())
 	default:
 		return ""
 	}
@@ -73,31 +68,25 @@ func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
 	}
 }
 
-// FetchCommunity makes a single request to store node for a given community id/shard pair.
+// FetchCommunity makes a single request to store node for a given community id.
 // When a community is successfully fetched, a `CommunityFound` event will be emitted. If `waitForResponse == true`,
 // the function will also wait for the store node response and return the fetched community.
 // Automatically waits for an available store node.
 // When a `nil` community and `nil` error is returned, that means the community wasn't found at the store node.
-func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, community communities.CommunityShard, opts []StoreNodeRequestOption) (*communities.Community, StoreNodeRequestStats, error) {
+func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityID string, opts []StoreNodeRequestOption) (*communities.Community, StoreNodeRequestStats, error) {
 	cfg := buildStoreNodeRequestConfig(opts)
 
 	m.logger.Info("requesting community from store node",
-		zap.Any("community", community),
+		zap.String("community", communityID),
 		zap.Any("config", cfg))
 
 	fetch := func() (*communities.Community, StoreNodeRequestStats, error) {
-		if community.Shard != nil {
-			return m.fetchCommunity(ctx, community.CommunityID, cfg, community.Shard)
-		}
-		communityCustomShard, err := m.fetchCustomShard(ctx, community.CommunityID, cfg, messagingtypes.DefaultNonProtectedShard(), messagingtypes.GlobalCommunityControlShard())
-		if err != nil {
-			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to fetch community shard: %w", err)
-		}
-		if communityCustomShard != nil {
-			return m.fetchCommunity(ctx, community.CommunityID, cfg, communityCustomShard)
-		}
-		// request community in 32 and 128 shards
-		return m.fetchCommunity(ctx, community.CommunityID, cfg, messagingtypes.DefaultShard(), messagingtypes.GlobalCommunityControlShard())
+		// Since now we could have this community description in shards 32 and 128 we are doing the following:
+		//  1. trying to fetch in shards 32 and 128
+		//  2. returning the first non-nil community result
+		//
+		// Eventually we should just go to shard 128, once full migration to Global Community Control and Content Topic is done.
+		return m.fetchCommunity(ctx, communityID, cfg, messagingtypes.DefaultShard(), messagingtypes.GlobalCommunityControlShard())
 	}
 
 	if !cfg.WaitForResponse {
@@ -114,12 +103,6 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, community 
 }
 
 // fetchCommunity fetches a community from the store node.
-//
-// Since now we could have this community description in shards 32 and 128 we are doing the following:
-//  1. trying to fetch in shards 32 and 128
-//  2. returning the first non-nil community result
-//
-// Eventually we should just go to shard 128, once full migration to Global Community Control and Content Topic is done.
 func (m *StoreNodeRequestManager) fetchCommunity(ctx context.Context, communityID string, cfg StoreNodeRequestConfig, shards ...*messagingtypes.Shard) (*communities.Community, StoreNodeRequestStats, error) {
 	for _, shard := range shards {
 		sub, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, communityID, shard, cfg)
@@ -133,28 +116,6 @@ func (m *StoreNodeRequestManager) fetchCommunity(ctx context.Context, communityI
 		}
 	}
 	return nil, StoreNodeRequestStats{}, nil
-}
-
-// fetchCustomShard fetches a community custom shard from the store node.
-//
-// Since now we could have communities' shard info in shards 64 and 128 we are doing the following:
-//  1. trying to fetch in shards 64 and 128
-//  2. returning the first non-nil shard result
-//
-// Eventually we should just go to shard 128, once full migration to Global Community Control and Content Topic is done.
-func (m *StoreNodeRequestManager) fetchCustomShard(ctx context.Context, communityID string, cfg StoreNodeRequestConfig, shards ...*messagingtypes.Shard) (*messagingtypes.Shard, error) {
-	for _, shard := range shards {
-		sub, err := m.subscribeToRequest(ctx, storeNodeShardRequest, messaging.CommunityShardInfoTopic(communityID), shard, cfg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create a shard info request: %w", err)
-		}
-		// not doing this concurrently to avoid two filters for the same CommunityShardInfoTopic, not a big deal since it is at most 2 shards and temporary
-		res := <-sub
-		if res.shard != nil {
-			return res.shard, nil
-		}
-	}
-	return nil, nil
 }
 
 // FetchContact - similar to FetchCommunity
@@ -247,7 +208,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 	}
 
 	switch requestType {
-	case storeNodeShardRequest, storeNodeCommunityRequest:
+	case storeNodeCommunityRequest:
 		// If filter wasn't installed we create it and
 		// remember for uninstalling after response is received
 		filters, err := m.messenger.messaging.InitPublicChats(messagingtypes.ChatsToInitialize{{
@@ -307,7 +268,6 @@ type storeNodeRequestType int
 const (
 	storeNodeCommunityRequest storeNodeRequestType = iota
 	storeNodeContactRequest
-	storeNodeShardRequest
 )
 
 // storeNodeRequest represents a single store node batch request.
@@ -343,7 +303,6 @@ type storeNodeRequestResult struct {
 	// One of data fields (community or contact) will be present depending on request type
 	community *communities.Community
 	contact   *contacts.Contact
-	shard     *messagingtypes.Shard
 }
 
 type storeNodeResponseSubscription = chan storeNodeRequestResult
@@ -362,7 +321,6 @@ func (r *storeNodeRequest) finalize() {
 		zap.Any("requestID", r.requestID),
 		zap.Bool("communityFound", r.result.community != nil),
 		zap.Bool("contactFound", r.result.contact != nil),
-		zap.Bool("shardFound", r.result.shard != nil),
 		zap.Error(r.result.err))
 
 	// Send the result to subscribers
@@ -460,36 +418,6 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 
 		r.result.community = community
 
-	case storeNodeShardRequest:
-		communityIDStr := strings.TrimSuffix(r.requestID.DataID, messaging.CommunityShardInfoTopicPrefix())
-		communityID, err := types.DecodeHex(communityIDStr)
-		if err != nil {
-			logger.Error("decode community ID failed",
-				zap.String("communityID", communityIDStr),
-				zap.Error(err))
-			return false, 0
-		}
-		shardResult, err := r.manager.messenger.communitiesManager.GetCommunityShard(communityID)
-		if err != nil {
-			if err != sql.ErrNoRows {
-				logger.Error("failed to read from database",
-					zap.String("communityID", communityIDStr),
-					zap.Error(err))
-				r.result = storeNodeRequestResult{
-					shard: nil,
-					err:   fmt.Errorf("failed to read from database: %w", err),
-				}
-				return false, 0 // failed to read from database, no sense to continue the procedure
-			}
-		}
-
-		logger.Debug("shard found",
-			zap.String("community", communityIDStr),
-			zap.Any("shard", shardResult),
-		)
-
-		r.result.shard = shardResult
-
 	case storeNodeContactRequest:
 		contact := r.manager.messenger.GetContactByID(r.requestID.DataID)
 
@@ -523,7 +451,6 @@ func (r *storeNodeRequest) routine() {
 		err:       nil,
 		community: nil,
 		contact:   nil,
-		shard:     nil,
 	}
 
 	defer func() {

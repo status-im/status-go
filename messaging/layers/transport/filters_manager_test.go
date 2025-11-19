@@ -96,7 +96,6 @@ func (s *FiltersManagerSuite) SetupTest() {
 		&wakuv2.DefaultConfig,
 		s.logger,
 		nil,
-		nil,
 		func([]byte, peer.AddrInfo, error) {},
 		nil,
 	)

@@ -43,11 +43,3 @@ func ContactCodeTopic(publicKey *ecdsa.PublicKey) string {
 func NegotiatedTopic(publicKey *ecdsa.PublicKey) string {
 	return "0x" + PublicKeyToStr(publicKey) + "-negotiated"
 }
-
-func CommunityShardInfoTopic(communityID string) string {
-	return communityID + CommunityShardInfoTopicPrefix()
-}
-
-func CommunityShardInfoTopicPrefix() string {
-	return "-shard-info"
-}

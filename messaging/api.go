@@ -242,24 +242,8 @@ func (a *API) ConnectionChanged(state connection.State) {
 	a.core.connectionChanged(state)
 }
 
-func (a *API) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
-	return a.core.stack.Transport.SubscribeToPubsubTopic(topic, optPublicKey)
-}
-
-func (a *API) UnsubscribeFromPubsubTopic(topic string) error {
-	return a.core.stack.Transport.UnsubscribeFromPubsubTopic(topic)
-}
-
-func (a *API) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
-	return a.core.stack.Transport.StorePubsubTopicKey(topic, privKey)
-}
-
-func (a *API) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
-	return a.core.stack.Transport.RetrievePubsubTopicKey(topic)
-}
-
-func (a *API) RemovePubsubTopicKey(topic string) error {
-	return a.core.stack.Transport.RemovePubsubTopicKey(topic)
+func (a *API) SubscribeToPubsubTopic(topic string) error {
+	return a.core.stack.Transport.SubscribeToPubsubTopic(topic)
 }
 
 func (a *API) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters types.ChatFilters) {
@@ -440,14 +424,6 @@ func ToContentTopic(s string) []byte {
 
 func ContactCodeTopic(publicKey *ecdsa.PublicKey) string {
 	return transport.ContactCodeTopic(publicKey)
-}
-
-func CommunityShardInfoTopic(communityID string) string {
-	return transport.CommunityShardInfoTopic(communityID)
-}
-
-func CommunityShardInfoTopicPrefix() string {
-	return transport.CommunityShardInfoTopicPrefix()
 }
 
 func GenerateInstallationID() string {

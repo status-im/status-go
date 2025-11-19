@@ -6,7 +6,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/server"
 )
@@ -15,14 +14,6 @@ func communityToRecord(community *Community) (*CommunityRecord, error) {
 	wrappedDescription, err := community.ToProtocolMessageBytes()
 	if err != nil {
 		return nil, err
-	}
-
-	var shardIndex, shardCluster *uint
-	if community.Shard() != nil {
-		index := uint(community.Shard().Index)
-		shardIndex = &index
-		cluster := uint(community.Shard().Cluster)
-		shardCluster = &cluster
 	}
 
 	return &CommunityRecord{
@@ -37,8 +28,6 @@ func communityToRecord(community *Community) (*CommunityRecord, error) {
 		spectated:    community.config.Spectated,
 		muted:        community.config.Muted,
 		mutedTill:    community.config.MuteTill,
-		shardCluster: shardCluster,
-		shardIndex:   shardIndex,
 	}, nil
 }
 
@@ -118,14 +107,6 @@ func recordBundleToCommunity(
 		}
 	}
 
-	var s *messagingtypes.Shard = nil
-	if r.community.shardCluster != nil && r.community.shardIndex != nil {
-		s = &messagingtypes.Shard{
-			Cluster: uint16(*r.community.shardCluster),
-			Index:   uint16(*r.community.shardIndex),
-		}
-	}
-
 	isControlDevice := r.installationID != nil && *r.installationID == installationID
 
 	config := Config{
@@ -145,7 +126,6 @@ func recordBundleToCommunity(
 		LastOpenedAt:                        r.community.lastOpenedAt,
 		Spectated:                           r.community.spectated,
 		EventsData:                          eventsData,
-		Shard:                               s,
 	}
 
 	community, err := New(config, timesource, encryptor, mediaServer)

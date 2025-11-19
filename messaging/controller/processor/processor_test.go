@@ -84,7 +84,6 @@ func (s *ProcessorSuite) SetupTest() {
 		&wakuConfig,
 		s.logger,
 		nil,
-		nil,
 		func([]byte, peer.AddrInfo, error) {},
 		nil,
 	)

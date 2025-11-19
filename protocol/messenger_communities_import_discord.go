@@ -1795,7 +1795,6 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 		// Init the community filter so we can receive messages on the community
 		_, err = m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
-			Shard:   discordCommunity.Shard(),
 			PrivKey: discordCommunity.PrivateKey(),
 		}})
 		if err != nil {

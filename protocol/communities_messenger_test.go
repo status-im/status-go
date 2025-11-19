@@ -3,7 +3,6 @@ package protocol
 import (
 	"bytes"
 	"context"
-	"crypto/ecdsa"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -4637,10 +4636,6 @@ func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityReque
 	grant, err := community.BuildGrant(s.alice.IdentityPublicKey(), "")
 	s.Require().NoError(err)
 
-	var key *ecdsa.PrivateKey
-	key, err = s.owner.messaging.RetrievePubsubTopicKey(community.PubsubTopic())
-	s.Require().NoError(err)
-
 	descriptionMessage, err := community.ToProtocolMessageBytes()
 	s.Require().NoError(err)
 
@@ -4649,8 +4644,6 @@ func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityReque
 		Accepted:                            true,
 		CommunityId:                         community.ID(),
 		Grant:                               grant,
-		ProtectedTopicPrivateKey:            crypto.FromECDSA(key),
-		Shard:                               community.Shard().Protobuffer(),
 		CommunityDescriptionProtocolMessage: descriptionMessage,
 	}
 
@@ -4700,7 +4693,7 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 	// Handle first community description
 	{
 		messageState := s.bob.buildMessageState()
-		err = s.bob.handleCommunityDescription(messageState, signer, description1, wrappedDescription1, nil, community.Shard().Protobuffer())
+		err = s.bob.handleCommunityDescription(messageState, signer, description1, wrappedDescription1, nil)
 		s.Require().NoError(err)
 		s.Require().Len(messageState.Response.Communities(), 1)
 		s.Require().Equal(description1.Clock, messageState.Response.Communities()[0].Clock())
@@ -4709,7 +4702,7 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 	// Handle third community description
 	{
 		messageState := s.bob.buildMessageState()
-		err = s.bob.handleCommunityDescription(messageState, signer, description3, wrappedDescription3, nil, community.Shard().Protobuffer())
+		err = s.bob.handleCommunityDescription(messageState, signer, description3, wrappedDescription3, nil)
 		s.Require().NoError(err)
 		s.Require().Len(messageState.Response.Communities(), 1)
 		s.Require().Equal(description3.Clock, messageState.Response.Communities()[0].Clock())
@@ -4724,7 +4717,7 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 	// It should be ignored
 	{
 		messageState := s.bob.buildMessageState()
-		err = s.bob.handleCommunityDescription(messageState, signer, description2, wrappedDescription2, nil, community.Shard().Protobuffer())
+		err = s.bob.handleCommunityDescription(messageState, signer, description2, wrappedDescription2, nil)
 		s.Require().Len(messageState.Response.Communities(), 0)
 		s.Require().Len(messageState.Response.CommunityChanges, 0)
 		s.Require().ErrorIs(err, communities.ErrInvalidCommunityDescriptionClockOutdated)

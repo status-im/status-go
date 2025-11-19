@@ -124,7 +124,6 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 	}
 
 	waku, err := newWaku(wakuParams{
-		persistence:                     config.persistence.WakuStorage(),
 		identity:                        params.Identity,
 		nodeKey:                         params.NodeKey,
 		wakuConfig:                      params.WakuConfig,
@@ -213,8 +212,6 @@ func (c *Core) connectionChanged(state connection.State) {
 }
 
 type wakuParams struct {
-	persistence wakuv2.ProtectedTopicsPersistence
-
 	identity *ecdsa.PrivateKey
 	nodeKey  *ecdsa.PrivateKey
 
@@ -269,7 +266,6 @@ func newWaku(params wakuParams) (*wakuv2.Waku, error) {
 		params.nodeKey,
 		cfg,
 		params.logger,
-		params.persistence,
 		params.timeSource,
 		params.onHistoricMessagesRequestFailed,
 		params.onPeerStats,

@@ -137,14 +137,6 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 	}
 	response.ContractFeaturedCommunities = curatedCommunities.ContractFeaturedCommunities
 
-	// TODO: use mechanism to obtain shard from community ID (https://github.com/status-im/status-desktop/issues/12585)
-	var unknownCommunities []communities.CommunityShard
-	for _, u := range response.UnknownCommunities {
-		unknownCommunities = append(unknownCommunities, communities.CommunityShard{
-			CommunityID: u,
-		})
-	}
-
 	m.shutdownWaitGroup.Add(1)
 
 	go func() {
@@ -152,11 +144,11 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 		defer m.shutdownWaitGroup.Done()
 		m.logger.Debug("fetching unknown curated communities")
 
-		for _, community := range unknownCommunities {
-			_, _, err := m.storeNodeRequestsManager.FetchCommunity(m.ctx, community, nil)
+		for _, communityID := range response.UnknownCommunities {
+			_, _, err := m.storeNodeRequestsManager.FetchCommunity(m.ctx, communityID, nil)
 			if err != nil {
 				m.logger.Error("failed to fetch curated community",
-					zap.String("communityID", community.CommunityID),
+					zap.String("communityID", communityID),
 					zap.Error(err),
 				)
 			}

@@ -142,7 +142,6 @@ func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitia
 }
 
 type CommunityFilterToInitialize struct {
-	Shard   *wakuv2.Shard
 	PrivKey *ecdsa.PrivateKey
 }
 
@@ -159,10 +158,10 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 		}
 
 		topics := make([]string, 0)
+		topics = append(topics, wakuv2.DefaultShardPubsubTopic())
 		topics = append(topics, wakuv2.DefaultNonProtectedPubsubTopic())
 		topics = append(topics, wakuv2.GlobalCommunityControlPubsubTopic())
 		topics = append(topics, wakuv2.GlobalCommunityContentPubsubTopic())
-		topics = append(topics, communityFilter.Shard.PubsubTopic())
 
 		for _, pubsubTopic := range topics {
 			pk := &cf.PrivKey.PublicKey
