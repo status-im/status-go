@@ -33,30 +33,30 @@ func TestConfirmations(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	p := NewSQLiteMessageSenderPersistence(db)
+	p := NewSQLiteMessageConfirmationPersistence(db)
 
-	confirmation1 := &types.RawMessageConfirmation{
+	confirmation1 := &MessageConfirmation{
 		DataSyncID: dataSyncID1,
 		MessageID:  messageID1,
 		PublicKey:  publicKey1,
 	}
 
 	// Same datasyncID and same messageID, different pubkey
-	confirmation2 := &types.RawMessageConfirmation{
+	confirmation2 := &MessageConfirmation{
 		DataSyncID: dataSyncID2,
 		MessageID:  messageID1,
 		PublicKey:  publicKey2,
 	}
 
 	// Different datasyncID and same messageID, different pubkey
-	confirmation3 := &types.RawMessageConfirmation{
+	confirmation3 := &MessageConfirmation{
 		DataSyncID: dataSyncID3,
 		MessageID:  messageID1,
 		PublicKey:  publicKey3,
 	}
 
 	// Same dataSyncID, different messageID
-	confirmation4 := &types.RawMessageConfirmation{
+	confirmation4 := &MessageConfirmation{
 		DataSyncID: dataSyncID4,
 		MessageID:  messageID2,
 		PublicKey:  publicKey1,
@@ -102,23 +102,23 @@ func TestConfirmationsAtLeastOne(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	p := NewSQLiteMessageSenderPersistence(db)
+	p := NewSQLiteMessageConfirmationPersistence(db)
 
-	confirmation1 := &types.RawMessageConfirmation{
+	confirmation1 := &MessageConfirmation{
 		DataSyncID: dataSyncID1,
 		MessageID:  messageID1,
 		PublicKey:  publicKey1,
 	}
 
 	// Same datasyncID and same messageID, different pubkey
-	confirmation2 := &types.RawMessageConfirmation{
+	confirmation2 := &MessageConfirmation{
 		DataSyncID: dataSyncID2,
 		MessageID:  messageID1,
 		PublicKey:  publicKey2,
 	}
 
 	// Different datasyncID and same messageID, different pubkey
-	confirmation3 := &types.RawMessageConfirmation{
+	confirmation3 := &MessageConfirmation{
 		DataSyncID: dataSyncID3,
 		MessageID:  messageID1,
 		PublicKey:  publicKey3,
@@ -144,7 +144,7 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	p := NewSQLiteMessageSenderPersistence(db)
+	p := NewSQLiteHashRatchetPersistence(db)
 
 	groupID1 := []byte("group-id-1")
 	groupID2 := []byte("group-id-2")
@@ -157,7 +157,7 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 		Payload:   []byte{3},
 	}
 
-	require.NoError(t, p.SaveHashRatchetMessage(groupID1, keyID, message1))
+	require.NoError(t, p.SaveMessage(groupID1, keyID, message1))
 
 	message2 := &types.ReceivedMessage{
 		Hash:      []byte{2},
@@ -168,9 +168,9 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 		Dst:       []byte{4},
 	}
 
-	require.NoError(t, p.SaveHashRatchetMessage(groupID2, keyID, message2))
+	require.NoError(t, p.SaveMessage(groupID2, keyID, message2))
 
-	fetchedMessages, err := p.GetHashRatchetMessages(keyID)
+	fetchedMessages, err := p.GetMessages(keyID)
 	require.NoError(t, err)
 	require.NotNil(t, fetchedMessages)
 	require.Len(t, fetchedMessages, 2)
@@ -185,7 +185,7 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	p := NewSQLiteMessageSenderPersistence(db)
+	p := NewSQLiteHashRatchetPersistence(db)
 
 	groupID := []byte("group-id")
 	keyID := []byte("key-id")
@@ -197,7 +197,7 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 		Payload:   []byte{3},
 	}
 
-	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message1))
+	require.NoError(t, p.SaveMessage(groupID, keyID, message1))
 
 	message2 := &types.ReceivedMessage{
 		Hash:      []byte{2},
@@ -208,7 +208,7 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 		Dst:       []byte{4},
 	}
 
-	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message2))
+	require.NoError(t, p.SaveMessage(groupID, keyID, message2))
 
 	message3 := &types.ReceivedMessage{
 		Hash:      []byte{3},
@@ -219,16 +219,16 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 		Dst:       []byte{4},
 	}
 
-	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message3))
+	require.NoError(t, p.SaveMessage(groupID, keyID, message3))
 
-	fetchedMessages, err := p.GetHashRatchetMessages(keyID)
+	fetchedMessages, err := p.GetMessages(keyID)
 	require.NoError(t, err)
 	require.NotNil(t, fetchedMessages)
 	require.Len(t, fetchedMessages, 3)
 
-	require.NoError(t, p.DeleteHashRatchetMessages([][]byte{[]byte{1}, []byte{2}}))
+	require.NoError(t, p.DeleteMessages([][]byte{[]byte{1}, []byte{2}}))
 
-	fetchedMessages, err = p.GetHashRatchetMessages(keyID)
+	fetchedMessages, err = p.GetMessages(keyID)
 	require.NoError(t, err)
 	require.NotNil(t, fetchedMessages)
 	require.Len(t, fetchedMessages, 1)

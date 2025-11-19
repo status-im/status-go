@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -288,10 +288,10 @@ func (m *Messenger) syncActivityCenterReadByIDs(ctx context.Context, ids []types
 		return err
 	}
 
-	return m.sendToPairedDevices(ctx, messagingtypes.RawMessage{
+	return m.sendToPairedDevices(ctx, common.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_READ,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 
@@ -306,10 +306,10 @@ func (m *Messenger) syncActivityCenterUnreadByIDs(ctx context.Context, ids []typ
 		return err
 	}
 
-	return m.sendToPairedDevices(ctx, messagingtypes.RawMessage{
+	return m.sendToPairedDevices(ctx, common.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_UNREAD,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 
@@ -409,10 +409,10 @@ func (m *Messenger) syncActivityCenterAcceptedByIDs(ctx context.Context, ids []t
 		return err
 	}
 
-	return m.sendToPairedDevices(ctx, messagingtypes.RawMessage{
+	return m.sendToPairedDevices(ctx, common.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_ACCEPTED,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 
@@ -451,10 +451,10 @@ func (m *Messenger) syncActivityCenterCommunityRequestDecision(ctx context.Conte
 		return err
 	}
 
-	return m.sendToPairedDevices(ctx, messagingtypes.RawMessage{
+	return m.sendToPairedDevices(ctx, common.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_COMMUNITY_REQUEST_DECISION,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 
@@ -531,10 +531,10 @@ func (m *Messenger) syncActivityCenterDeletedByIDs(ctx context.Context, ids []ty
 		return err
 	}
 
-	return m.sendToPairedDevices(ctx, messagingtypes.RawMessage{
+	return m.sendToPairedDevices(ctx, common.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_DELETED,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 
@@ -557,10 +557,10 @@ func (m *Messenger) syncActivityCenterDismissedByIDs(ctx context.Context, ids []
 		return err
 	}
 
-	return m.sendToPairedDevices(ctx, messagingtypes.RawMessage{
+	return m.sendToPairedDevices(ctx, common.RawMessage{
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_DISMISSED,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	})
 }
 
@@ -615,7 +615,7 @@ func (m *Messenger) ActivityCenterNotification(id types.HexBytes) (*ActivityCent
 	return notification, nil
 }
 
-func (m *Messenger) HandleSyncActivityCenterRead(state *ReceivedMessageState, message *protobuf.SyncActivityCenterRead, statusMessage *messagingtypes.Message) error {
+func (m *Messenger) HandleSyncActivityCenterRead(state *ReceivedMessageState, message *protobuf.SyncActivityCenterRead, statusMessage *common.StatusMessage) error {
 	resp, err := m.MarkActivityCenterNotificationsRead(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 
 	if err != nil {
@@ -625,7 +625,7 @@ func (m *Messenger) HandleSyncActivityCenterRead(state *ReceivedMessageState, me
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) HandleSyncActivityCenterUnread(state *ReceivedMessageState, message *protobuf.SyncActivityCenterUnread, statusMessage *messagingtypes.Message) error {
+func (m *Messenger) HandleSyncActivityCenterUnread(state *ReceivedMessageState, message *protobuf.SyncActivityCenterUnread, statusMessage *common.StatusMessage) error {
 	resp, err := m.MarkActivityCenterNotificationsUnread(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 
 	if err != nil {
@@ -635,7 +635,7 @@ func (m *Messenger) HandleSyncActivityCenterUnread(state *ReceivedMessageState, 
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) HandleSyncActivityCenterDeleted(state *ReceivedMessageState, message *protobuf.SyncActivityCenterDeleted, statusMessage *messagingtypes.Message) error {
+func (m *Messenger) HandleSyncActivityCenterDeleted(state *ReceivedMessageState, message *protobuf.SyncActivityCenterDeleted, statusMessage *common.StatusMessage) error {
 	response, err := m.MarkActivityCenterNotificationsDeleted(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 	if err != nil {
 		return err
@@ -643,7 +643,7 @@ func (m *Messenger) HandleSyncActivityCenterDeleted(state *ReceivedMessageState,
 	return state.Response.Merge(response)
 }
 
-func (m *Messenger) HandleSyncActivityCenterAccepted(state *ReceivedMessageState, message *protobuf.SyncActivityCenterAccepted, statusMessage *messagingtypes.Message) error {
+func (m *Messenger) HandleSyncActivityCenterAccepted(state *ReceivedMessageState, message *protobuf.SyncActivityCenterAccepted, statusMessage *common.StatusMessage) error {
 	resp, err := m.AcceptActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 
 	if err != nil {
@@ -653,7 +653,7 @@ func (m *Messenger) HandleSyncActivityCenterAccepted(state *ReceivedMessageState
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) HandleSyncActivityCenterDismissed(state *ReceivedMessageState, message *protobuf.SyncActivityCenterDismissed, statusMessage *messagingtypes.Message) error {
+func (m *Messenger) HandleSyncActivityCenterDismissed(state *ReceivedMessageState, message *protobuf.SyncActivityCenterDismissed, statusMessage *common.StatusMessage) error {
 	resp, err := m.DismissActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 
 	if err != nil {
@@ -663,7 +663,7 @@ func (m *Messenger) HandleSyncActivityCenterDismissed(state *ReceivedMessageStat
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) HandleSyncActivityCenterCommunityRequestDecision(state *ReceivedMessageState, a *protobuf.SyncActivityCenterCommunityRequestDecision, statusMessage *messagingtypes.Message) error {
+func (m *Messenger) HandleSyncActivityCenterCommunityRequestDecision(state *ReceivedMessageState, a *protobuf.SyncActivityCenterCommunityRequestDecision, statusMessage *common.StatusMessage) error {
 	notification, err := m.persistence.GetActivityCenterNotificationByID(a.Id)
 	if err != nil {
 		return err

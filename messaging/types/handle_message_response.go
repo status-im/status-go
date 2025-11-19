@@ -3,6 +3,6 @@ package types
 import cryptotypes "github.com/status-im/status-go/crypto/types"
 
 type HandleMessageResponse struct {
-	StatusMessages  []*Message
+	Messages        []*Message
 	AckedMessageIDs []cryptotypes.HexBytes
 }

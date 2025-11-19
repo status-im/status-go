@@ -67,16 +67,16 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 
 	contactCodeTopic := messaging.ContactCodeTopic(&m.identity.PublicKey)
 
-	rawMessage := messagingtypes.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID: contactCodeTopic,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
-		ResendType:  messagingtypes.ResendTypeNone, // does this need to be resent?
+		ResendType:  common.ResendTypeNone, // does this need to be resent?
 		Ephemeral:   statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
 		Priority:    &messagingtypes.LowPriority,
 	}
 
-	_, err = m.messaging.SendPublic(ctx, contactCodeTopic, rawMessage)
+	_, err = m.sender.SendPublic(ctx, contactCodeTopic, rawMessage)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 	for _, community := range joinedCommunities {
 		rawMessage.LocalChatID = community.StatusUpdatesChannelID()
 		rawMessage.PubsubTopic = community.PubsubTopic()
-		_, err = m.messaging.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
+		_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 		if err != nil {
 			return err
 		}
@@ -170,19 +170,19 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 		return err
 	}
 
-	rawMessage := messagingtypes.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID: community.StatusUpdatesChannelID(),
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
-		ResendType:  messagingtypes.ResendTypeNone, // does this need to be resent?
+		ResendType:  common.ResendTypeNone, // does this need to be resent?
 		Ephemeral:   statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
 		PubsubTopic: community.PubsubTopic(),
 		Priority:    &messagingtypes.LowPriority,
 	}
 
-	_, err = m.messaging.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
+	_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 	if err != nil {
-		logger.Debug("m.messaging.SendPublic error", zap.Error(err))
+		logger.Debug("m.sender.SendPublic error", zap.Error(err))
 		return err
 	}
 
@@ -243,7 +243,7 @@ func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomT
 	return m.sendUserStatus(ctx, *currStatus)
 }
 
-func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *protobuf.StatusUpdate, statusMessage *messagingtypes.Message) error {
+func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *protobuf.StatusUpdate, statusMessage *common.StatusMessage) error {
 	if err := ValidateStatusUpdate(message); err != nil {
 		return err
 	}

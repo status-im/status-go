@@ -38,10 +38,6 @@ Please note that we follow [Effective Go](https://golang.org/doc/effective_go.ht
 
 We use a slight variation of [Conventional commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
-We enforce the usage of `!` for breaking changes, or `_` for non-breaking. The rationale is that
-if we don't enforce one or the other, often devs will forget to add `!` to breaking changes.
-Forcing to add one or the other, will also hopefully force devs to make a decision with each commit.
-
 ## Testing
 
 ### Test Validation
@@ -58,7 +54,7 @@ Please request manual QA if the PR is high-risk or it's large impact.
 ### Feature Flags
 
 For PRs introducing new features, especially those in high-risk areas, consider using feature flags. Feature flags allow features to be toggled on or off, providing a way to deploy code changes to production while controlling the visibility of new features.
-For example, for messenger, you can use https://github.com/status-im/status-go/blob/develop/protocol/common/feature_flags.go.
+For example, for messenger, you can use `./protocol/common/feature_flags.go`.
 
 ### Removing Feature Flags
 
@@ -77,7 +73,7 @@ Test coverage is vital for ensuring the stability and reliability of our project
 
 ### Metrics for Test Coverage
 
-PRs should not decrease the overall coverage. If possible, aim to increase the overall coverage with each contribution.
+There are CI checks that enforce a minimum test coverage threshold. Currently it requires 50% patch coverage, but this may be adjusted in the future.
 
 Thank you for your contribution!
 

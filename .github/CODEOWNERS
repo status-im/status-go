@@ -13,7 +13,6 @@ Dockerfile            @status-im/devops
 
 # Custom ownership for specific folders
 # Feel free to add yourself for any new packages you implement.
-/_docs/policies       @jrainville @alaibe @plopezlpz
 /cmd/status-backend   @igor-sirotin
 /pkg/sentry           @igor-sirotin
 /healthmanager        @friofry

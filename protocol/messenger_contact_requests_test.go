@@ -1285,9 +1285,19 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	state := s.m.buildMessageState()
 
 	state.CurrentMessageState = &CurrentMessageState{
-		PublicKey:        &contactKey.PublicKey,
-		MessageID:        "0xa",
-		StatusMessage:    &messagingtypes.Message{TransportLayer: messagingtypes.TransportLayer{Message: &messagingtypes.ReceivedMessage{Timestamp: 1}}, ApplicationLayer: messagingtypes.ApplicationLayer{ID: []byte("test-id")}},
+		PublicKey: &contactKey.PublicKey,
+		MessageID: "0xa",
+		StatusMessage: &common.StatusMessage{
+			Message: messagingtypes.Message{
+				TransportLayer: messagingtypes.TransportLayer{
+					Message: &messagingtypes.ReceivedMessage{Timestamp: 1},
+				},
+				EncryptionLayer: messagingtypes.EncryptionLayer{},
+			},
+			ApplicationLayer: common.ApplicationLayer{
+				ID: []byte("test-id"),
+			},
+		},
 		Contact:          contact,
 		WhisperTimestamp: 1,
 	}

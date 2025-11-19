@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -10,17 +11,17 @@ import (
 	"github.com/status-im/status-go/messaging/types"
 )
 
-type SQLiteMessageSenderPersistence struct {
+type SQLiteMessageConfirmationPersistence struct {
 	db *sql.DB
 }
 
-var _ types.MessageSenderPersistence = (*SQLiteMessageSenderPersistence)(nil)
+var _ MessageConfirmationPersistence = (*SQLiteMessageConfirmationPersistence)(nil)
 
-func NewSQLiteMessageSenderPersistence(db *sql.DB) *SQLiteMessageSenderPersistence {
-	return &SQLiteMessageSenderPersistence{db: db}
+func NewSQLiteMessageConfirmationPersistence(db *sql.DB) *SQLiteMessageConfirmationPersistence {
+	return &SQLiteMessageConfirmationPersistence{db: db}
 }
 
-func (p *SQLiteMessageSenderPersistence) InsertPendingConfirmation(confirmation *types.RawMessageConfirmation) error {
+func (p *SQLiteMessageConfirmationPersistence) InsertPendingConfirmation(confirmation *MessageConfirmation) error {
 	_, err := p.db.Exec(`INSERT INTO raw_message_confirmations
 		 (datasync_id, message_id, public_key)
 		 VALUES
@@ -36,7 +37,7 @@ func (p *SQLiteMessageSenderPersistence) InsertPendingConfirmation(confirmation 
 // the messageIDs that can be considered confirmed.
 // If atLeastOne is set it will return messageid if at least once of the messages
 // sent has been confirmed
-func (p *SQLiteMessageSenderPersistence) MarkAsConfirmed(dataSyncID []byte, atLeastOne bool) (messageID cryptotypes.HexBytes, err error) {
+func (p *SQLiteMessageConfirmationPersistence) MarkAsConfirmed(dataSyncID []byte, atLeastOne bool) (messageID cryptotypes.HexBytes, err error) {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return nil, err
@@ -89,12 +90,22 @@ func (p *SQLiteMessageSenderPersistence) MarkAsConfirmed(dataSyncID []byte, atLe
 	return
 }
 
-func (p *SQLiteMessageSenderPersistence) SaveHashRatchetMessage(groupID []byte, keyID []byte, m *types.ReceivedMessage) error {
+type SQLiteHashRatchetPersistence struct {
+	db *sql.DB
+}
+
+func NewSQLiteHashRatchetPersistence(db *sql.DB) *SQLiteHashRatchetPersistence {
+	return &SQLiteHashRatchetPersistence{db: db}
+}
+
+var _ HashRatchetPersistence = (*SQLiteHashRatchetPersistence)(nil)
+
+func (p *SQLiteHashRatchetPersistence) SaveMessage(groupID []byte, keyID []byte, m *types.ReceivedMessage) error {
 	_, err := p.db.Exec(`INSERT INTO hash_ratchet_encrypted_messages(hash, sig, timestamp, topic, payload, dst, padding, group_id, key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, m.Hash, m.Sig, m.Timestamp, m.Topic.Bytes(), m.Payload, m.Dst, m.Padding, groupID, keyID)
 	return err
 }
 
-func (p *SQLiteMessageSenderPersistence) GetHashRatchetMessages(keyID []byte) ([]*types.ReceivedMessage, error) {
+func (p *SQLiteHashRatchetPersistence) GetMessages(keyID []byte) ([]*types.ReceivedMessage, error) {
 	var messages []*types.ReceivedMessage
 
 	rows, err := p.db.Query(`SELECT hash, sig, timestamp, topic, payload, dst, padding FROM hash_ratchet_encrypted_messages WHERE key_id = ?`, keyID)
@@ -118,7 +129,19 @@ func (p *SQLiteMessageSenderPersistence) GetHashRatchetMessages(keyID []byte) ([
 	return messages, nil
 }
 
-func (p *SQLiteMessageSenderPersistence) DeleteHashRatchetMessages(ids [][]byte) error {
+func (p *SQLiteHashRatchetPersistence) GetMessagesCountForGroup(groupID []byte) (int, error) {
+	var count int
+	err := p.db.QueryRow(`SELECT count(*) FROM hash_ratchet_encrypted_messages WHERE group_id = ?`, groupID).Scan(&count)
+	if err == nil {
+		return count, nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return 0, err
+}
+
+func (p *SQLiteHashRatchetPersistence) DeleteMessages(ids [][]byte) error {
 	if len(ids) == 0 {
 		return nil
 	}
@@ -134,7 +157,7 @@ func (p *SQLiteMessageSenderPersistence) DeleteHashRatchetMessages(ids [][]byte)
 	return err
 }
 
-func (p *SQLiteMessageSenderPersistence) DeleteHashRatchetMessagesOlderThan(timestamp int64) error {
+func (p *SQLiteHashRatchetPersistence) DeleteMessagesOlderThan(timestamp int64) error {
 	_, err := p.db.Exec("DELETE FROM hash_ratchet_encrypted_messages WHERE timestamp < ?", timestamp)
 	return err
 }

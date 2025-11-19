@@ -5098,9 +5098,9 @@ func (m *Manager) encryptCommunityDescriptionImpl(groupID []byte, d *protobuf.Co
 	}
 
 	m.logger.Debug("encrypting community description",
-		zap.Any("community", d),
-		zap.String("groupID", types.Bytes2Hex(groupID)),
-		zap.String("keyID", types.Bytes2Hex(keyID)))
+		zap.Any("communityID", d.ID),
+		zap.String("groupID", types.EncodeHex(groupID)),
+		zap.String("keyID", types.EncodeHex(keyID)))
 
 	keyIDSeqNo := fmt.Sprintf("%s%d", hex.EncodeToString(keyID), newSeqNo)
 

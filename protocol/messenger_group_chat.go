@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -125,7 +124,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 
 	m.allChats.Store(chat.ID, &chat)
 
-	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -219,7 +218,7 @@ func (m *Messenger) RemoveMembersFromGroupChat(ctx context.Context, chatID strin
 		return nil, err
 	}
 
-	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     removeMembersResponse.encodedProtobuf,
 		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -301,7 +300,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -355,7 +354,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -452,7 +451,7 @@ func (m *Messenger) EditGroupChat(ctx context.Context, chatID string, name strin
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -500,11 +499,11 @@ func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID s
 		return nil, err
 	}
 
-	spec := messagingtypes.RawMessage{
+	spec := common.RawMessage{
 		LocalChatID: adminPK,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_GROUP_CHAT_INVITATION,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	pkey, err := hex.DecodeString(adminPK[2:])
@@ -517,7 +516,7 @@ func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID s
 		return nil, err
 	}
 
-	id, err := m.messaging.SendPrivate(ctx, adminpk, &spec)
+	id, err := m.sender.SendPrivate(ctx, adminpk, &spec)
 	if err != nil {
 		return nil, err
 	}
@@ -568,11 +567,11 @@ func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invita
 		return nil, err
 	}
 
-	spec := messagingtypes.RawMessage{
+	spec := common.RawMessage{
 		LocalChatID: invitationR.From,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_GROUP_CHAT_INVITATION,
-		ResendType:  messagingtypes.ResendTypeDataSync,
+		ResendType:  common.ResendTypeDataSync,
 	}
 
 	pkey, err := hex.DecodeString(invitationR.From[2:])
@@ -585,7 +584,7 @@ func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invita
 		return nil, err
 	}
 
-	id, err := m.messaging.SendPrivate(ctx, userpk, &spec)
+	id, err := m.sender.SendPrivate(ctx, userpk, &spec)
 	if err != nil {
 		return nil, err
 	}
@@ -647,7 +646,7 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -704,7 +703,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -764,7 +763,7 @@ func (m *Messenger) leaveGroupChat(ctx context.Context, response *MessengerRespo
 		// shouldBeSynced is false if we got here because a synced client has already
 		// sent the leave group message. In that case we don't need to send it again.
 		if shouldBeSynced {
-			_, err = m.dispatchMessage(ctx, messagingtypes.RawMessage{
+			_, err = m.dispatchMessage(ctx, common.RawMessage{
 				LocalChatID: chat.ID,
 				Payload:     encodedMessage,
 				MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,

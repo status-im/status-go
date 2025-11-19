@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/deprecation"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -301,12 +300,12 @@ func (c *Chat) IsActivePersonalChat() bool {
 // Note that specific message might have different resent types. At times
 // some messages dictate their ResendType based on their own properties and
 // context, rather than the chat type it is associated with.
-func (c *Chat) DefaultResendType() messagingtypes.ResendType {
+func (c *Chat) DefaultResendType() common.ResendType {
 	if c.OneToOne() || c.PrivateGroupChat() {
-		return messagingtypes.ResendTypeDataSync
+		return common.ResendTypeDataSync
 	}
 
-	return messagingtypes.ResendTypeRawMessage
+	return common.ResendTypeRawMessage
 }
 
 func (c *Chat) shouldBeSynced() bool {

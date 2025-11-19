@@ -17,7 +17,6 @@ import (
 	segmentationmigrations "github.com/status-im/status-go/messaging/layers/segmentation/migrations"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	transportmigrations "github.com/status-im/status-go/messaging/layers/transport/migrations"
-	"github.com/status-im/status-go/messaging/types"
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
 	wakumigrations "github.com/status-im/status-go/messaging/waku/migrations"
 	"github.com/status-im/status-go/sqlite"
@@ -124,7 +123,7 @@ type sqliteTransportPersistence struct {
 	db *sql.DB
 }
 
-var _ TransportPersistence = (*sqliteTransportPersistence)(nil)
+var _ transport.Persistence = (*sqliteTransportPersistence)(nil)
 
 func (p *sqliteTransportPersistence) KeysStorage() transport.KeysPersistence {
 	return transport.NewSQLiteKeysPersistence(p.db)
@@ -134,7 +133,7 @@ func (p *sqliteTransportPersistence) ProcessedMessageIDsCacheStorage() transport
 	return transport.NewSQLiteProcessedMessageIDsCachePersistence(p.db)
 }
 
-func (p *sqlitePersistence) TransportStorage() TransportPersistence {
+func (p *sqlitePersistence) TransportStorage() transport.Persistence {
 	return &sqliteTransportPersistence{db: p.db}
 }
 
@@ -150,6 +149,10 @@ func (p *sqlitePersistence) EncryptionStorage() encryption.Persistence {
 	return encryption.NewSQLitePersistence(p.db)
 }
 
-func (p *sqlitePersistence) MessageSenderStorage() types.MessageSenderPersistence {
-	return common.NewSQLiteMessageSenderPersistence(p.db)
+func (p *sqlitePersistence) MessageConfirmationStorage() common.MessageConfirmationPersistence {
+	return common.NewSQLiteMessageConfirmationPersistence(p.db)
+}
+
+func (p *sqlitePersistence) HashRatchetStorage() common.HashRatchetPersistence {
+	return common.NewSQLiteHashRatchetPersistence(p.db)
 }

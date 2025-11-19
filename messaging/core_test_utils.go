@@ -155,7 +155,7 @@ type TestUtils struct {
 }
 
 func (t TestUtils) GetAllHRKeysCount(groupID []byte) (int, error) {
-	keys, err := t.API.core.encryptor.GetAllHRKeys(groupID)
+	keys, err := t.API.core.stack.Encryption.GetAllHRKeys(groupID)
 	if err != nil {
 		return 0, err
 	}
@@ -166,7 +166,7 @@ func (t TestUtils) GetAllHRKeysCount(groupID []byte) (int, error) {
 }
 
 func (t TestUtils) GetKeysForGroupCount(groupID []byte) (int, error) {
-	keys, err := t.API.core.encryptor.GetKeysForGroup(groupID)
+	keys, err := t.API.core.stack.Encryption.GetKeysForGroup(groupID)
 	if err != nil {
 		return 0, err
 	}
@@ -174,11 +174,11 @@ func (t TestUtils) GetKeysForGroupCount(groupID []byte) (int, error) {
 }
 
 func (t TestUtils) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, theirAPI *API, theirIdentityKey *ecdsa.PrivateKey) error {
-	theirBundle, err := theirAPI.core.encryptor.GetBundle(theirIdentityKey)
+	theirBundle, err := theirAPI.core.stack.Encryption.GetBundle(theirIdentityKey)
 	if err != nil {
 		return err
 	}
 
-	_, err = t.API.core.encryptor.ProcessPublicBundle(myIdentityKey, theirBundle)
+	_, err = t.API.core.stack.Encryption.ProcessPublicBundle(myIdentityKey, theirBundle)
 	return err
 }

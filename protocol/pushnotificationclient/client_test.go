@@ -12,8 +12,6 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	messagingevents "github.com/status-im/status-go/messaging/events"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -57,7 +55,7 @@ func (s *ClientSuite) SetupTest() {
 		InstallationID:             s.installationID,
 	}
 
-	s.client = New(s.persistence, config, nil, nil)
+	s.client = New(s.persistence, config, nil, nil, nil)
 }
 
 func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
@@ -196,13 +194,13 @@ func (s *ClientSuite) TestHandleMessageScheduled() {
 	chatID := "chat-id"
 	installationID1 := "1"
 	installationID2 := "2"
-	rawMessage := &messagingtypes.RawMessage{
+	rawMessage := &common.RawMessage{
 		ID:                   types.EncodeHex(messageID),
 		SendPushNotification: true,
 		LocalChatID:          chatID,
 	}
 
-	event := &messagingevents.MessageEvent{
+	event := &common.ScheduledMessageEvent{
 		RawMessage: rawMessage,
 	}
 

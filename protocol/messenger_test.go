@@ -1520,7 +1520,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // relevant logic now
 // func (s *MessengerSuite) TestShouldResendEmoji() {
 // 	// shouldn't try to resend non-emoji messages.
-// 	ok, err := s.m.shouldResendMessage(&messagingtypes.RawMessage{
+// 	ok, err := s.m.shouldResendMessage(&common.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_CONTACT_UPDATE,
 // 		Sent:        false,
 // 		SendCount:   2,
@@ -1529,7 +1529,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.False(ok)
 
 // 	// shouldn't try to resend already sent message
-// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        true,
 // 		SendCount:   1,
@@ -1538,7 +1538,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.False(ok)
 
 // 	// messages that already sent to many times shouldn't be resend
-// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        false,
 // 		SendCount:   s.m.config.messageResendMaxCount + 1,
@@ -1547,7 +1547,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.False(ok)
 
 // 	// message sent one time CAN'T be resend in 15 seconds (only after 30)
-// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        false,
 // 		SendCount:   1,
@@ -1557,7 +1557,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.False(ok)
 
 // 	// message sent one time CAN be resend in 35 seconds
-// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        false,
 // 		SendCount:   1,
@@ -1567,7 +1567,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.True(ok)
 
 // 	// message sent three times CAN'T be resend in 100 seconds (only after 120)
-// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        false,
 // 		SendCount:   3,
@@ -1577,7 +1577,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // 	s.False(ok)
 
 // 	// message sent tow times CAN be resend in 65 seconds
-// 	ok, err = s.m.shouldResendMessage(&messagingtypes.RawMessage{
+// 	ok, err = s.m.shouldResendMessage(&common.RawMessage{
 // 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 // 		Sent:        false,
 // 		SendCount:   3,
