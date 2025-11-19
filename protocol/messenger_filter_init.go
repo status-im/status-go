@@ -24,15 +24,15 @@ func (m *Messenger) InitFilters() error {
 
 	// Community requests will arrive in this pubsub topic
 	// TODO remove once fully migrated to Global Community Control and Content Topic https://github.com/status-im/status-go/issues/6384
-	if err := m.SubscribeToPubsubTopic(messagingtypes.DefaultNonProtectedPubsubTopic(), nil); err != nil {
+	if err := m.SubscribeToPubsubTopic(messagingtypes.DefaultNonProtectedPubsubTopic()); err != nil {
 		return err
 	}
 	// TODO only subscribe if interested in communities
-	if err := m.SubscribeToPubsubTopic(messagingtypes.GlobalCommunityControlPubsubTopic(), nil); err != nil {
+	if err := m.SubscribeToPubsubTopic(messagingtypes.GlobalCommunityControlPubsubTopic()); err != nil {
 		return err
 	}
 	// TODO only subscribe if interested in communities
-	if err := m.SubscribeToPubsubTopic(messagingtypes.GlobalCommunityContentPubsubTopic(), nil); err != nil {
+	if err := m.SubscribeToPubsubTopic(messagingtypes.GlobalCommunityContentPubsubTopic()); err != nil {
 		return err
 	}
 
@@ -325,7 +325,6 @@ func (m *Messenger) processControlledCommunities(wg *sync.WaitGroup, errCh chan<
 	var communityFiltersToInitialize messagingtypes.CommunitiesToInitialize
 	for _, c := range controlledCommunities {
 		communityFiltersToInitialize = append(communityFiltersToInitialize, &messagingtypes.CommunityToInitialize{
-			Shard:   c.Shard(),
 			PrivKey: c.PrivateKey(),
 		})
 	}

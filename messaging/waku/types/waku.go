@@ -120,15 +120,9 @@ type Waku interface {
 
 	StopDiscV5() error
 
-	SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error
+	SubscribeToPubsubTopic(topic string) error
 
 	UnsubscribeFromPubsubTopic(topic string) error
-
-	StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error
-
-	RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error)
-
-	RemovePubsubTopicKey(topic string) error
 
 	AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error)
 

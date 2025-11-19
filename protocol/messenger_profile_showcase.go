@@ -145,7 +145,6 @@ func (m *Messenger) validateCommunitiesMembership(communities []*identity.Profil
 	for _, communityEntry := range communities {
 		community, err := m.FetchCommunity(&FetchCommunityRequest{
 			CommunityKey:    communityEntry.CommunityID,
-			Shard:           nil,
 			TryDatabase:     true,
 			WaitForResponse: true,
 		})

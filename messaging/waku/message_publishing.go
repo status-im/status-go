@@ -8,7 +8,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
@@ -20,19 +19,6 @@ import (
 // network in the coming cycles.
 func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]byte, error) {
 	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
-	if w.protectedTopicStore != nil {
-		privKey, err := w.protectedTopicStore.FetchPrivateKey(pubsubTopic)
-		if err != nil {
-			return nil, err
-		}
-
-		if privKey != nil {
-			err = relay.SignMessage(privKey, msg, pubsubTopic)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
 
 	envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
 

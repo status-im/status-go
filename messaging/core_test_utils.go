@@ -133,7 +133,6 @@ func newTestWakuWrapper() (*testWakuWrapper, error) {
 		nil,
 		&wakuv2.DefaultConfig,
 		zap.NewNop(),
-		nil,
 		&testTimeSource{},
 		func([]byte, peer.AddrInfo, error) {},
 		nil,

@@ -14,7 +14,6 @@ type ChatToInitialize struct {
 type ChatsToInitialize []*ChatToInitialize
 
 type CommunityToInitialize struct {
-	Shard   *Shard
 	PrivKey *ecdsa.PrivateKey
 }
 

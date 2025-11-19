@@ -13,7 +13,6 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -129,7 +128,6 @@ func parseCommunityURLWithChatKey(urlData string) (*URLDataResponse, error) {
 			CommunityID: communityID,
 			TagIndices:  []uint32{},
 		},
-		Shard: nil,
 	}, nil
 }
 
@@ -149,7 +147,6 @@ func prepareEncodedCommunityData(community *communities.Community) (string, stri
 
 	urlDataProto := &protobuf.URLData{
 		Content: communityData,
-		Shard:   community.Shard().Protobuffer(),
 	}
 
 	urlData, err := proto.Marshal(urlDataProto)
@@ -231,7 +228,6 @@ func parseCommunityURLWithData(data string, chatKey string) (*URLDataResponse, e
 			TagIndices:   tagIndices,
 			CommunityID:  types.EncodeHex(communityID),
 		},
-		Shard: messagingtypes.FromShardProtobuff(urlDataProto.Shard),
 	}, nil
 }
 
@@ -280,7 +276,6 @@ func parseCommunityChannelURLWithChatKey(channelID string, publicKey string) (*U
 		Channel: &CommunityChannelURLData{
 			ChannelUUID: channelID,
 		},
-		Shard: nil,
 	}, nil
 }
 
@@ -309,7 +304,6 @@ func (s *Service) prepareEncodedCommunityChannelData(community *communities.Comm
 
 	urlDataProto := &protobuf.URLData{
 		Content: channelData,
-		Shard:   community.Shard().Protobuffer(),
 	}
 
 	urlData, err := proto.Marshal(urlDataProto)
@@ -407,7 +401,6 @@ func parseCommunityChannelURLWithData(data string, chatKey string) (*URLDataResp
 			Color:       channelProto.Color,
 			ChannelUUID: channelProto.Uuid,
 		},
-		Shard: messagingtypes.FromShardProtobuff(urlDataProto.Shard),
 	}, nil
 }
 

@@ -17,7 +17,6 @@ import (
 	segmentationmigrations "github.com/status-im/status-go/messaging/layers/segmentation/migrations"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	transportmigrations "github.com/status-im/status-go/messaging/layers/transport/migrations"
-	wakuv2 "github.com/status-im/status-go/messaging/waku"
 	wakumigrations "github.com/status-im/status-go/messaging/waku/migrations"
 	"github.com/status-im/status-go/sqlite"
 )
@@ -113,10 +112,6 @@ var _ Persistence = (*sqlitePersistence)(nil)
 
 func newSQLitePersistence(db *sql.DB) Persistence {
 	return &sqlitePersistence{db: db}
-}
-
-func (p *sqlitePersistence) WakuStorage() wakuv2.ProtectedTopicsPersistence {
-	return wakuv2.NewSQLiteProtectedTopicsPersistence(p.db)
 }
 
 type sqliteTransportPersistence struct {

@@ -150,8 +150,6 @@ type Waku struct {
 
 	bandwidthCounter *metrics.BandwidthCounter
 
-	protectedTopicStore ProtectedTopicsPersistence
-
 	sendQueue *publish.MessageQueue
 
 	missingMsgVerifier *missing.MissingMessageVerifier
@@ -217,7 +215,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTopicsPersistence ProtectedTopicsPersistence, ts timesource.Provider, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesource.Provider, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -262,7 +260,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTo
 		onPeerStats:                     onPeerStats,
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
 		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
-		protectedTopicStore:             protectedTopicsPersistence,
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
@@ -637,7 +634,7 @@ func (w *Waku) unsubscribeFromPubsubTopicWithWakuRelay(topic string) error {
 	return w.node.Relay().Unsubscribe(w.ctx, contentFilter)
 }
 
-func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.PublicKey) error {
+func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string) error {
 	if w.cfg.LightClient {
 		return errors.New("only available for full nodes")
 	}
@@ -646,13 +643,6 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 
 	if w.node.Relay().IsSubscribed(topic) {
 		return nil
-	}
-
-	if pubkey != nil {
-		err := w.node.Relay().AddSignedTopicValidator(topic, pubkey)
-		if err != nil {
-			return err
-		}
 	}
 
 	contentFilter := protocol.NewContentFilter(topic)
@@ -1355,22 +1345,7 @@ func (w *Waku) setupRelaySubscriptions() error {
 		return nil
 	}
 
-	if w.protectedTopicStore != nil {
-		protectedTopics, err := w.protectedTopicStore.All()
-		if err != nil {
-			return err
-		}
-
-		for _, pt := range protectedTopics {
-			// Adding subscription to protected topics
-			err = w.subscribeToPubsubTopicWithWakuRelay(pt.Topic, pt.PubKey)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	err := w.subscribeToPubsubTopicWithWakuRelay(w.cfg.DefaultShardPubsubTopic, nil)
+	err := w.subscribeToPubsubTopicWithWakuRelay(w.cfg.DefaultShardPubsubTopic)
 	if err != nil {
 		return err
 	}
@@ -1605,11 +1580,11 @@ func (w *Waku) ENR() (*enode.Node, error) {
 	return enr, nil
 }
 
-func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) error {
+func (w *Waku) SubscribeToPubsubTopic(topic string) error {
 	topic = w.GetPubsubTopic(topic)
 
 	if !w.cfg.LightClient {
-		err := w.subscribeToPubsubTopicWithWakuRelay(topic, pubkey)
+		err := w.subscribeToPubsubTopicWithWakuRelay(topic)
 		if err != nil {
 			return err
 		}
@@ -1627,33 +1602,6 @@ func (w *Waku) UnsubscribeFromPubsubTopic(topic string) error {
 		}
 	}
 	return nil
-}
-
-func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
-	topic = w.GetPubsubTopic(topic)
-	if w.protectedTopicStore == nil {
-		return nil, nil
-	}
-
-	return w.protectedTopicStore.FetchPrivateKey(topic)
-}
-
-func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
-	topic = w.GetPubsubTopic(topic)
-	if w.protectedTopicStore == nil {
-		return nil
-	}
-
-	return w.protectedTopicStore.Insert(topic, privKey, &privKey.PublicKey)
-}
-
-func (w *Waku) RemovePubsubTopicKey(topic string) error {
-	topic = w.GetPubsubTopic(topic)
-	if w.protectedTopicStore == nil {
-		return nil
-	}
-
-	return w.protectedTopicStore.Delete(topic)
 }
 
 func (w *Waku) StartDiscV5() error {

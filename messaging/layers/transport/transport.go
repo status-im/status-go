@@ -517,40 +517,10 @@ func (t *Transport) ConnectionChanged(state connection.State) {
 	t.waku.ConnectionChanged(state)
 }
 
-// Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
-func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
-	var pubKey *ecdsa.PublicKey
-	if optPublicKey != nil {
-		pubKey = optPublicKey
-	} else {
-		// try to retrieve pubkey for pubsubtopic if none provided
-		privK, err := t.RetrievePubsubTopicKey(topic)
-		if err != nil {
-			return err
-		}
-		if privK != nil {
-			pubKey = &privK.PublicKey
-		}
-	}
-	t.logger.Debug("subscribing to protected pubsub topic", zap.String("pubsubtopic", topic), zap.Any("pubkey", pubKey))
-	return t.waku.SubscribeToPubsubTopic(topic, pubKey)
-}
-
-// Unsubscribe from a pubsub topic
-func (t *Transport) UnsubscribeFromPubsubTopic(topic string) error {
-	return t.waku.UnsubscribeFromPubsubTopic(topic)
-}
-
-func (t *Transport) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
-	return t.waku.StorePubsubTopicKey(topic, privKey)
-}
-
-func (t *Transport) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
-	return t.waku.RetrievePubsubTopicKey(topic)
-}
-
-func (t *Transport) RemovePubsubTopicKey(topic string) error {
-	return t.waku.RemovePubsubTopicKey(topic)
+// Subscribe to a pubsub topic
+func (t *Transport) SubscribeToPubsubTopic(topic string) error {
+	t.logger.Debug("subscribing to pubsub topic", zap.String("pubsubtopic", topic))
+	return t.waku.SubscribeToPubsubTopic(topic)
 }
 
 func (t *Transport) ConfirmMessageDelivered(messageID string) {

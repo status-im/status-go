@@ -58,7 +58,7 @@ func TestDiscoveryV5(t *testing.T) {
 	setDefaultConfig(config, false)
 	config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
 	config.DiscoveryLimit = 20
-	w, err := New(nil, config, nil, nil, nil, nil, nil)
+	w, err := New(nil, config, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, w.Start())
@@ -84,7 +84,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	config.DiscoveryLimit = 20
 	config.UDPPort = 10002
 	config.ClusterID = 16
-	w, err := New(nil, config, nil, nil, nil, nil, nil)
+	w, err := New(nil, config, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, w.Start())
@@ -128,7 +128,7 @@ func TestRelayPeers(t *testing.T) {
 		EnableMissingMessageVerification: true,
 	}
 	setDefaultConfig(config, false)
-	w, err := New(nil, config, nil, nil, nil, nil, nil)
+	w, err := New(nil, config, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
@@ -138,7 +138,7 @@ func TestRelayPeers(t *testing.T) {
 	config = &Config{}
 	config.ClusterID = 16
 	config.LightClient = true
-	w, err = New(nil, config, nil, nil, nil, nil, nil)
+	w, err = New(nil, config, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
@@ -186,7 +186,7 @@ func TestBasicWakuV2(t *testing.T) {
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
 	config.WakuNodes = []string{enrTreeAddress}
-	w, err := New(nil, config, nil, nil, nil, nil, nil)
+	w, err := New(nil, config, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
@@ -326,7 +326,7 @@ func TestPeerExchange(t *testing.T) {
 	config.EnableDiscV5 = true
 	config.EnablePeerExchangeServer = true
 	config.EnablePeerExchangeClient = false
-	pxServerNode, err := New(nil, config, logger.Named("pxServerNode"), nil, nil, nil, nil)
+	pxServerNode, err := New(nil, config, logger.Named("pxServerNode"), nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, pxServerNode.Start())
 
@@ -339,7 +339,7 @@ func TestPeerExchange(t *testing.T) {
 	config.EnablePeerExchangeServer = false
 	config.EnablePeerExchangeClient = false
 	config.DiscV5BootstrapNodes = []string{pxServerNode.node.ENR().String()}
-	discV5Node, err := New(nil, config, logger.Named("discV5Node"), nil, nil, nil, nil)
+	discV5Node, err := New(nil, config, logger.Named("discV5Node"), nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, discV5Node.Start())
 
@@ -358,7 +358,7 @@ func TestPeerExchange(t *testing.T) {
 	config.Resolver = resolver
 
 	config.WakuNodes = []string{url}
-	lightNode, err := New(nil, config, logger.Named("lightNode"), nil, nil, nil, nil)
+	lightNode, err := New(nil, config, logger.Named("lightNode"), nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, lightNode.Start())
 
@@ -405,7 +405,7 @@ func TestWakuV2Filter(t *testing.T) {
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
 	config.WakuNodes = []string{enrTreeAddress}
-	w, err := New(nil, config, nil, nil, nil, nil, nil)
+	w, err := New(nil, config, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
@@ -486,7 +486,7 @@ func TestWakuV2Filter(t *testing.T) {
 }
 
 func TestOnlineChecker(t *testing.T) {
-	w, err := New(nil, nil, nil, nil, nil, nil, nil)
+	w, err := New(nil, nil, nil, nil, nil, nil)
 	require.NoError(t, w.Start())
 
 	require.NoError(t, err)
@@ -512,7 +512,7 @@ func TestOnlineChecker(t *testing.T) {
 	config := &Config{}
 	config.ClusterID = 16
 	config.LightClient = true
-	lightNode, err := New(nil, config, nil, nil, nil, nil, nil)
+	lightNode, err := New(nil, config, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	err = lightNode.Start()

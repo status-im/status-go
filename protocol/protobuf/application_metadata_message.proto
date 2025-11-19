@@ -13,22 +13,15 @@ message ApplicationMetadataMessage {
   Type type = 3;
 
   enum Type {
-    reserved 14;
-    reserved "SYNC_INSTALLATION_PUBLIC_CHAT";
     UNKNOWN = 0;
     CHAT_MESSAGE = 1;
     CONTACT_UPDATE = 2;
     MEMBERSHIP_UPDATE_MESSAGE = 3;
     SYNC_PAIR_INSTALLATION = 4;
-    DEPRECATED_SYNC_INSTALLATION = 5 [deprecated=true];
-    REQUEST_ADDRESS_FOR_TRANSACTION = 6 [deprecated = true];
-    ACCEPT_REQUEST_ADDRESS_FOR_TRANSACTION = 7 [deprecated = true];
-    DECLINE_REQUEST_ADDRESS_FOR_TRANSACTION = 8 [deprecated = true];
-    REQUEST_TRANSACTION = 9 [deprecated = true];
-    SEND_TRANSACTION = 10 [deprecated = true];
-    DECLINE_REQUEST_TRANSACTION = 11 [deprecated = true];
+    reserved 5, 6, 7, 8, 9, 10, 11;
     SYNC_INSTALLATION_CONTACT_V2 = 12;
     SYNC_INSTALLATION_ACCOUNT = 13;
+    reserved 14;
     CONTACT_CODE_ADVERTISEMENT = 15;
     PUSH_NOTIFICATION_REGISTRATION = 16;
     PUSH_NOTIFICATION_REGISTRATION_RESPONSE = 17;
@@ -40,7 +33,7 @@ message ApplicationMetadataMessage {
     GROUP_CHAT_INVITATION = 23;
     CHAT_IDENTITY = 24;
     COMMUNITY_DESCRIPTION = 25;
-    COMMUNITY_INVITATION = 26 [deprecated=true];
+    reserved 26;
     COMMUNITY_REQUEST_TO_JOIN = 27;
     PIN_MESSAGE = 28;
     EDIT_MESSAGE = 29;
@@ -50,7 +43,7 @@ message ApplicationMetadataMessage {
     ANONYMOUS_METRIC_BATCH = 33;
     SYNC_CHAT_REMOVED = 34;
     SYNC_CHAT_MESSAGES_READ = 35;
-    BACKUP = 36 [deprecated=true];
+    reserved 36;
     SYNC_ACTIVITY_CENTER_READ = 37;
     SYNC_ACTIVITY_CENTER_ACCEPTED = 38;
     SYNC_ACTIVITY_CENTER_DISMISSED = 39;
@@ -76,33 +69,26 @@ message ApplicationMetadataMessage {
     COMMUNITY_CANCEL_REQUEST_TO_JOIN = 60;
     CANCEL_CONTACT_VERIFICATION = 61;
     SYNC_KEYPAIR = 62;
-    SYNC_SOCIAL_LINKS = 63 [deprecated=true];
+    reserved 63;
     SYNC_ENS_USERNAME_DETAIL = 64;
-    reserved 65;
-    reserved "SYNC_ACTIVITY_CENTER_NOTIFICATIONS";
-    // No need to sync AC state now since we allow exist different number of ACs between paired devices
-    // Also we will update AC state after sync AC decision
-    reserved 66;
-    reserved "SYNC_ACTIVITY_CENTER_NOTIFICATION_STATE";
+    reserved 65, 66;
     COMMUNITY_EVENTS_MESSAGE = 67;
     COMMUNITY_EDIT_SHARED_ADDRESSES = 68;
     SYNC_ACCOUNT_CUSTOMIZATION_COLOR = 69;
     SYNC_ACCOUNTS_POSITIONS = 70;
     reserved 71;
-    reserved "COMMUNITY_EVENTS_MESSAGE_REJECTED";
     COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE = 72;
-    COMMUNITY_SHARD_KEY = 73;
+    reserved 73;
     SYNC_CHAT = 74;
     SYNC_ACTIVITY_CENTER_DELETED = 75;
     SYNC_ACTIVITY_CENTER_UNREAD = 76;
     SYNC_ACTIVITY_CENTER_COMMUNITY_REQUEST_DECISION = 77;
     SYNC_TOKEN_PREFERENCES = 78;
-    COMMUNITY_PUBLIC_SHARD_INFO = 79;
+    reserved 79;
     SYNC_COLLECTIBLE_PREFERENCES = 80;
     COMMUNITY_USER_KICKED = 81;
     SYNC_PROFILE_SHOWCASE_PREFERENCES = 82;
     reserved 83;
-    reserved "COMMUNITY_PUBLIC_STORENODES_INFO";
     COMMUNITY_REEVALUATE_PERMISSIONS_REQUEST = 84;
     DELETE_COMMUNITY_MEMBER_MESSAGES = 85;
     COMMUNITY_UPDATE_GRANT = 86;
