@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/pkg/backend/requests"
+	"github.com/status-im/status-go/pkg/backend2"
 )
 
 func main() {
@@ -23,7 +24,7 @@ func main() {
 
 	fmt.Printf("Root data dir: %s\n", rootDataDir)
 
-	b, err := backend.NewStatusBackend(
+	b, err := backend2.NewStatusBackend(
 		rootDataDir,
 		backend.WithLogger(logger),
 	)

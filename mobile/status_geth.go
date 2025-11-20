@@ -1,8 +1,8 @@
 package statusgo
 
 import (
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/backend"
 )
 
-var statusBackend = api.NewGethStatusBackend(logutils.ZapLogger())
+var statusBackend = backend.NewStatusBackend(logutils.ZapLogger())

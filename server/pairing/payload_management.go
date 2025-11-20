@@ -6,12 +6,12 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/pkg/backend"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -195,7 +195,7 @@ type InstallationPayloadMounterReceiver struct {
 	PayloadReceiver
 }
 
-func NewInstallationPayloadMounterReceiver(encryptor *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounterReceiver {
+func NewInstallationPayloadMounterReceiver(encryptor *PayloadEncryptor, backend *backend.StatusBackend, deviceType string) *InstallationPayloadMounterReceiver {
 	return &InstallationPayloadMounterReceiver{
 		NewInstallationPayloadMounter(encryptor, backend, deviceType),
 		NewInstallationPayloadReceiver(encryptor, backend, deviceType),

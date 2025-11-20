@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	backend2 "github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/requests"
 
@@ -29,7 +30,7 @@ var (
 )
 
 type setupContext struct {
-	backend        *GethStatusBackend
+	backend        *backend2.StatusBackend
 	mnemonic       string
 	settings       settings.Settings
 	config         *params.NodeConfig
@@ -145,7 +146,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 		}
 	}
 
-	data.backend = NewGethStatusBackend(testutils.MustCreateTestLogger())
+	data.backend = backend2.NewStatusBackend(testutils.MustCreateTestLogger())
 	data.backend.UpdateRootDataDir(tmpdir)
 
 	err = data.backend.OpenAccounts(true)

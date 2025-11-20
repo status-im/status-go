@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
@@ -63,7 +64,7 @@ func (s *SyncDeviceSuite) SetupTest() {
 	s.tmpdir = s.T().TempDir()
 }
 
-func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *api.GethStatusBackend {
+func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *backend.StatusBackend {
 	err := os.MkdirAll(tmpdir, 0755) // making sure the dir is created
 	s.Require().NoError(err)
 
@@ -101,8 +102,8 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *ap
 	return backend
 }
 
-func (s *SyncDeviceSuite) prepareBackendWithoutAccount(tmpdir string) *api.GethStatusBackend {
-	backend := api.NewGethStatusBackend(s.logger)
+func (s *SyncDeviceSuite) prepareBackendWithoutAccount(tmpdir string) *backend.StatusBackend {
+	backend := backend.NewStatusBackend(s.logger)
 	backend.UpdateRootDataDir(tmpdir)
 	return backend
 }

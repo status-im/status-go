@@ -10,13 +10,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/requests"
 
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/api"
 )
 
 func newValidate() (*validator.Validate, error) {
@@ -177,7 +177,7 @@ func validateReceivedKeystoreFiles(expectedKeys []string, keys map[string][]byte
 	return validateKeys(keys, password)
 }
 
-func validateKeystoreFilesConfig(backend *api.GethStatusBackend, conf interface{}) error {
+func validateKeystoreFilesConfig(backend *backend.StatusBackend, conf interface{}) error {
 	var (
 		loggedInKeyUID string
 		password       string

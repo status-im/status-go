@@ -6,10 +6,9 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/centralizedmetrics"
-	"github.com/status-im/status-go/pkg/backend"
-
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/requests"
 )
 
