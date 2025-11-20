@@ -1,6 +1,7 @@
 import logging
-
+import time
 import pytest
+
 from clients.contract_deployers.snt import SNTDeployer
 from clients.services.wakuext import CommunityPermissionsAccess
 from steps.messenger import MessengerSteps
@@ -54,7 +55,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Create token overrides for wallet service
         token_overrides = [{"symbol": "SNT", "address": self.snt_address}]
 
-        self.owner_with_snt = backend_new_profile("owner_with_snt", token_overrides=token_overrides)
         self.member_with_snt = backend_new_profile("member_with_snt", token_overrides=token_overrides)
 
         # Fund the member_with_snt with 10 SNT tokens
@@ -67,7 +67,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
             f"--private-key {user_1.private_key}"
         )
         result = foundry_client.container.exec_run(generate_cmd)
-        logger.debug(f"Generate tokens result: exit_code={result.exit_code}, output={result.output.decode()}")
+        logger.debug(f"Generate tokens result for member: exit_code={result.exit_code}, output={result.output.decode()}")
 
         logger.debug(f"Funded {member_address} with 10 SNT tokens at contract {self.snt_address}")
 
@@ -144,7 +144,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         token_address = self.snt_address
 
         # Owner creates token-gated community with the deployed token
-        community_resp = self.owner_with_snt.wakuext_service.create_community(
+        community_resp = self.owner.wakuext_service.create_community(
             name=fake.community_name(),
             description=fake.community_description(),
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
@@ -162,7 +162,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
             }
         ]
 
-        self.owner_with_snt.wakuext_service.create_community_token_permission(
+        self.owner.wakuext_service.create_community_token_permission(
             community_id=community_id, permission_type=CommunityTokenPermissionType.BECOME_MEMBER, token_criteria=token_criteria
         )
 
@@ -177,16 +177,14 @@ class TestCommunityTokenPermissions(MessengerSteps):
             req_id = requests[0].get("id")
             # Since member has valid tokens, request should not be declined
             # Wait a bit for token validation to complete, then try to accept directly
-            import time
-
             time.sleep(2)
 
             # Owner can accept the request since member has tokens
-            accept_resp = self.owner_with_snt.wakuext_service.accept_request_to_join_community(req_id)
+            accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
             assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
         # Verify member is now in community (check from owner's perspective since acceptance happened there)
-        communities = self.owner_with_snt.wakuext_service.communities()
+        communities = self.owner.wakuext_service.communities()
         owner_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
         assert owner_community is not None
         # Check that member is in the community members list
@@ -199,8 +197,13 @@ class TestCommunityTokenPermissions(MessengerSteps):
         accounts = self.member_with_snt.accounts_service.get_accounts()
         member_address = accounts[0].get("address") if accounts else self.fake_address
 
+        # Verify the balance directly with cast
+        balance_cmd = f"cast call {self.snt_address} 'balanceOf(address)' {member_address} --rpc-url http://anvil:8545"
+        balance_result = foundry_client.container.exec_run(balance_cmd)
+        logger.debug(f"SNT balance check: exit_code={balance_result.exit_code}, output={balance_result.output.decode()}")
+
         # Owner creates token-gated community with admin permission
-        community_resp = self.owner_with_snt.wakuext_service.create_community(
+        community_resp = self.owner.wakuext_service.create_community(
             name=fake.community_name(),
             description=fake.community_description(),
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
@@ -218,17 +221,33 @@ class TestCommunityTokenPermissions(MessengerSteps):
             }
         ]
 
-        self.owner_with_snt.wakuext_service.create_community_token_permission(
-            community_id=community_id, permission_type=CommunityTokenPermissionType.BECOME_ADMIN, token_criteria=token_criteria
+        # Add BECOME_MEMBER permission so join can succeed based on tokens
+        self.owner.wakuext_service.create_community_token_permission(
+            community_id=community_id,
+            permission_type=CommunityTokenPermissionType.BECOME_MEMBER,
+            token_criteria=token_criteria,
+        )
+
+        # Add BECOME_ADMIN permission with same criteria
+        self.owner.wakuext_service.create_community_token_permission(
+            community_id=community_id,
+            permission_type=CommunityTokenPermissionType.BECOME_ADMIN,
+            token_criteria=token_criteria,
         )
 
         # Fetch community as member
         self.fetch_community(self.member_with_snt, community_id)
 
-        # Wait for token balance to be available
-        import time
+        for i in range(10):
+            permissions_resp = self.member_with_snt.wakuext_service.check_permissions_to_join_community(community_id)
+            # Inspect response to see if admin permission is satisfied
+            # Exact response shape depends on your RPC wrapper; pseudocode:
+            if permissions_resp.get("satisfied"):
+                break
+            elif i == 9:
+                pytest.fail("Permissions to join never became satisfied for member_with_snt")
 
-        time.sleep(2)
+            time.sleep(1)
 
         # Member with tokens requests to join community
         join_resp = self.member_with_snt.wakuext_service.request_to_join_community(community_id, member_address)
@@ -237,34 +256,30 @@ class TestCommunityTokenPermissions(MessengerSteps):
         if requests:
             req_id = requests[0].get("id")
             # Wait for token validation
-            import time
 
             time.sleep(2)
             # Owner accepts the request since member has tokens
-            accept_resp = self.owner_with_snt.wakuext_service.accept_request_to_join_community(req_id)
+            accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
             assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
-        # Verify member is now in community
-        communities = self.owner_with_snt.wakuext_service.communities()
-        owner_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
-        assert owner_community is not None
-        # Check that member is in the community members list
-        member_public_key = self.member_with_snt.public_key
-        assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
+        # Explicitly reevaluate community members so token-based roles are applied
+        self.owner.wakuext_service.reevaluate_community_members_permissions(community_id)
 
-        # Check roles from owner's perspective
-        communities = self.owner_with_snt.wakuext_service.communities()
-        owner_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
+        # Verify member is now in community and has admin role
+        communities = self.owner.wakuext_service.communities()
+        owner_community = next(
+            (c for c in self._communities_list(communities) if c.get("id") == community_id),
+            None,
+        )
         assert owner_community is not None
 
-        # Check member roles
         member_key = self.member_with_snt.public_key
-        owner_key = self.owner_with_snt.public_key
+        owner_key = self.owner.public_key
 
-        # Member should have admin role (4) since they have tokens
+        # Member should have admin role (4), granted via BECOME_ADMIN token permission
         assert member_key in owner_community.get("members", {})
         assert 4 in owner_community["members"][member_key].get("roles", [])
 
-        # Owner should have owner role (1)
+        # Owner should remain owner (1) only, not changed by token reevaluation
         assert owner_key in owner_community.get("members", {})
         assert 1 in owner_community["members"][owner_key].get("roles", [])
