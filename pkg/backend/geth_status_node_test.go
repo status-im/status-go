@@ -16,7 +16,7 @@ import (
 func TestStatusNodeStart(t *testing.T) {
 	config, err := params.NewNodeConfig("", params.StatusChainNetworkID)
 	require.NoError(t, err)
-	n := New(nil, nil, testutils.MustCreateTestLogger())
+	n := NewServices(nil, nil, testutils.MustCreateTestLogger())
 
 	// checks before node is started
 	require.Nil(t, n.Config())

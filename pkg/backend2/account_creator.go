@@ -14,7 +14,6 @@ import (
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto/types"
@@ -24,6 +23,7 @@ import (
 	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/backend"
 	requests2 "github.com/status-im/status-go/pkg/backend/requests"
 	identityutils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
@@ -376,7 +376,7 @@ func (s *AccountCreator) generateDerivedAddresses(genAcc *generator.Account, pat
 
 func prepareSettings(request *requests2.CreateAccount, mnemonic string, keyUID string, masterAddress string,
 	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (*settings.Settings, error) {
-	newSettings, err := api.DefaultSettings(keyUID, masterAddress, derivedAddresses)
+	newSettings, err := backend.DefaultSettings(keyUID, masterAddress, derivedAddresses)
 	if err != nil {
 		return nil, err
 	}

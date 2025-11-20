@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/requests"
 
 	"github.com/stretchr/testify/require"
@@ -39,7 +40,7 @@ func setupConfigs() (*params.NodeConfig, *requests.APIConfig) {
 
 func TestOverrideApiConfig(t *testing.T) {
 	newNodeConfig, apiConfig := setupConfigs()
-	overrideApiConfig(newNodeConfig, apiConfig)
+	backend.overrideApiConfig(newNodeConfig, apiConfig)
 
 	require.Equal(t, apiConfig.APIModules, newNodeConfig.APIModules)
 	require.Equal(t, apiConfig.ConnectorEnabled, newNodeConfig.ConnectorConfig.Enabled)

@@ -12,8 +12,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/pkg/security"
 )
 
@@ -22,7 +22,7 @@ func TestNewConfigFromJSON(t *testing.T) {
 	json := `{
 		"NetworkId": 3,
 		"RootDataDir": "` + tmpDir + `",
-		"KeycardPairingDataFile": "` + path.Join(tmpDir, api.DefaultKeycardPairingDataFileRelativePath) + `",
+		"KeycardPairingDataFile": "` + path.Join(tmpDir, backend.DefaultKeycardPairingDataFileRelativePath) + `",
 		"TorrentConfig": {
 			"Port": 9025,
 			"Enabled": false,

@@ -1,4 +1,4 @@
-package api
+package backend
 
 import (
 	"crypto/rand"
@@ -9,6 +9,7 @@ import (
 
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/api"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/messaging"
@@ -278,7 +279,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	if request.TestOverrideNetworks != nil {
 		nodeConfig.Networks = request.TestOverrideNetworks
 	} else {
-		nodeConfig.Networks = BuildDefaultNetworks(&request.WalletSecretsConfig, request.ThirdpartyServicesEnabled)
+		nodeConfig.Networks = api.BuildDefaultNetworks(&request.WalletSecretsConfig, request.ThirdpartyServicesEnabled)
 	}
 
 	if request.NetworkID != nil {
@@ -365,7 +366,7 @@ func DefaultKeystorePath(rootDataDir string, keyUID string) (string, string) {
 }
 
 func buildSigningPhrase() (string, error) {
-	length := big.NewInt(int64(len(dictionary)))
+	length := big.NewInt(int64(len(api.dictionary)))
 	a, err := rand.Int(rand.Reader, length)
 	if err != nil {
 		return "", err
@@ -379,5 +380,5 @@ func buildSigningPhrase() (string, error) {
 		return "", err
 	}
 
-	return dictionary[a.Int64()] + " " + dictionary[b.Int64()] + " " + dictionary[c.Int64()], nil
+	return api.dictionary[a.Int64()] + " " + api.dictionary[b.Int64()] + " " + api.dictionary[c.Int64()], nil
 }

@@ -16,7 +16,6 @@ import (
 
 	accsmanagementcommon "github.com/status-im/status-go/accounts-management/common"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto/types"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
@@ -161,7 +160,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 	require.NoError(s.T(), err, "saving seed phrase keypair on client without keystore files")
 
 	// check server - server should contain keystore files for imported seed phrase
-	serverKeystorePath := filepath.Join(serverTmpDir, api.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
+	serverKeystorePath := filepath.Join(serverTmpDir, backend.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
 	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverSeedPhraseKp.DerivedFrom[2:]))
 	for _, acc := range serverSeedPhraseKp.Accounts {
 		require.True(s.T(), containsKeystoreFile(serverKeystorePath, acc.Address.String()[2:]))
@@ -188,7 +187,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 	}
 
 	// check client - client should not contain keystore files for imported seed phrase
-	clientKeystorePath := filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
+	clientKeystorePath := filepath.Join(clientTmpDir, backend.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
 	require.False(s.T(), containsKeystoreFile(clientKeystorePath, clientSeedPhraseKp.DerivedFrom[2:]))
 	for _, acc := range clientSeedPhraseKp.Accounts {
 		require.False(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
@@ -380,14 +379,14 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 		len(serverKp.Keycards) == len(clientKp.Keycards))
 
 	// Check server - server should contain keystore files for imported seed phrase
-	serverKeystorePath := filepath.Join(serverTmpDir, api.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
+	serverKeystorePath := filepath.Join(serverTmpDir, backend.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
 	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverKp.DerivedFrom[2:]))
 	for _, acc := range serverKp.Accounts {
 		require.True(s.T(), containsKeystoreFile(serverKeystorePath, acc.Address.String()[2:]))
 	}
 
 	// Check client - client should not contain keystore files for imported seed phrase
-	clientKeystorePath := filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
+	clientKeystorePath := filepath.Join(clientTmpDir, backend.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
 	require.False(s.T(), containsKeystoreFile(clientKeystorePath, clientKp.DerivedFrom[2:]))
 	for _, acc := range clientKp.Accounts {
 		require.False(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))

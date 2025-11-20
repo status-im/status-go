@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server/servertest"
 	"github.com/status-im/status-go/t/utils"
@@ -67,7 +67,7 @@ func setupTestDB(t *testing.T) (*multiaccounts.Database, func()) {
 
 func makeKeystore(t *testing.T) string {
 	keyStoreDir := t.TempDir()
-	keyStoreDir = filepath.Join(keyStoreDir, api.DefaultKeystoreRelativePath)
+	keyStoreDir = filepath.Join(keyStoreDir, backend.DefaultKeystoreRelativePath)
 
 	err := os.MkdirAll(keyStoreDir, 0777)
 	require.NoError(t, err)

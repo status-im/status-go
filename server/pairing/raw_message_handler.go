@@ -9,7 +9,6 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/backend"
@@ -146,7 +145,7 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 
 	installationID := messaging.GenerateInstallationID()
 
-	nodeConfig, err := api.DefaultNodeConfig(installationID, account.KeyUID, createAccountRequest)
+	nodeConfig, err := backend.DefaultNodeConfig(installationID, account.KeyUID, createAccountRequest)
 	if err != nil {
 		return err
 	}
@@ -169,7 +168,7 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 	// Override some of received settings
 	rmp.setting.DeviceName = createAccountRequest.DeviceName
 	rmp.setting.InstallationID = installationID
-	rmp.setting.CurrentNetwork = api.DefaultCurrentNetwork
+	rmp.setting.CurrentNetwork = backend.DefaultCurrentNetwork
 
 	return s.backend.StartNodeWithAccountAndInitialConfig(
 		account,

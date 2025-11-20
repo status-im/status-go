@@ -102,7 +102,7 @@ type NodeConfig struct {
 	// NetworkID sets network to use for selecting peers to connect to
 	NetworkID uint64 `json:"NetworkId" validate:"required"`
 
-	RootDataDir string `json:",omitempty"`
+	//RootDataDir string `json:",omitempty"`
 
 	// KeycardPairingDataFile is the file where we keep keycard pairings data.
 	// It's specified by clients (and not in status-go) when creating a new account,

@@ -51,7 +51,7 @@ var (
 	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
 )
 
-func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server.MediaServer) error {
+func (b *Services) initServices(config *params.NodeConfig, mediaServer *server.MediaServer) error {
 	accDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	return nil
 }
 
-func (b *StatusNode) runServicesMigrations() error {
+func (b *Services) runServicesMigrations() error {
 	err := newsfeed.SQLiteMigrate(b.appDB)
 	if err != nil {
 		return err
@@ -125,7 +125,7 @@ func (b *StatusNode) runServicesMigrations() error {
 	return nil
 }
 
-func (b *StatusNode) registerService(s common.StatusService) error {
+func (b *Services) registerService(s common.StatusService) error {
 	for _, api := range s.APIs() {
 		b.logger.Debug("registering service api", zap.String("namespace", api.Namespace))
 		err := b.rpcServer.RegisterName(api.Namespace, api.Service)
@@ -138,7 +138,7 @@ func (b *StatusNode) registerService(s common.StatusService) error {
 	return nil
 }
 
-func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Service, error) {
+func (b *Services) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Service, error) {
 	if b.wakuV2ExtSrvc == nil {
 		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.rpcClient, b.logger.Named("protocol"))
 	}
@@ -146,34 +146,34 @@ func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Ser
 	return b.wakuV2ExtSrvc, nil
 }
 
-func (b *StatusNode) statusPublicService() *status.Service {
+func (b *Services) statusPublicService() *status.Service {
 	if b.statusPublicSrvc == nil {
 		b.statusPublicSrvc = status.New()
 	}
 	return b.statusPublicSrvc
 }
 
-func (b *StatusNode) StatusPublicService() *status.Service {
+func (b *Services) StatusPublicService() *status.Service {
 	return b.statusPublicSrvc
 }
 
-func (b *StatusNode) AccountService() *accountssvc.Service {
+func (b *Services) AccountService() *accountssvc.Service {
 	return b.accountsSrvc
 }
 
-func (b *StatusNode) BrowserService() *browsers.Service {
+func (b *Services) BrowserService() *browsers.Service {
 	return b.browsersSrvc
 }
 
-func (b *StatusNode) EnsService() *ens.Service {
+func (b *Services) EnsService() *ens.Service {
 	return b.ensSrvc
 }
 
-func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
+func (b *Services) WakuV2ExtService() *wakuv2ext.Service {
 	return b.wakuV2ExtSrvc
 }
 
-func (b *StatusNode) connectorService() *connector.Service {
+func (b *Services) connectorService() *connector.Service {
 	if b.connectorSrvc == nil {
 		logger := b.logger.Named("connector")
 		b.connectorSrvc = connector.NewService(
@@ -191,7 +191,7 @@ func (b *StatusNode) connectorService() *connector.Service {
 	return b.connectorSrvc
 }
 
-func (b *StatusNode) rpcStatsService() *rpcstats.Service {
+func (b *Services) rpcStatsService() *rpcstats.Service {
 	if b.rpcStatsSrvc == nil {
 		b.rpcStatsSrvc = rpcstats.New()
 	}
@@ -199,7 +199,7 @@ func (b *StatusNode) rpcStatsService() *rpcstats.Service {
 	return b.rpcStatsSrvc
 }
 
-func (b *StatusNode) accountsService(accDB *accounts.Database, mediaServer *server.MediaServer) *accountssvc.Service {
+func (b *Services) accountsService(accDB *accounts.Database, mediaServer *server.MediaServer) *accountssvc.Service {
 	if b.accountsSrvc == nil {
 		b.accountsSrvc = accountssvc.NewService(
 			accDB,
@@ -215,21 +215,21 @@ func (b *StatusNode) accountsService(accDB *accounts.Database, mediaServer *serv
 	return b.accountsSrvc
 }
 
-func (b *StatusNode) browsersService() *browsers.Service {
+func (b *Services) browsersService() *browsers.Service {
 	if b.browsersSrvc == nil {
 		b.browsersSrvc = browsers.NewService(browsers.NewDB(b.appDB))
 	}
 	return b.browsersSrvc
 }
 
-func (b *StatusNode) ensService(timesource func() time.Time) *ens.Service {
+func (b *Services) ensService(timesource func() time.Time) *ens.Service {
 	if b.ensSrvc == nil {
 		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountsManager, b.pendingTracker, b.config, b.appDB, timesource)
 	}
 	return b.ensSrvc
 }
 
-func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *pendingtxtracker.PendingTxTracker {
+func (b *Services) pendingTrackerService(walletFeed *event.Feed) *pendingtxtracker.PendingTxTracker {
 	if b.pendingTracker == nil {
 		b.pendingTracker = pendingtxtracker.NewPendingTxTracker(b.walletDB, pendingtxtracker.NewBatchTxStatusFetcher(b.rpcClient, b.logger.Named("PendingTxTracker")), walletFeed, pendingtxtracker.PendingCheckInterval)
 		if b.transactor != nil {
@@ -239,21 +239,21 @@ func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *pendingtxtra
 	return b.pendingTracker
 }
 
-func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
+func (b *Services) CommunityTokensService() *communitytokens.Service {
 	if b.communityTokensSrvc == nil {
 		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountsManager, b.config, b.appDB, &b.walletFeed, b.transactor)
 	}
 	return b.communityTokensSrvc
 }
 
-func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
+func (b *Services) stickersService(accountDB *accounts.Database) *stickers.Service {
 	if b.stickersSrvc == nil {
 		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountsManager, b.config, b.downloader, b.mediaServer, b.pendingTracker)
 	}
 	return b.stickersSrvc
 }
 
-func (b *StatusNode) updatesService() *updates.Service {
+func (b *Services) updatesService() *updates.Service {
 	if b.updatesSrvc == nil {
 		b.updatesSrvc = updates.NewService(b.ensService(b.timeSourceNow()))
 	}
@@ -261,49 +261,49 @@ func (b *StatusNode) updatesService() *updates.Service {
 	return b.updatesSrvc
 }
 
-func (b *StatusNode) gifService(accountsDB *accounts.Database) *gif.Service {
+func (b *Services) gifService(accountsDB *accounts.Database) *gif.Service {
 	if b.gifSrvc == nil {
 		b.gifSrvc = gif.NewService(accountsDB)
 	}
 	return b.gifSrvc
 }
 
-func (b *StatusNode) ChatService(accountsDB *accounts.Database) *chat.Service {
+func (b *Services) ChatService(accountsDB *accounts.Database) *chat.Service {
 	if b.chatSrvc == nil {
 		b.chatSrvc = chat.NewService(accountsDB)
 	}
 	return b.chatSrvc
 }
 
-func (b *StatusNode) permissionsService() *permissions.Service {
+func (b *Services) permissionsService() *permissions.Service {
 	if b.permissionsSrvc == nil {
 		b.permissionsSrvc = permissions.NewService(permissions.NewDB(b.appDB))
 	}
 	return b.permissionsSrvc
 }
 
-func (b *StatusNode) appgeneralService() *appgeneral.Service {
+func (b *Services) appgeneralService() *appgeneral.Service {
 	if b.appGeneralSrvc == nil {
 		b.appGeneralSrvc = appgeneral.New()
 	}
 	return b.appGeneralSrvc
 }
 
-func (b *StatusNode) WalletService() *wallet.Service {
+func (b *Services) WalletService() *wallet.Service {
 	return b.walletSrvc
 }
 
-func (b *StatusNode) AccountsPublisher() *pubsub.Publisher {
+func (b *Services) AccountsPublisher() *pubsub.Publisher {
 	return b.accountsPublisher
 }
 
-func (b *StatusNode) SetWalletCommunityInfoProvider(provider thirdparty.CommunityInfoProvider) {
+func (b *Services) SetWalletCommunityInfoProvider(provider thirdparty.CommunityInfoProvider) {
 	if b.walletSrvc != nil {
 		b.walletSrvc.SetWalletCommunityInfoProvider(provider)
 	}
 }
 
-func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB, accountsPublisher *pubsub.Publisher, walletFeed *event.Feed, statusProxyStageName string) *wallet.Service {
+func (b *Services) walletService(accountsDB *accounts.Database, appDB *sql.DB, accountsPublisher *pubsub.Publisher, walletFeed *event.Feed, statusProxyStageName string) *wallet.Service {
 	if b.walletSrvc == nil {
 		b.walletSrvc = wallet.NewService(
 			b.walletDB, accountsDB, appDB, b.rpcClient, accountsPublisher, b.gethAccountsManager, b.transactor, b.config,
@@ -318,14 +318,14 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB,
 	return b.walletSrvc
 }
 
-func (b *StatusNode) ethService() *eth.Service {
+func (b *Services) ethService() *eth.Service {
 	if b.ethSrvc == nil {
 		b.ethSrvc = eth.NewService(b.rpcClient, b.gethAccountsManager)
 	}
 	return b.ethSrvc
 }
 
-func (b *StatusNode) sharedUrlsService() *sharedurls.Service {
+func (b *Services) sharedUrlsService() *sharedurls.Service {
 	if b.sharedUrlsSrvc == nil {
 		b.sharedUrlsSrvc = sharedurls.NewService(nil)
 		if extService := b.WakuV2ExtService(); extService != nil {
@@ -336,11 +336,11 @@ func (b *StatusNode) sharedUrlsService() *sharedurls.Service {
 	return b.sharedUrlsSrvc
 }
 
-func (b *StatusNode) SharedUrlsService() *sharedurls.Service {
+func (b *Services) SharedUrlsService() *sharedurls.Service {
 	return b.sharedUrlsSrvc
 }
 
-func (b *StatusNode) localNotificationsService(network uint64) (*localnotifications.Service, error) {
+func (b *Services) localNotificationsService(network uint64) (*localnotifications.Service, error) {
 	var err error
 	if b.localNotificationsSrvc == nil {
 		b.localNotificationsSrvc, err = localnotifications.NewService(b.appDB)
@@ -358,11 +358,11 @@ func appendIf(condition bool, services []common.StatusService, service common.St
 	return append(services, service)
 }
 
-func (b *StatusNode) PendingTracker() *pendingtxtracker.PendingTxTracker {
+func (b *Services) PendingTracker() *pendingtxtracker.PendingTxTracker {
 	return b.pendingTracker
 }
 
-func (b *StatusNode) StopLocalNotifications() error {
+func (b *Services) StopLocalNotifications() error {
 	if b.localNotificationsSrvc == nil {
 		return nil
 	}
@@ -378,7 +378,7 @@ func (b *StatusNode) StopLocalNotifications() error {
 	return nil
 }
 
-func (b *StatusNode) StartLocalNotifications() error {
+func (b *Services) StartLocalNotifications() error {
 	if b.localNotificationsSrvc == nil {
 		return nil
 	}
@@ -399,14 +399,14 @@ func (b *StatusNode) StartLocalNotifications() error {
 	return nil
 }
 
-func (b *StatusNode) personalService() *personal.Service {
+func (b *Services) personalService() *personal.Service {
 	if b.personalSrvc == nil {
 		b.personalSrvc = personal.New()
 	}
 	return b.personalSrvc
 }
 
-func (b *StatusNode) TimeSource() timesource.Provider {
+func (b *Services) TimeSource() timesource.Provider {
 	if b.timeSourceSrvc == nil {
 		if privateMode {
 			b.timeSourceSrvc = timesource.LocalService()
@@ -417,11 +417,11 @@ func (b *StatusNode) TimeSource() timesource.Provider {
 	return b.timeSourceSrvc
 }
 
-func (b *StatusNode) timeSourceNow() func() time.Time {
+func (b *Services) timeSourceNow() func() time.Time {
 	return b.TimeSource().Now
 }
 
-func (b *StatusNode) NewsFeedService() *newsfeed.Service {
+func (b *Services) NewsFeedService() *newsfeed.Service {
 	if !featureflags.EnableNewsFeed {
 		return nil
 	}
@@ -443,7 +443,7 @@ func (b *StatusNode) NewsFeedService() *newsfeed.Service {
 	return b.newsfeedSrvc
 }
 
-func (b *StatusNode) Cleanup() error {
+func (b *Services) Cleanup() error {
 	if b.Config() != nil && b.Config().WalletConfig.Enabled {
 		if b.walletSrvc != nil {
 			if b.walletSrvc.IsStarted() {

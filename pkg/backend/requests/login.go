@@ -27,3 +27,9 @@ type Login struct {
 	APIConfig          *APIConfig `json:"apiConfig"`
 	StatusProxyEnabled bool       `json:"statusProxyEnabled"`
 }
+
+func (c *Login) ChatPrivateKey() *ecdsa.PrivateKey {
+	// Skip error check, as it's already validated in Validate
+	privateKey, _ := parsePrivateKey(c.KeycardWhisperPrivateKey)
+	return privateKey
+}

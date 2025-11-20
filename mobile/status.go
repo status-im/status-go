@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol"
 	identityUtils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
@@ -198,7 +199,7 @@ func initializeLogging(request *requests.InitializeApplication) error {
 	)
 
 	if request.APILoggingEnabled {
-		logRequestsFile := path.Join(request.LogDir, api.DefaultAPILogFile)
+		logRequestsFile := path.Join(request.LogDir, backend.DefaultAPILogFile)
 		err = requestlog.ConfigureAndEnableRequestLogging(logRequestsFile)
 		if err != nil {
 			return err
@@ -353,69 +354,6 @@ func migrateKeyStoreDir(newDir string) string {
 	return makeJSONResponse(err)
 }
 
-// login deprecated as Login and LoginWithConfig are deprecated
-func login(accountData, password, configJSON string) error {
-	var account multiaccounts.Account
-	err := json.Unmarshal([]byte(accountData), &account)
-	if err != nil {
-		return err
-	}
-
-	var conf params.NodeConfig
-	if configJSON != "" {
-		err = json.Unmarshal([]byte(configJSON), &conf)
-		if err != nil {
-			return err
-		}
-	}
-
-	api.RunAsync(func() error {
-		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
-		err := statusBackend.UpdateNodeConfigFleet(account, password, &conf)
-		if err != nil {
-			logutils.ZapLogger().Error("failed to update node config fleet", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
-			return statusBackend.LoggedIn(account.KeyUID, err)
-		}
-
-		err = statusBackend.StartNodeWithAccount(account, password, &conf, nil)
-		if err != nil {
-			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
-			return err
-		}
-		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
-		return nil
-	})
-
-	return nil
-}
-
-// Login loads a key file (for a given address), tries to decrypt it using the password,
-// to verify ownership if verified, purges all the previous identities from Whisper,
-// and injects verified key as shh identity.
-//
-// Deprecated: Use LoginAccount instead.
-func Login(accountData, password string) string {
-	err := login(accountData, password, "")
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	return makeJSONResponse(nil)
-}
-
-// LoginWithConfig loads a key file (for a given address), tries to decrypt it using the password,
-// to verify ownership if verified, purges all the previous identities from Whisper,
-// and injects verified key as shh identity. It then updates the accounts node db configuration
-// mergin the values received in the configJSON parameter
-//
-// Deprecated: Use LoginAccount instead.
-func LoginWithConfig(accountData, password, configJSON string) string {
-	err := login(accountData, password, configJSON)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	return makeJSONResponse(nil)
-}
-
 func CreateAccountAndLogin(requestJSON string) string {
 	return callWithResponse(createAccountAndLogin, requestJSON)
 }
@@ -520,33 +458,6 @@ func restoreAccountAndLogin(requestJSON string) string {
 	return makeJSONResponse(nil)
 }
 
-// LoginWithKeycard initializes an account with a chat key and encryption key used for PFS.
-// It purges all the previous identities from Whisper, and injects the key as shh identity.
-// Deprecated: Use LoginAccount instead.
-func LoginWithKeycard(accountData, password, keyHex string, configJSON string) string {
-	var account multiaccounts.Account
-	err := json.Unmarshal([]byte(accountData), &account)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	var conf params.NodeConfig
-	err = json.Unmarshal([]byte(configJSON), &conf)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	api.RunAsync(func() error {
-		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
-		err := statusBackend.StartNodeWithKey(account, password, keyHex, &conf)
-		if err != nil {
-			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
-			return err
-		}
-		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
-		return nil
-	})
-	return makeJSONResponse(nil)
-}
-
 func Logout() string {
 	return callWithResponse(logout)
 }
@@ -572,25 +483,6 @@ func signMessage(rpcParams string) string {
 	return prepareJSONResponse(result.String(), err)
 }
 
-// SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
-// if password matches selected account.
-func SignTypedData(data, address, password string) string {
-	return signTypedData(data, address, password)
-}
-
-func signTypedData(data, address, password string) string {
-	var typed typeddata.TypedData
-	err := json.Unmarshal([]byte(data), &typed)
-	if err != nil {
-		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
-	}
-	if err := typed.Validate(); err != nil {
-		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
-	}
-	result, err := statusBackend.SignTypedData(typed, address, password)
-	return prepareJSONResponse(result.String(), err)
-}
-
 // HashTypedData unmarshalls data into TypedData, validates it and hashes it.
 //
 //export HashTypedData
@@ -608,24 +500,6 @@ func hashTypedData(data string) string {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
 	}
 	result, err := statusBackend.HashTypedData(typed)
-	return prepareJSONResponse(result.String(), err)
-}
-
-// SignTypedDataV4 unmarshall data into TypedData, validate it and signs with selected account,
-// if password matches selected account.
-//
-//export SignTypedDataV4
-func SignTypedDataV4(data, address, password string) string {
-	return signTypedDataV4(data, address, password)
-}
-
-func signTypedDataV4(data, address, password string) string {
-	var typed apitypes.TypedData
-	err := json.Unmarshal([]byte(data), &typed)
-	if err != nil {
-		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
-	}
-	result, err := statusBackend.SignTypedDataV4(typed, address, password)
 	return prepareJSONResponse(result.String(), err)
 }
 
@@ -1335,7 +1209,7 @@ func convertFleets(fleetsMap params.FleetsMap) map[string]map[string][]string {
 
 func fleets() string {
 	fleets := FleetDescription{
-		DefaultFleet: api.DefaultFleet,
+		DefaultFleet: backend.DefaultFleet,
 		Fleets:       convertFleets(params.GetSupportedFleets()),
 	}
 

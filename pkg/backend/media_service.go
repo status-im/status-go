@@ -30,3 +30,33 @@ func (b *StatusBackend) startMediaServer(address, advertizeHost string, advertiz
 
 	return nil
 }
+
+//
+//func (n *Services) startMediaServer() error {
+//	if n.mediaServer != nil {
+//		if err := n.mediaServer.Stop(); err != nil {
+//			return err
+//		}
+//	}
+//
+//	var opts []server.MediaServerOption
+//	if n.mediaServerEnableTLS != nil {
+//		opts = append(opts, server.WithMediaServerDisableTLS(!*n.mediaServerEnableTLS))
+//	}
+//	if n.mediaServerAddress != nil {
+//		opts = append(opts, server.WithMediaServerAddress(*n.mediaServerAddress))
+//	}
+//	opts = append(opts, server.WithMediaServerAdvertizeAddress(n.mediaServerAdvertizeHost, n.mediaServerAdvertizePort))
+//	mediaServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB, nil, opts...)
+//	if err != nil {
+//		return err
+//	}
+//
+//	n.mediaServer = mediaServer
+//
+//	if err := n.mediaServer.Start(); err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}

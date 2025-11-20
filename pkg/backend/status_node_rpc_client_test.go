@@ -56,7 +56,7 @@ func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
 	}, nil
 }
 
-func createStatusNode() (*StatusNode, func() error, func() error, error) {
+func createStatusNode() (*Services, func() error, func() error, error) {
 	appDB, walletDB, stop1, err := setupTestDBs()
 	if err != nil {
 		return nil, nil, nil, err
@@ -73,7 +73,7 @@ func createStatusNode() (*StatusNode, func() error, func() error, error) {
 	}
 	accountsManager.SetPersistence(accsDB)
 
-	statusNode := New(nil, accountsManager, testutils.MustCreateTestLogger())
+	statusNode := NewServices(nil, accountsManager, testutils.MustCreateTestLogger())
 	statusNode.SetAppDB(appDB)
 	statusNode.SetWalletDB(walletDB)
 

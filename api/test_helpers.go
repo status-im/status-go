@@ -96,12 +96,12 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 			}
 		}
 
-		defSettings, err := DefaultSettings(genMasterAcc.KeyUID(), genMasterAcc.Address().Hex(), derivedAddresses)
+		defSettings, err := backend2.DefaultSettings(genMasterAcc.KeyUID(), genMasterAcc.Address().Hex(), derivedAddresses)
 		require.NoError(t, err)
 
 		data.settings = *defSettings
 
-		data.config, err = DefaultNodeConfig(data.settings.InstallationID, genMasterAcc.KeyUID(), &requests.CreateAccount{
+		data.config, err = backend2.DefaultNodeConfig(data.settings.InstallationID, genMasterAcc.KeyUID(), &requests.CreateAccount{
 			LogLevel: data.settings.LogLevel,
 		})
 		require.NoError(t, err)

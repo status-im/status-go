@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/requests"
@@ -177,7 +176,7 @@ func (aps *AccountPayloadStorer) storeKeys(keyStorePath string) error {
 
 	// If lastDir == keystoreDir we presume we need to create the rest of the keystore path
 	// else we presume the provided keystore is valid
-	if lastDir == api.DefaultKeystoreRelativePath {
+	if lastDir == backend.DefaultKeystoreRelativePath {
 		if aps.multiaccount == nil || aps.multiaccount.KeyUID == "" {
 			return fmt.Errorf("no known Key UID")
 		}
@@ -443,7 +442,7 @@ func (kfps *KeystoreFilesPayloadStorer) storeKeys(keyStorePath string) error {
 
 	// If lastDir == keystoreDir we presume we need to create the rest of the keystore path
 	// else we presume the provided keystore is valid
-	if lastDir == api.DefaultKeystoreRelativePath {
+	if lastDir == backend.DefaultKeystoreRelativePath {
 		keyStorePath = filepath.Join(keyStorePath, kfps.loggedInKeyUID)
 		_, err := os.Stat(keyStorePath)
 		if os.IsNotExist(err) {
