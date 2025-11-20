@@ -1,5 +1,6 @@
 import logging
 from uuid import uuid4
+import concurrent.futures
 
 import pytest
 from requests import ReadTimeout
@@ -100,11 +101,21 @@ def backend_new_profile(request, backend_factory):
 
     yield factory
 
+    # Logout backends sequentially
     for backend in backends:
         try:
             backend.logout(timeout=10)
         except ReadTimeout as e:
             logging.warning(f"Failed to logout during shutdown: {e}")
+
+    # Shutdown backends in parallel
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(backend.shutdown, log_sufix=request.node.name) for backend in backends]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                logging.error(f"Error during backend shutdown: {e}")
 
 
 @pytest.fixture(scope="function", autouse=False)
