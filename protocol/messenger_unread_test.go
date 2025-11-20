@@ -6,10 +6,10 @@ import (
 
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 func (s *MessengerSuite) checkMessageSeen(messageID string, expectedSeen bool) {
@@ -34,7 +34,7 @@ func (s *MessengerSuite) retrieveAllWithRetry(errorMessage string) (*MessengerRe
 		return nil
 	}
 
-	err = tt.RetryWithBackOff(retryFunc)
+	err = testutils.RetryWithBackOff(retryFunc)
 	return response, err
 }
 

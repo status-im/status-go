@@ -8,7 +8,7 @@ import (
 	utils "github.com/status-im/status-go/common"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -147,7 +147,7 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 	err = s.m.SetDisplayName(testDisplayName)
 	s.Require().NoError(err)
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err

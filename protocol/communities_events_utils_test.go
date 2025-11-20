@@ -13,12 +13,12 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -1458,7 +1458,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	)
 	s.Require().NoError(err)
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		// request to join is now marked as rejected
 		rejectedRequests, err := base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
 		if err != nil {
@@ -1496,7 +1496,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	)
 	s.Require().NoError(err)
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		rejectedRequests, err := base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
 		if err != nil {
 			return err

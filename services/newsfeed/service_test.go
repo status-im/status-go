@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/newsfeed/migrations"
 	mock_newsfeed "github.com/status-im/status-go/services/newsfeed/mock"
 	"github.com/status-im/status-go/t/helpers"
@@ -39,7 +39,7 @@ func (s *MessengerNewsFeedSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.storage = NewSQLitePersistence(db)
 
-	s.service = NewService(tt.MustCreateTestLogger(), s.storage, s.ac)
+	s.service = NewService(testutils.MustCreateTestLogger(), s.storage, s.ac)
 }
 
 func TestMessengerNewsFeedSuite(t *testing.T) {

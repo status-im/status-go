@@ -37,8 +37,8 @@ import (
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
@@ -78,7 +78,7 @@ func setupGethStatusBackend() (*GethStatusBackend, func() error, func() error, f
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
+	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -276,7 +276,7 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 func TestBackendConnectionChangesConcurrently(t *testing.T) {
 	connections := [...]string{connection.Wifi, connection.Cellular, connection.Unknown}
-	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
+	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
 
 	count := 3
 
@@ -295,7 +295,7 @@ func TestBackendConnectionChangesConcurrently(t *testing.T) {
 }
 
 func TestBackendConnectionChangesToOffline(t *testing.T) {
-	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+	b := NewGethStatusBackend(testutils.MustCreateTestLogger())
 
 	b.ConnectionChange(connection.None, false)
 	assert.True(t, b.connectionState.Offline)
@@ -367,7 +367,7 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 }
 
 func TestAppStateChange(t *testing.T) {
-	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
+	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
 
 	var testCases = []struct {
 		name          string
@@ -399,7 +399,7 @@ func TestAppStateChange(t *testing.T) {
 }
 
 func TestCallRPCWithStoppedNode(t *testing.T) {
-	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
+	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
 
 	resp := backend.CallInProcessRPC(
 		`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":1}`,
@@ -945,7 +945,7 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig, keyUID string) {
 	username := "TestUser"
 	passwd := "0xC888C9CE9E098D5864D3DED6EBCC140A12142263BACE3A23A36F9905F12BD64A" // #nosec G101
 
-	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+	b := NewGethStatusBackend(testutils.MustCreateTestLogger())
 
 	b.UpdateRootDataDir(conf.RootDataDir)
 
@@ -1238,7 +1238,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 	tmpdir := t.TempDir()
 
-	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+	b := NewGethStatusBackend(testutils.MustCreateTestLogger())
 
 	// Creating an account with test networks enabled
 	createAccountRequest1 := &requests.CreateAccount{
@@ -1283,7 +1283,7 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 func TestRestoreAccountAndLogin(t *testing.T) {
 	tmpdir := t.TempDir()
 
-	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
+	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
 
 	// Test case 1: Valid restore account request
 	restoreRequest := &requests.RestoreAccount{
@@ -1316,7 +1316,7 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
 	tmpdir := t.TempDir()
 
-	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
+	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
 
 	// Test case: Valid restore account request without DisplayName
 	restoreRequest := &requests.RestoreAccount{
@@ -1336,7 +1336,7 @@ func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
 
 func TestAcceptTerms(t *testing.T) {
 	tmpdir := t.TempDir()
-	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+	b := NewGethStatusBackend(testutils.MustCreateTestLogger())
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 
@@ -1498,7 +1498,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 
-	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
+	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
 	require.NoError(t, err)
 
 	backend.UpdateRootDataDir(conf.RootDataDir)

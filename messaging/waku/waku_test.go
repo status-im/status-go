@@ -32,7 +32,7 @@ import (
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/messaging/waku/common"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 )
 
 var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
@@ -63,7 +63,7 @@ func TestDiscoveryV5(t *testing.T) {
 
 	require.NoError(t, w.Start())
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		if len(w.Peers()) == 0 {
 			return errors.New("no peers discovered")
 		}
@@ -95,7 +95,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	}
 
 	// Sanity check, not great, but it's probably helpful
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		if len(w.Peers()) == 0 {
 			return errors.New("no peers discovered")
 		}
@@ -110,7 +110,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 		b.MaxElapsedTime = 90 * time.Second
 	}
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		if len(w.Peers()) == 0 {
 			return errors.New("no peers discovered")
 		}
@@ -212,7 +212,7 @@ func TestBasicWakuV2(t *testing.T) {
 	}
 
 	// Sanity check, not great, but it's probably helpful
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		if len(w.Peers()) < 1 {
 			return errors.New("no peers discovered")
 		}
@@ -228,7 +228,7 @@ func TestBasicWakuV2(t *testing.T) {
 	err = w.DialPeerByID(storeNode.PeerID)
 	require.NoError(t, err)
 
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		if len(w.Peers()) < 1 {
 			return errors.New("no peers discovered")
 		}
@@ -271,7 +271,7 @@ func TestBasicWakuV2(t *testing.T) {
 		b.MaxElapsedTime = 60 * time.Second
 		b.InitialInterval = 500 * time.Millisecond
 	}
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		result, err := w.node.Store().Query(
 			context.Background(),
 			store.FilterCriteria{
@@ -319,7 +319,7 @@ func makeTestTree(domain string, nodes []*enode.Node, links []string) (*ethdnsdi
 }
 
 func TestPeerExchange(t *testing.T) {
-	logger := tt.MustCreateTestLogger()
+	logger := testutils.MustCreateTestLogger()
 	// start node which serve as PeerExchange server
 	config := &Config{}
 	config.ClusterID = 16
@@ -366,7 +366,7 @@ func TestPeerExchange(t *testing.T) {
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 30 * time.Second
 	}
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		// we should not use lightNode.Peers() here as it only indicates peers that are connected right now,
 		// in light client mode,the peer will be closed via `w.node.Host().Network().ClosePeer(peerInfo.ID)`
 		// after invoking identifyAndConnect, instead, we should check the peerStore, peers from peerStore
@@ -415,7 +415,7 @@ func TestWakuV2Filter(t *testing.T) {
 	time.Sleep(10 * time.Second) //TODO: Check if we can remove this sleep.
 
 	// Sanity check, not great, but it's probably helpful
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		peers, err := w.node.PeerManager().FilterPeersByProto(nil, nil, filter.FilterSubscribeID_v20beta1)
 		if err != nil {
 			return err

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/messaging/layers/transport/migrations"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -20,7 +20,7 @@ func TestNewTransport(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	logger := tt.MustCreateTestLogger()
+	logger := testutils.MustCreateTestLogger()
 	defer func() { _ = logger.Sync() }()
 
 	_, err = NewTransport(nil, nil, NewSQLiteKeysPersistence(db), NewSQLiteProcessedMessageIDsCachePersistence(db), nil, logger)

@@ -11,7 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 
 	_ "github.com/mutecomm/go-sqlcipher/v4"
 	"github.com/stretchr/testify/suite"
@@ -71,7 +71,7 @@ func newTestKey(privateKey string, partitionedTopic int) (*testKey, error) {
 }
 
 func (s *FiltersManagerSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.logger = testutils.MustCreateTestLogger()
 
 	keyStrs := []string{
 		"c6cbd7d76bc5baca530c875663711b947efa6a86a900a9e8645ce32e5821484e",

@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 
 	customerrors "github.com/status-im/status-go/accounts-management/errors"
 )
@@ -41,7 +41,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 		Password:      "password",
 	}
 
-	accManager, err := NewAccountsManager(tt.MustCreateTestLogger())
+	accManager, err := NewAccountsManager(testutils.MustCreateTestLogger())
 	require.NoError(t, err)
 
 	ctrl := gomock.NewController(t)
@@ -173,7 +173,7 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	accManager, err := NewAccountsManager(tt.MustCreateTestLogger())
+	accManager, err := NewAccountsManager(testutils.MustCreateTestLogger())
 	require.NoError(t, err)
 
 	persistence := mock_persistence.NewMockPersistence(ctrl)
@@ -239,7 +239,7 @@ func (s *ManagerTestSuite) SetupTest() {
 	defer ctrl.Finish()
 
 	var err error
-	s.accManager, err = NewAccountsManager(tt.MustCreateTestLogger())
+	s.accManager, err = NewAccountsManager(testutils.MustCreateTestLogger())
 	s.Require().NoError(err)
 
 	s.persistence = mock_persistence.NewMockPersistence(ctrl)

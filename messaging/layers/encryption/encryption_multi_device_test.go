@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/messaging/layers/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -72,7 +72,7 @@ func setupUser(user string, s *EncryptionServiceMultiDeviceSuite, n int) error {
 }
 
 func (s *EncryptionServiceMultiDeviceSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.logger = testutils.MustCreateTestLogger()
 
 	s.services = make(map[string]*serviceAndKey)
 	err := setupUser(aliceUser, s, 4)

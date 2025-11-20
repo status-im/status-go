@@ -30,12 +30,12 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/server"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -163,7 +163,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().NoError(err)
 
 	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -361,7 +361,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().NoError(err)
 
 	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -439,7 +439,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 
 	var actualChat *Chat
 	// Pull message, this time it should be received as advertised automatically
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -514,7 +514,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	s.Require().NoError(err)
 
 	// Ensure alice receives bob's ContactCodeAdvertisement
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -563,7 +563,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 
 	var response *MessengerResponse
 	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.owner.RetrieveAll()
 		if err != nil {
 			return err
@@ -814,7 +814,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().NotNil(response)
 
 	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -879,7 +879,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().Len(requestsToJoin, 1)
 
 	// Retrieve request to join
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.bob.RetrieveAll()
 		if err != nil {
 			return err
@@ -943,7 +943,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	s.Require().Equal(notification.Dismissed, false)
 
 	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -1021,7 +1021,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().NotNil(response)
 
 	// Retrieve community link & community for Alice
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -1074,7 +1074,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	bobRetrieveAll := func() (*MessengerResponse, error) {
 		return s.bob.RetrieveAll()
 	}
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = bobRetrieveAll()
 		if err != nil {
 			return err
@@ -1151,7 +1151,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	aliceRequestToJoin := response.RequestsToJoinCommunity()[0]
 
 	// Retrieve request to join and Check activity center notification for Bob
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = bobRetrieveAll()
 		if err != nil {
 			return err
@@ -1212,7 +1212,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().NotNil(response)
 
 	// Retrieve community link & community for Alice
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -1289,7 +1289,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	}
 
 	// Retrieve request to join
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = bobRetrieveAll()
 		if err != nil {
 			return err
@@ -1401,7 +1401,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	// Retrieve request to join and Check activity center notification for Bob
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = bobRetrieveAll()
 		if err != nil {
 			return err
@@ -1464,7 +1464,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().NotNil(response)
 
 	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -1519,7 +1519,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().Len(requestsToJoin, 1)
 
 	// Retrieve request to join
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.bob.RetrieveAll()
 		if err != nil {
 			return err
@@ -1569,7 +1569,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().Equal(cancelRequestsToJoin[0].State, communities.RequestToJoinStateCanceled)
 
 	// Retrieve cancel request to join
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.bob.RetrieveAll()
 		if err != nil {
 			return err
@@ -1677,7 +1677,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().Len(requestsToJoin, 1)
 
 	// Retrieve request to join
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.bob.RetrieveAll()
 		if err != nil {
 			return err
@@ -1734,7 +1734,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().True(updatedCommunity.HasMember(&s.alice.identity.PublicKey))
 
 	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -1786,7 +1786,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 
 	// Alice should then be removed
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -1905,7 +1905,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().NotNil(response)
 
 	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -1959,7 +1959,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
 
 	// Retrieve request to join
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.bob.RetrieveAll()
 		if err != nil {
 			return err
@@ -2039,7 +2039,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusAccepted)
 
 	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -2122,11 +2122,11 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 
 		return communityMembersError
 	}
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		return verifyCommunityMembers(s.owner)
 	})
 	s.Require().NoError(err)
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		return verifyCommunityMembers(s.bob)
 	})
 	s.Require().NoError(err)
@@ -2461,7 +2461,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 	s.NotNil(cs, "Must have community settings")
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -2515,7 +2515,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 	s.NotNil(cs, "Must have community settings")
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -2556,7 +2556,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 
 	// Wait a bit for sync messages to reach destination
 	time.Sleep(1 * time.Second)
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -2606,7 +2606,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.Len(cs, 1, "Must have 1 community")
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -2793,7 +2793,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Require().NotNil(response)
 
 	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -2861,7 +2861,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Len(requestsToJoin, 1)
 
 	// Alice's other device retrieves sync message from the join
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
@@ -2904,7 +2904,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Equal(aRtj.CustomizationColor, aodRtj.CustomizationColor)
 
 	// Bob the admin retrieves request to join
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.bob.RetrieveAll()
 		if err != nil {
 			return err
@@ -3021,7 +3021,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	s.Require().NotNil(response)
 
 	// Retrieve community link & community
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -3054,7 +3054,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	s.Equal(community.PublicKey(), aCom.PublicKey())
 
 	// Check alicesOtherDevice receives the sync join message
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err

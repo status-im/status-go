@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 const minimumResendDelay = 500 * time.Millisecond
@@ -137,7 +137,7 @@ func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
 func (s *MessengerOfflineSuite) checkMessageDelivery(ctx context.Context, inputMessage *common.Message) {
 	var response *MessengerResponse
 	// Pull message and make sure org is received
-	err := tt.RetryWithBackOff(func() error {
+	err := testutils.RetryWithBackOff(func() error {
 		var err error
 		response, err = s.owner.RetrieveAll()
 		if err != nil {

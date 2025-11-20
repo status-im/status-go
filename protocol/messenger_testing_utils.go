@@ -9,18 +9,16 @@ import (
 	"sync"
 	"time"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/protocol/backupsync"
-
-	"github.com/status-im/status-go/protocol/identity"
-
 	"github.com/stretchr/testify/suite"
 
+	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/pkg/testutils"
+	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -29,7 +27,7 @@ var hexRunes = []rune("0123456789abcdef")
 // WaitOnMessengerResponse Wait until the condition is true or the timeout is reached.
 func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
-	err := tt.RetryWithBackOff(func() error {
+	err := testutils.RetryWithBackOff(func() error {
 		var err error
 		r, err := m.RetrieveAll()
 		if err != nil {

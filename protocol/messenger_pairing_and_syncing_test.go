@@ -11,8 +11,8 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestMessengerPairingTest(t *testing.T) {
@@ -216,7 +216,7 @@ func (s *MessengerPairingSuite) TestMessengerSyncFallback() {
 	s.Require().True(installationID2Exist)
 
 	// check if the display name is synced
-	err = tt.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		r, err := alice2.RetrieveAll()
 		s.Require().NoError(err)
 		for _, ss := range r.Settings {
