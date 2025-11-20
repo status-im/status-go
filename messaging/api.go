@@ -17,6 +17,7 @@ import (
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/messaging/adapters"
+	"github.com/status-im/status-go/messaging/common"
 	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
@@ -466,6 +467,10 @@ func CommunityShardInfoTopic(communityID string) string {
 
 func CommunityShardInfoTopicPrefix() string {
 	return transport.CommunityShardInfoTopicPrefix()
+}
+
+func SetRekeyCompatibility(compatibility bool) {
+	common.RekeyCompatibility = compatibility
 }
 
 func GenerateInstallationID() string {
