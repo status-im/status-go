@@ -35,6 +35,7 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/contacts"
+	"github.com/status-im/status-go/services/media"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -48,7 +49,6 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/verification"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 	ensservice "github.com/status-im/status-go/services/ens"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -127,7 +127,7 @@ type Messenger struct {
 	account                    *multiaccounts.Account
 	mailserversDatabase        *mailserversDB.Database
 	browserDatabase            *browsers.Database
-	httpServer                 *server.MediaServer
+	httpServer                 *media.Service
 
 	started           bool
 	quit              chan struct{}
@@ -704,7 +704,7 @@ func (m *Messenger) startHistoryArchivesImportLoop() {
 	m.enableHistoryArchivesImportAfterDelay()
 }
 
-func (m *Messenger) SetMediaServer(server *server.MediaServer) {
+func (m *Messenger) SetMediaServer(server *media.Service) {
 	m.httpServer = server
 	m.communitiesManager.SetMediaServer(server)
 }
@@ -3559,7 +3559,7 @@ func (m *Messenger) prepareMessagesList(messages []*common.Message) error {
 	return nil
 }
 
-func extractQuotedImages(messages []*common.Message, s *server.MediaServer) []string {
+func extractQuotedImages(messages []*common.Message, s *media.Service) []string {
 	var quotedImages []string
 
 	for _, message := range messages {
@@ -3570,7 +3570,7 @@ func extractQuotedImages(messages []*common.Message, s *server.MediaServer) []st
 	return quotedImages
 }
 
-func (m *Messenger) prepareTokenData(tokenData *ActivityTokenData, s *server.MediaServer) error {
+func (m *Messenger) prepareTokenData(tokenData *ActivityTokenData, s *media.Service) error {
 	if tokenData.TokenType == int(protobuf.CommunityTokenType_ERC721) {
 		tokenData.ImageURL = s.MakeWalletCollectibleImagesURL(tokenData.CollectibleID)
 	} else if tokenData.TokenType == int(protobuf.CommunityTokenType_ERC20) {
@@ -3579,7 +3579,7 @@ func (m *Messenger) prepareTokenData(tokenData *ActivityTokenData, s *server.Med
 	return nil
 }
 
-func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) error {
+func (m *Messenger) prepareMessage(msg *common.Message, s *media.Service) error {
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
 		msg.QuotedMessage.ImageLocalURL = s.MakeImageURL(msg.QuotedMessage.ID)
 

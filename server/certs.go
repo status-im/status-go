@@ -75,7 +75,7 @@ func GenerateTLSCert(notBefore, notAfter time.Time, IPAddresses []net.IP, DNSNam
 	return &finalCert, certPem, err
 }
 
-func generateMediaTLSCert() (*tls.Certificate, string, error) {
+func GenerateMediaTLSCert() (*tls.Certificate, string, error) {
 	if globalMediaCertificate != nil {
 		return globalMediaCertificate, globalMediaPem, nil
 	}
@@ -99,7 +99,7 @@ func generateMediaTLSCert() (*tls.Certificate, string, error) {
 }
 
 func PublicMediaTLSCert() (string, error) {
-	_, pem, err := generateMediaTLSCert()
+	_, pem, err := GenerateMediaTLSCert()
 	if err != nil {
 		return "", err
 	}

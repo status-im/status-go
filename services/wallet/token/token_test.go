@@ -18,8 +18,8 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
-	mediaserver "github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
+	mediaserver "github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/wallet/community"
 	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -288,7 +288,7 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	rpcClient, _ := rpc.NewClient(config)
 
 	nm := network.NewManager(appDB, nil)
-	mediaServer, err := mediaserver.NewMediaServer(appDB, nil, nil, walletDB)
+	mediaServer, err := mediaserver.NewService(appDB, nil, nil, walletDB)
 	require.NoError(t, err)
 
 	manager := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, mediaServer, nil, accountsPublisher, accountsDB, NewPersistence(walletDB))

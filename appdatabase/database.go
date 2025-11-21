@@ -28,8 +28,6 @@ var customSteps = []*sqlite.PostStep{
 	{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
 }
 
-var CurrentAppDBKeyUID string
-
 type DbInitializer struct {
 }
 

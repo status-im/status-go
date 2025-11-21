@@ -1,4 +1,4 @@
-package server
+package media
 
 import (
 	"database/sql"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/pkg/testutils"
+	"github.com/status-im/status-go/server"
 
 	"github.com/status-im/status-go/crypto"
 
@@ -38,7 +39,7 @@ type HandlersSuite struct {
 	suite.Suite
 	db     *sql.DB
 	logger *zap.Logger
-	server *MediaServer
+	server *Service
 }
 
 func (s *HandlersSuite) SetupTest() {
@@ -51,9 +52,9 @@ func (s *HandlersSuite) SetupTest() {
 	s.logger = testutils.MustCreateTestLogger()
 	s.db = db
 
-	s.server = &MediaServer{
+	s.server = &Service{
 		db: s.db,
-		Server: Server{
+		Server: server.Server{
 			logger: s.logger,
 		},
 	}

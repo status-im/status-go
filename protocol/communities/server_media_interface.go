@@ -1,8 +1,8 @@
-package server
+package communities
 
 import "github.com/status-im/status-go/protocol/protobuf"
 
-type MediaServerInterface interface {
+type MediaProvider interface {
 	MakeCommunityDescriptionTokenImageURL(communityID, symbol string) string
 	MakeCommunityImageURL(communityID, name string) string
 	SetCommunityImageVersionReader(func(communityID string) uint32)

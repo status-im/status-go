@@ -37,8 +37,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/server"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/services/media"
 )
 
 func TestMessengerCommunitiesSuite(t *testing.T) {
@@ -4262,7 +4262,7 @@ func (s *MessengerCommunitiesSuite) sendImageToCommunity(sender *Messenger, chat
 
 func (s *MessengerCommunitiesSuite) TestSerializedCommunities() {
 	addMediaServer := func(messenger *Messenger) {
-		mediaServer, err := server.NewMediaServer(messenger.database, nil, nil, nil)
+		mediaServer, err := media.NewService(messenger.database, nil, nil, nil)
 		s.Require().NoError(err)
 		s.Require().NoError(mediaServer.Start())
 		messenger.SetMediaServer(mediaServer)
@@ -4426,7 +4426,7 @@ func (s *MessengerCommunitiesSuite) fetchImage(fullURL string) ([]byte, error) {
 func (s *MessengerCommunitiesSuite) TestMemberMessagesHasImageLink() {
 	// GIVEN
 	addMediaServer := func(messenger *Messenger) {
-		mediaServer, err := server.NewMediaServer(messenger.database, nil, nil, nil)
+		mediaServer, err := media.NewService(messenger.database, nil, nil, nil)
 		s.Require().NoError(err)
 		s.Require().NoError(mediaServer.Start())
 		messenger.SetMediaServer(mediaServer)

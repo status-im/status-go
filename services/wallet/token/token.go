@@ -31,9 +31,9 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
+	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/community"
 	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
@@ -86,7 +86,7 @@ type Manager struct {
 	networkManager       network.ManagerInterface
 	communityTokensDB    *communitytokensdatabase.Database
 	communityManager     *community.Manager
-	mediaServer          *server.MediaServer
+	mediaServer          *media.Service
 	walletFeed           *event.Feed
 	accountsDB           *accounts.Database
 	accountsPublisher    *pubsub.Publisher
@@ -103,7 +103,7 @@ func NewTokenManager(
 	communityManager *community.Manager,
 	networkManager network.ManagerInterface,
 	appDB *sql.DB,
-	mediaServer *server.MediaServer,
+	mediaServer *media.Service,
 	walletFeed *event.Feed,
 	accountsPublisher *pubsub.Publisher,
 	accountsDB *accounts.Database,

@@ -23,7 +23,7 @@ import (
 	"github.com/status-im/status-go/contracts/ierc1155"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/collectibles/ownership"
@@ -67,7 +67,7 @@ type Manager struct {
 	communityManager   community.CommunityManagerInterface
 	ownershipDB        ownership.OwnershipStorage
 
-	mediaServer *server.MediaServer
+	mediaServer *media.Service
 
 	statuses       *sync.Map
 	statusNotifier *connection.StatusNotifier
@@ -80,7 +80,7 @@ func NewManager(
 	ethClientGetter rpc.EthClientGetter,
 	communityManager community.CommunityManagerInterface,
 	providers thirdparty.CollectibleProviders,
-	mediaServer *server.MediaServer,
+	mediaServer *media.Service,
 	feed *event.Feed) *Manager {
 
 	var ownershipDB ownership.OwnershipStorage

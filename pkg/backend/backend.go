@@ -13,6 +13,7 @@ import (
 
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/centralizedmetrics"
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/logutils"
@@ -23,31 +24,40 @@ import (
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 )
 
 const (
 	DefaultAPILogFile = "api.log"
 )
 
+type StatusBackendService interface {
+	Start() error
+	Stop() error
+	API() interface{}
+	//Metrics() // TODO: Prometheus metrics
+}
+
 type StatusBackend struct {
 	rootDataDir string
 	logger      *zap.Logger
 
 	// Databases
-	rootDB          *sql.DB // aka multiaccounts db, aka 'accounts.sql'
-	appDB           *sql.DB
-	walletDB        *sql.DB
+	rootDB          *sql.DB                 // aka multiaccounts db, aka 'accounts.sql'
 	multiaccountsDB *multiaccounts.Database // FIXME: Remove this pointer
+
+	// Active Account
+	activeAccount *ActiveAccount
 
 	// RPC server
 	rpcServer *gethrpc.Server
+	services  []StatusBackendService // NOTE: Not sure if we need it. We'll still have to keep pointers to each service.
 
 	// Services
+	mediaService *media.Service
 
 	// FIXME: Extract to separate services
 	ipfs               *ipfs.Downloader
-	mediaServer        *server.MediaServer
 	centralizedMetrics *centralizedmetrics.MetricService
 	prometheusMetrics  *metrics.Server
 }
@@ -142,10 +152,9 @@ func NewStatusBackend(rootDataDir string, opts ...Option) (*StatusBackend, error
 	// TODO: No need to create it before login.
 	b.ipfs = ipfs.NewDownloader(b.rootDataDir)
 
-	// Create media server
-	// TODO: Extract as a separate service
+	// Create media service
 	if cfg.mediaServiceEnabled {
-		err = b.startMediaServer(cfg.mediaServerAddress, cfg.mediaServerAdvertizeHost, cfg.mediaServerAdvertizePort)
+		err = b.createMediaService(cfg.mediaServerAddress, cfg.mediaServerAdvertizeHost, cfg.mediaServerAdvertizePort)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to start media server")
 		}
@@ -155,6 +164,13 @@ func NewStatusBackend(rootDataDir string, opts ...Option) (*StatusBackend, error
 	err = b.rpcServer.RegisterName("backend", b.API())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to register root service")
+	}
+
+	for _, service := range b.services {
+		err = service.Start()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to start service")
+		}
 	}
 
 	b.logger.Info("status backend initialized",
@@ -169,22 +185,23 @@ func (b *StatusBackend) Start() {
 	//	b.rpcServer.RegisterName("settings", settingsService.API())
 }
 
-func (b *StatusBackend) Stop() error {
+func (b *StatusBackend) Shutdown() error {
 	var err error
 
 	if b.rpcServer != nil {
 		b.rpcServer.Stop()
 	}
 
+	for _, service := range b.services {
+		err = service.Stop()
+		if err != nil {
+			b.logger.Error("failed to stop service", zap.Error(err))
+		}
+	}
+	b.services = nil
+
 	if b.ipfs != nil {
 		b.ipfs.Stop()
-	}
-
-	if b.mediaServer != nil {
-		err = b.mediaServer.Stop()
-		if err != nil {
-			b.logger.Error("failed to stop media server", zap.Error(err))
-		}
 	}
 
 	if b.centralizedMetrics != nil {
@@ -207,30 +224,39 @@ func (b *StatusBackend) API() *API {
 	}
 }
 
-func (b *StatusBackend) startMediaServer(address, advertizeHost string, advertizePort int) error {
-	if b.mediaServer != nil {
-		if err := b.mediaServer.Stop(); err != nil {
-			return err
-		}
+func (b *StatusBackend) createMediaService(address, advertizeHost string, advertizePort int) error {
+	if b.mediaService != nil {
+		// Media service should only be spawned once
+		return errors.New("media server is already running")
 	}
 
-	opts := []server.MediaServerOption{
-		server.WithMediaServerDisableTLS(false),
-		server.WithMediaServerAddress(address),
-		server.WithMediaServerAdvertizeAddress(advertizeHost, advertizePort),
+	opts := []media.Option{
+		media.WithLogger(b.logger.Named("media-server")),
+		media.WithDisableTLS(false),
+		media.WithServerAddress(address),
+		media.WithServerAdvertizeAddress(advertizeHost, advertizePort),
 	}
-	mediaServer, err := server.NewMediaServer(nil, nil, b.multiaccountsDB, nil, opts...)
+
+	mediaService, err := media.NewService(nil, b.ipfs, b.multiaccountsDB, nil, opts...)
 	if err != nil {
 		return err
 	}
-	mediaServer.SetDataProviders(b.appDB, b.walletDB, b.ipfs)
+	//mediaService.SetDataProviders(b.ActiveAccount.appDB, b.ActiveAccount.walletDB, b.ipfs)
 
-	b.mediaServer = mediaServer
+	// Register service
+	err = b.rpcServer.RegisterName("media", mediaService.API())
+	if err != nil {
+		return errors.Wrap(err, "failed to register media server")
+	}
 
-	if err := b.mediaServer.Start(); err != nil {
+	// Start service
+	err = b.mediaService.Start()
+	if err != nil {
 		return err
 	}
 
+	b.services = append(b.services, mediaService)
+	b.mediaService = mediaService
 	return nil
 }
 
@@ -248,10 +274,10 @@ func (b *StatusBackend) CallInProcessRPC(inputJSON string) string {
 func (b *StatusBackend) ListAccounts(ctx context.Context) ([]multiaccounts.Account, error) {
 	accs, err := b.multiaccountsDB.GetAccounts()
 
-	if b.mediaServer != nil {
+	if b.mediaService != nil {
 		for i, acc := range accs {
 			for j, images := range acc.Images {
-				url := b.mediaServer.MakeAccountImageURL(acc.KeyUID, images.Name, images.Clock)
+				url := b.mediaService.MakeAccountImageURL(acc.KeyUID, images.Name, images.Clock)
 				accs[i].Images[j].LocalURL = url
 			}
 		}
@@ -261,13 +287,28 @@ func (b *StatusBackend) ListAccounts(ctx context.Context) ([]multiaccounts.Accou
 }
 
 func (b *StatusBackend) CreateAccount(ctx context.Context, request *requests2.CreateAccount, keycardData *requests2.KeycardData) (*multiaccounts.Account, error) {
-	mnemonic, err := accscommon.CreateRandomMnemonicWithDefaultLength()
+
+	//creator := NewAccountCreator(b.rootDataDir, b.logger.Named("account-creator"), b.multiaccountsDB, b.mediaService)
+	//return creator.StartNodeWithChatKeyOrMnemonic(ctx, request, mnemonic, keycardData, true)
+
+	activeAcc, err := CreateAccount(b.rootDataDir, b.logger, request)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create random mnemonic")
+		return nil, errors.Wrap(err, "failed to create account")
 	}
 
-	creator := NewAccountCreator(b.rootDataDir, b.logger.Named("account-creator"), b.multiaccountsDB, b.mediaServer)
-	return creator.StartNodeWithChatKeyOrMnemonic(ctx, request, mnemonic, keycardData, true)
+	// We don't need the account, so we can immediately close it
+	err = activeAcc.Close()
+	if err != nil {
+		b.logger.Error("failed to close account", zap.Error(err))
+	}
+
+	// Save account to multiaccounts database
+	err = b.multiaccountsDB.SaveAccount(*activeAcc.account)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to save account")
+	}
+
+	return activeAcc.account, nil
 }
 
 func (b *StatusBackend) Login(request *requests.Login) error {
@@ -286,6 +327,10 @@ func (b *StatusBackend) Login(request *requests.Login) error {
 	}
 
 	// Open databases
+	activeAccount, err := Login(b.rootDataDir, b.logger, acc, request.Password)
+	if err != nil {
+		return errors.Wrap(err, "failed to login")
+	}
 
 	// Run migrations
 

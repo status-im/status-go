@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 )
 
 var ipRegex = regexp.MustCompile("(https://(?:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|\\[[:0-9a-fA-F:]+\\]):\\d{1,5})")
@@ -289,7 +289,7 @@ func makeThingToSay() (string, error) {
 }
 
 func (s *PairingServerSuite) TestGetOutboundIPWithFullServerE2e() {
-	s.SS.SetHandlers(server.HandlerPatternMap{"/hello": testHandler(s.T())})
+	s.SS.SetHandlers(media.HandlerPatternMap{"/hello": testHandler(s.T())})
 
 	err := s.SS.Start()
 	s.Require().NoError(err)

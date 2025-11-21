@@ -8,7 +8,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/server"
 )
 
 func communityToRecord(community *Community) (*CommunityRecord, error) {
@@ -79,7 +78,7 @@ func recordBundleToCommunity(
 	logger *zap.Logger,
 	timesource common.TimeSource,
 	encryptor DescriptionEncryptor,
-	mediaServer server.MediaServerInterface,
+	mediaServer MediaProvider,
 	initializer func(*Community) error,
 ) (*Community, error) {
 	var privateKey *ecdsa.PrivateKey

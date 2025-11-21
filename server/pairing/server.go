@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 )
 
 /*
@@ -154,7 +155,7 @@ func (s *SenderServer) startSendingData() error {
 			}
 		}
 	}
-	s.SetHandlers(server.HandlerPatternMap{
+	s.SetHandlers(media.HandlerPatternMap{
 		pairingChallenge:      handlePairingChallenge(s.challengeGiver),
 		pairingSendAccount:    middlewareChallenge(s.challengeGiver, handleSendAccount(logger, s.accountMounter, beforeSending)),
 		pairingSendSyncDevice: middlewareChallenge(s.challengeGiver, handlePairingSyncDeviceSend(logger, s.rawMessageMounter, beforeSending)),
@@ -266,7 +267,7 @@ func (s *ReceiverServer) startReceivingData() error {
 			}
 		}
 	}
-	s.SetHandlers(server.HandlerPatternMap{
+	s.SetHandlers(media.HandlerPatternMap{
 		pairingChallenge:         handlePairingChallenge(s.challengeGiver),
 		pairingReceiveAccount:    handleReceiveAccount(logger, s.accountReceiver),
 		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(logger, s.rawMessageReceiver),
@@ -378,7 +379,7 @@ func (s *KeystoreFilesSenderServer) startSendingData() error {
 			}
 		}
 	}
-	s.SetHandlers(server.HandlerPatternMap{
+	s.SetHandlers(media.HandlerPatternMap{
 		pairingChallenge:   handlePairingChallenge(s.challengeGiver),
 		pairingSendAccount: middlewareChallenge(s.challengeGiver, handleSendAccount(logger, s.keystoreFilesMounter, beforeSending)),
 	})

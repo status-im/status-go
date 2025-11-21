@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 )
 
 func TestMessengerActivityCenterMessageSuite(t *testing.T) {
@@ -149,7 +149,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// create an http server
-	mediaServer, err := server.NewMediaServer(nil, nil, nil, nil)
+	mediaServer, err := media.NewService(nil, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(mediaServer)
 	s.Require().NoError(mediaServer.Start())

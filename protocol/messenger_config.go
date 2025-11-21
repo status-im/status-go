@@ -7,8 +7,8 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/media"
 
 	"go.uber.org/zap"
 
@@ -78,7 +78,7 @@ type config struct {
 	torrentConfig          *params.TorrentConfig
 	walletService          *wallet.Service
 	communityTokensService communities.CommunityTokensServiceInterface
-	httpServer             *server.MediaServer
+	httpServer             *media.Service
 	rpcClient              *rpc.Client
 	tokenManager           communities.TokenManager
 	tokenBalanceManager    communities.TokenBalanceManager
@@ -251,7 +251,7 @@ func WithTorrentConfig(tc *params.TorrentConfig) Option {
 	}
 }
 
-func WithHTTPServer(s *server.MediaServer) Option {
+func WithHTTPServer(s *media.Service) Option {
 	return func(c *config) error {
 		c.httpServer = s
 		return nil

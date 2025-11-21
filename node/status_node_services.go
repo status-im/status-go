@@ -11,8 +11,8 @@ import (
 	"github.com/status-im/status-go/node/adapters"
 	"github.com/status-im/status-go/pkg/featureflags"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
+	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/newsfeed"
 	"github.com/status-im/status-go/services/sharedurls"
 
@@ -51,7 +51,7 @@ var (
 	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
 )
 
-func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server.MediaServer) error {
+func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *media.Service) error {
 	accDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return err
@@ -199,7 +199,7 @@ func (b *StatusNode) rpcStatsService() *rpcstats.Service {
 	return b.rpcStatsSrvc
 }
 
-func (b *StatusNode) accountsService(accDB *accounts.Database, mediaServer *server.MediaServer) *accountssvc.Service {
+func (b *StatusNode) accountsService(accDB *accounts.Database, mediaServer *media.Service) *accountssvc.Service {
 	if b.accountsSrvc == nil {
 		b.accountsSrvc = accountssvc.NewService(
 			accDB,

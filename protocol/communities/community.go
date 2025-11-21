@@ -28,7 +28,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/server"
 )
 
 const signatureLength = 65
@@ -70,7 +69,7 @@ type Community struct {
 	mutex       sync.Mutex
 	timesource  common.TimeSource
 	encryptor   DescriptionEncryptor
-	mediaServer server.MediaServerInterface
+	mediaServer MediaProvider
 }
 
 type ReadonlyCommunity interface {
@@ -80,7 +79,7 @@ type ReadonlyCommunity interface {
 	IsBanned(pk *ecdsa.PublicKey) bool
 }
 
-func New(config Config, timesource common.TimeSource, encryptor DescriptionEncryptor, mediaServer server.MediaServerInterface) (*Community, error) {
+func New(config Config, timesource common.TimeSource, encryptor DescriptionEncryptor, mediaServer MediaProvider) (*Community, error) {
 	if config.MemberIdentity == nil {
 		return nil, errors.New("no member identity")
 	}

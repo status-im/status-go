@@ -11,7 +11,7 @@ import (
 	"strconv"
 
 	"go.uber.org/zap"
-
+	
 	"github.com/status-im/status-go/common"
 )
 
@@ -29,7 +29,7 @@ type Server struct {
 	listener net.Listener
 	server   *http.Server
 	logger   *zap.Logger
-	handlers HandlerPatternMap
+	handlers map[string]http.HandlerFunc
 
 	config *Config
 
@@ -212,13 +212,13 @@ func (s *Server) ToBackground() {
 	}
 }
 
-func (s *Server) SetHandlers(handlers HandlerPatternMap) {
+func (s *Server) SetHandlers(handlers map[string]http.HandlerFunc) {
 	s.handlers = handlers
 }
 
-func (s *Server) AddHandlers(handlers HandlerPatternMap) {
+func (s *Server) AddHandlers(handlers map[string]http.HandlerFunc) {
 	if s.handlers == nil {
-		s.handlers = make(HandlerPatternMap)
+		s.handlers = make(map[string]http.HandlerFunc)
 	}
 
 	for name := range handlers {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
@@ -30,7 +31,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/syncing"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/activityfetcher"
@@ -93,7 +93,7 @@ func NewService(
 	ensResolver *ensresolver.EnsResolver,
 	pendingTxManager *pendingtxtracker.PendingTxTracker,
 	feed *event.Feed,
-	mediaServer *server.MediaServer,
+	mediaServer *media.Service,
 	tokenManager *token.Manager,
 	statusProxyStageName string,
 ) *Service {

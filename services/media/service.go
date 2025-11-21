@@ -1,4 +1,4 @@
-package server
+package media
 
 import (
 	"crypto/tls"
@@ -14,36 +14,17 @@ import (
 	errorspkg "github.com/pkg/errors"
 
 	"github.com/status-im/status-go/ipfs"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/signal"
 )
 
-type MediaServerOption func(*MediaServerConfig)
+type config struct {
+	logger *zap.Logger
 
-func WithMediaServerDisableTLS(disableTLS bool) MediaServerOption {
-	return func(s *MediaServerConfig) {
-		s.disableTLS = disableTLS
-	}
-}
-
-func WithMediaServerAddress(address string) MediaServerOption {
-	return func(s *MediaServerConfig) {
-		s.address = address
-	}
-}
-
-func WithMediaServerAdvertizeAddress(host string, port int) MediaServerOption {
-	return func(s *MediaServerConfig) {
-		s.advertizeHost = host
-		s.advertizePort = port
-	}
-}
-
-type MediaServerConfig struct {
 	// disableTLS controls whether the media server uses HTTP instead of HTTPS.
 	// Set to true to avoid TLS certificate issues with react-native-fast-image
 	// on Android, which has limitations with dynamic certificate updates.
@@ -53,15 +34,16 @@ type MediaServerConfig struct {
 	// address is the address to bind the media server to. Defaults to "localhost:0".
 	address string
 
-	// AdvertizeHost and AdvertizePort define the a different host/port to be advertized.
+	// AdvertizeHost and AdvertizePort define a different host/port to be advertized.
 	// Check server.Config for more details.
 	advertizeHost string
 	advertizePort int
 }
 
-type MediaServer struct {
-	Server
+type Service struct {
+	server.Server
 
+	logger                      *zap.Logger
 	db                          *sql.DB
 	downloader                  *ipfs.Downloader
 	multiaccountsDB             *multiaccounts.Database
@@ -69,8 +51,6 @@ type MediaServer struct {
 	communityImagesReader       func(communityID string) (map[string]*protobuf.IdentityImage, error)
 	communityTokenReader        func(communityID string) ([]*protobuf.CommunityTokenMetadata, error)
 	communityImageVersionReader func(communityID string) uint32
-
-	config *MediaServerConfig
 }
 
 func initMediaCertificate(disableTLS bool) (*tls.Certificate, error) {
@@ -78,49 +58,52 @@ func initMediaCertificate(disableTLS bool) (*tls.Certificate, error) {
 		return nil, nil
 	}
 
-	cert, _, err := generateMediaTLSCert()
+	cert, _, err := server.GenerateMediaTLSCert()
 	if err != nil {
 		return nil, err
 	}
 	return cert, nil
 }
 
-// NewMediaServer returns a *MediaServer
-func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiaccounts.Database, walletDB *sql.DB, opts ...MediaServerOption) (*MediaServer, error) {
+// NewService returns a *Service
+func NewService(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiaccounts.Database, walletDB *sql.DB, opts ...Option) (*Service, error) {
+	cfg := &config{
+		logger:        zap.NewNop(),
+		disableTLS:    false,
+		address:       "127.0.0.1:0",
+		advertizeHost: "",
+		advertizePort: 0,
+	}
 
-	s := &MediaServer{
-		config: &MediaServerConfig{
-			disableTLS:    false,
-			address:       "127.0.0.1:0",
-			advertizeHost: "",
-			advertizePort: 0,
-		},
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	s := &Service{
+		logger:          cfg.logger,
 		db:              db,
 		downloader:      downloader,
 		multiaccountsDB: multiaccountsDB,
 		walletDB:        walletDB,
 	}
 
-	for _, opt := range opts {
-		opt(s.config)
-	}
-
-	addrPort, err := netip.ParseAddrPort(s.config.address)
+	addrPort, err := netip.ParseAddrPort(cfg.address)
 	if err != nil {
 		return nil, errorspkg.Wrap(err, "failed to parse media server address")
 	}
 
-	cert, err := initMediaCertificate(s.config.disableTLS)
+	cert, err := initMediaCertificate(cfg.disableTLS)
 	if err != nil {
 		return nil, err
 	}
-	s.Server = NewServer(
-		logutils.ZapLogger().Named("MediaServer"),
-		&Config{
+
+	s.Server = server.NewServer(
+		s.logger.Named("server"),
+		&server.Config{
 			Cert:          cert,
 			AddrPort:      addrPort,
-			AdvertizeHost: s.config.advertizeHost,
-			AdvertizePort: s.config.advertizePort,
+			AdvertizeHost: cfg.advertizeHost,
+			AdvertizePort: cfg.advertizePort,
 		},
 	)
 
@@ -147,14 +130,13 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 
 	return s, nil
 }
-
-func (s *MediaServer) SetDataProviders(db *sql.DB, walletDB *sql.DB, downloader *ipfs.Downloader) {
+func (s *Service) SetDataProviders(db *sql.DB, walletDB *sql.DB, downloader *ipfs.Downloader) {
 	s.db = db
 	s.walletDB = walletDB
 	s.downloader = downloader
 }
 
-func (s *MediaServer) Start() error {
+func (s *Service) Start() error {
 	err := s.Server.Start()
 	if err != nil {
 		s.logger.Error("failed to start media server", zap.Error(err))
@@ -170,46 +152,54 @@ func (s *MediaServer) Start() error {
 	return nil
 }
 
-func (s *MediaServer) SetCommunityImageVersionReader(getFunc func(communityID string) uint32) {
+func (s *Service) Stop() error {
+	return s.Server.Stop()
+}
+
+func (s *Service) API() interface{} {
+	return &API{}
+}
+
+func (s *Service) SetCommunityImageVersionReader(getFunc func(communityID string) uint32) {
 	s.communityImageVersionReader = getFunc
 }
 
-func (s *MediaServer) getCommunityImageVersion(communityID string) uint32 {
+func (s *Service) getCommunityImageVersion(communityID string) uint32 {
 	if s.communityImageVersionReader == nil {
 		return 0
 	}
 	return s.communityImageVersionReader(communityID)
 }
 
-func (s *MediaServer) SetCommunityImageReader(getFunc func(communityID string) (map[string]*protobuf.IdentityImage, error)) {
+func (s *Service) SetCommunityImageReader(getFunc func(communityID string) (map[string]*protobuf.IdentityImage, error)) {
 	s.communityImagesReader = getFunc
 }
 
-func (s *MediaServer) getCommunityImage(communityID string) (map[string]*protobuf.IdentityImage, error) {
+func (s *Service) getCommunityImage(communityID string) (map[string]*protobuf.IdentityImage, error) {
 	if s.communityImagesReader == nil {
 		return nil, errors.New("community image reader not set")
 	}
 	return s.communityImagesReader(communityID)
 }
 
-func (s *MediaServer) SetCommunityTokensReader(getFunc func(communityID string) ([]*protobuf.CommunityTokenMetadata, error)) {
+func (s *Service) SetCommunityTokensReader(getFunc func(communityID string) ([]*protobuf.CommunityTokenMetadata, error)) {
 	s.communityTokenReader = getFunc
 }
 
-func (s *MediaServer) getCommunityTokens(communityID string) ([]*protobuf.CommunityTokenMetadata, error) {
+func (s *Service) getCommunityTokens(communityID string) ([]*protobuf.CommunityTokenMetadata, error) {
 	if s.communityTokenReader == nil {
 		return nil, errors.New("community token reader not set")
 	}
 	return s.communityTokenReader(communityID)
 }
 
-func (s *MediaServer) MakeImageServerURL() string {
+func (s *Service) MakeImageServerURL() string {
 	u := s.MakeBaseURL()
 	u.Path = basePath + "/"
 	return u.String()
 }
 
-func (s *MediaServer) MakeImageURL(id string) string {
+func (s *Service) MakeImageURL(id string) string {
 	u := s.MakeBaseURL()
 	u.Path = imagesPath
 	u.RawQuery = url.Values{"messageId": {id}}.Encode()
@@ -217,28 +207,28 @@ func (s *MediaServer) MakeImageURL(id string) string {
 	return u.String()
 }
 
-func (s *MediaServer) MakeLinkPreviewThumbnailURL(msgID string, previewURL string) string {
+func (s *Service) MakeLinkPreviewThumbnailURL(msgID string, previewURL string) string {
 	u := s.MakeBaseURL()
 	u.Path = LinkPreviewThumbnailPath
 	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}}.Encode()
 	return u.String()
 }
 
-func (s *MediaServer) MakeStatusLinkPreviewThumbnailURL(msgID string, previewURL string, imageID common.MediaServerImageID) string {
+func (s *Service) MakeStatusLinkPreviewThumbnailURL(msgID string, previewURL string, imageID common.MediaServerImageID) string {
 	u := s.MakeBaseURL()
 	u.Path = StatusLinkPreviewThumbnailPath
 	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}, "image-id": {string(imageID)}}.Encode()
 	return u.String()
 }
 
-func (s *MediaServer) MakeLinkPreviewFaviconURL(msgID string, previewURL string) string {
+func (s *Service) MakeLinkPreviewFaviconURL(msgID string, previewURL string) string {
 	u := s.MakeBaseURL()
 	u.Path = LinkPreviewFaviconPath
 	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}}.Encode()
 	return u.String()
 }
 
-func (s *MediaServer) MakeDiscordAuthorAvatarURL(authorID string) string {
+func (s *Service) MakeDiscordAuthorAvatarURL(authorID string) string {
 	u := s.MakeBaseURL()
 	u.Path = discordAuthorsPath
 	u.RawQuery = url.Values{"authorId": {authorID}}.Encode()
@@ -246,7 +236,7 @@ func (s *MediaServer) MakeDiscordAuthorAvatarURL(authorID string) string {
 	return u.String()
 }
 
-func (s *MediaServer) MakeDiscordAttachmentURL(messageID string, id string) string {
+func (s *Service) MakeDiscordAttachmentURL(messageID string, id string) string {
 	u := s.MakeBaseURL()
 	u.Path = discordAttachmentsPath
 	u.RawQuery = url.Values{"messageId": {messageID}, "attachmentId": {id}}.Encode()
@@ -254,7 +244,7 @@ func (s *MediaServer) MakeDiscordAttachmentURL(messageID string, id string) stri
 	return u.String()
 }
 
-func (s *MediaServer) MakeAudioURL(id string) string {
+func (s *Service) MakeAudioURL(id string) string {
 	u := s.MakeBaseURL()
 	u.Path = audioPath
 	u.RawQuery = url.Values{"messageId": {id}}.Encode()
@@ -262,7 +252,7 @@ func (s *MediaServer) MakeAudioURL(id string) string {
 	return u.String()
 }
 
-func (s *MediaServer) MakeStickerURL(stickerHash string) string {
+func (s *Service) MakeStickerURL(stickerHash string) string {
 	u := s.MakeBaseURL()
 	u.Path = ipfsPath
 	u.RawQuery = url.Values{"hash": {stickerHash}}.Encode()
@@ -270,7 +260,7 @@ func (s *MediaServer) MakeStickerURL(stickerHash string) string {
 	return u.String()
 }
 
-func (s *MediaServer) MakeContactImageURL(publicKey string, imageType string, imageClock uint64) string {
+func (s *Service) MakeContactImageURL(publicKey string, imageType string, imageClock uint64) string {
 	u := s.MakeBaseURL()
 	u.Path = contactImagesPath
 	u.RawQuery = url.Values{"publicKey": {publicKey}, "imageName": {imageType}, "clock": {fmt.Sprint(imageClock)}}.Encode()
@@ -278,7 +268,7 @@ func (s *MediaServer) MakeContactImageURL(publicKey string, imageType string, im
 	return u.String()
 }
 
-func (s *MediaServer) MakeAccountImageURL(keyUid string, imageType string, imageClock uint64) string {
+func (s *Service) MakeAccountImageURL(keyUid string, imageType string, imageClock uint64) string {
 	u := s.MakeBaseURL()
 	u.Path = accountImagesPath
 	u.RawQuery = url.Values{"keyUid": {keyUid}, "imageName": {imageType}, "clock": {fmt.Sprint(imageClock)}}.Encode()
@@ -286,7 +276,7 @@ func (s *MediaServer) MakeAccountImageURL(keyUid string, imageType string, image
 	return u.String()
 }
 
-func (s *MediaServer) MakeCommunityTokenImagesURL(communityID string, chainID uint64, symbol string) string {
+func (s *Service) MakeCommunityTokenImagesURL(communityID string, chainID uint64, symbol string) string {
 	u := s.MakeBaseURL()
 	u.Path = communityTokenImagesPath
 	u.RawQuery = url.Values{
@@ -298,7 +288,7 @@ func (s *MediaServer) MakeCommunityTokenImagesURL(communityID string, chainID ui
 	return u.String()
 }
 
-func (s *MediaServer) MakeCommunityImageURL(communityID, name string) string {
+func (s *Service) MakeCommunityImageURL(communityID, name string) string {
 	u := s.MakeBaseURL()
 	u.Path = communityDescriptionImagesPath
 	u.RawQuery = url.Values{
@@ -310,7 +300,7 @@ func (s *MediaServer) MakeCommunityImageURL(communityID, name string) string {
 	return u.String()
 }
 
-func (s *MediaServer) MakeCommunityDescriptionTokenImageURL(communityID, symbol string) string {
+func (s *Service) MakeCommunityDescriptionTokenImageURL(communityID, symbol string) string {
 	u := s.MakeBaseURL()
 	u.Path = communityDescriptionTokenImagesPath
 	u.RawQuery = url.Values{
@@ -321,7 +311,7 @@ func (s *MediaServer) MakeCommunityDescriptionTokenImageURL(communityID, symbol 
 	return u.String()
 }
 
-func (s *MediaServer) MakeWalletCommunityImagesURL(communityID string) string {
+func (s *Service) MakeWalletCommunityImagesURL(communityID string) string {
 	u := s.MakeBaseURL()
 	u.Path = walletCommunityImagesPath
 	u.RawQuery = url.Values{
@@ -331,7 +321,7 @@ func (s *MediaServer) MakeWalletCommunityImagesURL(communityID string) string {
 	return u.String()
 }
 
-func (s *MediaServer) MakeWalletCollectionImagesURL(contractID thirdparty.ContractID) string {
+func (s *Service) MakeWalletCollectionImagesURL(contractID thirdparty.ContractID) string {
 	u := s.MakeBaseURL()
 	u.Path = walletCollectionImagesPath
 	u.RawQuery = url.Values{
@@ -342,7 +332,7 @@ func (s *MediaServer) MakeWalletCollectionImagesURL(contractID thirdparty.Contra
 	return u.String()
 }
 
-func (s *MediaServer) MakeWalletCollectibleImagesURL(collectibleID thirdparty.CollectibleUniqueID) string {
+func (s *Service) MakeWalletCollectibleImagesURL(collectibleID thirdparty.CollectibleUniqueID) string {
 	u := s.MakeBaseURL()
 	u.Path = walletCollectibleImagesPath
 	u.RawQuery = url.Values{

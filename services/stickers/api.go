@@ -23,7 +23,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )
@@ -48,7 +48,7 @@ type API struct {
 	pendingTracker  *pendingtxtracker.PendingTxTracker
 
 	downloader *ipfs.Downloader
-	httpServer *server.MediaServer
+	httpServer *media.Service
 
 	ctx context.Context
 }
@@ -90,7 +90,7 @@ type ednStickerPackInfo struct {
 }
 
 func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager,
-	pendingTracker *pendingtxtracker.PendingTxTracker, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
+	pendingTracker *pendingtxtracker.PendingTxTracker, downloader *ipfs.Downloader, httpServer *media.Service) *API {
 	result := &API{
 		contractMaker:   contracts.NewContractMaker(rpcClient),
 		accountsManager: accountsManager,

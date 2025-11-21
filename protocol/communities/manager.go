@@ -43,7 +43,6 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
@@ -121,7 +120,7 @@ type Manager struct {
 	PermissionChecker        PermissionChecker
 	keyDistributor           KeyDistributor
 	communityLock            *CommunityLock
-	mediaServer              server.MediaServerInterface
+	mediaServer              MediaProvider
 	communityImageVersions   map[string]uint32
 	cache                    *ttlcache.Cache[string, ReadonlyCommunity]
 }
@@ -365,7 +364,7 @@ func NewManager(
 	messaging *messaging.API,
 	timesource common.TimeSource,
 	keyDistributor KeyDistributor,
-	mediaServer server.MediaServerInterface,
+	mediaServer MediaProvider,
 	opts ...ManagerOption,
 ) (*Manager, error) {
 	if identity == nil {
@@ -511,7 +510,7 @@ type CommunityResponse struct {
 	FailedToDecrypt []*CommunityPrivateDataFailedToDecrypt `json:"-"`
 }
 
-func (m *Manager) SetMediaServer(mediaServer server.MediaServerInterface) {
+func (m *Manager) SetMediaServer(mediaServer MediaProvider) {
 	m.mediaServer = mediaServer
 	m.SetMediaServerProperties()
 }

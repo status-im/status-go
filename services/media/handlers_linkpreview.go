@@ -1,4 +1,4 @@
-package server
+package media
 
 import (
 	"database/sql"
@@ -105,7 +105,7 @@ func checkForFetchImageError(err error, logger *zap.Logger, parsedImageParams Im
 	}
 }
 
-func (s *MediaServer) handleLinkPreviewThumbnail(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleLinkPreviewThumbnail(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -120,7 +120,7 @@ func (s *MediaServer) handleLinkPreviewThumbnail(w http.ResponseWriter, r *http.
 	}
 }
 
-func (s *MediaServer) handleLinkPreviewFavicon(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleLinkPreviewFavicon(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -224,7 +224,7 @@ func getStatusLinkPreviewThumbnail(db *sql.DB, messageID string, URL string, ima
 	return nil, http.StatusBadRequest, fmt.Errorf("no link preview found for given url")
 }
 
-func (s *MediaServer) handleStatusLinkPreviewThumbnail(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleStatusLinkPreviewThumbnail(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	parsed := ParseImageParams(s.logger, params)
 

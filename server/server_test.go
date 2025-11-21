@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/services/media"
 )
 
 func TestServerURLSuite(t *testing.T) {
@@ -19,7 +20,7 @@ type ServerURLSuite struct {
 	suite.Suite
 
 	baseURL string
-	server  *MediaServer
+	server  *media.Service
 }
 
 func (s *ServerURLSuite) SetupTest() {
@@ -27,7 +28,7 @@ func (s *ServerURLSuite) SetupTest() {
 	ip := gofakeit.IPv4Address()
 	s.baseURL = fmt.Sprintf("http://%s:%d", ip, port)
 
-	s.server = &MediaServer{
+	s.server = &media.Service{
 		Server: Server{
 			address: &net.TCPAddr{
 				IP:   net.ParseIP(ip),

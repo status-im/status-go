@@ -39,10 +39,10 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/communitytokens"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/collectibles"
@@ -95,7 +95,7 @@ type InitProtocolParams struct {
 	Identity               *ecdsa.PrivateKey
 	AppDB                  *sql.DB
 	WalletDB               *sql.DB
-	HTTPServer             *server.MediaServer
+	HTTPServer             *media.Service
 	MultiAccountDB         *multiaccounts.Database
 	Account                *multiaccounts.Account
 	AccountsManager        *accsmanagement.AccountsManager
@@ -309,7 +309,7 @@ func buildMessengerOptions(
 	identity *ecdsa.PrivateKey,
 	appDb *sql.DB,
 	walletDb *sql.DB,
-	httpServer *server.MediaServer,
+	httpServer *media.Service,
 	rpcClient *rpc.Client,
 	multiAccounts *multiaccounts.Database,
 	account *multiaccounts.Account,

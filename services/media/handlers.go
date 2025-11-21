@@ -1,4 +1,4 @@
-package server
+package media
 
 import (
 	"bytes"
@@ -293,7 +293,7 @@ func ParseImageParams(logger *zap.Logger, params url.Values) ImageParams {
 	return parsed
 }
 
-func (s *MediaServer) handleAccountImagesImpl(w http.ResponseWriter, parsed ImageParams) {
+func (s *Service) handleAccountImagesImpl(w http.ResponseWriter, parsed ImageParams) {
 	if s.multiaccountsDB == nil {
 		s.logger.Error("handleAccountImagesImpl: no multiaccountsDB")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -393,7 +393,7 @@ func (s *MediaServer) handleAccountImagesImpl(w http.ResponseWriter, parsed Imag
 	}
 }
 
-func (s *MediaServer) handleAccountImagesPlaceholder(w http.ResponseWriter, parsed ImageParams) {
+func (s *Service) handleAccountImagesPlaceholder(w http.ResponseWriter, parsed ImageParams) {
 	if parsed.ImagePath == "" {
 		s.logger.Error("handleAccountImagesPlaceholder: no imagePath")
 		return
@@ -444,7 +444,7 @@ func (s *MediaServer) handleAccountImagesPlaceholder(w http.ResponseWriter, pars
 }
 
 // handleAccountImages render multiaccounts custom profile image
-func (s *MediaServer) handleAccountImages(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleAccountImages(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	parsed := ParseImageParams(s.logger, params)
 
@@ -577,7 +577,7 @@ func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter,
 }
 
 // handleAccountInitials render multiaccounts/contacts initials avatar image
-func (s *MediaServer) handleAccountInitials(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleAccountInitials(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	parsed := ParseImageParams(s.logger, params)
 
@@ -610,7 +610,7 @@ func (s *MediaServer) handleAccountInitials(w http.ResponseWriter, r *http.Reque
 }
 
 // handleContactImages render contacts custom profile image
-func (s *MediaServer) handleContactImages(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleContactImages(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -723,7 +723,7 @@ func getTheme(params url.Values, logger *zap.Logger) ring.Theme {
 	return theme
 }
 
-func (s *MediaServer) handleDiscordAuthorAvatar(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleDiscordAuthorAvatar(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -762,7 +762,7 @@ func (s *MediaServer) handleDiscordAuthorAvatar(w http.ResponseWriter, r *http.R
 	}
 }
 
-func (s *MediaServer) handleDiscordAttachment(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleDiscordAttachment(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -805,7 +805,7 @@ func (s *MediaServer) handleDiscordAttachment(w http.ResponseWriter, r *http.Req
 	}
 }
 
-func (s *MediaServer) handleImage(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleImage(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -844,7 +844,7 @@ func (s *MediaServer) handleImage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *MediaServer) handleAudio(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleAudio(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -879,7 +879,7 @@ func (s *MediaServer) handleAudio(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *MediaServer) handleIPFS(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleIPFS(w http.ResponseWriter, r *http.Request) {
 	if s.downloader == nil {
 		s.logger.Warn("can't handle media request without ipfs downloader")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -909,7 +909,7 @@ func (s *MediaServer) handleIPFS(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *MediaServer) handleCommunityTokenImages(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleCommunityTokenImages(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -966,7 +966,7 @@ func (s *MediaServer) handleCommunityTokenImages(w http.ResponseWriter, r *http.
 	}
 }
 
-func (s *MediaServer) handleCommunityDescriptionImages(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleCommunityDescriptionImages(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -1015,7 +1015,7 @@ func (s *MediaServer) handleCommunityDescriptionImages(w http.ResponseWriter, r 
 	}
 }
 
-func (s *MediaServer) handleCommunityDescriptionTokenImages(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleCommunityDescriptionTokenImages(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -1070,7 +1070,7 @@ func (s *MediaServer) handleCommunityDescriptionTokenImages(w http.ResponseWrite
 	}
 }
 
-func (s *MediaServer) handleWalletCommunityImages(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleWalletCommunityImages(w http.ResponseWriter, r *http.Request) {
 	if s.walletDB == nil {
 		s.logger.Warn("can't handle media request without wallet db")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -1108,7 +1108,7 @@ func (s *MediaServer) handleWalletCommunityImages(w http.ResponseWriter, r *http
 	}
 }
 
-func (s *MediaServer) handleWalletCollectionImages(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleWalletCollectionImages(w http.ResponseWriter, r *http.Request) {
 	if s.walletDB == nil {
 		s.logger.Warn("can't handle media request without wallet db")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -1164,7 +1164,7 @@ func (s *MediaServer) handleWalletCollectionImages(w http.ResponseWriter, r *htt
 	}
 }
 
-func (s *MediaServer) handleWalletCollectibleImages(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleWalletCollectibleImages(w http.ResponseWriter, r *http.Request) {
 	if s.walletDB == nil {
 		s.logger.Warn("can't handle media request without wallet db")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -1231,6 +1231,6 @@ func (s *MediaServer) handleWalletCollectibleImages(w http.ResponseWriter, r *ht
 	}
 }
 
-func (s *MediaServer) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
