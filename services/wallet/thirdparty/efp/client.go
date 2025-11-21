@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
-const baseURL = "https://api.ethfollow.xyz/api/v1"
+const baseURL = "https://data.ethfollow.xyz/api/v1"
 
 // ENSData represents ENS information from the EFP API
 type ENSData struct {
