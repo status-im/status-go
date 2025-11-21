@@ -192,7 +192,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
 
     def test_admin_token_permissions_with_valid_tokens(self, foundry_client):
-        """Test that users with admin tokens get admin privileges"""
+        """Test that users with required tokens get admin privileges"""
         # Get member's wallet address
         accounts = self.member_with_snt.accounts_service.get_accounts()
         member_address = accounts[0].get("address") if accounts else self.fake_address
