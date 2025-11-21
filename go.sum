@@ -212,7 +212,6 @@ github.com/anacrolix/confluence v1.7.1-0.20210221224747-9cb14aa2c53a/go.mod h1:T
 github.com/anacrolix/confluence v1.7.1-0.20210221225853-90405640e928/go.mod h1:NoLcfoRet+kYttjLXJRmh4qBVrylJsfIItik5GGj21A=
 github.com/anacrolix/confluence v1.7.1-0.20210311004351-d642adb8546c/go.mod h1:KCZ3eObqKECNeZg0ekAoJVakHMP3gAdR8i0bQ26IkzM=
 github.com/anacrolix/confluence v1.8.0/go.mod h1:GsPP6ikA8h/CU7ExbuMOswpzZpPdf1efDPu4rVXL43g=
-github.com/anacrolix/confluence v1.9.0 h1:7WrWktoDw7P4uo1bzgaA8FFesvc7NsTp37sAsG54XlE=
 github.com/anacrolix/confluence v1.9.0/go.mod h1:O5uS+WVgip+3SOcV1K7E/jE3m4DtK7Jk6QJTnU2VS5s=
 github.com/anacrolix/dht v0.0.0-20180412060941-24cbf25b72a4/go.mod h1:hQfX2BrtuQsLQMYQwsypFAab/GvHg8qxwVi4OJdR1WI=
 github.com/anacrolix/dht/v2 v2.0.1/go.mod h1:GbTT8BaEtfqab/LPd5tY41f3GvYeii3mmDUK300Ycyo=
@@ -227,8 +226,9 @@ github.com/anacrolix/dht/v2 v2.10.0/go.mod h1:KC51tqylRYBu82RM5pEYf+g1n7db+F0tOJ
 github.com/anacrolix/dht/v2 v2.10.5-0.20210902001729-06cc4fe90e53/go.mod h1:zHjijcebN+L7JbzxW0mOraHis+I81EIgsJAAtiw8bQ8=
 github.com/anacrolix/dht/v2 v2.10.6-0.20211007004332-99263ec9c1c8/go.mod h1:WID4DexLrucfnwzv1OV8REzgoCpyVDwEczxIOrUeFrY=
 github.com/anacrolix/dht/v2 v2.14.1-0.20211220010335-4062f7927abf/go.mod h1:zJgaiAU2yhzmchZE2mY8WyZ64LK/F/D9MAeN0ct73qQ=
-github.com/anacrolix/dht/v2 v2.15.2-0.20220123034220-0538803801cb h1:c4e9XiiT0P3uMkONTkpzLVGxz3if5fIn6UB4HTrVlc0=
 github.com/anacrolix/dht/v2 v2.15.2-0.20220123034220-0538803801cb/go.mod h1:GCylVI6WTvbxvhY7pBoHiE5dmjfDWkhqbobDpjND01A=
+github.com/anacrolix/dht/v2 v2.16.0 h1:uMlUtdduzevqiqN08eH1CNn+L5KRXxvZ7hA0oT/nndQ=
+github.com/anacrolix/dht/v2 v2.16.0/go.mod h1:fH31EehJQZ0p3LeFq/pwjuj1AhbUapg6WRRBS+JNCG4=
 github.com/anacrolix/envpprof v0.0.0-20180404065416-323002cec2fa/go.mod h1:KgHhUaQMc8cC0+cEflSgCFNFbKwi5h54gqtVn8yhP7c=
 github.com/anacrolix/envpprof v1.0.0/go.mod h1:KgHhUaQMc8cC0+cEflSgCFNFbKwi5h54gqtVn8yhP7c=
 github.com/anacrolix/envpprof v1.0.1/go.mod h1:My7T5oSqVfEn4MD4Meczkw/f5lSIndGAKu/0SM/rkf4=
@@ -290,8 +290,9 @@ github.com/anacrolix/multiless v0.0.0-20200413040533-acfd16f65d5d/go.mod h1:TrCL
 github.com/anacrolix/multiless v0.0.0-20210222022749-ef43011a77ec/go.mod h1:TrCLEZfIDbMVfLoQt5tOoiBS/uq4y8+ojuEVVvTNPX4=
 github.com/anacrolix/multiless v0.1.1-0.20210520040635-10ee7b5f3cff/go.mod h1:TrCLEZfIDbMVfLoQt5tOoiBS/uq4y8+ojuEVVvTNPX4=
 github.com/anacrolix/multiless v0.1.1-0.20210529082330-de2f6cf29619/go.mod h1:TrCLEZfIDbMVfLoQt5tOoiBS/uq4y8+ojuEVVvTNPX4=
-github.com/anacrolix/multiless v0.2.0 h1:HtGBBOQcHaJM59RP3ysITId7AMIgiNF4xJucaFh14Ms=
 github.com/anacrolix/multiless v0.2.0/go.mod h1:TrCLEZfIDbMVfLoQt5tOoiBS/uq4y8+ojuEVVvTNPX4=
+github.com/anacrolix/multiless v0.2.1-0.20211218050420-533661eef5dc h1:K047jUtd0Xv4SEpv/5DoBgDvj4ZNpT1SOVtMlFpRrh0=
+github.com/anacrolix/multiless v0.2.1-0.20211218050420-533661eef5dc/go.mod h1:TrCLEZfIDbMVfLoQt5tOoiBS/uq4y8+ojuEVVvTNPX4=
 github.com/anacrolix/publicip v0.2.0/go.mod h1:67G1lVkLo8UjdEcJkwScWVTvlJ35OCDsRJoWXl/wi4g=
 github.com/anacrolix/squirrel v0.1.0/go.mod h1:YzgVvikMdFD441oTWlNG189bpKabO9Sbf3uCSVgca04=
 github.com/anacrolix/squirrel v0.1.1-0.20210914065657-81bc5ecdc43a/go.mod h1:YzgVvikMdFD441oTWlNG189bpKabO9Sbf3uCSVgca04=
