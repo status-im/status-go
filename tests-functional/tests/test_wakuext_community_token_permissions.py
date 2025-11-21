@@ -191,6 +191,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_public_key = self.member_with_snt.public_key
         assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
 
+    @pytest.mark.skip(reason="Pending on issue resolution https://github.com/status-im/status-go/issues/7135")
     def test_admin_token_permissions_with_valid_tokens(self, foundry_client):
         """Test that users with required tokens get admin privileges"""
         # Get member's wallet address
