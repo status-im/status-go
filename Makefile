@@ -55,6 +55,7 @@ ifeq ($(MAKECMDGOALS),statusgo-android-library)
         ANDROID_CLANG_TARGET := aarch64-linux-android$(ANDROID_API)
     endif
     ANDROID_BUILD_FLAGS := CC="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/clang --target=$(ANDROID_CLANG_TARGET) --sysroot=$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/sysroot" CGO_ENABLED=1 GOOS=android GOARCH=$(MOBILE_GOARCH)
+	GO_GENERATE_FLAGS := CGO_ENABLED=1 GOOS=android GOARCH=$(MOBILE_GOARCH)
     CGO_CFLAGS+=-Os -flto -fembed-bitcode
     CGO_LDFLAGS+=-Os -flto
 endif
@@ -322,7 +323,7 @@ generate: GO_GENERATE_CMD ?= go tool go-generate-fast
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
-	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
+	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_FLAGS) $(GO_GENERATE_CMD) $(PACKAGES)
 
 generate-contracts:
 	go generate ./contracts
