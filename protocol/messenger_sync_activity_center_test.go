@@ -34,13 +34,13 @@ func (s *MessengerSyncActivityCenterSuite) SetupTest() {
 
 	s.m = s.newMessenger(alicePassword, []string{aliceAccountAddress})
 
-	_, err := s.m.Start()
+	err := s.m.Start()
 	s.Require().NoError(err)
 
 	s.m2 = s.newMessengerWithKey(s.m.identity, alicePassword, []string{aliceAccountAddress})
 	s.Require().NoError(err)
 
-	_, err = s.m2.Start()
+	err = s.m2.Start()
 	s.Require().NoError(err)
 
 	PairDevices(&s.Suite, s.m2, s.m)
@@ -128,7 +128,7 @@ func (s *MessengerSyncActivityCenterSuite) testSyncCommunityRequestDecision(acti
 		s.Require().NoError(userB.Shutdown())
 	}()
 
-	_, err := userB.Start()
+	err := userB.Start()
 	s.Require().NoError(err)
 
 	communityID := s.createClosedCommunity()

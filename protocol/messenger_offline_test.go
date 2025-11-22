@@ -49,11 +49,11 @@ func (s *MessengerOfflineSuite) SetupTest() {
 	s.bob = s.newMessenger(bobPassword, []string{bobAccountAddress})
 	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1})
 
-	_, err := s.owner.Start()
+	err := s.owner.Start()
 	s.Require().NoError(err)
-	_, err = s.bob.Start()
+	err = s.bob.Start()
 	s.Require().NoError(err)
-	_, err = s.alice.Start()
+	err = s.alice.Start()
 	s.Require().NoError(err)
 
 	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond

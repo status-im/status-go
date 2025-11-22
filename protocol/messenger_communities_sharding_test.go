@@ -74,9 +74,9 @@ func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 		mockedBalances:  &s.mockedBalances,
 	})
 
-	_, err := s.owner.Start()
+	err := s.owner.Start()
 	s.Require().NoError(err)
-	_, err = s.alice.Start()
+	err = s.alice.Start()
 	s.Require().NoError(err)
 }
 

@@ -35,11 +35,11 @@ func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
 	s.owner = s.newMessenger("", []string{})
 	s.eventSender = s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
 	s.alice = s.newMessenger(accountPassword, []string{aliceAccountAddress})
-	_, err := s.owner.Start()
+	err := s.owner.Start()
 	s.Require().NoError(err)
-	_, err = s.eventSender.Start()
+	err = s.eventSender.Start()
 	s.Require().NoError(err)
-	_, err = s.alice.Start()
+	err = s.alice.Start()
 	s.Require().NoError(err)
 
 }

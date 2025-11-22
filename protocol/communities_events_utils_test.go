@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
@@ -1407,7 +1407,7 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 }
 
 func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
-	_, err := user.Start()
+	err := user.Start()
 
 	s := base.GetSuite()
 	s.Require().NoError(err)

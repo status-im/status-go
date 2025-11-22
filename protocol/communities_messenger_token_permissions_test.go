@@ -166,11 +166,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 
 	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{})
 
-	_, err := s.owner.Start()
+	err := s.owner.Start()
 	s.Require().NoError(err)
-	_, err = s.bob.Start()
+	err = s.bob.Start()
 	s.Require().NoError(err)
-	_, err = s.alice.Start()
+	err = s.alice.Start()
 	s.Require().NoError(err)
 }
 

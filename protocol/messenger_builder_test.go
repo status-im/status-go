@@ -205,7 +205,7 @@ func newRunningTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, c
 		return nil, err
 	}
 
-	_, err = m.Start()
+	err = m.Start()
 	if err != nil {
 		return nil, err
 	}

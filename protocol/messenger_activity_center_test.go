@@ -41,7 +41,7 @@ func (s *MessengerActivityCenterMessageSuite) SetupTest() {
 	s.m = s.newMessenger(alicePassword, []string{aliceAccountAddress})
 	s.m.account.CustomizationColor = multiaccountscommon.CustomizationColorOrange
 
-	_, err := s.m.Start()
+	err := s.m.Start()
 	s.Require().NoError(err)
 }
 
