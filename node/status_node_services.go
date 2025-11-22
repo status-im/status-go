@@ -8,11 +8,13 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/node/adapters"
 	"github.com/status-im/status-go/pkg/featureflags"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
+	wakuext "github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/newsfeed"
 	"github.com/status-im/status-go/services/sharedurls"
 
@@ -36,7 +38,6 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/updates"
-	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/router/fees"
@@ -51,7 +52,9 @@ var (
 	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
 )
 
-func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server.MediaServer) error {
+// NOTE: account and metricsEnabled are temporary parameters.
+// They will be removed as part of https://github.com/status-im/status-go/issues/7077
+func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server.MediaServer, account *multiaccounts.Account, metricsEnabled bool) error {
 	accDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return err
@@ -75,7 +78,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.ChatService(accDB))
 	services = append(services, b.ethService())
 
-	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
+	// Wallet Service is used by wakuV2ExtSrvc
 	// Keep this initialization before the other two
 	if config.WalletConfig.Enabled {
 		walletService := b.walletService(accDB, b.appDB, b.accountsPublisher, &b.walletFeed, config.WalletConfig.StatusProxyStageName)
@@ -89,16 +92,21 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	// We handle circular dependency between the two by delaying ininitalization of the CommunityCollectibleInfoProvider
 	// in the CollectiblesManager.
 	if config.WakuV2Config.Enabled {
-		wakuext, err := b.wakuV2ExtService(config)
+		wakuextService, err := b.wakuV2ExtService(config)
 		if err != nil {
 			return err
 		}
 
-		b.wakuV2ExtSrvc = wakuext
+		err = b.initProtocol(account, metricsEnabled)
+		if err != nil {
+			return err
+		}
 
-		services = append(services, wakuext)
+		b.wakuV2ExtSrvc = wakuextService
 
-		b.SetWalletCommunityInfoProvider(wakuext)
+		services = append(services, wakuextService)
+
+		b.SetWalletCommunityInfoProvider(wakuextService)
 	}
 
 	// We ignore for now local notifications flag as users who are upgrading have no mean to enable it
@@ -112,6 +120,56 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.sharedUrlsService())
 
 	b.services = services
+
+	return nil
+}
+
+func (b *StatusNode) initProtocol(acc *multiaccounts.Account, metricsEnabled bool) error {
+	st := b.WakuExtService()
+	if st == nil {
+		return nil
+	}
+
+	chatAccount, err := b.accountsManager.SelectedChatAccount()
+	if err != nil {
+		return err
+	}
+
+	params := wakuext.InitProtocolParams{
+		Identity:               chatAccount.PrivateKey(),
+		AppDB:                  b.appDB,
+		WalletDB:               b.walletDB,
+		HTTPServer:             b.MediaServer(),
+		MultiAccountDB:         b.multiaccountsDB,
+		Account:                acc,
+		AccountsManager:        b.accountsManager,
+		RPCClient:              b.RPCClient(),
+		WalletService:          b.WalletService(),
+		CommunityTokensService: b.CommunityTokensService(),
+		AccountsPublisher:      b.AccountsPublisher(),
+		TimeSource:             b.TimeSource(),
+		MetricsEnabled:         metricsEnabled,
+		TokenManager:           adapters.NewCommunitiesTokenManager(b.TokenManager()),
+		TokenBalanceManager:    adapters.NewCommunitiesTokenBalanceManager(b.TokenBalancesFetcher(), b.TokenBalancesStorage()),
+		NetworkManager:         adapters.NewCommunitiesNetworkManager(b.RPCClient().GetNetworkManager()),
+	}
+	err = st.InitProtocol(params)
+	if err != nil {
+		return err
+	}
+
+	messenger := st.Messenger()
+	// Init public status api
+	b.StatusPublicService().Init(messenger)
+	b.AccountService().Init(messenger, acc)
+	// Init chat service
+	accDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
+	b.ChatService(accDB).Init(messenger)
+	b.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
+	b.CommunityTokensService().Init(messenger)
 
 	return nil
 }
@@ -138,9 +196,9 @@ func (b *StatusNode) registerService(s common.StatusService) error {
 	return nil
 }
 
-func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Service, error) {
+func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuext.Service, error) {
 	if b.wakuV2ExtSrvc == nil {
-		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.rpcClient, b.logger.Named("protocol"))
+		b.wakuV2ExtSrvc = wakuext.New(*config, b.rpcClient, b.logger.Named("protocol"))
 	}
 
 	return b.wakuV2ExtSrvc, nil
@@ -169,7 +227,7 @@ func (b *StatusNode) EnsService() *ens.Service {
 	return b.ensSrvc
 }
 
-func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
+func (b *StatusNode) WakuExtService() *wakuext.Service {
 	return b.wakuV2ExtSrvc
 }
 
@@ -204,7 +262,7 @@ func (b *StatusNode) accountsService(accDB *accounts.Database, mediaServer *serv
 		b.accountsSrvc = accountssvc.NewService(
 			accDB,
 			b.multiaccountsDB,
-			b.gethAccountsManager,
+			b.accountsManager,
 			b.config,
 			b.accountsPublisher,
 			mediaServer,
@@ -224,7 +282,7 @@ func (b *StatusNode) browsersService() *browsers.Service {
 
 func (b *StatusNode) ensService(timesource func() time.Time) *ens.Service {
 	if b.ensSrvc == nil {
-		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountsManager, b.pendingTracker, b.config, b.appDB, timesource)
+		b.ensSrvc = ens.NewService(b.rpcClient, b.accountsManager, b.pendingTracker, b.config, b.appDB, timesource)
 	}
 	return b.ensSrvc
 }
@@ -241,14 +299,14 @@ func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *pendingtxtra
 
 func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
 	if b.communityTokensSrvc == nil {
-		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountsManager, b.config, b.appDB, &b.walletFeed, b.transactor)
+		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.accountsManager, b.config, b.appDB, &b.walletFeed, b.transactor)
 	}
 	return b.communityTokensSrvc
 }
 
 func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
 	if b.stickersSrvc == nil {
-		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountsManager, b.config, b.downloader, b.mediaServer, b.pendingTracker)
+		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.accountsManager, b.config, b.downloader, b.mediaServer, b.pendingTracker)
 	}
 	return b.stickersSrvc
 }
@@ -306,7 +364,7 @@ func (b *StatusNode) SetWalletCommunityInfoProvider(provider thirdparty.Communit
 func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB, accountsPublisher *pubsub.Publisher, walletFeed *event.Feed, statusProxyStageName string) *wallet.Service {
 	if b.walletSrvc == nil {
 		b.walletSrvc = wallet.NewService(
-			b.walletDB, accountsDB, appDB, b.rpcClient, accountsPublisher, b.gethAccountsManager, b.transactor, b.config,
+			b.walletDB, accountsDB, appDB, b.rpcClient, accountsPublisher, b.accountsManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()).API().EnsResolver(),
 			b.pendingTracker,
 			walletFeed,
@@ -320,7 +378,7 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB,
 
 func (b *StatusNode) ethService() *eth.Service {
 	if b.ethSrvc == nil {
-		b.ethSrvc = eth.NewService(b.rpcClient, b.gethAccountsManager)
+		b.ethSrvc = eth.NewService(b.rpcClient, b.accountsManager)
 	}
 	return b.ethSrvc
 }
@@ -328,7 +386,7 @@ func (b *StatusNode) ethService() *eth.Service {
 func (b *StatusNode) sharedUrlsService() *sharedurls.Service {
 	if b.sharedUrlsSrvc == nil {
 		b.sharedUrlsSrvc = sharedurls.NewService(nil)
-		if extService := b.WakuV2ExtService(); extService != nil {
+		if extService := b.WakuExtService(); extService != nil {
 			provider := adapters.NewSharedUrlsMessengerAdapter(extService.Messenger())
 			b.sharedUrlsSrvc.SetDataProvider(provider)
 		}
@@ -435,7 +493,7 @@ func (b *StatusNode) NewsFeedService() *newsfeed.Service {
 			nil,
 		)
 
-		if wakuext := b.WakuV2ExtService(); wakuext != nil && wakuext.Messenger() != nil {
+		if wakuext := b.WakuExtService(); wakuext != nil && wakuext.Messenger() != nil {
 			ac := adapters.NewNewsFeedActivityCenterAdapter(wakuext.Messenger())
 			b.newsfeedSrvc.SetActivityCenter(ac)
 		}

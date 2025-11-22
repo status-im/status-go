@@ -192,7 +192,7 @@ func main() {
 		os.Exit(exitCodeStartServerFailed)
 	}
 
-	_, err = messenger.Start()
+	err = messenger.Start()
 	if err != nil {
 		fmt.Println("failed to start messenger", err)
 		logger.Error("failed to start messenger", zap.Error(err))

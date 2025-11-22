@@ -1,4 +1,4 @@
-package api
+package adapters
 
 import (
 	"context"

@@ -46,7 +46,6 @@ import (
 	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
-	"github.com/status-im/status-go/node/adapters"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/sentry"
@@ -59,7 +58,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server/pairing/statecontrol"
 	"github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
@@ -651,12 +649,6 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	}
 	b.account = multiAccount
 
-	err = b.StartNode(b.config)
-	if err != nil {
-		b.logger.Info("failed to start node")
-		return errors.Wrap(err, "failed to start node")
-	}
-
 	chatAddr, err := accountsDB.GetChatAddress()
 	if err != nil {
 		return errors.Wrap(err, "failed to get chat address")
@@ -674,6 +666,12 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	err = b.SelectAccount(login, request.ChatPrivateKey())
 	if err != nil {
 		return errors.Wrap(err, "failed to select account")
+	}
+
+	err = b.StartNode(b.config)
+	if err != nil {
+		b.logger.Info("failed to start node")
+		return errors.Wrap(err, "failed to start node")
 	}
 
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
@@ -1845,7 +1843,12 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		return err
 	}
 
-	if err = b.statusNode.Start(config); err != nil {
+	acc, err := b.GetActiveAccount()
+	if err != nil {
+		return err
+	}
+
+	if err = b.statusNode.Start(config, acc, b.prometheusMetrics != nil); err != nil {
 		return
 	}
 
@@ -2044,8 +2047,8 @@ func (b *GethStatusBackend) AppStateChange(state AppState) {
 		return
 	}
 
-	if b.statusNode.WakuV2ExtService() != nil {
-		messenger = b.statusNode.WakuV2ExtService().Messenger()
+	if b.statusNode.WakuExtService() != nil {
+		messenger = b.statusNode.WakuExtService().Messenger()
 	}
 
 	if messenger == nil {
@@ -2189,14 +2192,6 @@ func (b *GethStatusBackend) SelectAccount(loginParams LoginParams, privateKey *e
 		b.account = loginParams.MultiAccount
 	}
 
-	if err := b.initProtocol(); err != nil {
-		return err
-	}
-
-	if err = b.statusNode.StartLocalBackup(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -2219,61 +2214,6 @@ func (b *GethStatusBackend) LocalPairingStarted() error {
 	}
 
 	return accountDB.MnemonicWasShown()
-}
-
-func (b *GethStatusBackend) initProtocol() error {
-	st := b.statusNode.WakuV2ExtService()
-	if st == nil {
-		return nil
-	}
-	chatAccount, err := b.accountsManager.SelectedChatAccount()
-	if err != nil {
-		return err
-	}
-	identity := chatAccount.PrivateKey()
-	acc, err := b.GetActiveAccount()
-	if err != nil {
-		return err
-	}
-	params := ext.InitProtocolParams{
-		Identity:               identity,
-		AppDB:                  b.appDB,
-		WalletDB:               b.walletDB,
-		HTTPServer:             b.statusNode.MediaServer(),
-		MultiAccountDB:         b.multiaccountsDB,
-		Account:                acc,
-		AccountsManager:        b.accountsManager,
-		RPCClient:              b.statusNode.RPCClient(),
-		WalletService:          b.statusNode.WalletService(),
-		CommunityTokensService: b.statusNode.CommunityTokensService(),
-		AccountsPublisher:      b.statusNode.AccountsPublisher(),
-		TimeSource:             b.statusNode.TimeSource(),
-		MetricsEnabled:         b.prometheusMetrics != nil,
-		TokenManager:           NewCommunitiesTokenManager(b.statusNode.TokenManager()),
-		TokenBalanceManager:    NewCommunitiesTokenBalanceManager(b.statusNode.TokenBalancesFetcher(), b.statusNode.TokenBalancesStorage()),
-		NetworkManager:         NewCommunitiesNetworkManager(b.statusNode.RPCClient().GetNetworkManager()),
-	}
-	err = st.InitProtocol(params)
-	if err != nil {
-		return err
-	}
-
-	messenger := st.Messenger()
-	// Init public status api
-	b.statusNode.StatusPublicService().Init(messenger)
-	b.statusNode.AccountService().Init(messenger, acc)
-	// Init chat service
-	accDB, err := accounts.NewDB(b.appDB)
-	if err != nil {
-		return err
-	}
-	b.statusNode.ChatService(accDB).Init(messenger)
-	b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
-	b.statusNode.CommunityTokensService().Init(messenger)
-	b.statusNode.SharedUrlsService().SetDataProvider(adapters.NewSharedUrlsMessengerAdapter(messenger))
-	b.statusNode.NewsFeedService().SetActivityCenter(adapters.NewNewsFeedActivityCenterAdapter(messenger))
-
-	return nil
 }
 
 func (b *GethStatusBackend) InstallationID() string {
@@ -2462,12 +2402,12 @@ func (b *GethStatusBackend) wakuMetricsHandler() http.Handler {
 			return
 		}
 
-		if b.StatusNode().WakuV2ExtService() == nil {
-			b.logger.Error("failed to get waku metrics: WakuV2ExtService is nil")
+		if b.StatusNode().WakuExtService() == nil {
+			b.logger.Error("failed to get waku metrics: WakuExtService is nil")
 			return
 		}
 
-		wakuMetrics := b.StatusNode().WakuV2ExtService().Metrics()
+		wakuMetrics := b.StatusNode().WakuExtService().Metrics()
 		if wakuMetrics != "" {
 			_, err := w.Write([]byte(wakuMetrics))
 

@@ -41,6 +41,7 @@ import (
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/eth"
+	wakuext "github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/newsfeed"
@@ -52,7 +53,6 @@ import (
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/utils"
-	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
@@ -99,8 +99,8 @@ type StatusNode struct {
 
 	logger *zap.Logger
 
-	gethAccountsManager *accsmanagement.AccountsManager
-	transactor          *transactions.Transactor
+	accountsManager *accsmanagement.AccountsManager
+	transactor      *transactions.Transactor
 
 	publicMethods map[string]bool
 	// we explicitly list every service, we could use interfaces
@@ -114,7 +114,7 @@ type StatusNode struct {
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         timesource.Service
-	wakuV2ExtSrvc          *wakuv2ext.Service
+	wakuV2ExtSrvc          *wakuext.Service
 	ensSrvc                *ens.Service
 	communityTokensSrvc    *communitytokens.Service
 	gifSrvc                *gif.Service
@@ -135,15 +135,15 @@ type StatusNode struct {
 }
 
 // New makes new instance of StatusNode.
-func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagement.AccountsManager, logger *zap.Logger) *StatusNode {
+func New(transactor *transactions.Transactor, accountsManager *accsmanagement.AccountsManager, logger *zap.Logger) *StatusNode {
 	logger = logger.Named("StatusNode")
 	return &StatusNode{
-		transactor:          transactor,
-		gethAccountsManager: gethAccountsManager,
-		logger:              logger,
-		publicMethods:       make(map[string]bool),
-		accountsPublisher:   pubsub.NewPublisher(),
-		rpcServer:           gethrpc.NewServer(),
+		transactor:        transactor,
+		accountsManager:   accountsManager,
+		logger:            logger,
+		publicMethods:     make(map[string]bool),
+		accountsPublisher: pubsub.NewPublisher(),
+		rpcServer:         gethrpc.NewServer(),
 	}
 }
 
@@ -204,7 +204,7 @@ func (n *StatusNode) StartMediaServerWithoutDB() error {
 
 // StartWithOptions starts current StatusNode, failing if it's already started.
 // It takes some options that allows to further configure starting process.
-func (n *StatusNode) Start(config *params.NodeConfig) error {
+func (n *StatusNode) Start(config *params.NodeConfig, account *multiaccounts.Account, metricsEnabled bool) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -215,7 +215,7 @@ func (n *StatusNode) Start(config *params.NodeConfig) error {
 
 	n.logger.Debug("starting with options", zap.Stringer("ClusterConfig", &config.ClusterConfig))
 
-	return n.startWithDB(config)
+	return n.startWithDB(config, account, metricsEnabled)
 }
 
 func (n *StatusNode) StartLocalBackup() error {
@@ -241,7 +241,7 @@ func (n *StatusNode) StartLocalBackup() error {
 		}
 	}
 
-	chatAccount, err := n.gethAccountsManager.SelectedChatAccount()
+	chatAccount, err := n.accountsManager.SelectedChatAccount()
 	if err != nil {
 		return err
 	}
@@ -313,7 +313,7 @@ func (n *StatusNode) SetMediaServerOptions(address *string, enableTLS *bool, adv
 	n.mediaServerAdvertizePort = advertizePort
 }
 
-func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
+func (n *StatusNode) startWithDB(config *params.NodeConfig, account *multiaccounts.Account, metricsEnabled bool) error {
 	n.config = config
 
 	if err := n.setupRPCClient(); err != nil {
@@ -333,7 +333,11 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 		return err
 	}
 
-	if err := n.initServices(config, n.mediaServer); err != nil {
+	if err := n.initServices(config, n.mediaServer, account, metricsEnabled); err != nil {
+		return err
+	}
+
+	if err := n.StartLocalBackup(); err != nil {
 		return err
 	}
 

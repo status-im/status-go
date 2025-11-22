@@ -214,27 +214,6 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 	return s.messenger.InitInstallations()
 }
 
-func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
-	err := s.messaging.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	// Start a loop that retrieves all messages and propagates them to status-mobile.
-	s.cancelMessenger = make(chan struct{})
-	response, err := s.messenger.Start()
-	if err != nil {
-		return nil, err
-	}
-	s.messenger.StartRetrieveMessagesLoop(time.Second, s.cancelMessenger)
-
-	if s.config.ShhextConfig.BandwidthStatsEnabled {
-		go s.retrieveStats(5*time.Second, s.cancelMessenger)
-	}
-
-	return response, nil
-}
-
 func (s *Service) retrieveStats(tick time.Duration, cancel <-chan struct{}) {
 	defer gocommon.LogOnPanic()
 	ticker := time.NewTicker(tick)
@@ -263,11 +242,35 @@ func (s *Service) DisableInstallation(installationID string) error {
 
 // APIs returns a list of new APIs.
 func (s *Service) APIs() []gethrpc.API {
-	panic("this is abstract service, use shhext or wakuext implementation")
+	return []gethrpc.API{
+		{
+			Namespace: "wakuext",
+			Version:   "1.0",
+			Service:   NewPublicAPI(s),
+			Public:    false,
+		},
+	}
 }
 
 // Start is run when a service is started.
 func (s *Service) Start() error {
+	err := s.messaging.Start()
+	if err != nil {
+		return err
+	}
+
+	// Start a loop that retrieves all messages and propagates them to status-mobile.
+	s.cancelMessenger = make(chan struct{})
+	err = s.messenger.Start()
+	if err != nil {
+		return err
+	}
+	s.messenger.StartRetrieveMessagesLoop(time.Second, s.cancelMessenger)
+
+	if s.config.ShhextConfig.BandwidthStatsEnabled {
+		go s.retrieveStats(5*time.Second, s.cancelMessenger)
+	}
+
 	return nil
 }
 

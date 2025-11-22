@@ -605,8 +605,10 @@ func (api *PublicAPI) StatusUpdates() (*ApplicationStatusUpdatesResponse, error)
 	}, nil
 }
 
+// StartMessenger starts the messenger
+// Deprecated: Messenger is now started together with service. This method is no-op.
 func (api *PublicAPI) StartMessenger() (*protocol.MessengerResponse, error) {
-	return api.service.StartMessenger()
+	return &protocol.MessengerResponse{}, nil
 }
 
 func (api *PublicAPI) SetUserStatus(ctx context.Context, status int, customText string) error {
