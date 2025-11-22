@@ -459,13 +459,11 @@ func (r *storeNodeRequest) routine() {
 
 	communityID := r.requestID.getCommunityID()
 
-	if r.requestID.RequestType != storeNodeCommunityRequest {
-		ctx, cancel := context.WithTimeout(r.ctx, storeNodeAvailableTimeout)
-		defer cancel()
-		if !r.manager.messenger.messaging.WaitForAvailableStoreNode(ctx) {
-			r.result.err = fmt.Errorf("store node is not available")
-			return
-		}
+	ctx, cancel := context.WithTimeout(r.ctx, storeNodeAvailableTimeout)
+	defer cancel()
+	if !r.manager.messenger.messaging.WaitForAvailableStoreNode(ctx) {
+		r.result.err = fmt.Errorf("store node is not available")
+		return
 	}
 
 	// Check if community already exists locally and get Clock.
