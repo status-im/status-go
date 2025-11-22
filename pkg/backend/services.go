@@ -1,0 +1,451 @@
+package backend
+
+import (
+	"time"
+
+	"github.com/ethereum/go-ethereum/event"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/node/adapters"
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/featureflags"
+	accountssvc "github.com/status-im/status-go/services/accounts"
+	appgeneral "github.com/status-im/status-go/services/app-general"
+	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/chat"
+	"github.com/status-im/status-go/services/communitytokens"
+	"github.com/status-im/status-go/services/connector"
+	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/ens/ensresolver"
+	"github.com/status-im/status-go/services/eth"
+	"github.com/status-im/status-go/services/gif"
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/services/media"
+	"github.com/status-im/status-go/services/newsfeed"
+	"github.com/status-im/status-go/services/permissions"
+	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/rpcstats"
+	"github.com/status-im/status-go/services/sharedurls"
+	"github.com/status-im/status-go/services/status"
+	"github.com/status-im/status-go/services/stickers"
+	"github.com/status-im/status-go/services/updates"
+	"github.com/status-im/status-go/services/wakuv2ext"
+	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
+	"github.com/status-im/status-go/services/wallet/router/fees"
+)
+
+type StatusBackendService interface {
+	Start() error
+	Stop() error
+	//API() interface{}
+	APIs() []gethrpc.API // TODO: We don't need gethrpc API
+	//Metrics() // TODO: Prometheus metrics
+}
+
+// services groups all services in a single place.
+// At the moment, the idea is simply not to pollute StatusBackend. For now services have direct access to StatusBackend instance and vice versa.
+// FIXME: Ideally, backend pointer should not be needed here. Instead, services should refer to each other with provider interfaces.
+type services struct {
+	backend *StatusBackend
+	logger  *zap.Logger
+
+	//backend                *API
+	mediaService           *media.Service
+	rpcStatsSrvc           *rpcstats.Service
+	statusPublicSrvc       *status.Service
+	accountsSrvc           *accountssvc.Service
+	browsersSrvc           *browsers.Service
+	permissionsSrvc        *permissions.Service
+	walletSrvc             *wallet.Service
+	localNotificationsSrvc *localnotifications.Service
+	personalSrvc           *personal.Service
+	timeSourceSrvc         timesource.Service
+	wakuV2ExtSrvc          *wakuv2ext.Service
+	ensSrvc                *ens.Service
+	communityTokensSrvc    *communitytokens.Service
+	gifSrvc                *gif.Service
+	stickersSrvc           *stickers.Service
+	chatSrvc               *chat.Service
+	updatesSrvc            *updates.Service
+	pendingTracker         *pendingtxtracker.PendingTxTracker
+	connectorSrvc          *connector.Service
+	appGeneralSrvc         *appgeneral.Service
+	ethSrvc                *eth.Service
+	newsfeedSrvc           *newsfeed.Service
+	sharedUrlsSrvc         *sharedurls.Service
+
+	// idleServices is a list of created, but not yet started services
+	// After starting, services are removed from this list.
+	idleServices []StatusBackendService
+}
+
+func newServices(backend *StatusBackend) *services {
+	return &services{
+		backend: backend,
+		logger:  backend.logger.Named("services"),
+	}
+}
+
+// All returns all created services. The order is fixed, but might change between versions.
+func (s *services) All() []StatusBackendService {
+	var out []StatusBackendService
+
+	all := []StatusBackendService{
+		s.mediaService,
+		s.rpcStatsSrvc,
+		s.statusPublicSrvc,
+		s.accountsSrvc,
+		s.browsersSrvc,
+		s.permissionsSrvc,
+		s.walletSrvc,
+		s.localNotificationsSrvc,
+		s.personalSrvc,
+		s.timeSourceSrvc,
+		s.wakuV2ExtSrvc,
+		s.ensSrvc,
+		s.communityTokensSrvc,
+		s.gifSrvc,
+		s.stickersSrvc,
+		s.chatSrvc,
+		s.updatesSrvc,
+		s.pendingTracker,
+		s.connectorSrvc,
+		s.appGeneralSrvc,
+		s.ethSrvc,
+		s.newsfeedSrvc,
+		s.sharedUrlsSrvc,
+	}
+
+	for _, service := range all {
+		if !common.IsNil(service) {
+			out = append(out, service)
+		}
+	}
+
+	return out
+}
+
+func (s *services) Register() error {
+	for _, service := range s.idleServices {
+		for _, api := range service.APIs() {
+			err := s.backend.rpcServer.RegisterName(api.Namespace, api.Service)
+			if err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// Start starts all created, but still idle (not started) services.
+// If any of the services failed to start, operation is interrupted and an error is returned.
+func (s *services) Start() error {
+	for _, service := range s.idleServices {
+		err := service.Start()
+		if err != nil {
+			return errors.Wrap(err, "failed to start service")
+		}
+	}
+
+	s.idleServices = []StatusBackendService{}
+
+	return nil
+}
+
+func (s *services) Stop() {
+	for _, service := range s.idleServices {
+		err := service.Stop()
+		if err != nil {
+			s.logger.Warn("failed to stop service", zap.Error(err))
+		}
+	}
+
+	// All services can be destroyed now
+	s.mediaService = nil
+	s.rpcStatsSrvc = nil
+	s.statusPublicSrvc = nil
+	s.accountsSrvc = nil
+	s.browsersSrvc = nil
+	s.permissionsSrvc = nil
+	s.walletSrvc = nil
+	s.localNotificationsSrvc = nil
+	s.personalSrvc = nil
+	s.timeSourceSrvc = nil
+	s.wakuV2ExtSrvc = nil
+	s.ensSrvc = nil
+	s.communityTokensSrvc = nil
+	s.gifSrvc = nil
+	s.stickersSrvc = nil
+	s.chatSrvc = nil
+	s.updatesSrvc = nil
+	s.pendingTracker = nil
+	s.connectorSrvc = nil
+	s.appGeneralSrvc = nil
+	s.ethSrvc = nil
+	s.newsfeedSrvc = nil
+	s.sharedUrlsSrvc = nil
+}
+
+func (s *services) createMedia(address, advertizeHost string, advertizePort int) error {
+	b := s.backend
+
+	if s.mediaService != nil {
+		// Media service should only be spawned once
+		return errors.New("media service is already created")
+	}
+
+	opts := []media.Option{
+		media.WithLogger(b.logger.Named("media-server")),
+		media.WithDisableTLS(false),
+		media.WithServerAddress(address),
+		media.WithServerAdvertizeAddress(advertizeHost, advertizePort),
+	}
+
+	mediaService, err := media.NewService(nil, b.ipfs, b.multiaccountsDB, nil, opts...)
+	if err != nil {
+		return err
+	}
+	//mediaService.SetDataProviders(b.ActiveAccount.appDB, b.ActiveAccount.walletDB, b.ipfs)
+
+	// Register service
+	err = b.rpcServer.RegisterName("media", mediaService.API())
+	if err != nil {
+		return errors.Wrap(err, "failed to register media server")
+	}
+
+	// Start service
+	err = s.mediaService.Start()
+	if err != nil {
+		return err
+	}
+
+	s.mediaService = mediaService
+	s.addService(s.mediaService)
+
+	return nil
+}
+
+func (s *services) addService(service StatusBackendService) {
+	s.idleServices = append(s.idleServices, service)
+}
+
+func (s *services) media() *media.Service {
+	return s.mediaService
+}
+
+func (s *services) createRPCStats() {
+	s.rpcStatsSrvc = rpcstats.New()
+	s.addService(s.rpcStatsSrvc)
+}
+
+func (s *services) statusPublicService() {
+	s.statusPublicSrvc = status.New()
+	s.addService(s.statusPublicSrvc)
+}
+
+func (s *services) accountsService() {
+	if s.mediaService == nil {
+		s.logger.Warn("creating accounts service without media service")
+	}
+
+	s.accountsSrvc = accountssvc.NewService(
+		s.backend.activeAccount.accountsDB,
+		s.backend.multiaccountsDB,
+		s.gethAccountsManager,
+		s.config,
+		s.accountsPublisher,
+		s.mediaService,
+		s.logger.Named("accounts"),
+	)
+	s.addService(s.accountsSrvc)
+}
+
+func (s *services) createBrowsersService() {
+	db := browsers.NewDB(s.backend.activeAccount.appDB)
+	s.browsersSrvc = browsers.NewService(db)
+	s.addService(s.browsersSrvc)
+}
+
+func (s *services) permissionsService() {
+	db := permissions.NewDB(s.backend.activeAccount.appDB)
+	s.permissionsSrvc = permissions.NewService(db)
+}
+
+func (s *services) createWallet() {
+	if s.mediaService == nil {
+		s.logger.Warn("creating wallet service without media service")
+	}
+
+	var ensResolver *ensresolver.EnsResolver
+	if s.ensSrvc != nil {
+		ensResolver = s.ensSrvc.API().EnsResolver()
+	}
+
+	s.walletSrvc = wallet.NewService(
+		s.backend.activeAccount.walletDB,
+		s.backend.activeAccount.accountsDB,
+		s.backend.activeAccount.appDB,
+		b.rpcClient,
+		accountsPublisher,
+		b.gethAccountsManager,
+		b.transactor,
+		b.config,
+		ensResolver,
+		s.pendingTracker,
+		walletFeed,
+		s.mediaService,
+		b.tokenManager,
+		statusProxyStageName,
+	)
+	s.addService(s.walletSrvc)
+
+	if s.wakuV2ExtSrvc != nil {
+		s.walletSrvc.SetWalletCommunityInfoProvider(s.wakuV2ExtSrvc)
+	}
+}
+
+func (s *services) localNotificationsService() {
+	db := s.backend.activeAccount.appDB
+	s.localNotificationsSrvc = localnotifications.NewService(db)
+	s.addService(s.localNotificationsSrvc)
+}
+
+func (s *services) personalService() {
+	s.personalSrvc = personal.New()
+	s.addService(s.personalSrvc)
+}
+
+func (s *services) createTimeSource() {
+	const privateMode = false // FIXME: This is temporal and will be replaced with the actual setting
+	if privateMode {
+		s.timeSourceSrvc = timesource.LocalService()
+	} else {
+		s.timeSourceSrvc = timesource.DefaultService()
+	}
+}
+
+func (s *services) wakuV2ExtService(config *params.NodeConfig) {
+	nodeConfig, err := s.backend.activeAccount.GetNodeConfig()
+	s.wakuV2ExtSrvc = wakuv2ext.New(*config, s.rpcClient, s.logger.Named("protocol"))
+	s.addService(s.wakuV2ExtSrvc)
+
+	if s.walletSrvc != nil {
+		s.walletSrvc.SetWalletCommunityInfoProvider(s.wakuV2ExtSrvc)
+	}
+}
+
+func (s *services) ensService() {
+	timesourceCb := s.timeSourceSrvc.Now // TODO: Replace callback with proper interface
+	s.ensSrvc = ens.NewService(s.rpcClient, s.gethAccountsManager, s.pendingTracker, s.config, s.appDB, timesourceCb)
+	s.addService(s.ensSrvc)
+}
+
+func (s *services) CommunityTokensService() {
+	s.communityTokensSrvc = communitytokens.NewService(s.rpcClient, s.gethAccountsManager, s.config, s.appDB, &s.walletFeed, s.transactor)
+	s.addService(s.communityTokensSrvc)
+}
+
+func (s *services) gifService(accountsDB *accounts.Database) {
+	s.gifSrvc = gif.NewService(accountsDB)
+	s.addService(s.gifSrvc)
+}
+
+func (s *services) stickersService(accountDB *accounts.Database) {
+	if s.mediaService == nil {
+		s.logger.Warn("creating stickers service without media service")
+	}
+	s.stickersSrvc = stickers.NewService(
+		accountDB,
+		s.rpcClient,
+		s.gethAccountsManager,
+		s.config,
+		s.downloader,
+		s.mediaService,
+		s.pendingTracker,
+	)
+	s.addService(s.stickersSrvc)
+}
+
+func (s *services) ChatService(accountsDB *accounts.Database) {
+	s.chatSrvc = chat.NewService(accountsDB)
+	s.addService(s.chatSrvc)
+}
+
+func (s *services) updatesService() {
+	ensService := s.ensSrvc
+	s.updatesSrvc = updates.NewService(ensService)
+	s.addService(s.updatesSrvc)
+}
+
+func (s *services) pendingTrackerService(walletFeed *event.Feed) {
+	s.pendingTracker = pendingtxtracker.NewPendingTxTracker(
+		s.backend.activeAccount.walletDB,
+		pendingtxtracker.NewBatchTxStatusFetcher(s.rpcClient, s.logger.Named("PendingTxTracker")),
+		walletFeed,
+		pendingtxtracker.PendingCheckInterval,
+	)
+	if s.transactor != nil {
+		s.transactor.SetPendingTracker(s.pendingTracker)
+	}
+	s.addService(s.pendingTracker)
+}
+
+func (s *services) connectorService() {
+	logger := s.logger.Named("connector")
+	s.connectorSrvc = connector.NewService(
+		logger,
+		s.backend.activeAccount.walletDB,
+		s.rpcClient,
+		fees.NewFeeManager(s.rpcClient, logger.Named("feeManager")),
+		s.rpcClient.GetNetworkManager(),
+		&connector.Config{
+			WSHost: s.config.WSHost,
+			WSPort: s.config.WSPort,
+		},
+	)
+	s.addService(s.connectorSrvc)
+}
+
+func (s *services) appgeneralService() {
+	s.appGeneralSrvc = appgeneral.New()
+	s.addService(s.appGeneralSrvc)
+}
+
+func (s *services) ethService() {
+	s.ethSrvc = eth.NewService(s.rpcClient, s.gethAccountsManager)
+	s.addService(s.ethSrvc)
+}
+
+func (s *services) NewsFeedService() {
+	if !featureflags.EnableNewsFeed {
+		return
+	}
+
+	persistence := newsfeed.NewSQLitePersistence(s.appDB)
+
+	s.newsfeedSrvc = newsfeed.NewService(
+		s.logger.Named("newsfeed"),
+		persistence,
+		nil,
+	)
+
+	if wakuext := s.WakuV2ExtService(); wakuext != nil && wakuext.Messenger() != nil {
+		ac := adapters.NewNewsFeedActivityCenterAdapter(wakuext.Messenger())
+		s.newsfeedSrvc.SetActivityCenter(ac)
+	}
+	s.addService(s.newsfeedSrvc)
+}
+
+func (s *services) sharedUrlsService() {
+	s.sharedUrlsSrvc = sharedurls.NewService(nil)
+	if extService := s.WakuV2ExtService(); extService != nil {
+		provider := adapters.NewSharedUrlsMessengerAdapter(extService.Messenger())
+		s.sharedUrlsSrvc.SetDataProvider(provider)
+	}
+	s.addService(s.sharedUrlsSrvc)
+}

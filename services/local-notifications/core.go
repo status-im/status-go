@@ -78,12 +78,12 @@ type Service struct {
 	db      *Database
 }
 
-func NewService(appDB *sql.DB) (*Service, error) {
+func NewService(appDB *sql.DB) *Service {
 	db := NewDB(appDB)
 
 	return &Service{
 		db: db,
-	}, nil
+	}
 }
 
 func (n *Notification) MarshalJSON() ([]byte, error) {

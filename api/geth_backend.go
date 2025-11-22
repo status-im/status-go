@@ -802,12 +802,6 @@ func (b *GethStatusBackend) GetSettings() (*settings.Settings, error) {
 	return &s, nil
 }
 
-func (b *GethStatusBackend) GetEnsUsernames() ([]*ens.UsernameDetail, error) {
-	db := ens.NewEnsDatabase(b.appDB)
-	removed := false
-	return db.GetEnsUsernames(&removed)
-}
-
 func (b *GethStatusBackend) Login(keyUID, password string) error {
 	return b.startNodeWithAccount(multiaccounts.Account{KeyUID: keyUID}, password, nil, nil)
 }
@@ -827,7 +821,7 @@ func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, pass
 
 func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
 	if err != nil {
-		signal.SendLoggedIn(nil, nil, nil, err)
+		signal.SendLoggedIn(nil, nil, err)
 		return err
 	}
 	s, err := b.GetSettings()
@@ -839,18 +833,7 @@ func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
 		return err
 	}
 
-	ensUsernames, err := b.GetEnsUsernames()
-	if err != nil {
-		return err
-	}
-	var ensUsernamesJSON json.RawMessage
-	if ensUsernames != nil {
-		ensUsernamesJSON, err = json.Marshal(ensUsernames)
-		if err != nil {
-			return err
-		}
-	}
-	signal.SendLoggedIn(acc, s, ensUsernamesJSON, nil)
+	signal.SendLoggedIn(acc, s, nil)
 	return nil
 }
 
@@ -1578,7 +1561,7 @@ func EnrichMultiAccountByPublicKey(account *multiaccounts.Account, chatPublicKey
 
 func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 	request *requests.CreateAccount,
-	mnemonic string, // empty mnemonic is used for keycard account, not empty for regular account
+	mnemonic string,                   // empty mnemonic is used for keycard account, not empty for regular account
 	keycardData *requests.KeycardData, // nil for regular account, not nil for account with already set keycard
 	restoreAccount bool,
 ) (*multiaccounts.Account, error) {

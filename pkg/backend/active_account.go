@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -33,6 +34,10 @@ type ActiveAccount struct {
 	appDB       *sql.DB
 	walletDB    *sql.DB
 	accsManager *accsmanagement.AccountsManager
+
+	// accountsDB is a wrapper around appDB
+	//TODO: get rid of this wrapper, use a settings service instead.
+	accountsDB *accounts.Database
 }
 
 func (a *ActiveAccount) Close() error {
@@ -57,7 +62,32 @@ func (a *ActiveAccount) Close() error {
 	return errorsog.Join(errs...)
 }
 
-func CreateAccount(dataDir string, logger *zap.Logger, request *requests2.CreateAccount) (*ActiveAccount, error) {
+func (a *ActiveAccount) GetSettings() (*settings.Settings, error) {
+	s, err := a.accountsDB.GetSettings()
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+func (a *ActiveAccount) GetNodeConfig() (*params.NodeConfig, error) {
+	return a.accountsDB.GetNodeConfig()
+}
+
+// ServicesConfig reads accounts settings from database and returns a configuration of services that should be started.
+// NOTE: Currently this is an adapter to Settings and NodeConfig, later should be stored in the database as is.
+func (a *ActiveAccount) ServicesConfig() (*ServicesConfig, error) {
+	cfg := ServicesConfig{}
+
+	nodeConfig, err := a.GetNodeConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get node config")
+	}
+
+	return cfg, nil
+}
+
+func createAccount(dataDir string, logger *zap.Logger, request *requests2.CreateAccount) (*ActiveAccount, error) {
 	activeAccount := &ActiveAccount{}
 
 	// 0. Generate mnemonic
@@ -169,11 +199,14 @@ func CreateAccount(dataDir string, logger *zap.Logger, request *requests2.Create
 	return activeAccount, nil
 }
 
-func CreateKeycardAccount(dataDir string, logger *zap.Logger) (*ActiveAccount, error) {
+func createKeycardAccount(dataDir string, logger *zap.Logger) (*ActiveAccount, error) {
 	return nil, errors.New("not implemented")
 }
 
-func Login(dataDir string, logger *zap.Logger, account *multiaccounts.Account, password string) (*ActiveAccount, error) {
+// login opens given account databases, and creates an account manager.
+// Returns ActiveAccount with all created objects.
+// Note that it does not operate with multiaccounts database.
+func login(dataDir string, logger *zap.Logger, account *multiaccounts.Account, password string) (*ActiveAccount, error) {
 	var err error
 	activeAccount := &ActiveAccount{
 		account: account,

@@ -341,12 +341,8 @@ func (b *StatusNode) SharedUrlsService() *sharedurls.Service {
 }
 
 func (b *StatusNode) localNotificationsService(network uint64) (*localnotifications.Service, error) {
-	var err error
 	if b.localNotificationsSrvc == nil {
-		b.localNotificationsSrvc, err = localnotifications.NewService(b.appDB)
-		if err != nil {
-			return nil, err
-		}
+		b.localNotificationsSrvc = localnotifications.NewService(b.appDB)
 	}
 	return b.localNotificationsSrvc, nil
 }

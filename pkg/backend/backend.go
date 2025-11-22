@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -11,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/centralizedmetrics"
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/metrics"
@@ -19,24 +19,18 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/requestlog"
 	"github.com/status-im/status-go/multiaccounts"
-	requests2 "github.com/status-im/status-go/pkg/backend/requests"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/backend/rpc"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
-	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/media"
+	"github.com/status-im/status-go/services/rpcstats"
 )
 
 const (
 	DefaultAPILogFile = "api.log"
 )
-
-type StatusBackendService interface {
-	Start() error
-	Stop() error
-	API() interface{}
-	//Metrics() // TODO: Prometheus metrics
-}
 
 type StatusBackend struct {
 	rootDataDir string
@@ -51,10 +45,7 @@ type StatusBackend struct {
 
 	// RPC server
 	rpcServer *gethrpc.Server
-	services  []StatusBackendService // NOTE: Not sure if we need it. We'll still have to keep pointers to each service.
-
-	// Services
-	mediaService *media.Service
+	services  *services
 
 	// FIXME: Extract to separate services
 	ipfs               *ipfs.Downloader
@@ -79,6 +70,7 @@ func NewStatusBackend(rootDataDir string, opts ...Option) (*StatusBackend, error
 
 	// Start RPC server
 	// NOTE: After refactoring, all actions below will be called as part of some service
+	b.services = newServices(b)
 	b.rpcServer = gethrpc.NewServer()
 	b.Start()
 
@@ -154,7 +146,7 @@ func NewStatusBackend(rootDataDir string, opts ...Option) (*StatusBackend, error
 
 	// Create media service
 	if cfg.mediaServiceEnabled {
-		err = b.createMediaService(cfg.mediaServerAddress, cfg.mediaServerAdvertizeHost, cfg.mediaServerAdvertizePort)
+		err = b.services.createMedia(cfg.mediaServerAddress, cfg.mediaServerAdvertizeHost, cfg.mediaServerAdvertizePort)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to start media server")
 		}
@@ -166,11 +158,9 @@ func NewStatusBackend(rootDataDir string, opts ...Option) (*StatusBackend, error
 		return nil, errors.Wrap(err, "failed to register root service")
 	}
 
-	for _, service := range b.services {
-		err = service.Start()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to start service")
-		}
+	err = b.services.Start()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to start services")
 	}
 
 	b.logger.Info("status backend initialized",
@@ -188,16 +178,8 @@ func (b *StatusBackend) Start() {
 func (b *StatusBackend) Shutdown() error {
 	var err error
 
-	if b.rpcServer != nil {
-		b.rpcServer.Stop()
-	}
-
-	for _, service := range b.services {
-		err = service.Stop()
-		if err != nil {
-			b.logger.Error("failed to stop service", zap.Error(err))
-		}
-	}
+	b.rpcServer.Stop()
+	b.services.Stop()
 	b.services = nil
 
 	if b.ipfs != nil {
@@ -224,42 +206,6 @@ func (b *StatusBackend) API() *API {
 	}
 }
 
-func (b *StatusBackend) createMediaService(address, advertizeHost string, advertizePort int) error {
-	if b.mediaService != nil {
-		// Media service should only be spawned once
-		return errors.New("media server is already running")
-	}
-
-	opts := []media.Option{
-		media.WithLogger(b.logger.Named("media-server")),
-		media.WithDisableTLS(false),
-		media.WithServerAddress(address),
-		media.WithServerAdvertizeAddress(advertizeHost, advertizePort),
-	}
-
-	mediaService, err := media.NewService(nil, b.ipfs, b.multiaccountsDB, nil, opts...)
-	if err != nil {
-		return err
-	}
-	//mediaService.SetDataProviders(b.ActiveAccount.appDB, b.ActiveAccount.walletDB, b.ipfs)
-
-	// Register service
-	err = b.rpcServer.RegisterName("media", mediaService.API())
-	if err != nil {
-		return errors.Wrap(err, "failed to register media server")
-	}
-
-	// Start service
-	err = b.mediaService.Start()
-	if err != nil {
-		return err
-	}
-
-	b.services = append(b.services, mediaService)
-	b.mediaService = mediaService
-	return nil
-}
-
 // TODO: Move to a CentralizedMetrics service
 func (b *StatusBackend) CentralizedMetricsInfo() (*centralizedmetrics.MetricsInfo, error) {
 	return b.centralizedMetrics.Info()
@@ -274,78 +220,120 @@ func (b *StatusBackend) CallInProcessRPC(inputJSON string) string {
 func (b *StatusBackend) ListAccounts(ctx context.Context) ([]multiaccounts.Account, error) {
 	accs, err := b.multiaccountsDB.GetAccounts()
 
-	if b.mediaService != nil {
-		for i, acc := range accs {
-			for j, images := range acc.Images {
-				url := b.mediaService.MakeAccountImageURL(acc.KeyUID, images.Name, images.Clock)
-				accs[i].Images[j].LocalURL = url
-			}
-		}
+	for i, acc := range accs {
+		b.setAccountsImageURLs(&acc)
+		accs[i] = acc
 	}
 
 	return accs, err
 }
 
-func (b *StatusBackend) CreateAccount(ctx context.Context, request *requests2.CreateAccount, keycardData *requests2.KeycardData) (*multiaccounts.Account, error) {
-
-	//creator := NewAccountCreator(b.rootDataDir, b.logger.Named("account-creator"), b.multiaccountsDB, b.mediaService)
-	//return creator.StartNodeWithChatKeyOrMnemonic(ctx, request, mnemonic, keycardData, true)
-
-	activeAcc, err := CreateAccount(b.rootDataDir, b.logger, request)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create account")
+// setAccountsImageURLs sets acc.Images using b.mediaService.
+// TODO: This should be done using a multiaccounts service
+func (b *StatusBackend) setAccountsImageURLs(acc *multiaccounts.Account) {
+	if b.mediaService == nil {
+		return
 	}
 
-	// We don't need the account, so we can immediately close it
-	err = activeAcc.Close()
-	if err != nil {
-		b.logger.Error("failed to close account", zap.Error(err))
+	for k, v := range acc.Images {
+		url := b.mediaService.MakeAccountImageURL(acc.KeyUID, v.Name, v.Clock)
+		acc.Images[k].LocalURL = url
 	}
-
-	// Save account to multiaccounts database
-	err = b.multiaccountsDB.SaveAccount(*activeAcc.account)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to save account")
-	}
-
-	return activeAcc.account, nil
 }
 
-func (b *StatusBackend) Login(request *requests.Login) error {
-	// Get account from database
-	acc, err := b.multiaccountsDB.GetAccount(request.KeyUID)
+type ServicesConfig struct {
+	browserEnabled            bool
+	permissionsServiceEnabled bool
+	connectorEnabled          bool
+	walletEnabled             bool
+	wakuV2ExtEnabled          bool
+}
+
+// Register and start services, according to persisted settings
+// Root service should only load the settings required to define the list of services to start
+// Other services should load their settings through its persistence interfaces.
+// NOTE: For now we always register and start all services, as we did before. (messenger and wallet started by client)
+func (b *StatusBackend) startServices() error {
+	// 1. Spawn settings service
+
+	// 2. Read settings required to decide which allServices to start
+	cfg, err := b.activeAccount.ServicesConfig()
 	if err != nil {
-		return errors.Wrap(err, "failed to get account")
-	}
-	if acc == nil {
-		return errors.New("account not found")
+		return errors.Wrap(err, "failed to load active account config")
 	}
 
-	// Set runtime parameters
-	if request.RuntimeLogLevel != "" {
-		// TODO
+	accDB := b.activeAccount.accountsDB
+
+	// 3. Start allServices
+	b.services.createRPCStats()
+	b.services.appgeneralService()
+	b.services.personalService()
+	b.services.statusPublicService()
+	b.services.pendingTrackerService(&b.walletFeed)
+	b.services.ensService(b.timeSourceNow())
+	b.services.CommunityTokensService()
+	b.services.stickersService(b.activeAccount.accountsDB)
+	b.services.updatesService()
+	b.services.accountsService(b.activeAccount.accountsDB, mediaServer)
+
+	if cfg.browserEnabled {
+		b.services.createBrowsersService()
 	}
 
-	// Open databases
-	activeAccount, err := Login(b.rootDataDir, b.logger, acc, request.Password)
+	if cfg.permissionsServiceEnabled {
+		b.services.permissionsService()
+	}
+
+	if cfg.connectorEnabled {
+		b.services.connectorService()
+	}
+
+	b.services.gifService(b.activeAccount.accountsDB)
+	b.services.ChatService(b.activeAccount.accountsDB)
+	b.services.ethService()
+
+	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
+	// Keep this initialization before the other two
+	if cfg.walletEnabled {
+		b.services.createWallet()
+	}
+
+	// CollectiblesManager needs the WakuExt service to get metadata for
+	// Community collectibles.
+	// Messenger needs the CollectiblesManager to get the list of collectibles owned
+	// by a certain account and check community entry permissions.
+	// We handle circular dependency between the two by delaying initialization of the CommunityCollectibleInfoProvider
+	// in the CollectiblesManager.
+	if cfg.wakuV2ExtEnabled {
+		b.services.wakuV2ExtService()
+	}
+
+	b.services.localNotificationsService()
+	b.services.NewsFeedService()
+	b.services.sharedUrlsService()
+
+	// FIXME: refactor waku ext services to MessengerService.
+	//   There should be no custom InitProtocol functions, services should be set up in messenger.NewService().
+	//   And messenger should not be started from client, but just as a regular service.
+	initProtocol()
+
+	// Register ourselves as a service
+	err = b.services.Register()
 	if err != nil {
-		return errors.Wrap(err, "failed to login")
+		return errors.Wrap(err, "failed to register services")
 	}
 
-	// Run migrations
-
-	// Register and start services, according to persisted settings
-	// Root service should only load the settings required to define the list of services to start
-	// Other services should load their settings through its persistence interfaces.
-	// NOTE: For now we always register and start all services, as we did before.
-	//   (messenger and wallet started by client)
-
-	// Send LoggedIn signal to the client
-	// TODO: Perhaps this signal makes no sense when Login is a sync call
-	err = b.LoggedIn(request.KeyUID, err)
+	err = b.services.Start()
 	if err != nil {
-		return errors.Wrap(err, "failed to send LoggedIn signal")
+		return errors.Wrap(err, "failed to start services")
 	}
 
 	return nil
+}
+
+func appendIf(services []common.StatusService, service common.StatusService, condition bool) []common.StatusService {
+	if !condition {
+		return services
+	}
+	return append(services, service)
 }
