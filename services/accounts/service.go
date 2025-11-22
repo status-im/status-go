@@ -31,7 +31,6 @@ func NewService(
 	mdb *multiaccounts.Database,
 	manager *accsmanagement.AccountsManager,
 	config *params.NodeConfig,
-	publisher *pubsub.Publisher,
 	mediaServer *media.Service,
 	logger *zap.Logger,
 ) *Service {
@@ -41,16 +40,14 @@ func NewService(
 		manager:     manager,
 		config:      config,
 		mediaServer: mediaServer,
-		publisher:   publisher,
+		publisher:   pubsub.NewPublisher(),
 		logger:      logger,
 	}
 	db.SetSettingsNotifier(func(setting settings.SettingField, val interface{}) {
-		if s.publisher != nil {
-			pubsub.Publish(s.publisher, settings.EventSettingChanged{
-				Setting: setting,
-				Value:   val,
-			})
-		}
+		pubsub.Publish(s.publisher, settings.EventSettingChanged{
+			Setting: setting,
+			Value:   val,
+		})
 	})
 	return s
 }
@@ -80,6 +77,7 @@ func (s *Service) Start() error {
 
 // Stop a service.
 func (s *Service) Stop() error {
+	s.publisher.Close()
 	return nil
 }
 
@@ -105,7 +103,11 @@ func (s *Service) APIs() []rpc.API {
 }
 
 func (s *Service) AccountsAPI() *API {
-	return NewAccountsAPI(s.manager, s.config, s.db, &s.messenger, s.publisher)
+	return NewAccountsAPI(s.manager, s.db, &s.messenger, s.publisher)
+}
+
+func (s *Service) Publisher() *pubsub.Publisher {
+	return s.publisher
 }
 
 func (s *Service) GetKeypairByKeyUID(keyUID string) (*accsmanagementtypes.Keypair, error) {

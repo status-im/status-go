@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -58,7 +57,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server/pairing/statecontrol"
-	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
@@ -2229,12 +2227,12 @@ func (b *GethStatusBackend) initProtocol() error {
 		RPCClient:              b.statusNode.RPCClient(),
 		WalletService:          b.statusNode.WalletService(),
 		CommunityTokensService: b.statusNode.CommunityTokensService(),
-		AccountsPublisher:      b.statusNode.AccountsPublisher(),
+		AccountsPublisher:      b.statusNode.AccountService().Publisher(),
 		TimeSource:             b.statusNode.TimeSource(),
 		MetricsEnabled:         b.prometheusMetrics != nil,
-		TokenManager:           NewCommunitiesTokenManager(b.statusNode.TokenManager()),
-		TokenBalanceManager:    NewCommunitiesTokenBalanceManager(b.statusNode.TokenBalancesFetcher(), b.statusNode.TokenBalancesStorage()),
-		NetworkManager:         NewCommunitiesNetworkManager(b.statusNode.RPCClient().GetNetworkManager()),
+		TokenManager:           adapters.NewCommunitiesTokenManager(b.statusNode.TokenManager()),
+		TokenBalanceManager:    adapters.NewCommunitiesTokenBalanceManager(b.statusNode.TokenBalancesFetcher(), b.statusNode.TokenBalancesStorage()),
+		NetworkManager:         adapters.NewCommunitiesNetworkManager(b.statusNode.RPCClient().GetNetworkManager()),
 	}
 	err = st.InitProtocol(params)
 	if err != nil {

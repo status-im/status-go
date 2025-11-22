@@ -30,7 +30,6 @@ import (
 	"github.com/status-im/status-go/node/backup"
 	"github.com/status-im/status-go/params"
 	rpc2 "github.com/status-im/status-go/pkg/backend/rpc"
-	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appgeneral "github.com/status-im/status-go/services/app-general"
@@ -40,6 +39,7 @@ import (
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/eth"
+	wakuext "github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/media"
@@ -52,7 +52,6 @@ import (
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/utils"
-	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
@@ -114,7 +113,7 @@ type StatusNode struct {
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         timesource.Service
-	wakuV2ExtSrvc          *wakuv2ext.Service
+	wakuV2ExtSrvc          *wakuext.Service
 	ensSrvc                *ens.Service
 	communityTokensSrvc    *communitytokens.Service
 	gifSrvc                *gif.Service
@@ -128,8 +127,7 @@ type StatusNode struct {
 	newsfeedSrvc           *newsfeed.Service
 	sharedUrlsSrvc         *sharedurls.Service
 
-	walletFeed        event.Feed
-	accountsPublisher *pubsub.Publisher
+	walletFeed event.Feed
 
 	localBackup *backup.Controller
 }
@@ -142,7 +140,6 @@ func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagemen
 		gethAccountsManager: gethAccountsManager,
 		logger:              logger,
 		publicMethods:       make(map[string]bool),
-		accountsPublisher:   pubsub.NewPublisher(),
 		rpcServer:           gethrpc.NewServer(),
 	}
 }
@@ -380,7 +377,7 @@ func (n *StatusNode) createAndStartTokenManager() error {
 	}
 
 	n.tokenManager = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.mediaServer, nil),
-		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsPublisher, accDB,
+		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsSrvc.Publisher(), accDB,
 		token.NewPersistence(n.walletDB))
 
 	const (
@@ -405,7 +402,7 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	config := rpc.ClientConfig{
 		Networks:          n.config.Networks,
 		DB:                n.appDB,
-		AccountsPublisher: n.accountsPublisher,
+		AccountsPublisher: n.accountsSrvc.Publisher(),
 	}
 	n.rpcClient, err = rpc.NewClient(config)
 	if err != nil {
@@ -438,8 +435,6 @@ func (n *StatusNode) Stop() error {
 		n.localBackup.Stop()
 		n.localBackup = nil
 	}
-
-	n.accountsPublisher.Close()
 
 	n.rpcClient.Stop()
 	n.rpcClient = nil

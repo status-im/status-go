@@ -13,20 +13,18 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 )
 
-func NewAccountsAPI(manager *accsmanagement.AccountsManager, config *params.NodeConfig, db *accounts.Database, messenger **protocol.Messenger, publisher *pubsub.Publisher) *API {
-	return &API{manager, config, db, messenger, publisher}
+func NewAccountsAPI(manager *accsmanagement.AccountsManager, db *accounts.Database, messenger **protocol.Messenger, publisher *pubsub.Publisher) *API {
+	return &API{manager, db, messenger, publisher}
 }
 
 // API is class with methods available over RPC.
 type API struct {
 	manager   *accsmanagement.AccountsManager
-	config    *params.NodeConfig
 	db        *accounts.Database
 	messenger **protocol.Messenger
 	publisher *pubsub.Publisher

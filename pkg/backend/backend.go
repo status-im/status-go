@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,19 +12,14 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/centralizedmetrics"
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/requestlog"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/backend/rpc"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
-	"github.com/status-im/status-go/services/media"
-	"github.com/status-im/status-go/services/rpcstats"
 )
 
 const (
@@ -231,12 +225,12 @@ func (b *StatusBackend) ListAccounts(ctx context.Context) ([]multiaccounts.Accou
 // setAccountsImageURLs sets acc.Images using b.mediaService.
 // TODO: This should be done using a multiaccounts service
 func (b *StatusBackend) setAccountsImageURLs(acc *multiaccounts.Account) {
-	if b.mediaService == nil {
+	if b.services.mediaService == nil {
 		return
 	}
 
 	for k, v := range acc.Images {
-		url := b.mediaService.MakeAccountImageURL(acc.KeyUID, v.Name, v.Clock)
+		url := b.services.mediaService.MakeAccountImageURL(acc.KeyUID, v.Name, v.Clock)
 		acc.Images[k].LocalURL = url
 	}
 }
@@ -262,40 +256,38 @@ func (b *StatusBackend) startServices() error {
 		return errors.Wrap(err, "failed to load active account config")
 	}
 
-	accDB := b.activeAccount.accountsDB
-
 	// 3. Start allServices
 	b.services.createRPCStats()
-	b.services.appgeneralService()
-	b.services.personalService()
-	b.services.statusPublicService()
-	b.services.pendingTrackerService(&b.walletFeed)
-	b.services.ensService(b.timeSourceNow())
-	b.services.CommunityTokensService()
-	b.services.stickersService(b.activeAccount.accountsDB)
-	b.services.updatesService()
-	b.services.accountsService(b.activeAccount.accountsDB, mediaServer)
+	b.services.createAppgeneralService()
+	b.services.createPersonalService()
+	b.services.createStatusPublicService()
+	b.services.createPendingTrackerService()
+	b.services.createEnsService()
+	b.services.createCommunityTokensService()
+	b.services.createStickersService()
+	b.services.createUpdatesService()
+	b.services.createAccountsService()
 
 	if cfg.browserEnabled {
 		b.services.createBrowsersService()
 	}
 
 	if cfg.permissionsServiceEnabled {
-		b.services.permissionsService()
+		b.services.createPermissionsService()
 	}
 
 	if cfg.connectorEnabled {
-		b.services.connectorService()
+		b.services.createConnectorService()
 	}
 
-	b.services.gifService(b.activeAccount.accountsDB)
-	b.services.ChatService(b.activeAccount.accountsDB)
-	b.services.ethService()
+	b.services.createGifService(b.activeAccount.accountsDB)
+	b.services.createChatService(b.activeAccount.accountsDB)
+	b.services.createEthService()
 
 	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
 	// Keep this initialization before the other two
 	if cfg.walletEnabled {
-		b.services.createWallet()
+		b.services.createWalletService()
 	}
 
 	// CollectiblesManager needs the WakuExt service to get metadata for
@@ -305,35 +297,27 @@ func (b *StatusBackend) startServices() error {
 	// We handle circular dependency between the two by delaying initialization of the CommunityCollectibleInfoProvider
 	// in the CollectiblesManager.
 	if cfg.wakuV2ExtEnabled {
-		b.services.wakuV2ExtService()
+		err := b.services.createWakuExtService()
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize waku v2 extension service")
+		}
 	}
 
-	b.services.localNotificationsService()
-	b.services.NewsFeedService()
-	b.services.sharedUrlsService()
+	b.services.createLocalNotificationsService()
+	b.services.createNewsFeedService()
+	b.services.createSharedUrlsService()
 
-	// FIXME: refactor waku ext services to MessengerService.
-	//   There should be no custom InitProtocol functions, services should be set up in messenger.NewService().
-	//   And messenger should not be started from client, but just as a regular service.
-	initProtocol()
-
-	// Register ourselves as a service
+	// Register all created services
 	err = b.services.Register()
 	if err != nil {
 		return errors.Wrap(err, "failed to register services")
 	}
 
+	// Start all created services
 	err = b.services.Start()
 	if err != nil {
 		return errors.Wrap(err, "failed to start services")
 	}
 
 	return nil
-}
-
-func appendIf(services []common.StatusService, service common.StatusService, condition bool) []common.StatusService {
-	if !condition {
-		return services
-	}
-	return append(services, service)
 }

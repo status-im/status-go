@@ -76,7 +76,7 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 
 	tokenManager := token.NewTokenManager(db, c, nil, nil, appDB, nil, nil, nil, accountsDb, token.NewPersistence(db))
 
-	service := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, tokenManager, "")
+	service := NewService(db, accountsDb, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, tokenManager, "")
 
 	mockCtrl := gomock.NewController(t)
 	tokenbalancesFetcher := mock_tokenbalances.NewMockFetcherIface(mockCtrl)

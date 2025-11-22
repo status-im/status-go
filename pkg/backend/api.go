@@ -89,8 +89,8 @@ func (a *API) Login(request requests2.Login) error {
 	// Save active account
 	b.activeAccount = activeAccount
 
-	// FIXME: Start  services
-	err := b.startServices(activeAccount)
+	// Start services
+	err = b.startServices()
 	if err != nil {
 		// WARNING: stop services and logout if failed?
 		return errors.Wrap(err, "failed to start services")

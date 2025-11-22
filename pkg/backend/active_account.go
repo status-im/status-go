@@ -2,7 +2,6 @@ package backend
 
 import (
 	"database/sql"
-	"encoding/json"
 	errorsog "errors"
 	"fmt"
 	"path/filepath"
@@ -15,17 +14,11 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	requests2 "github.com/status-im/status-go/pkg/backend/requests"
-	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/identity/alias"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -75,13 +68,19 @@ func (a *ActiveAccount) GetNodeConfig() (*params.NodeConfig, error) {
 }
 
 // ServicesConfig reads accounts settings from database and returns a configuration of services that should be started.
-// NOTE: Currently this is an adapter to Settings and NodeConfig, later should be stored in the database as is.
+// NOTE: Currently this is an adapter to NodeConfig, later should be stored in the database as is.
 func (a *ActiveAccount) ServicesConfig() (*ServicesConfig, error) {
-	cfg := ServicesConfig{}
-
 	nodeConfig, err := a.GetNodeConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get node config")
+	}
+
+	cfg := &ServicesConfig{
+		browserEnabled:            nodeConfig.BrowsersConfig.Enabled,
+		permissionsServiceEnabled: nodeConfig.PermissionsConfig.Enabled,
+		connectorEnabled:          nodeConfig.ConnectorConfig.Enabled,
+		walletEnabled:             nodeConfig.WalletConfig.Enabled,
+		wakuV2ExtEnabled:          nodeConfig.WakuV2Config.Enabled,
 	}
 
 	return cfg, nil

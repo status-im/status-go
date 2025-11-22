@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node/adapters"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/featureflags"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appgeneral "github.com/status-im/status-go/services/app-general"
@@ -23,6 +22,7 @@ import (
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	"github.com/status-im/status-go/services/eth"
+	wakuext "github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/media"
@@ -34,7 +34,6 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/updates"
-	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/router/fees"
@@ -66,7 +65,7 @@ type services struct {
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         timesource.Service
-	wakuV2ExtSrvc          *wakuv2ext.Service
+	wakuV2ExtSrvc          *wakuext.Service
 	ensSrvc                *ens.Service
 	communityTokensSrvc    *communitytokens.Service
 	gifSrvc                *gif.Service
@@ -191,6 +190,21 @@ func (s *services) Stop() {
 	s.sharedUrlsSrvc = nil
 }
 
+func (s *services) requireWakuextService() {
+	if s.wakuV2ExtSrvc == nil {
+		panic("attempted to create a service that requires WakuV2Ext")
+	}
+	if s.wakuV2ExtSrvc.Messenger() == nil {
+		panic("wakuV2Ext service initialized, but messenger is nil")
+	}
+}
+
+func (s *services) requireWalletService() {
+	if s.walletSrvc == nil {
+		panic("attempted to create a service that requires wallet service")
+	}
+}
+
 func (s *services) createMedia(address, advertizeHost string, advertizePort int) error {
 	b := s.backend
 
@@ -243,12 +257,17 @@ func (s *services) createRPCStats() {
 	s.addService(s.rpcStatsSrvc)
 }
 
-func (s *services) statusPublicService() {
+func (s *services) createStatusPublicService() {
+	s.requireWakuextService()
+
 	s.statusPublicSrvc = status.New()
+	s.statusPublicSrvc.Init(s.wakuV2ExtSrvc.Messenger())
 	s.addService(s.statusPublicSrvc)
 }
 
-func (s *services) accountsService() {
+func (s *services) createAccountsService() {
+	s.requireWakuextService()
+
 	if s.mediaService == nil {
 		s.logger.Warn("creating accounts service without media service")
 	}
@@ -256,12 +275,12 @@ func (s *services) accountsService() {
 	s.accountsSrvc = accountssvc.NewService(
 		s.backend.activeAccount.accountsDB,
 		s.backend.multiaccountsDB,
-		s.gethAccountsManager,
+		s.backend.activeAccount.accsManager,
 		s.config,
-		s.accountsPublisher,
 		s.mediaService,
 		s.logger.Named("accounts"),
 	)
+	s.accountsSrvc.Init(s.wakuV2ExtSrvc.Messenger(), s.backend.activeAccount.account)
 	s.addService(s.accountsSrvc)
 }
 
@@ -271,12 +290,12 @@ func (s *services) createBrowsersService() {
 	s.addService(s.browsersSrvc)
 }
 
-func (s *services) permissionsService() {
+func (s *services) createPermissionsService() {
 	db := permissions.NewDB(s.backend.activeAccount.appDB)
 	s.permissionsSrvc = permissions.NewService(db)
 }
 
-func (s *services) createWallet() {
+func (s *services) createWalletService() {
 	if s.mediaService == nil {
 		s.logger.Warn("creating wallet service without media service")
 	}
@@ -289,15 +308,13 @@ func (s *services) createWallet() {
 	s.walletSrvc = wallet.NewService(
 		s.backend.activeAccount.walletDB,
 		s.backend.activeAccount.accountsDB,
-		s.backend.activeAccount.appDB,
 		b.rpcClient,
-		accountsPublisher,
+		s.accountsSrvc.Publisher(),
 		b.gethAccountsManager,
 		b.transactor,
 		b.config,
 		ensResolver,
 		s.pendingTracker,
-		walletFeed,
 		s.mediaService,
 		b.tokenManager,
 		statusProxyStageName,
@@ -309,13 +326,13 @@ func (s *services) createWallet() {
 	}
 }
 
-func (s *services) localNotificationsService() {
+func (s *services) createLocalNotificationsService() {
 	db := s.backend.activeAccount.appDB
 	s.localNotificationsSrvc = localnotifications.NewService(db)
 	s.addService(s.localNotificationsSrvc)
 }
 
-func (s *services) personalService() {
+func (s *services) createPersonalService() {
 	s.personalSrvc = personal.New()
 	s.addService(s.personalSrvc)
 }
@@ -329,64 +346,122 @@ func (s *services) createTimeSource() {
 	}
 }
 
-func (s *services) wakuV2ExtService(config *params.NodeConfig) {
+func (s *services) createWakuExtService() error {
 	nodeConfig, err := s.backend.activeAccount.GetNodeConfig()
-	s.wakuV2ExtSrvc = wakuv2ext.New(*config, s.rpcClient, s.logger.Named("protocol"))
+	s.wakuV2ExtSrvc = wakuext.New(*config, s.rpcClient, s.logger.Named("protocol"))
 	s.addService(s.wakuV2ExtSrvc)
 
 	if s.walletSrvc != nil {
 		s.walletSrvc.SetWalletCommunityInfoProvider(s.wakuV2ExtSrvc)
 	}
+
+	activeAccount := s.backend.activeAccount
+	chatAccount, err := activeAccount.accsManager.SelectedChatAccount()
+	if err != nil {
+		return errors.Wrap(err, "failed to get selected chat account")
+	}
+
+	params := wakuext.InitProtocolParams{
+		Identity:               chatAccount.PrivateKey(),
+		AppDB:                  activeAccount.appDB,
+		WalletDB:               activeAccount.walletDB,
+		HTTPServer:             s.mediaService,
+		MultiAccountDB:         s.backend.multiaccountsDB,
+		Account:                activeAccount.account,
+		AccountsManager:        activeAccount.accsManager,
+		RPCClient:              s.statusNode.RPCClient(),
+		WalletService:          s.walletSrvc,
+		CommunityTokensService: s.communityTokensSrvc,
+		AccountsPublisher:      s.accountsSrvc.Publisher(),
+		TimeSource:             s.timeSourceSrvc,
+		MetricsEnabled:         s.prometheusMetrics != nil,
+		TokenManager:           adapters.NewCommunitiesTokenManager(s.statusNode.TokenManager()),
+		TokenBalanceManager:    adapters.NewCommunitiesTokenBalanceManager(s.statusNode.TokenBalancesFetcher(), s.statusNode.TokenBalancesStorage()),
+		NetworkManager:         adapters.NewCommunitiesNetworkManager(s.statusNode.RPCClient().GetNetworkManager()),
+	}
+
+	err = s.wakuV2ExtSrvc.InitProtocol(params)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize protocol")
+	}
+
+	return nil
 }
 
-func (s *services) ensService() {
-	timesourceCb := s.timeSourceSrvc.Now // TODO: Replace callback with proper interface
-	s.ensSrvc = ens.NewService(s.rpcClient, s.gethAccountsManager, s.pendingTracker, s.config, s.appDB, timesourceCb)
+func (s *services) createEnsService() {
+	s.requireWakuextService()
+	timeSourceCb := s.timeSourceSrvc.Now // TODO: Replace callback with proper interface
+	s.ensSrvc = ens.NewService(
+		s.rpcClient,
+		s.backend.activeAccount.accsManager,
+		s.pendingTracker,
+		s.config,
+		s.appDB,
+		timeSourceCb,
+	)
+	s.ensSrvc.Init(s.wakuV2ExtSrvc.Messenger().SyncEnsNamesWithDispatchMessage)
 	s.addService(s.ensSrvc)
 }
 
-func (s *services) CommunityTokensService() {
-	s.communityTokensSrvc = communitytokens.NewService(s.rpcClient, s.gethAccountsManager, s.config, s.appDB, &s.walletFeed, s.transactor)
+func (s *services) createCommunityTokensService() {
+	s.requireWakuextService()
+	s.requireWalletService()
+
+	s.communityTokensSrvc = communitytokens.NewService(
+		s.rpcClient,
+		s.backend.activeAccount.accsManager,
+		s.config,
+		s.backend.activeAccount.appDB,
+		s.walletSrvc.EventsFeed(),
+		s.transactor,
+	)
+	s.communityTokensSrvc.Init(s.wakuV2ExtSrvc.Messenger())
 	s.addService(s.communityTokensSrvc)
 }
 
-func (s *services) gifService(accountsDB *accounts.Database) {
+func (s *services) createGifService(accountsDB *accounts.Database) {
 	s.gifSrvc = gif.NewService(accountsDB)
 	s.addService(s.gifSrvc)
 }
 
-func (s *services) stickersService(accountDB *accounts.Database) {
+func (s *services) createStickersService() {
 	if s.mediaService == nil {
 		s.logger.Warn("creating stickers service without media service")
 	}
 	s.stickersSrvc = stickers.NewService(
-		accountDB,
+		s.backend.activeAccount.accountsDB,
 		s.rpcClient,
-		s.gethAccountsManager,
+		s.backend.activeAccount.accsManager,
 		s.config,
-		s.downloader,
+		s.backend.ipfs,
 		s.mediaService,
 		s.pendingTracker,
 	)
 	s.addService(s.stickersSrvc)
 }
 
-func (s *services) ChatService(accountsDB *accounts.Database) {
+func (s *services) createChatService(accountsDB *accounts.Database) {
+	s.requireWakuextService()
 	s.chatSrvc = chat.NewService(accountsDB)
+	s.chatSrvc.Init(s.wakuV2ExtSrvc.Messenger())
 	s.addService(s.chatSrvc)
 }
 
-func (s *services) updatesService() {
+func (s *services) createUpdatesService() {
 	ensService := s.ensSrvc
 	s.updatesSrvc = updates.NewService(ensService)
 	s.addService(s.updatesSrvc)
 }
 
-func (s *services) pendingTrackerService(walletFeed *event.Feed) {
+func (s *services) createPendingTrackerService() {
+	s.requireWalletService()
 	s.pendingTracker = pendingtxtracker.NewPendingTxTracker(
 		s.backend.activeAccount.walletDB,
-		pendingtxtracker.NewBatchTxStatusFetcher(s.rpcClient, s.logger.Named("PendingTxTracker")),
-		walletFeed,
+		pendingtxtracker.NewBatchTxStatusFetcher(
+			s.rpcClient,
+			s.logger.Named("PendingTxTracker"),
+		),
+		s.walletSrvc.EventsFeed(),
 		pendingtxtracker.PendingCheckInterval,
 	)
 	if s.transactor != nil {
@@ -395,7 +470,7 @@ func (s *services) pendingTrackerService(walletFeed *event.Feed) {
 	s.addService(s.pendingTracker)
 }
 
-func (s *services) connectorService() {
+func (s *services) createConnectorService() {
 	logger := s.logger.Named("connector")
 	s.connectorSrvc = connector.NewService(
 		logger,
@@ -411,22 +486,24 @@ func (s *services) connectorService() {
 	s.addService(s.connectorSrvc)
 }
 
-func (s *services) appgeneralService() {
+func (s *services) createAppgeneralService() {
 	s.appGeneralSrvc = appgeneral.New()
 	s.addService(s.appGeneralSrvc)
 }
 
-func (s *services) ethService() {
-	s.ethSrvc = eth.NewService(s.rpcClient, s.gethAccountsManager)
+func (s *services) createEthService() {
+	s.ethSrvc = eth.NewService(s.rpcClient, s.backend.activeAccount.accsManager)
 	s.addService(s.ethSrvc)
 }
 
-func (s *services) NewsFeedService() {
+func (s *services) createNewsFeedService() {
 	if !featureflags.EnableNewsFeed {
 		return
 	}
 
-	persistence := newsfeed.NewSQLitePersistence(s.appDB)
+	s.requireWakuextService()
+
+	persistence := newsfeed.NewSQLitePersistence(s.backend.activeAccount.appDB)
 
 	s.newsfeedSrvc = newsfeed.NewService(
 		s.logger.Named("newsfeed"),
@@ -434,18 +511,17 @@ func (s *services) NewsFeedService() {
 		nil,
 	)
 
-	if wakuext := s.WakuV2ExtService(); wakuext != nil && wakuext.Messenger() != nil {
-		ac := adapters.NewNewsFeedActivityCenterAdapter(wakuext.Messenger())
-		s.newsfeedSrvc.SetActivityCenter(ac)
-	}
+	activityCenter := adapters.NewNewsFeedActivityCenterAdapter(s.wakuV2ExtSrvc.Messenger())
+	s.newsfeedSrvc.SetActivityCenter(activityCenter)
+
 	s.addService(s.newsfeedSrvc)
 }
 
-func (s *services) sharedUrlsService() {
+func (s *services) createSharedUrlsService() {
 	s.sharedUrlsSrvc = sharedurls.NewService(nil)
-	if extService := s.WakuV2ExtService(); extService != nil {
-		provider := adapters.NewSharedUrlsMessengerAdapter(extService.Messenger())
-		s.sharedUrlsSrvc.SetDataProvider(provider)
-	}
+
+	provider := adapters.NewSharedUrlsMessengerAdapter(s.wakuV2ExtSrvc.Messenger())
+	s.sharedUrlsSrvc.SetDataProvider(provider)
+
 	s.addService(s.sharedUrlsSrvc)
 }

@@ -84,7 +84,6 @@ func ThirdpartyServicesEnabled(accountsDB *accounts.Database) bool {
 func NewService(
 	db *sql.DB,
 	accountsDB *accounts.Database,
-	appDB *sql.DB,
 	rpcClient *rpc.Client,
 	accountsPublisher *pubsub.Publisher,
 	gethManager *accsmanagement.AccountsManager,
@@ -92,11 +91,12 @@ func NewService(
 	config *params.NodeConfig,
 	ensResolver *ensresolver.EnsResolver,
 	pendingTxManager *pendingtxtracker.PendingTxTracker,
-	feed *event.Feed,
 	mediaServer *media.Service,
 	tokenManager *token.Manager,
 	statusProxyStageName string,
 ) *Service {
+	feed := &event.Feed{}
+
 	signals := &walletevent.SignalsTransmitter{
 		Publisher: feed,
 	}
@@ -459,6 +459,10 @@ func (s *Service) APIs() []gethrpc.API {
 			Public:    true,
 		},
 	}
+}
+
+func (s *Service) EventsFeed() *event.Feed {
+	return s.feed
 }
 
 func (s *Service) IsStarted() bool {
