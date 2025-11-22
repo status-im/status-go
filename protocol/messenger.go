@@ -532,9 +532,9 @@ func (m *Messenger) ToBackground() {
 	}
 }
 
-func (m *Messenger) Start() (*MessengerResponse, error) {
+func (m *Messenger) Start() error {
 	if m.started {
-		return nil, errors.New("messenger already started")
+		return errors.New("messenger already started")
 	}
 	m.started = true
 
@@ -542,12 +542,12 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	err := m.InitFilters()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	now := time.Now().UnixMilli()
 	if err := m.settings.CheckAndDeleteExpiredKeypairsAndAccounts(uint64(now)); err != nil {
-		return nil, err
+		return err
 	}
 
 	m.logger.Info("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
@@ -557,7 +557,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		m.handlePushNotificationClientRegistrations(m.pushNotificationClient.SubscribeToRegistrations())
 
 		if err := m.pushNotificationClient.Start(); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -567,12 +567,12 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 		// Subscribe
 		if err := m.ensVerifier.Start(); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	if err := m.communitiesManager.Start(); err != nil {
-		return nil, err
+		return err
 	}
 
 	m.handleEncryptionLayerSubscriptions(m.messaging.EncryptionSubscriptions())
@@ -592,7 +592,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if !m.config.featureFlags.DisableAutoMessageLoop {
 		err = m.startAutoMessageLoop()
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	m.startSyncSettingsLoop()
@@ -604,13 +604,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.startRequestMissingCommunityChannelsHRKeysLoop()
 
 	if err := m.cleanTopics(); err != nil {
-		return nil, err
-	}
-	response := &MessengerResponse{}
-
-	response.StoreNodes, err = m.AllMailservers()
-	if err != nil {
-		return nil, err
+		return err
 	}
 
 	m.messaging.SetStorenodeConfigProvider(m)
@@ -620,7 +614,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	controlledCommunities, err := m.communitiesManager.Controlled()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if m.archiveManager.IsReady() {
@@ -648,29 +642,29 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if m.httpServer != nil {
 		err = m.httpServer.Start()
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	err = m.GarbageCollectRemovedBookmarks()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = m.garbageCollectRemovedSavedAddresses()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if err := utils.ValidateDisplayName(&displayName); err != nil {
 		// Somehow a wrong display name was saved. We need to update it so that others accept our messages
 		pubKey, err := m.settings.GetPublicKey()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		replacementDisplayName := pubKey[:12]
 		m.logger.Warn("unaccepted display name was saved to the setting, reverting to pubkey substring", zap.String("displayName", displayName), zap.String("replacement", replacementDisplayName))
@@ -681,7 +675,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}
 	}
 
-	return response, nil
+	return nil
 }
 
 func (m *Messenger) startHistoryArchivesImportLoop() {
