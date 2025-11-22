@@ -37,7 +37,7 @@ type TestMessengerProfileShowcase struct {
 func (s *TestMessengerProfileShowcase) SetupTest() {
 	s.CommunitiesMessengerTestSuiteBase.SetupTest()
 	s.m = s.newMessenger("", []string{})
-	_, err := s.m.Start()
+	err := s.m.Start()
 	s.Require().NoError(err)
 }
 
@@ -229,7 +229,7 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntries() {
 	// Add mutual contact
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
-	_, err := theirMessenger.Start()
+	err := theirMessenger.Start()
 	s.Require().NoError(err)
 
 	defer TearDownMessenger(&s.Suite, theirMessenger)
@@ -424,7 +424,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 
 	// Add mutual contact
 	mutualContact := s.newMessenger(alicePassword, []string{aliceAccountAddress})
-	_, err = mutualContact.Start()
+	err = mutualContact.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, mutualContact)
 
@@ -432,7 +432,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 
 	// Add identity verified contact
 	verifiedContact := s.newMessenger(bobPassword, []string{bobAccountAddress})
-	_, err = verifiedContact.Start()
+	err = verifiedContact.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, verifiedContact)
 
@@ -559,7 +559,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnenc
 
 	// Add bob as a mutual contact
 	bob := s.newMessenger(bobPassword, []string{bobAccountAddress})
-	_, err = bob.Start()
+	err = bob.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
@@ -627,7 +627,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 
 	// Add bob as a mutual contact
 	bob := s.newMessenger(bobPassword, []string{bobAccountAddress})
-	_, err = bob.Start()
+	err = bob.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
@@ -713,7 +713,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesGrantExpires(
 
 	// 2) Bob add Alice become a mutual contacts
 	bob := s.newMessenger(bobPassword, []string{bobAccountAddress})
-	_, err = bob.Start()
+	err = bob.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
@@ -781,7 +781,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 
 	// 1) Owner creates an encrypted community
 	owner := s.newMessenger("", []string{})
-	_, err = owner.Start()
+	err = owner.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, owner)
 
@@ -792,7 +792,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 
 	// 2) Bob add Alice become a mutual contacts
 	bob := s.newMessenger(bobPassword, []string{bobAccountAddress})
-	_, err = bob.Start()
+	err = bob.Start()
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 

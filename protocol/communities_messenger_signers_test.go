@@ -38,11 +38,11 @@ func (s *MessengerCommunitiesSignersSuite) SetupTest() {
 	s.john = s.newMessenger(accountPassword, []string{commonAccountAddress})
 	s.bob = s.newMessenger(accountPassword, []string{bobAddress})
 	s.alice = s.newMessenger(accountPassword, []string{aliceAddress1})
-	_, err := s.john.Start()
+	err := s.john.Start()
 	s.Require().NoError(err)
-	_, err = s.bob.Start()
+	err = s.bob.Start()
 	s.Require().NoError(err)
-	_, err = s.alice.Start()
+	err = s.alice.Start()
 	s.Require().NoError(err)
 }
 

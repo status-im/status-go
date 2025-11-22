@@ -31,11 +31,11 @@ func (s *MessengerDeleteMessageForEveryoneSuite) SetupTest() {
 	s.bob = s.newMessenger(bobPassword, []string{bobPassword})
 	s.moderator = s.newMessenger(aliceAccountAddress, []string{aliceAddress1})
 
-	_, err := s.admin.Start()
+	err := s.admin.Start()
 	s.Require().NoError(err)
-	_, err = s.bob.Start()
+	err = s.bob.Start()
 	s.Require().NoError(err)
-	_, err = s.moderator.Start()
+	err = s.moderator.Start()
 	s.Require().NoError(err)
 }
 
