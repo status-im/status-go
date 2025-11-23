@@ -52,6 +52,8 @@ type StatusBackendService interface {
 // FIXME: Ideally, backend pointer should not be needed here. Instead, services should refer to each other with provider interfaces.
 type services struct {
 	backend *StatusBackend
+	
+	// lgoger is used to derive a logger for all services. And for logging.
 	logger  *zap.Logger
 
 	//backend                *API
@@ -276,7 +278,6 @@ func (s *services) createAccountsService() {
 		s.backend.activeAccount.accountsDB,
 		s.backend.multiaccountsDB,
 		s.backend.activeAccount.accsManager,
-		s.config,
 		s.mediaService,
 		s.logger.Named("accounts"),
 	)
@@ -310,9 +311,9 @@ func (s *services) createWalletService() {
 		s.backend.activeAccount.accountsDB,
 		b.rpcClient,
 		s.accountsSrvc.Publisher(),
-		b.gethAccountsManager,
+		s.backend.activeAccount.accsManager,
 		b.transactor,
-		b.config,
+		nodeConfig,
 		ensResolver,
 		s.pendingTracker,
 		s.mediaService,
@@ -347,8 +348,7 @@ func (s *services) createTimeSource() {
 }
 
 func (s *services) createWakuExtService() error {
-	nodeConfig, err := s.backend.activeAccount.GetNodeConfig()
-	s.wakuV2ExtSrvc = wakuext.New(*config, s.rpcClient, s.logger.Named("protocol"))
+	s.wakuV2ExtSrvc = wakuext.New(nodeConfig, s.rpcClient, s.logger.Named("protocol"))
 	s.addService(s.wakuV2ExtSrvc)
 
 	if s.walletSrvc != nil {
@@ -390,13 +390,13 @@ func (s *services) createWakuExtService() error {
 
 func (s *services) createEnsService() {
 	s.requireWakuextService()
+
 	timeSourceCb := s.timeSourceSrvc.Now // TODO: Replace callback with proper interface
 	s.ensSrvc = ens.NewService(
 		s.rpcClient,
 		s.backend.activeAccount.accsManager,
 		s.pendingTracker,
-		s.config,
-		s.appDB,
+		s.backend.activeAccount.appDB,
 		timeSourceCb,
 	)
 	s.ensSrvc.Init(s.wakuV2ExtSrvc.Messenger().SyncEnsNamesWithDispatchMessage)
@@ -410,7 +410,6 @@ func (s *services) createCommunityTokensService() {
 	s.communityTokensSrvc = communitytokens.NewService(
 		s.rpcClient,
 		s.backend.activeAccount.accsManager,
-		s.config,
 		s.backend.activeAccount.appDB,
 		s.walletSrvc.EventsFeed(),
 		s.transactor,
@@ -432,7 +431,6 @@ func (s *services) createStickersService() {
 		s.backend.activeAccount.accountsDB,
 		s.rpcClient,
 		s.backend.activeAccount.accsManager,
-		s.config,
 		s.backend.ipfs,
 		s.mediaService,
 		s.pendingTracker,

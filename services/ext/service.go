@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -112,9 +111,6 @@ type InitProtocolParams struct {
 
 func (s *Service) InitProtocol(params InitProtocolParams) error {
 	var err error
-	if !s.config.ShhextConfig.PFSEnabled {
-		return nil
-	}
 
 	// If Messenger has been already set up, we need to shut it down
 	// before we init it again. Otherwise, it will lead to goroutines leakage
@@ -128,13 +124,6 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		if err := s.messaging.Stop(); err != nil {
 			return err
 		}
-	}
-
-	// This directory should have already been created in loadNodeConfig, keeping this to ensure.
-	dataDir := filepath.Clean(s.config.RootDataDir)
-
-	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
-		return err
 	}
 
 	s.accountsDB, err = accounts.NewDB(params.AppDB)

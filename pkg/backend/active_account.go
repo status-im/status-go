@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	errorsog "errors"
 	"fmt"
+	"os"
 	"path/filepath"
 
+	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -13,10 +15,12 @@ import (
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	requests2 "github.com/status-im/status-go/pkg/backend/requests"
 	"github.com/status-im/status-go/walletdatabase"
@@ -27,6 +31,12 @@ type ActiveAccount struct {
 	appDB       *sql.DB
 	walletDB    *sql.DB
 	accsManager *accsmanagement.AccountsManager
+
+	// nodeConfig is an old solution to keep node configuration.
+	// It's value is calculated based on persisted settings and runtime overrides. It's calculated once and cached.
+	// TODO: this should be removed. Instead, load ServicesConfig. And services should read their configs from database.
+	// If any runtime overrides are needed, they should defined accordingly, and passed as "runtime overrides" login parameters.
+	nodeConfig *params.NodeConfig
 
 	// accountsDB is a wrapper around appDB
 	//TODO: get rid of this wrapper, use a settings service instead.
@@ -63,8 +73,21 @@ func (a *ActiveAccount) GetSettings() (*settings.Settings, error) {
 	return &s, nil
 }
 
+func (a *ActiveAccount) SetNodeConfig(rootDataDir string, request *requests2.Login) error {
+	// FIXME: Problem is that currently we don't save NodeConfig into database.
+	//        Hence, we can't read it from the database.
+
+}
+
+// GetNodeConfig returns a node configuration based on the persisted settings and given runtime overrides.
+// TODO: This is a temporary solution. Instead, we should
 func (a *ActiveAccount) GetNodeConfig() (*params.NodeConfig, error) {
-	return a.accountsDB.GetNodeConfig()
+	if a.nodeConfig != nil {
+		// Used cached value
+		return a.nodeConfig, nil
+	}
+
+	//return a.accountsDB.GetNodeConfig()
 }
 
 // ServicesConfig reads accounts settings from database and returns a configuration of services that should be started.
@@ -140,12 +163,6 @@ func createAccount(dataDir string, logger *zap.Logger, request *requests2.Create
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create app database")
 	}
-	defer func() {
-		err := activeAccount.appDB.Close()
-		if err != nil {
-			logger.Error("failed to close app database", zap.Error(err))
-		}
-	}()
 
 	accdb, err := accounts.NewDB(activeAccount.appDB)
 	if err != nil {
@@ -153,16 +170,10 @@ func createAccount(dataDir string, logger *zap.Logger, request *requests2.Create
 	}
 
 	// 7. Create wallet database
-	walletDB, err := createWalletDatabase(dataDir, activeAccount.account.KeyUID, activeAccount.account.KDFIterations, request.Password)
+	activeAccount.walletDB, err = createWalletDatabase(dataDir, activeAccount.account.KeyUID, activeAccount.account.KDFIterations, request.Password)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create wallet database")
 	}
-	defer func() {
-		err := walletDB.Close()
-		if err != nil {
-			logger.Error("failed to close wallet database", zap.Error(err))
-		}
-	}()
 
 	// 8. Create accounts manager
 	activeAccount.accsManager, err = createAccountsManager(logger.Named("accounts-manager"), dataDir, accdb)
@@ -361,4 +372,95 @@ func openWalletDatabase(rootDataDir string, account *multiaccounts.Account, pass
 	//}
 	//b.statusNode.SetWalletDB(b.walletDB)
 	//return nil
+}
+
+func createNodeConfig(request *requests2.CreateAccount, installationID string, keyUID string) (*params.NodeConfig, error) {
+	nodeConfig, err := api.DefaultNodeConfig(installationID, keyUID, request)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeConfig, nil
+}
+
+func loginNodeConfig(rootDataDir string, request *requests2.Login) (*params.NodeConfig, error) {
+	defaultConfig := &params.NodeConfig{
+		// why we need this? relate PR: https://github.com/status-im/status-go/pull/4014
+		KeycardPairingDataFile: filepath.Join(rootDataDir, DefaultKeycardPairingDataFileRelativePath),
+	}
+
+	cfg.WalletConfig = api.BuildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
+
+	//err := b.UpdateNodeConfigFleet(acc, request.Password, cfg)
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "failed to update node config fleet")
+	//}
+
+	accountsSettings, err := a.GetSettings()
+	if err != nil {
+		return errors.Wrap(err, "failed to load account settings")
+	}
+
+	fleet := accountsSettings.GetFleet()
+
+	if !params.IsFleetSupported(fleet) {
+		fleet = api.DefaultFleet
+	}
+
+	err = api.SetFleet(fleet, cfg)
+	if err != nil {
+		return errors.Wrap(err, "failed to set fleet")
+	}
+
+	//err = b.loadNodeConfig(cfg)
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "failed to load node config")
+	//}
+
+	peristedCfg, err := nodecfg.GetNodeConfigFromDB(a.appDB)
+	if err != nil {
+		return err
+	}
+
+	// If an installationID is provided, we override it
+	if peristedCfg.ShhextConfig.InstallationID != "" {
+		cfg.ShhextConfig.InstallationID = conf.ShhextConfig.InstallationID
+	}
+
+	//cfg, err = b.OverwriteNodeConfigValues(peristedCfg, cfg)
+	//if err != nil {
+	//	return err
+	//}
+
+	if err := mergo.Merge(conf, n, mergo.WithOverride); err != nil {
+		return nil, err
+	}
+
+	cfg.Networks = n.Networks
+
+	cfg.RootDataDir = rootDataDir
+
+	if cfg.RuntimeLogLevel != "" {
+		cfg.LogLevel = cfg.RuntimeLogLevel
+	}
+
+	if request.RuntimeLogLevel != "" {
+		cfg.LogLevel = request.RuntimeLogLevel
+	}
+
+	if cfg.WakuV2Config.Enabled && request.WakuV2Nameserver != "" {
+		cfg.WakuV2Config.Nameserver = request.WakuV2Nameserver
+	}
+
+	cfg.ShhextConfig.BandwidthStatsEnabled = request.BandwidthStatsEnabled
+
+	//b.overrideNetworks(b.config, request, accountSettings.ThirdpartyServicesEnabled)
+	cfg.Networks = api.BuildDefaultNetworks(&request.WalletSecretsConfig, accountsSettings.ThirdpartyServicesEnabled)
+
+	if request.APIConfig != nil {
+		api.OverrideApiConfig(cfg, request.APIConfig)
+	}
+
+	a.nodeConfig = cfg
+	return nil
 }

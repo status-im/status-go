@@ -143,7 +143,7 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	return nil
 }
 
-func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.WalletSecretsConfig) params.WalletConfig {
+func BuildWalletConfig(walletRequest *requests.WalletConfig, request *requests.WalletSecretsConfig) params.WalletConfig {
 	walletConfig := params.WalletConfig{
 		Enabled:                true,
 		EnableMercuryoProvider: true,
@@ -224,7 +224,7 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	return walletConfig
 }
 
-func overrideApiConfig(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
+func OverrideApiConfig(nodeConfig *params.NodeConfig, config *requests.APIConfig) {
 	nodeConfig.APIModules = config.APIModules
 	nodeConfig.ConnectorConfig.Enabled = config.ConnectorEnabled
 
@@ -287,7 +287,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.NetworkID = nodeConfig.Networks[0].ChainID
 	}
 
-	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
+	nodeConfig.WalletConfig = BuildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
 
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
@@ -352,7 +352,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	}
 
 	if request.APIConfig != nil {
-		overrideApiConfig(nodeConfig, request.APIConfig)
+		OverrideApiConfig(nodeConfig, request.APIConfig)
 	}
 
 	return nodeConfig, nil

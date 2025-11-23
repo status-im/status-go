@@ -39,7 +39,7 @@ func setupConfigs() (*params.NodeConfig, *requests.APIConfig) {
 
 func TestOverrideApiConfig(t *testing.T) {
 	newNodeConfig, apiConfig := setupConfigs()
-	overrideApiConfig(newNodeConfig, apiConfig)
+	OverrideApiConfig(newNodeConfig, apiConfig)
 
 	require.Equal(t, apiConfig.APIModules, newNodeConfig.APIModules)
 	require.Equal(t, apiConfig.ConnectorEnabled, newNodeConfig.ConnectorConfig.Enabled)

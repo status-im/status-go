@@ -605,7 +605,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		KeycardPairingDataFile: filepath.Join(b.rootDataDir, DefaultKeycardPairingDataFileRelativePath),
 	}
 
-	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
+	defaultCfg.WalletConfig = BuildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
 
 	err = b.UpdateNodeConfigFleet(acc, request.Password, defaultCfg)
 	if err != nil {
@@ -635,7 +635,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	b.overrideNetworks(b.config, request, accountSettings.ThirdpartyServicesEnabled)
 
 	if request.APIConfig != nil {
-		overrideApiConfig(b.config, request.APIConfig)
+		OverrideApiConfig(b.config, request.APIConfig)
 	}
 
 	accountsDB, err := accounts.NewDB(b.appDB)
@@ -1559,7 +1559,7 @@ func EnrichMultiAccountByPublicKey(account *multiaccounts.Account, chatPublicKey
 
 func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 	request *requests.CreateAccount,
-	mnemonic string,                   // empty mnemonic is used for keycard account, not empty for regular account
+	mnemonic string, // empty mnemonic is used for keycard account, not empty for regular account
 	keycardData *requests.KeycardData, // nil for regular account, not nil for account with already set keycard
 	restoreAccount bool,
 ) (*multiaccounts.Account, error) {
@@ -1663,7 +1663,7 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 		return nil, err
 	}
 
-	nodeConfig, err := b.prepareConfig(request, keyUID, settings.InstallationID)
+	nodeConfig, err := b.prepareConfig(request, keyU, ID, settings.InstallationID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to prepare node config")
 	}

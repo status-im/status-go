@@ -20,7 +20,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
@@ -43,7 +42,6 @@ import (
 type Service struct {
 	manager         *Manager
 	accountsManager *accsmanagement.AccountsManager
-	config          *params.NodeConfig
 	db              *communitytokensdatabase.Database
 	Messenger       *protocol.Messenger
 	walletFeed      *event.Feed
@@ -55,13 +53,12 @@ type Service struct {
 }
 
 // Returns a new Collectibles Service.
-func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, config *params.NodeConfig, appDb *sql.DB,
+func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, appDb *sql.DB,
 	walletFeed *event.Feed, transactor *transactions.Transactor) *Service {
 	logger := logutils.ZapLogger().Named("communitytokens")
 	return &Service{
 		manager:         NewManager(rpcClient),
 		accountsManager: accountsManager,
-		config:          config,
 		db:              communitytokensdatabase.NewCommunityTokensDatabase(appDb),
 		walletFeed:      walletFeed,
 		transactor:      transactor,

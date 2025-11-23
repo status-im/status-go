@@ -8,14 +8,13 @@ import (
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )
 
 // NewService initializes service instance.
-func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, config *params.NodeConfig,
+func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager,
 	downloader *ipfs.Downloader, httpServer *media.Service, pendingTracker *pendingtxtracker.PendingTxTracker) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 

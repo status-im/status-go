@@ -36,7 +36,6 @@ type TransactionManager struct {
 func NewTransactionManager(
 	gethManager *accsmanagement.AccountsManager,
 	transactor transactions.TransactorIface,
-	config *params.NodeConfig,
 	accountsDB accounts.AccountsStorage,
 	pendingTxManager *pendingtxtracker.PendingTxTracker,
 	eventFeed *event.Feed,
@@ -44,16 +43,11 @@ func NewTransactionManager(
 	return &TransactionManager{
 		gethManager:    gethManager,
 		transactor:     transactor,
-		config:         config,
 		accountsDB:     accountsDB,
 		pendingTracker: pendingTxManager,
 		eventFeed:      eventFeed,
 	}
 }
-
-var (
-	emptyHash = common.Hash{}
-)
 
 type TxResponse struct {
 	KeyUID        string                 `json:"keyUid,omitempty"`

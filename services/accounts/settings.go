@@ -6,15 +6,13 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 )
 
-func NewSettingsAPI(messenger **protocol.Messenger, db *accounts.Database, config *params.NodeConfig) *SettingsAPI {
+func NewSettingsAPI(messenger **protocol.Messenger, db *accounts.Database) *SettingsAPI {
 	return &SettingsAPI{
 		messenger: messenger,
 		db:        db,
-		config:    config,
 	}
 }
 
@@ -22,7 +20,6 @@ func NewSettingsAPI(messenger **protocol.Messenger, db *accounts.Database, confi
 type SettingsAPI struct {
 	messenger **protocol.Messenger
 	db        *accounts.Database
-	config    *params.NodeConfig
 }
 
 func (api *SettingsAPI) SaveSetting(ctx context.Context, typ string, val interface{}) error {
@@ -36,11 +33,6 @@ func (api *SettingsAPI) SaveSetting(ctx context.Context, typ string, val interfa
 
 func (api *SettingsAPI) GetSettings(ctx context.Context) (settings.Settings, error) {
 	return api.db.GetSettings()
-}
-
-// NodeConfig returns the currently used node configuration
-func (api *SettingsAPI) NodeConfig(ctx context.Context) (*params.NodeConfig, error) {
-	return api.config, nil
 }
 
 // Backup Settings

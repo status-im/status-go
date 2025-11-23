@@ -17,7 +17,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -30,7 +29,6 @@ func NewService(
 	db *accounts.Database,
 	mdb *multiaccounts.Database,
 	manager *accsmanagement.AccountsManager,
-	config *params.NodeConfig,
 	mediaServer *media.Service,
 	logger *zap.Logger,
 ) *Service {
@@ -38,7 +36,6 @@ func NewService(
 		db:          db,
 		mdb:         mdb,
 		manager:     manager,
-		config:      config,
 		mediaServer: mediaServer,
 		publisher:   pubsub.NewPublisher(),
 		logger:      logger,
@@ -57,7 +54,6 @@ type Service struct {
 	db          *accounts.Database
 	mdb         *multiaccounts.Database
 	manager     *accsmanagement.AccountsManager
-	config      *params.NodeConfig
 	account     *multiaccounts.Account
 	messenger   *protocol.Messenger
 	mediaServer *media.Service
@@ -87,7 +83,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "settings",
 			Version:   "0.1.0",
-			Service:   NewSettingsAPI(&s.messenger, s.db, s.config),
+			Service:   NewSettingsAPI(&s.messenger, s.db),
 		},
 		{
 			Namespace: "accounts",

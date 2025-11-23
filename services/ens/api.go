@@ -27,13 +27,12 @@ import (
 )
 
 func NewAPI(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, pendingTracker *pendingtxtracker.PendingTxTracker,
-	config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
+	appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
 	return &API{
 		ensResolver: ensresolver.NewEnsResolver(rpcClient),
 
 		accountsManager: accountsManager,
 		pendingTracker:  pendingTracker,
-		config:          config,
 		db:              NewEnsDatabase(appDb),
 
 		timeSource:         timeSource,
@@ -71,7 +70,6 @@ type API struct {
 	ensResolver     *ensresolver.EnsResolver
 	accountsManager *accsmanagement.AccountsManager
 	pendingTracker  *pendingtxtracker.PendingTxTracker
-	config          *params.NodeConfig
 
 	db                 *Database
 	syncUserDetailFunc *syncUsernameDetail

@@ -105,7 +105,7 @@ func NewService(
 	featureFlags := &protocolCommon.FeatureFlags{}
 
 	savedAddressesManager := &SavedAddressesManager{db: db}
-	transactionManager := transfer.NewTransactionManager(gethManager, transactor, config, accountsDB, pendingTxManager, feed)
+	transactionManager := transfer.NewTransactionManager(gethManager, transactor, accountsDB, pendingTxManager, feed)
 	blockChainState := blockchainstate.NewBlockChainState(rpcClient)
 
 	thirdpartyServicesEnabled := ThirdpartyServicesEnabled(accountsDB)
@@ -471,10 +471,6 @@ func (s *Service) IsStarted() bool {
 
 func (s *Service) KeycardPairings() *KeycardPairings {
 	return s.keycardPairings
-}
-
-func (s *Service) Config() *params.NodeConfig {
-	return s.config
 }
 
 func (s *Service) FeatureFlags() *protocolCommon.FeatureFlags {
