@@ -9,7 +9,6 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts"
 	requests2 "github.com/status-im/status-go/pkg/backend/requests"
-	"github.com/status-im/status-go/services/media"
 )
 
 type API struct {
@@ -69,8 +68,11 @@ func (a *API) Login(request *requests2.Login) error {
 	}
 
 	// Set runtime parameters
-	if request.RuntimeLogLevel != "" {
-		// TODO
+	if request.RuntimeOverrides.LogLevel != nil {
+		err = a.backend.SetLogLevel(*request.RuntimeOverrides.LogLevel)
+		if err != nil {
+			return errors.Wrap(err, "failed to set runtime override log level")
+		}
 	}
 
 	activeAccount, err := login(b.rootDataDir, b.logger, acc, request.Password)
@@ -112,7 +114,3 @@ func (a *API) Login(request *requests2.Login) error {
 //func (a *API) Logout() error {
 //
 //}
-
-func (a *API) MediaService() *media.Service {
-	return a.backend.mediaService
-}

@@ -90,13 +90,9 @@ func NewStatusBackend(rootDataDir string, opts ...Option) (*StatusBackend, error
 	}
 
 	// Initialize logging
-	logSettings := logutils.LogSettings{
-		Enabled: true,
-		Level:   cfg.LogLevel,
-	}
-	err = logutils.OverrideRootLoggerWithConfig(logSettings)
+	err = b.SetLogLevel(cfg.LogLevel)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to override root logger")
+		return nil, errors.Wrap(err, "failed to set log level")
 	}
 
 	// Initialize API logging
@@ -420,4 +416,16 @@ func (b *StatusBackend) startServices() error {
 	}
 
 	return nil
+}
+
+// SetLogLevel is a simplification wrapper of logutils.OverrideRootLoggerWithConfig
+// TODO: This method shouldn't really exist. Instead, logutils should have appropriate API to modify LogLevel.
+func (b *StatusBackend) SetLogLevel(logLevel string) error {
+	// Initialize logging
+	logSettings := logutils.LogSettings{
+		Enabled: true,
+		Level:   logLevel,
+	}
+
+	return logutils.OverrideRootLoggerWithConfig(logSettings)
 }

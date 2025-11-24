@@ -231,7 +231,7 @@ func (b *StatusNode) pendingTrackerService() *pendingtxtracker.PendingTxTracker 
 		b.pendingTracker = pendingtxtracker.NewPendingTxTracker(
 			b.walletDB,
 			pendingtxtracker.NewBatchTxStatusFetcher(b.rpcClient, b.logger.Named("PendingTxTracker")),
-			b.walletSrvc.EventsFeed(),
+			&b.walletFeed,
 			pendingtxtracker.PendingCheckInterval,
 		)
 		if b.transactor != nil {
@@ -243,7 +243,7 @@ func (b *StatusNode) pendingTrackerService() *pendingtxtracker.PendingTxTracker 
 
 func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
 	if b.communityTokensSrvc == nil {
-		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountsManager, b.appDB, b.walletSrvc.EventsFeed())
+		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountsManager, b.appDB, &b.walletFeed)
 	}
 	return b.communityTokensSrvc
 }
