@@ -18,7 +18,10 @@
     nixpkgs.url = "github:NixOS/nixpkgs/0ef228213045d2cdb5a169a95d63ded38670b293";
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
     nwaku.url = "git+https://github.com/waku-org/nwaku?submodules=1&rev=e755fd834f5f3d6fba216b09469316f0328b3b6f";
-    nim-sds.url = "git+https://github.com/waku-org/nim-sds?submodules=1&rev=b6431260110fe62956ff4d7bab6767556c19d040";
+    nim-sds = {
+      url = "git+https://github.com/waku-org/nim-sds?submodules=1&rev=b6431260110fe62956ff4d7bab6767556c19d040";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = { self, nixpkgs, nwaku, nim-sds }:
@@ -39,20 +42,9 @@
         };
         overlays = [
           pkgsOverlay
-          (final: prev: let
-            libSds = nim-sds.packages.${system}.libsds;
-          in {
-            # Make nwaku available
-            nwaku = nwaku.packages.${system};
-
-            # Wrap nim-sds package so its dependencies propagate
-            lib-sds-pkg = libSds.overrideAttrs (old: {
-              propagatedBuildInputs = with final; [
-                openssl
-                gmp
-                nim-unwrapped-2_2
-              ];
-            });
+          (final: prev: {
+            nwaku        = nwaku.packages.${system};
+            lib-sds-pkg  = nim-sds.packages.${system}.libsds;
           })
         ];
       }
