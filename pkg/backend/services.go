@@ -298,7 +298,7 @@ func (s *services) createWalletService() {
 		s.backend.rpcClient,
 		s.accountsSrvc.Publisher(),
 		s.backend.activeAccount.accsManager,
-		s.transactor,
+		s.backend.transactor,
 		s.backend.activeAccount.nodeConfig,
 		ensResolver,
 		s.mediaService,
@@ -359,7 +359,7 @@ func (s *services) createWakuExtService() error {
 		CommunityTokensService: s.communityTokensSrvc,
 		AccountsPublisher:      s.accountsSrvc.Publisher(),
 		TimeSource:             s.timeSourceSrvc,
-		MetricsEnabled:         s.prometheusMetrics != nil,
+		MetricsEnabled:         s.backend.prometheusMetrics != nil,
 		TokenManager:           adapters.NewCommunitiesTokenManager(s.statusNode.TokenManager()),
 		TokenBalanceManager:    adapters.NewCommunitiesTokenBalanceManager(s.statusNode.TokenBalancesFetcher(), s.statusNode.TokenBalancesStorage()),
 		NetworkManager:         adapters.NewCommunitiesNetworkManager(s.backend.rpcClient.GetNetworkManager()),
@@ -395,7 +395,6 @@ func (s *services) createCommunityTokensService() {
 		s.backend.activeAccount.accsManager,
 		s.backend.activeAccount.appDB,
 		s.walletSrvc.EventsFeed(),
-		s.transactor,
 	)
 	s.communityTokensSrvc.Init(s.wakuV2ExtSrvc.Messenger())
 	s.addService(s.communityTokensSrvc)
@@ -444,9 +443,7 @@ func (s *services) createPendingTrackerService() {
 		s.walletSrvc.EventsFeed(),
 		pendingtxtracker.PendingCheckInterval,
 	)
-	if s.transactor != nil {
-		s.transactor.SetPendingTracker(s.pendingTracker)
-	}
+	s.backend.transactor.SetPendingTracker(s.pendingTracker)
 	s.addService(s.pendingTracker)
 }
 

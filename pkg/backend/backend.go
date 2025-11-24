@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/transactions"
 )
 
 const (
@@ -47,6 +48,7 @@ type StatusBackend struct {
 	ipfs               *ipfs.Downloader
 	centralizedMetrics *centralizedmetrics.MetricService
 	prometheusMetrics  *metrics.Server
+	transactor         *transactions.Transactor
 }
 
 func NewStatusBackend(rootDataDir string, opts ...Option) (*StatusBackend, error) {
@@ -181,6 +183,8 @@ func (b *StatusBackend) Shutdown() error {
 	b.rpcClient.Stop()
 	b.rpcClient = nil
 
+	b.transactor = nil
+
 	if b.ipfs != nil {
 		b.ipfs.Stop()
 	}
@@ -264,6 +268,8 @@ func (b *StatusBackend) startServices() error {
 	}
 	b.rpcClient = rpcClient
 	b.rpcClient.Start()
+
+	b.transactor = transactions.NewTransactor()
 
 	// 1. Spawn settings service
 
