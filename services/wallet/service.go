@@ -89,12 +89,11 @@ func NewService(
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
 	ensResolver *ensresolver.EnsResolver,
+	feed *event.Feed,
 	mediaServer *media.Service,
 	tokenManager *token.Manager,
 	statusProxyStageName string,
 ) *Service {
-	feed := &event.Feed{}
-
 	signals := &walletevent.SignalsTransmitter{
 		Publisher: feed,
 	}
@@ -455,10 +454,6 @@ func (s *Service) APIs() []gethrpc.API {
 			Public:    true,
 		},
 	}
-}
-
-func (s *Service) EventsFeed() *event.Feed {
-	return s.feed
 }
 
 func (s *Service) IsStarted() bool {

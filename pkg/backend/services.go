@@ -301,6 +301,7 @@ func (s *services) createWalletService() {
 		s.backend.transactor,
 		s.backend.activeAccount.nodeConfig,
 		ensResolver,
+		&s.backend.walletFeed,
 		s.mediaService,
 		s.tokenManager,
 		statusProxyStageName,
@@ -394,7 +395,7 @@ func (s *services) createCommunityTokensService() {
 		s.backend.rpcClient,
 		s.backend.activeAccount.accsManager,
 		s.backend.activeAccount.appDB,
-		s.walletSrvc.EventsFeed(),
+		&s.backend.walletFeed,
 	)
 	s.communityTokensSrvc.Init(s.wakuV2ExtSrvc.Messenger())
 	s.addService(s.communityTokensSrvc)
@@ -440,7 +441,7 @@ func (s *services) createPendingTrackerService() {
 			s.backend.rpcClient,
 			s.logger.Named("PendingTxTracker"),
 		),
-		s.walletSrvc.EventsFeed(),
+		&s.backend.walletFeed,
 		pendingtxtracker.PendingCheckInterval,
 	)
 	s.backend.transactor.SetPendingTracker(s.pendingTracker)

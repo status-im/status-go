@@ -306,6 +306,7 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsPublis
 		b.walletSrvc = wallet.NewService(
 			b.walletDB, accountsDB, b.rpcClient, accountsPublisher, b.gethAccountsManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()).API().EnsResolver(),
+			&b.walletFeed,
 			b.mediaServer,
 			b.tokenManager,
 			statusProxyStageName,

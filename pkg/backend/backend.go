@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -49,6 +50,10 @@ type StatusBackend struct {
 	centralizedMetrics *centralizedmetrics.MetricService
 	prometheusMetrics  *metrics.Server
 	transactor         *transactions.Transactor
+
+	// FIXME: Replace events feed with pubsub - https://github.com/status-im/status-go/issues/6744
+	// FIXME: It should not be a part of the backend, but rather a part of the wallet service
+	walletFeed event.Feed
 }
 
 func NewStatusBackend(rootDataDir string, opts ...Option) (*StatusBackend, error) {

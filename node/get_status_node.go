@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/event"
 	errorspkg "github.com/pkg/errors"
 
 	"go.uber.org/zap"
@@ -125,6 +126,8 @@ type StatusNode struct {
 	ethSrvc                *eth.Service
 	newsfeedSrvc           *newsfeed.Service
 	sharedUrlsSrvc         *sharedurls.Service
+
+	walletFeed event.Feed
 
 	localBackup *backup.Controller
 }
@@ -374,7 +377,7 @@ func (n *StatusNode) createAndStartTokenManager() error {
 	}
 
 	n.tokenManager = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.mediaServer, nil),
-		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, n.walletSrvc.EventsFeed(), n.accountsSrvc.Publisher(), accDB,
+		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsSrvc.Publisher(), accDB,
 		token.NewPersistence(n.walletDB))
 
 	const (
