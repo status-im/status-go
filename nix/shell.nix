@@ -21,14 +21,20 @@ in mkShell {
     go golangci-lint go-junit-report gopls codecov-cli
     protobuf3_24 protoc-gen-go gotestsum openjdk openssl
     rustc cargo
+    nim
+    lib-sds-pkg
   ];
 
-  shellHook = lib.optionalString (!isMacM1) ''
-    ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
-    ANDROID_NDK=$ANDROID_HOME/ndk-bundle
-    ANDROID_SDK_ROOT=$ANDROID_HOME
-    ANDROID_NDK_HOME=$ANDROID_NDK
-  '' + lib.optionalString (stdenv.isDarwin) ''
+  shellHook = ''
+    export USE_SYSTEM_NIM=1
+  ''
+  + lib.optionalString (!isMacM1) ''
+    export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
+    export ANDROID_NDK=\$ANDROID_HOME/ndk-bundle
+    export ANDROID_SDK_ROOT=\$ANDROID_HOME
+    export ANDROID_NDK_HOME=\$ANDROID_NDK
+  ''
+  + lib.optionalString (stdenv.isDarwin) ''
     export PATH="/usr/bin:$PATH"
   '';
   # Sandbox causes Xcode issues on MacOS. Requires sandbox=relaxed.
