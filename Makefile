@@ -110,7 +110,7 @@ endif
 
 # `nim-sds` variables
 
-# Option 1: Provide NIM_SDS_SOURCE_DIR
+# Option 1: Provide NIM_SDS_SOURCE_DIR. Make clones it if missing.
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
 
 # Option 2: Provide NIM_SDS_LIB_DIR and NIM_SDS_INC_DIR
