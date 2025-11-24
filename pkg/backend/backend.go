@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/pkg/backend/jsonrpc"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
+	"github.com/status-im/status-go/rpc"
 )
 
 const (
@@ -42,6 +43,7 @@ type StatusBackend struct {
 	services  *services
 
 	// FIXME: Extract to separate services
+	rpcClient          *rpc.Client
 	ipfs               *ipfs.Downloader
 	centralizedMetrics *centralizedmetrics.MetricService
 	prometheusMetrics  *metrics.Server
@@ -176,6 +178,9 @@ func (b *StatusBackend) Shutdown() error {
 	b.services.Stop()
 	b.services = nil
 
+	b.rpcClient.Stop()
+	b.rpcClient = nil
+
 	if b.ipfs != nil {
 		b.ipfs.Stop()
 	}
@@ -248,6 +253,18 @@ type ServicesConfig struct {
 // Other services should load their settings through its persistence interfaces.
 // NOTE: For now we always register and start all services, as we did before. (messenger and wallet started by client)
 func (b *StatusBackend) startServices() error {
+	// 0. Start prerequisites that are not yet extracted as services
+	rpcClient, err := rpc.NewClient(rpc.ClientConfig{
+		Networks:          n.config.Networks,
+		DB:                n.appDB,
+		AccountsPublisher: n.accountsSrvc.Publisher(),
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to create rpc client")
+	}
+	b.rpcClient = rpcClient
+	b.rpcClient.Start()
+
 	// 1. Spawn settings service
 
 	// 2. Read settings required to decide which allServices to start

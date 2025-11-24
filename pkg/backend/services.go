@@ -295,7 +295,7 @@ func (s *services) createWalletService() {
 	s.walletSrvc = wallet.NewService(
 		s.backend.activeAccount.walletDB,
 		s.backend.activeAccount.accountsDB,
-		s.rpcClient,
+		s.backend.rpcClient,
 		s.accountsSrvc.Publisher(),
 		s.backend.activeAccount.accsManager,
 		s.transactor,
@@ -333,7 +333,7 @@ func (s *services) createTimeSource() {
 }
 
 func (s *services) createWakuExtService() error {
-	s.wakuV2ExtSrvc = wakuext.New(*s.backend.activeAccount.nodeConfig, s.rpcClient, s.logger.Named("protocol"))
+	s.wakuV2ExtSrvc = wakuext.New(*s.backend.activeAccount.nodeConfig, s.backend.rpcClient, s.logger.Named("protocol"))
 	s.addService(s.wakuV2ExtSrvc)
 
 	if s.walletSrvc != nil {
@@ -354,7 +354,7 @@ func (s *services) createWakuExtService() error {
 		MultiAccountDB:         s.backend.multiaccountsDB,
 		Account:                activeAccount.account,
 		AccountsManager:        activeAccount.accsManager,
-		RPCClient:              s.statusNode.RPCClient(),
+		RPCClient:              s.backend.rpcClient,
 		WalletService:          s.walletSrvc,
 		CommunityTokensService: s.communityTokensSrvc,
 		AccountsPublisher:      s.accountsSrvc.Publisher(),
@@ -362,7 +362,7 @@ func (s *services) createWakuExtService() error {
 		MetricsEnabled:         s.prometheusMetrics != nil,
 		TokenManager:           adapters.NewCommunitiesTokenManager(s.statusNode.TokenManager()),
 		TokenBalanceManager:    adapters.NewCommunitiesTokenBalanceManager(s.statusNode.TokenBalancesFetcher(), s.statusNode.TokenBalancesStorage()),
-		NetworkManager:         adapters.NewCommunitiesNetworkManager(s.statusNode.RPCClient().GetNetworkManager()),
+		NetworkManager:         adapters.NewCommunitiesNetworkManager(s.backend.rpcClient.GetNetworkManager()),
 	}
 
 	err = s.wakuV2ExtSrvc.InitProtocol(params)
@@ -378,7 +378,7 @@ func (s *services) createEnsService() {
 
 	timeSourceCb := s.timeSourceSrvc.Now // TODO: Replace callback with proper interface
 	s.ensSrvc = ens.NewService(
-		s.rpcClient,
+		s.backend.rpcClient,
 		s.backend.activeAccount.appDB,
 		timeSourceCb,
 	)
@@ -391,7 +391,7 @@ func (s *services) createCommunityTokensService() {
 	s.requireWalletService()
 
 	s.communityTokensSrvc = communitytokens.NewService(
-		s.rpcClient,
+		s.backend.rpcClient,
 		s.backend.activeAccount.accsManager,
 		s.backend.activeAccount.appDB,
 		s.walletSrvc.EventsFeed(),
@@ -412,7 +412,7 @@ func (s *services) createStickersService() {
 	}
 	s.stickersSrvc = stickers.NewService(
 		s.backend.activeAccount.accountsDB,
-		s.rpcClient,
+		s.backend.rpcClient,
 		s.backend.activeAccount.accsManager,
 		s.backend.ipfs,
 		s.mediaService,
@@ -438,7 +438,7 @@ func (s *services) createPendingTrackerService() {
 	s.pendingTracker = pendingtxtracker.NewPendingTxTracker(
 		s.backend.activeAccount.walletDB,
 		pendingtxtracker.NewBatchTxStatusFetcher(
-			s.rpcClient,
+			s.backend.rpcClient,
 			s.logger.Named("PendingTxTracker"),
 		),
 		s.walletSrvc.EventsFeed(),
@@ -455,9 +455,9 @@ func (s *services) createConnectorService() {
 	s.connectorSrvc = connector.NewService(
 		logger,
 		s.backend.activeAccount.walletDB,
-		s.rpcClient,
-		fees.NewFeeManager(s.rpcClient, logger.Named("feeManager")),
-		s.rpcClient.GetNetworkManager(),
+		s.backend.rpcClient,
+		fees.NewFeeManager(s.backend.rpcClient, logger.Named("feeManager")),
+		s.backend.rpcClient.GetNetworkManager(),
 		&connector.Config{
 			WSHost: s.backend.activeAccount.nodeConfig.WSHost,
 			WSPort: s.backend.activeAccount.nodeConfig.WSPort,
@@ -472,7 +472,7 @@ func (s *services) createAppgeneralService() {
 }
 
 func (s *services) createEthService() {
-	s.ethSrvc = eth.NewService(s.rpcClient, s.backend.activeAccount.accsManager)
+	s.ethSrvc = eth.NewService(s.backend.rpcClient, s.backend.activeAccount.accsManager)
 	s.addService(s.ethSrvc)
 }
 
