@@ -6,30 +6,23 @@ import (
 
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )
 
 // NewService initializes service instance.
-func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, pendingTracker *pendingtxtracker.PendingTxTracker,
-	appDb *sql.DB, timeSource func() time.Time) *Service {
+func NewService(rpcClient *rpc.Client, appDb *sql.DB, timeSource func() time.Time) *Service {
 	service := &Service{
 		rpcClient,
-		accountsManager,
-		pendingTracker,
 		nil,
 		nil,
 	}
-	service.api = NewAPI(rpcClient, accountsManager, pendingTracker, appDb, timeSource, &service.syncUserDetailFunc)
+	service.api = NewAPI(rpcClient, appDb, timeSource, &service.syncUserDetailFunc)
 	return service
 }
 
 // Service is a browsers service.
 type Service struct {
 	rpcClient          *rpc.Client
-	accountsManager    *accsmanagement.AccountsManager
-	pendingTracker     *pendingtxtracker.PendingTxTracker
 	api                *API
 	syncUserDetailFunc syncUsernameDetail
 }

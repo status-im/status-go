@@ -398,7 +398,6 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 		return errors.New("Failed to migrate db file: " + err.Error())
 	}
 
-	appdatabase.CurrentAppDBKeyUID = account.KeyUID
 	b.appDB, err = appdatabase.InitializeDB(dbFilePath, password, account.KDFIterations)
 	if err != nil {
 		b.logger.Error("failed to initialize db", zap.Error(err))
@@ -1663,7 +1662,7 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 		return nil, err
 	}
 
-	nodeConfig, err := b.prepareConfig(request, keyU, ID, settings.InstallationID)
+	nodeConfig, err := b.prepareConfig(request, keyUID, settings.InstallationID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to prepare node config")
 	}

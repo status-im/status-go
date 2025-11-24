@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -26,7 +25,6 @@ type TransactionManager struct {
 	transactor     transactions.TransactorIface
 	config         *params.NodeConfig
 	accountsDB     accounts.AccountsStorage
-	pendingTracker *pendingtxtracker.PendingTxTracker
 	eventFeed      *event.Feed
 
 	// used in a new approach
@@ -37,14 +35,12 @@ func NewTransactionManager(
 	gethManager *accsmanagement.AccountsManager,
 	transactor transactions.TransactorIface,
 	accountsDB accounts.AccountsStorage,
-	pendingTxManager *pendingtxtracker.PendingTxTracker,
 	eventFeed *event.Feed,
 ) *TransactionManager {
 	return &TransactionManager{
 		gethManager:    gethManager,
 		transactor:     transactor,
 		accountsDB:     accountsDB,
-		pendingTracker: pendingTxManager,
 		eventFeed:      eventFeed,
 	}
 }

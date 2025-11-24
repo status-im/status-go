@@ -1,5 +1,9 @@
 package requests
 
+import (
+	"github.com/status-im/status-go/protocol/requests"
+)
+
 type ImageCropRectangle struct {
 	Ax int `json:"ax"`
 	Ay int `json:"ay"`
@@ -72,3 +76,46 @@ type KeycardData struct {
 	Eip1581Address      string `json:"eip1581Address"`
 	EncryptionPublicKey string `json:"encryptionPublicKey"`
 }
+
+func CreateAccountAdapter(input *CreateAccount, rootDataDir string) *requests.CreateAccount {
+	return &requests.CreateAccount{
+		RootDataDir:        rootDataDir,
+		Password:           input.Password,
+		KdfIterations:      input.KdfIterations,
+		KeycardInstanceUID: input.KeycardInstanceUID,
+		DeviceName:         input.DeviceName,
+		DisplayName:        input.DisplayName,
+		ImagePath:          input.ImagePath,
+		CustomizationColor: input.CustomizationColor,
+		WakuV2LightClient:  input.WakuV2LightClient,
+		PreviewPrivacy:     input.PreviewPrivacy,
+	}
+}
+
+//func CreateAccountAdapter(input *requests.CreateAccount) *CreateAccount {
+//	out := &CreateAccount{
+//		Password:                  input.Password,
+//		KdfIterations:             input.KdfIterations,
+//		KeycardInstanceUID:        input.KeycardInstanceUID,
+//		DeviceName:                input.DeviceName,
+//		DisplayName:               input.DisplayName,
+//		ImagePath:                 input.ImagePath,
+//		CustomizationColor:        input.CustomizationColor,
+//		WakuV2LightClient:         input.WakuV2LightClient,
+//		PreviewPrivacy:            input.PreviewPrivacy,
+//		KeycardPairingKey:         input.KeycardPairingKey,
+//		KeycardPairingDataFile:    input.KeycardPairingDataFile,
+//		ThirdpartyServicesEnabled: input.ThirdpartyServicesEnabled,
+//	}
+//
+//	if input.ImageCropRectangle != nil {
+//		out.ImageCropRectangle = &ImageCropRectangle{
+//			Ax: input.ImageCropRectangle.Ax,
+//			Ay: input.ImageCropRectangle.Ay,
+//			Bx: input.ImageCropRectangle.Bx,
+//			By: input.ImageCropRectangle.By,
+//		}
+//	}
+//
+//	return out
+//}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
@@ -17,13 +18,22 @@ import (
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/common/dbsetup"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	requests2 "github.com/status-im/status-go/pkg/backend/requests"
+	identityutils "github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/walletdatabase"
+)
+
+const (
+	walletAccountDefaultName = "Account 1"
 )
 
 type ActiveAccount struct {
@@ -141,13 +151,13 @@ func createAccount(dataDir string, logger *zap.Logger, request *requests2.Create
 	}
 
 	// 3. Get default settings
-	settings, err := prepareSettings(request, mnemonic, keyUID, masterAddress, derivedAddresses, restoreAccount)
+	settings, err := createSettings(request, mnemonic, keyUID, masterAddress, derivedAddresses)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to prepare settings")
 	}
 
 	// 4. Apply request to default settings
-	// NOTE: currently done as part of prepareSettings
+	// NOTE: currently done as part of createSettings
 
 	// 5. Build account
 	customizationColorClock := uint64(1)
@@ -199,8 +209,14 @@ func createAccount(dataDir string, logger *zap.Logger, request *requests2.Create
 		return nil, errors.Wrap(err, "failed to create wallet account")
 	}
 
+	// TEMP: write nodeConfig to database
+	nodeConfig, err := createNodeConfig(request, "", activeAccount.account.KeyUID, dataDir)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create node config")
+	}
+
 	// 10. Save values to DB
-	err = accdb.CreateSettings(*settings, params.NodeConfig{}) // FIXME: Remove deprecated NodeConfig argument
+	err = accdb.CreateSettings(*settings, *nodeConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create settings")
 	}
@@ -258,6 +274,14 @@ func login(dataDir string, logger *zap.Logger, account *multiaccounts.Account, p
 
 	// 3. Return logged in account
 	return activeAccount, nil
+}
+
+func restoreAccount(mnemonic string) error {
+	//settings := createSettings()
+	//settings.Mnemonic = ""
+	//settings.MnemonicWasNotShown = false
+
+	return errors.New("not implemented")
 }
 
 func generateDerivedAddresses(genAcc *generator.Account, paths []string) (genDerivedAccounts map[string]*generator.Account, genDerivedAccountsInfo map[string]generator.AccountInfo, err error) {
@@ -374,93 +398,162 @@ func openWalletDatabase(rootDataDir string, account *multiaccounts.Account, pass
 	//return nil
 }
 
-func createNodeConfig(request *requests2.CreateAccount, installationID string, keyUID string) (*params.NodeConfig, error) {
-	nodeConfig, err := api.DefaultNodeConfig(installationID, keyUID, request)
+func createSettings(request *requests2.CreateAccount, mnemonic string, keyUID string, masterAddress string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
+	newSettings, err := api.DefaultSettings(keyUID, masterAddress, derivedAddresses)
 	if err != nil {
 		return nil, err
 	}
 
-	return nodeConfig, nil
-}
+	newSettings.DeviceName = request.DeviceName
+	newSettings.DisplayName = request.DisplayName
+	newSettings.PreviewPrivacy = request.PreviewPrivacy
+	//newSettings.CurrentNetwork = request.CurrentNetwork
+	//newSettings.TestNetworksEnabled = request.TestNetworksEnabled
+	//newSettings.AutoRefreshTokensEnabled = request.AutoRefreshTokensEnabled
 
-func loginNodeConfig(rootDataDir string, request *requests2.Login) (*params.NodeConfig, error) {
-	defaultConfig := &params.NodeConfig{
-		// why we need this? relate PR: https://github.com/status-im/status-go/pull/4014
-		KeycardPairingDataFile: filepath.Join(rootDataDir, DefaultKeycardPairingDataFileRelativePath),
-	}
+	newSettings.Mnemonic = &mnemonic
+	newSettings.MnemonicWasNotShown = true
 
-	cfg.WalletConfig = api.BuildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
-
-	//err := b.UpdateNodeConfigFleet(acc, request.Password, cfg)
-	//if err != nil {
-	//	return nil, errors.Wrap(err, "failed to update node config fleet")
+	//if request.WakuV2Fleet != "" {
+	//	newSettings.Fleet = &request.WakuV2Fleet
 	//}
 
-	accountsSettings, err := a.GetSettings()
-	if err != nil {
-		return errors.Wrap(err, "failed to load account settings")
+	newSettings.ThirdpartyServicesEnabled = request.ThirdpartyServicesEnabled
+
+	return newSettings, nil
+}
+
+func buildAccount(request *requests2.CreateAccount, keyUID string, customizationColorClock uint64, chatKey string, hasAcceptedTerms bool) (*multiaccounts.Account, error) {
+	//err := s.OpenAccounts(request.ThirdpartyServicesEnabled)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	acc := &multiaccounts.Account{
+		KeyUID:                  keyUID,
+		Name:                    request.DisplayName,
+		CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
+		CustomizationColorClock: customizationColorClock,
+		KDFIterations:           request.KdfIterations,
+		Timestamp:               time.Now().Unix(),
 	}
 
-	fleet := accountsSettings.GetFleet()
+	if acc.KDFIterations == 0 {
+		acc.KDFIterations = dbsetup.ReducedKDFIterationsNumber
+	}
+
+	if request.ImagePath != "" {
+		imageCropRectangle := request.ImageCropRectangle
+		if imageCropRectangle == nil {
+			// Default crop rectangle used by mobile
+			imageCropRectangle = &requests2.ImageCropRectangle{
+				Ax: 0,
+				Ay: 0,
+				Bx: 1000,
+				By: 1000,
+			}
+		}
+
+		iis, err := images.GenerateIdentityImages(request.ImagePath,
+			imageCropRectangle.Ax, imageCropRectangle.Ay, imageCropRectangle.Bx, imageCropRectangle.By)
+
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate identity images")
+		}
+		acc.Images = iis
+	}
+
+	var err error
+	acc.ColorHash, err = colorhash.GenerateFor(chatKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate color hash")
+	}
+
+	acc.ColorID, err = identityutils.ToColorID(chatKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate color id")
+	}
+
+	return acc, nil
+}
+
+func createNodeConfig(request *requests2.CreateAccount, installationID string, keyUID string, rootDataDir string) (*params.NodeConfig, error) {
+	oldRequest := requests2.CreateAccountAdapter(request, rootDataDir)
+	return api.DefaultNodeConfig(installationID, keyUID, oldRequest)
+}
+
+func (a *ActiveAccount) loginNodeConfig(rootDataDir string, request *requests2.Login) (*params.NodeConfig, error) {
+	// NOTE: You might want to say that this function is very complex and should be refactored. And you'll be right.
+	//       This is a copy of code in GethStatusBackend.loginAccount. I left it as is not to break anything.
+	//       Some of the internal calls were decapsulated: loadNodeConfig, UpdateNodeConfigFleet.
+	//       The whole function should be removed altogether with NodeConfig itself.
+
+	defaultCfg := &params.NodeConfig{
+		// why we need this? relate PR: https://github.com/status-im/status-go/pull/4014
+		KeycardPairingDataFile: filepath.Join(rootDataDir, api.DefaultKeycardPairingDataFileRelativePath),
+	}
+
+	defaultCfg.WalletConfig = api.BuildWalletConfig(&request.RuntimeConfig.WalletConfig, &request.RuntimeConfig.WalletSecrets)
+
+	accountSettings, err := a.GetSettings()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load accountSettings")
+	}
+
+	fleet := accountSettings.GetFleet()
 
 	if !params.IsFleetSupported(fleet) {
 		fleet = api.DefaultFleet
 	}
 
-	err = api.SetFleet(fleet, cfg)
+	err = api.SetFleet(fleet, defaultCfg)
 	if err != nil {
-		return errors.Wrap(err, "failed to set fleet")
+		return nil, errors.Wrap(err, "failed to set fleet")
 	}
 
-	//err = b.loadNodeConfig(cfg)
-	//if err != nil {
-	//	return nil, errors.Wrap(err, "failed to load node config")
-	//}
-
-	peristedCfg, err := nodecfg.GetNodeConfigFromDB(a.appDB)
+	persistedNodeConfig, err := nodecfg.GetNodeConfigFromDB(a.appDB)
 	if err != nil {
-		return err
+		return nil, errors.Wrap(err, "failed to get persisted node config")
+	}
+	if persistedNodeConfig == nil {
+		return nil, errors.New("persisted node config is nil")
 	}
 
 	// If an installationID is provided, we override it
-	if peristedCfg.ShhextConfig.InstallationID != "" {
-		cfg.ShhextConfig.InstallationID = conf.ShhextConfig.InstallationID
+	if persistedNodeConfig.ShhextConfig.InstallationID != "" {
+		defaultCfg.ShhextConfig.InstallationID = persistedNodeConfig.ShhextConfig.InstallationID
 	}
 
-	//cfg, err = b.OverwriteNodeConfigValues(peristedCfg, cfg)
-	//if err != nil {
-	//	return err
-	//}
-
-	if err := mergo.Merge(conf, n, mergo.WithOverride); err != nil {
+	if err := mergo.Merge(persistedNodeConfig, defaultCfg, mergo.WithOverride); err != nil {
 		return nil, err
 	}
 
-	cfg.Networks = n.Networks
+	persistedNodeConfig.Networks = defaultCfg.Networks
 
-	cfg.RootDataDir = rootDataDir
-
-	if cfg.RuntimeLogLevel != "" {
-		cfg.LogLevel = cfg.RuntimeLogLevel
+	err = nodecfg.SaveNodeConfig(a.appDB, persistedNodeConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to save node config")
 	}
 
-	if request.RuntimeLogLevel != "" {
-		cfg.LogLevel = request.RuntimeLogLevel
+	persistedNodeConfig.RootDataDir = rootDataDir
+
+	out := persistedNodeConfig
+
+	if request.RuntimeOverrides.LogLevel != nil {
+		out.LogLevel = *request.RuntimeOverrides.LogLevel
+	}
+	if request.RuntimeOverrides.WakuV2Nameserver != nil {
+		out.WakuV2Config.Nameserver = *request.RuntimeOverrides.WakuV2Nameserver
+	}
+	if request.RuntimeOverrides.BandwidthStatsEnabled != nil {
+		out.ShhextConfig.BandwidthStatsEnabled = *request.RuntimeOverrides.BandwidthStatsEnabled
 	}
 
-	if cfg.WakuV2Config.Enabled && request.WakuV2Nameserver != "" {
-		cfg.WakuV2Config.Nameserver = request.WakuV2Nameserver
+	out.Networks = api.BuildDefaultNetworks(&request.RuntimeConfig.WalletSecrets, accountSettings.ThirdpartyServicesEnabled)
+
+	if request.RuntimeConfig.APIConfig != nil {
+		api.OverrideApiConfig(out, request.RuntimeConfig.APIConfig)
 	}
 
-	cfg.ShhextConfig.BandwidthStatsEnabled = request.BandwidthStatsEnabled
-
-	//b.overrideNetworks(b.config, request, accountSettings.ThirdpartyServicesEnabled)
-	cfg.Networks = api.BuildDefaultNetworks(&request.WalletSecretsConfig, accountsSettings.ThirdpartyServicesEnabled)
-
-	if request.APIConfig != nil {
-		api.OverrideApiConfig(cfg, request.APIConfig)
-	}
-
-	a.nodeConfig = cfg
-	return nil
+	return out, nil
 }

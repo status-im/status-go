@@ -159,15 +159,6 @@ func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address commo
 	return token, err
 }
 
-// @deprecated
-// Not used by status-desktop anymore
-func (api *API) GetPendingTransactions(ctx context.Context) ([]*pendingtxtracker.PendingTransaction, error) {
-	logutils.ZapLogger().Debug("wallet.api.GetPendingTransactions")
-	rst, err := api.s.pendingTxManager.GetAllPending()
-	logutils.ZapLogger().Debug("wallet.api.GetPendingTransactions RESULT", zap.Int("len", len(rst)))
-	return rst, err
-}
-
 func (api *API) GetCryptoOnRamps(ctx context.Context) ([]onramp.CryptoOnRamp, error) {
 	logutils.ZapLogger().Debug("call to GetCryptoOnRamps")
 	return api.s.cryptoOnRampManager.GetProviders(ctx)

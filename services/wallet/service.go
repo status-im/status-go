@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
-	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/services/wallet/transferdetector"
@@ -90,7 +89,6 @@ func NewService(
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
 	ensResolver *ensresolver.EnsResolver,
-	pendingTxManager *pendingtxtracker.PendingTxTracker,
 	mediaServer *media.Service,
 	tokenManager *token.Manager,
 	statusProxyStageName string,
@@ -105,7 +103,7 @@ func NewService(
 	featureFlags := &protocolCommon.FeatureFlags{}
 
 	savedAddressesManager := &SavedAddressesManager{db: db}
-	transactionManager := transfer.NewTransactionManager(gethManager, transactor, accountsDB, pendingTxManager, feed)
+	transactionManager := transfer.NewTransactionManager(gethManager, transactor, accountsDB, feed)
 	blockChainState := blockchainstate.NewBlockChainState(rpcClient)
 
 	thirdpartyServicesEnabled := ThirdpartyServicesEnabled(accountsDB)
@@ -273,7 +271,6 @@ func NewService(
 		communityManager:               communityManager,
 		savedAddressesManager:          savedAddressesManager,
 		transactionManager:             transactionManager,
-		pendingTxManager:               pendingTxManager,
 		multistandardBalanceController: multistandardBalanceController,
 		transferDetectorController:     transferDetectorController,
 		tokenBalancesFetcher:           tokenBalancesFetcher,
@@ -371,7 +368,6 @@ type Service struct {
 	communityManager               *community.Manager
 	savedAddressesManager          *SavedAddressesManager
 	transactionManager             *transfer.TransactionManager
-	pendingTxManager               *pendingtxtracker.PendingTxTracker
 	multistandardBalanceController *multistandardbalance.Controller
 	tokenBalancesFetcher           tokenbalances.FetcherIface
 	tokenBalancesStorage           tokenbalances.Storage

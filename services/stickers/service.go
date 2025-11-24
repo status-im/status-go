@@ -10,12 +10,11 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/media"
-	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )
 
 // NewService initializes service instance.
 func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager,
-	downloader *ipfs.Downloader, httpServer *media.Service, pendingTracker *pendingtxtracker.PendingTxTracker) *Service {
+	downloader *ipfs.Downloader, httpServer *media.Service) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Service{
@@ -26,7 +25,7 @@ func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *
 		httpServer:      httpServer,
 		ctx:             ctx,
 		cancel:          cancel,
-		api:             NewAPI(ctx, acc, rpcClient, accountsManager, pendingTracker, downloader, httpServer),
+		api:             NewAPI(ctx, acc, rpcClient, accountsManager, downloader, httpServer),
 	}
 }
 

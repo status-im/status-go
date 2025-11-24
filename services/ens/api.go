@@ -19,21 +19,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens/ensresolver"
-	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )
 
-func NewAPI(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, pendingTracker *pendingtxtracker.PendingTxTracker,
-	appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
+func NewAPI(rpcClient *rpc.Client, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
 	return &API{
 		ensResolver: ensresolver.NewEnsResolver(rpcClient),
 
-		accountsManager: accountsManager,
-		pendingTracker:  pendingTracker,
-		db:              NewEnsDatabase(appDb),
+		db: NewEnsDatabase(appDb),
 
 		timeSource:         timeSource,
 		syncUserDetailFunc: syncUserDetailFunc,
@@ -67,9 +62,7 @@ type URI struct {
 type syncUsernameDetail func(context.Context, *UsernameDetail) error
 
 type API struct {
-	ensResolver     *ensresolver.EnsResolver
-	accountsManager *accsmanagement.AccountsManager
-	pendingTracker  *pendingtxtracker.PendingTxTracker
+	ensResolver *ensresolver.EnsResolver
 
 	db                 *Database
 	syncUserDetailFunc *syncUsernameDetail

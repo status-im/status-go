@@ -1,7 +1,6 @@
 package node
 
 import (
-	"database/sql"
 	"errors"
 	"time"
 
@@ -12,11 +11,10 @@ import (
 	"github.com/status-im/status-go/pkg/featureflags"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/services/eth"
+	wakuext "github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/newsfeed"
 	"github.com/status-im/status-go/services/sharedurls"
-
-	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -36,7 +34,6 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/updates"
-	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/router/fees"
@@ -62,9 +59,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *media.
 	services = append(services, b.appgeneralService())
 	services = append(services, b.personalService())
 	services = append(services, b.statusPublicService())
-	services = append(services, b.pendingTrackerService(&b.walletFeed))
 	services = append(services, b.ensService(b.timeSourceNow()))
-	services = append(services, b.CommunityTokensService())
 	services = append(services, b.stickersService(accDB))
 	services = append(services, b.updatesService())
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accDB, mediaServer))
@@ -78,8 +73,12 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *media.
 	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
 	// Keep this initialization before the other two
 	if config.WalletConfig.Enabled {
-		walletService := b.walletService(accDB, b.appDB, b.AccountService().Publisher(), &b.walletFeed, config.WalletConfig.StatusProxyStageName)
+		walletService := b.walletService(accDB, b.AccountService().Publisher(), config.WalletConfig.StatusProxyStageName)
 		services = append(services, walletService)
+
+		// These services require wallet event feed
+		services = append(services, b.pendingTrackerService())
+		services = append(services, b.CommunityTokensService())
 	}
 
 	// CollectiblesManager needs the WakuExt service to get metadata for
@@ -138,9 +137,9 @@ func (b *StatusNode) registerService(s common.StatusService) error {
 	return nil
 }
 
-func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Service, error) {
+func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuext.Service, error) {
 	if b.wakuV2ExtSrvc == nil {
-		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.rpcClient, b.logger.Named("protocol"))
+		b.wakuV2ExtSrvc = wakuext.New(*config, b.rpcClient, b.logger.Named("protocol"))
 	}
 
 	return b.wakuV2ExtSrvc, nil
@@ -169,7 +168,7 @@ func (b *StatusNode) EnsService() *ens.Service {
 	return b.ensSrvc
 }
 
-func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
+func (b *StatusNode) WakuV2ExtService() *wakuext.Service {
 	return b.wakuV2ExtSrvc
 }
 
@@ -205,7 +204,6 @@ func (b *StatusNode) accountsService(accDB *accounts.Database, mediaServer *medi
 			accDB,
 			b.multiaccountsDB,
 			b.gethAccountsManager,
-			b.config,
 			mediaServer,
 			b.logger.Named("AccountsService"),
 		)
@@ -223,14 +221,19 @@ func (b *StatusNode) browsersService() *browsers.Service {
 
 func (b *StatusNode) ensService(timesource func() time.Time) *ens.Service {
 	if b.ensSrvc == nil {
-		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountsManager, b.pendingTracker, b.config, b.appDB, timesource)
+		b.ensSrvc = ens.NewService(b.rpcClient, b.appDB, timesource)
 	}
 	return b.ensSrvc
 }
 
-func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *pendingtxtracker.PendingTxTracker {
+func (b *StatusNode) pendingTrackerService() *pendingtxtracker.PendingTxTracker {
 	if b.pendingTracker == nil {
-		b.pendingTracker = pendingtxtracker.NewPendingTxTracker(b.walletDB, pendingtxtracker.NewBatchTxStatusFetcher(b.rpcClient, b.logger.Named("PendingTxTracker")), walletFeed, pendingtxtracker.PendingCheckInterval)
+		b.pendingTracker = pendingtxtracker.NewPendingTxTracker(
+			b.walletDB,
+			pendingtxtracker.NewBatchTxStatusFetcher(b.rpcClient, b.logger.Named("PendingTxTracker")),
+			b.walletSrvc.EventsFeed(),
+			pendingtxtracker.PendingCheckInterval,
+		)
 		if b.transactor != nil {
 			b.transactor.SetPendingTracker(b.pendingTracker)
 		}
@@ -240,14 +243,14 @@ func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *pendingtxtra
 
 func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
 	if b.communityTokensSrvc == nil {
-		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountsManager, b.config, b.appDB, &b.walletFeed, b.transactor)
+		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountsManager, b.appDB, b.walletSrvc.EventsFeed(), b.transactor)
 	}
 	return b.communityTokensSrvc
 }
 
 func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
 	if b.stickersSrvc == nil {
-		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountsManager, b.config, b.downloader, b.mediaServer, b.pendingTracker)
+		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountsManager, b.downloader, b.mediaServer)
 	}
 	return b.stickersSrvc
 }
@@ -298,13 +301,11 @@ func (b *StatusNode) SetWalletCommunityInfoProvider(provider thirdparty.Communit
 	}
 }
 
-func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB, accountsPublisher *pubsub.Publisher, walletFeed *event.Feed, statusProxyStageName string) *wallet.Service {
+func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsPublisher *pubsub.Publisher, statusProxyStageName string) *wallet.Service {
 	if b.walletSrvc == nil {
 		b.walletSrvc = wallet.NewService(
 			b.walletDB, accountsDB, b.rpcClient, accountsPublisher, b.gethAccountsManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()).API().EnsResolver(),
-			b.pendingTracker,
-			walletFeed,
 			b.mediaServer,
 			b.tokenManager,
 			statusProxyStageName,
@@ -347,10 +348,6 @@ func appendIf(condition bool, services []common.StatusService, service common.St
 		return services
 	}
 	return append(services, service)
-}
-
-func (b *StatusNode) PendingTracker() *pendingtxtracker.PendingTxTracker {
-	return b.pendingTracker
 }
 
 func (b *StatusNode) StopLocalNotifications() error {
