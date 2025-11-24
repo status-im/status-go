@@ -59,7 +59,7 @@ require (
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
-	github.com/wealdtech/go-ens/v3 v3.5.0
+	github.com/wealdtech/go-ens/v3 v3.6.0
 	github.com/wealdtech/go-multicodec v1.4.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 	github.com/zenthangplus/goccm v0.0.0-20211005163543-2f2e522aca15
@@ -137,8 +137,7 @@ require (
 	github.com/alexkohler/prealloc v1.0.0 // indirect
 	github.com/alingse/asasalint v0.0.11 // indirect
 	github.com/anacrolix/chansync v0.3.0 // indirect
-	github.com/anacrolix/confluence v1.9.0 // indirect
-	github.com/anacrolix/dht/v2 v2.15.2-0.20220123034220-0538803801cb // indirect
+	github.com/anacrolix/dht/v2 v2.16.0 // indirect
 	github.com/anacrolix/envpprof v1.1.1 // indirect
 	github.com/anacrolix/go-libutp v1.3.2 // indirect
 	github.com/anacrolix/log v0.13.1 // indirect
@@ -146,7 +145,7 @@ require (
 	github.com/anacrolix/missinggo/perf v1.0.0 // indirect
 	github.com/anacrolix/missinggo/v2 v2.5.2 // indirect
 	github.com/anacrolix/mmsg v1.0.1 // indirect
-	github.com/anacrolix/multiless v0.2.0 // indirect
+	github.com/anacrolix/multiless v0.2.1-0.20211218050420-533661eef5dc // indirect
 	github.com/anacrolix/stm v0.3.0 // indirect
 	github.com/anacrolix/sync v0.4.0 // indirect
 	github.com/anacrolix/upnp v0.1.3-0.20220123035249-922794e51c96 // indirect
