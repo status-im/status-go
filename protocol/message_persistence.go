@@ -1568,7 +1568,7 @@ func (db sqlitePersistence) backedUpMessageToUserMessageValues(message *protobuf
 		message.GetChatId(),           // local_chat_id (same as chat_id) // TODO this should be adapated if 1-1
 		messageType,                   // message_type
 		message.GetClock(),            // clock_value
-		false,                         // seen
+		true,                          // seen
 		"",                            // outgoing_status
 		jsonParsedText,                // parsed_text
 		sticker.GetPack(),             // sticker_pack
