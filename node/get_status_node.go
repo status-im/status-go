@@ -405,7 +405,7 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	if err != nil {
 		return
 	}
-	n.rpcClient.Start(context.Background())
+	n.rpcClient.Start()
 	return
 }
 

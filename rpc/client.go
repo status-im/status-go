@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -69,8 +70,10 @@ type Client struct {
 
 	networkManager *network.Manager
 
+	running atomic.Bool
+	quit    chan struct{}
+
 	healthMgr          *healthmanager.BlockchainHealthManager
-	stopMonitoringFunc context.CancelFunc
 	accountsPublisher  *pubsub.Publisher
 	signalsTransmitter *SignalsTransmitter
 
@@ -121,23 +124,21 @@ func NewClient(config ClientConfig) (*Client, error) {
 	return &c, nil
 }
 
-func (c *Client) Start(ctx context.Context) {
+func (c *Client) Start() {
 	if err := c.signalsTransmitter.Start(); err != nil {
 		c.logger.Error("Failed to start signals transmitter", zap.Error(err))
 	}
 	c.networkManager.Start()
 
-	if c.stopMonitoringFunc != nil {
+	if c.running.CompareAndSwap(false, true) {
 		c.logger.Warn("Blockchain health manager already started")
 		return
 	}
 
-	cancelableCtx, cancel := context.WithCancel(ctx)
-	c.stopMonitoringFunc = cancel
 	statusCh := c.healthMgr.Subscribe()
 	go func() {
 		defer appCommon.LogOnPanic()
-		c.monitorHealth(cancelableCtx, statusCh)
+		c.monitorHealth(statusCh)
 	}()
 }
 
@@ -152,14 +153,12 @@ func (c *Client) Stop() {
 	c.rpcClientsMutex.Unlock()
 
 	c.healthMgr.Stop()
-	if c.stopMonitoringFunc == nil {
-		return
-	}
-	c.stopMonitoringFunc()
-	c.stopMonitoringFunc = nil
+
+	close(c.quit)
+	c.running.Store(false)
 }
 
-func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
+func (c *Client) monitorHealth(statusCh chan struct{}) {
 	sendFullStatusEventFunc := func() {
 		publisher := c.GetNetworksPublisher()
 		if publisher == nil {
@@ -172,7 +171,7 @@ func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-c.quit:
 			return
 		case <-statusCh:
 			sendFullStatusEventFunc()
