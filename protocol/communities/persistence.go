@@ -29,7 +29,6 @@ type Persistence struct {
 
 var ErrOldRequestToJoin = errors.New("old request to join")
 var ErrOldRequestToLeave = errors.New("old request to leave")
-var ErrOldShardInfo = errors.New("old shard info")
 
 type CommunityRecord struct {
 	id           []byte
@@ -42,8 +41,6 @@ type CommunityRecord struct {
 	spectated    bool
 	muted        bool
 	mutedTill    time.Time
-	shardCluster *uint
-	shardIndex   *uint
 	lastOpenedAt int64
 }
 
@@ -81,12 +78,10 @@ const OR = " OR "
 const communitiesBaseQuery = `
 	SELECT
 		c.id, c.private_key, c.control_node, c.description, c.joined, c.joined_at, c.last_opened_at, c.spectated, c.verified, c.muted, c.muted_till,
-		csd.shard_cluster, csd.shard_index,
 		r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.state,
 		ae.raw_events, ae.raw_description,
 		ccn.installation_id
 	FROM communities_communities c
-	LEFT JOIN communities_shards csd ON c.id = csd.community_id
 	LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
 	LEFT JOIN communities_events ae ON c.id = ae.id
 	LEFT JOIN communities_control_node ccn ON c.id = ccn.community_id`
@@ -100,7 +95,6 @@ func scanCommunity(scanner func(dest ...any) error) (*CommunityRecordBundle, err
 	}
 
 	var mutedTill sql.NullTime
-	var cluster, index sql.NullInt64
 
 	var requestToJoinID []byte
 	var requestToJoinPublicKey, requestToJoinENSName, requestToJoinChatID sql.NullString
@@ -122,8 +116,6 @@ func scanCommunity(scanner func(dest ...any) error) (*CommunityRecordBundle, err
 		&r.community.verified,
 		&r.community.muted,
 		&mutedTill,
-		&cluster,
-		&index,
 
 		&requestToJoinID,
 		&requestToJoinPublicKey,
@@ -143,14 +135,6 @@ func scanCommunity(scanner func(dest ...any) error) (*CommunityRecordBundle, err
 
 	if mutedTill.Valid {
 		r.community.mutedTill = mutedTill.Time
-	}
-	if cluster.Valid {
-		clusterValue := uint(cluster.Int64)
-		r.community.shardCluster = &clusterValue
-	}
-	if index.Valid {
-		shardIndexValue := uint(index.Int64)
-		r.community.shardIndex = &shardIndexValue
 	}
 
 	if requestToJoinID != nil {
@@ -223,8 +207,7 @@ func (p *Persistence) SaveCommunityEvents(community *Community) error {
 
 func (p *Persistence) DeleteCommunity(id types.HexBytes) error {
 	_, err := p.db.Exec(`DELETE FROM communities_communities WHERE id = ?;
-						 DELETE FROM communities_events WHERE id = ?;
-						 DELETE FROM communities_shards WHERE community_id = ?`, id, id, id)
+						 DELETE FROM communities_events WHERE id = ?;`, id, id)
 	return err
 }
 
@@ -1767,66 +1750,6 @@ func (p *Persistence) AllNonApprovedCommunitiesRequestsToJoin() ([]*RequestToJoi
 		nonApprovedRequestsToJoin = append(nonApprovedRequestsToJoin, request)
 	}
 	return nonApprovedRequestsToJoin, nil
-}
-
-func (p *Persistence) SaveCommunityShard(communityID types.HexBytes, shard *messagingtypes.Shard, clock uint64) error {
-	var cluster, index *uint16
-
-	if shard != nil {
-		cluster = &shard.Cluster
-		index = &shard.Index
-	}
-
-	result, err := p.db.Exec(`
-		INSERT INTO communities_shards (community_id, shard_cluster, shard_index, clock)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT(community_id)
-		DO UPDATE SET
-			shard_cluster = CASE WHEN excluded.clock > communities_shards.clock THEN excluded.shard_cluster ELSE communities_shards.shard_cluster END,
-			shard_index = CASE WHEN excluded.clock > communities_shards.clock THEN excluded.shard_index ELSE communities_shards.shard_index END,
-			clock = CASE WHEN excluded.clock > communities_shards.clock THEN excluded.clock ELSE communities_shards.clock END
-		WHERE excluded.clock > communities_shards.clock OR communities_shards.community_id IS NULL`,
-		communityID, cluster, index, clock)
-
-	if err != nil {
-		return err
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
-		return ErrOldShardInfo
-	}
-	return nil
-}
-
-// if data will not be found, will return sql.ErrNoRows. Must be handled on the caller side
-func (p *Persistence) GetCommunityShard(communityID types.HexBytes) (*messagingtypes.Shard, error) {
-	var cluster sql.NullInt64
-	var index sql.NullInt64
-	err := p.db.QueryRow(`SELECT shard_cluster, shard_index FROM communities_shards WHERE community_id = ?`,
-		communityID).Scan(&cluster, &index)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if !cluster.Valid || !index.Valid {
-		return nil, nil
-	}
-
-	return &messagingtypes.Shard{
-		Cluster: uint16(cluster.Int64),
-		Index:   uint16(index.Int64),
-	}, nil
-}
-
-func (p *Persistence) DeleteCommunityShard(communityID types.HexBytes) error {
-	_, err := p.db.Exec(`DELETE FROM communities_shards WHERE community_id = ?`, communityID)
-	return err
 }
 
 func (p *Persistence) GetAppliedCommunityEvents(communityID types.HexBytes) (map[string]uint64, error) {

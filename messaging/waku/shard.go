@@ -2,8 +2,6 @@ package wakuv2
 
 import (
 	wakuproto "github.com/waku-org/go-waku/waku/v2/protocol"
-
-	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type Shard struct {
@@ -11,16 +9,6 @@ type Shard struct {
 	Index   uint16 `json:"index"`
 }
 
-func (s *Shard) Protobuffer() *protobuf.Shard {
-	if s == nil {
-		return nil
-	}
-
-	return &protobuf.Shard{
-		Cluster: int32(s.Cluster),
-		Index:   int32(s.Index),
-	}
-}
 func (s *Shard) PubsubTopic() string {
 	if s != nil {
 		return wakuproto.NewStaticShardingPubsubTopic(s.Cluster, s.Index).String()
@@ -46,13 +34,6 @@ func DefaultNonProtectedShard() *Shard {
 // TODO this is used only for community control messages, we need to stop using it once migration is done
 func DefaultNonProtectedPubsubTopic() string {
 	return DefaultNonProtectedShard().PubsubTopic()
-}
-
-func DefaultShard() *Shard {
-	return &Shard{
-		Cluster: MainStatusShardCluster,
-		Index:   DefaultShardIndex,
-	}
 }
 
 // GlobalCommunityControlShard returns the shard for the global community control messages

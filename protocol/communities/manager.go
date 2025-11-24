@@ -694,8 +694,7 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 			continue
 		}
 
-		// TODO: handle shards
-		response, err := m.HandleCommunityDescriptionMessage(signer, description, community.payload, ownerPK, nil)
+		response, err := m.HandleCommunityDescriptionMessage(signer, description, community.payload, ownerPK)
 		if err != nil {
 			m.logger.Error("failed to handle community", zap.Error(err))
 			err = m.persistence.DeleteCommunityToValidate(community.id, community.clock)
@@ -744,11 +743,6 @@ func (m *Manager) publish(subscription *Subscription) {
 
 func (m *Manager) All() ([]*Community, error) {
 	return m.persistence.AllCommunities(&m.identity.PublicKey)
-}
-
-type CommunityShard struct {
-	CommunityID string                `json:"communityID"`
-	Shard       *messagingtypes.Shard `json:"shard"`
 }
 
 type CuratedCommunities struct {
@@ -881,7 +875,6 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		JoinedAt:             time.Now().Unix(),
 		MemberIdentity:       m.identity,
 		CommunityDescription: description,
-		Shard:                nil,
 		LastOpenedAt:         0,
 	}
 
@@ -1554,55 +1547,6 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
-func (m *Manager) updateShard(community *Community, shard *messagingtypes.Shard, clock uint64) error {
-	community.config.Shard = shard
-	if shard == nil {
-		return m.persistence.DeleteCommunityShard(community.ID())
-	}
-
-	return m.persistence.SaveCommunityShard(community.ID(), shard, clock)
-}
-
-func (m *Manager) UpdateShard(community *Community, shard *messagingtypes.Shard, clock uint64) error {
-	m.communityLock.Lock(community.ID())
-	defer m.communityLock.Unlock(community.ID())
-
-	return m.updateShard(community, shard, clock)
-}
-
-// SetShard assigns a shard to a community
-func (m *Manager) SetShard(communityID types.HexBytes, shard *messagingtypes.Shard) (*Community, error) {
-	m.communityLock.Lock(communityID)
-	defer m.communityLock.Unlock(communityID)
-
-	community, err := m.GetByID(communityID)
-	if err != nil {
-		return nil, err
-	}
-
-	community.increaseClock()
-
-	err = m.updateShard(community, shard, community.Clock())
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.saveAndPublish(community)
-	if err != nil {
-		return nil, err
-	}
-
-	return community, nil
-}
-
-func (m *Manager) UpdatePubsubTopicPrivateKey(topic string, privKey *ecdsa.PrivateKey) error {
-	if privKey != nil {
-		return m.messaging.StorePubsubTopicKey(topic, privKey)
-	}
-
-	return m.messaging.RemovePubsubTopicKey(topic)
-}
-
 // Managing the version of community images is necessary because image URLs are "constant"
 // For eg: https://localhost:46739/communityDescriptionImages?communityID=[ID]&name=thumbnail
 // So the clients have no way of knowing that they need to reload the image
@@ -2136,7 +2080,7 @@ func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uin
 	return nil
 }
 
-func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, verifiedOwner *ecdsa.PublicKey, communityShard *protobuf.Shard) (*CommunityResponse, error) {
+func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, verifiedOwner *ecdsa.PublicKey) (*CommunityResponse, error) {
 	m.logger.Debug("HandleCommunityDescriptionMessage", zap.String("communityID", description.ID), zap.Uint64("clock", description.Clock))
 
 	if signer == nil {
@@ -2181,12 +2125,6 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		if err != nil {
 			return nil, err
 		}
-		var cShard *messagingtypes.Shard
-		if communityShard == nil {
-			cShard = &messagingtypes.Shard{Cluster: messagingtypes.MainStatusShardCluster, Index: messagingtypes.DefaultShardIndex}
-		} else {
-			cShard = messagingtypes.FromShardProtobuff(communityShard)
-		}
 		config := Config{
 			CommunityDescription:                processedDescription,
 			Logger:                              m.logger,
@@ -2194,7 +2132,6 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 			MemberIdentity:                      m.identity,
 			ID:                                  pubKey,
 			ControlNode:                         signer,
-			Shard:                               cShard,
 		}
 
 		var descriptionEncryptor DescriptionEncryptor
@@ -3523,7 +3460,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		if err != nil {
 			return nil, err
 		}
-		_, err = m.HandleCommunityDescriptionMessage(signer, description, request.CommunityDescriptionProtocolMessage, nil, nil)
+		_, err = m.HandleCommunityDescriptionMessage(signer, description, request.CommunityDescriptionProtocolMessage, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -3929,15 +3866,6 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 			}
 		}
 
-		if m.messaging != nil {
-			topic := community.PubsubTopic()
-			privKey, err := m.messaging.RetrievePubsubTopicKey(topic)
-			if err != nil {
-				return err
-			}
-			community.config.PubsubTopicPrivateKey = privKey
-		}
-
 		return nil
 	}
 
@@ -3989,24 +3917,6 @@ func (m *Manager) GetByIDStringReadonly(idString string) (ReadonlyCommunity, err
 	m.cache.Set(idString, ReadonlyCommunity(community), ttlcache.DefaultTTL)
 
 	return ReadonlyCommunity(community), err
-}
-
-func (m *Manager) GetCommunityShard(communityID types.HexBytes) (*messagingtypes.Shard, error) {
-	return m.persistence.GetCommunityShard(communityID)
-}
-
-func (m *Manager) SaveCommunityShard(communityID types.HexBytes, shard *messagingtypes.Shard, clock uint64) error {
-	m.communityLock.Lock(communityID)
-	defer m.communityLock.Unlock(communityID)
-
-	return m.persistence.SaveCommunityShard(communityID, shard, clock)
-}
-
-func (m *Manager) DeleteCommunityShard(communityID types.HexBytes) error {
-	m.communityLock.Lock(communityID)
-	defer m.communityLock.Unlock(communityID)
-
-	return m.persistence.DeleteCommunityShard(communityID)
 }
 
 func (m *Manager) SaveRequestToJoinRevealedAddresses(requestID types.HexBytes, revealedAccounts []*protobuf.RevealedAccount) error {

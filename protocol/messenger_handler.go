@@ -1612,19 +1612,6 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	}
 
 	if requestToJoinResponseProto.Accepted && community != nil && community.HasMember(&m.identity.PublicKey) {
-
-		communityShardKey := &protobuf.CommunityShardKey{
-			CommunityId: requestToJoinResponseProto.CommunityId,
-			PrivateKey:  requestToJoinResponseProto.ProtectedTopicPrivateKey,
-			Clock:       community.Clock(),
-			Shard:       requestToJoinResponseProto.Shard,
-		}
-
-		err = m.handleCommunityShardAndFiltersFromProto(community, communityShardKey)
-		if err != nil {
-			return err
-		}
-
 		// Note: we can't guarantee that REQUEST_TO_JOIN_RESPONSE msg will be delivered before
 		// COMMUNITY_DESCRIPTION msg, so this msg can return an ErrOrgAlreadyJoined if we
 		// have been joined during COMMUNITY_DESCRIPTION
@@ -2269,7 +2256,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			return err
 		}
 
-		err = m.handleCommunityDescription(state, signer, description, receivedMessage.GetCommunity(), nil, receivedMessage.GetShard())
+		err = m.handleCommunityDescription(state, signer, description, receivedMessage.GetCommunity(), nil)
 		if err != nil {
 			return err
 		}
@@ -3506,8 +3493,7 @@ func (m *Messenger) HandlePushNotificationRequest(state *ReceivedMessageState, m
 }
 
 func (m *Messenger) HandleCommunityDescription(state *ReceivedMessageState, message *protobuf.CommunityDescription, statusMessage *common.StatusMessage) error {
-	// shard passed as nil since it is handled within by using default shard
-	err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.EncryptionLayer.Payload, nil, nil)
+	err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.EncryptionLayer.Payload, nil)
 	if err != nil {
 		m.logger.Warn("failed to handle CommunityDescription", zap.Error(err))
 		return err

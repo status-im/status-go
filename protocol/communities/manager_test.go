@@ -1746,7 +1746,7 @@ func (s *ManagerSuite) TestCommunityQueue() {
 
 	subscription := m.Subscribe()
 
-	response, err := m.HandleCommunityDescriptionMessage(&notTheOwner.PublicKey, description, payload, nil, nil)
+	response, err := m.HandleCommunityDescriptionMessage(&notTheOwner.PublicKey, description, payload, nil)
 	s.Require().NoError(err)
 
 	// No response, as it should be queued
@@ -1838,7 +1838,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSigners() {
 
 	subscription := m.Subscribe()
 
-	response, err := m.HandleCommunityDescriptionMessage(&oldOwner.PublicKey, description, payload, nil, nil)
+	response, err := m.HandleCommunityDescriptionMessage(&oldOwner.PublicKey, description, payload, nil)
 	s.Require().NoError(err)
 
 	// No response, as it should be queued
@@ -1856,7 +1856,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSigners() {
 	payload, err = v1.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, newOwner)
 	s.Require().NoError(err)
 
-	response, err = m.HandleCommunityDescriptionMessage(&newOwner.PublicKey, description, payload, nil, nil)
+	response, err = m.HandleCommunityDescriptionMessage(&newOwner.PublicKey, description, payload, nil)
 	s.Require().NoError(err)
 
 	// No response, as it should be queued
@@ -1968,7 +1968,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSignersIgnoreIfNotRetu
 
 	subscription := m.Subscribe()
 
-	response, err := m.HandleCommunityDescriptionMessage(&oldOwner.PublicKey, description, payload, nil, nil)
+	response, err := m.HandleCommunityDescriptionMessage(&oldOwner.PublicKey, description, payload, nil)
 	s.Require().NoError(err)
 
 	// No response, as it should be queued
@@ -1984,7 +1984,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSignersIgnoreIfNotRetu
 	payload, err = v1.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, newOwner)
 	s.Require().NoError(err)
 
-	response, err = m.HandleCommunityDescriptionMessage(&newOwner.PublicKey, description, payload, nil, nil)
+	response, err = m.HandleCommunityDescriptionMessage(&newOwner.PublicKey, description, payload, nil)
 	s.Require().NoError(err)
 
 	// No response, as it should be queued

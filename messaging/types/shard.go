@@ -4,23 +4,11 @@ import (
 	wakuproto "github.com/waku-org/go-waku/waku/v2/protocol"
 
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
-	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type Shard struct {
 	Cluster uint16 `json:"cluster"`
 	Index   uint16 `json:"index"`
-}
-
-func (s *Shard) Protobuffer() *protobuf.Shard {
-	if s == nil {
-		return nil
-	}
-
-	return &protobuf.Shard{
-		Cluster: int32(s.Cluster),
-		Index:   int32(s.Index),
-	}
 }
 
 func (s *Shard) PubsubTopic() string {
@@ -34,17 +22,6 @@ func (s *Shard) PubsubTopic() string {
 	}
 
 	return wakuv2Shard.PubsubTopic()
-}
-
-func FromShardProtobuff(p *protobuf.Shard) *Shard {
-	if p == nil {
-		return nil
-	}
-
-	return &Shard{
-		Cluster: uint16(p.Cluster),
-		Index:   uint16(p.Index),
-	}
 }
 
 const MainStatusShardCluster = 16

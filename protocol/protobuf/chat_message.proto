@@ -5,7 +5,6 @@ package protobuf;
 
 import "enums.proto";
 import "contact.proto";
-import "shard.proto";
 
 message StickerMessage {
   string hash = 1;
@@ -235,7 +234,7 @@ message ChatMessage {
 
   repeated UnfurledLink unfurled_links = 16;
 
-  Shard shard = 17;
+  reserved 17;
 
   UnfurledStatusLinks unfurled_status_links = 18;
 
