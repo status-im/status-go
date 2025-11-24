@@ -305,7 +305,7 @@ func (s *services) createWalletService() {
 		&s.backend.walletFeed,
 		s.mediaService,
 		s.backend.tokenManager,
-		statusProxyStageName,
+		s.backend.activeAccount.nodeConfig.WalletConfig.StatusProxyStageName,
 	)
 	s.addService(s.walletSrvc)
 
