@@ -269,9 +269,9 @@ endif
 
 build-libsds: $(LIBSDS)
 
-#build-libsds-android: clone-nim-sds
-#	@echo "Building nim-sds for Android" $(LIBSDS)
-#	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
+build-libsds-android: clone-nim-sds
+	@echo "Building nim-sds for Android" $(LIBSDS)
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
 
 clean-libsds:
 	@echo "Removing libsds"
