@@ -1395,7 +1395,7 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 }
 
 func (db sqlitePersistence) AllMessagesForBackup() ([]*protobuf.BackedUpMessage, error) {
-	where := "WHERE NOT(m1.hide)"
+	where := "WHERE NOT(m1.hide) AND (discord_message_id IS NULL OR discord_message_id == '')"
 	fields := db.tableUserMessagesProtobufFields()
 	selectQuery := `SELECT    %s
 				FROM      user_messages m1
