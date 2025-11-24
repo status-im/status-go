@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/router/fees"
+	"github.com/status-im/status-go/services/wallet/tokenbalances"
 )
 
 type StatusBackendService interface {
@@ -337,14 +338,19 @@ func (s *services) createWakuExtService() error {
 	s.wakuV2ExtSrvc = wakuext.New(*s.backend.activeAccount.nodeConfig, s.backend.rpcClient, s.logger.Named("protocol"))
 	s.addService(s.wakuV2ExtSrvc)
 
-	if s.walletSrvc != nil {
-		s.walletSrvc.SetWalletCommunityInfoProvider(s.wakuV2ExtSrvc)
-	}
-
 	activeAccount := s.backend.activeAccount
 	chatAccount, err := activeAccount.accsManager.SelectedChatAccount()
 	if err != nil {
 		return errors.Wrap(err, "failed to get selected chat account")
+	}
+
+	var tokenBalancesFetcher *tokenbalances.Fetcher
+	var tokenBalancesStorage tokenbalances.Storage
+
+	if s.walletSrvc != nil {
+		s.walletSrvc.SetWalletCommunityInfoProvider(s.wakuV2ExtSrvc)
+		tokenBalancesFetcher = s.walletSrvc.GetTokenBalancesFetcher().(*tokenbalances.Fetcher)
+		tokenBalancesStorage = s.walletSrvc.GetTokenBalancesStorage()
 	}
 
 	params := wakuext.InitProtocolParams{
@@ -362,7 +368,7 @@ func (s *services) createWakuExtService() error {
 		TimeSource:             s.timeSourceSrvc,
 		MetricsEnabled:         s.backend.prometheusMetrics != nil,
 		TokenManager:           adapters.NewCommunitiesTokenManager(s.backend.tokenManager),
-		TokenBalanceManager:    adapters.NewCommunitiesTokenBalanceManager(s.statusNode.TokenBalancesFetcher(), s.statusNode.TokenBalancesStorage()),
+		TokenBalanceManager:    adapters.NewCommunitiesTokenBalanceManager(tokenBalancesFetcher, tokenBalancesStorage),
 		NetworkManager:         adapters.NewCommunitiesNetworkManager(s.backend.rpcClient.GetNetworkManager()),
 	}
 
