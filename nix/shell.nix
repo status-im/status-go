@@ -26,7 +26,6 @@ in mkShell {
   ];
 
   shellHook = ''
-    export NIM_SDS_SOURCE_DIR="$(pwd)/../nim-sds/"
     export USE_SYSTEM_NIM=1
   ''
   + lib.optionalString (!isMacM1) ''
