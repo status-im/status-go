@@ -63,7 +63,7 @@ func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, account get
 	parameters.ToBlock = &toBlock
 
 	if lastFetchedBlock == nil {
-		fromBlock := gethrpc.EarliestBlockNumber
+		fromBlock := gethrpc.BlockNumber(0)
 		parameters.FromBlock = &fromBlock
 	} else if uint64(lastFetchedBlock.Int64()) >= currentBlock {
 		// Nothing to fetch
